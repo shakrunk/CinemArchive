@@ -14,38 +14,38 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-void/80 backdrop-blur-md projector-beam">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-        {/* Brand */}
+        {/* Brand — always visible */}
         <div className="flex items-center gap-2 shrink-0">
           <Film className="w-5 h-5 text-amber" />
-          <span className="font-serif text-lg font-light text-gold hidden sm:block">
+          <span className="font-serif text-lg font-light text-gold">
             CinemArchive
           </span>
         </div>
 
-        {/* Nav */}
-        <nav className="flex items-center gap-1">
-          <button
-            onClick={() => onViewChange('library')}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm font-sans transition-colors',
-              currentView === 'library'
-                ? 'text-amber bg-amber/10'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-            )}
-          >
-            Library
-          </button>
-          <button
-            onClick={() => onViewChange('ledger')}
-            className={cn(
-              'px-3 py-1.5 rounded-md text-sm font-sans transition-colors',
-              currentView === 'ledger'
-                ? 'text-amber bg-amber/10'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-            )}
-          >
-            Ledger
-          </button>
+        {/* Nav — animated amber underline on active tab */}
+        <nav className="flex items-stretch self-stretch">
+          {(['library', 'ledger'] as const).map((view) => (
+            <button
+              key={view}
+              onClick={() => onViewChange(view)}
+              className={cn(
+                'px-3 text-sm font-sans transition-colors relative capitalize',
+                currentView === view
+                  ? 'text-amber'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {view === 'library' ? 'Library' : 'Ledger'}
+              <span
+                className={cn(
+                  'absolute bottom-0 left-2 right-2 h-px rounded-full bg-amber transition-all duration-300 origin-center',
+                  currentView === view
+                    ? 'scale-x-100 opacity-100'
+                    : 'scale-x-0 opacity-0'
+                )}
+              />
+            </button>
+          ))}
         </nav>
 
         {/* Actions */}

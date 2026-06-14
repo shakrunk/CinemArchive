@@ -1,6 +1,4 @@
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   Tooltip,
@@ -11,6 +9,7 @@ import {
   PieChart,
   Pie,
 } from 'recharts'
+import { Film, Tv, Eye, Star, Clock, CalendarDays } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { StatNumber, StatLabel, SectionHeading } from 'src/components/ui/typography'
 import { cn } from 'src/lib/utils'
@@ -31,6 +30,7 @@ const tooltipStyle = {
   color: '#e9b266',
 }
 
+// ChartCard: serif title with amber left accent bar
 function ChartCard({
   title,
   children,
@@ -42,9 +42,12 @@ function ChartCard({
 }) {
   return (
     <div className={cn('card-cinematic p-4 md:p-6', className)}>
-      <h3 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-4">
-        {title}
-      </h3>
+      <div className="flex items-center gap-2.5 mb-5">
+        <div className="chart-accent-line" />
+        <h3 className="font-serif text-base font-light text-foreground/80">
+          {title}
+        </h3>
+      </div>
       {children}
     </div>
   )
@@ -58,18 +61,21 @@ function SummaryRow() {
   const days = (stats.totalMinutes / 60 / 24).toFixed(1)
 
   const items = [
-    { value: stats.totalMovies, label: 'Films' },
-    { value: stats.totalSeries, label: 'Series' },
-    { value: stats.totalViewings, label: 'Viewings' },
-    { value: stats.avgRating.toFixed(1), label: 'Avg Rating' },
-    { value: `${hours}h`, label: 'Screen Time' },
-    { value: `${days}d`, label: 'Total Days' },
+    { value: stats.totalMovies, label: 'Films', Icon: Film },
+    { value: stats.totalSeries, label: 'Series', Icon: Tv },
+    { value: stats.totalViewings, label: 'Viewings', Icon: Eye },
+    { value: stats.avgRating.toFixed(1), label: 'Avg Rating', Icon: Star },
+    { value: `${hours}h`, label: 'Screen Time', Icon: Clock },
+    { value: `${days}d`, label: 'Total Days', Icon: CalendarDays },
   ]
 
   return (
     <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
       {items.map((item) => (
         <div key={item.label} className="card-cinematic p-4 text-center">
+          <div className="flex justify-center mb-2">
+            <item.Icon className="w-4 h-4 text-amber/50" />
+          </div>
           <StatNumber className="block text-2xl md:text-3xl">{item.value}</StatNumber>
           <div className="mt-1">
             <StatLabel>{item.label}</StatLabel>
@@ -80,42 +86,47 @@ function SummaryRow() {
   )
 }
 
-// ─── Rating Distribution ("Critical Record") ─────────────────────────────────
+// ─── Rating Distribution — custom star bars replacing BarChart ────────────────
+
+function renderStarLabel(rating: number): string {
+  const full = Math.floor(rating)
+  const half = rating % 1 >= 0.5
+  return '★'.repeat(full) + (half ? '½' : '')
+}
 
 function RatingDistribution() {
   const dist = useAppStore((s) => s.stats.ratingDistribution)
-
-  const data = dist
-    .filter((d) => d.count > 0)
-    .map((d) => ({ name: `★${d.rating}`, count: d.count }))
+  const data = dist.filter((d) => d.count > 0).sort((a, b) => b.rating - a.rating)
+  const maxCount = Math.max(...data.map((d) => d.count), 1)
 
   return (
-    <ChartCard title="Critical Record — Rating Distribution">
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-          <XAxis
-            dataKey="name"
-            tick={{ fontFamily: '"DM Mono", monospace', fontSize: 11, fill: MUTED_FG }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontFamily: '"DM Mono", monospace', fontSize: 11, fill: MUTED_FG }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(233,178,102,0.05)' }} />
-          <Bar dataKey="count" radius={[3, 3, 0, 0]}>
-            {data.map((_, i) => (
-              <Cell
-                key={i}
-                fill={i === data.length - 1 ? AMBER : AMBER_MUTED}
-                opacity={0.4 + (i / data.length) * 0.6}
+    <ChartCard title="The Record — Rating Distribution">
+      <div className="space-y-3">
+        {data.map((d, i) => (
+          <div key={d.rating} className="flex items-center gap-3">
+            <div className="font-mono text-sm text-amber shrink-0 w-14 text-right leading-none select-none">
+              {renderStarLabel(d.rating)}
+            </div>
+            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${(d.count / maxCount) * 100}%`,
+                  background: i === 0
+                    ? `linear-gradient(90deg, ${AMBER_MUTED}, ${AMBER})`
+                    : `linear-gradient(90deg, ${AMBER_MUTED}80, ${AMBER}80)`,
+                }}
               />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+            </div>
+            <span className="font-mono text-xs text-muted-foreground w-4 text-right shrink-0">
+              {d.count}
+            </span>
+          </div>
+        ))}
+        {data.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground font-sans py-8">No ratings yet</p>
+        )}
+      </div>
     </ChartCard>
   )
 }
@@ -164,34 +175,41 @@ function ScreeningsTimeline() {
   )
 }
 
-// ─── Genre Marquee ────────────────────────────────────────────────────────────
+// ─── Genre Marquee — with percentage labels + highlighted #1 ──────────────────
 
 function GenreMarquee() {
   const genres = useAppStore((s) => s.stats.topGenres)
 
   return (
     <ChartCard title="Genre Marquee — Top Categories">
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {genres.map((g, i) => {
           const maxCount = genres[0]?.count ?? 1
-          const pct = (g.count / maxCount) * 100
+          const pct = Math.round((g.count / maxCount) * 100)
 
           return (
             <div key={g.genre} className="flex items-center gap-3">
-              <span className="font-mono text-xs text-muted-foreground w-4 text-right shrink-0">
+              <span className={cn(
+                'font-serif text-sm shrink-0 w-5 text-right',
+                i === 0 ? 'text-amber' : 'text-muted-foreground/30'
+              )}>
                 {i + 1}
               </span>
               <span className="font-sans text-sm text-foreground w-28 shrink-0 truncate">{g.genre}</span>
-              <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${pct}%`,
-                    background: `linear-gradient(90deg, ${AMBER_MUTED}, ${AMBER})`,
+                    background: i === 0
+                      ? `linear-gradient(90deg, ${AMBER_MUTED}, ${AMBER})`
+                      : `linear-gradient(90deg, ${MUTED_FG}50, ${MUTED_FG}90)`,
                   }}
                 />
               </div>
-              <span className="font-mono text-xs text-muted-foreground w-4 shrink-0">{g.count}</span>
+              <span className="font-mono text-xs text-muted-foreground w-8 text-right shrink-0">
+                {pct}%
+              </span>
             </div>
           )
         })}
@@ -200,7 +218,7 @@ function GenreMarquee() {
   )
 }
 
-// ─── The Auteurs ──────────────────────────────────────────────────────────────
+// ─── The Auteurs — card-style ranking with serif numbers ──────────────────────
 
 function TheAuteurs() {
   const directors = useAppStore((s) => s.stats.topDirectors)
@@ -208,25 +226,38 @@ function TheAuteurs() {
   if (directors.length === 0) return null
 
   return (
-    <ChartCard title="The Auteurs — Top Directors">
-      <div className="space-y-3">
+    <ChartCard title="The Auteurs — Directors">
+      <div className="space-y-2">
         {directors.map((d, i) => (
-          <div key={d.director} className="flex items-center gap-4">
-            <span
-              className="font-serif text-2xl font-light shrink-0"
-              style={{ color: i === 0 ? AMBER : MUTED_FG }}
-            >
+          <div
+            key={d.director}
+            className={cn(
+              'flex items-center gap-3 p-3 rounded-lg border transition-colors',
+              i === 0
+                ? 'bg-amber/5 border-amber/15'
+                : 'bg-secondary/20 border-border/40 hover:border-border/70'
+            )}
+          >
+            <span className={cn(
+              'font-serif text-2xl font-light w-7 text-center shrink-0 leading-none',
+              i === 0 ? 'text-amber' : 'text-muted-foreground/25'
+            )}>
               {i + 1}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="font-sans text-sm text-foreground truncate">{d.director}</p>
+              <p className={cn(
+                'font-serif text-sm',
+                i === 0 ? 'text-foreground' : 'text-foreground/70'
+              )}>
+                {d.director}
+              </p>
               <p className="font-mono text-xs text-muted-foreground">
                 {d.count} film{d.count !== 1 ? 's' : ''}
               </p>
             </div>
-            {i === 0 && (
-              <span className="text-amber text-lg shrink-0">★</span>
-            )}
+            <div className="shrink-0 font-mono text-xs text-amber/40 select-none">
+              {'★'.repeat(Math.min(d.count, 5))}
+            </div>
           </div>
         ))}
       </div>
@@ -239,7 +270,8 @@ function TheAuteurs() {
 function TimeInTheDark() {
   const stats = useAppStore((s) => s.stats)
   const hours = Math.round(stats.totalMinutes / 60)
-  const movieShare = Math.round((stats.totalMovies / (stats.totalMovies + stats.totalSeries)) * 100)
+  const total = stats.totalMovies + stats.totalSeries
+  const movieShare = total > 0 ? Math.round((stats.totalMovies / total) * 100) : 0
   const tvShare = 100 - movieShare
 
   const pieData = [

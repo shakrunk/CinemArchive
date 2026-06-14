@@ -75,7 +75,6 @@ function useDebouncedSearch(delay = 400) {
     }
     setLoading(true)
     timerRef.current = setTimeout(() => {
-      // Phase 3: replace with real API call
       const q = query.toLowerCase()
       const filtered = MOCK_RESULTS.filter(
         (r) => r.title.toLowerCase().includes(q) || r.director?.toLowerCase().includes(q)
@@ -152,6 +151,52 @@ function SeasonEditor({ seasons, onChange }: SeasonEditorProps) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ─── Step Progress Indicator ──────────────────────────────────────────────────
+
+function StepIndicator({ step }: { step: 'search' | 'log' }) {
+  return (
+    <div className="flex items-center gap-2 mb-6">
+      {/* Step 1 */}
+      <div className={cn(
+        'flex items-center gap-1.5 transition-colors',
+        step === 'search' ? 'text-amber' : 'text-muted-foreground'
+      )}>
+        <div className={cn(
+          'w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono border transition-all',
+          step === 'search'
+            ? 'bg-amber text-void border-amber'
+            : 'bg-amber/15 border-amber/40 text-amber'
+        )}>
+          {step === 'log' ? <Check className="w-3 h-3" /> : '1'}
+        </div>
+        <span className="text-xs font-mono">Search</span>
+      </div>
+
+      {/* Connector */}
+      <div className={cn(
+        'flex-1 h-px transition-colors',
+        step === 'log' ? 'bg-amber/30' : 'bg-border'
+      )} />
+
+      {/* Step 2 */}
+      <div className={cn(
+        'flex items-center gap-1.5 transition-colors',
+        step === 'log' ? 'text-amber' : 'text-muted-foreground/40'
+      )}>
+        <div className={cn(
+          'w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono border transition-all',
+          step === 'log'
+            ? 'bg-amber text-void border-amber'
+            : 'border-border text-muted-foreground'
+        )}>
+          2
+        </div>
+        <span className="text-xs font-mono">Log</span>
+      </div>
     </div>
   )
 }
@@ -238,7 +283,6 @@ export function AddTitleWorkflow() {
         : [],
     }
 
-    // Optimistic update
     addTitle(newTitle)
     handleClose()
   }
@@ -257,9 +301,12 @@ export function AddTitleWorkflow() {
     <BottomSheet
       open={isAddTitleOpen}
       onClose={handleClose}
-      title={step === 'search' ? 'Add to Library' : selected?.title ?? 'Log'}
+      title="Add to Library"
       side="right"
     >
+      {/* Visual step progress indicator */}
+      <StepIndicator step={step} />
+
       {/* Step 1: Search */}
       {step === 'search' && (
         <div className="space-y-4">
@@ -326,7 +373,9 @@ export function AddTitleWorkflow() {
 
           {!query && (
             <div className="text-center py-12 text-muted-foreground">
-              <div className="text-4xl mb-3">🔍</div>
+              <div className="w-12 h-12 rounded-full bg-secondary/40 flex items-center justify-center mx-auto mb-3">
+                <Search className="w-6 h-6 text-muted-foreground/40" />
+              </div>
               <p className="font-serif text-base">Search for a title</p>
               <p className="font-sans text-xs mt-1 opacity-60">
                 Movies, TV series, directors

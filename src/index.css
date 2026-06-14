@@ -137,7 +137,8 @@
     box-shadow:
       0 1px 3px rgba(0,0,0,0.5),
       0 4px 16px rgba(0,0,0,0.4),
-      inset 0 1px 0 rgba(233,178,102,0.06);
+      inset 0 1px 0 rgba(233,178,102,0.08);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
   }
 
   /* Poster aspect ratio container */
@@ -150,6 +151,12 @@
   .star-rating {
     @apply flex gap-0.5 items-center font-mono text-sm;
     color: #e9b266;
+  }
+
+  /* Chart accent line used in ChartCard headers */
+  .chart-accent-line {
+    @apply w-0.5 h-5 rounded-full shrink-0;
+    background: linear-gradient(to bottom, #e9b266, #c8924a44);
   }
 }
 
@@ -167,5 +174,22 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: #e9b266;
     border-radius: 2px;
+  }
+
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Amber glow shadow for emphasized interactive elements */
+  .amber-glow {
+    box-shadow:
+      0 0 16px rgba(233, 178, 102, 0.4),
+      0 0 40px rgba(233, 178, 102, 0.15),
+      0 4px 12px rgba(0, 0, 0, 0.5);
   }
 }

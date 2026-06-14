@@ -117,41 +117,57 @@ export function TitleDetailDrawer() {
 
   return (
     <BottomSheet open={isDetailDrawerOpen} onClose={closeDetailDrawer} side="right">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex gap-4">
-          <div className="w-28 shrink-0">
-            <DynamicPoster title={title} />
-          </div>
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex items-center gap-2">
-              {title.type === 'movie' ? (
-                <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              ) : (
-                <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              )}
-              <span className="font-mono text-xs text-muted-foreground uppercase">
-                {title.type}
-              </span>
+      <div className="space-y-5">
+        {/* Hero header with blurred poster background */}
+        <div className="relative rounded-xl overflow-hidden -mx-6 -mt-6 mb-1">
+          {title.posterUrl && (
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url(${title.posterUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center top',
+                filter: 'blur(20px)',
+                transform: 'scale(1.3)',
+                opacity: 0.14,
+              }}
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-secondary/30 via-card/70 to-card" />
+          <div className="relative z-10 flex gap-4 px-6 pt-8 pb-5">
+            <div className="w-28 shrink-0">
+              <DynamicPoster title={title} />
             </div>
-            <CardTitle className="text-lg leading-tight">{title.title}</CardTitle>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-sm text-amber">{title.year}</span>
-              {title.director && (
-                <span className="text-xs text-muted-foreground font-sans">
-                  dir. {title.director}
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-2">
+                {title.type === 'movie' ? (
+                  <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                ) : (
+                  <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                )}
+                <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+                  {title.type}
                 </span>
-              )}
-              {title.runtime && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span className="font-mono">{title.runtime}m</span>
-                </div>
+              </div>
+              <CardTitle className="text-lg leading-tight">{title.title}</CardTitle>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-mono text-sm text-amber">{title.year}</span>
+                {title.director && (
+                  <span className="text-xs text-muted-foreground font-sans">
+                    dir. {title.director}
+                  </span>
+                )}
+                {title.runtime && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    <span className="font-mono">{title.runtime}m</span>
+                  </div>
+                )}
+              </div>
+              {title.rating && (
+                <StarRating value={title.rating} readonly size="sm" />
               )}
             </div>
-            {title.rating && (
-              <StarRating value={title.rating} readonly size="sm" />
-            )}
           </div>
         </div>
 
@@ -207,7 +223,7 @@ export function TitleDetailDrawer() {
               <StatNumber className="text-xl">
                 {title.viewings[0]
                   ? new Date(
-                      title.viewings.sort(
+                      title.viewings.slice().sort(
                         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
                       )[0].date
                     ).getFullYear()

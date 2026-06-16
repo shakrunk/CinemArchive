@@ -43,7 +43,7 @@ export async function signInWithEmail(email: string) {
   const { data, error } = await getClient().auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: window.location.origin,
+      emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
     },
   })
   if (error) throw error

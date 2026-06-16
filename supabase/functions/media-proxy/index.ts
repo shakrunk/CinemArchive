@@ -21,8 +21,8 @@ interface CorsHeaders {
 
 const corsHeaders: CorsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS, POST',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 async function getCached(key: string): Promise<unknown | null> {

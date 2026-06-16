@@ -211,3 +211,19 @@ create policy "shared_keys: owner full access"
   on shared_access_keys for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================
+-- API CACHE (used by media-proxy Edge Function)
+-- ============================================================
+
+create table if not exists api_cache (
+  cache_key   text primary key,
+  response    jsonb not null,
+  expires_at  timestamptz not null
+);
+
+alter table api_cache enable row level security;
+
+create index if not exists api_cache_expires_at_idx on api_cache(expires_at);
+
+

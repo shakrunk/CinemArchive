@@ -8,6 +8,7 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { Title, MediaType, WatchStatus, Season } from 'src/store/mockData'
+import { supabase, isSupabaseConfigured } from 'src/lib/auth'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,9 @@ interface SearchResult {
   runtime?: number
   network?: string
   seasonCount?: number
+  imdbRating?: number
+  rtScore?: number
+  metacriticScore?: number
 }
 
 // ─── Mock search (will be replaced in Phase 3 with real Edge Function) ────────
@@ -74,13 +78,59 @@ function useDebouncedSearch(delay = 400) {
       return
     }
     setLoading(true)
-    timerRef.current = setTimeout(() => {
-      const q = query.toLowerCase()
-      const filtered = MOCK_RESULTS.filter(
-        (r) => r.title.toLowerCase().includes(q) || r.director?.toLowerCase().includes(q)
-      )
-      setResults(filtered)
-      setLoading(false)
+    timerRef.current = setTimeout(async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const [movieRes, tvRes] = await Promise.all([
+            supabase.functions.invoke(`media-proxy?action=search&q=${encodeURIComponent(query)}&type=movie`),
+            supabase.functions.invoke(`media-proxy?action=search&q=${encodeURIComponent(query)}&type=tv`)
+          ])
+
+          if (movieRes.error) throw movieRes.error
+          if (tvRes.error) throw tvRes.error
+
+          const moviesList = (movieRes.data?.results || []).map((item: any) => ({
+            tmdbId: item.id,
+            type: 'movie' as const,
+            title: item.title,
+            year: item.release_date ? new Date(item.release_date).getFullYear() : 0,
+            posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
+            synopsis: item.overview,
+            genres: [],
+          }))
+
+          const tvList = (tvRes.data?.results || []).map((item: any) => ({
+            tmdbId: item.id,
+            type: 'tv' as const,
+            title: item.name,
+            year: item.first_air_date ? new Date(item.first_air_date).getFullYear() : 0,
+            posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
+            synopsis: item.overview,
+            genres: [],
+          }))
+
+          const combined: SearchResult[] = []
+          const maxLength = Math.max(moviesList.length, tvList.length)
+          for (let i = 0; i < maxLength; i++) {
+            if (i < moviesList.length) combined.push(moviesList[i])
+            if (i < tvList.length) combined.push(tvList[i])
+          }
+
+          setResults(combined.slice(0, 15))
+        } catch (err) {
+          console.error('Error during media search:', err)
+          setResults([])
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        const q = query.toLowerCase()
+        const filtered = MOCK_RESULTS.filter(
+          (r) => r.title.toLowerCase().includes(q) || r.director?.toLowerCase().includes(q)
+        )
+        setResults(filtered)
+        setLoading(false)
+      }
     }, delay)
   }, [delay])
 
@@ -236,6 +286,7 @@ export function AddTitleWorkflow() {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<SearchResult | null>(null)
   const [log, setLog] = useState<LogFormState>(DEFAULT_LOG)
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const { results, loading, search } = useDebouncedSearch()
 
   function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -243,18 +294,92 @@ export function AddTitleWorkflow() {
     search(e.target.value)
   }
 
-  function selectResult(result: SearchResult) {
-    setSelected(result)
-    const seasons: Season[] = result.type === 'tv' && result.seasonCount
-      ? Array.from({ length: result.seasonCount }, (_, i) => ({
-          id: `new-s${i + 1}`,
-          seasonNumber: i + 1,
-          episodeCount: 10,
-          episodesWatched: 0,
-        }))
-      : []
-    setLog({ ...DEFAULT_LOG, seasons })
-    setStep('log')
+  async function selectResult(result: SearchResult) {
+    setLoadingDetails(true)
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase.functions.invoke(
+          `media-proxy?action=details&id=${result.tmdbId}&type=${result.type}`
+        )
+        if (error) throw error
+
+        let imdbRating: number | undefined
+        let rtScore: number | undefined
+        let metacriticScore: number | undefined
+
+        if (data.imdb_id) {
+          try {
+            const { data: ratingsData } = await supabase.functions.invoke(
+              `media-proxy?action=ratings&imdb=${data.imdb_id}`
+            )
+            if (ratingsData) {
+              imdbRating = ratingsData.imdbRating && ratingsData.imdbRating !== 'N/A'
+                ? parseFloat(ratingsData.imdbRating)
+                : undefined
+              const rt = ratingsData.Ratings?.find((r: any) => r.Source === 'Rotten Tomatoes')?.Value
+              rtScore = rt ? parseInt(rt.replace('%', ''), 10) : undefined
+              const meta = ratingsData.Metascore
+              metacriticScore = meta && meta !== 'N/A' ? parseInt(meta, 10) : undefined
+            }
+          } catch (e) {
+            console.error('Error fetching ratings:', e)
+          }
+        }
+
+        const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name
+
+        const detailedResult: SearchResult = {
+          tmdbId: data.id,
+          type: result.type,
+          title: data.title || data.name,
+          year: (data.release_date || data.first_air_date)
+            ? new Date(data.release_date || data.first_air_date).getFullYear()
+            : result.year,
+          posterUrl: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : result.posterUrl,
+          director,
+          genres: data.genres?.map((g: any) => g.name) ?? [],
+          synopsis: data.overview,
+          runtime: data.runtime,
+          network: data.networks?.[0]?.name,
+          seasonCount: data.number_of_seasons,
+          imdbRating,
+          rtScore,
+          metacriticScore,
+        }
+
+        setSelected(detailedResult)
+        const seasons: Season[] = result.type === 'tv' && detailedResult.seasonCount
+          ? Array.from({ length: detailedResult.seasonCount }, (_, i) => {
+              const tmdbSeason = data.seasons?.find((s: any) => s.season_number === i + 1)
+              return {
+                id: `new-s${i + 1}`,
+                seasonNumber: i + 1,
+                episodeCount: tmdbSeason?.episode_count || 10,
+                episodesWatched: 0,
+              }
+            })
+          : []
+        setLog({ ...DEFAULT_LOG, seasons })
+      } else {
+        setSelected(result)
+        const seasons: Season[] = result.type === 'tv' && result.seasonCount
+          ? Array.from({ length: result.seasonCount }, (_, i) => ({
+              id: `new-s${i + 1}`,
+              seasonNumber: i + 1,
+              episodeCount: 10,
+              episodesWatched: 0,
+            }))
+          : []
+        setLog({ ...DEFAULT_LOG, seasons })
+      }
+      setStep('log')
+    } catch (err) {
+      console.error('Error fetching details:', err)
+      setSelected(result)
+      setStep('log')
+    } finally {
+      setLoadingDetails(false)
+    }
   }
 
   function handleSave() {
@@ -283,6 +408,9 @@ export function AddTitleWorkflow() {
       viewings: log.status === 'watched' && log.date
         ? [{ id: `v-${id}`, titleId: id, date: log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
         : [],
+      imdbRating: selected.imdbRating,
+      rtScore: selected.rtScore,
+      metacriticScore: selected.metacriticScore,
     }
 
     addTitle(newTitle)
@@ -314,77 +442,85 @@ export function AddTitleWorkflow() {
       {/* Step 1: Search */}
       {step === 'search' && (
         <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              autoFocus
-              value={query}
-              onChange={handleQueryChange}
-              placeholder="Search for a movie or series…"
-              className="pl-9 bg-secondary/50 border-border"
-            />
-          </div>
-
-          {loading && (
-            <div className="text-center py-6 text-muted-foreground text-sm font-mono">
-              Searching…
+          {loadingDetails ? (
+            <div className="text-center py-12 text-muted-foreground text-sm font-mono">
+              Loading titles details…
             </div>
-          )}
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  autoFocus
+                  value={query}
+                  onChange={handleQueryChange}
+                  placeholder="Search for a movie or series…"
+                  className="pl-9 bg-secondary/50 border-border"
+                />
+              </div>
 
-          {!loading && results.length === 0 && query.length > 1 && (
-            <div className="text-center py-6 text-muted-foreground text-sm">
-              No results for "{query}"
-            </div>
-          )}
+              {loading && (
+                <div className="text-center py-6 text-muted-foreground text-sm font-mono">
+                  Searching…
+                </div>
+              )}
 
-          {results.length > 0 && (
-            <div className="space-y-2">
-              {results.map((r) => (
-                <button
-                  key={r.tmdbId}
-                  onClick={() => selectResult(r)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left"
-                >
-                  <div className="w-12 shrink-0">
-                    {r.posterUrl ? (
-                      <img src={r.posterUrl} alt={r.title} className="w-full aspect-[2/3] object-cover rounded" />
-                    ) : (
-                      <div className="w-full aspect-[2/3] bg-secondary rounded flex items-center justify-center">
-                        {r.type === 'movie' ? (
-                          <Film className="w-4 h-4 text-muted-foreground" />
+              {!loading && results.length === 0 && query.length > 1 && (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  No results for "{query}"
+                </div>
+              )}
+
+              {results.length > 0 && (
+                <div className="space-y-2">
+                  {results.map((r) => (
+                    <button
+                      key={r.tmdbId}
+                      onClick={() => selectResult(r)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left"
+                    >
+                      <div className="w-12 shrink-0">
+                        {r.posterUrl ? (
+                          <img src={r.posterUrl} alt={r.title} className="w-full aspect-[2/3] object-cover rounded" />
                         ) : (
-                          <Tv className="w-4 h-4 text-muted-foreground" />
+                          <div className="w-full aspect-[2/3] bg-secondary rounded flex items-center justify-center">
+                            {r.type === 'movie' ? (
+                              <Film className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <Tv className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-sans text-sm text-foreground truncate">{r.title}</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {r.year} · {r.type === 'movie' ? 'Film' : 'Series'}
-                    </p>
-                    {r.director && (
-                      <p className="font-sans text-xs text-muted-foreground truncate">
-                        {r.director}
-                      </p>
-                    )}
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-              ))}
-            </div>
-          )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-sans text-sm text-foreground truncate">{r.title}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {r.year} · {r.type === 'movie' ? 'Film' : 'Series'}
+                        </p>
+                        {r.director && (
+                          <p className="font-sans text-xs text-muted-foreground truncate">
+                            {r.director}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
 
-          {!query && (
-            <div className="text-center py-12 text-muted-foreground">
-              <div className="w-12 h-12 rounded-full bg-secondary/40 flex items-center justify-center mx-auto mb-3">
-                <Search className="w-6 h-6 text-muted-foreground/40" />
-              </div>
-              <p className="font-serif text-base">Search for a title</p>
-              <p className="font-sans text-xs mt-1 opacity-60">
-                Movies, TV series, directors
-              </p>
-            </div>
+              {!query && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <div className="w-12 h-12 rounded-full bg-secondary/40 flex items-center justify-center mx-auto mb-3">
+                    <Search className="w-6 h-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="font-serif text-base">Search for a title</p>
+                  <p className="font-sans text-xs mt-1 opacity-60">
+                    Movies, TV series, directors
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

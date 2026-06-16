@@ -114,7 +114,7 @@ function ReviewBadges({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: n
 }
 
 export function TitleDetailDrawer() {
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle } = useAppStore()
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, isSharedView } = useAppStore()
   const title = useSelectedTitle()
 
   const [showLogForm, setShowLogForm] = useState(false)
@@ -210,7 +210,7 @@ export function TitleDetailDrawer() {
               <StarRating
                 value={title.rating ?? 0}
                 size="sm"
-                onChange={(rating) => updateTitle(title.id, { rating })}
+                onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
               />
             </div>
           </div>
@@ -225,12 +225,13 @@ export function TitleDetailDrawer() {
               {STATUS_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => updateTitle(title.id, { status: opt.value })}
+                  onClick={isSharedView ? undefined : () => updateTitle(title.id, { status: opt.value })}
                   className={cn(
                     'px-3 py-1.5 rounded-md text-xs font-sans border transition-all',
                     title.status === opt.value
                       ? 'bg-amber/20 border-amber/50 text-amber'
-                      : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
+                      : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground',
+                    isSharedView && 'opacity-60 cursor-default pointer-events-none'
                   )}
                 >
                   {opt.label}
@@ -311,12 +312,12 @@ export function TitleDetailDrawer() {
               <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
                 Viewing History
               </h4>
-              {!showLogForm && (
+              {!showLogForm && !isSharedView && (
                 <button
                   onClick={() => setShowLogForm(true)}
                   className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-3.5 h-3.5" />
                   Log a viewing
                 </button>
               )}
@@ -376,15 +377,17 @@ export function TitleDetailDrawer() {
           </div>
 
           {/* Remove from library */}
-          <div className="pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-ember transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Remove from library
-            </button>
-          </div>
+          {!isSharedView && (
+            <div className="pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-amber transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Remove from library
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </CinemaModal>

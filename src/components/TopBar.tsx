@@ -1,10 +1,12 @@
-import { Plus, LayoutGrid, List, BarChart3 } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { isSupabaseConfigured } from 'src/lib/auth'
 
 interface TopBarProps {
   currentView: 'library' | 'ledger'
   onViewChange: (view: 'library' | 'ledger') => void
+  onProfileClick: () => void
 }
 
 /** Spinning film-reel brand mark (matches The Projection Room). */
@@ -35,8 +37,8 @@ const NAV: { id: 'ledger' | 'library'; label: string; Icon: typeof BarChart3 }[]
   { id: 'library', label: 'The Library', Icon: LayoutGrid },
 ]
 
-export function TopBar({ currentView, onViewChange }: TopBarProps) {
-  const { viewMode, setViewMode, openAddTitle } = useAppStore()
+export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView } = useAppStore()
 
   return (
     <header
@@ -108,13 +110,32 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
               </button>
             </div>
           )}
-          <button
-            onClick={openAddTitle}
-            className="btn-amber inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Title</span>
-          </button>
+
+          {isSupabaseConfigured && !isSharedView && (
+            <button
+              onClick={onProfileClick}
+              className={cn(
+                "icon-btn w-9 h-9 border rounded-md hover:text-amber transition-colors flex items-center justify-center relative",
+                user ? "text-amber border-amber/30 bg-amber/5" : "text-muted-foreground border-border"
+              )}
+              aria-label="Profile and Settings"
+            >
+              <User className="w-[17px] h-[17px]" />
+              {user && (
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-amber rounded-full border border-void animate-pulse" />
+              )}
+            </button>
+          )}
+
+          {!isSharedView && (
+            <button
+              onClick={openAddTitle}
+              className="btn-amber inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Title</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -32,7 +32,12 @@ export async function registerPasskey() {
 export async function signInWithPasskey(email: string) {
   // Phase 1: initiate the challenge
   const { data: challengeData, error: challengeError } =
-    await getClient().auth.signInWithOtp({ email })
+    await getClient().auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
+      },
+    })
   if (challengeError) throw challengeError
 
   return challengeData

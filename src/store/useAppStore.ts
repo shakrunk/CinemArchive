@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
+import type { User } from '@supabase/supabase-js'
+import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb } from '../lib/db'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ interface UISlice {
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
+  isSharedView: boolean
 
   setViewMode: (mode: ViewMode) => void
   selectTitle: (id: string | null) => void
@@ -55,6 +58,16 @@ interface UISlice {
   closeAddTitle: () => void
   openDetailDrawer: (id: string) => void
   closeDetailDrawer: () => void
+  setIsSharedView: (isSharedView: boolean) => void
+}
+
+interface AuthSlice {
+  user: User | null
+  loadingUser: boolean
+  setUser: (user: User | null) => void
+  setLoadingUser: (loading: boolean) => void
+  loadUserLibrary: () => Promise<void>
+  loadSharedLibrary: (token: string) => Promise<void>
 }
 
 // ─── Default Filters ────────────────────────────────────────────────────────
@@ -147,14 +160,14 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
-type AppStore = LibrarySlice & LedgerSlice & UISlice
+type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 1
 
 export const useAppStore = create<AppStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
   // ── Library ────────────────────────────────────────────────
   titles: mockTitles,
   filters: defaultFilters,
@@ -170,6 +183,11 @@ export const useAppStore = create<AppStore>()(
   addTitle: (title) =>
     set((s) => {
       const titles = [title, ...s.titles]
+      if (s.user) {
+        insertTitleToDb(s.user.id, title).catch((err) => {
+          console.error('Failed to sync added title to DB:', err)
+        })
+      }
       return {
         titles,
         filteredTitles: applyFiltersToTitles(titles, s.filters),
@@ -180,6 +198,11 @@ export const useAppStore = create<AppStore>()(
   updateTitle: (id, patch) =>
     set((s) => {
       const titles = s.titles.map((t) => (t.id === id ? { ...t, ...patch } : t))
+      if (s.user) {
+        updateTitleInDb(s.user.id, id, patch).catch((err) => {
+          console.error('Failed to sync updated title to DB:', err)
+        })
+      }
       return {
         titles,
         filteredTitles: applyFiltersToTitles(titles, s.filters),
@@ -190,6 +213,11 @@ export const useAppStore = create<AppStore>()(
   removeTitle: (id) =>
     set((s) => {
       const titles = s.titles.filter((t) => t.id !== id)
+      if (s.user) {
+        deleteTitleFromDb(s.user.id, id).catch((err) => {
+          console.error('Failed to sync deleted title from DB:', err)
+        })
+      }
       return {
         titles,
         filteredTitles: applyFiltersToTitles(titles, s.filters),
@@ -237,6 +265,63 @@ export const useAppStore = create<AppStore>()(
 
   closeDetailDrawer: () =>
     set({ isDetailDrawerOpen: false, selectedTitleId: null }),
+
+  isSharedView: false,
+  setIsSharedView: (isSharedView) => set({ isSharedView }),
+
+  // ── Auth ───────────────────────────────────────────────────
+  user: null,
+  loadingUser: false,
+
+  setUser: (user) => {
+    set({ user })
+    if (user) {
+      get().loadUserLibrary()
+    } else {
+      // Clear or reload mock data on logout
+      set((s) => ({
+        titles: mockTitles,
+        filteredTitles: applyFiltersToTitles(mockTitles, s.filters),
+        stats: computeLedgerStats(mockTitles),
+      }))
+    }
+  },
+
+  setLoadingUser: (loadingUser) => set({ loadingUser }),
+
+  loadUserLibrary: async () => {
+    const user = get().user
+    if (!user) return
+    set({ loadingUser: true })
+    try {
+      const dbTitles = await fetchUserLibrary(user.id)
+      set((s) => ({
+        titles: dbTitles,
+        filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
+        stats: computeLedgerStats(dbTitles),
+      }))
+    } catch (err) {
+      console.error('Failed to load user library from DB:', err)
+    } finally {
+      set({ loadingUser: false })
+    }
+  },
+
+  loadSharedLibrary: async (token) => {
+    set({ loadingUser: true, isSharedView: true })
+    try {
+      const dbTitles = await fetchSharedLibrary(token)
+      set((s) => ({
+        titles: dbTitles,
+        filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
+        stats: computeLedgerStats(dbTitles),
+      }))
+    } catch (err) {
+      console.error('Failed to load shared library from DB:', err)
+    } finally {
+      set({ loadingUser: false })
+    }
+  },
     }),
     {
       name: 'cinemarchive-library',

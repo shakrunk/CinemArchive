@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import { mockTitles, mockLedgerStats, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import { computeLedgerStats } from './ledgerStats'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
@@ -147,7 +149,12 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
 type AppStore = LibrarySlice & LedgerSlice & UISlice
 
-export const useAppStore = create<AppStore>((set) => ({
+// Bump when the persisted shape changes incompatibly; older payloads are dropped.
+const PERSIST_VERSION = 1
+
+export const useAppStore = create<AppStore>()(
+  persist(
+    (set) => ({
   // ── Library ────────────────────────────────────────────────
   titles: mockTitles,
   filters: defaultFilters,
@@ -157,24 +164,37 @@ export const useAppStore = create<AppStore>((set) => ({
     set((s) => ({
       titles,
       filteredTitles: applyFiltersToTitles(titles, s.filters),
+      stats: computeLedgerStats(titles),
     })),
 
   addTitle: (title) =>
     set((s) => {
       const titles = [title, ...s.titles]
-      return { titles, filteredTitles: applyFiltersToTitles(titles, s.filters) }
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
     }),
 
   updateTitle: (id, patch) =>
     set((s) => {
       const titles = s.titles.map((t) => (t.id === id ? { ...t, ...patch } : t))
-      return { titles, filteredTitles: applyFiltersToTitles(titles, s.filters) }
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
     }),
 
   removeTitle: (id) =>
     set((s) => {
       const titles = s.titles.filter((t) => t.id !== id)
-      return { titles, filteredTitles: applyFiltersToTitles(titles, s.filters) }
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
     }),
 
   setFilter: (key, value) =>
@@ -195,7 +215,7 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
 
   // ── Ledger ─────────────────────────────────────────────────
-  stats: mockLedgerStats,
+  stats: computeLedgerStats(mockTitles),
 
   setStats: (stats) => set({ stats }),
 
@@ -217,14 +237,27 @@ export const useAppStore = create<AppStore>((set) => ({
 
   closeDetailDrawer: () =>
     set({ isDetailDrawerOpen: false, selectedTitleId: null }),
-}))
+    }),
+    {
+      name: 'cinemarchive-library',
+      version: PERSIST_VERSION,
+      storage: createJSONStorage(() => localStorage),
+      // Only the source of truth is persisted; derived state (filteredTitles,
+      // stats) and transient UI flags are recomputed/reset on load.
+      partialize: (s) => ({ titles: s.titles, filters: s.filters, viewMode: s.viewMode }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
+        state.stats = computeLedgerStats(state.titles)
+      },
+    }
+  )
+)
 
 // ─── Selectors ──────────────────────────────────────────────────────────────
 
-export const useSelectedTitle = () => {
-  const { titles, selectedTitleId } = useAppStore()
-  return titles.find((t) => t.id === selectedTitleId) ?? null
-}
+export const useSelectedTitle = () =>
+  useAppStore((s) => s.titles.find((t) => t.id === s.selectedTitleId) ?? null)
 
 export const useAllGenres = () => {
   const titles = useAppStore((s) => s.titles)

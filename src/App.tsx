@@ -11,10 +11,23 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('library')
 
   return (
-    <div className="min-h-screen bg-void grain vignette">
+    <div className="relative min-h-screen">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-3 focus:left-3 focus:px-4 focus:py-2 focus:rounded-md focus:bg-amber focus:text-void focus:font-sans focus:text-sm focus:font-medium focus:shadow-lg"
+      >
+        Skip to content
+      </a>
+
+      {/* ── Atmosphere layers (fixed, full-viewport) ── */}
+      <div className="projector-beam" aria-hidden="true" />
+      <div className="dust" aria-hidden="true" />
+      <div className="vignette" aria-hidden="true" />
+      <div className="grain" aria-hidden="true" />
+
       <TopBar currentView={currentView} onViewChange={setCurrentView} />
 
-      <main className="pt-0 sm:pb-0 pb-16">
+      <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
         {currentView === 'library' && <Library />}
         {currentView === 'ledger' && <Ledger />}
       </main>

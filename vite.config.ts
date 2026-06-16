@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon.ico'],
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'CinemArchive — The Projection Room',
         short_name: 'CinemArchive',
@@ -20,8 +20,7 @@ export default defineConfig({
         scope: '/',
         start_url: '/',
         icons: [
-          { src: '/icons/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
       },
       workbox: {
@@ -64,9 +63,6 @@ export default defineConfig({
         manualChunks(id: string) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'react'
-          }
-          if (id.includes('node_modules/recharts')) {
-            return 'recharts'
           }
           if (id.includes('node_modules/@radix-ui')) {
             return 'radix'

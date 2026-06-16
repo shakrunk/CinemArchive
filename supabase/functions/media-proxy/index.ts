@@ -54,6 +54,16 @@ async function setCached(key: string, response: unknown): Promise<void> {
   }
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function parseMediaType(value: string | null): 'movie' | 'tv' {
+  const type = value ?? 'movie'
+  if (type !== 'movie' && type !== 'tv') {
+    throw new Error(`Invalid type parameter: ${type}`)
+  }
+  return type
+}
+
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 async function searchTMDB(query: string, type: 'movie' | 'tv') {
@@ -112,14 +122,14 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case 'search': {
         const query = url.searchParams.get('q') ?? ''
-        const type = (url.searchParams.get('type') ?? 'movie') as 'movie' | 'tv'
+        const type = parseMediaType(url.searchParams.get('type'))
         if (!query) throw new Error('Missing query parameter')
         result = await searchTMDB(query, type)
         break
       }
       case 'details': {
         const id = parseInt(url.searchParams.get('id') ?? '0', 10)
-        const type = (url.searchParams.get('type') ?? 'movie') as 'movie' | 'tv'
+        const type = parseMediaType(url.searchParams.get('type'))
         if (!id) throw new Error('Missing id parameter')
         result = await getTMDBDetails(id, type)
         break

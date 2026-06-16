@@ -2,9 +2,6 @@ import { useMemo, useState } from 'react'
 import { Search, SlidersHorizontal, X, Film } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
-import { StarBadge } from 'src/components/ui/star-rating'
-import { Input } from 'src/components/ui/input'
-import { Button } from 'src/components/ui/button'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
@@ -12,20 +9,13 @@ import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir } from 'src/store/useAppStore'
 
-// ─── Status badge colors ──────────────────────────────────────────────────────
+// ─── Status colors for the ledger list ───────────────────────────────────────
 
 const STATUS_DOT: Record<WatchStatus, string> = {
-  watched: 'bg-green-400',
-  watchlist: 'bg-blue-400',
-  watching: 'bg-amber',
-  dropped: 'bg-red-400',
-}
-
-const STATUS_TEXT_COLORS: Record<WatchStatus, string> = {
-  watched: 'text-green-400',
-  watchlist: 'text-blue-400',
-  watching: 'text-amber',
-  dropped: 'text-red-400',
+  watched: 'bg-amber',
+  watchlist: 'bg-moon',
+  watching: 'bg-amber-bright',
+  dropped: 'bg-ember',
 }
 
 // ─── Filter Panel ────────────────────────────────────────────────────────────
@@ -68,17 +58,20 @@ function Chip({
   children: React.ReactNode
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'px-3 py-1 rounded-full text-xs font-sans border transition-all',
-        active
-          ? 'bg-amber/20 border-amber/50 text-amber'
-          : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground hover:border-border/80'
-      )}
-    >
+    <button onClick={onClick} className={cn('chip', active && 'is-active')}>
       {children}
     </button>
+  )
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-3">
+        {label}
+      </h4>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
   )
 }
 
@@ -90,11 +83,10 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
 
   return (
     <BottomSheet open={open} onClose={onClose} side="right">
-      <div className="space-y-5">
-        {/* Panel header with icon + active filter count */}
-        <div className="flex items-center gap-3 pb-4 border-b border-border">
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--line)' }}>
           <SlidersHorizontal className="w-4 h-4 text-amber shrink-0" />
-          <span className="font-serif text-lg font-light text-foreground">Refine Collection</span>
+          <span className="font-serif text-xl font-light text-paper">Refine Collection</span>
           {activeFilterCount > 0 && (
             <span className="ml-auto font-mono text-xs text-amber bg-amber/10 border border-amber/20 px-2 py-0.5 rounded-full shrink-0">
               {activeFilterCount} active
@@ -102,66 +94,42 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
           )}
         </div>
 
-        {/* Type */}
-        <div>
-          <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">Type</h4>
-          <div className="flex flex-wrap gap-2">
-            {TYPE_OPTIONS.map((opt) => (
-              <Chip
-                key={opt.value}
-                active={filters.type === opt.value}
-                onClick={() => setFilter('type', opt.value)}
-              >
-                {opt.label}
-              </Chip>
-            ))}
-          </div>
-        </div>
-
-        {/* Status */}
-        <div>
-          <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">Status</h4>
-          <div className="flex flex-wrap gap-2">
-            {STATUS_OPTIONS.map((opt) => (
-              <Chip
-                key={opt.value}
-                active={filters.status === opt.value}
-                onClick={() => setFilter('status', opt.value)}
-              >
-                {opt.label}
-              </Chip>
-            ))}
-          </div>
-        </div>
-
-        {/* Sort */}
-        <div>
-          <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">Sort By</h4>
-          <div className="flex flex-wrap gap-2">
-            {SORT_OPTIONS.map((opt) => (
-              <Chip
-                key={opt.value}
-                active={filters.sortField === opt.value}
-                onClick={() => setFilter('sortField', opt.value)}
-              >
-                {opt.label}
-              </Chip>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-2">
-            <Chip active={filters.sortDir === 'asc'} onClick={() => setFilter('sortDir', 'asc' as SortDir)}>
-              Ascending
+        <FilterGroup label="Type">
+          {TYPE_OPTIONS.map((opt) => (
+            <Chip key={opt.value} active={filters.type === opt.value} onClick={() => setFilter('type', opt.value)}>
+              {opt.label}
             </Chip>
-            <Chip active={filters.sortDir === 'desc'} onClick={() => setFilter('sortDir', 'desc' as SortDir)}>
-              Descending
+          ))}
+        </FilterGroup>
+
+        <FilterGroup label="Status">
+          {STATUS_OPTIONS.map((opt) => (
+            <Chip key={opt.value} active={filters.status === opt.value} onClick={() => setFilter('status', opt.value)}>
+              {opt.label}
             </Chip>
-          </div>
+          ))}
+        </FilterGroup>
+
+        <FilterGroup label="Sort By">
+          {SORT_OPTIONS.map((opt) => (
+            <Chip key={opt.value} active={filters.sortField === opt.value} onClick={() => setFilter('sortField', opt.value)}>
+              {opt.label}
+            </Chip>
+          ))}
+        </FilterGroup>
+        <div className="flex gap-2 -mt-2">
+          <Chip active={filters.sortDir === 'asc'} onClick={() => setFilter('sortDir', 'asc' as SortDir)}>
+            Ascending
+          </Chip>
+          <Chip active={filters.sortDir === 'desc'} onClick={() => setFilter('sortDir', 'desc' as SortDir)}>
+            Descending
+          </Chip>
         </div>
 
-        {/* Min Rating */}
         <div>
-          <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">
-            Min Rating: <span className="text-amber font-mono">{filters.minRating > 0 ? `★ ${filters.minRating}` : 'Any'}</span>
+          <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-3">
+            Min Rating:{' '}
+            <span className="text-amber">{filters.minRating > 0 ? `★ ${filters.minRating}` : 'Any'}</span>
           </h4>
           <Slider
             value={[filters.minRating]}
@@ -173,83 +141,70 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
           />
         </div>
 
-        {/* Genres */}
         {allGenres.length > 0 && (
-          <div>
-            <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">Genres</h4>
-            <div className="flex flex-wrap gap-2">
-              {allGenres.map((g) => (
-                <Chip
-                  key={g}
-                  active={filters.genres.includes(g)}
-                  onClick={() => {
-                    const next = filters.genres.includes(g)
-                      ? filters.genres.filter((x) => x !== g)
-                      : [...filters.genres, g]
-                    setFilter('genres', next)
-                  }}
-                >
-                  {g}
-                </Chip>
-              ))}
-            </div>
-          </div>
+          <FilterGroup label="Genres">
+            {allGenres.map((g) => (
+              <Chip
+                key={g}
+                active={filters.genres.includes(g)}
+                onClick={() => {
+                  const next = filters.genres.includes(g)
+                    ? filters.genres.filter((x) => x !== g)
+                    : [...filters.genres, g]
+                  setFilter('genres', next)
+                }}
+              >
+                {g}
+              </Chip>
+            ))}
+          </FilterGroup>
         )}
 
-        {/* Decades */}
         {allDecades.length > 0 && (
-          <div>
-            <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">Decade</h4>
-            <div className="flex flex-wrap gap-2">
-              {allDecades.map((d) => (
-                <Chip
-                  key={d}
-                  active={filters.decades.includes(d)}
-                  onClick={() => {
-                    const next = filters.decades.includes(d)
-                      ? filters.decades.filter((x) => x !== d)
-                      : [...filters.decades, d]
-                    setFilter('decades', next)
-                  }}
-                >
-                  {d}
-                </Chip>
-              ))}
-            </div>
-          </div>
+          <FilterGroup label="Decade">
+            {allDecades.map((d) => (
+              <Chip
+                key={d}
+                active={filters.decades.includes(d)}
+                onClick={() => {
+                  const next = filters.decades.includes(d)
+                    ? filters.decades.filter((x) => x !== d)
+                    : [...filters.decades, d]
+                  setFilter('decades', next)
+                }}
+              >
+                {d}
+              </Chip>
+            ))}
+          </FilterGroup>
         )}
 
-        {/* Networks */}
         {allNetworks.length > 0 && (
-          <div>
-            <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">Network</h4>
-            <div className="flex flex-wrap gap-2">
-              {allNetworks.map((n) => (
-                <Chip
-                  key={n}
-                  active={filters.networks.includes(n)}
-                  onClick={() => {
-                    const next = filters.networks.includes(n)
-                      ? filters.networks.filter((x) => x !== n)
-                      : [...filters.networks, n]
-                    setFilter('networks', next)
-                  }}
-                >
-                  {n}
-                </Chip>
-              ))}
-            </div>
-          </div>
+          <FilterGroup label="Network">
+            {allNetworks.map((n) => (
+              <Chip
+                key={n}
+                active={filters.networks.includes(n)}
+                onClick={() => {
+                  const next = filters.networks.includes(n)
+                    ? filters.networks.filter((x) => x !== n)
+                    : [...filters.networks, n]
+                  setFilter('networks', next)
+                }}
+              >
+                {n}
+              </Chip>
+            ))}
+          </FilterGroup>
         )}
 
-        {/* Reset button — contextual label */}
         <button
           onClick={resetFilters}
           className={cn(
             'w-full py-2.5 rounded-lg text-sm font-sans border transition-all',
             activeFilterCount > 0
               ? 'border-amber/30 text-amber hover:bg-amber/10 hover:border-amber/50'
-              : 'border-border text-muted-foreground/50 cursor-default'
+              : 'border-[var(--line)] text-paper-faint/60 cursor-default'
           )}
           disabled={activeFilterCount === 0}
         >
@@ -262,58 +217,39 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
   )
 }
 
-// ─── Poster Grid ─────────────────────────────────────────────────────────────
+// ─── Empty state ─────────────────────────────────────────────────────────────
 
 function EmptyState() {
+  const isLibraryEmpty = useAppStore((s) => s.titles.length === 0)
+
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="relative mb-6">
-        <div className="w-16 h-16 rounded-full bg-secondary/50 flex items-center justify-center">
-          <Film className="w-8 h-8 text-muted-foreground/40" />
-        </div>
-        <span className="absolute inset-0 rounded-full border border-amber/25 animate-ping opacity-40" />
-      </div>
-      <p className="font-serif text-xl text-muted-foreground">Nothing in frame</p>
-      <p className="font-sans text-sm text-muted-foreground/50 mt-2 max-w-xs leading-relaxed">
-        Your library is empty, or no titles match the current filters.
-      </p>
+    <div className="text-center py-24 px-5 text-paper-faint">
+      <Film className="w-14 h-14 mx-auto mb-5 text-amber-deep opacity-50" />
+      {isLibraryEmpty ? (
+        <>
+          <p className="font-serif text-2xl text-paper-dim font-light">Your archive is empty.</p>
+          <p className="font-sans text-sm mt-2 opacity-70">Add your first title to start your collection.</p>
+        </>
+      ) : (
+        <>
+          <p className="font-serif text-2xl text-paper-dim font-light">No titles match the bill.</p>
+          <p className="font-sans text-sm mt-2 opacity-70">Try a different search or reset the filters.</p>
+        </>
+      )}
     </div>
   )
 }
 
-function PosterGrid({ titles }: { titles: Title[] }) {
-  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+// ─── Poster Wall ─────────────────────────────────────────────────────────────
 
+function PosterWall({ titles }: { titles: Title[] }) {
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   if (titles.length === 0) return <EmptyState />
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+    <div className="poster-wall">
       {titles.map((title) => (
-        <div key={title.id} className="group relative">
-          <DynamicPoster
-            title={title}
-            onClick={() => openDetailDrawer(title.id)}
-          />
-          {/* Always-visible status dot badge */}
-          <div className={cn(
-            'absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-1 ring-black/60 z-20',
-            STATUS_DOT[title.status]
-          )} />
-          {/* Rating badge on hover */}
-          {title.rating && (
-            <div className="absolute bottom-1.5 left-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-              <StarBadge rating={title.rating} />
-            </div>
-          )}
-          <div className="mt-1.5 px-0.5">
-            <p className="font-sans text-xs text-foreground/80 truncate leading-tight">
-              {title.title}
-            </p>
-            <p className="font-mono text-xs text-muted-foreground">
-              {title.year}
-            </p>
-          </div>
-        </div>
+        <DynamicPoster key={title.id} title={title} rich onClick={() => openDetailDrawer(title.id)} />
       ))}
     </div>
   )
@@ -323,46 +259,75 @@ function PosterGrid({ titles }: { titles: Title[] }) {
 
 function LedgerList({ titles }: { titles: Title[] }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-
   if (titles.length === 0) return <EmptyState />
 
   return (
-    <div className="divide-y divide-border/50">
-      {/* Header */}
-      <div className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr] gap-3 px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground/50">
-        <span />
-        <span>Title</span>
-        <span className="hidden sm:block">Year</span>
-        <span>Status</span>
-        <span>Rating</span>
-      </div>
-      {titles.map((title) => (
-        <button
-          key={title.id}
-          className="w-full grid grid-cols-[2rem_2fr_1fr_1fr_1fr] gap-3 px-3 py-2.5 items-center hover:bg-secondary/30 transition-colors text-left group"
-          onClick={() => openDetailDrawer(title.id)}
-        >
-          {/* Mini poster thumbnail */}
-          <div className="w-8 shrink-0 overflow-hidden rounded">
-            <DynamicPoster title={title} />
-          </div>
-          <div className="min-w-0">
-            <p className="font-sans text-sm text-foreground truncate group-hover:text-amber/90 transition-colors">
-              {title.title}
-            </p>
-            {title.director && (
-              <p className="font-sans text-xs text-muted-foreground truncate">{title.director}</p>
-            )}
-          </div>
-          <span className="hidden sm:block font-mono text-sm text-muted-foreground">{title.year}</span>
-          <span className={cn('font-mono text-xs capitalize', STATUS_TEXT_COLORS[title.status])}>
-            {title.status}
-          </span>
-          <span className="font-mono text-sm text-amber">
-            {title.rating ? `★ ${title.rating}` : '—'}
-          </span>
-        </button>
-      ))}
+    <div
+      className="rounded-xl overflow-x-auto"
+      style={{
+        border: '1px solid var(--line)',
+        background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))',
+      }}
+    >
+      <table className="w-full border-collapse sm:min-w-[640px]">
+        <thead>
+          <tr>
+            {['No.', 'Title', 'Year', 'Status', 'Rating'].map((h, i) => (
+              <th
+                key={h}
+                className={cn(
+                  'text-left px-4 py-3.5 font-mono text-[10px] tracking-[0.14em] uppercase font-medium text-paper-faint whitespace-nowrap',
+                  i === 2 && 'hidden sm:table-cell'
+                )}
+                style={{ borderBottom: '1px solid var(--line-2)', background: 'rgba(0,0,0,0.25)' }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {titles.map((title, idx) => (
+            <tr
+              key={title.id}
+              onClick={() => openDetailDrawer(title.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openDetailDrawer(title.id)
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`View details for ${title.title}`}
+              className="cursor-pointer transition-colors hover:bg-[rgba(233,178,102,0.06)] focus:outline-none focus-visible:bg-[rgba(233,178,102,0.1)]"
+              style={{ borderBottom: '1px solid var(--line)' }}
+            >
+              <td className="px-4 py-3 font-mono text-[11px] text-paper-faint w-[52px]">
+                {String(idx + 1).padStart(2, '0')}
+              </td>
+              <td className="px-4 py-3">
+                <div className="font-serif text-[17px] font-medium text-paper" style={{ fontVariationSettings: '"opsz" 30' }}>
+                  {title.title}
+                </div>
+                {title.director && (
+                  <div className="font-sans text-xs text-paper-faint truncate max-w-[260px]">{title.director}</div>
+                )}
+              </td>
+              <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-paper-dim">{title.year}</td>
+              <td className="px-4 py-3">
+                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] uppercase text-paper-dim">
+                  <i className={cn('w-[7px] h-[7px] rounded-full', STATUS_DOT[title.status])} />
+                  {title.status}
+                </span>
+              </td>
+              <td className="px-4 py-3 font-mono text-sm text-amber whitespace-nowrap">
+                {title.rating ? `★ ${title.rating}` : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -372,8 +337,8 @@ function LedgerList({ titles }: { titles: Title[] }) {
 const QUICK_STATUS_FILTERS: { value: WatchStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'watched', label: 'Watched' },
-  { value: 'watchlist', label: 'Watchlist' },
   { value: 'watching', label: 'Watching' },
+  { value: 'watchlist', label: 'Watchlist' },
   { value: 'dropped', label: 'Dropped' },
 ]
 
@@ -395,81 +360,80 @@ export function Library() {
   }, [filters])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Search + Filter Bar */}
-      <div className="sticky top-14 z-40 bg-void/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 pt-3 pb-2">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                value={filters.search}
-                onChange={(e) => setFilter('search', e.target.value)}
-                placeholder="Search titles, directors, genres…"
-                className="pl-9 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-amber/30"
-              />
-              {filters.search && (
-                <button
-                  onClick={() => setFilter('search', '')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setFilterOpen(true)}
-              className={cn(
-                'gap-1.5 border-border shrink-0',
-                activeFilterCount > 0 ? 'text-amber border-amber/40' : 'text-muted-foreground'
-              )}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span className="hidden sm:inline">Filter</span>
-              {activeFilterCount > 0 && (
-                <span className="bg-amber text-void font-mono text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-          </div>
+    <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="search-field flex-1 min-w-[220px] max-w-[460px]">
+          <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" />
+          <input
+            value={filters.search}
+            onChange={(e) => setFilter('search', e.target.value)}
+            placeholder="Search title, director, genre…"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {filters.search && (
+            <button onClick={() => setFilter('search', '')} className="text-paper-faint hover:text-ember">
+              <X className="w-[15px] h-[15px]" />
+            </button>
+          )}
         </div>
 
-        {/* Quick status filter bar — horizontal scrollable chips */}
-        <div className="max-w-7xl mx-auto px-4 pb-2.5 flex gap-1.5 overflow-x-auto scrollbar-none">
+        {/* Status segmented control (desktop) */}
+        <div className="seg hidden md:flex" role="group" aria-label="Status filter">
           {QUICK_STATUS_FILTERS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setFilter('status', opt.value)}
-              className={cn(
-                'px-3 py-1 rounded-full text-xs font-sans whitespace-nowrap border transition-all shrink-0',
-                filters.status === opt.value
-                  ? 'bg-amber text-void border-amber font-medium'
-                  : 'bg-transparent border-border text-muted-foreground hover:text-foreground hover:border-border/80'
-              )}
+              className={cn('seg__btn', filters.status === opt.value && 'is-active')}
             >
               {opt.label}
             </button>
           ))}
         </div>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={() => setFilterOpen(true)}
+          className={cn(
+            'icon-btn h-11 px-3.5 gap-2 border text-sm',
+            activeFilterCount > 0 ? '!text-amber !border-amber/40' : 'border-[var(--line)] text-paper-dim'
+          )}
+          style={{ background: 'rgba(0,0,0,0.3)' }}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          <span className="hidden sm:inline">Filters</span>
+          {activeFilterCount > 0 && (
+            <span className="bg-amber text-void font-mono text-[11px] rounded-full w-[18px] h-[18px] flex items-center justify-center">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Count line */}
-      <div className="max-w-7xl mx-auto w-full px-4 pt-3 pb-1">
-        <p className="font-mono text-xs text-muted-foreground">
-          {filteredTitles.length} title{filteredTitles.length !== 1 ? 's' : ''}
-        </p>
+      {/* Status chips (mobile) */}
+      <div className="flex md:hidden gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1">
+        {QUICK_STATUS_FILTERS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setFilter('status', opt.value)}
+            className={cn('chip shrink-0', filters.status === opt.value && 'is-active')}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
+
+      {/* Result meta */}
+      <p className="font-mono text-[11px] tracking-[0.06em] text-paper-faint mb-5">
+        <b className="text-amber font-medium">{filteredTitles.length}</b> title
+        {filteredTitles.length !== 1 ? 's' : ''} on the bill
+      </p>
 
       {/* Content */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 pb-24">
-        {viewMode === 'grid' ? (
-          <PosterGrid titles={filteredTitles} />
-        ) : (
-          <LedgerList titles={filteredTitles} />
-        )}
+      <div className="animate-view-in">
+        {viewMode === 'grid' ? <PosterWall titles={filteredTitles} /> : <LedgerList titles={filteredTitles} />}
       </div>
 
       <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} activeFilterCount={activeFilterCount} />

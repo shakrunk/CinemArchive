@@ -1,84 +1,66 @@
-import {
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-} from 'recharts'
 import { Film, Tv, Eye, Star, Clock, CalendarDays } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
-import { StatNumber, StatLabel, SectionHeading } from 'src/components/ui/typography'
 import { cn } from 'src/lib/utils'
 
-const AMBER = '#e9b266'
-const AMBER_MUTED = '#c8924a'
-const MUTED = '#2e2825'
-const MUTED_FG = '#6b5f52'
+// ─── Dashboard hero ───────────────────────────────────────────────────────────
 
-// ─── Shared chart theme ──────────────────────────────────────────────────────
+function DashHero() {
+  const stats = useAppStore((s) => s.stats)
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+  const total = stats.totalMovies + stats.totalSeries
+  const hours = Math.round(stats.totalMinutes / 60)
 
-const tooltipStyle = {
-  backgroundColor: '#1a1510',
-  border: '1px solid #2e2825',
-  borderRadius: '6px',
-  fontFamily: '"DM Mono", monospace',
-  fontSize: '12px',
-  color: '#e9b266',
-}
-
-// ChartCard: serif title with amber left accent bar
-function ChartCard({
-  title,
-  children,
-  className,
-}: {
-  title: string
-  children: React.ReactNode
-  className?: string
-}) {
   return (
-    <div className={cn('card-cinematic p-4 md:p-6', className)}>
-      <div className="flex items-center gap-2.5 mb-5">
-        <div className="chart-accent-line" />
-        <h3 className="font-serif text-base font-light text-foreground/80">
-          {title}
-        </h3>
-      </div>
-      {children}
+    <div className="mb-[clamp(28px,4vw,44px)]">
+      <p className="kicker">
+        <span className="dot" /> now showing · {today}
+      </p>
+      <h1 className="display-title text-[clamp(40px,8vw,88px)] mt-3.5">
+        An evening at <em>the&nbsp;pictures.</em>
+      </h1>
+      <p className="mt-4 max-w-[60ch] text-[clamp(15px,1.6vw,18px)] text-paper-dim">
+        A private record of <strong className="text-paper font-bold">{total}</strong> titles,{' '}
+        <strong className="text-paper font-bold">{stats.totalViewings}</strong> screenings, and roughly{' '}
+        <strong className="text-paper font-bold">{hours}</strong> hours spent in the dark.
+      </p>
     </div>
   )
 }
 
-// ─── Summary Stats Row ────────────────────────────────────────────────────────
+// ─── Stat strip ───────────────────────────────────────────────────────────────
 
-function SummaryRow() {
+function StatStrip() {
   const stats = useAppStore((s) => s.stats)
   const hours = Math.round(stats.totalMinutes / 60)
   const days = (stats.totalMinutes / 60 / 24).toFixed(1)
 
   const items = [
-    { value: stats.totalMovies, label: 'Films', Icon: Film },
-    { value: stats.totalSeries, label: 'Series', Icon: Tv },
-    { value: stats.totalViewings, label: 'Viewings', Icon: Eye },
-    { value: stats.avgRating.toFixed(1), label: 'Avg Rating', Icon: Star },
-    { value: `${hours}h`, label: 'Screen Time', Icon: Clock },
-    { value: `${days}d`, label: 'Total Days', Icon: CalendarDays },
+    { value: stats.totalMovies, unit: '', label: 'Films', Icon: Film },
+    { value: stats.totalSeries, unit: '', label: 'Series', Icon: Tv },
+    { value: stats.totalViewings, unit: '', label: 'Screenings', Icon: Eye },
+    { value: stats.avgRating.toFixed(1), unit: '★', label: 'Avg Rating', Icon: Star },
+    { value: hours, unit: 'h', label: 'Screen Time', Icon: Clock },
+    { value: days, unit: 'd', label: 'In the Dark', Icon: CalendarDays },
   ]
 
   return (
-    <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
+    <div
+      className="grid gap-3.5 mb-[clamp(24px,4vw,40px)]"
+      style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}
+    >
       {items.map((item) => (
-        <div key={item.label} className="card-cinematic p-4 text-center">
-          <div className="flex justify-center mb-2">
-            <item.Icon className="w-4 h-4 text-amber/50" />
+        <div key={item.label} className="stat-card px-5 pt-5 pb-[18px]">
+          <item.Icon className="w-[18px] h-[18px] text-amber-deep mb-2.5" />
+          <div className="stat-num text-[clamp(30px,4vw,44px)]">
+            {item.value}
+            {item.unit && <span className="unit">{item.unit}</span>}
           </div>
-          <StatNumber className="block text-2xl md:text-3xl">{item.value}</StatNumber>
-          <div className="mt-1">
-            <StatLabel>{item.label}</StatLabel>
+          <div className="mt-2 font-mono text-[10px] tracking-[0.18em] uppercase text-paper-faint">
+            {item.label}
           </div>
         </div>
       ))}
@@ -86,7 +68,31 @@ function SummaryRow() {
   )
 }
 
-// ─── Rating Distribution — custom star bars replacing BarChart ────────────────
+// ─── Panel shell ──────────────────────────────────────────────────────────────
+
+function Panel({
+  title,
+  hint,
+  className,
+  children,
+}: {
+  title: string
+  hint: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <article className={cn('panel p-6', className)}>
+      <header className="panel__head mb-5">
+        <h2 className="panel__title text-[21px]">{title}</h2>
+        <span className="panel__hint">{hint}</span>
+      </header>
+      {children}
+    </article>
+  )
+}
+
+// ─── Rating distribution histogram ────────────────────────────────────────────
 
 function renderStarLabel(rating: number): string {
   const full = Math.floor(rating)
@@ -94,230 +100,209 @@ function renderStarLabel(rating: number): string {
   return '★'.repeat(full) + (half ? '½' : '')
 }
 
-function RatingDistribution() {
+function RatingDistribution({ className }: { className?: string }) {
   const dist = useAppStore((s) => s.stats.ratingDistribution)
   const data = dist.filter((d) => d.count > 0).sort((a, b) => b.rating - a.rating)
   const maxCount = Math.max(...data.map((d) => d.count), 1)
 
   return (
-    <ChartCard title="The Record — Rating Distribution">
-      <div className="space-y-3">
+    <Panel title="Critical record" hint="rating distribution" className={className}>
+      <div className="flex flex-col gap-3">
         {data.map((d, i) => (
-          <div key={d.rating} className="flex items-center gap-3">
-            <div className="font-mono text-sm text-amber shrink-0 w-14 text-right leading-none select-none">
+          <div key={d.rating} className="grid items-center gap-3" style={{ gridTemplateColumns: '60px 1fr 28px' }}>
+            <div className="font-mono text-[13px] text-amber text-right leading-none select-none">
               {renderStarLabel(d.rating)}
             </div>
-            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+            <div className="h-3 rounded-md overflow-hidden bg-white/[0.04]">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="bar-fill h-full rounded-md"
                 style={{
                   width: `${(d.count / maxCount) * 100}%`,
-                  background: i === 0
-                    ? `linear-gradient(90deg, ${AMBER_MUTED}, ${AMBER})`
-                    : `linear-gradient(90deg, ${AMBER_MUTED}80, ${AMBER}80)`,
+                  background: 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))',
+                  boxShadow: '0 0 16px -2px rgba(233,178,102,0.5)',
+                  animationDelay: `${i * 60}ms`,
                 }}
               />
             </div>
-            <span className="font-mono text-xs text-muted-foreground w-4 text-right shrink-0">
-              {d.count}
-            </span>
+            <span className="font-mono text-[13px] text-paper-dim text-right">{d.count}</span>
           </div>
         ))}
-        {data.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground font-sans py-8">No ratings yet</p>
-        )}
+        {data.length === 0 && <p className="text-center text-sm text-paper-faint py-8">No ratings yet</p>}
       </div>
-    </ChartCard>
+    </Panel>
   )
 }
 
-// ─── Screenings Timeline ──────────────────────────────────────────────────────
+// ─── Genre bars ───────────────────────────────────────────────────────────────
 
-function ScreeningsTimeline() {
-  const viewingsByMonth = useAppStore((s) => s.stats.viewingsByMonth)
-
-  const data = viewingsByMonth
-    .slice()
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .map((d) => ({
-      month: d.month.slice(5, 7) + '/' + d.month.slice(2, 4),
-      count: d.count,
-    }))
-
-  return (
-    <ChartCard title="Screenings Timeline — Viewings by Month">
-      <ResponsiveContainer width="100%" height={200}>
-        <LineChart data={data} margin={{ top: 5, right: 0, bottom: 0, left: -20 }}>
-          <XAxis
-            dataKey="month"
-            tick={{ fontFamily: '"DM Mono", monospace', fontSize: 10, fill: MUTED_FG }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            allowDecimals={false}
-            tick={{ fontFamily: '"DM Mono", monospace', fontSize: 11, fill: MUTED_FG }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: 'rgba(233,178,102,0.2)' }} />
-          <Line
-            type="monotone"
-            dataKey="count"
-            stroke={AMBER}
-            strokeWidth={2}
-            dot={{ fill: AMBER, r: 3 }}
-            activeDot={{ r: 5 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </ChartCard>
-  )
-}
-
-// ─── Genre Marquee — with percentage labels + highlighted #1 ──────────────────
-
-function GenreMarquee() {
+function GenreBars({ className }: { className?: string }) {
   const genres = useAppStore((s) => s.stats.topGenres)
+  const maxCount = genres[0]?.count ?? 1
 
   return (
-    <ChartCard title="Genre Marquee — Top Categories">
-      <div className="space-y-3">
+    <Panel title="By the genre" hint="top of the marquee" className={className}>
+      <div className="flex flex-col gap-3">
         {genres.map((g, i) => {
-          const maxCount = genres[0]?.count ?? 1
           const pct = Math.round((g.count / maxCount) * 100)
-
           return (
-            <div key={g.genre} className="flex items-center gap-3">
-              <span className={cn(
-                'font-serif text-sm shrink-0 w-5 text-right',
-                i === 0 ? 'text-amber' : 'text-muted-foreground/30'
-              )}>
-                {i + 1}
+            <div key={g.genre} className="grid items-center gap-3 group" style={{ gridTemplateColumns: '120px 1fr 36px' }}>
+              <span className="text-[13px] text-paper-dim truncate transition-colors group-hover:text-amber-bright">
+                {g.genre}
               </span>
-              <span className="font-sans text-sm text-foreground w-28 shrink-0 truncate">{g.genre}</span>
-              <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-2.5 rounded-md overflow-hidden bg-white/[0.04]">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="bar-fill h-full rounded-md"
                   style={{
                     width: `${pct}%`,
-                    background: i === 0
-                      ? `linear-gradient(90deg, ${AMBER_MUTED}, ${AMBER})`
-                      : `linear-gradient(90deg, ${MUTED_FG}50, ${MUTED_FG}90)`,
+                    background:
+                      i === 0
+                        ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
+                        : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
+                    animationDelay: `${i * 50}ms`,
                   }}
                 />
               </div>
-              <span className="font-mono text-xs text-muted-foreground w-8 text-right shrink-0">
-                {pct}%
-              </span>
+              <span className="font-mono text-xs text-paper-faint text-right">{pct}%</span>
             </div>
           )
         })}
       </div>
-    </ChartCard>
+    </Panel>
   )
 }
 
-// ─── The Auteurs — card-style ranking with serif numbers ──────────────────────
+// ─── Screenings timeline (column chart) ───────────────────────────────────────
 
-function TheAuteurs() {
+function Timeline({ className }: { className?: string }) {
+  const viewingsByMonth = useAppStore((s) => s.stats.viewingsByMonth)
+  const data = viewingsByMonth.slice().sort((a, b) => a.month.localeCompare(b.month))
+  const maxCount = Math.max(...data.map((d) => d.count), 1)
+
+  return (
+    <Panel title="Time in the dark" hint="screenings by month" className={className}>
+      <div className="flex items-end gap-1.5 h-[150px] overflow-x-auto pb-7">
+        {data.map((d, i) => {
+          const label = `${d.month.slice(5, 7)}/${d.month.slice(2, 4)}`
+          return (
+            <div
+              key={d.month}
+              className="group relative flex flex-col items-center justify-end gap-1.5 flex-1 min-w-[24px] h-full"
+              title={`${label}: ${d.count}`}
+            >
+              <span className="font-mono text-[10px] text-amber opacity-0 transition-opacity group-hover:opacity-100">
+                {d.count}
+              </span>
+              <div
+                className="w-full max-w-[26px] rounded-t origin-bottom transition-[filter] group-hover:brightness-125"
+                style={{
+                  height: `${(d.count / maxCount) * 100}%`,
+                  minHeight: '3px',
+                  background:
+                    d.count > 0
+                      ? 'linear-gradient(180deg, var(--amber-bright), var(--amber-deep))'
+                      : 'rgba(255,255,255,0.05)',
+                  animation: 'col-grow 0.7s var(--ease) forwards',
+                  transform: 'scaleY(0)',
+                  animationDelay: `${i * 30}ms`,
+                }}
+              />
+              <span className="absolute -bottom-6 font-mono text-[9px] text-paper-faint whitespace-nowrap tracking-wide">
+                {label}
+              </span>
+            </div>
+          )
+        })}
+        {data.length === 0 && <p className="text-center text-sm text-paper-faint w-full self-center">No screenings logged</p>}
+      </div>
+    </Panel>
+  )
+}
+
+// ─── The auteurs (directors) ──────────────────────────────────────────────────
+
+function TheAuteurs({ className }: { className?: string }) {
   const directors = useAppStore((s) => s.stats.topDirectors)
-
   if (directors.length === 0) return null
 
   return (
-    <ChartCard title="The Auteurs — Directors">
-      <div className="space-y-2">
+    <Panel title="The auteurs" hint="most-watched directors" className={className}>
+      <ol className="flex flex-col gap-1">
         {directors.map((d, i) => (
-          <div
+          <li
             key={d.director}
-            className={cn(
-              'flex items-center gap-3 p-3 rounded-lg border transition-colors',
-              i === 0
-                ? 'bg-amber/5 border-amber/15'
-                : 'bg-secondary/20 border-border/40 hover:border-border/70'
-            )}
+            className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-white/[0.04]"
+            style={{ gridTemplateColumns: '26px 1fr auto' }}
           >
-            <span className={cn(
-              'font-serif text-2xl font-light w-7 text-center shrink-0 leading-none',
-              i === 0 ? 'text-amber' : 'text-muted-foreground/25'
-            )}>
-              {i + 1}
+            <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>
+            <span
+              className="font-serif text-base font-medium text-paper truncate"
+              style={{ fontVariationSettings: '"opsz" 30' }}
+            >
+              {d.director}
             </span>
-            <div className="flex-1 min-w-0">
-              <p className={cn(
-                'font-serif text-sm',
-                i === 0 ? 'text-foreground' : 'text-foreground/70'
-              )}>
-                {d.director}
-              </p>
-              <p className="font-mono text-xs text-muted-foreground">
-                {d.count} film{d.count !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <div className="shrink-0 font-mono text-xs text-amber/40 select-none">
-              {'★'.repeat(Math.min(d.count, 5))}
-            </div>
-          </div>
+            <span className="flex items-center gap-2">
+              <span className="font-mono text-xs text-paper-dim">{d.count}</span>
+              <span className="flex gap-0.5">
+                {Array.from({ length: Math.min(d.count, 5) }, (_, k) => (
+                  <i key={k} className="w-[5px] h-[5px] rounded-full bg-amber" />
+                ))}
+              </span>
+            </span>
+          </li>
         ))}
-      </div>
-    </ChartCard>
+      </ol>
+    </Panel>
   )
 }
 
-// ─── Time in the Dark ─────────────────────────────────────────────────────────
+// ─── Media breakdown donut ────────────────────────────────────────────────────
 
-function TimeInTheDark() {
+function MediaBreakdown({ className }: { className?: string }) {
   const stats = useAppStore((s) => s.stats)
-  const hours = Math.round(stats.totalMinutes / 60)
   const total = stats.totalMovies + stats.totalSeries
   const movieShare = total > 0 ? Math.round((stats.totalMovies / total) * 100) : 0
   const tvShare = 100 - movieShare
-
-  const pieData = [
-    { name: 'Movies', value: movieShare },
-    { name: 'TV', value: tvShare },
-  ]
+  const hours = Math.round(stats.totalMinutes / 60)
 
   return (
-    <ChartCard title="Time in the Dark — Media Breakdown">
+    <Panel title="The bill" hint="film vs. series" className={className}>
       <div className="flex items-center gap-6">
-        <ResponsiveContainer width={120} height={120}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              cx="50%"
-              cy="50%"
-              innerRadius={35}
-              outerRadius={55}
-              dataKey="value"
-              strokeWidth={0}
-            >
-              <Cell fill={AMBER} />
-              <Cell fill={MUTED} />
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+        <div
+          className="w-[120px] h-[120px] rounded-full shrink-0 grid place-items-center"
+          style={{
+            background: `conic-gradient(var(--amber) 0% ${movieShare}%, var(--ink-3) ${movieShare}% 100%)`,
+          }}
+        >
+          <div
+            className="w-[72px] h-[72px] rounded-full grid place-items-center"
+            style={{ background: 'var(--ink-1)' }}
+          >
+            <span className="font-mono text-[13px] text-amber">{movieShare}%</span>
+          </div>
+        </div>
         <div className="space-y-4">
           <div>
-            <StatNumber className="text-xl">{hours}h</StatNumber>
-            <div className="mt-0.5">
-              <StatLabel>Total Screen Time</StatLabel>
+            <div className="stat-num text-2xl">
+              {hours}
+              <span className="unit">h</span>
+            </div>
+            <div className="mt-0.5 font-mono text-[10px] tracking-[0.18em] uppercase text-paper-faint">
+              Total Screen Time
             </div>
           </div>
-          <div className="flex gap-4 text-xs font-mono">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: AMBER }} />
-              <span className="text-muted-foreground">{movieShare}% Movies</span>
+          <div className="space-y-1.5 font-mono text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber" />
+              <span className="text-paper-dim">{movieShare}% Films</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: MUTED }} />
-              <span className="text-muted-foreground">{tvShare}% TV</span>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full" style={{ background: 'var(--ink-3)' }} />
+              <span className="text-paper-dim">{tvShare}% Series</span>
             </div>
           </div>
         </div>
       </div>
-    </ChartCard>
+    </Panel>
   )
 }
 
@@ -325,26 +310,16 @@ function TimeInTheDark() {
 
 export function Ledger() {
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 pb-24 space-y-6">
-      <div className="mb-8">
-        <SectionHeading>The Ledger</SectionHeading>
-        <p className="font-sans text-sm text-muted-foreground mt-1">
-          Your cinematic record
-        </p>
-      </div>
+    <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+      <DashHero />
+      <StatStrip />
 
-      <SummaryRow />
-
-      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-        <RatingDistribution />
-        <TimeInTheDark />
-      </div>
-
-      <ScreeningsTimeline />
-
-      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-        <GenreMarquee />
-        <TheAuteurs />
+      <div className="grid grid-cols-12 gap-4">
+        <RatingDistribution className="col-span-12 lg:col-span-5" />
+        <GenreBars className="col-span-12 lg:col-span-7" />
+        <Timeline className="col-span-12 lg:col-span-8" />
+        <TheAuteurs className="col-span-12 lg:col-span-4" />
+        <MediaBreakdown className="col-span-12" />
       </div>
     </div>
   )

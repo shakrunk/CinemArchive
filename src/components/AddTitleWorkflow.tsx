@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { Search, Film, Tv, Star, Calendar, FileText, ChevronRight, Check } from 'lucide-react'
-import { BottomSheet } from 'src/components/ui/bottom-sheet'
+import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { StarRating } from 'src/components/ui/star-rating'
@@ -260,8 +260,10 @@ export function AddTitleWorkflow() {
   function handleSave() {
     if (!selected) return
 
+    const id = `local-${Date.now()}`
+
     const newTitle: Title = {
-      id: `local-${Date.now()}`,
+      id,
       tmdbId: selected.tmdbId,
       type: selected.type,
       title: selected.title,
@@ -279,7 +281,7 @@ export function AddTitleWorkflow() {
       addedAt: new Date().toISOString().slice(0, 10),
       seasons: log.seasons.length > 0 ? log.seasons : undefined,
       viewings: log.status === 'watched' && log.date
-        ? [{ id: `v-${Date.now()}`, titleId: `local-${Date.now()}`, date: log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
+        ? [{ id: `v-${id}`, titleId: id, date: log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
         : [],
     }
 
@@ -298,14 +300,16 @@ export function AddTitleWorkflow() {
   }
 
   return (
-    <BottomSheet
+    <CinemaModal
       open={isAddTitleOpen}
       onClose={handleClose}
+      maxWidth="sm:max-w-lg"
       title="Add to Library"
-      side="right"
+      description="Search for a movie or series and log your viewing details."
     >
-      {/* Visual step progress indicator */}
-      <StepIndicator step={step} />
+      <div className="overflow-y-auto flex-1 scrollbar-thin px-6 py-6">
+        <h2 className="font-serif text-xl font-light text-foreground mb-5">Add to Library</h2>
+        <StepIndicator step={step} />
 
       {/* Step 1: Search */}
       {step === 'search' && (
@@ -524,6 +528,7 @@ export function AddTitleWorkflow() {
           </Button>
         </div>
       )}
-    </BottomSheet>
+      </div>
+    </CinemaModal>
   )
 }

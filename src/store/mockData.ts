@@ -54,284 +54,1293 @@ export interface LedgerStats {
   viewingsByMonth: { month: string; count: number }[]
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Library data — migrated from MovieTracker v1 (movies.json) on 2026-06-16.
+// Regenerate with: node scripts/migrate-from-v1.mjs
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const mockTitles: Title[] = [
   {
-    id: '1',
-    tmdbId: 807,
-    type: 'movie',
-    title: 'Se7en',
-    year: 1995,
-    director: 'David Fincher',
-    genres: ['Crime', 'Drama', 'Mystery', 'Thriller'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/6yoghtyTpznpBik8EngEmJskVUO.jpg',
-    synopsis:
-      'Two detectives, a rookie and a veteran, hunt a serial killer who uses the seven deadly sins as his motive.',
-    runtime: 127,
-    status: 'watched',
-    rating: 5,
-    tags: ['noir', 'psychological', 'neo-noir'],
-    addedAt: '2024-01-15',
-    imdbRating: 8.6,
-    rtScore: 82,
-    metacriticScore: 65,
-    viewings: [
-      { id: 'v1', titleId: '1', date: '2022-10-31', rating: 5, notes: 'Halloween rewatch. Still perfect.' },
-      { id: 'v2', titleId: '1', date: '2024-01-15', rating: 5 },
+    "id": "mt-1",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Inception",
+    "year": 2010,
+    "director": "Christopher Nolan",
+    "genres": [
+      "Action",
+      "Science Fiction",
+      "Adventure"
     ],
+    "runtime": 148,
+    "status": "watched",
+    "rating": 5,
+    "notes": "Mind-bending and visually stunning.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2010-07-15",
+    "viewings": []
   },
   {
-    id: '2',
-    tmdbId: 157336,
-    type: 'movie',
-    title: 'Interstellar',
-    year: 2014,
-    director: 'Christopher Nolan',
-    genres: ['Adventure', 'Drama', 'Science Fiction'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
-    synopsis: 'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
-    runtime: 169,
-    status: 'watched',
-    rating: 4.5,
-    tags: ['space', 'epic', 'emotional'],
-    addedAt: '2024-02-10',
-    imdbRating: 8.7,
-    rtScore: 72,
-    metacriticScore: 74,
-    viewings: [
-      { id: 'v3', titleId: '2', date: '2014-11-07', rating: 4.5, notes: 'Cinema. The IMAX experience was transcendent.' },
-      { id: 'v4', titleId: '2', date: '2023-05-20', rating: 5 },
+    "id": "mt-2",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Pulp Fiction",
+    "year": 1994,
+    "director": "Quentin Tarantino",
+    "genres": [
+      "Thriller",
+      "Crime",
+      "Comedy"
     ],
+    "runtime": 154,
+    "status": "watched",
+    "rating": 1,
+    "notes": "Guess I'm not really a Tarantino fan :/",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1994-09-10",
+    "viewings": []
   },
   {
-    id: '3',
-    tmdbId: 278,
-    type: 'movie',
-    title: 'The Shawshank Redemption',
-    year: 1994,
-    director: 'Frank Darabont',
-    genres: ['Drama'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/lyQBXzOQSuE59IsHyhrp0qIiPAz.jpg',
-    synopsis: 'Two imprisoned men bond over years, finding solace and eventual redemption through acts of common decency.',
-    runtime: 142,
-    status: 'watched',
-    rating: 5,
-    tags: ['classic', 'prison', 'hope'],
-    addedAt: '2024-01-01',
-    imdbRating: 9.3,
-    rtScore: 91,
-    metacriticScore: 80,
-    viewings: [
-      { id: 'v5', titleId: '3', date: '2019-03-10', rating: 5 },
-      { id: 'v6', titleId: '3', date: '2024-01-01', rating: 5, notes: 'Annual rewatch tradition.' },
+    "id": "mt-3",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Shawshank Redemption",
+    "year": 1994,
+    "director": "Frank Darabont",
+    "genres": [
+      "Drama",
+      "Crime"
     ],
+    "runtime": 142,
+    "status": "watched",
+    "rating": 5,
+    "notes": "Uplifting and emotionally resonant.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1994-09-23",
+    "viewings": []
   },
   {
-    id: '4',
-    tmdbId: 1396,
-    type: 'tv',
-    title: 'Breaking Bad',
-    year: 2008,
-    director: 'Vince Gilligan',
-    genres: ['Crime', 'Drama', 'Thriller'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
-    synopsis: 'A high school chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine.',
-    network: 'AMC',
-    status: 'watched',
-    rating: 5,
-    tags: ['prestige-tv', 'crime', 'drama'],
-    addedAt: '2024-01-20',
-    imdbRating: 9.5,
-    rtScore: 96,
-    metacriticScore: 99,
-    seasons: [
-      { id: 's1', seasonNumber: 1, episodeCount: 7, episodesWatched: 7, airYear: 2008 },
-      { id: 's2', seasonNumber: 2, episodeCount: 13, episodesWatched: 13, airYear: 2009 },
-      { id: 's3', seasonNumber: 3, episodeCount: 13, episodesWatched: 13, airYear: 2010 },
-      { id: 's4', seasonNumber: 4, episodeCount: 13, episodesWatched: 13, airYear: 2011 },
-      { id: 's5', seasonNumber: 5, episodeCount: 16, episodesWatched: 16, airYear: 2012 },
+    "id": "mt-4",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Dark Knight",
+    "year": 2008,
+    "director": "Christopher Nolan",
+    "genres": [
+      "Action",
+      "Crime",
+      "Thriller"
     ],
-    viewings: [
-      { id: 'v7', titleId: '4', date: '2023-08-15', rating: 5, notes: 'Finally watched all of it in one month. Incredible.' },
+    "runtime": 152,
+    "status": "watched",
+    "rating": 5,
+    "notes": "A superhero masterpiece.",
+    "tags": [
+      "rewatch"
     ],
+    "addedAt": "2008-07-16",
+    "viewings": []
   },
   {
-    id: '5',
-    tmdbId: 680,
-    type: 'movie',
-    title: 'Pulp Fiction',
-    year: 1994,
-    director: 'Quentin Tarantino',
-    genres: ['Crime', 'Drama', 'Thriller'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/fIE3lAGcZDV1G6XM5KmuWnNsPp1.jpg',
-    synopsis: 'The lives of two mob hitmen, a boxer, a gangster and his wife intertwine in this crime drama.',
-    runtime: 154,
-    status: 'watched',
-    rating: 5,
-    tags: ['postmodern', 'crime', 'cult'],
-    addedAt: '2024-01-05',
-    imdbRating: 8.9,
-    rtScore: 92,
-    metacriticScore: 94,
-    viewings: [
-      { id: 'v8', titleId: '5', date: '2020-06-12', rating: 5 },
-      { id: 'v9', titleId: '5', date: '2023-11-22', rating: 5, notes: 'Still hits differently every time.' },
+    "id": "mt-5",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Forrest Gump",
+    "year": 1994,
+    "director": "Robert Zemeckis",
+    "genres": [
+      "Comedy",
+      "Drama",
+      "Romance"
     ],
+    "runtime": 142,
+    "status": "watched",
+    "rating": 1,
+    "notes": "Heartwarming but a bit too sentimental for my taste.  Kinda lacks a traditional story stucture.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1994-06-23",
+    "viewings": []
   },
   {
-    id: '6',
-    tmdbId: 11,
-    type: 'movie',
-    title: 'Star Wars: A New Hope',
-    year: 1977,
-    director: 'George Lucas',
-    genres: ['Adventure', 'Action', 'Science Fiction'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/6FfCtAuVAW8XJjZ7eWeLibRLWTw.jpg',
-    synopsis: 'Luke Skywalker joins forces with a Jedi Knight, a cocky pilot, and two droids to save the galaxy.',
-    runtime: 121,
-    status: 'watched',
-    rating: 4,
-    tags: ['space-opera', 'classic', 'franchise'],
-    addedAt: '2024-02-01',
-    imdbRating: 8.6,
-    rtScore: 93,
-    metacriticScore: 90,
-    viewings: [
-      { id: 'v10', titleId: '6', date: '2024-02-01', rating: 4 },
+    "id": "mt-6",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Interstellar",
+    "year": 2014,
+    "director": "Christopher Nolan",
+    "genres": [
+      "Adventure",
+      "Drama",
+      "Science Fiction"
     ],
+    "runtime": 169,
+    "status": "watched",
+    "rating": 3,
+    "notes": "Ambitious and thought-provoking.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2014-11-05",
+    "viewings": []
   },
   {
-    id: '7',
-    tmdbId: 1399,
-    type: 'tv',
-    title: 'Game of Thrones',
-    year: 2011,
-    genres: ['Action', 'Adventure', 'Drama', 'Fantasy'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
-    synopsis: 'Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns.',
-    network: 'HBO',
-    status: 'watched',
-    rating: 3.5,
-    tags: ['fantasy', 'epic', 'prestige-tv'],
-    addedAt: '2024-01-25',
-    imdbRating: 9.2,
-    rtScore: 89,
-    seasons: [
-      { id: 'gs1', seasonNumber: 1, episodeCount: 10, episodesWatched: 10, airYear: 2011 },
-      { id: 'gs2', seasonNumber: 2, episodeCount: 10, episodesWatched: 10, airYear: 2012 },
-      { id: 'gs3', seasonNumber: 3, episodeCount: 10, episodesWatched: 10, airYear: 2013 },
-      { id: 'gs4', seasonNumber: 4, episodeCount: 10, episodesWatched: 10, airYear: 2014 },
-      { id: 'gs5', seasonNumber: 5, episodeCount: 10, episodesWatched: 10, airYear: 2015 },
-      { id: 'gs6', seasonNumber: 6, episodeCount: 10, episodesWatched: 10, airYear: 2016 },
-      { id: 'gs7', seasonNumber: 7, episodeCount: 7, episodesWatched: 7, airYear: 2017 },
-      { id: 'gs8', seasonNumber: 8, episodeCount: 6, episodesWatched: 6, airYear: 2019 },
+    "id": "mt-7",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "GATTACA",
+    "year": 1997,
+    "director": "Andrew Niccol",
+    "genres": [
+      "Science Fiction",
+      "Drama",
+      "Thriller"
     ],
-    viewings: [
-      { id: 'v11', titleId: '7', date: '2019-05-19', rating: 3.5, notes: 'Loved S1-S6. S7-S8 was disappointing.' },
+    "runtime": 106,
+    "status": "watched",
+    "rating": 5,
+    "tags": [
+      "rewatch"
     ],
+    "addedAt": "1997-07-09",
+    "viewings": []
   },
   {
-    id: '8',
-    tmdbId: 240,
-    type: 'movie',
-    title: 'The Godfather Part II',
-    year: 1974,
-    director: 'Francis Ford Coppola',
-    genres: ['Crime', 'Drama'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/hek3koDUyRQk7FIhPXsa6mT2Zc3.jpg',
-    synopsis: 'The early life and career of Vito Corleone in 1920s New York is portrayed, while his son Michael expands and tightens his grip on the family crime syndicate.',
-    runtime: 202,
-    status: 'watchlist',
-    rating: undefined,
-    tags: ['crime', 'classic', 'sequel'],
-    addedAt: '2024-03-01',
-    imdbRating: 9.0,
-    rtScore: 97,
-    metacriticScore: 90,
-    viewings: [],
-  },
-  {
-    id: '9',
-    tmdbId: 13,
-    type: 'movie',
-    title: 'Forrest Gump',
-    year: 1994,
-    director: 'Robert Zemeckis',
-    genres: ['Comedy', 'Drama', 'Romance'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg',
-    synopsis: 'The presidencies of Kennedy and Johnson, Vietnam, Watergate, and other historical events unfold through the perspective of an Alabama man.',
-    runtime: 142,
-    status: 'watched',
-    rating: 4,
-    tags: ['classic', 'americana', 'drama'],
-    addedAt: '2024-02-15',
-    imdbRating: 8.8,
-    rtScore: 71,
-    metacriticScore: 82,
-    viewings: [
-      { id: 'v12', titleId: '9', date: '2024-02-15', rating: 4 },
+    "id": "mt-8",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "A Bug's Life",
+    "year": 1998,
+    "director": "John Lasseter, Andrew Stanton",
+    "genres": [
+      "Animation",
+      "Adventure",
+      "Comedy"
     ],
+    "runtime": 95,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1998-11-25",
+    "viewings": []
   },
   {
-    id: '10',
-    tmdbId: 346698,
-    type: 'movie',
-    title: 'Barbie',
-    year: 2023,
-    director: 'Greta Gerwig',
-    genres: ['Adventure', 'Comedy', 'Fantasy'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg',
-    synopsis: 'Barbie and Ken are having the time of their lives in the colorful and seemingly perfect world of Barbie Land.',
-    runtime: 114,
-    status: 'watching',
-    rating: undefined,
-    tags: ['2023', 'feminist', 'comedy'],
-    addedAt: '2024-03-10',
-    imdbRating: 6.9,
-    rtScore: 88,
-    viewings: [],
+    "id": "mt-9",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Sixth Sense",
+    "year": 1999,
+    "director": "M. Night Shyamalan",
+    "genres": [
+      "Thriller",
+      "Mystery"
+    ],
+    "runtime": 107,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1999-08-06",
+    "viewings": []
   },
+  {
+    "id": "mt-10",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Matrix",
+    "year": 1999,
+    "director": "The Wachowskis",
+    "genres": [
+      "Science Fiction",
+      "Action"
+    ],
+    "runtime": 136,
+    "status": "watched",
+    "rating": 5,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1999-03-31",
+    "viewings": []
+  },
+  {
+    "id": "mt-11",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Looper",
+    "year": 2012,
+    "director": "Rian Johnson",
+    "genres": [
+      "Science Fiction",
+      "Action"
+    ],
+    "runtime": 119,
+    "status": "watched",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2012-09-28",
+    "viewings": []
+  },
+  {
+    "id": "mt-12",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Upgrade",
+    "year": 2018,
+    "director": "Leigh Whannell",
+    "genres": [
+      "Science Fiction",
+      "Action"
+    ],
+    "runtime": 100,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2018-06-01",
+    "viewings": []
+  },
+  {
+    "id": "mt-13",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Everything Everywhere All at Once",
+    "year": 2022,
+    "director": "Daniel Kwan, Daniel Scheinert",
+    "genres": [
+      "Science Fiction",
+      "Adventure"
+    ],
+    "runtime": 139,
+    "status": "watched",
+    "rating": 5,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2022-03-25",
+    "viewings": []
+  },
+  {
+    "id": "mt-14",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Ex Machina",
+    "year": 2015,
+    "director": "Alex Garland",
+    "genres": [
+      "Science Fiction",
+      "Thriller"
+    ],
+    "runtime": 108,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2015-04-10",
+    "viewings": []
+  },
+  {
+    "id": "mt-15",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Arrival",
+    "year": 2016,
+    "director": "Denis Villeneuve",
+    "genres": [
+      "Science Fiction",
+      "Drama"
+    ],
+    "runtime": 116,
+    "status": "watched",
+    "rating": 3,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2016-11-11",
+    "viewings": []
+  },
+  {
+    "id": "mt-16",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Coherence",
+    "year": 2013,
+    "director": "James Ward Byrkit",
+    "genres": [
+      "Science Fiction",
+      "Thriller"
+    ],
+    "runtime": 89,
+    "status": "watched",
+    "rating": 4,
+    "tags": [],
+    "addedAt": "2026-06-06",
+    "viewings": [
+      {
+        "id": "mt-16-v1",
+        "titleId": "mt-16",
+        "date": "2026-06-06",
+        "rating": 4
+      }
+    ]
+  },
+  {
+    "id": "mt-17",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Triangle",
+    "year": 2009,
+    "director": "Christopher Smith",
+    "genres": [
+      "Thriller",
+      "Mystery"
+    ],
+    "runtime": 99,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2009-10-16",
+    "viewings": []
+  },
+  {
+    "id": "mt-18",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Predestination",
+    "year": 2014,
+    "director": "The Spierig Brothers",
+    "genres": [
+      "Science Fiction",
+      "Thriller"
+    ],
+    "runtime": 97,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2014-08-28",
+    "viewings": []
+  },
+  {
+    "id": "mt-19",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Fall",
+    "year": 2022,
+    "director": "Scott Mann",
+    "genres": [
+      "Thriller",
+      "Survival"
+    ],
+    "runtime": 107,
+    "status": "watched",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2022-08-12",
+    "viewings": []
+  },
+  {
+    "id": "mt-20",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Searching",
+    "year": 2018,
+    "director": "Aneesh Chaganty",
+    "genres": [
+      "Thriller",
+      "Mystery"
+    ],
+    "runtime": 102,
+    "status": "watched",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2018-08-24",
+    "viewings": []
+  },
+  {
+    "id": "mt-21",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Heretic",
+    "year": 2024,
+    "director": "Scott Beck, Bryan Woods",
+    "genres": [
+      "Horror",
+      "Thriller"
+    ],
+    "runtime": 111,
+    "status": "watched",
+    "rating": 5,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2024-11-08",
+    "viewings": []
+  },
+  {
+    "id": "mt-22",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Housemaid",
+    "year": 2010,
+    "director": "Im Sang-soo",
+    "genres": [
+      "Thriller",
+      "Drama"
+    ],
+    "runtime": 106,
+    "status": "watched",
+    "rating": 3,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2010-05-13",
+    "viewings": []
+  },
+  {
+    "id": "mt-23",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Subservience",
+    "year": 2024,
+    "director": "S.K. Dale",
+    "genres": [
+      "Science Fiction",
+      "Thriller"
+    ],
+    "runtime": 95,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2024-08-23",
+    "viewings": []
+  },
+  {
+    "id": "mt-24",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "OtherLife",
+    "year": 2017,
+    "director": "Ben C. Lucas",
+    "genres": [
+      "Science Fiction",
+      "Thriller",
+      "Mystery"
+    ],
+    "runtime": 96,
+    "status": "watched",
+    "rating": 4,
+    "tags": [],
+    "addedAt": "2026-05-24",
+    "viewings": [
+      {
+        "id": "mt-24-v1",
+        "titleId": "mt-24",
+        "date": "2026-05-24",
+        "rating": 4
+      }
+    ]
+  },
+  {
+    "id": "mt-25",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Smile",
+    "year": 2022,
+    "director": "Parker Finn",
+    "genres": [
+      "Horror",
+      "Mystery",
+      "Thriller"
+    ],
+    "runtime": 115,
+    "status": "watched",
+    "rating": 4,
+    "notes": "Concept felt familiar immediately; unsure if watched previously or just recognizing the sequel.",
+    "tags": [],
+    "addedAt": "2026-05-30",
+    "viewings": [
+      {
+        "id": "mt-25-v1",
+        "titleId": "mt-25",
+        "date": "2026-05-30",
+        "rating": 4
+      }
+    ]
+  },
+  {
+    "id": "mt-26",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Eternal Sunshine of the Spotless Mind",
+    "year": 2004,
+    "director": "Michel Gondry",
+    "genres": [
+      "Science Fiction",
+      "Drama",
+      "Romance"
+    ],
+    "runtime": 108,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-04-08",
+    "viewings": [
+      {
+        "id": "mt-26-v1",
+        "titleId": "mt-26",
+        "date": "2025-04-08"
+      }
+    ]
+  },
+  {
+    "id": "mt-27",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "How to Train Your Dragon: Homecoming",
+    "year": 2019,
+    "director": "Tim Johnson",
+    "genres": [
+      "Animation",
+      "Action",
+      "Adventure",
+      "Family"
+    ],
+    "runtime": 22,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-04-27",
+    "viewings": [
+      {
+        "id": "mt-27-v1",
+        "titleId": "mt-27",
+        "date": "2025-04-27"
+      }
+    ]
+  },
+  {
+    "id": "mt-28",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "How to Train Your Dragon: Snoggletog Log",
+    "year": 2019,
+    "director": "Tim Johnson",
+    "genres": [
+      "Animation",
+      "Short",
+      "Family"
+    ],
+    "runtime": 28,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-04-27",
+    "viewings": [
+      {
+        "id": "mt-28-v1",
+        "titleId": "mt-28",
+        "date": "2025-04-27"
+      }
+    ]
+  },
+  {
+    "id": "mt-29",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Sinners",
+    "year": 2025,
+    "director": "Ryan Coogler",
+    "genres": [
+      "Horror",
+      "Thriller",
+      "Drama"
+    ],
+    "runtime": 137,
+    "status": "watched",
+    "rating": 5,
+    "tags": [],
+    "addedAt": "2025-06-05",
+    "viewings": [
+      {
+        "id": "mt-29-v1",
+        "titleId": "mt-29",
+        "date": "2025-06-05",
+        "rating": 5
+      }
+    ]
+  },
+  {
+    "id": "mt-30",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "What Women Want",
+    "year": 2000,
+    "director": "Nancy Meyers",
+    "genres": [
+      "Comedy",
+      "Romance"
+    ],
+    "runtime": 127,
+    "status": "watched",
+    "rating": 3,
+    "tags": [],
+    "addedAt": "2025-06-28",
+    "viewings": [
+      {
+        "id": "mt-30-v1",
+        "titleId": "mt-30",
+        "date": "2025-06-28",
+        "rating": 3
+      }
+    ]
+  },
+  {
+    "id": "mt-31",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Hidden Face",
+    "year": 2011,
+    "director": "Andrés Baiz",
+    "genres": [
+      "Drama",
+      "Mystery",
+      "Thriller"
+    ],
+    "runtime": 97,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-06-30",
+    "viewings": [
+      {
+        "id": "mt-31-v1",
+        "titleId": "mt-31",
+        "date": "2025-06-30"
+      }
+    ]
+  },
+  {
+    "id": "mt-32",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Thunderbolts*",
+    "year": 2025,
+    "director": "Jake Schreier",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Science Fiction"
+    ],
+    "runtime": 126,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-07-21",
+    "viewings": [
+      {
+        "id": "mt-32-v1",
+        "titleId": "mt-32",
+        "date": "2025-07-21"
+      }
+    ]
+  },
+  {
+    "id": "mt-33",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Pursuit of Happyness",
+    "year": 2006,
+    "director": "Gabriele Muccino",
+    "genres": [
+      "Drama"
+    ],
+    "runtime": 117,
+    "status": "watched",
+    "rating": 3,
+    "tags": [],
+    "addedAt": "2025-08-25",
+    "viewings": [
+      {
+        "id": "mt-33-v1",
+        "titleId": "mt-33",
+        "date": "2025-08-25",
+        "rating": 3
+      }
+    ]
+  },
+  {
+    "id": "mt-34",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Giver",
+    "year": 2014,
+    "director": "Phillip Noyce",
+    "genres": [
+      "Science Fiction",
+      "Drama"
+    ],
+    "runtime": 97,
+    "status": "watched",
+    "rating": 3,
+    "tags": [],
+    "addedAt": "2025-09-01",
+    "viewings": [
+      {
+        "id": "mt-34-v1",
+        "titleId": "mt-34",
+        "date": "2025-09-01",
+        "rating": 3
+      }
+    ]
+  },
+  {
+    "id": "mt-35",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "TRON: Ares",
+    "year": 2025,
+    "director": "Joachim Rønning",
+    "genres": [
+      "Science Fiction",
+      "Action",
+      "Adventure"
+    ],
+    "runtime": 119,
+    "status": "watched",
+    "rating": 2,
+    "tags": [],
+    "addedAt": "2025-11-24",
+    "viewings": [
+      {
+        "id": "mt-35-v1",
+        "titleId": "mt-35",
+        "date": "2025-11-24",
+        "rating": 2
+      }
+    ]
+  },
+  {
+    "id": "mt-36",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Substance",
+    "year": 2024,
+    "director": "Coralie Fargeat",
+    "genres": [
+      "Horror",
+      "Science Fiction",
+      "Drama"
+    ],
+    "runtime": 141,
+    "status": "watched",
+    "rating": 2,
+    "notes": "Social commentary is strong.  Still would rather not watch again.  I think body horror is probably just not my thing.",
+    "tags": [],
+    "addedAt": "2025-12-01",
+    "viewings": [
+      {
+        "id": "mt-36-v1",
+        "titleId": "mt-36",
+        "date": "2025-12-01",
+        "rating": 2
+      }
+    ]
+  },
+  {
+    "id": "mt-37",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Batman: Hush",
+    "year": 2019,
+    "director": "Justin Copeland",
+    "genres": [
+      "Animation",
+      "Action",
+      "Mystery"
+    ],
+    "runtime": 82,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-12-13",
+    "viewings": [
+      {
+        "id": "mt-37-v1",
+        "titleId": "mt-37",
+        "date": "2025-12-13"
+      }
+    ]
+  },
+  {
+    "id": "mt-38",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Father",
+    "year": 2020,
+    "director": "Florian Zeller",
+    "genres": [
+      "Drama",
+      "Mystery"
+    ],
+    "runtime": 97,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2025-12-13",
+    "viewings": [
+      {
+        "id": "mt-38-v1",
+        "titleId": "mt-38",
+        "date": "2025-12-13"
+      }
+    ]
+  },
+  {
+    "id": "mt-39",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Primer",
+    "year": 2004,
+    "director": "Shane Carruth",
+    "genres": [
+      "Science Fiction",
+      "Drama",
+      "Thriller"
+    ],
+    "runtime": 77,
+    "status": "watched",
+    "rating": 5,
+    "tags": [],
+    "addedAt": "2026-01-02",
+    "viewings": [
+      {
+        "id": "mt-39-v1",
+        "titleId": "mt-39",
+        "date": "2026-01-02",
+        "rating": 5
+      }
+    ]
+  },
+  {
+    "id": "mt-40",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Doctor Strange",
+    "year": 2016,
+    "director": "Scott Derrickson",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Fantasy"
+    ],
+    "runtime": 115,
+    "status": "watched",
+    "rating": 3,
+    "tags": [],
+    "addedAt": "2026-01-25",
+    "viewings": [
+      {
+        "id": "mt-40-v1",
+        "titleId": "mt-40",
+        "date": "2026-01-25",
+        "rating": 3
+      }
+    ]
+  },
+  {
+    "id": "mt-41",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Sky High",
+    "year": 2005,
+    "director": "Mike Mitchell",
+    "genres": [
+      "Action",
+      "Comedy",
+      "Family",
+      "Science Fiction"
+    ],
+    "runtime": 100,
+    "status": "watched",
+    "tags": [],
+    "addedAt": "2026-01-25",
+    "viewings": [
+      {
+        "id": "mt-41-v1",
+        "titleId": "mt-41",
+        "date": "2026-01-25"
+      }
+    ]
+  },
+  {
+    "id": "mt-42",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Her",
+    "year": 2013,
+    "director": "Spike Jonze",
+    "genres": [
+      "Romance",
+      "Science Fiction",
+      "Drama"
+    ],
+    "runtime": 126,
+    "status": "watched",
+    "rating": 4,
+    "tags": [],
+    "addedAt": "2026-02-20",
+    "viewings": [
+      {
+        "id": "mt-42-v1",
+        "titleId": "mt-42",
+        "date": "2026-02-20",
+        "rating": 4
+      }
+    ]
+  },
+  {
+    "id": "mt-43",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Archive",
+    "year": 2020,
+    "director": "Gavin Rothery",
+    "genres": [
+      "Science Fiction",
+      "Drama",
+      "Mystery"
+    ],
+    "runtime": 109,
+    "status": "watched",
+    "rating": 3,
+    "tags": [],
+    "addedAt": "2026-04-25",
+    "viewings": [
+      {
+        "id": "mt-43-v1",
+        "titleId": "mt-43",
+        "date": "2026-04-25",
+        "rating": 3
+      }
+    ]
+  },
+  {
+    "id": "mt-44",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Prestige",
+    "year": 2006,
+    "director": "Christopher Nolan",
+    "genres": [
+      "Drama",
+      "Mystery",
+      "Science Fiction"
+    ],
+    "runtime": 130,
+    "status": "watched",
+    "rating": 3,
+    "notes": "Kinda unimpressed but mostly because the big \"twist\" was a little derivative.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2006-10-20",
+    "viewings": []
+  },
+  {
+    "id": "mt-45",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "The Game",
+    "year": 1997,
+    "director": "David Fincher",
+    "genres": [
+      "Drama",
+      "Mystery",
+      "Thriller"
+    ],
+    "runtime": 129,
+    "status": "watched",
+    "rating": 4,
+    "notes": "That was a fun one.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "1997-09-12",
+    "viewings": []
+  },
+  {
+    "id": "mt-46",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Fracture",
+    "year": 2007,
+    "director": "Gregory Hoblit",
+    "genres": [
+      "Crime",
+      "Drama",
+      "Thriller"
+    ],
+    "runtime": 113,
+    "status": "watched",
+    "rating": 4,
+    "notes": "Solid 4 / 5 in my book",
+    "tags": [],
+    "addedAt": "2026-06-01",
+    "viewings": [
+      {
+        "id": "mt-46-v1",
+        "titleId": "mt-46",
+        "date": "2026-06-01",
+        "rating": 4
+      }
+    ]
+  },
+  {
+    "id": "mt-47",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Prisoners",
+    "year": 2013,
+    "director": "Denis Villeneuve",
+    "genres": [
+      "Crime",
+      "Drama",
+      "Mystery",
+      "Thriller"
+    ],
+    "runtime": 153,
+    "status": "watched",
+    "rating": 3,
+    "notes": "The one with the weird recurring maze motif.",
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2013-09-20",
+    "viewings": []
+  },
+  {
+    "id": "mt-48",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Source Code",
+    "year": 2011,
+    "director": "Duncan Jones",
+    "genres": [
+      "Science Fiction",
+      "Thriller"
+    ],
+    "runtime": 93,
+    "status": "watched",
+    "rating": 2,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2011-04-01",
+    "viewings": []
+  },
+  {
+    "id": "mt-49",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Memento",
+    "year": 2000,
+    "director": "Christopher Nolan",
+    "genres": [
+      "Mystery",
+      "Thriller"
+    ],
+    "runtime": 113,
+    "status": "watched",
+    "rating": 4,
+    "tags": [
+      "rewatch"
+    ],
+    "addedAt": "2000-09-05",
+    "viewings": []
+  },
+  {
+    "id": "mt-50",
+    "tmdbId": 0,
+    "type": "movie",
+    "title": "Paddington",
+    "year": 2015,
+    "director": "Paul King",
+    "genres": [
+      "Adventure",
+      "Comedy",
+      "Family"
+    ],
+    "runtime": 95,
+    "status": "watched",
+    "rating": 4,
+    "notes": "Warm and fun",
+    "tags": [],
+    "addedAt": "2026-06-08",
+    "viewings": [
+      {
+        "id": "mt-50-v1",
+        "titleId": "mt-50",
+        "date": "2026-06-08",
+        "rating": 4
+      }
+    ]
+  }
 ]
 
 export const mockLedgerStats: LedgerStats = {
-  totalMovies: 8,
-  totalSeries: 2,
-  totalViewings: 13,
-  avgRating: 4.5,
-  totalMinutes: 1701,
-  topGenres: [
-    { genre: 'Drama', count: 7 },
-    { genre: 'Crime', count: 5 },
-    { genre: 'Thriller', count: 4 },
-    { genre: 'Science Fiction', count: 2 },
-    { genre: 'Adventure', count: 2 },
-    { genre: 'Fantasy', count: 2 },
+  "totalMovies": 50,
+  "totalSeries": 0,
+  "totalViewings": 23,
+  "avgRating": 3.7,
+  "totalMinutes": 5601,
+  "topGenres": [
+    {
+      "genre": "Thriller",
+      "count": 23
+    },
+    {
+      "genre": "Science Fiction",
+      "count": 22
+    },
+    {
+      "genre": "Drama",
+      "count": 20
+    },
+    {
+      "genre": "Mystery",
+      "count": 13
+    },
+    {
+      "genre": "Action",
+      "count": 11
+    },
+    {
+      "genre": "Adventure",
+      "count": 9
+    }
   ],
-  topDirectors: [
-    { director: 'David Fincher', count: 1 },
-    { director: 'Christopher Nolan', count: 1 },
-    { director: 'Quentin Tarantino', count: 1 },
-    { director: 'Francis Ford Coppola', count: 1 },
-    { director: 'Greta Gerwig', count: 1 },
+  "topDirectors": [
+    {
+      "director": "Christopher Nolan",
+      "count": 5
+    },
+    {
+      "director": "Denis Villeneuve",
+      "count": 2
+    },
+    {
+      "director": "Tim Johnson",
+      "count": 2
+    },
+    {
+      "director": "Quentin Tarantino",
+      "count": 1
+    },
+    {
+      "director": "Frank Darabont",
+      "count": 1
+    }
   ],
-  ratingDistribution: [
-    { rating: 5, count: 4 },
-    { rating: 4.5, count: 1 },
-    { rating: 4, count: 2 },
-    { rating: 3.5, count: 1 },
-    { rating: 3, count: 0 },
-    { rating: 2.5, count: 0 },
-    { rating: 2, count: 0 },
-    { rating: 1.5, count: 0 },
-    { rating: 1, count: 0 },
+  "ratingDistribution": [
+    {
+      "rating": 5,
+      "count": 9
+    },
+    {
+      "rating": 4.5,
+      "count": 0
+    },
+    {
+      "rating": 4,
+      "count": 15
+    },
+    {
+      "rating": 3.5,
+      "count": 0
+    },
+    {
+      "rating": 3,
+      "count": 10
+    },
+    {
+      "rating": 2.5,
+      "count": 0
+    },
+    {
+      "rating": 2,
+      "count": 3
+    },
+    {
+      "rating": 1.5,
+      "count": 0
+    },
+    {
+      "rating": 1,
+      "count": 2
+    }
   ],
-  viewingsByMonth: [
-    { month: '2024-01', count: 4 },
-    { month: '2024-02', count: 3 },
-    { month: '2024-03', count: 2 },
-    { month: '2023-11', count: 2 },
-    { month: '2023-08', count: 1 },
-    { month: '2023-05', count: 1 },
-    { month: '2022-10', count: 1 },
-    { month: '2021-06', count: 1 },
-  ],
+  "viewingsByMonth": [
+    {
+      "month": "2025-04",
+      "count": 3
+    },
+    {
+      "month": "2025-06",
+      "count": 3
+    },
+    {
+      "month": "2025-07",
+      "count": 1
+    },
+    {
+      "month": "2025-08",
+      "count": 1
+    },
+    {
+      "month": "2025-09",
+      "count": 1
+    },
+    {
+      "month": "2025-11",
+      "count": 1
+    },
+    {
+      "month": "2025-12",
+      "count": 3
+    },
+    {
+      "month": "2026-01",
+      "count": 3
+    },
+    {
+      "month": "2026-02",
+      "count": 1
+    },
+    {
+      "month": "2026-04",
+      "count": 1
+    },
+    {
+      "month": "2026-05",
+      "count": 2
+    },
+    {
+      "month": "2026-06",
+      "count": 3
+    }
+  ]
 }

@@ -86,6 +86,7 @@ create index titles_status_idx on titles(status);
 create index titles_year_idx on titles(year);
 create index titles_added_at_idx on titles(added_at desc);
 create index seasons_title_id_idx on seasons(title_id);
+create index seasons_user_id_idx on seasons(user_id);
 create index viewings_title_id_idx on viewings(title_id);
 create index viewings_user_id_idx on viewings(user_id);
 create index viewings_viewed_at_idx on viewings(viewed_at desc);
@@ -135,6 +136,14 @@ returns void language sql security definer as $$
   update shared_access_keys
   set last_used_at = now()
   where token = token_val;
+$$;
+
+-- Wrapper exposing set_config via RPC (the pg_catalog builtin isn't
+-- callable directly through PostgREST) so clients can set the
+-- shared-token session setting that the "shared key read" policies check.
+create or replace function set_shared_token(token text)
+returns void language sql security definer as $$
+  select set_config('app.shared_token', token, false)
 $$;
 
 -- -----------------------------------------------------------

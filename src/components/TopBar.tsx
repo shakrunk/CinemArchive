@@ -1,5 +1,4 @@
-import { Film, Plus, LayoutGrid, List } from 'lucide-react'
-import { Button } from 'src/components/ui/button'
+import { Plus, LayoutGrid, List, BarChart3 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 
@@ -8,84 +7,114 @@ interface TopBarProps {
   onViewChange: (view: 'library' | 'ledger') => void
 }
 
+/** Spinning film-reel brand mark (matches The Projection Room). */
+function ReelMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="12" cy="6.5" r="1.4" />
+      <circle cx="12" cy="17.5" r="1.4" />
+      <circle cx="6.5" cy="12" r="1.4" />
+      <circle cx="17.5" cy="12" r="1.4" />
+    </svg>
+  )
+}
+
+const NAV: { id: 'ledger' | 'library'; label: string; Icon: typeof BarChart3 }[] = [
+  { id: 'ledger', label: 'The Ledger', Icon: BarChart3 },
+  { id: 'library', label: 'The Library', Icon: LayoutGrid },
+]
+
 export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const { viewMode, setViewMode, openAddTitle } = useAppStore()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-void/80 backdrop-blur-md projector-beam">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-        {/* Brand — always visible */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Film className="w-5 h-5 text-amber" />
-          <span className="font-serif text-lg font-light text-gold">
-            CinemArchive
-          </span>
+    <header
+      className="sticky top-0 z-[200] border-b"
+      style={{
+        borderColor: 'var(--line)',
+        background:
+          'linear-gradient(180deg, rgba(11,9,7,0.92), rgba(11,9,7,0.62) 70%, transparent)',
+        backdropFilter: 'blur(14px) saturate(1.1)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+      }}
+    >
+      <div className="max-w-[1500px] mx-auto flex items-center gap-3 sm:gap-6 px-4 sm:px-8 py-3.5">
+        {/* Brand */}
+        <div className="flex items-center gap-3 shrink-0 select-none">
+          <ReelMark className="w-[30px] h-[30px] text-amber animate-spin-slow drop-shadow-[0_0_10px_rgba(233,178,102,0.5)]" />
+          <div className="hidden sm:flex flex-col leading-[1.05]">
+            <span
+              className="font-serif text-xl font-semibold text-paper tracking-tight"
+              style={{ fontVariationSettings: '"opsz" 40' }}
+            >
+              CinemArchive
+            </span>
+            <span className="font-mono text-[9.5px] tracking-[0.34em] uppercase text-amber-deep mt-[3px]">
+              a private film archive
+            </span>
+          </div>
         </div>
 
-        {/* Nav — animated amber underline on active tab */}
-        <nav className="flex items-stretch self-stretch">
-          {(['library', 'ledger'] as const).map((view) => (
+        {/* Pill nav */}
+        <nav className="navpill ml-1 hidden sm:flex" role="tablist">
+          {NAV.map(({ id, label, Icon }) => (
             <button
-              key={view}
-              onClick={() => onViewChange(view)}
-              className={cn(
-                'px-3 text-sm font-sans transition-colors relative capitalize',
-                currentView === view
-                  ? 'text-amber'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
+              key={id}
+              role="tab"
+              aria-selected={currentView === id}
+              onClick={() => onViewChange(id)}
+              className={cn('navtab', currentView === id && 'is-active')}
             >
-              {view === 'library' ? 'Library' : 'Ledger'}
-              <span
-                className={cn(
-                  'absolute bottom-0 left-2 right-2 h-px rounded-full bg-amber transition-all duration-300 origin-center',
-                  currentView === view
-                    ? 'scale-x-100 opacity-100'
-                    : 'scale-x-0 opacity-0'
-                )}
-              />
+              <Icon className="w-4 h-4" />
+              <span className="whitespace-nowrap">{label}</span>
             </button>
           ))}
         </nav>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           {currentView === 'library' && (
-            <div className="hidden sm:flex items-center gap-0.5 bg-secondary rounded-md p-0.5">
+            <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
               <button
                 onClick={() => setViewMode('grid')}
                 className={cn(
-                  'p-1.5 rounded transition-colors',
-                  viewMode === 'grid'
-                    ? 'bg-amber/20 text-amber'
-                    : 'text-muted-foreground hover:text-foreground'
+                  'icon-btn w-8 h-8',
+                  viewMode === 'grid' && '!text-amber-bright bg-[rgba(233,178,102,0.12)]'
                 )}
-                aria-label="Grid view"
+                aria-label="Poster wall"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-[17px] h-[17px]" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
                 className={cn(
-                  'p-1.5 rounded transition-colors',
-                  viewMode === 'list'
-                    ? 'bg-amber/20 text-amber'
-                    : 'text-muted-foreground hover:text-foreground'
+                  'icon-btn w-8 h-8',
+                  viewMode === 'list' && '!text-amber-bright bg-[rgba(233,178,102,0.12)]'
                 )}
-                aria-label="List view"
+                aria-label="Ledger list"
               >
-                <List className="w-4 h-4" />
+                <List className="w-[17px] h-[17px]" />
               </button>
             </div>
           )}
-          <Button
-            size="sm"
+          <button
             onClick={openAddTitle}
-            className="bg-amber hover:bg-amber-muted text-void font-sans font-medium gap-1.5"
+            className="btn-amber inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
+            <span className="hidden sm:inline">Add Title</span>
+          </button>
         </div>
       </div>
     </header>

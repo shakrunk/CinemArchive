@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: '/CinemArchive/',
   plugins: [
     react(),
     VitePWA({
@@ -17,8 +18,8 @@ export default defineConfig({
         background_color: '#0b0907',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: '/CinemArchive/',
+        start_url: '/CinemArchive/',
         icons: [
           { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
         ],

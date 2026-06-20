@@ -351,11 +351,19 @@ export function AddTitleWorkflow() {
         const seasons: Season[] = result.type === 'tv' && detailedResult.seasonCount
           ? Array.from({ length: detailedResult.seasonCount }, (_, i) => {
               const tmdbSeason = data.seasons?.find((s: any) => s.season_number === i + 1)
+              const epCount = tmdbSeason?.episode_count || 10
               return {
-                id: `new-s${i + 1}`,
+                id: crypto.randomUUID(),
                 seasonNumber: i + 1,
-                episodeCount: tmdbSeason?.episode_count || 10,
+                episodeCount: epCount,
                 episodesWatched: 0,
+                episodes: Array.from({ length: epCount }, (_, j) => ({
+                  id: crypto.randomUUID(),
+                  episodeNumber: j + 1,
+                  watchEvents: [],
+                  ratings: [],
+                  reviews: [],
+                })),
               }
             })
           : []
@@ -364,10 +372,17 @@ export function AddTitleWorkflow() {
         setSelected(result)
         const seasons: Season[] = result.type === 'tv' && result.seasonCount
           ? Array.from({ length: result.seasonCount }, (_, i) => ({
-              id: `new-s${i + 1}`,
+              id: crypto.randomUUID(),
               seasonNumber: i + 1,
               episodeCount: 10,
               episodesWatched: 0,
+              episodes: Array.from({ length: 10 }, (_, j) => ({
+                id: `new-s${i + 1}-e${j + 1}`,
+                episodeNumber: j + 1,
+                watchEvents: [],
+                ratings: [],
+                reviews: [],
+              })),
             }))
           : []
         setLog({ ...DEFAULT_LOG, seasons })
@@ -385,7 +400,7 @@ export function AddTitleWorkflow() {
   function handleSave() {
     if (!selected) return
 
-    const id = `local-${Date.now()}`
+    const id = crypto.randomUUID()
 
     const newTitle: Title = {
       id,
@@ -406,7 +421,7 @@ export function AddTitleWorkflow() {
       addedAt: new Date().toISOString().slice(0, 10),
       seasons: log.seasons.length > 0 ? log.seasons : undefined,
       viewings: log.status === 'watched' && log.date
-        ? [{ id: `v-${id}`, titleId: id, date: log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
+        ? [{ id: crypto.randomUUID(), titleId: id, date: log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
         : [],
       imdbRating: selected.imdbRating,
       rtScore: selected.rtScore,

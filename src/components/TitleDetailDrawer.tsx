@@ -575,7 +575,7 @@ export function TitleDetailDrawer() {
   function logViewing() {
     if (!title || !logDate) return
     const viewing: Viewing = {
-      id: `v-${title.id}-${Date.now()}`,
+      id: crypto.randomUUID(),
       titleId: title.id,
       date: logDate,
       rating: logRating > 0 ? logRating : undefined,

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import type { User } from '@supabase/supabase-js'
-import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb } from '../lib/db'
+import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb } from '../lib/db'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
@@ -252,6 +252,18 @@ export const useAppStore = create<AppStore>()(
 
   logEpisode: (titleId, seasonNumber, episodeNumber, opts) =>
     set((s) => {
+      // Sync to DB: resolve episode id from current state, then fire async
+      if (s.user) {
+        const targetTitle = s.titles.find((t) => t.id === titleId)
+        const targetSeason = targetTitle?.seasons?.find((season) => season.seasonNumber === seasonNumber)
+        const targetEpisode = targetSeason?.episodes?.find((ep) => ep.episodeNumber === episodeNumber)
+        if (targetEpisode) {
+          logEpisodeToDb(s.user.id, targetEpisode.id, opts).catch((err) =>
+            console.error('Failed to sync episode log to DB:', err)
+          )
+        }
+      }
+
       const now = new Date().toISOString()
       const titles = s.titles.map((t) => {
         if (t.id !== titleId) return t

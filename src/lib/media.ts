@@ -31,6 +31,15 @@ export interface RawTmdbSeason {
   episode_count: number
 }
 
+export interface RawTmdbEpisode {
+  episode_number: number
+  name: string
+  overview?: string
+  air_date?: string
+  runtime?: number
+  still_path?: string
+}
+
 export interface MediaDetails {
   /** Fully-hydrated metadata for the chosen entry. */
   result: SearchResult
@@ -189,4 +198,23 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
   }
 
   return { result, tmdbSeasons: data.seasons ?? [] }
+}
+
+/**
+ * Fetch episode-level details for one season from TMDB.
+ * Returns an empty array when Supabase isn't configured or the call fails.
+ */
+export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): Promise<RawTmdbEpisode[]> {
+  if (!(isSupabaseConfigured && supabase)) return []
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=season&id=${tmdbId}&season=${seasonNumber}`
+    )
+    if (error) throw error
+    return (data?.episodes ?? []) as RawTmdbEpisode[]
+  } catch (e) {
+    console.error(`Error fetching season ${seasonNumber} details for tmdbId ${tmdbId}:`, e)
+    return []
+  }
 }

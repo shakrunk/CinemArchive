@@ -75,6 +75,7 @@ create table episodes (
   air_date        date,
   runtime         integer,
   synopsis        text,
+  still_url       text,
 
   constraint unique_episode unique (title_id, season_number, episode_number)
 );

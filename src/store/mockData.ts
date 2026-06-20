@@ -26,6 +26,7 @@ export interface Episode {
   airDate?: string
   runtime?: number
   synopsis?: string
+  stillUrl?: string
   watchEvents: EpisodeWatchEvent[]
   ratings: EpisodeRating[]    // independent historical log
   reviews: EpisodeReview[]    // independent historical log

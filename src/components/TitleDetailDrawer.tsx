@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -21,6 +21,10 @@ import {
 } from 'lucide-react'
 import { cn } from 'src/lib/utils'
 import type { Viewing, WatchStatus, Season, Episode } from 'src/store/mockData'
+import { fetchSeasonDetails } from 'src/lib/media'
+import { upsertEpisodeMetadataInDb } from 'src/lib/db'
+
+const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // ─── Shared status options ────────────────────────────────────────────────────
 
@@ -153,6 +157,25 @@ function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelPr
 
   return (
     <div className="ep-panel px-3 py-3 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
+      {/* Episode still + synopsis */}
+      {(episode.stillUrl || episode.synopsis) && (
+        <div className="flex gap-3">
+          {episode.stillUrl && (
+            <img
+              src={episode.stillUrl}
+              alt={episode.episodeName ?? `Episode ${episode.episodeNumber}`}
+              className="rounded-md object-cover shrink-0"
+              style={{ width: '120px', height: '68px', objectPosition: 'center' }}
+            />
+          )}
+          {episode.synopsis && (
+            <p className="font-sans text-xs leading-relaxed flex-1 min-w-0" style={{ color: 'var(--paper-dim)' }}>
+              {episode.synopsis}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Existing history */}
       {(episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0) && (
         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -564,11 +587,91 @@ function TVSeriesSection({ titleId, seasons, isSharedView }: TVSeriesSectionProp
 export function TitleDetailDrawer() {
   const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, openRefreshMetadata, isSharedView } = useAppStore()
   const title = useSelectedTitle()
+  const user = useAppStore((s) => s.user)
 
   const [showLogForm, setShowLogForm] = useState(false)
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [logRating, setLogRating] = useState(0)
   const [logNotes, setLogNotes] = useState('')
+
+  // Track which title IDs have already been backfilled this session to avoid repeat calls.
+  const backfilledRef = useRef<Set<string>>(new Set())
+
+  // When a TV show is opened and its episodes lack metadata (no episode names), fetch
+  // season details from TMDB and hydrate them in-place, then persist to DB.
+  useEffect(() => {
+    if (!title || title.type !== 'tv' || !title.seasons || title.tmdbId <= 0 || isSharedView) return
+
+    const seasonsNeedingBackfill = title.seasons.filter((s) =>
+      s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName)
+    )
+    if (seasonsNeedingBackfill.length === 0) return
+
+    const cacheKey = `${title.id}:${title.tmdbId}`
+    if (backfilledRef.current.has(cacheKey)) return
+    backfilledRef.current.add(cacheKey)
+
+    const snapshotTitle = title
+    const snapshotUser = user
+
+    async function backfill() {
+      const settled = await Promise.allSettled(
+        seasonsNeedingBackfill.map(async (season) => {
+          const tmdbEps = await fetchSeasonDetails(snapshotTitle.tmdbId, season.seasonNumber)
+          return { season, tmdbEps }
+        })
+      )
+
+      let updatedSeasons = [...snapshotTitle.seasons!]
+      const allUpdatedEpisodes: Parameters<typeof upsertEpisodeMetadataInDb>[2] = []
+
+      for (const result of settled) {
+        if (result.status !== 'fulfilled' || result.value.tmdbEps.length === 0) continue
+        const { season, tmdbEps } = result.value
+
+        const updatedEpisodes = season.episodes!.map((ep) => {
+          const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
+          if (!tmdbEp) return ep
+          return {
+            ...ep,
+            episodeName: tmdbEp.name || ep.episodeName,
+            airDate: tmdbEp.air_date || ep.airDate,
+            runtime: tmdbEp.runtime || ep.runtime,
+            synopsis: tmdbEp.overview || ep.synopsis,
+            stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : ep.stillUrl,
+          }
+        })
+
+        updatedSeasons = updatedSeasons.map((s) =>
+          s.seasonNumber === season.seasonNumber ? { ...s, episodes: updatedEpisodes } : s
+        )
+
+        for (const ep of updatedEpisodes) {
+          allUpdatedEpisodes.push({
+            id: ep.id,
+            seasonNumber: season.seasonNumber,
+            episodeNumber: ep.episodeNumber,
+            episodeName: ep.episodeName,
+            airDate: ep.airDate,
+            runtime: ep.runtime,
+            synopsis: ep.synopsis,
+            stillUrl: ep.stillUrl,
+          })
+        }
+      }
+
+      if (allUpdatedEpisodes.length > 0) {
+        updateTitle(snapshotTitle.id, { seasons: updatedSeasons })
+        if (snapshotUser) {
+          upsertEpisodeMetadataInDb(snapshotUser.id, snapshotTitle.id, allUpdatedEpisodes).catch((e) =>
+            console.error('Episode metadata backfill DB write failed:', e)
+          )
+        }
+      }
+    }
+
+    backfill().catch((e) => console.error('Episode metadata backfill failed:', e))
+  }, [title?.id, title?.tmdbId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!title) return null
 

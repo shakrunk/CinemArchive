@@ -93,6 +93,19 @@ async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
   return data
 }
 
+async function getTMDBSeasonDetails(tmdbId: number, seasonNumber: number) {
+  const cacheKey = `tmdb:season:${tmdbId}:${seasonNumber}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=en-US`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
 async function getOMDbRatings(imdbId: string) {
   const cacheKey = `omdb:${imdbId}`
   const cached = await getCached(cacheKey)
@@ -132,6 +145,13 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         if (!id) throw new Error('Missing id parameter')
         result = await getTMDBDetails(id, type)
+        break
+      }
+      case 'season': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        const seasonNum = parseInt(url.searchParams.get('season') ?? '0', 10)
+        if (!id || !seasonNum) throw new Error('Missing id or season parameter')
+        result = await getTMDBSeasonDetails(id, seasonNum)
         break
       }
       case 'ratings': {

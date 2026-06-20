@@ -50,6 +50,7 @@ function mapDbTitleToLocal(row: any): Title {
             airDate: ep.air_date || undefined,
             runtime: ep.runtime || undefined,
             synopsis: ep.synopsis || undefined,
+            stillUrl: ep.still_url || undefined,
             watchEvents: (ep.episode_watch_events || [])
               .sort(
                 (a: any, b: any) =>
@@ -217,6 +218,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
         air_date: ep.airDate,
         runtime: ep.runtime,
         synopsis: ep.synopsis,
+        still_url: ep.stillUrl,
       }))
     )
 
@@ -384,6 +386,45 @@ export async function logEpisodeToDb(
       console.error('Error inserting episode review:', error)
       throw error
     }
+  }
+}
+
+export async function upsertEpisodeMetadataInDb(
+  userId: string,
+  titleId: string,
+  episodes: Array<{
+    id: string
+    seasonNumber: number
+    episodeNumber: number
+    episodeName?: string
+    airDate?: string
+    runtime?: number
+    synopsis?: string
+    stillUrl?: string
+  }>
+): Promise<void> {
+  if (!supabase || episodes.length === 0) return
+
+  const rows = episodes.map((ep) => ({
+    id: ep.id,
+    title_id: titleId,
+    user_id: userId,
+    season_number: ep.seasonNumber,
+    episode_number: ep.episodeNumber,
+    episode_name: ep.episodeName ?? null,
+    air_date: ep.airDate ?? null,
+    runtime: ep.runtime ?? null,
+    synopsis: ep.synopsis ?? null,
+    still_url: ep.stillUrl ?? null,
+  }))
+
+  const { error } = await supabase
+    .from('episodes')
+    .upsert(rows, { onConflict: 'title_id,season_number,episode_number' })
+
+  if (error) {
+    console.error('Error upserting episode metadata:', error)
+    throw error
   }
 }
 

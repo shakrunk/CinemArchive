@@ -8,7 +8,7 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, Season } from 'src/store/mockData'
-import { searchMedia, fetchMediaDetails, type SearchResult, type RawTmdbSeason } from 'src/lib/media'
+import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
 
 // ─── Search hook ─────────────────────────────────────────────────────────────
 
@@ -40,27 +40,44 @@ function useDebouncedSearch(delay = 400) {
   return { results, loading, search }
 }
 
+const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
+
 // ─── Season scaffolding ──────────────────────────────────────────────────────
 
 // Build fresh (unwatched) season/episode structures for a selected series.
-// Episode counts come from TMDB when available, otherwise default to 10.
-function buildSeasons(result: SearchResult, tmdbSeasons: RawTmdbSeason[]): Season[] {
+// Episode counts and metadata come from TMDB when available.
+function buildSeasons(
+  result: SearchResult,
+  tmdbSeasons: RawTmdbSeason[],
+  episodesBySeason?: Map<number, RawTmdbEpisode[]>
+): Season[] {
   if (result.type !== 'tv' || !result.seasonCount) return []
   return Array.from({ length: result.seasonCount }, (_, i) => {
-    const tmdbSeason = tmdbSeasons.find((s) => s.season_number === i + 1)
+    const seasonNum = i + 1
+    const tmdbSeason = tmdbSeasons.find((s) => s.season_number === seasonNum)
     const epCount = tmdbSeason?.episode_count || 10
+    const tmdbEpisodes = episodesBySeason?.get(seasonNum) ?? []
     return {
       id: crypto.randomUUID(),
-      seasonNumber: i + 1,
+      seasonNumber: seasonNum,
       episodeCount: epCount,
       episodesWatched: 0,
-      episodes: Array.from({ length: epCount }, (_, j) => ({
-        id: crypto.randomUUID(),
-        episodeNumber: j + 1,
-        watchEvents: [],
-        ratings: [],
-        reviews: [],
-      })),
+      episodes: Array.from({ length: epCount }, (_, j) => {
+        const epNum = j + 1
+        const tmdbEp = tmdbEpisodes.find((e) => e.episode_number === epNum)
+        return {
+          id: crypto.randomUUID(),
+          episodeNumber: epNum,
+          episodeName: tmdbEp?.name || undefined,
+          airDate: tmdbEp?.air_date || undefined,
+          runtime: tmdbEp?.runtime || undefined,
+          synopsis: tmdbEp?.overview || undefined,
+          stillUrl: tmdbEp?.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+          watchEvents: [],
+          ratings: [],
+          reviews: [],
+        }
+      }),
     }
   })
 }
@@ -226,8 +243,22 @@ export function AddTitleWorkflow() {
     setLoadingDetails(true)
     try {
       const { result: detailed, tmdbSeasons } = await fetchMediaDetails(result)
+      let episodesBySeason: Map<number, RawTmdbEpisode[]> | undefined
+      if (detailed.type === 'tv' && detailed.tmdbId && tmdbSeasons.length > 0) {
+        const settled = await Promise.allSettled(
+          tmdbSeasons
+            .filter((s) => s.season_number > 0)
+            .map((s) => fetchSeasonDetails(detailed.tmdbId, s.season_number).then((eps) => ({ seasonNumber: s.season_number, eps })))
+        )
+        episodesBySeason = new Map()
+        for (const r of settled) {
+          if (r.status === 'fulfilled') {
+            episodesBySeason.set(r.value.seasonNumber, r.value.eps)
+          }
+        }
+      }
       setSelected(detailed)
-      setLog({ ...DEFAULT_LOG, seasons: buildSeasons(detailed, tmdbSeasons) })
+      setLog({ ...DEFAULT_LOG, seasons: buildSeasons(detailed, tmdbSeasons, episodesBySeason) })
       setStep('log')
     } catch (err) {
       console.error('Error fetching details:', err)

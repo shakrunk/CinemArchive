@@ -2,13 +2,27 @@ import { useState } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
+import { SeriesGraph } from 'src/components/ui/series-graph'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { CardTitle, BodyText, MetaBadge, StatNumber, StatLabel } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
-import { Calendar, Clock, Film, Tv, Plus, FileText, Trash2 } from 'lucide-react'
+import {
+  avgEpisodeRating,
+  avgSeasonRating,
+  avgSeriesRating,
+  episodesWatchedInSeason,
+  totalEpisodesWatched,
+  totalEpisodeCount,
+} from 'src/store/episodeUtils'
+import {
+  Calendar, Clock, Film, Tv, Plus, FileText, Trash2, Star,
+  ChevronDown, ChevronRight, Eye, MessageSquare,
+} from 'lucide-react'
 import { cn } from 'src/lib/utils'
-import type { Viewing, WatchStatus } from 'src/store/mockData'
+import type { Viewing, WatchStatus, Season, Episode } from 'src/store/mockData'
+
+// ─── Shared status options ────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
   { value: 'watched', label: 'Watched' },
@@ -16,6 +30,8 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
   { value: 'watching', label: 'Watching' },
   { value: 'dropped', label: 'Dropped' },
 ]
+
+// ─── Movie-only: viewing timeline ────────────────────────────────────────────
 
 function ViewingTimeline({ viewings }: { viewings: Viewing[] }) {
   if (viewings.length === 0) {
@@ -40,9 +56,7 @@ function ViewingTimeline({ viewings }: { viewings: Viewing[] }) {
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-mono text-xs text-amber">
                     {new Date(v.date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
+                      month: 'short', day: 'numeric', year: 'numeric',
                     })}
                   </span>
                   {v.rating && (
@@ -58,32 +72,6 @@ function ViewingTimeline({ viewings }: { viewings: Viewing[] }) {
             </div>
           ))}
       </div>
-    </div>
-  )
-}
-
-function SeasonProgress({ seasons }: { seasons: NonNullable<ReturnType<typeof useSelectedTitle>>['seasons'] }) {
-  if (!seasons || seasons.length === 0) return null
-
-  return (
-    <div className="space-y-2">
-      {seasons.map((s) => {
-        const pct = s.episodeCount > 0 ? (s.episodesWatched / s.episodeCount) * 100 : 0
-        return (
-          <div key={s.id} className="flex items-center gap-3">
-            <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">S{s.seasonNumber}</span>
-            <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber rounded-full transition-all"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="font-mono text-xs text-muted-foreground w-12 text-right shrink-0">
-              {s.episodesWatched}/{s.episodeCount}
-            </span>
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -112,6 +100,466 @@ function ReviewBadges({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: n
     </div>
   )
 }
+
+// ─── TV: Episode log form (watch event + optional rating + optional review) ───
+
+interface EpLogState {
+  includeWatch: boolean
+  watchedAt: string
+  watchNotes: string
+  rating: number
+  reviewText: string
+}
+
+const EMPTY_EP_LOG: EpLogState = {
+  includeWatch: true,
+  watchedAt: new Date().toISOString().slice(0, 10),
+  watchNotes: '',
+  rating: 0,
+  reviewText: '',
+}
+
+interface EpisodePanelProps {
+  episode: Episode
+  season: Season
+  titleId: string
+  isSharedView: boolean
+}
+
+function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelProps) {
+  const logEpisode = useAppStore((s) => s.logEpisode)
+  const [log, setLog] = useState<EpLogState>(EMPTY_EP_LOG)
+  const [showForm, setShowForm] = useState(false)
+
+  const avg = avgEpisodeRating(episode)
+  const watched = episode.watchEvents.length > 0
+
+  function handleSubmit() {
+    if (!log.includeWatch && log.rating === 0 && !log.reviewText.trim()) return
+    logEpisode(titleId, season.seasonNumber, episode.episodeNumber, {
+      watchedAt: log.includeWatch ? log.watchedAt : undefined,
+      watchNotes: log.includeWatch ? log.watchNotes : undefined,
+      rating: log.rating > 0 ? log.rating : undefined,
+      reviewText: log.reviewText.trim() || undefined,
+    })
+    setLog(EMPTY_EP_LOG)
+    setShowForm(false)
+  }
+
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const fmtDateTime = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+  return (
+    <div className="ep-panel px-3 py-3 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
+      {/* Existing history */}
+      {(episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0) && (
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          {/* Watch events */}
+          <div>
+            <div
+              className="font-mono mb-1.5"
+              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+            >
+              Watched
+            </div>
+            {episode.watchEvents.length === 0 ? (
+              <span style={{ color: 'var(--paper-faint)' }}>—</span>
+            ) : (
+              episode.watchEvents.map((we) => (
+                <div key={we.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
+                  {fmtDate(we.watchedAt)}
+                  {we.notes && (
+                    <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                      {we.notes}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Ratings */}
+          <div>
+            <div
+              className="font-mono mb-1.5"
+              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+            >
+              Ratings
+            </div>
+            {episode.ratings.length === 0 ? (
+              <span style={{ color: 'var(--paper-faint)', fontSize: '11px' }}>—</span>
+            ) : (
+              episode.ratings.map((er) => (
+                <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
+                  ★ {er.rating}
+                  <div className="font-sans mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                    {fmtDateTime(er.ratedAt)}
+                  </div>
+                </div>
+              ))
+            )}
+            {episode.ratings.length > 1 && avg !== null && (
+              <div className="font-mono mt-1" style={{ color: 'var(--amber-deep)', fontSize: '10px' }}>
+                avg ★ {avg.toFixed(1)}
+              </div>
+            )}
+          </div>
+
+          {/* Reviews */}
+          <div>
+            <div
+              className="font-mono mb-1.5"
+              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+            >
+              Reviews
+            </div>
+            {episode.reviews.length === 0 ? (
+              <span style={{ color: 'var(--paper-faint)', fontSize: '11px' }}>—</span>
+            ) : (
+              episode.reviews.map((rv) => (
+                <div key={rv.id}>
+                  <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>
+                    "{rv.reviewText}"
+                  </div>
+                  <div className="font-mono mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                    {fmtDateTime(rv.reviewedAt)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Log form */}
+      {!isSharedView && (
+        showForm ? (
+          <div className="space-y-3 pt-2" style={{ borderTop: episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0 ? '1px solid var(--line)' : 'none' }}>
+            {/* Watch event toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={log.includeWatch}
+                onChange={(e) => setLog((l) => ({ ...l, includeWatch: e.target.checked }))}
+                className="accent-amber w-3.5 h-3.5"
+              />
+              <span className="font-sans text-xs" style={{ color: 'var(--paper-dim)' }}>
+                Log a watch event
+              </span>
+            </label>
+
+            {log.includeWatch && (
+              <div className="space-y-2 pl-5">
+                <Input
+                  type="date"
+                  value={log.watchedAt}
+                  onChange={(e) => setLog((l) => ({ ...l, watchedAt: e.target.value }))}
+                  className="h-8 text-xs font-mono bg-secondary/50 border-border"
+                />
+                <Input
+                  value={log.watchNotes}
+                  onChange={(e) => setLog((l) => ({ ...l, watchNotes: e.target.value }))}
+                  placeholder="Watch notes (optional)"
+                  className="h-8 text-xs bg-secondary/50 border-border"
+                />
+              </div>
+            )}
+
+            {/* Rating (independent) */}
+            <div>
+              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>
+                Rating <span style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>(optional · logged independently)</span>
+              </div>
+              <StarRating value={log.rating} onChange={(r) => setLog((l) => ({ ...l, rating: r }))} size="sm" />
+            </div>
+
+            {/* Review (independent) */}
+            <div>
+              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>
+                Review <span style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>(optional · logged independently)</span>
+              </div>
+              <textarea
+                value={log.reviewText}
+                onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))}
+                placeholder="Your thoughts on this episode…"
+                rows={2}
+                className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40"
+                style={{
+                  background: 'rgba(0,0,0,0.25)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--paper)',
+                }}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleSubmit}
+                disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()}
+                className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40"
+                style={{ background: 'var(--amber)', color: '#1a0e06' }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }}
+                className="h-8 px-3 rounded-md text-xs font-sans border transition-colors"
+                style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 text-xs font-mono transition-colors"
+            style={{ color: 'var(--amber-deep)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--amber)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--amber-deep)')}
+          >
+            <Plus className="w-3 h-3" />
+            {watched ? 'Add rating, review, or re-watch' : 'Log watch event, rating, or review'}
+          </button>
+        )
+      )}
+    </div>
+  )
+}
+
+// ─── TV: Episode row ──────────────────────────────────────────────────────────
+
+interface EpisodeRowProps {
+  episode: Episode
+  season: Season
+  titleId: string
+  expanded: boolean
+  onToggle: () => void
+  isSharedView: boolean
+}
+
+function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView }: EpisodeRowProps) {
+  const avg = avgEpisodeRating(episode)
+  const watched = episode.watchEvents.length > 0
+
+  return (
+    <div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
+        className={cn('episode-row', expanded && 'is-expanded', watched && 'is-watched')}
+      >
+        {/* Episode number */}
+        <span
+          className="ep-num font-mono shrink-0 w-8 text-right"
+          style={{ fontSize: '11px', color: watched ? 'var(--amber)' : 'var(--paper-faint)' }}
+        >
+          E{String(episode.episodeNumber).padStart(2, '0')}
+        </span>
+
+        {/* Name + meta */}
+        <div className="flex-1 min-w-0">
+          <div
+            className="font-sans truncate"
+            style={{ fontSize: '13px', color: 'var(--paper)' }}
+          >
+            {episode.episodeName ?? `Episode ${episode.episodeNumber}`}
+          </div>
+          {episode.airDate && (
+            <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+              {new Date(episode.airDate).getFullYear()}
+              {episode.runtime ? ` · ${episode.runtime}m` : ''}
+            </div>
+          )}
+        </div>
+
+        {/* Watch + rating indicators */}
+        <div className="flex items-center gap-2 shrink-0">
+          {watched && (
+            <Eye className="w-3 h-3" style={{ color: 'var(--amber)', opacity: 0.8 }} />
+          )}
+          {episode.reviews.length > 0 && (
+            <MessageSquare className="w-3 h-3" style={{ color: 'var(--paper-faint)', opacity: 0.7 }} />
+          )}
+          {avg !== null ? (
+            <span className="font-mono" style={{ fontSize: '11px', color: 'var(--amber)' }}>
+              ★ {avg.toFixed(1)}
+            </span>
+          ) : (
+            <span className="font-mono" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>—</span>
+          )}
+          {expanded
+            ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--paper-faint)' }} />
+            : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--paper-faint)' }} />
+          }
+        </div>
+      </div>
+
+      {expanded && (
+        <EpisodePanel
+          episode={episode}
+          season={season}
+          titleId={titleId}
+          isSharedView={isSharedView}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── TV: Season tab bar + episode list ───────────────────────────────────────
+
+interface TVSeriesSectionProps {
+  titleId: string
+  seasons: Season[]
+  isSharedView: boolean
+}
+
+function TVSeriesSection({ titleId, seasons, isSharedView }: TVSeriesSectionProps) {
+  const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
+  const [expandedEpId, setExpandedEpId] = useState<string | null>(null)
+
+  const season = seasons.find((s) => s.seasonNumber === selectedSeason)
+  const hasEpisodes = (s: Season) => (s.episodes?.length ?? 0) > 0
+
+  // Rollup stats
+  const totalWatched = totalEpisodesWatched(seasons)
+  const totalCount = totalEpisodeCount(seasons)
+  const seriesAvg = avgSeriesRating(seasons)
+
+  return (
+    <div className="space-y-5">
+      {/* Series-level stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
+          <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
+            {totalWatched}<span className="text-sm font-mono ml-0.5" style={{ color: 'var(--paper-faint)' }}>/{totalCount}</span>
+          </div>
+          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+            Episodes
+          </div>
+        </div>
+        <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
+          <div className="font-serif text-xl" style={{ color: 'var(--amber)', fontVariationSettings: '"opsz" 30' }}>
+            {seriesAvg !== null ? `★ ${seriesAvg.toFixed(1)}` : '—'}
+          </div>
+          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+            Avg Rating
+          </div>
+        </div>
+        <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
+          <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
+            {seasons.length}
+          </div>
+          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+            Seasons
+          </div>
+        </div>
+      </div>
+
+      {/* Series Graph heatmap — only when at least one season has episode data */}
+      {seasons.some(hasEpisodes) && (
+        <div>
+          <h4
+            className="font-mono mb-3"
+            style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--paper-faint)' }}
+          >
+            Series Graph
+          </h4>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
+          >
+            <SeriesGraph
+              seasons={seasons}
+              onCellClick={(sn, en) => {
+                setSelectedSeason(sn)
+                const ep = seasons.find((s) => s.seasonNumber === sn)?.episodes?.find((e) => e.episodeNumber === en)
+                if (ep) setExpandedEpId(ep.id)
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Season tabs */}
+      <div>
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none mb-3 -mx-1 px-1">
+          {seasons.map((s) => {
+            const watched = episodesWatchedInSeason(s)
+            const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
+            const seasonAvg = avgSeasonRating(s)
+            return (
+              <button
+                key={s.seasonNumber}
+                onClick={() => { setSelectedSeason(s.seasonNumber); setExpandedEpId(null) }}
+                className={cn(
+                  'shrink-0 px-3 py-2 rounded-lg text-left transition-all border',
+                  selectedSeason === s.seasonNumber
+                    ? 'border-amber/40 bg-amber/10'
+                    : 'border-transparent hover:border-[var(--line)] hover:bg-[rgba(255,255,255,0.03)]'
+                )}
+              >
+                <div
+                  className="font-mono"
+                  style={{ fontSize: '11px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}
+                >
+                  S{s.seasonNumber}
+                </div>
+                <div className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+                  {pct}%{seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Episode list for selected season */}
+        {season && (
+          <div>
+            {hasEpisodes(season) ? (
+              <div className="space-y-0.5">
+                {season.episodes!.map((ep) => (
+                  <EpisodeRow
+                    key={ep.id}
+                    episode={ep}
+                    season={season}
+                    titleId={titleId}
+                    expanded={expandedEpId === ep.id}
+                    onToggle={() => setExpandedEpId(expandedEpId === ep.id ? null : ep.id)}
+                    isSharedView={isSharedView}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* Fallback: coarse progress bar when this season has no episode-level data */
+              (() => {
+                const pct = season.episodeCount > 0 ? (season.episodesWatched / season.episodeCount) * 100 : 0
+                return (
+                  <div className="flex items-center gap-3 px-2 py-3">
+                    <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">S{season.seasonNumber}</span>
+                    <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full bg-amber rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="font-mono text-xs text-muted-foreground w-12 text-right shrink-0">
+                      {season.episodesWatched}/{season.episodeCount}
+                    </span>
+                  </div>
+                )
+              })()
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
   const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, isSharedView } = useAppStore()
@@ -189,8 +637,11 @@ export function TitleDetailDrawer() {
                   <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 )}
                 <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-                  {title.type}
+                  {title.type === 'tv' ? 'Series' : 'Film'}
                 </span>
+                {title.network && (
+                  <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
+                )}
               </div>
               <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -200,7 +651,7 @@ export function TitleDetailDrawer() {
                     dir. {title.director}
                   </span>
                 )}
-                {title.runtime && (
+                {title.runtime && title.type === 'movie' && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="w-3 h-3" />
                     <span className="font-mono">{title.runtime}m</span>
@@ -270,111 +721,118 @@ export function TitleDetailDrawer() {
             </div>
           )}
 
-          {/* TV Season Progress */}
+          {/* ── TV Series section ───────────────────────────────────── */}
           {title.type === 'tv' && title.seasons && title.seasons.length > 0 && (
             <div>
-              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">
-                Season Progress
+              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-4">
+                Season &amp; Episodes
               </h4>
-              <SeasonProgress seasons={title.seasons} />
+              <TVSeriesSection
+                titleId={title.id}
+                seasons={title.seasons}
+                isSharedView={isSharedView}
+              />
             </div>
           )}
 
-          {/* Viewing Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-secondary/40 rounded-lg p-3 text-center">
-              <StatNumber className="text-xl">{title.viewings.length}</StatNumber>
-              <div className="mt-0.5">
-                <StatLabel>Viewings</StatLabel>
-              </div>
-            </div>
-            <div className="bg-secondary/40 rounded-lg p-3 text-center">
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                <StatNumber className="text-xl">
-                  {title.viewings.length > 0
-                    ? new Date(
-                        title.viewings
-                          .slice()
-                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-                          .date
-                      ).getFullYear()
-                    : '—'}
-                </StatNumber>
-              </div>
-              <StatLabel>Last Seen</StatLabel>
-            </div>
-          </div>
-
-          {/* Viewing History */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
-                Viewing History
-              </h4>
-              {!showLogForm && !isSharedView && (
-                <button
-                  onClick={() => setShowLogForm(true)}
-                  className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Log a viewing
-                </button>
-              )}
-            </div>
-
-            {showLogForm && (
-              <div className="bg-secondary/40 rounded-lg p-3 mb-4 space-y-3">
-                <div>
-                  <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                    <Calendar className="inline w-3 h-3 mr-1" />
-                    Date Watched
-                  </label>
-                  <Input
-                    type="date"
-                    value={logDate}
-                    onChange={(e) => setLogDate(e.target.value)}
-                    className="bg-secondary/50 border-border font-mono"
-                  />
+          {/* ── Movie section (and TV without seasons) ─────────────── */}
+          {title.type === 'movie' && (
+            <>
+              {/* Viewing Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-secondary/40 rounded-lg p-3 text-center">
+                  <StatNumber className="text-xl">{title.viewings.length}</StatNumber>
+                  <div className="mt-0.5">
+                    <StatLabel>Viewings</StatLabel>
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                    Rating
-                  </label>
-                  <StarRating value={logRating} onChange={setLogRating} size="md" />
-                </div>
-                <div>
-                  <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                    <FileText className="inline w-3 h-3 mr-1" />
-                    Notes
-                  </label>
-                  <textarea
-                    value={logNotes}
-                    onChange={(e) => setLogNotes(e.target.value)}
-                    placeholder="Your thoughts…"
-                    rows={2}
-                    className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1 bg-amber hover:bg-amber-muted text-void font-sans font-medium"
-                    onClick={logViewing}
-                  >
-                    Save Viewing
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowLogForm(false)}
-                  >
-                    Cancel
-                  </Button>
+                <div className="bg-secondary/40 rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-0.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    <StatNumber className="text-xl">
+                      {title.viewings.length > 0
+                        ? new Date(
+                            title.viewings
+                              .slice()
+                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+                              .date
+                          ).getFullYear()
+                        : '—'}
+                    </StatNumber>
+                  </div>
+                  <StatLabel>Last Seen</StatLabel>
                 </div>
               </div>
-            )}
 
-            <ViewingTimeline viewings={title.viewings} />
-          </div>
+              {/* Viewing History */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
+                    Viewing History
+                  </h4>
+                  {!showLogForm && !isSharedView && (
+                    <button
+                      onClick={() => setShowLogForm(true)}
+                      className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Log a viewing
+                    </button>
+                  )}
+                </div>
+
+                {showLogForm && (
+                  <div className="bg-secondary/40 rounded-lg p-3 mb-4 space-y-3">
+                    <div>
+                      <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                        <Calendar className="inline w-3 h-3 mr-1" />
+                        Date Watched
+                      </label>
+                      <Input
+                        type="date"
+                        value={logDate}
+                        onChange={(e) => setLogDate(e.target.value)}
+                        className="bg-secondary/50 border-border font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                        Rating
+                      </label>
+                      <StarRating value={logRating} onChange={setLogRating} size="md" />
+                    </div>
+                    <div>
+                      <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                        <FileText className="inline w-3 h-3 mr-1" />
+                        Notes
+                      </label>
+                      <textarea
+                        value={logNotes}
+                        onChange={(e) => setLogNotes(e.target.value)}
+                        placeholder="Your thoughts…"
+                        rows={2}
+                        className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 bg-amber hover:bg-amber-muted text-void font-sans font-medium"
+                        onClick={logViewing}
+                      >
+                        <Star className="w-4 h-4 mr-2" />
+                        Save Viewing
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowLogForm(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <ViewingTimeline viewings={title.viewings} />
+              </div>
+            </>
+          )}
 
           {/* Remove from library */}
           {!isSharedView && (

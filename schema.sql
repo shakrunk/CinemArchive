@@ -64,6 +64,49 @@ create table viewings (
   created_at  timestamptz not null default now()
 );
 
+-- Episodes (child of seasons, identified by title + season + episode number)
+create table episodes (
+  id              uuid primary key default gen_random_uuid(),
+  title_id        uuid not null references titles(id) on delete cascade,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  season_number   integer not null,
+  episode_number  integer not null,
+  episode_name    text,
+  air_date        date,
+  runtime         integer,
+  synopsis        text,
+
+  constraint unique_episode unique (title_id, season_number, episode_number)
+);
+
+-- Episode watch events — independent timeline entry, not tied to a rating
+create table episode_watch_events (
+  id          uuid primary key default gen_random_uuid(),
+  episode_id  uuid not null references episodes(id) on delete cascade,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  watched_at  date not null,
+  notes       text,
+  created_at  timestamptz not null default now()
+);
+
+-- Episode ratings — standalone historical log, timestamped when recorded
+create table episode_ratings (
+  id          uuid primary key default gen_random_uuid(),
+  episode_id  uuid not null references episodes(id) on delete cascade,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  rating      numeric(3,1) not null check (rating >= 0 and rating <= 5),
+  rated_at    timestamptz not null default now()  -- when the user records it, not when watched
+);
+
+-- Episode reviews — standalone historical log, timestamped when recorded
+create table episode_reviews (
+  id           uuid primary key default gen_random_uuid(),
+  episode_id   uuid not null references episodes(id) on delete cascade,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  review_text  text not null,
+  reviewed_at  timestamptz not null default now()  -- independent of any watch event
+);
+
 -- Time-bound read-only access tokens for sharing
 create table shared_access_keys (
   id            uuid primary key default gen_random_uuid(),
@@ -92,6 +135,14 @@ create index viewings_user_id_idx on viewings(user_id);
 create index viewings_viewed_at_idx on viewings(viewed_at desc);
 create index shared_keys_token_idx on shared_access_keys(token);
 create index shared_keys_user_id_idx on shared_access_keys(user_id);
+create index episodes_title_id_idx on episodes(title_id);
+create index episodes_user_id_idx on episodes(user_id);
+create index ep_watch_events_episode_id_idx on episode_watch_events(episode_id);
+create index ep_watch_events_user_id_idx on episode_watch_events(user_id);
+create index ep_ratings_episode_id_idx on episode_ratings(episode_id);
+create index ep_ratings_user_id_idx on episode_ratings(user_id);
+create index ep_reviews_episode_id_idx on episode_reviews(episode_id);
+create index ep_reviews_user_id_idx on episode_reviews(user_id);
 
 -- ============================================================
 -- UPDATED_AT TRIGGER
@@ -117,6 +168,10 @@ alter table titles enable row level security;
 alter table seasons enable row level security;
 alter table viewings enable row level security;
 alter table shared_access_keys enable row level security;
+alter table episodes enable row level security;
+alter table episode_watch_events enable row level security;
+alter table episode_ratings enable row level security;
+alter table episode_reviews enable row level security;
 
 -- Helper function: validate a shared access token for a given user_id
 create or replace function is_valid_shared_token(token_val text, owner_id uuid)
@@ -201,6 +256,47 @@ create policy "viewings: shared key read"
       user_id
     )
   );
+
+-- -----------------------------------------------------------
+-- EPISODES / EPISODE_WATCH_EVENTS / EPISODE_RATINGS / EPISODE_REVIEWS policies
+-- (same pattern as seasons: owner full access + shared key read)
+-- -----------------------------------------------------------
+
+create policy "episodes: owner full access"
+  on episodes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "episodes: shared key read"
+  on episodes for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+create policy "episode_watch_events: owner full access"
+  on episode_watch_events for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "episode_watch_events: shared key read"
+  on episode_watch_events for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+create policy "episode_ratings: owner full access"
+  on episode_ratings for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "episode_ratings: shared key read"
+  on episode_ratings for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+create policy "episode_reviews: owner full access"
+  on episode_reviews for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "episode_reviews: shared key read"
+  on episode_reviews for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
 
 -- -----------------------------------------------------------
 -- SHARED_ACCESS_KEYS policies

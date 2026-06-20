@@ -26,6 +26,13 @@ export interface LibraryFilters {
 
 // ─── Slice Types ────────────────────────────────────────────────────────────
 
+interface EpisodeLogOpts {
+  watchedAt?: string   // ISO date — creates a WatchEvent if provided
+  watchNotes?: string
+  rating?: number      // creates an EpisodeRating stamped at call-time
+  reviewText?: string  // creates an EpisodeReview stamped at call-time
+}
+
 interface LibrarySlice {
   titles: Title[]
   filters: LibraryFilters
@@ -38,6 +45,7 @@ interface LibrarySlice {
   setFilter: <K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]) => void
   resetFilters: () => void
   applyFilters: () => void
+  logEpisode: (titleId: string, seasonNumber: number, episodeNumber: number, opts: EpisodeLogOpts) => void
 }
 
 interface LedgerSlice {
@@ -163,7 +171,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
-const PERSIST_VERSION = 1
+const PERSIST_VERSION = 2
 
 export const useAppStore = create<AppStore>()(
   persist(
@@ -241,6 +249,61 @@ export const useAppStore = create<AppStore>()(
     set((s) => ({
       filteredTitles: applyFiltersToTitles(s.titles, s.filters),
     })),
+
+  logEpisode: (titleId, seasonNumber, episodeNumber, opts) =>
+    set((s) => {
+      const now = new Date().toISOString()
+      const titles = s.titles.map((t) => {
+        if (t.id !== titleId) return t
+        const seasons = (t.seasons ?? []).map((season) => {
+          if (season.seasonNumber !== seasonNumber) return season
+          if (!season.episodes) return season
+          const episodes = season.episodes.map((ep) => {
+            if (ep.episodeNumber !== episodeNumber) return ep
+            const updated = { ...ep }
+            if (opts.watchedAt) {
+              updated.watchEvents = [
+                ...ep.watchEvents,
+                {
+                  id: `we-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
+                  watchedAt: opts.watchedAt,
+                  notes: opts.watchNotes || undefined,
+                },
+              ]
+            }
+            if (opts.rating && opts.rating > 0) {
+              updated.ratings = [
+                ...ep.ratings,
+                {
+                  id: `er-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
+                  rating: opts.rating,
+                  ratedAt: now,
+                },
+              ]
+            }
+            if (opts.reviewText?.trim()) {
+              updated.reviews = [
+                ...ep.reviews,
+                {
+                  id: `rv-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
+                  reviewText: opts.reviewText.trim(),
+                  reviewedAt: now,
+                },
+              ]
+            }
+            return updated
+          })
+          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
+          return { ...season, episodes, episodesWatched }
+        })
+        return { ...t, seasons }
+      })
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
+    }),
 
   // ── Ledger ─────────────────────────────────────────────────
   stats: computeLedgerStats(mockTitles),

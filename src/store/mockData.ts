@@ -1,12 +1,43 @@
 export type MediaType = 'movie' | 'tv'
 export type WatchStatus = 'watched' | 'watchlist' | 'watching' | 'dropped'
 
+export interface EpisodeWatchEvent {
+  id: string
+  watchedAt: string  // ISO date (YYYY-MM-DD)
+  notes?: string
+}
+
+export interface EpisodeRating {
+  id: string
+  rating: number    // 0–5 (matches title-level rating scale)
+  ratedAt: string   // ISO datetime — timestamped when user records it, not when watched
+}
+
+export interface EpisodeReview {
+  id: string
+  reviewText: string
+  reviewedAt: string  // ISO datetime — standalone timestamp
+}
+
+export interface Episode {
+  id: string
+  episodeNumber: number
+  episodeName?: string
+  airDate?: string
+  runtime?: number
+  synopsis?: string
+  watchEvents: EpisodeWatchEvent[]
+  ratings: EpisodeRating[]    // independent historical log
+  reviews: EpisodeReview[]    // independent historical log
+}
+
 export interface Season {
   id: string
   seasonNumber: number
   episodeCount: number
-  episodesWatched: number
+  episodesWatched: number  // derived from episodes with watch events when episodes[] is present
   airYear?: number
+  episodes?: Episode[]
 }
 
 export interface Viewing {
@@ -1196,6 +1227,411 @@ export const mockTitles: Title[] = [
         "titleId": "mt-50",
         "date": "2026-06-08",
         "rating": 4
+      }
+    ]
+  },
+  {
+    "id": "tv-1",
+    "tmdbId": 42009,
+    "type": "tv",
+    "title": "Black Mirror",
+    "year": 2011,
+    "genres": ["Science Fiction", "Drama", "Thriller"],
+    "synopsis": "An anthology series exploring a twisted, high-tech near-future where humanity's greatest innovations and darkest instincts collide.",
+    "network": "Netflix",
+    "status": "watching",
+    "rating": 4,
+    "tags": ["anthology"],
+    "addedAt": "2026-01-10",
+    "viewings": [],
+    "seasons": [
+      {
+        "id": "tv-1-s1",
+        "seasonNumber": 1,
+        "episodeCount": 3,
+        "episodesWatched": 3,
+        "airYear": 2011,
+        "episodes": [
+          {
+            "id": "tv-1-s1-e1",
+            "episodeNumber": 1,
+            "episodeName": "The National Anthem",
+            "airDate": "2011-12-04",
+            "runtime": 44,
+            "watchEvents": [{ "id": "we-tv-1-s1-e1-1", "watchedAt": "2026-01-10" }],
+            "ratings": [{ "id": "er-tv-1-s1-e1-1", "rating": 3, "ratedAt": "2026-01-10T21:30:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s1-e2",
+            "episodeNumber": 2,
+            "episodeName": "Fifteen Million Merits",
+            "airDate": "2011-12-11",
+            "runtime": 62,
+            "watchEvents": [{ "id": "we-tv-1-s1-e2-1", "watchedAt": "2026-01-11" }],
+            "ratings": [{ "id": "er-tv-1-s1-e2-1", "rating": 5, "ratedAt": "2026-01-11T22:15:00Z" }],
+            "reviews": [{ "id": "rv-tv-1-s1-e2-1", "reviewText": "A devastating critique of talent shows and gamified existence. The ending wrecked me.", "reviewedAt": "2026-01-11T22:45:00Z" }]
+          },
+          {
+            "id": "tv-1-s1-e3",
+            "episodeNumber": 3,
+            "episodeName": "The Entire History of You",
+            "airDate": "2011-12-18",
+            "runtime": 49,
+            "watchEvents": [{ "id": "we-tv-1-s1-e3-1", "watchedAt": "2026-01-12" }],
+            "ratings": [{ "id": "er-tv-1-s1-e3-1", "rating": 4, "ratedAt": "2026-01-12T23:00:00Z" }],
+            "reviews": []
+          }
+        ]
+      },
+      {
+        "id": "tv-1-s2",
+        "seasonNumber": 2,
+        "episodeCount": 4,
+        "episodesWatched": 4,
+        "airYear": 2013,
+        "episodes": [
+          {
+            "id": "tv-1-s2-e1",
+            "episodeNumber": 1,
+            "episodeName": "Be Right Back",
+            "airDate": "2013-02-11",
+            "runtime": 48,
+            "watchEvents": [{ "id": "we-tv-1-s2-e1-1", "watchedAt": "2026-01-18" }],
+            "ratings": [{ "id": "er-tv-1-s2-e1-1", "rating": 4, "ratedAt": "2026-01-18T21:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s2-e2",
+            "episodeNumber": 2,
+            "episodeName": "White Bear",
+            "airDate": "2013-02-18",
+            "runtime": 42,
+            "watchEvents": [{ "id": "we-tv-1-s2-e2-1", "watchedAt": "2026-01-19" }],
+            "ratings": [
+              { "id": "er-tv-1-s2-e2-1", "rating": 5, "ratedAt": "2026-01-19T22:00:00Z" },
+              { "id": "er-tv-1-s2-e2-2", "rating": 4, "ratedAt": "2026-02-01T14:00:00Z" }
+            ],
+            "reviews": [{ "id": "rv-tv-1-s2-e2-1", "reviewText": "The twist completely reframes everything. Punishing and brilliant.", "reviewedAt": "2026-01-19T22:30:00Z" }]
+          },
+          {
+            "id": "tv-1-s2-e3",
+            "episodeNumber": 3,
+            "episodeName": "The Waldo Moment",
+            "airDate": "2013-02-25",
+            "runtime": 43,
+            "watchEvents": [{ "id": "we-tv-1-s2-e3-1", "watchedAt": "2026-01-20" }],
+            "ratings": [{ "id": "er-tv-1-s2-e3-1", "rating": 2, "ratedAt": "2026-01-20T21:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s2-e4",
+            "episodeNumber": 4,
+            "episodeName": "White Christmas",
+            "airDate": "2014-12-16",
+            "runtime": 73,
+            "watchEvents": [{ "id": "we-tv-1-s2-e4-1", "watchedAt": "2026-01-21" }],
+            "ratings": [{ "id": "er-tv-1-s2-e4-1", "rating": 5, "ratedAt": "2026-01-21T22:00:00Z" }],
+            "reviews": [{ "id": "rv-tv-1-s2-e4-1", "reviewText": "Perhaps the best episode of the series. Three interlocking stories, all harrowing.", "reviewedAt": "2026-01-21T22:45:00Z" }]
+          }
+        ]
+      },
+      {
+        "id": "tv-1-s3",
+        "seasonNumber": 3,
+        "episodeCount": 6,
+        "episodesWatched": 6,
+        "airYear": 2016,
+        "episodes": [
+          {
+            "id": "tv-1-s3-e1",
+            "episodeNumber": 1,
+            "episodeName": "Nosedive",
+            "airDate": "2016-10-21",
+            "runtime": 63,
+            "watchEvents": [{ "id": "we-tv-1-s3-e1-1", "watchedAt": "2026-02-05" }],
+            "ratings": [{ "id": "er-tv-1-s3-e1-1", "rating": 4, "ratedAt": "2026-02-05T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s3-e2",
+            "episodeNumber": 2,
+            "episodeName": "Playtest",
+            "airDate": "2016-10-21",
+            "runtime": 56,
+            "watchEvents": [{ "id": "we-tv-1-s3-e2-1", "watchedAt": "2026-02-06" }],
+            "ratings": [{ "id": "er-tv-1-s3-e2-1", "rating": 4, "ratedAt": "2026-02-06T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s3-e3",
+            "episodeNumber": 3,
+            "episodeName": "Shut Up and Dance",
+            "airDate": "2016-10-21",
+            "runtime": 52,
+            "watchEvents": [{ "id": "we-tv-1-s3-e3-1", "watchedAt": "2026-02-07" }],
+            "ratings": [{ "id": "er-tv-1-s3-e3-1", "rating": 5, "ratedAt": "2026-02-07T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s3-e4",
+            "episodeNumber": 4,
+            "episodeName": "San Junipero",
+            "airDate": "2016-10-21",
+            "runtime": 61,
+            "watchEvents": [{ "id": "we-tv-1-s3-e4-1", "watchedAt": "2026-02-08" }],
+            "ratings": [
+              { "id": "er-tv-1-s3-e4-1", "rating": 5, "ratedAt": "2026-02-08T21:00:00Z" },
+              { "id": "er-tv-1-s3-e4-2", "rating": 5, "ratedAt": "2026-03-15T10:00:00Z" }
+            ],
+            "reviews": [{ "id": "rv-tv-1-s3-e4-1", "reviewText": "Genuinely beautiful. The rare Black Mirror episode that leaves you feeling hopeful. Still holds on second viewing.", "reviewedAt": "2026-02-08T22:00:00Z" }]
+          },
+          {
+            "id": "tv-1-s3-e5",
+            "episodeNumber": 5,
+            "episodeName": "Men Against Fire",
+            "airDate": "2016-10-21",
+            "runtime": 60,
+            "watchEvents": [{ "id": "we-tv-1-s3-e5-1", "watchedAt": "2026-02-09" }],
+            "ratings": [{ "id": "er-tv-1-s3-e5-1", "rating": 3, "ratedAt": "2026-02-09T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-1-s3-e6",
+            "episodeNumber": 6,
+            "episodeName": "Hated in the Nation",
+            "airDate": "2016-10-21",
+            "runtime": 89,
+            "watchEvents": [{ "id": "we-tv-1-s3-e6-1", "watchedAt": "2026-02-10" }],
+            "ratings": [{ "id": "er-tv-1-s3-e6-1", "rating": 4, "ratedAt": "2026-02-10T22:00:00Z" }],
+            "reviews": [{ "id": "rv-tv-1-s3-e6-1", "reviewText": "The longest and most procedural, but the finale lands. An important episode about mob justice.", "reviewedAt": "2026-02-10T23:00:00Z" }]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tv-2",
+    "tmdbId": 95396,
+    "type": "tv",
+    "title": "Severance",
+    "year": 2022,
+    "genres": ["Science Fiction", "Thriller", "Drama", "Mystery"],
+    "synopsis": "Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives. When a mysterious colleague appears outside of work, it begins a journey to discover the truth about their jobs.",
+    "network": "Apple TV+",
+    "status": "watching",
+    "rating": 5,
+    "tags": [],
+    "addedAt": "2026-03-01",
+    "viewings": [],
+    "seasons": [
+      {
+        "id": "tv-2-s1",
+        "seasonNumber": 1,
+        "episodeCount": 9,
+        "episodesWatched": 9,
+        "airYear": 2022,
+        "episodes": [
+          {
+            "id": "tv-2-s1-e1",
+            "episodeNumber": 1,
+            "episodeName": "Good News About Hell",
+            "airDate": "2022-02-18",
+            "runtime": 53,
+            "watchEvents": [{ "id": "we-tv-2-s1-e1-1", "watchedAt": "2026-03-01" }],
+            "ratings": [{ "id": "er-tv-2-s1-e1-1", "rating": 4, "ratedAt": "2026-03-01T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e2",
+            "episodeNumber": 2,
+            "episodeName": "Half Loop",
+            "airDate": "2022-02-18",
+            "runtime": 38,
+            "watchEvents": [{ "id": "we-tv-2-s1-e2-1", "watchedAt": "2026-03-02" }],
+            "ratings": [{ "id": "er-tv-2-s1-e2-1", "rating": 4, "ratedAt": "2026-03-02T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e3",
+            "episodeNumber": 3,
+            "episodeName": "In Perpetuity",
+            "airDate": "2022-02-25",
+            "runtime": 41,
+            "watchEvents": [{ "id": "we-tv-2-s1-e3-1", "watchedAt": "2026-03-03" }],
+            "ratings": [{ "id": "er-tv-2-s1-e3-1", "rating": 4, "ratedAt": "2026-03-03T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e4",
+            "episodeNumber": 4,
+            "episodeName": "The You You Are",
+            "airDate": "2022-03-04",
+            "runtime": 41,
+            "watchEvents": [{ "id": "we-tv-2-s1-e4-1", "watchedAt": "2026-03-05" }],
+            "ratings": [{ "id": "er-tv-2-s1-e4-1", "rating": 5, "ratedAt": "2026-03-05T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e5",
+            "episodeNumber": 5,
+            "episodeName": "The Grim Barbarity of Optics and Design",
+            "airDate": "2022-03-11",
+            "runtime": 43,
+            "watchEvents": [{ "id": "we-tv-2-s1-e5-1", "watchedAt": "2026-03-07" }],
+            "ratings": [{ "id": "er-tv-2-s1-e5-1", "rating": 5, "ratedAt": "2026-03-07T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e6",
+            "episodeNumber": 6,
+            "episodeName": "Hide and Seek",
+            "airDate": "2022-03-18",
+            "runtime": 41,
+            "watchEvents": [{ "id": "we-tv-2-s1-e6-1", "watchedAt": "2026-03-08" }],
+            "ratings": [{ "id": "er-tv-2-s1-e6-1", "rating": 4, "ratedAt": "2026-03-08T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e7",
+            "episodeNumber": 7,
+            "episodeName": "Defiant Jazz",
+            "airDate": "2022-03-25",
+            "runtime": 39,
+            "watchEvents": [{ "id": "we-tv-2-s1-e7-1", "watchedAt": "2026-03-09" }],
+            "ratings": [{ "id": "er-tv-2-s1-e7-1", "rating": 5, "ratedAt": "2026-03-09T22:00:00Z" }],
+            "reviews": [{ "id": "rv-tv-2-s1-e7-1", "reviewText": "The dance number. Enough said.", "reviewedAt": "2026-03-09T22:30:00Z" }]
+          },
+          {
+            "id": "tv-2-s1-e8",
+            "episodeNumber": 8,
+            "episodeName": "What Is Dead May Never Die",
+            "airDate": "2022-04-01",
+            "runtime": 46,
+            "watchEvents": [{ "id": "we-tv-2-s1-e8-1", "watchedAt": "2026-03-10" }],
+            "ratings": [{ "id": "er-tv-2-s1-e8-1", "rating": 5, "ratedAt": "2026-03-10T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s1-e9",
+            "episodeNumber": 9,
+            "episodeName": "The We We Are",
+            "airDate": "2022-04-08",
+            "runtime": 53,
+            "watchEvents": [{ "id": "we-tv-2-s1-e9-1", "watchedAt": "2026-03-11" }],
+            "ratings": [{ "id": "er-tv-2-s1-e9-1", "rating": 5, "ratedAt": "2026-03-11T22:30:00Z" }],
+            "reviews": [{ "id": "rv-tv-2-s1-e9-1", "reviewText": "One of the best season finales I have seen. The final scene is pure cinema.", "reviewedAt": "2026-03-11T23:00:00Z" }]
+          }
+        ]
+      },
+      {
+        "id": "tv-2-s2",
+        "seasonNumber": 2,
+        "episodeCount": 10,
+        "episodesWatched": 5,
+        "airYear": 2025,
+        "episodes": [
+          {
+            "id": "tv-2-s2-e1",
+            "episodeNumber": 1,
+            "episodeName": "Chikhai Bardo",
+            "airDate": "2025-01-17",
+            "runtime": 55,
+            "watchEvents": [{ "id": "we-tv-2-s2-e1-1", "watchedAt": "2026-06-01" }],
+            "ratings": [{ "id": "er-tv-2-s2-e1-1", "rating": 5, "ratedAt": "2026-06-01T22:00:00Z" }],
+            "reviews": [{ "id": "rv-tv-2-s2-e1-1", "reviewText": "Three years later and Lumon Industries is just as menacing. Picked right back up.", "reviewedAt": "2026-06-01T22:30:00Z" }]
+          },
+          {
+            "id": "tv-2-s2-e2",
+            "episodeNumber": 2,
+            "episodeName": "Goodbye, Mrs. Selvig",
+            "airDate": "2025-01-17",
+            "runtime": 42,
+            "watchEvents": [{ "id": "we-tv-2-s2-e2-1", "watchedAt": "2026-06-02" }],
+            "ratings": [{ "id": "er-tv-2-s2-e2-1", "rating": 4, "ratedAt": "2026-06-02T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e3",
+            "episodeNumber": 3,
+            "episodeName": "Who Is Alive?",
+            "airDate": "2025-01-24",
+            "runtime": 45,
+            "watchEvents": [{ "id": "we-tv-2-s2-e3-1", "watchedAt": "2026-06-04" }],
+            "ratings": [{ "id": "er-tv-2-s2-e3-1", "rating": 4, "ratedAt": "2026-06-04T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e4",
+            "episodeNumber": 4,
+            "episodeName": "Woe's Hollow",
+            "airDate": "2025-01-31",
+            "runtime": 44,
+            "watchEvents": [{ "id": "we-tv-2-s2-e4-1", "watchedAt": "2026-06-06" }],
+            "ratings": [{ "id": "er-tv-2-s2-e4-1", "rating": 5, "ratedAt": "2026-06-06T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e5",
+            "episodeNumber": 5,
+            "episodeName": "Trojan's Horse",
+            "airDate": "2025-02-07",
+            "runtime": 49,
+            "watchEvents": [{ "id": "we-tv-2-s2-e5-1", "watchedAt": "2026-06-08" }],
+            "ratings": [{ "id": "er-tv-2-s2-e5-1", "rating": 4, "ratedAt": "2026-06-08T22:00:00Z" }],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e6",
+            "episodeNumber": 6,
+            "episodeName": "Attila",
+            "airDate": "2025-02-14",
+            "runtime": 50,
+            "watchEvents": [],
+            "ratings": [],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e7",
+            "episodeNumber": 7,
+            "episodeName": "The After Lackey",
+            "airDate": "2025-02-21",
+            "runtime": 48,
+            "watchEvents": [],
+            "ratings": [],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e8",
+            "episodeNumber": 8,
+            "episodeName": "Sweet Vitriol",
+            "airDate": "2025-02-28",
+            "runtime": 47,
+            "watchEvents": [],
+            "ratings": [],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e9",
+            "episodeNumber": 9,
+            "episodeName": "Mammalians Nurtured by Wolfmother",
+            "airDate": "2025-03-07",
+            "runtime": 46,
+            "watchEvents": [],
+            "ratings": [],
+            "reviews": []
+          },
+          {
+            "id": "tv-2-s2-e10",
+            "episodeNumber": 10,
+            "episodeName": "Cold Harbor",
+            "airDate": "2025-03-14",
+            "runtime": 55,
+            "watchEvents": [],
+            "ratings": [],
+            "reviews": []
+          }
+        ]
       }
     ]
   }

@@ -1,4 +1,5 @@
 import type { LedgerStats, Title } from './mockData'
+import { watchedMinutesInSeason } from './episodeUtils'
 
 // Mirrors the logic in scripts/migrate-from-v1.mjs's computeStats, kept in
 // sync so stats are always derived from the live titles list.
@@ -46,7 +47,10 @@ export function computeLedgerStats(titles: Title[]): LedgerStats {
     totalSeries: series.length,
     totalViewings: viewings.length,
     avgRating: Math.round(avgRating * 10) / 10,
-    totalMinutes: titles.reduce((sum, t) => sum + (t.runtime ?? 0), 0),
+    totalMinutes: titles.reduce((sum, t) => {
+      if (t.type === 'movie') return sum + (t.runtime ?? 0)
+      return sum + (t.seasons ?? []).reduce((s, season) => s + watchedMinutesInSeason(season), 0)
+    }, 0),
     topGenres,
     topDirectors,
     ratingDistribution,

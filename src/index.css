@@ -704,3 +704,52 @@
     animation: none !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   SERIES GRAPH — episode rating heatmap
+   ════════════════════════════════════════════════════════════════════════ */
+
+.series-graph__cell {
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s;
+}
+.series-graph__cell:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2px rgba(233, 178, 102, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+  position: relative;
+}
+.series-graph__cell:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+
+/* Episode row in TV detail drawer */
+.episode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+.episode-row:hover {
+  background: rgba(233, 178, 102, 0.05);
+  border-color: var(--line);
+}
+.episode-row.is-expanded {
+  background: rgba(233, 178, 102, 0.07);
+  border-color: rgba(233, 178, 102, 0.2);
+}
+.episode-row.is-watched .ep-num {
+  color: var(--amber);
+}
+
+@keyframes ep-panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+.ep-panel {
+  animation: ep-panel-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

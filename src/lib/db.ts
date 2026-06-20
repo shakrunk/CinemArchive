@@ -248,6 +248,25 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
   }
 }
 
+// Title columns that a metadata refresh may overwrite. Keyed by the client-side
+// field; mapped to the snake_case DB column. Presence in the patch (even when
+// undefined) writes the column, so local `undefined` and DB `null` stay in sync.
+const META_COLUMNS: Array<[keyof Title, string]> = [
+  ['tmdbId', 'tmdb_id'],
+  ['title', 'title'],
+  ['year', 'year'],
+  ['director', 'director'],
+  ['genres', 'genres'],
+  ['posterUrl', 'poster_url'],
+  ['backdropUrl', 'backdrop_url'],
+  ['synopsis', 'synopsis'],
+  ['runtime', 'runtime'],
+  ['network', 'network'],
+  ['imdbRating', 'imdb_rating'],
+  ['rtScore', 'rt_score'],
+  ['metacriticScore', 'metacritic_score'],
+]
+
 export async function updateTitleInDb(userId: string, titleId: string, patch: Partial<Title>): Promise<void> {
   if (!supabase) return
 
@@ -256,6 +275,11 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
   if (patch.rating !== undefined) mappedPatch.rating = patch.rating
   if (patch.notes !== undefined) mappedPatch.notes = patch.notes
   if (patch.tags !== undefined) mappedPatch.tags = patch.tags
+
+  // Metadata refresh: only touch a column when its key is present in the patch.
+  for (const [field, column] of META_COLUMNS) {
+    if (field in patch) mappedPatch[column] = patch[field] ?? null
+  }
 
   if (Object.keys(mappedPatch).length > 0) {
     const { error } = await supabase

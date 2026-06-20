@@ -7,63 +7,10 @@ import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
-import type { Title, MediaType, WatchStatus, Season } from 'src/store/mockData'
-import { supabase, isSupabaseConfigured } from 'src/lib/auth'
+import type { Title, WatchStatus, Season } from 'src/store/mockData'
+import { searchMedia, fetchMediaDetails, type SearchResult, type RawTmdbSeason } from 'src/lib/media'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface SearchResult {
-  tmdbId: number
-  type: MediaType
-  title: string
-  year: number
-  posterUrl?: string
-  director?: string
-  genres: string[]
-  synopsis?: string
-  runtime?: number
-  network?: string
-  seasonCount?: number
-  imdbRating?: number
-  rtScore?: number
-  metacriticScore?: number
-}
-
-// ─── Mock search (will be replaced in Phase 3 with real Edge Function) ────────
-
-const MOCK_RESULTS: SearchResult[] = [
-  {
-    tmdbId: 238,
-    type: 'movie',
-    title: 'The Godfather',
-    year: 1972,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsLLeHSSa1xZx.jpg',
-    director: 'Francis Ford Coppola',
-    genres: ['Crime', 'Drama'],
-    synopsis: 'Spanning the years 1945 to 1955, a chronicle of the fictional Italian-American Corleone crime family.',
-    runtime: 175,
-  },
-  {
-    tmdbId: 372058,
-    type: 'movie',
-    title: 'Your Name',
-    year: 2016,
-    director: 'Makoto Shinkai',
-    genres: ['Animation', 'Drama', 'Romance'],
-    synopsis: 'Two teenagers share a profound, magical connection upon discovering they are swapping bodies.',
-    runtime: 106,
-  },
-  {
-    tmdbId: 60625,
-    type: 'tv',
-    title: 'Rick and Morty',
-    year: 2013,
-    genres: ['Animation', 'Comedy', 'Science Fiction'],
-    synopsis: 'An animated series following a sociopathic scientist and his grandson.',
-    network: 'Adult Swim',
-    seasonCount: 7,
-  },
-]
+// ─── Search hook ─────────────────────────────────────────────────────────────
 
 function useDebouncedSearch(delay = 400) {
   const [results, setResults] = useState<SearchResult[]>([])
@@ -79,62 +26,43 @@ function useDebouncedSearch(delay = 400) {
     }
     setLoading(true)
     timerRef.current = setTimeout(async () => {
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const [movieRes, tvRes] = await Promise.all([
-            supabase.functions.invoke(`media-proxy?action=search&q=${encodeURIComponent(query)}&type=movie`),
-            supabase.functions.invoke(`media-proxy?action=search&q=${encodeURIComponent(query)}&type=tv`)
-          ])
-
-          if (movieRes.error) throw movieRes.error
-          if (tvRes.error) throw tvRes.error
-
-          const moviesList = (movieRes.data?.results || []).map((item: any) => ({
-            tmdbId: item.id,
-            type: 'movie' as const,
-            title: item.title,
-            year: item.release_date ? new Date(item.release_date).getFullYear() : 0,
-            posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-            synopsis: item.overview,
-            genres: [],
-          }))
-
-          const tvList = (tvRes.data?.results || []).map((item: any) => ({
-            tmdbId: item.id,
-            type: 'tv' as const,
-            title: item.name,
-            year: item.first_air_date ? new Date(item.first_air_date).getFullYear() : 0,
-            posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-            synopsis: item.overview,
-            genres: [],
-          }))
-
-          const combined: SearchResult[] = []
-          const maxLength = Math.max(moviesList.length, tvList.length)
-          for (let i = 0; i < maxLength; i++) {
-            if (i < moviesList.length) combined.push(moviesList[i])
-            if (i < tvList.length) combined.push(tvList[i])
-          }
-
-          setResults(combined.slice(0, 15))
-        } catch (err) {
-          console.error('Error during media search:', err)
-          setResults([])
-        } finally {
-          setLoading(false)
-        }
-      } else {
-        const q = query.toLowerCase()
-        const filtered = MOCK_RESULTS.filter(
-          (r) => r.title.toLowerCase().includes(q) || r.director?.toLowerCase().includes(q)
-        )
-        setResults(filtered)
+      try {
+        setResults(await searchMedia(query))
+      } catch (err) {
+        console.error('Error during media search:', err)
+        setResults([])
+      } finally {
         setLoading(false)
       }
     }, delay)
   }, [delay])
 
   return { results, loading, search }
+}
+
+// ─── Season scaffolding ──────────────────────────────────────────────────────
+
+// Build fresh (unwatched) season/episode structures for a selected series.
+// Episode counts come from TMDB when available, otherwise default to 10.
+function buildSeasons(result: SearchResult, tmdbSeasons: RawTmdbSeason[]): Season[] {
+  if (result.type !== 'tv' || !result.seasonCount) return []
+  return Array.from({ length: result.seasonCount }, (_, i) => {
+    const tmdbSeason = tmdbSeasons.find((s) => s.season_number === i + 1)
+    const epCount = tmdbSeason?.episode_count || 10
+    return {
+      id: crypto.randomUUID(),
+      seasonNumber: i + 1,
+      episodeCount: epCount,
+      episodesWatched: 0,
+      episodes: Array.from({ length: epCount }, (_, j) => ({
+        id: crypto.randomUUID(),
+        episodeNumber: j + 1,
+        watchEvents: [],
+        ratings: [],
+        reviews: [],
+      })),
+    }
+  })
 }
 
 // ─── TV Season Editor ─────────────────────────────────────────────────────────
@@ -297,96 +225,9 @@ export function AddTitleWorkflow() {
   async function selectResult(result: SearchResult) {
     setLoadingDetails(true)
     try {
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.functions.invoke(
-          `media-proxy?action=details&id=${result.tmdbId}&type=${result.type}`
-        )
-        if (error) throw error
-
-        let imdbRating: number | undefined
-        let rtScore: number | undefined
-        let metacriticScore: number | undefined
-
-        if (data.imdb_id) {
-          try {
-            const { data: ratingsData } = await supabase.functions.invoke(
-              `media-proxy?action=ratings&imdb=${data.imdb_id}`
-            )
-            if (ratingsData) {
-              imdbRating = ratingsData.imdbRating && ratingsData.imdbRating !== 'N/A'
-                ? parseFloat(ratingsData.imdbRating)
-                : undefined
-              const rt = ratingsData.Ratings?.find((r: any) => r.Source === 'Rotten Tomatoes')?.Value
-              rtScore = rt ? parseInt(rt.replace('%', ''), 10) : undefined
-              const meta = ratingsData.Metascore
-              metacriticScore = meta && meta !== 'N/A' ? parseInt(meta, 10) : undefined
-            }
-          } catch (e) {
-            console.error('Error fetching ratings:', e)
-          }
-        }
-
-        const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name
-
-        const detailedResult: SearchResult = {
-          tmdbId: data.id,
-          type: result.type,
-          title: data.title || data.name,
-          year: (data.release_date || data.first_air_date)
-            ? new Date(data.release_date || data.first_air_date).getFullYear()
-            : result.year,
-          posterUrl: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : result.posterUrl,
-          director,
-          genres: data.genres?.map((g: any) => g.name) ?? [],
-          synopsis: data.overview,
-          runtime: data.runtime,
-          network: data.networks?.[0]?.name,
-          seasonCount: data.number_of_seasons,
-          imdbRating,
-          rtScore,
-          metacriticScore,
-        }
-
-        setSelected(detailedResult)
-        const seasons: Season[] = result.type === 'tv' && detailedResult.seasonCount
-          ? Array.from({ length: detailedResult.seasonCount }, (_, i) => {
-              const tmdbSeason = data.seasons?.find((s: any) => s.season_number === i + 1)
-              const epCount = tmdbSeason?.episode_count || 10
-              return {
-                id: crypto.randomUUID(),
-                seasonNumber: i + 1,
-                episodeCount: epCount,
-                episodesWatched: 0,
-                episodes: Array.from({ length: epCount }, (_, j) => ({
-                  id: crypto.randomUUID(),
-                  episodeNumber: j + 1,
-                  watchEvents: [],
-                  ratings: [],
-                  reviews: [],
-                })),
-              }
-            })
-          : []
-        setLog({ ...DEFAULT_LOG, seasons })
-      } else {
-        setSelected(result)
-        const seasons: Season[] = result.type === 'tv' && result.seasonCount
-          ? Array.from({ length: result.seasonCount }, (_, i) => ({
-              id: crypto.randomUUID(),
-              seasonNumber: i + 1,
-              episodeCount: 10,
-              episodesWatched: 0,
-              episodes: Array.from({ length: 10 }, (_, j) => ({
-                id: `new-s${i + 1}-e${j + 1}`,
-                episodeNumber: j + 1,
-                watchEvents: [],
-                ratings: [],
-                reviews: [],
-              })),
-            }))
-          : []
-        setLog({ ...DEFAULT_LOG, seasons })
-      }
+      const { result: detailed, tmdbSeasons } = await fetchMediaDetails(result)
+      setSelected(detailed)
+      setLog({ ...DEFAULT_LOG, seasons: buildSeasons(detailed, tmdbSeasons) })
       setStep('log')
     } catch (err) {
       console.error('Error fetching details:', err)

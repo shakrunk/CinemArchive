@@ -58,6 +58,7 @@ interface UISlice {
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
+  isRefreshMetadataOpen: boolean
   isSharedView: boolean
 
   setViewMode: (mode: ViewMode) => void
@@ -66,6 +67,8 @@ interface UISlice {
   closeAddTitle: () => void
   openDetailDrawer: (id: string) => void
   closeDetailDrawer: () => void
+  openRefreshMetadata: () => void
+  closeRefreshMetadata: () => void
   setIsSharedView: (isSharedView: boolean) => void
 }
 
@@ -339,7 +342,11 @@ export const useAppStore = create<AppStore>()(
     set({ selectedTitleId: id, isDetailDrawerOpen: true }),
 
   closeDetailDrawer: () =>
-    set({ isDetailDrawerOpen: false, selectedTitleId: null }),
+    set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false, selectedTitleId: null }),
+
+  isRefreshMetadataOpen: false,
+  openRefreshMetadata: () => set({ isRefreshMetadataOpen: true }),
+  closeRefreshMetadata: () => set({ isRefreshMetadataOpen: false }),
 
   isSharedView: false,
   setIsSharedView: (isSharedView) => set({ isSharedView }),

@@ -17,7 +17,7 @@ import {
 } from 'src/store/episodeUtils'
 import {
   Calendar, Clock, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronDown, ChevronRight, Eye, MessageSquare,
+  ChevronDown, ChevronRight, Eye, MessageSquare, RefreshCw,
 } from 'lucide-react'
 import { cn } from 'src/lib/utils'
 import type { Viewing, WatchStatus, Season, Episode } from 'src/store/mockData'
@@ -562,7 +562,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView }: TVSeriesSectionProp
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, isSharedView } = useAppStore()
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, openRefreshMetadata, isSharedView } = useAppStore()
   const title = useSelectedTitle()
 
   const [showLogForm, setShowLogForm] = useState(false)
@@ -834,12 +834,22 @@ export function TitleDetailDrawer() {
             </>
           )}
 
-          {/* Remove from library */}
+          {/* Maintenance actions */}
           {!isSharedView && (
-            <div className="pt-2 border-t" style={{ borderColor: 'var(--line)' }}>
+            <div
+              className="pt-2 border-t flex flex-wrap items-center gap-x-5 gap-y-2"
+              style={{ borderColor: 'var(--line)' }}
+            >
+              <button
+                onClick={openRefreshMetadata}
+                className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-amber transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh poster &amp; metadata
+              </button>
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-amber transition-colors"
+                className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-ember transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Remove from library

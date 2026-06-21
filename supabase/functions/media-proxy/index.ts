@@ -94,11 +94,12 @@ async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
 }
 
 async function getTMDBSeasonDetails(tmdbId: number, seasonNumber: number) {
-  const cacheKey = `tmdb:season:${tmdbId}:${seasonNumber}`
+  // Cache key bumped to v2 — v1 entries lack the credits field added by append_to_response
+  const cacheKey = `tmdb:season:v2:${tmdbId}:${seasonNumber}`
   const cached = await getCached(cacheKey)
   if (cached) return cached
 
-  const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=en-US`
+  const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=credits`
   const res = await fetch(url)
   const data = await res.json()
 

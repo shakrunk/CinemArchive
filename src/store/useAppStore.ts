@@ -31,6 +31,7 @@ interface EpisodeLogOpts {
   watchNotes?: string
   rating?: number      // creates an EpisodeRating stamped at call-time
   reviewText?: string  // creates an EpisodeReview stamped at call-time
+  colorMode?: 'bw' | 'color'
 }
 
 interface LibrarySlice {
@@ -283,6 +284,7 @@ export const useAppStore = create<AppStore>()(
                   id: `we-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
                   watchedAt: opts.watchedAt,
                   notes: opts.watchNotes || undefined,
+                  colorMode: opts.colorMode,
                 },
               ]
             }
@@ -303,6 +305,7 @@ export const useAppStore = create<AppStore>()(
                   id: `rv-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
                   reviewText: opts.reviewText.trim(),
                   reviewedAt: now,
+                  colorMode: opts.colorMode,
                 },
               ]
             }

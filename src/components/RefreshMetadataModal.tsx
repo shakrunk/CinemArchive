@@ -5,8 +5,8 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb } from 'src/lib/db'
-import type { Title, Episode } from 'src/store/mockData'
+import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
+import type { Title, Episode, EpisodeCrew } from 'src/store/mockData'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
@@ -28,6 +28,9 @@ function toSearchResult(t: Title): SearchResult {
     imdbRating: t.imdbRating,
     rtScore: t.rtScore,
     metacriticScore: t.metacriticScore,
+    cast: t.cast,
+    crew: t.crew,
+    studios: t.studios,
   }
 }
 
@@ -104,44 +107,67 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
         imdbRating: result.imdbRating,
         rtScore: result.rtScore,
         metacriticScore: result.metacriticScore,
+        cast: result.cast,
+        crew: result.crew,
+        studios: result.studios,
       }
+
+      const EP_CREW_JOBS = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
 
       // For TV shows, also refresh episode metadata for all seasons
       if (result.type === 'tv' && title.seasons && title.seasons.length > 0) {
         const settled = await Promise.allSettled(
           title.seasons.map((s) =>
-            fetchSeasonDetails(result.tmdbId, s.seasonNumber).then(({ episodes }) => ({ season: s, tmdbEps: episodes }))
+            fetchSeasonDetails(result.tmdbId, s.seasonNumber).then(({ episodes, cast }) => ({
+              season: s,
+              tmdbEps: episodes,
+              seasonCast: cast,
+            }))
           )
         )
 
         const allEpisodeUpdates: Parameters<typeof upsertEpisodeMetadataInDb>[2] = []
+        const allEpisodeCrew: Array<{ episodeId: string; crew: EpisodeCrew[] }> = []
+        const allSeasonCast: Array<{ seasonId: string; cast: NonNullable<Title['cast']> }> = []
+
         const updatedSeasons = title.seasons.map((s) => {
           const match = settled.find(
             (r) => r.status === 'fulfilled' && r.value.season.seasonNumber === s.seasonNumber
           )
           if (!match || match.status !== 'fulfilled' || match.value.tmdbEps.length === 0) return s
 
-          const { tmdbEps } = match.value
+          const { tmdbEps, seasonCast } = match.value
           const existingEpisodes = s.episodes || []
           let updatedEpisodes: Episode[]
 
           if (existingEpisodes.length === 0) {
-            updatedEpisodes = tmdbEps.map((tmdbEp) => ({
-              id: crypto.randomUUID(),
-              episodeNumber: tmdbEp.episode_number,
-              episodeName: tmdbEp.name || undefined,
-              airDate: tmdbEp.air_date || undefined,
-              runtime: tmdbEp.runtime || undefined,
-              synopsis: tmdbEp.overview || undefined,
-              stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
-              watchEvents: [],
-              ratings: [],
-              reviews: [],
-            }))
+            updatedEpisodes = tmdbEps.map((tmdbEp) => {
+              const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
+                .filter((c) => EP_CREW_JOBS.has(c.job))
+                .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
+              return {
+                id: crypto.randomUUID(),
+                episodeNumber: tmdbEp.episode_number,
+                episodeName: tmdbEp.name || undefined,
+                airDate: tmdbEp.air_date || undefined,
+                runtime: tmdbEp.runtime || undefined,
+                synopsis: tmdbEp.overview || undefined,
+                stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+                director: epCrew.find((c) => c.job === 'Director')?.name,
+                writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
+                crew: epCrew.length > 0 ? epCrew : undefined,
+                watchEvents: [],
+                ratings: [],
+                reviews: [],
+              }
+            })
           } else {
             updatedEpisodes = existingEpisodes.map((ep) => {
               const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
               if (!tmdbEp) return ep
+              const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
+                .filter((c) => EP_CREW_JOBS.has(c.job))
+                .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
               return {
                 ...ep,
                 episodeName: tmdbEp.name || ep.episodeName,
@@ -149,6 +175,9 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                 runtime: tmdbEp.runtime || ep.runtime,
                 synopsis: tmdbEp.overview || ep.synopsis,
                 stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : ep.stillUrl,
+                director: epCrew.find((c) => c.job === 'Director')?.name ?? ep.director,
+                writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
+                crew: epCrew.length > 0 ? epCrew : ep.crew,
               }
             })
           }
@@ -164,17 +193,41 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
               synopsis: ep.synopsis,
               stillUrl: ep.stillUrl,
             })
+            if (ep.crew && ep.crew.length > 0) {
+              allEpisodeCrew.push({ episodeId: ep.id, crew: ep.crew })
+            }
           }
 
-          return { ...s, episodes: updatedEpisodes, episodeCount: updatedEpisodes.length }
+          if (seasonCast && seasonCast.length > 0) {
+            allSeasonCast.push({ seasonId: s.id, cast: seasonCast })
+          }
+
+          return {
+            ...s,
+            episodes: updatedEpisodes,
+            episodeCount: updatedEpisodes.length,
+            cast: seasonCast && seasonCast.length > 0 ? seasonCast : s.cast,
+          }
         })
 
         patch.seasons = updatedSeasons
 
-        if (user && allEpisodeUpdates.length > 0) {
-          upsertEpisodeMetadataInDb(user.id, title.id, allEpisodeUpdates).catch((e) =>
-            console.error('Episode metadata refresh DB write failed:', e)
-          )
+        if (user) {
+          if (allEpisodeUpdates.length > 0) {
+            upsertEpisodeMetadataInDb(user.id, title.id, allEpisodeUpdates).catch((e) =>
+              console.error('Episode metadata refresh DB write failed:', e)
+            )
+          }
+          for (const { seasonId, cast } of allSeasonCast) {
+            upsertSeasonCastInDb(user.id, title.id, seasonId, cast).catch((e) =>
+              console.error('Season cast refresh DB write failed:', e)
+            )
+          }
+          for (const { episodeId, crew } of allEpisodeCrew) {
+            upsertEpisodeCrewInDb(user.id, title.id, episodeId, crew).catch((e) =>
+              console.error('Episode crew refresh DB write failed:', e)
+            )
+          }
         }
       }
 

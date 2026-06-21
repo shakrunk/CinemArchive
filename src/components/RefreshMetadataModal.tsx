@@ -4,8 +4,11 @@ import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
-import { searchMedia, fetchMediaDetails, type SearchResult } from 'src/lib/media'
-import type { Title } from 'src/store/mockData'
+import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult } from 'src/lib/media'
+import { upsertEpisodeMetadataInDb } from 'src/lib/db'
+import type { Title, Episode } from 'src/store/mockData'
+
+const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // Project an existing library Title back into a SearchResult so it can be
 // re-hydrated through the same detail-fetch path as a fresh search pick.
@@ -34,6 +37,7 @@ function toSearchResult(t: Title): SearchResult {
 function RefreshContent({ title, onClose }: { title: Title; onClose: () => void }) {
   const updateTitle = useAppStore((s) => s.updateTitle)
   const titles = useAppStore((s) => s.titles)
+  const user = useAppStore((s) => s.user)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -101,6 +105,79 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
         rtScore: result.rtScore,
         metacriticScore: result.metacriticScore,
       }
+
+      // For TV shows, also refresh episode metadata for all seasons
+      if (result.type === 'tv' && title.seasons && title.seasons.length > 0) {
+        const settled = await Promise.allSettled(
+          title.seasons.map((s) =>
+            fetchSeasonDetails(result.tmdbId, s.seasonNumber).then((eps) => ({ season: s, tmdbEps: eps }))
+          )
+        )
+
+        const allEpisodeUpdates: Parameters<typeof upsertEpisodeMetadataInDb>[2] = []
+        const updatedSeasons = title.seasons.map((s) => {
+          const match = settled.find(
+            (r) => r.status === 'fulfilled' && r.value.season.seasonNumber === s.seasonNumber
+          )
+          if (!match || match.status !== 'fulfilled' || match.value.tmdbEps.length === 0) return s
+
+          const { tmdbEps } = match.value
+          const existingEpisodes = s.episodes || []
+          let updatedEpisodes: Episode[]
+
+          if (existingEpisodes.length === 0) {
+            updatedEpisodes = tmdbEps.map((tmdbEp) => ({
+              id: crypto.randomUUID(),
+              episodeNumber: tmdbEp.episode_number,
+              episodeName: tmdbEp.name || undefined,
+              airDate: tmdbEp.air_date || undefined,
+              runtime: tmdbEp.runtime || undefined,
+              synopsis: tmdbEp.overview || undefined,
+              stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+              watchEvents: [],
+              ratings: [],
+              reviews: [],
+            }))
+          } else {
+            updatedEpisodes = existingEpisodes.map((ep) => {
+              const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
+              if (!tmdbEp) return ep
+              return {
+                ...ep,
+                episodeName: tmdbEp.name || ep.episodeName,
+                airDate: tmdbEp.air_date || ep.airDate,
+                runtime: tmdbEp.runtime || ep.runtime,
+                synopsis: tmdbEp.overview || ep.synopsis,
+                stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : ep.stillUrl,
+              }
+            })
+          }
+
+          for (const ep of updatedEpisodes) {
+            allEpisodeUpdates.push({
+              id: ep.id,
+              seasonNumber: s.seasonNumber,
+              episodeNumber: ep.episodeNumber,
+              episodeName: ep.episodeName,
+              airDate: ep.airDate,
+              runtime: ep.runtime,
+              synopsis: ep.synopsis,
+              stillUrl: ep.stillUrl,
+            })
+          }
+
+          return { ...s, episodes: updatedEpisodes, episodeCount: updatedEpisodes.length }
+        })
+
+        patch.seasons = updatedSeasons
+
+        if (user && allEpisodeUpdates.length > 0) {
+          upsertEpisodeMetadataInDb(user.id, title.id, allEpisodeUpdates).catch((e) =>
+            console.error('Episode metadata refresh DB write failed:', e)
+          )
+        }
+      }
+
       updateTitle(title.id, patch)
       onClose()
     } catch (err) {

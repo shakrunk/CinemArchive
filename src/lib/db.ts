@@ -87,6 +87,7 @@ function mapDbTitleToLocal(row: any): Title {
                   id: we.id,
                   watchedAt: we.watched_at,
                   notes: we.notes || undefined,
+                  colorMode: we.color_mode || undefined,
                 })),
               ratings: (ep.episode_ratings || [])
                 .sort(
@@ -107,6 +108,7 @@ function mapDbTitleToLocal(row: any): Title {
                   id: rv.id,
                   reviewText: rv.review_text,
                   reviewedAt: rv.reviewed_at,
+                  colorMode: rv.color_mode || undefined,
                 })),
             }
           })
@@ -516,6 +518,7 @@ export async function logEpisodeToDb(
     watchNotes?: string
     rating?: number
     reviewText?: string
+    colorMode?: 'bw' | 'color'
   }
 ): Promise<void> {
   if (!supabase) return
@@ -526,6 +529,7 @@ export async function logEpisodeToDb(
       user_id: userId,
       watched_at: opts.watchedAt,
       notes: opts.watchNotes || undefined,
+      color_mode: opts.colorMode ?? null,
     })
     if (error) {
       console.error('Error inserting episode watch event:', error)
@@ -550,6 +554,7 @@ export async function logEpisodeToDb(
       episode_id: episodeId,
       user_id: userId,
       review_text: opts.reviewText.trim(),
+      color_mode: opts.colorMode ?? null,
     })
     if (error) {
       console.error('Error inserting episode review:', error)

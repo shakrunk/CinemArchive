@@ -27,6 +27,7 @@ export interface EpisodeWatchEvent {
   id: string
   watchedAt: string  // ISO date (YYYY-MM-DD)
   notes?: string
+  colorMode?: 'bw' | 'color'  // Spider Noir only
 }
 
 export interface EpisodeRating {
@@ -39,6 +40,7 @@ export interface EpisodeReview {
   id: string
   reviewText: string
   reviewedAt: string  // ISO datetime — standalone timestamp
+  colorMode?: 'bw' | 'color'  // Spider Noir only
 }
 
 export interface Episode {

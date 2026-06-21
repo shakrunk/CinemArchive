@@ -20,13 +20,30 @@ import {
   ChevronDown, ChevronRight, Eye, MessageSquare, RefreshCw,
 } from 'lucide-react'
 import { cn } from 'src/lib/utils'
-import type { Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
+import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 242484
+
+function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
+  const allEvents: Array<{ date: string; colorMode: 'bw' | 'color' }> = []
+  for (const season of title.seasons ?? []) {
+    for (const ep of season.episodes ?? []) {
+      for (const we of ep.watchEvents) {
+        if (we.colorMode) allEvents.push({ date: we.watchedAt, colorMode: we.colorMode })
+      }
+      for (const rv of ep.reviews) {
+        if (rv.colorMode) allEvents.push({ date: rv.reviewedAt, colorMode: rv.colorMode })
+      }
+    }
+  }
+  if (allEvents.length === 0) return null
+  allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  return allEvents[0].colorMode
+}
 
 // ─── Shared status options ────────────────────────────────────────────────────
 
@@ -816,6 +833,21 @@ export function TitleDetailDrawer() {
   const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, openRefreshMetadata, isSharedView } = useAppStore()
   const title = useSelectedTitle()
   const user = useAppStore((s) => s.user)
+
+  const isSpiderNoir = title?.tmdbId === SPIDER_NOIR_TMDB_ID
+  const activeSpiderNoirMode = isSpiderNoir && title ? getSpiderNoirActiveMode(title) : null
+
+  useEffect(() => {
+    document.body.classList.remove('spider-noir-bw', 'spider-noir-color')
+    if (isSpiderNoir && activeSpiderNoirMode) {
+      document.body.classList.add(
+        activeSpiderNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color'
+      )
+    }
+    return () => {
+      document.body.classList.remove('spider-noir-bw', 'spider-noir-color')
+    }
+  }, [isSpiderNoir, activeSpiderNoirMode])
 
   const [showLogForm, setShowLogForm] = useState(false)
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))

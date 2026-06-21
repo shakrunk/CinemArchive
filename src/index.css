@@ -757,3 +757,43 @@
 .ep-panel {
   animation: ep-panel-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   SPIDER NOIR VIEWING MODE — app-wide transformation
+   Active while Spider-Man: Noir's detail drawer is open.
+   Body class is applied/removed by TitleDetailDrawer's useEffect.
+   ════════════════════════════════════════════════════════════════════════ */
+
+body.spider-noir-bw #root {
+  filter: grayscale(1) contrast(1.15);
+  transition: filter 600ms ease;
+}
+
+body.spider-noir-bw .grain {
+  opacity: 0.10;
+}
+
+body.spider-noir-color #root {
+  filter: saturate(2.2) contrast(1.05) hue-rotate(-8deg);
+  transition: filter 600ms ease;
+}
+
+body.spider-noir-color .btn-amber {
+  animation: spider-noir-shimmer 3s ease-in-out infinite;
+}
+
+body.spider-noir-color .projector-beam {
+  animation: flicker 7s ease-in-out infinite,
+             spider-noir-beam-hue 8s ease-in-out infinite;
+}
+
+@keyframes spider-noir-shimmer {
+  0%, 100% { box-shadow: 0 6px 20px -8px rgba(233, 178, 102, 0.7); }
+  50%       { box-shadow: 0 6px 28px -6px rgba(233, 100, 40, 0.95); }
+}
+
+@keyframes spider-noir-beam-hue {
+  0%, 100% { filter: blur(30px) hue-rotate(0deg); }
+  33%       { filter: blur(30px) hue-rotate(25deg); }
+  66%       { filter: blur(30px) hue-rotate(-90deg); }
+}

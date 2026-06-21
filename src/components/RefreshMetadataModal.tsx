@@ -110,7 +110,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
       if (result.type === 'tv' && title.seasons && title.seasons.length > 0) {
         const settled = await Promise.allSettled(
           title.seasons.map((s) =>
-            fetchSeasonDetails(result.tmdbId, s.seasonNumber).then((eps) => ({ season: s, tmdbEps: eps }))
+            fetchSeasonDetails(result.tmdbId, s.seasonNumber).then(({ episodes }) => ({ season: s, tmdbEps: episodes }))
           )
         )
 

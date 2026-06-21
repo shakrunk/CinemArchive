@@ -4,7 +4,7 @@
 // (local dev) we fall back to a small static result set.
 
 import { supabase, isSupabaseConfigured } from './auth'
-import type { MediaType } from '../store/mockData'
+import type { CastMember, CrewMember, MediaType } from '../store/mockData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,9 @@ export interface SearchResult {
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
+  cast?: CastMember[]
+  crew?: CrewMember[]
+  studios?: string[]
 }
 
 export interface RawTmdbSeason {
@@ -38,6 +41,13 @@ export interface RawTmdbEpisode {
   air_date?: string
   runtime?: number
   still_path?: string
+  crew?: Array<{
+    id: number
+    name: string
+    job: string
+    department?: string
+    profile_path?: string
+  }>
 }
 
 export interface MediaDetails {
@@ -47,7 +57,13 @@ export interface MediaDetails {
   tmdbSeasons: RawTmdbSeason[]
 }
 
+export interface SeasonFetchResult {
+  cast: CastMember[]
+  episodes: RawTmdbEpisode[]
+}
+
 const TMDB_IMG = 'https://image.tmdb.org/t/p'
+const TMDB_IMG_W185 = 'https://image.tmdb.org/t/p/w185'
 
 // ─── Local-dev fallback (no Supabase configured) ─────────────────────────────
 
@@ -139,8 +155,8 @@ export async function searchMedia(query: string): Promise<SearchResult[]> {
 
 /**
  * Hydrate a search result into full metadata: TMDB details (poster, synopsis,
- * genres, director/network, seasons) plus OMDb critic scores. Falls back to the
- * passed-in `base` values for any field the detail call can't supply.
+ * genres, director/network, seasons, cast, crew, studios) plus OMDb critic scores.
+ * Falls back to the passed-in `base` values for any field the detail call can't supply.
  */
 export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetails> {
   if (!(isSupabaseConfigured && supabase)) {
@@ -176,7 +192,51 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     }
   }
 
-  const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name
+  const TITLE_CREW_JOBS = new Set([
+    'Director', 'Screenplay', 'Writer', 'Producer',
+    'Director of Photography', 'Original Music Composer',
+  ])
+
+  const cast: CastMember[] = (data.credits?.cast ?? [])
+    .slice(0, 10)
+    .map((c: any) => ({
+      tmdbPersonId: c.id,
+      name: c.name,
+      character: c.character || undefined,
+      profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
+      order: c.order ?? 0,
+    }))
+
+  const seenCrewKey = new Set<string>()
+  const crew: CrewMember[] = []
+  for (const c of (data.credits?.crew ?? [])) {
+    if (!TITLE_CREW_JOBS.has(c.job)) continue
+    const key = `${c.id}:${c.job}`
+    if (seenCrewKey.has(key)) continue
+    seenCrewKey.add(key)
+    crew.push({
+      tmdbPersonId: c.id,
+      name: c.name,
+      job: c.job,
+      department: c.department || undefined,
+      profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
+    })
+  }
+
+  if (base.type === 'tv') {
+    for (const creator of (data.created_by ?? [])) {
+      crew.push({
+        tmdbPersonId: creator.id,
+        name: creator.name,
+        job: 'Creator',
+        profileUrl: creator.profile_path ? `${TMDB_IMG_W185}${creator.profile_path}` : undefined,
+      })
+    }
+  }
+
+  const studios: string[] = (data.production_companies ?? []).map((c: any) => c.name as string)
+
+  const director = crew.find((c) => c.job === 'Director')?.name
   const date = data.release_date || data.first_air_date
 
   const result: SearchResult = {
@@ -195,26 +255,42 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     imdbRating,
     rtScore,
     metacriticScore,
+    cast,
+    crew,
+    studios,
   }
 
   return { result, tmdbSeasons: data.seasons ?? [] }
 }
 
 /**
- * Fetch episode-level details for one season from TMDB.
- * Returns an empty array when Supabase isn't configured or the call fails.
+ * Fetch episode-level details and season cast for one season from TMDB.
+ * Returns empty arrays when Supabase isn't configured or the call fails.
  */
-export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): Promise<RawTmdbEpisode[]> {
-  if (!(isSupabaseConfigured && supabase)) return []
+export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): Promise<SeasonFetchResult> {
+  if (!(isSupabaseConfigured && supabase)) return { episodes: [], cast: [] }
 
   try {
     const { data, error } = await supabase.functions.invoke(
       `media-proxy?action=season&id=${tmdbId}&season=${seasonNumber}`
     )
     if (error) throw error
-    return (data?.episodes ?? []) as RawTmdbEpisode[]
+
+    const episodes = (data?.episodes ?? []) as RawTmdbEpisode[]
+
+    const cast: CastMember[] = (data?.credits?.cast ?? [])
+      .slice(0, 10)
+      .map((c: any) => ({
+        tmdbPersonId: c.id,
+        name: c.name,
+        character: c.character || undefined,
+        profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
+        order: c.order ?? 0,
+      }))
+
+    return { episodes, cast }
   } catch (e) {
     console.error(`Error fetching season ${seasonNumber} details for tmdbId ${tmdbId}:`, e)
-    return []
+    return { episodes: [], cast: [] }
   }
 }

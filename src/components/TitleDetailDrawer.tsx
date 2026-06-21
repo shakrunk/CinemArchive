@@ -622,7 +622,7 @@ export function TitleDetailDrawer() {
     async function backfill() {
       const settled = await Promise.allSettled(
         seasonsNeedingBackfill.map(async (season) => {
-          const tmdbEps = await fetchSeasonDetails(snapshotTitle.tmdbId, season.seasonNumber)
+          const { episodes: tmdbEps } = await fetchSeasonDetails(snapshotTitle.tmdbId, season.seasonNumber)
           return { season, tmdbEps }
         })
       )

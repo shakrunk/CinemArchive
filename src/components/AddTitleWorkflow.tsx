@@ -7,7 +7,7 @@ import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
-import type { Title, WatchStatus, Season } from 'src/store/mockData'
+import type { Title, WatchStatus, Season, CastMember, EpisodeCrew } from 'src/store/mockData'
 import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
 
 // ─── Search hook ─────────────────────────────────────────────────────────────
@@ -46,10 +46,13 @@ const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // Build fresh (unwatched) season/episode structures for a selected series.
 // Episode counts and metadata come from TMDB when available.
+const EP_CREW_JOBS = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
+
 function buildSeasons(
   result: SearchResult,
   tmdbSeasons: RawTmdbSeason[],
-  episodesBySeason?: Map<number, RawTmdbEpisode[]>
+  episodesBySeason?: Map<number, RawTmdbEpisode[]>,
+  seasonCastBySeason?: Map<number, CastMember[]>
 ): Season[] {
   if (result.type !== 'tv' || !result.seasonCount) return []
   return Array.from({ length: result.seasonCount }, (_, i) => {
@@ -62,9 +65,13 @@ function buildSeasons(
       seasonNumber: seasonNum,
       episodeCount: epCount,
       episodesWatched: 0,
+      cast: seasonCastBySeason?.get(seasonNum),
       episodes: Array.from({ length: epCount }, (_, j) => {
         const epNum = j + 1
         const tmdbEp = tmdbEpisodes.find((e) => e.episode_number === epNum)
+        const epCrew: EpisodeCrew[] = (tmdbEp?.crew ?? [])
+          .filter((c) => EP_CREW_JOBS.has(c.job))
+          .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
         return {
           id: crypto.randomUUID(),
           episodeNumber: epNum,
@@ -73,6 +80,9 @@ function buildSeasons(
           runtime: tmdbEp?.runtime || undefined,
           synopsis: tmdbEp?.overview || undefined,
           stillUrl: tmdbEp?.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+          director: epCrew.find((c) => c.job === 'Director')?.name,
+          writers: epCrew.filter((c) => ['Writer', 'Teleplay', 'Story'].includes(c.job)).map((c) => c.name),
+          crew: epCrew.length > 0 ? epCrew : undefined,
           watchEvents: [],
           ratings: [],
           reviews: [],
@@ -244,21 +254,31 @@ export function AddTitleWorkflow() {
     try {
       const { result: detailed, tmdbSeasons } = await fetchMediaDetails(result)
       let episodesBySeason: Map<number, RawTmdbEpisode[]> | undefined
+      const seasonCastBySeason = new Map<number, CastMember[]>()
       if (detailed.type === 'tv' && detailed.tmdbId && tmdbSeasons.length > 0) {
         const settled = await Promise.allSettled(
           tmdbSeasons
             .filter((s) => s.season_number > 0)
-            .map((s) => fetchSeasonDetails(detailed.tmdbId, s.season_number).then((eps) => ({ seasonNumber: s.season_number, eps })))
+            .map((s) =>
+              fetchSeasonDetails(detailed.tmdbId, s.season_number).then(({ episodes, cast }) => ({
+                seasonNumber: s.season_number,
+                episodes,
+                cast,
+              }))
+            )
         )
         episodesBySeason = new Map()
         for (const r of settled) {
           if (r.status === 'fulfilled') {
-            episodesBySeason.set(r.value.seasonNumber, r.value.eps)
+            episodesBySeason.set(r.value.seasonNumber, r.value.episodes)
+            if (r.value.cast.length > 0) {
+              seasonCastBySeason.set(r.value.seasonNumber, r.value.cast)
+            }
           }
         }
       }
       setSelected(detailed)
-      setLog({ ...DEFAULT_LOG, seasons: buildSeasons(detailed, tmdbSeasons, episodesBySeason) })
+      setLog({ ...DEFAULT_LOG, seasons: buildSeasons(detailed, tmdbSeasons, episodesBySeason, seasonCastBySeason) })
       setStep('log')
     } catch (err) {
       console.error('Error fetching details:', err)
@@ -298,6 +318,9 @@ export function AddTitleWorkflow() {
       imdbRating: selected.imdbRating,
       rtScore: selected.rtScore,
       metacriticScore: selected.metacriticScore,
+      cast: selected.cast,
+      crew: selected.crew,
+      studios: selected.studios,
     }
 
     addTitle(newTitle)

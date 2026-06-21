@@ -36,6 +36,7 @@ npm run lint       # ESLint
 - **PWA:** vite-plugin-pwa
 - **Deploy:** GitHub Actions → GitHub Pages (`.github/workflows/deploy.yml`)
 - **DB migrations:** Supabase CLI migrations applied by `.github/workflows/db-migrate.yml`
+- **Edge Function deploy:** `media-proxy` deployed by `.github/workflows/deploy-functions.yml` (triggers on `supabase/functions/**` changes). Functions deploy independently of migrations — editing `index.ts` without deploying leaves the live function stale.
 
 ### Source Layout (planned)
 ```

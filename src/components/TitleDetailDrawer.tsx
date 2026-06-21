@@ -20,9 +20,9 @@ import {
   ChevronDown, ChevronRight, Eye, MessageSquare, RefreshCw,
 } from 'lucide-react'
 import { cn } from 'src/lib/utils'
-import type { Viewing, WatchStatus, Season, Episode } from 'src/store/mockData'
+import type { Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb } from 'src/lib/db'
+import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
@@ -105,6 +105,114 @@ function ReviewBadges({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: n
   )
 }
 
+// ─── Cast & Crew section ──────────────────────────────────────────────────────
+
+const CREW_DISPLAY: Array<{ jobs: string[]; label: string }> = [
+  { jobs: ['Creator'],                                     label: 'Created by' },
+  { jobs: ['Director'],                                    label: 'Dir.' },
+  { jobs: ['Screenplay', 'Writer', 'Teleplay', 'Story'],   label: 'Written by' },
+  { jobs: ['Producer'],                                    label: 'Prod.' },
+  { jobs: ['Director of Photography'],                     label: 'D.O.P.' },
+  { jobs: ['Original Music Composer'],                     label: 'Composer' },
+]
+
+interface CastCrewSectionProps {
+  cast?: CastMember[]
+  crew?: CrewMember[]
+  studios?: string[]
+}
+
+function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
+  const hasCast = cast && cast.length > 0
+  const hasCrew = crew && crew.length > 0
+  const hasStudios = studios && studios.length > 0
+  if (!hasCast && !hasCrew && !hasStudios) return null
+
+  return (
+    <div className="space-y-4">
+      {hasCast && (
+        <div>
+          <div
+            className="font-mono mb-2"
+            style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+          >
+            Cast
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+            {cast.map((member) => (
+              <div key={member.tmdbPersonId} className="shrink-0 w-14 text-center">
+                <div
+                  className="w-14 h-14 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center"
+                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
+                >
+                  {member.profileUrl ? (
+                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-mono text-lg" style={{ color: 'var(--paper-faint)' }}>
+                      {member.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className="font-sans truncate"
+                  style={{ fontSize: '10px', color: 'var(--paper)', lineHeight: 1.3 }}
+                  title={member.name}
+                >
+                  {member.name}
+                </div>
+                {member.character && (
+                  <div
+                    className="font-mono truncate"
+                    style={{ fontSize: '9px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
+                    title={member.character}
+                  >
+                    {member.character}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(hasCrew || hasStudios) && (
+        <div className="space-y-1.5">
+          {hasCrew && CREW_DISPLAY.map(({ jobs, label }) => {
+            const members = crew!.filter((c) => jobs.includes(c.job))
+            if (members.length === 0) return null
+            return (
+              <div key={label} className="flex gap-3" style={{ fontSize: '12px' }}>
+                <span
+                  className="font-mono shrink-0 text-right"
+                  style={{ width: '80px', color: 'var(--paper-faint)', fontSize: '10px', paddingTop: '1px' }}
+                >
+                  {label}
+                </span>
+                <span className="font-sans" style={{ color: 'var(--paper)' }}>
+                  {members.map((m) => m.name).join(' · ')}
+                </span>
+              </div>
+            )
+          })}
+          {hasStudios && (
+            <div className="flex gap-3" style={{ fontSize: '12px' }}>
+              <span
+                className="font-mono shrink-0 text-right"
+                style={{ width: '80px', color: 'var(--paper-faint)', fontSize: '10px', paddingTop: '1px' }}
+              >
+                Studio
+              </span>
+              <span className="font-sans" style={{ color: 'var(--paper)' }}>
+                {studios!.join(', ')}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── TV: Episode log form (watch event + optional rating + optional review) ───
 
 interface EpLogState {
@@ -157,6 +265,24 @@ function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelPr
 
   return (
     <div className="ep-panel px-3 py-3 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
+      {/* Episode crew — director / writers */}
+      {(episode.director || (episode.writers && episode.writers.length > 0)) && (
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: '11px' }}>
+          {episode.director && (
+            <span>
+              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>Dir. </span>
+              <span className="font-sans" style={{ color: 'var(--paper-dim)' }}>{episode.director}</span>
+            </span>
+          )}
+          {episode.writers && episode.writers.length > 0 && (
+            <span>
+              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>Written by </span>
+              <span className="font-sans" style={{ color: 'var(--paper-dim)' }}>{episode.writers.join(', ')}</span>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Episode still + synopsis */}
       {(episode.stillUrl || episode.synopsis) && (
         <div className="flex gap-3">
@@ -541,6 +667,43 @@ function TVSeriesSection({ titleId, seasons, isSharedView }: TVSeriesSectionProp
           })}
         </div>
 
+        {/* Season cast — shown when the selected season has cast data */}
+        {season?.cast && season.cast.length > 0 && (
+          <div className="mb-4">
+            <div
+              className="font-mono mb-2"
+              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+            >
+              Season Cast
+            </div>
+            <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+              {season.cast.map((member) => (
+                <div key={member.tmdbPersonId} className="shrink-0 w-12 text-center">
+                  <div
+                    className="w-12 h-12 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center"
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
+                  >
+                    {member.profileUrl ? (
+                      <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-mono text-base" style={{ color: 'var(--paper-faint)' }}>
+                        {member.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="font-sans truncate"
+                    style={{ fontSize: '9px', color: 'var(--paper)', lineHeight: 1.3 }}
+                    title={member.name}
+                  >
+                    {member.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Episode list for selected season */}
         {season && (
           <div>
@@ -608,7 +771,9 @@ export function TitleDetailDrawer() {
       // Case (a): season exists but no episodes were persisted to DB yet
       (s.episodeCount > 0 && (!s.episodes || s.episodes.length === 0)) ||
       // Case (b): episode rows exist but none have a name (pre-feature data)
-      (s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName))
+      (s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName)) ||
+      // Case (c): season has no cast data yet
+      (!s.cast || s.cast.length === 0)
     )
     if (seasonsNeedingBackfill.length === 0) return
 
@@ -619,48 +784,61 @@ export function TitleDetailDrawer() {
     const snapshotTitle = title
     const snapshotUser = user
 
+    const EP_CREW_JOBS_BF = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
+
     async function backfill() {
       const settled = await Promise.allSettled(
         seasonsNeedingBackfill.map(async (season) => {
-          const { episodes: tmdbEps } = await fetchSeasonDetails(snapshotTitle.tmdbId, season.seasonNumber)
-          return { season, tmdbEps }
+          const { episodes: tmdbEps, cast: seasonCast } = await fetchSeasonDetails(snapshotTitle.tmdbId, season.seasonNumber)
+          return { season, tmdbEps, seasonCast }
         })
       )
 
       let updatedSeasons = [...snapshotTitle.seasons!]
       const allUpdatedEpisodes: Parameters<typeof upsertEpisodeMetadataInDb>[2] = []
+      const allEpisodeCrew: Array<{ episodeId: string; crew: EpisodeCrew[] }> = []
+      const allSeasonCast: Array<{ seasonId: string; cast: CastMember[] }> = []
 
       for (const result of settled) {
         if (result.status !== 'fulfilled' || result.value.tmdbEps.length === 0) continue
-        const { season, tmdbEps } = result.value
+        const { season, tmdbEps, seasonCast } = result.value
 
         const existingEpisodes = season.episodes || []
         let updatedEpisodes: Episode[]
 
         if (existingEpisodes.length === 0) {
-          // No episode rows in DB yet — create them from TMDB data
-          updatedEpisodes = tmdbEps.map((tmdbEp) => ({
-            id: crypto.randomUUID(),
-            episodeNumber: tmdbEp.episode_number,
-            episodeName: tmdbEp.name || undefined,
-            airDate: tmdbEp.air_date || undefined,
-            runtime: tmdbEp.runtime || undefined,
-            synopsis: tmdbEp.overview || undefined,
-            stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
-            watchEvents: [],
-            ratings: [],
-            reviews: [],
-          }))
+          updatedEpisodes = tmdbEps.map((tmdbEp) => {
+            const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
+              .filter((c) => EP_CREW_JOBS_BF.has(c.job))
+              .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
+            return {
+              id: crypto.randomUUID(),
+              episodeNumber: tmdbEp.episode_number,
+              episodeName: tmdbEp.name || undefined,
+              airDate: tmdbEp.air_date || undefined,
+              runtime: tmdbEp.runtime || undefined,
+              synopsis: tmdbEp.overview || undefined,
+              stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+              director: epCrew.find((c) => c.job === 'Director')?.name,
+              writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
+              crew: epCrew.length > 0 ? epCrew : undefined,
+              watchEvents: [],
+              ratings: [],
+              reviews: [],
+            }
+          })
           updatedSeasons = updatedSeasons.map((s) =>
             s.seasonNumber === season.seasonNumber
-              ? { ...s, episodes: updatedEpisodes, episodeCount: updatedEpisodes.length }
+              ? { ...s, episodes: updatedEpisodes, episodeCount: updatedEpisodes.length, cast: seasonCast.length > 0 ? seasonCast : s.cast }
               : s
           )
         } else {
-          // Episode rows exist — merge TMDB metadata into them
           updatedEpisodes = existingEpisodes.map((ep) => {
             const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
             if (!tmdbEp) return ep
+            const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
+              .filter((c) => EP_CREW_JOBS_BF.has(c.job))
+              .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
             return {
               ...ep,
               episodeName: tmdbEp.name || ep.episodeName,
@@ -668,10 +846,15 @@ export function TitleDetailDrawer() {
               runtime: tmdbEp.runtime || ep.runtime,
               synopsis: tmdbEp.overview || ep.synopsis,
               stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : ep.stillUrl,
+              director: epCrew.find((c) => c.job === 'Director')?.name ?? ep.director,
+              writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
+              crew: epCrew.length > 0 ? epCrew : ep.crew,
             }
           })
           updatedSeasons = updatedSeasons.map((s) =>
-            s.seasonNumber === season.seasonNumber ? { ...s, episodes: updatedEpisodes } : s
+            s.seasonNumber === season.seasonNumber
+              ? { ...s, episodes: updatedEpisodes, cast: seasonCast.length > 0 ? seasonCast : s.cast }
+              : s
           )
         }
 
@@ -686,15 +869,34 @@ export function TitleDetailDrawer() {
             synopsis: ep.synopsis,
             stillUrl: ep.stillUrl,
           })
+          if (ep.crew && ep.crew.length > 0) {
+            allEpisodeCrew.push({ episodeId: ep.id, crew: ep.crew })
+          }
+        }
+
+        if (seasonCast.length > 0) {
+          allSeasonCast.push({ seasonId: season.id, cast: seasonCast })
         }
       }
 
-      if (allUpdatedEpisodes.length > 0) {
+      if (allUpdatedEpisodes.length > 0 || allSeasonCast.length > 0) {
         updateTitle(snapshotTitle.id, { seasons: updatedSeasons })
         if (snapshotUser) {
-          upsertEpisodeMetadataInDb(snapshotUser.id, snapshotTitle.id, allUpdatedEpisodes).catch((e) =>
-            console.error('Episode metadata backfill DB write failed:', e)
-          )
+          if (allUpdatedEpisodes.length > 0) {
+            upsertEpisodeMetadataInDb(snapshotUser.id, snapshotTitle.id, allUpdatedEpisodes).catch((e) =>
+              console.error('Episode metadata backfill DB write failed:', e)
+            )
+          }
+          for (const { seasonId, cast } of allSeasonCast) {
+            upsertSeasonCastInDb(snapshotUser.id, snapshotTitle.id, seasonId, cast).catch((e) =>
+              console.error('Season cast backfill DB write failed:', e)
+            )
+          }
+          for (const { episodeId, crew } of allEpisodeCrew) {
+            upsertEpisodeCrewInDb(snapshotUser.id, snapshotTitle.id, episodeId, crew).catch((e) =>
+              console.error('Episode crew backfill DB write failed:', e)
+            )
+          }
         }
       }
     }
@@ -842,6 +1044,16 @@ export function TitleDetailDrawer() {
               ))}
             </div>
           )}
+
+          {/* Cast & Crew */}
+          {(title.cast?.length || title.crew?.length || title.studios?.length) ? (
+            <div>
+              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">
+                Cast &amp; Crew
+              </h4>
+              <CastCrewSection cast={title.cast} crew={title.crew} studios={title.studios} />
+            </div>
+          ) : null}
 
           {/* Critical Reception */}
           {(title.imdbRating || title.rtScore || title.metacriticScore) && (

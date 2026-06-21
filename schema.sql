@@ -33,6 +33,7 @@ create table titles (
   imdb_rating   numeric(3,1),
   rt_score      integer check (rt_score >= 0 and rt_score <= 100),
   metacritic_score integer check (metacritic_score >= 0 and metacritic_score <= 100),
+  studios       text[] not null default '{}',
   added_at      timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 
@@ -108,6 +109,62 @@ create table episode_reviews (
   reviewed_at  timestamptz not null default now()  -- independent of any watch event
 );
 
+-- Series/movie-level cast (top 10 by TMDB order)
+create table title_cast (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  title_id        uuid not null references titles(id) on delete cascade,
+  tmdb_person_id  integer not null,
+  name            text not null,
+  character_name  text,
+  profile_url     text,
+  cast_order      integer not null default 0,
+  created_at      timestamptz default now(),
+  constraint unique_title_cast unique (title_id, tmdb_person_id)
+);
+
+-- Series/movie-level crew
+create table title_crew (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  title_id        uuid not null references titles(id) on delete cascade,
+  tmdb_person_id  integer not null,
+  name            text not null,
+  job             text not null,
+  department      text,
+  profile_url     text,
+  created_at      timestamptz default now(),
+  constraint unique_title_crew unique (title_id, tmdb_person_id, job)
+);
+
+-- Season-level cast (regulars/guests billed in that season)
+create table season_cast (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  title_id        uuid not null references titles(id) on delete cascade,
+  season_id       uuid not null references seasons(id) on delete cascade,
+  tmdb_person_id  integer not null,
+  name            text not null,
+  character_name  text,
+  profile_url     text,
+  cast_order      integer not null default 0,
+  created_at      timestamptz default now(),
+  constraint unique_season_cast unique (season_id, tmdb_person_id)
+);
+
+-- Per-episode crew: Director and Writer(s)
+create table episode_crew (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  title_id        uuid not null references titles(id) on delete cascade,
+  episode_id      uuid not null references episodes(id) on delete cascade,
+  tmdb_person_id  integer not null,
+  name            text not null,
+  job             text not null,
+  created_at      timestamptz default now(),
+  constraint unique_episode_crew unique (episode_id, tmdb_person_id, job)
+);
+
 -- Time-bound read-only access tokens for sharing
 create table shared_access_keys (
   id            uuid primary key default gen_random_uuid(),
@@ -144,6 +201,14 @@ create index ep_ratings_episode_id_idx on episode_ratings(episode_id);
 create index ep_ratings_user_id_idx on episode_ratings(user_id);
 create index ep_reviews_episode_id_idx on episode_reviews(episode_id);
 create index ep_reviews_user_id_idx on episode_reviews(user_id);
+create index title_cast_title_id_idx   on title_cast(title_id);
+create index title_cast_person_id_idx  on title_cast(tmdb_person_id);
+create index title_crew_title_id_idx   on title_crew(title_id);
+create index title_crew_person_id_idx  on title_crew(tmdb_person_id);
+create index season_cast_season_id_idx on season_cast(season_id);
+create index season_cast_person_id_idx on season_cast(tmdb_person_id);
+create index ep_crew_episode_id_idx    on episode_crew(episode_id);
+create index ep_crew_person_id_idx     on episode_crew(tmdb_person_id);
 
 -- ============================================================
 -- UPDATED_AT TRIGGER
@@ -173,6 +238,10 @@ alter table episodes enable row level security;
 alter table episode_watch_events enable row level security;
 alter table episode_ratings enable row level security;
 alter table episode_reviews enable row level security;
+alter table title_cast   enable row level security;
+alter table title_crew   enable row level security;
+alter table season_cast  enable row level security;
+alter table episode_crew enable row level security;
 
 -- Helper function: validate a shared access token for a given user_id
 create or replace function is_valid_shared_token(token_val text, owner_id uuid)
@@ -297,6 +366,38 @@ create policy "episode_reviews: owner full access"
 
 create policy "episode_reviews: shared key read"
   on episode_reviews for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+-- -----------------------------------------------------------
+-- TITLE_CAST / TITLE_CREW / SEASON_CAST / EPISODE_CREW policies
+-- -----------------------------------------------------------
+
+create policy "title_cast: owner full access"
+  on title_cast for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "title_cast: shared key read"
+  on title_cast for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+create policy "title_crew: owner full access"
+  on title_crew for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "title_crew: shared key read"
+  on title_crew for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+create policy "season_cast: owner full access"
+  on season_cast for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "season_cast: shared key read"
+  on season_cast for select
+  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+
+create policy "episode_crew: owner full access"
+  on episode_crew for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "episode_crew: shared key read"
+  on episode_crew for select
   using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
 
 -- -----------------------------------------------------------

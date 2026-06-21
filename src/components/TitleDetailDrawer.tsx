@@ -597,13 +597,18 @@ export function TitleDetailDrawer() {
   // Track which title IDs have already been backfilled this session to avoid repeat calls.
   const backfilledRef = useRef<Set<string>>(new Set())
 
-  // When a TV show is opened and its episodes lack metadata (no episode names), fetch
-  // season details from TMDB and hydrate them in-place, then persist to DB.
+  // When a TV show is opened and episode metadata is missing, fetch season details
+  // from TMDB and hydrate them in-place, then persist to DB. Handles two cases:
+  // (a) season rows exist but no episode rows were ever inserted, and
+  // (b) episode rows exist but none have names yet.
   useEffect(() => {
     if (!title || title.type !== 'tv' || !title.seasons || title.tmdbId <= 0 || isSharedView) return
 
     const seasonsNeedingBackfill = title.seasons.filter((s) =>
-      s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName)
+      // Case (a): season exists but no episodes were persisted to DB yet
+      (s.episodeCount > 0 && (!s.episodes || s.episodes.length === 0)) ||
+      // Case (b): episode rows exist but none have a name (pre-feature data)
+      (s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName))
     )
     if (seasonsNeedingBackfill.length === 0) return
 
@@ -629,22 +634,46 @@ export function TitleDetailDrawer() {
         if (result.status !== 'fulfilled' || result.value.tmdbEps.length === 0) continue
         const { season, tmdbEps } = result.value
 
-        const updatedEpisodes = season.episodes!.map((ep) => {
-          const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
-          if (!tmdbEp) return ep
-          return {
-            ...ep,
-            episodeName: tmdbEp.name || ep.episodeName,
-            airDate: tmdbEp.air_date || ep.airDate,
-            runtime: tmdbEp.runtime || ep.runtime,
-            synopsis: tmdbEp.overview || ep.synopsis,
-            stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : ep.stillUrl,
-          }
-        })
+        const existingEpisodes = season.episodes || []
+        let updatedEpisodes: Episode[]
 
-        updatedSeasons = updatedSeasons.map((s) =>
-          s.seasonNumber === season.seasonNumber ? { ...s, episodes: updatedEpisodes } : s
-        )
+        if (existingEpisodes.length === 0) {
+          // No episode rows in DB yet — create them from TMDB data
+          updatedEpisodes = tmdbEps.map((tmdbEp) => ({
+            id: crypto.randomUUID(),
+            episodeNumber: tmdbEp.episode_number,
+            episodeName: tmdbEp.name || undefined,
+            airDate: tmdbEp.air_date || undefined,
+            runtime: tmdbEp.runtime || undefined,
+            synopsis: tmdbEp.overview || undefined,
+            stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+            watchEvents: [],
+            ratings: [],
+            reviews: [],
+          }))
+          updatedSeasons = updatedSeasons.map((s) =>
+            s.seasonNumber === season.seasonNumber
+              ? { ...s, episodes: updatedEpisodes, episodeCount: updatedEpisodes.length }
+              : s
+          )
+        } else {
+          // Episode rows exist — merge TMDB metadata into them
+          updatedEpisodes = existingEpisodes.map((ep) => {
+            const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
+            if (!tmdbEp) return ep
+            return {
+              ...ep,
+              episodeName: tmdbEp.name || ep.episodeName,
+              airDate: tmdbEp.air_date || ep.airDate,
+              runtime: tmdbEp.runtime || ep.runtime,
+              synopsis: tmdbEp.overview || ep.synopsis,
+              stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : ep.stillUrl,
+            }
+          })
+          updatedSeasons = updatedSeasons.map((s) =>
+            s.seasonNumber === season.seasonNumber ? { ...s, episodes: updatedEpisodes } : s
+          )
+        }
 
         for (const ep of updatedEpisodes) {
           allUpdatedEpisodes.push({

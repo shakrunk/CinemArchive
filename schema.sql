@@ -88,6 +88,7 @@ create table episode_watch_events (
   user_id     uuid not null references auth.users(id) on delete cascade,
   watched_at  date not null,
   notes       text,
+  color_mode  text check (color_mode in ('bw', 'color')),
   created_at  timestamptz not null default now()
 );
 
@@ -106,6 +107,7 @@ create table episode_reviews (
   episode_id   uuid not null references episodes(id) on delete cascade,
   user_id      uuid not null references auth.users(id) on delete cascade,
   review_text  text not null,
+  color_mode   text check (color_mode in ('bw', 'color')),
   reviewed_at  timestamptz not null default now()  -- independent of any watch event
 );
 

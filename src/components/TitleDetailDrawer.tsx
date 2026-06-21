@@ -29,20 +29,18 @@ const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 242484
 
 function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
-  const allEvents: Array<{ date: string; colorMode: 'bw' | 'color' }> = []
+  let lastMode: 'bw' | 'color' | null = null
   for (const season of title.seasons ?? []) {
     for (const ep of season.episodes ?? []) {
       for (const we of ep.watchEvents) {
-        if (we.colorMode) allEvents.push({ date: we.watchedAt, colorMode: we.colorMode })
+        if (we.colorMode) lastMode = we.colorMode
       }
       for (const rv of ep.reviews) {
-        if (rv.colorMode) allEvents.push({ date: rv.reviewedAt, colorMode: rv.colorMode })
+        if (rv.colorMode) lastMode = rv.colorMode
       }
     }
   }
-  if (allEvents.length === 0) return null
-  allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  return allEvents[0].colorMode
+  return lastMode
 }
 
 // ─── Shared status options ────────────────────────────────────────────────────
@@ -283,7 +281,8 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
 
   function handleSubmit() {
     if (!log.includeWatch && log.rating === 0 && !log.reviewText.trim()) return
-    if (isSpiderNoir) {
+    const hasWatchOrReview = (log.includeWatch && !!log.watchedAt) || !!log.reviewText.trim()
+    if (isSpiderNoir && hasWatchOrReview) {
       setPendingLog(log)
       setShowNoirModal(true)
     } else {

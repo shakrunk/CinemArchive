@@ -1,14 +1,23 @@
 import { supabase } from './auth'
-import type { Title, WatchStatus, MediaType } from '../store/mockData'
+import type { CastMember, CrewMember, EpisodeCrew, Title, WatchStatus, MediaType } from '../store/mockData'
 
 // ─── Mapping Helpers ─────────────────────────────────────────────────────────
 
 function mapDbTitleToLocal(row: any): Title {
-  // Group episodes by season_number so we can attach them to the right season
   const episodesBySeason: Record<number, any[]> = {}
   for (const ep of (row.episodes || [])) {
     if (!episodesBySeason[ep.season_number]) episodesBySeason[ep.season_number] = []
     episodesBySeason[ep.season_number].push(ep)
+  }
+
+  function mapCastRow(c: any): CastMember {
+    return {
+      tmdbPersonId: c.tmdb_person_id,
+      name: c.name,
+      character: c.character_name || undefined,
+      profileUrl: c.profile_url || undefined,
+      order: c.cast_order,
+    }
   }
 
   return {
@@ -34,55 +43,85 @@ function mapDbTitleToLocal(row: any): Title {
     imdbRating: row.imdb_rating ? parseFloat(row.imdb_rating) : undefined,
     rtScore: row.rt_score || undefined,
     metacriticScore: row.metacritic_score || undefined,
+    studios: row.studios || [],
+    cast: (row.title_cast || [])
+      .sort((a: any, b: any) => a.cast_order - b.cast_order)
+      .map(mapCastRow),
+    crew: (row.title_crew || []).map((c: any): CrewMember => ({
+      tmdbPersonId: c.tmdb_person_id,
+      name: c.name,
+      job: c.job,
+      department: c.department || undefined,
+      profileUrl: c.profile_url || undefined,
+    })),
     seasons: (row.seasons || [])
-      .map((s: any) => ({
-        id: s.id,
-        seasonNumber: s.season_number,
-        episodeCount: s.episode_count,
-        episodesWatched: s.episodes_watched,
-        airYear: s.air_year || undefined,
-        episodes: (episodesBySeason[s.season_number] || [])
+      .map((s: any) => {
+        const episodes = (episodesBySeason[s.season_number] || [])
           .sort((a: any, b: any) => a.episode_number - b.episode_number)
-          .map((ep: any) => ({
-            id: ep.id,
-            episodeNumber: ep.episode_number,
-            episodeName: ep.episode_name || undefined,
-            airDate: ep.air_date || undefined,
-            runtime: ep.runtime || undefined,
-            synopsis: ep.synopsis || undefined,
-            stillUrl: ep.still_url || undefined,
-            watchEvents: (ep.episode_watch_events || [])
-              .sort(
-                (a: any, b: any) =>
-                  new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime()
-              )
-              .map((we: any) => ({
-                id: we.id,
-                watchedAt: we.watched_at,
-                notes: we.notes || undefined,
-              })),
-            ratings: (ep.episode_ratings || [])
-              .sort(
-                (a: any, b: any) =>
-                  new Date(a.rated_at).getTime() - new Date(b.rated_at).getTime()
-              )
-              .map((er: any) => ({
-                id: er.id,
-                rating: parseFloat(er.rating),
-                ratedAt: er.rated_at,
-              })),
-            reviews: (ep.episode_reviews || [])
-              .sort(
-                (a: any, b: any) =>
-                  new Date(a.reviewed_at).getTime() - new Date(b.reviewed_at).getTime()
-              )
-              .map((rv: any) => ({
-                id: rv.id,
-                reviewText: rv.review_text,
-                reviewedAt: rv.reviewed_at,
-              })),
-          })),
-      }))
+          .map((ep: any) => {
+            const epCrewRaw: any[] = ep.episode_crew || []
+            const epCrew: EpisodeCrew[] = epCrewRaw.map((c) => ({
+              tmdbPersonId: c.tmdb_person_id,
+              name: c.name,
+              job: c.job,
+            }))
+            return {
+              id: ep.id,
+              episodeNumber: ep.episode_number,
+              episodeName: ep.episode_name || undefined,
+              airDate: ep.air_date || undefined,
+              runtime: ep.runtime || undefined,
+              synopsis: ep.synopsis || undefined,
+              stillUrl: ep.still_url || undefined,
+              director: epCrew.find((c) => c.job === 'Director')?.name,
+              writers: epCrew
+                .filter((c) => ['Writer', 'Teleplay', 'Story'].includes(c.job))
+                .map((c) => c.name),
+              crew: epCrew.length > 0 ? epCrew : undefined,
+              watchEvents: (ep.episode_watch_events || [])
+                .sort(
+                  (a: any, b: any) =>
+                    new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime()
+                )
+                .map((we: any) => ({
+                  id: we.id,
+                  watchedAt: we.watched_at,
+                  notes: we.notes || undefined,
+                })),
+              ratings: (ep.episode_ratings || [])
+                .sort(
+                  (a: any, b: any) =>
+                    new Date(a.rated_at).getTime() - new Date(b.rated_at).getTime()
+                )
+                .map((er: any) => ({
+                  id: er.id,
+                  rating: parseFloat(er.rating),
+                  ratedAt: er.rated_at,
+                })),
+              reviews: (ep.episode_reviews || [])
+                .sort(
+                  (a: any, b: any) =>
+                    new Date(a.reviewed_at).getTime() - new Date(b.reviewed_at).getTime()
+                )
+                .map((rv: any) => ({
+                  id: rv.id,
+                  reviewText: rv.review_text,
+                  reviewedAt: rv.reviewed_at,
+                })),
+            }
+          })
+        return {
+          id: s.id,
+          seasonNumber: s.season_number,
+          episodeCount: s.episode_count,
+          episodesWatched: s.episodes_watched,
+          airYear: s.air_year || undefined,
+          cast: (s.season_cast || [])
+            .sort((a: any, b: any) => a.cast_order - b.cast_order)
+            .map(mapCastRow),
+          episodes,
+        }
+      })
       .sort((a: any, b: any) => a.seasonNumber - b.seasonNumber),
     viewings: (row.viewings || [])
       .map((v: any) => ({
@@ -105,10 +144,16 @@ export async function fetchUserLibrary(userId: string): Promise<Title[]> {
     .from('titles')
     .select(`
       *,
-      seasons (*),
+      title_cast (*),
+      title_crew (*),
+      seasons (
+        *,
+        season_cast (*)
+      ),
       viewings (*),
       episodes (
         *,
+        episode_crew (*),
         episode_watch_events (*),
         episode_ratings (*),
         episode_reviews (*)
@@ -137,10 +182,16 @@ export async function fetchSharedLibrary(token: string): Promise<Title[]> {
     .from('titles')
     .select(`
       *,
-      seasons (*),
+      title_cast (*),
+      title_crew (*),
+      seasons (
+        *,
+        season_cast (*)
+      ),
       viewings (*),
       episodes (
         *,
+        episode_crew (*),
         episode_watch_events (*),
         episode_ratings (*),
         episode_reviews (*)
@@ -180,6 +231,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
     imdb_rating: title.imdbRating,
     rt_score: title.rtScore,
     metacritic_score: title.metacriticScore,
+    studios: title.studios ?? [],
     added_at: new Date(title.addedAt).toISOString(),
   })
 
@@ -248,6 +300,84 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
       throw viewingsError
     }
   }
+
+  // 4. Insert title-level cast and crew (fire-and-forget)
+  if (title.cast && title.cast.length > 0) {
+    void (async () => {
+      const { error } = await supabase.from('title_cast').insert(
+        title.cast!.map((c) => ({
+          user_id: userId,
+          title_id: title.id,
+          tmdb_person_id: c.tmdbPersonId,
+          name: c.name,
+          character_name: c.character ?? null,
+          profile_url: c.profileUrl ?? null,
+          cast_order: c.order,
+        }))
+      )
+      if (error) console.error('Failed to insert title cast:', error)
+    })()
+  }
+
+  if (title.crew && title.crew.length > 0) {
+    void (async () => {
+      const { error } = await supabase.from('title_crew').insert(
+        title.crew!.map((c) => ({
+          user_id: userId,
+          title_id: title.id,
+          tmdb_person_id: c.tmdbPersonId,
+          name: c.name,
+          job: c.job,
+          department: c.department ?? null,
+          profile_url: c.profileUrl ?? null,
+        }))
+      )
+      if (error) console.error('Failed to insert title crew:', error)
+    })()
+  }
+
+  // 5. Insert season cast and episode crew (fire-and-forget)
+  if (title.type === 'tv' && title.seasons) {
+    for (const season of title.seasons) {
+      if (season.cast && season.cast.length > 0) {
+        const seasonCast = season.cast
+        void (async () => {
+          const { error } = await supabase.from('season_cast').insert(
+            seasonCast.map((c) => ({
+              user_id: userId,
+              title_id: title.id,
+              season_id: season.id,
+              tmdb_person_id: c.tmdbPersonId,
+              name: c.name,
+              character_name: c.character ?? null,
+              profile_url: c.profileUrl ?? null,
+              cast_order: c.order,
+            }))
+          )
+          if (error) console.error('Failed to insert season cast:', error)
+        })()
+      }
+
+      for (const ep of (season.episodes ?? [])) {
+        if (ep.crew && ep.crew.length > 0) {
+          const epCrew = ep.crew
+          void (async () => {
+            const { error } = await supabase.from('episode_crew').insert(
+              epCrew.map((c) => ({
+                user_id: userId,
+                title_id: title.id,
+                episode_id: ep.id,
+                tmdb_person_id: c.tmdbPersonId,
+                name: c.name,
+                job: c.job,
+              }))
+            )
+            if (error) console.error('Failed to insert episode crew:', error)
+          })()
+        }
+      }
+    }
+  }
 }
 
 // Title columns that a metadata refresh may overwrite. Keyed by the client-side
@@ -267,6 +397,7 @@ const META_COLUMNS: Array<[keyof Title, string]> = [
   ['imdbRating', 'imdb_rating'],
   ['rtScore', 'rt_score'],
   ['metacriticScore', 'metacritic_score'],
+  ['studios', 'studios'],
 ]
 
 export async function updateTitleInDb(userId: string, titleId: string, patch: Partial<Title>): Promise<void> {
@@ -335,6 +466,44 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
         console.error('Error upserting viewing:', error)
         throw error
       }
+    }
+  }
+
+  // Cast refresh: delete existing rows, re-insert new set (removes stale members)
+  if ('cast' in patch && patch.cast !== undefined) {
+    await supabase.from('title_cast').delete().eq('title_id', titleId).eq('user_id', userId)
+    if (patch.cast.length > 0) {
+      const { error } = await supabase.from('title_cast').insert(
+        patch.cast.map((c) => ({
+          user_id: userId,
+          title_id: titleId,
+          tmdb_person_id: c.tmdbPersonId,
+          name: c.name,
+          character_name: c.character ?? null,
+          profile_url: c.profileUrl ?? null,
+          cast_order: c.order,
+        }))
+      )
+      if (error) console.error('Error re-inserting title cast:', error)
+    }
+  }
+
+  // Crew refresh: same delete-reinsert pattern
+  if ('crew' in patch && patch.crew !== undefined) {
+    await supabase.from('title_crew').delete().eq('title_id', titleId).eq('user_id', userId)
+    if (patch.crew.length > 0) {
+      const { error } = await supabase.from('title_crew').insert(
+        patch.crew.map((c) => ({
+          user_id: userId,
+          title_id: titleId,
+          tmdb_person_id: c.tmdbPersonId,
+          name: c.name,
+          job: c.job,
+          department: c.department ?? null,
+          profile_url: c.profileUrl ?? null,
+        }))
+      )
+      if (error) console.error('Error re-inserting title crew:', error)
     }
   }
 }
@@ -441,4 +610,82 @@ export async function deleteTitleFromDb(userId: string, titleId: string): Promis
     console.error('Error deleting title:', error)
     throw error
   }
+}
+
+export async function upsertTitleCastInDb(userId: string, titleId: string, cast: CastMember[]): Promise<void> {
+  if (!supabase || cast.length === 0) return
+  const { error } = await supabase.from('title_cast').upsert(
+    cast.map((c) => ({
+      user_id: userId,
+      title_id: titleId,
+      tmdb_person_id: c.tmdbPersonId,
+      name: c.name,
+      character_name: c.character ?? null,
+      profile_url: c.profileUrl ?? null,
+      cast_order: c.order,
+    })),
+    { onConflict: 'title_id,tmdb_person_id' }
+  )
+  if (error) console.error('Error upserting title cast:', error)
+}
+
+export async function upsertTitleCrewInDb(userId: string, titleId: string, crew: CrewMember[]): Promise<void> {
+  if (!supabase || crew.length === 0) return
+  const { error } = await supabase.from('title_crew').upsert(
+    crew.map((c) => ({
+      user_id: userId,
+      title_id: titleId,
+      tmdb_person_id: c.tmdbPersonId,
+      name: c.name,
+      job: c.job,
+      department: c.department ?? null,
+      profile_url: c.profileUrl ?? null,
+    })),
+    { onConflict: 'title_id,tmdb_person_id,job' }
+  )
+  if (error) console.error('Error upserting title crew:', error)
+}
+
+export async function upsertSeasonCastInDb(
+  userId: string,
+  titleId: string,
+  seasonId: string,
+  cast: CastMember[]
+): Promise<void> {
+  if (!supabase || cast.length === 0) return
+  const { error } = await supabase.from('season_cast').upsert(
+    cast.map((c) => ({
+      user_id: userId,
+      title_id: titleId,
+      season_id: seasonId,
+      tmdb_person_id: c.tmdbPersonId,
+      name: c.name,
+      character_name: c.character ?? null,
+      profile_url: c.profileUrl ?? null,
+      cast_order: c.order,
+    })),
+    { onConflict: 'season_id,tmdb_person_id' }
+  )
+  if (error) console.error('Error upserting season cast:', error)
+}
+
+export async function upsertEpisodeCrewInDb(
+  userId: string,
+  titleId: string,
+  episodeId: string,
+  crew: EpisodeCrew[]
+): Promise<void> {
+  if (!supabase || crew.length === 0) return
+  const { error } = await supabase.from('episode_crew').upsert(
+    crew.map((c) => ({
+      user_id: userId,
+      title_id: titleId,
+      episode_id: episodeId,
+      tmdb_person_id: c.tmdbPersonId,
+      name: c.name,
+      job: c.job,
+    })),
+    { onConflict: 'episode_id,tmdb_person_id,job' }
+  )
+  if (error) console.error('Error upserting episode crew:', error)
 }

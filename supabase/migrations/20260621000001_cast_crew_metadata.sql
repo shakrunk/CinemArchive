@@ -1,7 +1,7 @@
 -- Extended metadata: normalized cast/crew tables + studios column
 -- Enables future "browse by actor / writer" queries across the library.
 
-alter table titles add column studios text[] default '{}';
+alter table titles add column studios text[] not null default '{}';
 
 -- ── title_cast ───────────────────────────────────────────────────────────────
 create table title_cast (

@@ -771,9 +771,9 @@ export function TitleDetailDrawer() {
       // Case (a): season exists but no episodes were persisted to DB yet
       (s.episodeCount > 0 && (!s.episodes || s.episodes.length === 0)) ||
       // Case (b): episode rows exist but none have a name (pre-feature data)
-      (s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName)) ||
-      // Case (c): season has no cast data yet
-      (!s.cast || s.cast.length === 0)
+      (s.episodes && s.episodes.length > 0 && s.episodes.every((ep) => !ep.episodeName))
+      // Season cast is captured as a bonus of episode backfills above;
+      // shows with complete episode data get cast via "Refresh metadata" instead.
     )
     if (seasonsNeedingBackfill.length === 0) return
 

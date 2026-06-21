@@ -1,6 +1,28 @@
 export type MediaType = 'movie' | 'tv'
 export type WatchStatus = 'watched' | 'watchlist' | 'watching' | 'dropped'
 
+export interface CastMember {
+  character?: string
+  name: string
+  order: number
+  profileUrl?: string
+  tmdbPersonId: number
+}
+
+export interface CrewMember {
+  department?: string
+  job: string
+  name: string
+  profileUrl?: string
+  tmdbPersonId: number
+}
+
+export interface EpisodeCrew {
+  job: string
+  name: string
+  tmdbPersonId: number
+}
+
 export interface EpisodeWatchEvent {
   id: string
   watchedAt: string  // ISO date (YYYY-MM-DD)
@@ -27,6 +49,9 @@ export interface Episode {
   runtime?: number
   synopsis?: string
   stillUrl?: string
+  director?: string
+  writers?: string[]
+  crew?: EpisodeCrew[]
   watchEvents: EpisodeWatchEvent[]
   ratings: EpisodeRating[]    // independent historical log
   reviews: EpisodeReview[]    // independent historical log
@@ -38,6 +63,7 @@ export interface Season {
   episodeCount: number
   episodesWatched: number  // derived from episodes with watch events when episodes[] is present
   airYear?: number
+  cast?: CastMember[]
   episodes?: Episode[]
 }
 
@@ -72,6 +98,9 @@ export interface Title {
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
+  cast?: CastMember[]
+  crew?: CrewMember[]
+  studios?: string[]
 }
 
 export interface LedgerStats {

@@ -23,8 +23,10 @@ import { cn } from 'src/lib/utils'
 import type { Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
+import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
+const SPIDER_NOIR_TMDB_ID = 242484
 
 // ─── Shared status options ────────────────────────────────────────────────────
 
@@ -236,26 +238,52 @@ interface EpisodePanelProps {
   season: Season
   titleId: string
   isSharedView: boolean
+  isSpiderNoir: boolean
 }
 
-function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelProps) {
+function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: EpisodePanelProps) {
   const logEpisode = useAppStore((s) => s.logEpisode)
   const [log, setLog] = useState<EpLogState>(EMPTY_EP_LOG)
   const [showForm, setShowForm] = useState(false)
+  const [pendingLog, setPendingLog] = useState<EpLogState | null>(null)
+  const [showNoirModal, setShowNoirModal] = useState(false)
 
   const avg = avgEpisodeRating(episode)
   const watched = episode.watchEvents.length > 0
 
-  function handleSubmit() {
-    if (!log.includeWatch && log.rating === 0 && !log.reviewText.trim()) return
+  function doSave(epLog: EpLogState, colorMode?: 'bw' | 'color') {
+    if (!epLog.includeWatch && epLog.rating === 0 && !epLog.reviewText.trim()) return
     logEpisode(titleId, season.seasonNumber, episode.episodeNumber, {
-      watchedAt: log.includeWatch ? log.watchedAt : undefined,
-      watchNotes: log.includeWatch ? log.watchNotes : undefined,
-      rating: log.rating > 0 ? log.rating : undefined,
-      reviewText: log.reviewText.trim() || undefined,
+      watchedAt: epLog.includeWatch ? epLog.watchedAt : undefined,
+      watchNotes: epLog.includeWatch ? epLog.watchNotes : undefined,
+      rating: epLog.rating > 0 ? epLog.rating : undefined,
+      reviewText: epLog.reviewText.trim() || undefined,
+      colorMode,
     })
     setLog(EMPTY_EP_LOG)
     setShowForm(false)
+  }
+
+  function handleSubmit() {
+    if (!log.includeWatch && log.rating === 0 && !log.reviewText.trim()) return
+    if (isSpiderNoir) {
+      setPendingLog(log)
+      setShowNoirModal(true)
+    } else {
+      doSave(log)
+    }
+  }
+
+  function handleNoirSelect(mode: 'bw' | 'color') {
+    setShowNoirModal(false)
+    if (pendingLog) doSave(pendingLog, mode)
+    setPendingLog(null)
+  }
+
+  function handleNoirSkip() {
+    setShowNoirModal(false)
+    if (pendingLog) doSave(pendingLog)
+    setPendingLog(null)
   }
 
   const fmtDate = (iso: string) =>
@@ -319,6 +347,20 @@ function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelPr
               episode.watchEvents.map((we) => (
                 <div key={we.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
                   {fmtDate(we.watchedAt)}
+                  {we.colorMode && (
+                    <span
+                      className="font-mono ml-1.5 px-1 rounded"
+                      style={{
+                        fontSize: '9px',
+                        letterSpacing: '0.06em',
+                        background: we.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
+                        color: we.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
+                        border: `1px solid ${we.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
+                      }}
+                    >
+                      {we.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
+                    </span>
+                  )}
                   {we.notes && (
                     <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
                       {we.notes}
@@ -372,8 +414,22 @@ function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelPr
                   <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>
                     "{rv.reviewText}"
                   </div>
-                  <div className="font-mono mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                  <div className="font-mono mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
                     {fmtDateTime(rv.reviewedAt)}
+                    {rv.colorMode && (
+                      <span
+                        className="font-mono px-1 rounded"
+                        style={{
+                          fontSize: '9px',
+                          letterSpacing: '0.06em',
+                          background: rv.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
+                          color: rv.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
+                          border: `1px solid ${rv.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
+                        }}
+                      >
+                        {rv.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))
@@ -474,6 +530,11 @@ function EpisodePanel({ episode, season, titleId, isSharedView }: EpisodePanelPr
           </button>
         )
       )}
+      <SpiderNoirModeModal
+        open={showNoirModal}
+        onSelect={handleNoirSelect}
+        onSkip={handleNoirSkip}
+      />
     </div>
   )
 }
@@ -487,9 +548,10 @@ interface EpisodeRowProps {
   expanded: boolean
   onToggle: () => void
   isSharedView: boolean
+  isSpiderNoir: boolean
 }
 
-function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView }: EpisodeRowProps) {
+function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView, isSpiderNoir }: EpisodeRowProps) {
   const avg = avgEpisodeRating(episode)
   const watched = episode.watchEvents.length > 0
 
@@ -554,6 +616,7 @@ function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView
           season={season}
           titleId={titleId}
           isSharedView={isSharedView}
+          isSpiderNoir={isSpiderNoir}
         />
       )}
     </div>
@@ -566,9 +629,10 @@ interface TVSeriesSectionProps {
   titleId: string
   seasons: Season[]
   isSharedView: boolean
+  isSpiderNoir: boolean
 }
 
-function TVSeriesSection({ titleId, seasons, isSharedView }: TVSeriesSectionProps) {
+function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSeriesSectionProps) {
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [expandedEpId, setExpandedEpId] = useState<string | null>(null)
 
@@ -718,6 +782,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView }: TVSeriesSectionProp
                     expanded={expandedEpId === ep.id}
                     onToggle={() => setExpandedEpId(expandedEpId === ep.id ? null : ep.id)}
                     isSharedView={isSharedView}
+                    isSpiderNoir={isSpiderNoir}
                   />
                 ))}
               </div>
@@ -1075,6 +1140,7 @@ export function TitleDetailDrawer() {
                 titleId={title.id}
                 seasons={title.seasons}
                 isSharedView={isSharedView}
+                isSpiderNoir={title.tmdbId === SPIDER_NOIR_TMDB_ID}
               />
             </div>
           )}

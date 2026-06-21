@@ -65,6 +65,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
           <div style={{ display: 'flex', gap: '16px', width: '100%', maxWidth: '480px' }}>
             {/* B&W card */}
             <button
+              aria-label="Authentic Black & White"
               onClick={() => onSelect('bw')}
               style={{
                 flex: 1,
@@ -118,6 +119,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
 
             {/* Color card */}
             <button
+              aria-label="True-Hue Full Color"
               onClick={() => onSelect('color')}
               style={{
                 flex: 1,

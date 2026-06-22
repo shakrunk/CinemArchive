@@ -39,7 +39,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
           <span className="text-[11px] font-sans">Library</span>
         </button>
 
-        <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-4 py-2">
+        <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-4 py-2" aria-label="Add Title">
           <div
             className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
             style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}

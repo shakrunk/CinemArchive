@@ -947,6 +947,12 @@ export function TitleDetailDrawer() {
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [logRating, setLogRating] = useState(0)
   const [logNotes, setLogNotes] = useState('')
+  const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
+
+  function onClose() {
+    setPendingDeleteTitle(false)
+    closeDetailDrawer()
+  }
 
   // Track which title IDs have already been backfilled this session to avoid repeat calls.
   const backfilledRef = useRef<Set<string>>(new Set())
@@ -1119,8 +1125,6 @@ export function TitleDetailDrawer() {
 
   function handleDelete() {
     if (!title) return
-    const ok = window.confirm(`Remove "${title.title}" from your library? This can't be undone.`)
-    if (!ok) return
     closeDetailDrawer()
     removeTitle(title.id)
   }
@@ -1128,7 +1132,7 @@ export function TitleDetailDrawer() {
   return (
     <CinemaModal
       open={isDetailDrawerOpen}
-      onClose={closeDetailDrawer}
+      onClose={onClose}
       maxWidth="sm:max-w-2xl"
       title={title.title}
       description={title.synopsis ?? `Details and viewing history for ${title.title}.`}
@@ -1377,23 +1381,49 @@ export function TitleDetailDrawer() {
           {/* Maintenance actions */}
           {!isSharedView && (
             <div
-              className="pt-2 border-t flex flex-wrap items-center gap-x-5 gap-y-2"
+              className="pt-2 border-t"
               style={{ borderColor: 'var(--line)' }}
             >
-              <button
-                onClick={openRefreshMetadata}
-                className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-amber transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Refresh poster &amp; metadata
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-ember transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Remove from library
-              </button>
+              {pendingDeleteTitle ? (
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
+                    Remove from library forever?
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleDelete}
+                      className="font-mono text-xs transition-opacity hover:opacity-80"
+                      style={{ color: 'var(--ember)' }}
+                    >
+                      Delete forever
+                    </button>
+                    <button
+                      onClick={() => setPendingDeleteTitle(false)}
+                      className="font-mono text-xs transition-opacity hover:opacity-80"
+                      style={{ color: 'var(--paper-faint)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <button
+                    onClick={openRefreshMetadata}
+                    className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-amber transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Refresh poster &amp; metadata
+                  </button>
+                  <button
+                    onClick={() => setPendingDeleteTitle(true)}
+                    className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-ember transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Remove from library
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -4,8 +4,6 @@ import { useAppStore, useAllGenres, useAllNetworks, useAllDecades } from 'src/st
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
-import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
-import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir } from 'src/store/useAppStore'
@@ -438,8 +436,6 @@ export function Library() {
       </div>
 
       <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} activeFilterCount={activeFilterCount} />
-      <TitleDetailDrawer />
-      <RefreshMetadataModal />
     </div>
   )
 }

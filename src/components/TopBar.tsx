@@ -1,11 +1,11 @@
-import { Plus, LayoutGrid, List, BarChart3, User } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User, PlayCircle } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 
 interface TopBarProps {
-  currentView: 'library' | 'ledger'
-  onViewChange: (view: 'library' | 'ledger') => void
+  currentView: 'upnext' | 'library' | 'ledger'
+  onViewChange: (view: 'upnext' | 'library' | 'ledger') => void
   onProfileClick: () => void
 }
 
@@ -32,9 +32,10 @@ function ReelMark({ className }: { className?: string }) {
   )
 }
 
-const NAV: { id: 'ledger' | 'library'; label: string; Icon: typeof BarChart3 }[] = [
-  { id: 'ledger', label: 'The Ledger', Icon: BarChart3 },
+const NAV: { id: 'upnext' | 'library' | 'ledger'; label: string; Icon: typeof BarChart3 }[] = [
+  { id: 'upnext', label: 'Up Next', Icon: PlayCircle },
   { id: 'library', label: 'The Library', Icon: LayoutGrid },
+  { id: 'ledger', label: 'The Ledger', Icon: BarChart3 },
 ]
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {

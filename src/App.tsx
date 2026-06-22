@@ -2,17 +2,24 @@ import { useState, useEffect } from 'react'
 import { TopBar } from 'src/components/TopBar'
 import { BottomNav } from 'src/components/BottomNav'
 import { AddTitleWorkflow } from 'src/components/AddTitleWorkflow'
+import { UpNext } from 'src/views/UpNext'
 import { Library } from 'src/views/Library'
 import { Ledger } from 'src/views/Ledger'
+import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
+import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { isSupabaseConfigured, onAuthStateChange } from 'src/lib/auth'
 import { useAppStore } from 'src/store/useAppStore'
+import { computeUpNextShows } from 'src/store/upNext'
 import { ProfileModal } from 'src/components/ProfileModal'
 
-
-type AppView = 'library' | 'ledger'
+type AppView = 'upnext' | 'library' | 'ledger'
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>('library')
+  // Smart landing: open Up Next when shows are in progress, else Library.
+  // Computed once from the synchronously-rehydrated persisted titles.
+  const [currentView, setCurrentView] = useState<AppView>(() =>
+    computeUpNextShows(useAppStore.getState().titles).length > 0 ? 'upnext' : 'library'
+  )
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const setUser = useAppStore((s) => s.setUser)
   const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
@@ -37,7 +44,6 @@ export default function App() {
     }
   }, [setUser, loadSharedLibrary])
 
-
   return (
     <div className="relative min-h-screen">
       <a
@@ -60,12 +66,15 @@ export default function App() {
       />
 
       <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
+        {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
         {currentView === 'library' && <Library />}
         {currentView === 'ledger' && <Ledger />}
       </main>
 
       <BottomNav currentView={currentView} onViewChange={setCurrentView} />
       <AddTitleWorkflow />
+      <TitleDetailDrawer />
+      <RefreshMetadataModal />
       <ProfileModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   )

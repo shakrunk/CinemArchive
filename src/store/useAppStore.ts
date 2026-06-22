@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import type { User } from '@supabase/supabase-js'
-import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb } from '../lib/db'
+import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb, deleteEpisodeWatchEventFromDb } from '../lib/db'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
@@ -47,6 +47,8 @@ interface LibrarySlice {
   resetFilters: () => void
   applyFilters: () => void
   logEpisode: (titleId: string, seasonNumber: number, episodeNumber: number, opts: EpisodeLogOpts) => void
+  removeViewing: (titleId: string, viewingId: string) => void
+  deleteEpisodeWatchEvent: (titleId: string, seasonNumber: number, episodeNumber: number, watchEventId: string) => void
 }
 
 interface LedgerSlice {
@@ -310,6 +312,55 @@ export const useAppStore = create<AppStore>()(
               ]
             }
             return updated
+          })
+          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
+          return { ...season, episodes, episodesWatched }
+        })
+        return { ...t, seasons }
+      })
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
+    }),
+
+  removeViewing: (titleId, viewingId) =>
+    set((s) => {
+      const titles = s.titles.map((t) => {
+        if (t.id !== titleId) return t
+        return { ...t, viewings: t.viewings.filter((v) => v.id !== viewingId) }
+      })
+      if (s.user) {
+        deleteViewingFromDb(s.user.id, viewingId).catch((err) =>
+          console.error('Failed to sync deleted viewing to DB:', err)
+        )
+      }
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
+    }),
+
+  deleteEpisodeWatchEvent: (titleId, seasonNumber, episodeNumber, watchEventId) =>
+    set((s) => {
+      if (s.user) {
+        deleteEpisodeWatchEventFromDb(s.user.id, watchEventId).catch((err) =>
+          console.error('Failed to sync deleted episode watch event to DB:', err)
+        )
+      }
+      const titles = s.titles.map((t) => {
+        if (t.id !== titleId) return t
+        const seasons = (t.seasons ?? []).map((season) => {
+          if (season.seasonNumber !== seasonNumber) return season
+          if (!season.episodes) return season
+          const episodes = season.episodes.map((ep) => {
+            if (ep.episodeNumber !== episodeNumber) return ep
+            return {
+              ...ep,
+              watchEvents: ep.watchEvents.filter((we) => we.id !== watchEventId),
+            }
           })
           const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
           return { ...season, episodes, episodesWatched }

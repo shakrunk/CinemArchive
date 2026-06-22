@@ -694,3 +694,29 @@ export async function upsertEpisodeCrewInDb(
   )
   if (error) console.error('Error upserting episode crew:', error)
 }
+
+export async function deleteViewingFromDb(userId: string, viewingId: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('viewings')
+    .delete()
+    .eq('id', viewingId)
+    .eq('user_id', userId)
+  if (error) {
+    console.error('Error deleting viewing:', error)
+    throw error
+  }
+}
+
+export async function deleteEpisodeWatchEventFromDb(userId: string, watchEventId: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('episode_watch_events')
+    .delete()
+    .eq('id', watchEventId)
+    .eq('user_id', userId)
+  if (error) {
+    console.error('Error deleting episode watch event:', error)
+    throw error
+  }
+}

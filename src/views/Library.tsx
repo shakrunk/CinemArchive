@@ -365,17 +365,22 @@ export function Library() {
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="search-field flex-1 min-w-[220px] max-w-[460px]">
-          <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" />
+          <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" aria-hidden="true" />
           <input
             value={filters.search}
             onChange={(e) => setFilter('search', e.target.value)}
             placeholder="Search title, director, genre…"
+            aria-label="Search"
             autoComplete="off"
             spellCheck={false}
           />
           {filters.search && (
-            <button onClick={() => setFilter('search', '')} className="text-paper-faint hover:text-ember">
-              <X className="w-[15px] h-[15px]" />
+            <button
+              onClick={() => setFilter('search', '')}
+              className="text-paper-faint hover:text-ember"
+              aria-label="Clear search"
+            >
+              <X className="w-[15px] h-[15px]" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -402,8 +407,9 @@ export function Library() {
             activeFilterCount > 0 ? '!text-amber !border-amber/40' : 'border-[var(--line)] text-paper-dim'
           )}
           style={{ background: 'rgba(0,0,0,0.3)' }}
+          aria-label={activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Filters'}
         >
-          <SlidersHorizontal className="w-4 h-4" />
+          <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
           <span className="hidden sm:inline">Filters</span>
           {activeFilterCount > 0 && (
             <span className="bg-amber text-void font-mono text-[11px] rounded-full w-[18px] h-[18px] flex items-center justify-center">

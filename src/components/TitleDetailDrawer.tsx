@@ -54,7 +54,16 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 
 // ─── Movie-only: viewing timeline ────────────────────────────────────────────
 
-function ViewingTimeline({ viewings }: { viewings: Viewing[] }) {
+function ViewingTimeline({
+  viewings,
+  onDeleteViewing,
+  isSharedView,
+}: {
+  viewings: Viewing[]
+  onDeleteViewing?: (viewingId: string) => void
+  isSharedView?: boolean
+}) {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   if (viewings.length === 0) {
     return (
       <div className="text-center py-6 text-muted-foreground text-sm font-sans">
@@ -74,20 +83,62 @@ function ViewingTimeline({ viewings }: { viewings: Viewing[] }) {
             <div key={v.id} className="relative">
               <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />
               <div className="bg-secondary/50 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono text-xs text-amber">
-                    {new Date(v.date).toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric', year: 'numeric',
-                    })}
-                  </span>
-                  {v.rating && (
-                    <span className="font-mono text-xs text-amber">★ {v.rating}</span>
-                  )}
-                </div>
-                {v.notes && (
-                  <p className="text-xs text-muted-foreground font-sans italic leading-relaxed">
-                    "{v.notes}"
-                  </p>
+                {pendingDeleteId === v.id ? (
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
+                      Remove this viewing?
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          onDeleteViewing?.(v.id)
+                          setPendingDeleteId(null)
+                        }}
+                        className="font-mono text-xs transition-opacity hover:opacity-80"
+                        style={{ color: 'var(--ember)' }}
+                      >
+                        Delete forever
+                      </button>
+                      <button
+                        onClick={() => setPendingDeleteId(null)}
+                        className="font-mono text-xs transition-opacity hover:opacity-80"
+                        style={{ color: 'var(--paper-faint)' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-mono text-xs text-amber">
+                        {new Date(v.date).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {v.rating && (
+                          <span className="font-mono text-xs text-amber">★ {v.rating}</span>
+                        )}
+                        {!isSharedView && onDeleteViewing && (
+                          <button
+                            onClick={() => setPendingDeleteId(v.id)}
+                            style={{ color: 'var(--paper-faint)', opacity: 0.45 }}
+                            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
+                            aria-label="Delete viewing"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {v.notes && (
+                      <p className="text-xs text-muted-foreground font-sans italic leading-relaxed">
+                        "{v.notes}"
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -829,7 +880,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSer
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, openRefreshMetadata, isSharedView } = useAppStore()
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore()
   const title = useSelectedTitle()
   const user = useAppStore((s) => s.user)
 
@@ -1270,7 +1321,11 @@ export function TitleDetailDrawer() {
                   </div>
                 )}
 
-                <ViewingTimeline viewings={title.viewings} />
+                <ViewingTimeline
+                  viewings={title.viewings}
+                  isSharedView={isSharedView}
+                  onDeleteViewing={(viewingId) => removeViewing(title.id, viewingId)}
+                />
               </div>
             </>
           )}

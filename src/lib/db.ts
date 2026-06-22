@@ -519,12 +519,14 @@ export async function logEpisodeToDb(
     rating?: number
     reviewText?: string
     colorMode?: 'bw' | 'color'
+    watchEventId?: string // client-supplied uuid so the optimistic store id matches the DB row (enables reliable delete/undo)
   }
 ): Promise<void> {
   if (!supabase) return
 
   if (opts.watchedAt) {
     const { error } = await supabase.from('episode_watch_events').insert({
+      ...(opts.watchEventId ? { id: opts.watchEventId } : {}),
       episode_id: episodeId,
       user_id: userId,
       watched_at: opts.watchedAt,

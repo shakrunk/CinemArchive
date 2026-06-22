@@ -130,6 +130,26 @@ assert('t1 next episode = 4', t1Entry ? t1Entry.episode.episodeNumber : null, 4)
 assert('t1 watchedCount = 6', t1Entry ? t1Entry.watchedCount : null, 6)
 assert('t1 totalCount = 8', t1Entry ? t1Entry.totalCount : null, 8)
 
+// ── Advance invariant: logging the next episode advances to the following one,
+//    and logging the final episode yields null (finale). This is the contract
+//    the store action `logNextEpisodeWatch` must uphold. ──
+function appendWatch(seasons, sn, en) {
+  return seasons.map((s) =>
+    s.seasonNumber !== sn || !s.episodes
+      ? s
+      : { ...s, episodes: s.episodes.map((e) => e.episodeNumber === en ? { ...e, watchEvents: [...e.watchEvents, { id: 'we-new', watchedAt: '2026-06-22' }] } : e) }
+  )
+}
+
+console.log('\n── 3. log-next advances / detects finale ──')
+let seq = partialSeasons
+const firstNext = nextUnwatchedEpisode(seq)            // S2E4
+seq = appendWatch(seq, firstNext.season.seasonNumber, firstNext.episode.episodeNumber)
+const afterFirst = nextUnwatchedEpisode(seq)
+assert('after logging S2E4, next episode = 5', afterFirst ? afterFirst.episode.episodeNumber : null, 5)
+seq = appendWatch(seq, afterFirst.season.seasonNumber, afterFirst.episode.episodeNumber)  // log S2E5 (final)
+assertNull('after logging final episode, next = null (finale)', nextUnwatchedEpisode(seq))
+
 // ── Summary ──  (Tasks 2 and 3 insert their sections ABOVE this block)
 console.log(`\n${'─'.repeat(50)}`)
 console.log(`Result: ${pass} passed, ${fail} failed`)

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
+import { nextUnwatchedEpisode } from './episodeUtils'
+import { computeUpNextShows, type UpNextEntry } from './upNext'
 import type { User } from '@supabase/supabase-js'
 import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb, deleteEpisodeWatchEventFromDb } from '../lib/db'
 
@@ -49,6 +51,7 @@ interface LibrarySlice {
   logEpisode: (titleId: string, seasonNumber: number, episodeNumber: number, opts: EpisodeLogOpts) => void
   removeViewing: (titleId: string, viewingId: string) => void
   deleteEpisodeWatchEvent: (titleId: string, seasonNumber: number, episodeNumber: number, watchEventId: string) => void
+  logNextEpisodeWatch: (titleId: string) => { seasonNumber: number; episodeNumber: number; watchEventId: string } | null
 }
 
 interface LedgerSlice {
@@ -325,6 +328,50 @@ export const useAppStore = create<AppStore>()(
       }
     }),
 
+  logNextEpisodeWatch: (titleId) => {
+    const state = get()
+    const title = state.titles.find((t) => t.id === titleId)
+    if (!title || !title.seasons) return null
+    const next = nextUnwatchedEpisode(title.seasons)
+    if (!next) return null
+
+    const seasonNumber = next.season.seasonNumber
+    const episodeNumber = next.episode.episodeNumber
+    const episodeId = next.episode.id
+    const watchEventId = crypto.randomUUID()
+    const watchedAt = new Date().toISOString().slice(0, 10)
+
+    if (state.user) {
+      logEpisodeToDb(state.user.id, episodeId, { watchedAt, watchEventId }).catch((err) =>
+        console.error('Failed to sync quick episode log to DB:', err)
+      )
+    }
+
+    set((s) => {
+      const titles = s.titles.map((t) => {
+        if (t.id !== titleId) return t
+        const seasons = (t.seasons ?? []).map((season) => {
+          if (season.seasonNumber !== seasonNumber || !season.episodes) return season
+          const episodes = season.episodes.map((ep) =>
+            ep.episodeNumber === episodeNumber
+              ? { ...ep, watchEvents: [...ep.watchEvents, { id: watchEventId, watchedAt }] }
+              : ep
+          )
+          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
+          return { ...season, episodes, episodesWatched }
+        })
+        return { ...t, seasons }
+      })
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
+    })
+
+    return { seasonNumber, episodeNumber, watchEventId }
+  },
+
   removeViewing: (titleId, viewingId) =>
     set((s) => {
       const titles = s.titles.map((t) => {
@@ -498,4 +545,9 @@ export const useAllDecades = () => {
 export const useAllTags = () => {
   const titles = useAppStore((s) => s.titles)
   return [...new Set(titles.flatMap((t) => t.tags))].sort()
+}
+
+export const useUpNextShows = (): UpNextEntry[] => {
+  const titles = useAppStore((s) => s.titles)
+  return computeUpNextShows(titles)
 }

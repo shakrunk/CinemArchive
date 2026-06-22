@@ -49,3 +49,21 @@ export function watchedMinutesInSeason(season: Season): number {
     .filter((e) => e.watchEvents.length > 0)
     .reduce((sum, e) => sum + (e.runtime ?? 0), 0)
 }
+
+// ─── Up Next: next unwatched episode ─────────────────────────────────────────
+
+/** First episode (ascending season → episode) with no watch events. Seasons
+ *  lacking an `episodes[]` array (coarse-only progress) are skipped. */
+export function nextUnwatchedEpisode(
+  seasons: Season[]
+): { season: Season; episode: Episode } | null {
+  const orderedSeasons = [...seasons].sort((a, b) => a.seasonNumber - b.seasonNumber)
+  for (const season of orderedSeasons) {
+    if (!season.episodes || season.episodes.length === 0) continue
+    const orderedEpisodes = [...season.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber)
+    for (const episode of orderedEpisodes) {
+      if (episode.watchEvents.length === 0) return { season, episode }
+    }
+  }
+  return null
+}

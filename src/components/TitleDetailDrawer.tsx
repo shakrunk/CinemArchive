@@ -309,6 +309,8 @@ interface EpisodePanelProps {
 
 function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: EpisodePanelProps) {
   const logEpisode = useAppStore((s) => s.logEpisode)
+  const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
+  const [pendingDeleteWeId, setPendingDeleteWeId] = useState<string | null>(null)
   const [log, setLog] = useState<EpLogState>(EMPTY_EP_LOG)
   const [showForm, setShowForm] = useState(false)
   const [pendingLog, setPendingLog] = useState<EpLogState | null>(null)
@@ -412,25 +414,67 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
               <span style={{ color: 'var(--paper-faint)' }}>—</span>
             ) : (
               episode.watchEvents.map((we) => (
-                <div key={we.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
-                  {fmtDate(we.watchedAt)}
-                  {we.colorMode && (
-                    <span
-                      className="font-mono ml-1.5 px-1 rounded"
-                      style={{
-                        fontSize: '9px',
-                        letterSpacing: '0.06em',
-                        background: we.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
-                        color: we.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
-                        border: `1px solid ${we.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
-                      }}
-                    >
-                      {we.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
-                    </span>
-                  )}
-                  {we.notes && (
-                    <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
-                      {we.notes}
+                <div key={we.id}>
+                  {pendingDeleteWeId === we.id ? (
+                    <div>
+                      <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                        Remove?
+                      </div>
+                      <div className="flex gap-2 mt-0.5">
+                        <button
+                          onClick={() => {
+                            deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id)
+                            setPendingDeleteWeId(null)
+                          }}
+                          className="font-mono transition-opacity hover:opacity-80"
+                          style={{ color: 'var(--ember)', fontSize: '10px' }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setPendingDeleteWeId(null)}
+                          className="font-mono transition-opacity hover:opacity-80"
+                          style={{ color: 'var(--paper-faint)', fontSize: '10px' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1">
+                      <div className="flex-1 font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
+                        {fmtDate(we.watchedAt)}
+                        {we.colorMode && (
+                          <span
+                            className="font-mono ml-1.5 px-1 rounded"
+                            style={{
+                              fontSize: '9px',
+                              letterSpacing: '0.06em',
+                              background: we.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
+                              color: we.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
+                              border: `1px solid ${we.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
+                            }}
+                          >
+                            {we.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
+                          </span>
+                        )}
+                        {we.notes && (
+                          <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                            {we.notes}
+                          </div>
+                        )}
+                      </div>
+                      {!isSharedView && (
+                        <button
+                          onClick={() => setPendingDeleteWeId(we.id)}
+                          style={{ color: 'var(--paper-faint)', opacity: 0.45, flexShrink: 0, marginTop: '1px' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
+                          aria-label="Delete watch event"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -11,6 +11,8 @@ It's a JAMstack app: a static React frontend on GitHub Pages, backed by Supabase
 ## Features
 
 - **Library** — poster wall + sortable list view, with client-side search, filtering (type, status, genre, tag, network, decade, rating), and sorting.
+- **Command palette (⌘K / Ctrl+K)** — jump to any title or fire an action (add a title, switch view, change layout) from the keyboard; ↑/↓ to move, Enter to run, Esc to close.
+- **Deep links & back button** — the active view and the open title live in the URL, so a refresh restores where you were, titles are linkable, and the browser/mobile back button closes an open drawer instead of leaving the app.
 - **Episode-level TV tracking** — each season expands into episodes; log watch events, ratings, and reviews per episode, all decoupled (re-watch an episode without changing its rating; review without re-watching). Season and series rollups are computed from the episode data.
 - **The Ledger** — a stats dashboard (counts, rating distribution, viewing timeline, top genres, auteurs, media breakdown) rendered with custom CSS visuals.
 - **Re-watch timeline** — every viewing is its own dated entry per title.

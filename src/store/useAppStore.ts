@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
@@ -588,22 +589,22 @@ export const useSelectedTitle = () =>
 
 export const useAllGenres = () => {
   const titles = useAppStore((s) => s.titles)
-  return [...new Set(titles.flatMap((t) => t.genres))].sort()
+  return useMemo(() => [...new Set(titles.flatMap((t) => t.genres))].sort(), [titles])
 }
 
 export const useAllNetworks = () => {
   const titles = useAppStore((s) => s.titles)
-  return [...new Set(titles.map((t) => t.network).filter(Boolean) as string[])].sort()
+  return useMemo(() => [...new Set(titles.map((t) => t.network).filter(Boolean) as string[])].sort(), [titles])
 }
 
 export const useAllDecades = () => {
   const titles = useAppStore((s) => s.titles)
-  return [...new Set(titles.map((t) => `${Math.floor(t.year / 10) * 10}s`))].sort()
+  return useMemo(() => [...new Set(titles.map((t) => `${Math.floor(t.year / 10) * 10}s`))].sort(), [titles])
 }
 
 export const useAllTags = () => {
   const titles = useAppStore((s) => s.titles)
-  return [...new Set(titles.flatMap((t) => t.tags))].sort()
+  return useMemo(() => [...new Set(titles.flatMap((t) => t.tags))].sort(), [titles])
 }
 
 export const useUpNextShows = (): UpNextEntry[] => {

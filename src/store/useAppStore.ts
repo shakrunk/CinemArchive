@@ -609,5 +609,7 @@ export const useAllTags = () => {
 
 export const useUpNextShows = (): UpNextEntry[] => {
   const titles = useAppStore((s) => s.titles)
-  return computeUpNextShows(titles)
+  // ⚡ Bolt: wrap expensive computation in useMemo to prevent unnecessary recalculations
+  // and maintain a stable array reference across renders
+  return useMemo(() => computeUpNextShows(titles), [titles])
 }

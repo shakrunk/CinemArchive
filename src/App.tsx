@@ -11,15 +11,19 @@ import { isSupabaseConfigured, onAuthStateChange } from 'src/lib/auth'
 import { useAppStore } from 'src/store/useAppStore'
 import { computeUpNextShows } from 'src/store/upNext'
 import { ProfileModal } from 'src/components/ProfileModal'
-
-type AppView = 'upnext' | 'library' | 'ledger'
+import { parseNav, type AppView } from 'src/lib/navigation'
+import { useNavigationSync } from 'src/lib/useNavigationSync'
 
 export default function App() {
-  // Smart landing: open Up Next when shows are in progress, else Library.
-  // Computed once from the synchronously-rehydrated persisted titles.
-  const [currentView, setCurrentView] = useState<AppView>(() =>
-    computeUpNextShows(useAppStore.getState().titles).length > 0 ? 'upnext' : 'library'
-  )
+  // Smart landing unless the URL already names a view (deep link / refresh).
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    const smart: AppView =
+      computeUpNextShows(useAppStore.getState().titles).length > 0 ? 'upnext' : 'library'
+    return parseNav(window.location.search, smart).view
+  })
+
+  useNavigationSync({ currentView, setCurrentView })
+
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const setUser = useAppStore((s) => s.setUser)
   const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)

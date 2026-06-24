@@ -66,6 +66,7 @@ interface UISlice {
   isDetailDrawerOpen: boolean
   isRefreshMetadataOpen: boolean
   isSharedView: boolean
+  isCommandPaletteOpen: boolean
 
   setViewMode: (mode: ViewMode) => void
   selectTitle: (id: string | null) => void
@@ -76,6 +77,8 @@ interface UISlice {
   openRefreshMetadata: () => void
   closeRefreshMetadata: () => void
   setIsSharedView: (isSharedView: boolean) => void
+  openCommandPalette: () => void
+  closeCommandPalette: () => void
 }
 
 interface AuthSlice {
@@ -451,6 +454,10 @@ export const useAppStore = create<AppStore>()(
 
   isSharedView: false,
   setIsSharedView: (isSharedView) => set({ isSharedView }),
+
+  isCommandPaletteOpen: false,
+  openCommandPalette: () => set({ isCommandPaletteOpen: true }),
+  closeCommandPalette: () => set({ isCommandPaletteOpen: false }),
 
   // ── Auth ───────────────────────────────────────────────────
   user: null,

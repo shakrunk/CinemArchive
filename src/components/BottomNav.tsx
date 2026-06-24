@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { LayoutGrid, BarChart3, Plus, PlayCircle } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
@@ -42,17 +43,42 @@ function NavTab({
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const openAddTitle = useAppStore((s) => s.openAddTitle)
 
+  // Firefox Android positions fixed elements relative to the layout viewport,
+  // not the visual viewport, so the nav floats above the screen bottom when the
+  // browser toolbar hides. Track the visual viewport and compensate.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    function update() {
+      const gap = Math.max(0, window.innerHeight - vv!.offsetTop - vv!.height)
+      document.documentElement.style.setProperty('--vv-bottom', `${gap}px`)
+    }
+
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-[200] sm:hidden border-t"
+      className="fixed inset-x-0 z-[200] sm:hidden border-t"
       style={{
+        bottom: 'var(--vv-bottom, 0px)',
         borderColor: 'var(--line)',
         background: 'linear-gradient(0deg, rgba(11,9,7,0.96), rgba(11,9,7,0.78))',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
       }}
     >
-      <div className="flex items-center justify-around h-16 px-2">
+      <div
+        className="flex items-center justify-around h-16 px-2"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <NavTab active={currentView === 'upnext'} onClick={() => onViewChange('upnext')} label="Up Next" Icon={PlayCircle} />
         <NavTab active={currentView === 'library'} onClick={() => onViewChange('library')} label="Library" Icon={LayoutGrid} />
 

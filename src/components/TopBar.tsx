@@ -1,4 +1,4 @@
-import { Plus, LayoutGrid, List, BarChart3, User, PlayCircle } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User, PlayCircle, Search } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
@@ -39,7 +39,7 @@ const NAV: { id: 'upnext' | 'library' | 'ledger'; label: string; Icon: typeof Ba
 ]
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView } = useAppStore()
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView, openCommandPalette } = useAppStore()
 
   return (
     <header
@@ -87,6 +87,22 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
 
         {/* Actions */}
         <div className="flex items-center gap-2 ml-auto shrink-0">
+          <button
+            onClick={openCommandPalette}
+            aria-label="Open command palette"
+            className="icon-btn h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center gap-2 px-2.5 sm:px-3"
+            style={{ borderColor: 'var(--line)', background: 'rgba(0,0,0,0.3)' }}
+          >
+            <Search className="w-[17px] h-[17px]" />
+            <span className="hidden lg:inline font-sans text-[13px] text-paper-faint">Search</span>
+            <kbd
+              className="hidden lg:inline font-mono text-[10px] tracking-[0.06em] text-paper-faint border rounded px-1.5 py-0.5"
+              style={{ borderColor: 'var(--line)' }}
+            >
+              ⌘K
+            </kbd>
+          </button>
+
           {currentView === 'library' && (
             <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
               <button

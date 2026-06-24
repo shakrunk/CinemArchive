@@ -5,6 +5,7 @@ import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, type UpNextEntry } from './upNext'
 import type { User } from '@supabase/supabase-js'
+import type { AppView } from '../lib/navigation'
 import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb, deleteEpisodeWatchEventFromDb } from '../lib/db'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
@@ -12,6 +13,12 @@ import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb,
 export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
+
+/** A cast/crew person, keyed by TMDB id with a display name. */
+export interface PersonRef {
+  id: number
+  name: string
+}
 
 export interface LibraryFilters {
   search: string
@@ -22,6 +29,7 @@ export interface LibraryFilters {
   networks: string[]
   decades: string[]
   minRating: number
+  person: PersonRef | null
   sortField: SortField
   sortDir: SortDir
 }
@@ -67,6 +75,9 @@ interface UISlice {
   isRefreshMetadataOpen: boolean
   isSharedView: boolean
   isCommandPaletteOpen: boolean
+  // A top-level view requested by a component that can't reach App's currentView
+  // (e.g. the detail drawer). App consumes and clears it. null = nothing pending.
+  pendingView: AppView | null
 
   setViewMode: (mode: ViewMode) => void
   selectTitle: (id: string | null) => void
@@ -79,6 +90,10 @@ interface UISlice {
   setIsSharedView: (isSharedView: boolean) => void
   openCommandPalette: () => void
   closeCommandPalette: () => void
+  requestView: (view: AppView | null) => void
+  // Filter the library to titles featuring a person, then surface it: close the
+  // drawer and request the Library view.
+  browseByPerson: (person: PersonRef) => void
 }
 
 interface AuthSlice {
@@ -101,11 +116,27 @@ const defaultFilters: LibraryFilters = {
   networks: [],
   decades: [],
   minRating: 0,
+  person: null,
   sortField: 'addedAt',
   sortDir: 'desc',
 }
 
 // ─── Filter Logic ───────────────────────────────────────────────────────────
+
+// True when the person (by TMDB id) appears anywhere in a title's credits:
+// title cast/crew, any season's cast, or any episode's crew. Mirrored by
+// scripts/verify-person-logic.mjs.
+export function titleHasPerson(title: Title, personId: number): boolean {
+  if (title.cast?.some((c) => c.tmdbPersonId === personId)) return true
+  if (title.crew?.some((c) => c.tmdbPersonId === personId)) return true
+  for (const season of title.seasons ?? []) {
+    if (season.cast?.some((c) => c.tmdbPersonId === personId)) return true
+    for (const ep of season.episodes ?? []) {
+      if (ep.crew?.some((c) => c.tmdbPersonId === personId)) return true
+    }
+  }
+  return false
+}
 
 function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[] {
   let result = [...titles]
@@ -150,6 +181,11 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
   if (filters.minRating > 0) {
     result = result.filter((t) => (t.rating ?? 0) >= filters.minRating)
+  }
+
+  if (filters.person) {
+    const personId = filters.person.id
+    result = result.filter((t) => titleHasPerson(t, personId))
   }
 
   // Sort
@@ -458,6 +494,22 @@ export const useAppStore = create<AppStore>()(
   isCommandPaletteOpen: false,
   openCommandPalette: () => set({ isCommandPaletteOpen: true }),
   closeCommandPalette: () => set({ isCommandPaletteOpen: false }),
+
+  pendingView: null,
+  requestView: (pendingView) => set({ pendingView }),
+
+  browseByPerson: (person) =>
+    set((s) => {
+      const filters = { ...s.filters, person }
+      return {
+        filters,
+        filteredTitles: applyFiltersToTitles(s.titles, filters),
+        isDetailDrawerOpen: false,
+        isRefreshMetadataOpen: false,
+        selectedTitleId: null,
+        pendingView: 'library',
+      }
+    }),
 
   // ── Auth ───────────────────────────────────────────────────
   user: null,

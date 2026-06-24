@@ -103,11 +103,19 @@ export function useNavigationSync({
       window.history.pushState({}, '', nextUrl)
       pushDepth.current += 1
     } else if (wasModal && !isModal && pushDepth.current > 0) {
-      // Closing a modal we pushed: pop it so history stays clean. popstate's
-      // handler then reconciles (state already matches → no-op) and decrements.
-      window.history.back()
-      prevRef.current = desired
-      return
+      // Closing a modal we pushed. If the view is unchanged it's a pure close:
+      // pop the entry we pushed so history stays clean (popstate reconciles +
+      // decrements). If the view ALSO changed, the user navigated away — e.g.
+      // browse-by-person from the drawer jumps to the Library — so replace the
+      // modal entry with the destination view instead of popping back to the
+      // pre-modal view (which popstate would otherwise restore).
+      if (prev.view === desired.view) {
+        window.history.back()
+        prevRef.current = desired
+        return
+      }
+      window.history.replaceState({}, '', nextUrl)
+      pushDepth.current -= 1
     } else {
       window.history.replaceState({}, '', nextUrl)
     }

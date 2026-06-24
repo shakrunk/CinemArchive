@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal, X, Film } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Film, User } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
@@ -355,6 +355,7 @@ export function Library() {
     if (filters.networks.length > 0) count++
     if (filters.decades.length > 0) count++
     if (filters.minRating > 0) count++
+    if (filters.person) count++
     return count
   }, [filters])
 
@@ -423,6 +424,25 @@ export function Library() {
           </button>
         ))}
       </div>
+
+      {/* Active person filter (set by clicking a name in a title's Cast & Crew) */}
+      {filters.person && (
+        <div className="mb-4">
+          <span className="inline-flex items-center gap-2 font-sans text-sm text-amber bg-amber/10 border border-amber/25 rounded-full pl-3 pr-1.5 py-1">
+            <User className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              Featuring <b className="font-medium">{filters.person.name}</b>
+            </span>
+            <button
+              onClick={() => setFilter('person', null)}
+              aria-label={`Clear ${filters.person.name} filter`}
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </span>
+        </div>
+      )}
 
       {/* Result meta */}
       <p className="font-mono text-[11px] tracking-[0.06em] text-paper-faint mb-5">

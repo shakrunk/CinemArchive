@@ -143,6 +143,18 @@ export const mockTitles: Title[] = [
       "rewatch"
     ],
     "addedAt": "2010-07-15",
+    "cast": [
+      { "tmdbPersonId": 6193, "name": "Leonardo DiCaprio", "character": "Dom Cobb", "order": 0 },
+      { "tmdbPersonId": 24045, "name": "Joseph Gordon-Levitt", "character": "Arthur", "order": 1 },
+      { "tmdbPersonId": 27578, "name": "Elliot Page", "character": "Ariadne", "order": 2 },
+      { "tmdbPersonId": 2524, "name": "Tom Hardy", "character": "Eames", "order": 3 },
+      { "tmdbPersonId": 2037, "name": "Cillian Murphy", "character": "Robert Fischer", "order": 4 }
+    ],
+    "crew": [
+      { "tmdbPersonId": 525, "name": "Christopher Nolan", "job": "Director" },
+      { "tmdbPersonId": 525, "name": "Christopher Nolan", "job": "Screenplay" },
+      { "tmdbPersonId": 947, "name": "Hans Zimmer", "job": "Original Music Composer" }
+    ],
     "viewings": []
   },
   {
@@ -165,6 +177,16 @@ export const mockTitles: Title[] = [
       "rewatch"
     ],
     "addedAt": "1994-09-10",
+    "cast": [
+      { "tmdbPersonId": 8891, "name": "John Travolta", "character": "Vincent Vega", "order": 0 },
+      { "tmdbPersonId": 2231, "name": "Samuel L. Jackson", "character": "Jules Winnfield", "order": 1 },
+      { "tmdbPersonId": 62, "name": "Bruce Willis", "character": "Butch Coolidge", "order": 2 },
+      { "tmdbPersonId": 139, "name": "Uma Thurman", "character": "Mia Wallace", "order": 3 }
+    ],
+    "crew": [
+      { "tmdbPersonId": 138, "name": "Quentin Tarantino", "job": "Director" },
+      { "tmdbPersonId": 138, "name": "Quentin Tarantino", "job": "Screenplay" }
+    ],
     "viewings": []
   },
   {
@@ -314,6 +336,15 @@ export const mockTitles: Title[] = [
       "rewatch"
     ],
     "addedAt": "1999-08-06",
+    "cast": [
+      { "tmdbPersonId": 62, "name": "Bruce Willis", "character": "Malcolm Crowe", "order": 0 },
+      { "tmdbPersonId": 6597, "name": "Haley Joel Osment", "character": "Cole Sear", "order": 1 },
+      { "tmdbPersonId": 3489, "name": "Toni Collette", "character": "Lynn Sear", "order": 2 }
+    ],
+    "crew": [
+      { "tmdbPersonId": 12891, "name": "M. Night Shyamalan", "job": "Director" },
+      { "tmdbPersonId": 12891, "name": "M. Night Shyamalan", "job": "Screenplay" }
+    ],
     "viewings": []
   },
   {
@@ -353,6 +384,16 @@ export const mockTitles: Title[] = [
       "rewatch"
     ],
     "addedAt": "2012-09-28",
+    "cast": [
+      { "tmdbPersonId": 24045, "name": "Joseph Gordon-Levitt", "character": "Joe", "order": 0 },
+      { "tmdbPersonId": 62, "name": "Bruce Willis", "character": "Old Joe", "order": 1 },
+      { "tmdbPersonId": 5081, "name": "Emily Blunt", "character": "Sara", "order": 2 },
+      { "tmdbPersonId": 7036, "name": "Jeff Daniels", "character": "Abe", "order": 3 }
+    ],
+    "crew": [
+      { "tmdbPersonId": 12526, "name": "Rian Johnson", "job": "Director" },
+      { "tmdbPersonId": 12526, "name": "Rian Johnson", "job": "Screenplay" }
+    ],
     "viewings": []
   },
   {

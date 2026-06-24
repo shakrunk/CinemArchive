@@ -38,6 +38,19 @@ export default function App() {
   const openAddTitle = useAppStore((s) => s.openAddTitle)
   const setViewMode = useAppStore((s) => s.setViewMode)
 
+  // A component without access to currentView (e.g. the detail drawer's
+  // browse-by-person) requests a view change via the store. We consume it in a
+  // store listener — not a synchronous setState in the effect body — so it reads
+  // like the popstate handler and avoids cascading-render lint.
+  useEffect(() => {
+    return useAppStore.subscribe((state, prev) => {
+      if (state.pendingView && state.pendingView !== prev.pendingView) {
+        setCurrentView(state.pendingView)
+        useAppStore.getState().requestView(null)
+      }
+    })
+  }, [])
+
   // ⌘K / Ctrl+K toggles the palette from anywhere.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

@@ -191,6 +191,7 @@ interface CastCrewSectionProps {
 }
 
 function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
+  const browseByPerson = useAppStore((s) => s.browseByPerson)
   const hasCast = cast && cast.length > 0
   const hasCrew = crew && crew.length > 0
   const hasStudios = studios && studios.length > 0
@@ -208,9 +209,15 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             {cast.map((member) => (
-              <div key={member.tmdbPersonId} className="shrink-0 w-14 text-center">
+              <button
+                key={member.tmdbPersonId}
+                type="button"
+                onClick={() => browseByPerson({ id: member.tmdbPersonId, name: member.name })}
+                aria-label={`Browse titles featuring ${member.name}`}
+                className="group shrink-0 w-14 text-center focus:outline-none"
+              >
                 <div
-                  className="w-14 h-14 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center"
+                  className="w-14 h-14 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
                   style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
                 >
                   {member.profileUrl ? (
@@ -222,8 +229,8 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
                   )}
                 </div>
                 <div
-                  className="font-sans truncate"
-                  style={{ fontSize: '10px', color: 'var(--paper)', lineHeight: 1.3 }}
+                  className="font-sans truncate text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
+                  style={{ fontSize: '10px', lineHeight: 1.3 }}
                   title={member.name}
                 >
                   {member.name}
@@ -237,7 +244,7 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
                     {member.character}
                   </div>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -257,7 +264,19 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
                   {label}
                 </span>
                 <span className="font-sans" style={{ color: 'var(--paper)' }}>
-                  {members.map((m) => m.name).join(' · ')}
+                  {members.map((m, i) => (
+                    <span key={m.tmdbPersonId}>
+                      {i > 0 && ' · '}
+                      <button
+                        type="button"
+                        onClick={() => browseByPerson({ id: m.tmdbPersonId, name: m.name })}
+                        aria-label={`Browse titles featuring ${m.name}`}
+                        className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-none"
+                      >
+                        {m.name}
+                      </button>
+                    </span>
+                  ))}
                 </span>
               </div>
             )
@@ -744,6 +763,7 @@ interface TVSeriesSectionProps {
 }
 
 function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSeriesSectionProps) {
+  const browseByPerson = useAppStore((s) => s.browseByPerson)
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [expandedEpId, setExpandedEpId] = useState<string | null>(null)
 
@@ -853,9 +873,15 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSer
             </div>
             <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
               {season.cast.map((member) => (
-                <div key={member.tmdbPersonId} className="shrink-0 w-12 text-center">
+                <button
+                  key={member.tmdbPersonId}
+                  type="button"
+                  onClick={() => browseByPerson({ id: member.tmdbPersonId, name: member.name })}
+                  aria-label={`Browse titles featuring ${member.name}`}
+                  className="group shrink-0 w-12 text-center focus:outline-none"
+                >
                   <div
-                    className="w-12 h-12 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center"
+                    className="w-12 h-12 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
                     style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
                   >
                     {member.profileUrl ? (
@@ -867,13 +893,13 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSer
                     )}
                   </div>
                   <div
-                    className="font-sans truncate"
-                    style={{ fontSize: '9px', color: 'var(--paper)', lineHeight: 1.3 }}
+                    className="font-sans truncate text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
+                    style={{ fontSize: '9px', lineHeight: 1.3 }}
                     title={member.name}
                   >
                     {member.name}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>

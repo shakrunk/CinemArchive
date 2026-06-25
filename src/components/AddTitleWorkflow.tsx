@@ -136,15 +136,21 @@ function SeasonEditor({ seasons, onChange }: SeasonEditorProps) {
             </span>
             <div className="flex gap-1 shrink-0">
               <button
+                type="button"
                 onClick={() => toggleEpisodes(i, -1)}
+                aria-label={`Decrease episodes watched for season ${s.seasonNumber}`}
                 className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center"
               >−</button>
               <button
+                type="button"
                 onClick={() => toggleEpisodes(i, 1)}
+                aria-label={`Increase episodes watched for season ${s.seasonNumber}`}
                 className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center"
               >+</button>
               <button
+                type="button"
                 onClick={() => markSeasonComplete(i)}
+                aria-label={complete ? `Mark season ${s.seasonNumber} incomplete` : `Mark season ${s.seasonNumber} complete`}
                 className={cn(
                   'w-5 h-5 rounded flex items-center justify-center transition-colors',
                   complete ? 'bg-amber/20 text-amber' : 'bg-secondary text-muted-foreground hover:text-amber'

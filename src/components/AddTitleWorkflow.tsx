@@ -368,6 +368,7 @@ export function AddTitleWorkflow() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
                   autoFocus
+                  aria-label="Search"
                   value={query}
                   onChange={handleQueryChange}
                   placeholder="Search for a movie or series…"
@@ -516,11 +517,12 @@ export function AddTitleWorkflow() {
           {/* Date */}
           {log.status === 'watched' && (
             <div>
-              <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+              <label htmlFor="log-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
                 <Calendar className="inline w-3 h-3 mr-1" />
                 Date Watched
               </label>
               <Input
+                id="log-date"
                 type="date"
                 value={log.date}
                 onChange={(e) => setLog((l) => ({ ...l, date: e.target.value }))}
@@ -557,11 +559,12 @@ export function AddTitleWorkflow() {
 
           {/* Notes */}
           <div>
-            <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <label htmlFor="log-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
               <FileText className="inline w-3 h-3 mr-1" />
               Notes
             </label>
             <textarea
+              id="log-notes"
               value={log.notes}
               onChange={(e) => setLog((l) => ({ ...l, notes: e.target.value }))}
               placeholder="Your thoughts…"

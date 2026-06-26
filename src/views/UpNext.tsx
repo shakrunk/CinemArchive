@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { PlayCircle, Check, Undo2 } from 'lucide-react'
-import { useUpNextShows, useAppStore } from 'src/store/useAppStore'
+import { PlayCircle, Check, Undo2, Clock } from 'lucide-react'
+import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
-import type { UpNextEntry } from 'src/store/upNext'
+import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import type { Title } from 'src/store/mockData'
 
 const UNDO_WINDOW_MS = 6000
@@ -181,10 +181,31 @@ function CaughtUpCard({ snapshot, undo, onDismiss }: { snapshot: UpNextEntry; un
   )
 }
 
+// ─── Upcoming (unreleased watchlist) card ────────────────────────────────────
+
+function formatReleaseDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+function UpcomingCard({ entry }: { entry: UpcomingEntry }) {
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const { title, releaseDate } = entry
+  return (
+    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)}>
+      <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
+        <Clock className="w-3.5 h-3.5" /> Upcoming
+      </p>
+      <p className="font-sans text-sm text-paper-dim">Releases {formatReleaseDate(releaseDate)}</p>
+    </CardFrame>
+  )
+}
+
 // ─── Up Next view ────────────────────────────────────────────────────────────
 
 export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const shows = useUpNextShows()
+  const upcoming = useUpcomingTitles()
   const [finished, setFinished] = useState<FinishedCard[]>([])
 
   const dismissFinished = useCallback((titleId: string) => {
@@ -200,7 +221,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const liveIds = new Set(shows.map((s) => s.title.id))
   const finishedToShow = finished.filter((c) => !liveIds.has(c.snapshot.title.id))
 
-  const isEmpty = shows.length === 0 && finishedToShow.length === 0
+  const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
@@ -218,6 +239,16 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {finishedToShow.map((c) => (
             <CaughtUpCard key={c.snapshot.title.id} snapshot={c.snapshot} undo={c.undo} onDismiss={dismissFinished} />
           ))}
+          {upcoming.length > 0 && (
+            <>
+              {(shows.length > 0 || finishedToShow.length > 0) && (
+                <p className="font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
+              )}
+              {upcoming.map((entry) => (
+                <UpcomingCard key={entry.title.id} entry={entry} />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -10,6 +10,11 @@ export interface UpNextEntry {
   lastWatchedAt: string | null
 }
 
+export interface UpcomingEntry {
+  title: Title
+  releaseDate: string  // YYYY-MM-DD
+}
+
 /** Latest `watchedAt` across all of a title's episode watch events, or null. */
 function lastWatchedAtForTitle(title: Title): string | null {
   let max: string | null = null
@@ -21,6 +26,14 @@ function lastWatchedAtForTitle(title: Title): string | null {
     }
   }
   return max
+}
+
+/** Watchlist movies/tv that have a future releaseDate, sorted soonest first. */
+export function computeUpcomingTitles(titles: Title[], today: string): UpcomingEntry[] {
+  return titles
+    .filter((t) => t.status === 'watchlist' && t.releaseDate && t.releaseDate > today)
+    .map((t) => ({ title: t, releaseDate: t.releaseDate! }))
+    .sort((a, b) => (a.releaseDate < b.releaseDate ? -1 : a.releaseDate > b.releaseDate ? 1 : 0))
 }
 
 /** In-progress TV shows (status 'watching') that have a next unwatched episode,

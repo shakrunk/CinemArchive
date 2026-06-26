@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
-import { computeUpNextShows, type UpNextEntry } from './upNext'
+import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import type { User } from '@supabase/supabase-js'
 import type { AppView } from '../lib/navigation'
 import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb, deleteEpisodeWatchEventFromDb } from '../lib/db'
@@ -635,4 +635,12 @@ export const useUpNextShows = (): UpNextEntry[] => {
   // ⚡ Bolt: wrap expensive computation in useMemo to prevent unnecessary recalculations
   // and maintain a stable array reference across renders
   return useMemo(() => computeUpNextShows(titles), [titles])
+}
+
+export const useUpcomingTitles = (): UpcomingEntry[] => {
+  const titles = useAppStore((s) => s.titles)
+  return useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    return computeUpcomingTitles(titles, today)
+  }, [titles])
 }

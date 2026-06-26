@@ -338,6 +338,9 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
 
   const avg = avgEpisodeRating(episode)
   const watched = episode.watchEvents.length > 0
+  const hasRatings = episode.ratings.length > 0
+  const hasReviews = episode.reviews.length > 0
+  const histCols = [watched, hasRatings, hasReviews].filter(Boolean).length
 
   function doSave(epLog: EpLogState, colorMode?: 'bw' | 'color') {
     if (!epLog.includeWatch && epLog.rating === 0 && !epLog.reviewText.trim()) return
@@ -418,19 +421,17 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
 
       {/* Existing history */}
       {(episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0) && (
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          {/* Watch events */}
-          <div>
-            <div
-              className="font-mono mb-1.5"
-              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-            >
-              Watched
-            </div>
-            {episode.watchEvents.length === 0 ? (
-              <span style={{ color: 'var(--paper-faint)' }}>—</span>
-            ) : (
-              episode.watchEvents.map((we) => (
+        <div className={cn('grid gap-2 text-xs', histCols === 1 ? 'grid-cols-1' : histCols === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
+          {/* Watch events — only when watched */}
+          {watched && (
+            <div>
+              <div
+                className="font-mono mb-1.5"
+                style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+              >
+                Watched
+              </div>
+              {episode.watchEvents.map((we) => (
                 <div key={we.id}>
                   {pendingDeleteWeId === we.id ? (
                     <div>
@@ -496,21 +497,20 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
                   )}
                 </div>
               ))
-            )}
-          </div>
-
-          {/* Ratings */}
-          <div>
-            <div
-              className="font-mono mb-1.5"
-              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-            >
-              Ratings
+            }
             </div>
-            {episode.ratings.length === 0 ? (
-              <span style={{ color: 'var(--paper-faint)', fontSize: '11px' }}>—</span>
-            ) : (
-              episode.ratings.map((er) => (
+          )}
+
+          {/* Ratings — only when rated */}
+          {hasRatings && (
+            <div>
+              <div
+                className="font-mono mb-1.5"
+                style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+              >
+                Ratings
+              </div>
+              {episode.ratings.map((er) => (
                 <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
                   ★ {er.rating}
                   <div className="mt-0.5">
@@ -523,26 +523,25 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
                   </div>
                 </div>
               ))
-            )}
-            {episode.ratings.length > 1 && avg !== null && (
-              <div className="font-mono mt-1" style={{ color: 'var(--amber-deep)', fontSize: '10px' }}>
-                avg ★ {avg.toFixed(1)}
-              </div>
-            )}
-          </div>
-
-          {/* Reviews */}
-          <div>
-            <div
-              className="font-mono mb-1.5"
-              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-            >
-              Reviews
+              }
+              {episode.ratings.length > 1 && avg !== null && (
+                <div className="font-mono mt-1" style={{ color: 'var(--amber-deep)', fontSize: '10px' }}>
+                  avg ★ {avg.toFixed(1)}
+                </div>
+              )}
             </div>
-            {episode.reviews.length === 0 ? (
-              <span style={{ color: 'var(--paper-faint)', fontSize: '11px' }}>—</span>
-            ) : (
-              episode.reviews.map((rv) => (
+          )}
+
+          {/* Reviews — only when reviewed */}
+          {hasReviews && (
+            <div>
+              <div
+                className="font-mono mb-1.5"
+                style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+              >
+                Reviews
+              </div>
+              {episode.reviews.map((rv) => (
                 <div key={rv.id}>
                   <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>
                     "{rv.reviewText}"
@@ -571,8 +570,9 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
                   </div>
                 </div>
               ))
-            )}
-          </div>
+              }
+            </div>
+          )}
         </div>
       )}
 

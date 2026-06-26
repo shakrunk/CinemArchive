@@ -2,15 +2,15 @@ import { cn } from 'src/lib/utils'
 import { avgEpisodeRating } from 'src/store/episodeUtils'
 import type { Season } from 'src/store/mockData'
 
-// ─── Color scale: null→void, 1→ember, 3→moon, 5→amber-bright ────────────────
+// ─── Color scale: null→void, 1→crimson, 2→rust, 3→stone, 4→amber, 5→gold ───
 
 function ratingColor(avg: number | null): string {
-  if (avg === null) return 'rgba(28, 20, 14, 0.55)'
-  if (avg < 1.5) return 'rgba(215, 106, 73, 0.90)'   // ember (very low)
-  if (avg < 2.5) return 'rgba(229, 142, 111, 0.75)'  // ember-soft (low)
-  if (avg < 3.5) return 'rgba(143, 182, 203, 0.80)'  // moon (mid)
-  if (avg < 4.5) return 'rgba(233, 178, 102, 0.90)'  // amber (good)
-  return 'rgba(247, 205, 134, 1.00)'                 // amber-bright (excellent)
+  if (avg === null) return 'rgba(28, 20, 14, 0.55)'    // void (unrated)
+  if (avg < 1.5) return 'rgba(170, 45, 45, 0.90)'      // crimson (★)
+  if (avg < 2.5) return 'rgba(195, 90, 55, 0.85)'      // rust (★★)
+  if (avg < 3.5) return 'rgba(155, 138, 112, 0.78)'    // warm stone (★★★)
+  if (avg < 4.5) return 'rgba(224, 172, 90, 0.90)'     // amber (★★★★)
+  return 'rgba(247, 210, 120, 1.00)'                   // bright gold (★★★★★)
 }
 
 function ratingLabel(avg: number | null): string {
@@ -21,11 +21,11 @@ function ratingLabel(avg: number | null): string {
 // ─── Legend ──────────────────────────────────────────────────────────────────
 
 const LEGEND = [
-  { color: ratingColor(1), label: '1–2' },
-  { color: ratingColor(2.5), label: '2–3' },
-  { color: ratingColor(3), label: '3–4' },
-  { color: ratingColor(4), label: '4–5' },
-  { color: ratingColor(5), label: '5' },
+  { color: ratingColor(1), label: '1★' },
+  { color: ratingColor(2), label: '2★' },
+  { color: ratingColor(3), label: '3★' },
+  { color: ratingColor(4), label: '4★' },
+  { color: ratingColor(5), label: '5★' },
 ]
 
 // ─── SeriesGraph ─────────────────────────────────────────────────────────────

@@ -34,3 +34,14 @@ cinemarchive-*.json
 
 # Graph analysis output
 graphify-out/
+# Added by code-review-graph
+.code-review-graph/
+
+# Local AI tool configs (machine-specific)
+.claude/
+.cursor/
+.gemini/
+.kiro/
+.mcp.json
+.opencode.json
+.qoder/

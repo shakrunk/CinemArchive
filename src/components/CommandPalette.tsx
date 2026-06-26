@@ -69,6 +69,7 @@ function CommandPaletteBody({
         <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" />
         <input
           autoFocus
+          aria-label="Search command palette"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setActive(0) }}
           placeholder="Search titles, jump to a view, add a title…"

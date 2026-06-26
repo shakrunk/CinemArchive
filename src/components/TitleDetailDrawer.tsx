@@ -1144,11 +1144,13 @@ export function TitleDetailDrawer() {
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
+  const [drawerExpanded, setDrawerExpanded] = useState(false)
 
   function onClose() {
     setPendingDeleteTitle(false)
     setPosterLightboxOpen(false)
     setActivePerson(null)
+    setDrawerExpanded(false)
     closeDetailDrawer()
   }
 
@@ -1338,6 +1340,8 @@ export function TitleDetailDrawer() {
       maxWidth="sm:max-w-2xl"
       title={title.title}
       description={title.synopsis ?? `Details and viewing history for ${title.title}.`}
+      expanded={drawerExpanded}
+      onToggleExpand={() => setDrawerExpanded((v) => !v)}
     >
       {/* Poster lightbox — rendered inside portal, above dialog via z-[60] */}
       {posterLightboxOpen && title.posterUrl && (

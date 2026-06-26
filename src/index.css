@@ -696,6 +696,14 @@
   }
 }
 
+@media (min-width: 640px) {
+  .cinema-content--expanded {
+    width: calc(100% - 3rem);
+    max-width: none;
+    max-height: calc(100vh - 100px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

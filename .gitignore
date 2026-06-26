@@ -31,3 +31,6 @@ pnpm-lock.yaml
 
 # Library data exports
 cinemarchive-*.json
+
+# Graph analysis output
+graphify-out/

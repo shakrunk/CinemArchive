@@ -21,6 +21,7 @@ export interface SearchResult {
   runtime?: number
   network?: string
   seasonCount?: number
+  releaseDate?: string  // YYYY-MM-DD; populated when title hasn't released yet
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
@@ -238,12 +239,15 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
 
   const director = crew.find((c) => c.job === 'Director')?.name
   const date = data.release_date || data.first_air_date
+  const today = new Date().toISOString().slice(0, 10)
+  const releaseDate = date && date > today ? date : undefined
 
   const result: SearchResult = {
     tmdbId: data.id,
     type: base.type,
     title: data.title || data.name,
     year: date ? new Date(date).getFullYear() : base.year,
+    releaseDate,
     posterUrl: data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : base.posterUrl,
     backdropUrl: data.backdrop_path ? `${TMDB_IMG}/w780${data.backdrop_path}` : base.backdropUrl,
     director,

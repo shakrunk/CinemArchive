@@ -96,6 +96,7 @@ export interface Title {
   notes?: string
   tags: string[]
   addedAt: string
+  releaseDate?: string  // YYYY-MM-DD; set for upcoming titles not yet released
   viewings: Viewing[]
   imdbRating?: number
   rtScore?: number

@@ -369,6 +369,7 @@ export function AddTitleWorkflow() {
       type: selected.type,
       title: selected.title,
       year: selected.year,
+      releaseDate: selected.releaseDate,
       director: selected.director,
       genres: selected.genres,
       posterUrl: selected.posterUrl,

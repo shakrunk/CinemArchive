@@ -374,11 +374,6 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
     setPendingLog(null)
   }
 
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const fmtDateTime = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-
   return (
     <div className="ep-panel px-3 py-3 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
       {/* Episode crew — director / writers */}
@@ -515,8 +510,13 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
               episode.ratings.map((er) => (
                 <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
                   ★ {er.rating}
-                  <div className="font-sans mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
-                    {fmtDateTime(er.ratedAt)}
+                  <div className="mt-0.5">
+                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
+                      {fmtDateTime(er.ratedAt).date}
+                    </div>
+                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>
+                      {fmtDateTime(er.ratedAt).time}
+                    </div>
                   </div>
                 </div>
               ))
@@ -544,22 +544,27 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
                   <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>
                     "{rv.reviewText}"
                   </div>
-                  <div className="font-mono mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
-                    {fmtDateTime(rv.reviewedAt)}
-                    {rv.colorMode && (
-                      <span
-                        className="font-mono px-1 rounded"
-                        style={{
-                          fontSize: '9px',
-                          letterSpacing: '0.06em',
-                          background: rv.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
-                          color: rv.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
-                          border: `1px solid ${rv.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
-                        }}
-                      >
-                        {rv.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
-                      </span>
-                    )}
+                  <div className="mt-0.5" style={{ color: 'var(--paper-faint)' }}>
+                    <div className="font-mono flex items-center gap-1.5" style={{ fontSize: '10px' }}>
+                      <span>{fmtDateTime(rv.reviewedAt).date}</span>
+                      {rv.colorMode && (
+                        <span
+                          className="font-mono px-1 rounded"
+                          style={{
+                            fontSize: '9px',
+                            letterSpacing: '0.06em',
+                            background: rv.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
+                            color: rv.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
+                            border: `1px solid ${rv.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
+                          }}
+                        >
+                          {rv.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono" style={{ fontSize: '9px' }}>
+                      {fmtDateTime(rv.reviewedAt).time}
+                    </div>
                   </div>
                 </div>
               ))
@@ -1056,6 +1061,20 @@ function DrawerTagEditor({
   )
 }
 
+// ─── Timestamp helpers ───────────────────────────────────────────────────────
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function fmtDateTime(iso: string): { date: string; time: string } {
+  const d = new Date(iso)
+  return {
+    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+  }
+}
+
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
@@ -1430,14 +1449,14 @@ export function TitleDetailDrawer() {
                 <div className="bg-secondary/40 rounded-lg p-3 text-center">
                   <div className="flex items-center justify-center gap-1 mb-0.5">
                     <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    <StatNumber className="text-xl">
+                    <StatNumber className="text-base leading-tight">
                       {title.viewings.length > 0
-                        ? new Date(
+                        ? fmtDate(
                             title.viewings
                               .slice()
                               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
                               .date
-                          ).getFullYear()
+                          )
                         : '—'}
                     </StatNumber>
                   </div>

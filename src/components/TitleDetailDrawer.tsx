@@ -16,7 +16,7 @@ import {
   totalEpisodeCount,
 } from 'src/store/episodeUtils'
 import {
-  Calendar, Clock, Film, Tv, Plus, FileText, Trash2, Star,
+  Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
   ChevronDown, ChevronRight, Eye, MessageSquare, RefreshCw, Tag, X,
 } from 'lucide-react'
 import { cn } from 'src/lib/utils'
@@ -332,6 +332,7 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
   const [pendingDeleteWeId, setPendingDeleteWeId] = useState<string | null>(null)
   const [log, setLog] = useState<EpLogState>(EMPTY_EP_LOG)
   const [showForm, setShowForm] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const [pendingLog, setPendingLog] = useState<EpLogState | null>(null)
   const [showNoirModal, setShowNoirModal] = useState(false)
 
@@ -349,6 +350,8 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
     })
     setLog(EMPTY_EP_LOG)
     setShowForm(false)
+    setShowSaved(true)
+    setTimeout(() => setShowSaved(false), 1500)
   }
 
   function handleSubmit() {
@@ -657,14 +660,27 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
           </div>
         ) : (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              if (showSaved) return
+              setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10) }))
+              setShowForm(true)
+            }}
             className="flex items-center gap-1.5 text-xs font-mono transition-colors"
-            style={{ color: 'var(--amber-deep)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--amber)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--amber-deep)')}
+            style={{ color: showSaved ? 'var(--amber)' : 'var(--amber-deep)' }}
+            onMouseEnter={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber)' }}
+            onMouseLeave={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber-deep)' }}
           >
-            <Plus className="w-3 h-3" />
-            {watched ? 'Add rating, review, or re-watch' : 'Log watch event, rating, or review'}
+            {showSaved ? (
+              <>
+                <Check className="w-3 h-3" />
+                Logged
+              </>
+            ) : (
+              <>
+                <Plus className="w-3 h-3" />
+                {watched ? 'Add rating, review, or re-watch' : 'Log watch event, rating, or review'}
+              </>
+            )}
           </button>
         )
       )}

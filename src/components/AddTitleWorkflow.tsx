@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { Search, Film, Tv, Star, Calendar, FileText, ChevronRight, Check } from 'lucide-react'
+import { Search, Film, Tv, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -212,6 +212,67 @@ function StepIndicator({ step }: { step: 'search' | 'log' }) {
   )
 }
 
+// ─── Tag input ───────────────────────────────────────────────────────────────
+
+function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [input, setInput] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function commit() {
+    const trimmed = input.trim().replace(/,+$/, '')
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed])
+    }
+    setInput('')
+  }
+
+  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      commit()
+    } else if (e.key === 'Backspace' && input === '' && tags.length > 0) {
+      onChange(tags.slice(0, -1))
+    }
+  }
+
+  function removeTag(tag: string) {
+    onChange(tags.filter((t) => t !== tag))
+  }
+
+  return (
+    <div
+      className="flex flex-wrap gap-1.5 min-h-[38px] bg-secondary/50 border border-border rounded-md px-2.5 py-1.5 cursor-text focus-within:ring-2 focus-within:ring-amber/30"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber/10 border border-amber/20 font-mono text-xs text-amber"
+        >
+          {tag}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); removeTag(tag) }}
+            className="hover:text-amber-bright transition-colors"
+            aria-label={`Remove tag ${tag}`}
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKey}
+        onBlur={commit}
+        placeholder={tags.length === 0 ? 'Add tags…  Enter or comma to add' : ''}
+        className="flex-1 min-w-[120px] bg-transparent text-sm font-sans text-foreground placeholder:text-muted-foreground focus:outline-none"
+      />
+    </div>
+  )
+}
+
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
 type Step = 'search' | 'log'
@@ -221,6 +282,7 @@ interface LogFormState {
   rating: number
   date: string
   notes: string
+  tags: string[]
   seasons: Season[]
 }
 
@@ -229,6 +291,7 @@ const DEFAULT_LOG: LogFormState = {
   rating: 0,
   date: new Date().toISOString().slice(0, 10),
   notes: '',
+  tags: [],
   seasons: [],
 }
 
@@ -315,7 +378,7 @@ export function AddTitleWorkflow() {
       status: log.status,
       rating: log.rating > 0 ? log.rating : undefined,
       notes: log.notes || undefined,
-      tags: [],
+      tags: log.tags,
       addedAt: new Date().toISOString().slice(0, 10),
       seasons: log.seasons.length > 0 ? log.seasons : undefined,
       viewings: log.status === 'watched' && log.date
@@ -554,6 +617,18 @@ export function AddTitleWorkflow() {
               />
             </div>
           )}
+
+          {/* Tags */}
+          <div>
+            <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+              <Tag className="inline w-3 h-3 mr-1" />
+              Tags
+            </label>
+            <TagInput
+              tags={log.tags}
+              onChange={(tags) => setLog((l) => ({ ...l, tags }))}
+            />
+          </div>
 
           {/* Notes */}
           <div>

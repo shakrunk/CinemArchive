@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Search, SlidersHorizontal, X, Film, User } from 'lucide-react'
-import { useAppStore, useAllGenres, useAllNetworks, useAllDecades } from 'src/store/useAppStore'
+import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
@@ -79,6 +79,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
   const allGenres = useAllGenres()
   const allNetworks = useAllNetworks()
   const allDecades = useAllDecades()
+  const allTags = useAllTags()
 
   return (
     <BottomSheet open={open} onClose={onClose} side="right">
@@ -192,6 +193,25 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
                 }}
               >
                 {n}
+              </Chip>
+            ))}
+          </FilterGroup>
+        )}
+
+        {allTags.length > 0 && (
+          <FilterGroup label="Tags">
+            {allTags.map((tag) => (
+              <Chip
+                key={tag}
+                active={filters.tags.includes(tag)}
+                onClick={() => {
+                  const next = filters.tags.includes(tag)
+                    ? filters.tags.filter((x) => x !== tag)
+                    : [...filters.tags, tag]
+                  setFilter('tags', next)
+                }}
+              >
+                {tag}
               </Chip>
             ))}
           </FilterGroup>
@@ -354,6 +374,7 @@ export function Library() {
     if (filters.genres.length > 0) count++
     if (filters.networks.length > 0) count++
     if (filters.decades.length > 0) count++
+    if (filters.tags.length > 0) count++
     if (filters.minRating > 0) count++
     if (filters.person) count++
     return count

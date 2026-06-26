@@ -1117,6 +1117,7 @@ export function TitleDetailDrawer() {
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [logRating, setLogRating] = useState(0)
   const [logNotes, setLogNotes] = useState('')
+  const [showMovieSaved, setShowMovieSaved] = useState(false)
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
 
   function onClose() {
@@ -1287,10 +1288,14 @@ export function TitleDetailDrawer() {
       status: 'watched',
       rating: logRating > 0 ? logRating : title.rating,
     })
-    setShowLogForm(false)
-    setLogDate(new Date().toISOString().slice(0, 10))
-    setLogRating(0)
-    setLogNotes('')
+    setShowMovieSaved(true)
+    setTimeout(() => {
+      setShowMovieSaved(false)
+      setShowLogForm(false)
+      setLogDate(new Date().toISOString().slice(0, 10))
+      setLogRating(0)
+      setLogNotes('')
+    }, 1500)
   }
 
   function handleDelete() {
@@ -1536,9 +1541,19 @@ export function TitleDetailDrawer() {
                       <Button
                         className="flex-1 bg-amber hover:bg-amber-muted text-void font-sans font-medium"
                         onClick={logViewing}
+                        disabled={showMovieSaved}
                       >
-                        <Star className="w-4 h-4 mr-2" />
-                        Save Viewing
+                        {showMovieSaved ? (
+                          <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Star className="w-4 h-4 mr-2" />
+                            Save Viewing
+                          </>
+                        )}
                       </Button>
                       <Button variant="outline" onClick={() => setShowLogForm(false)}>
                         Cancel

@@ -10,27 +10,65 @@
 
 @layer base {
   :root {
-    /* ── Surfaces (warm darkness) ── */
-    --void: #0b0907;
-    --ink: #110d0b;
-    --ink-1: #17120f;
-    --ink-2: #1e1714;
-    --ink-3: #281f19;
+    /* ── Palette source of truth: RGB triples ──
+       Consumed two ways: raw CSS via rgb(var(--X-rgb)) and Tailwind via
+       rgb(var(--X-rgb) / <alpha-value>) so opacity modifiers keep working.
+       The named vars below derive from these so existing var(--void) usages
+       still resolve. The [data-theme="light"] block overrides ONLY the triples
+       and a few theme-aware tokens; everything else derives automatically. */
+    --void-rgb: 11 9 7;
+    --ink-rgb: 17 13 11;
+    --ink-1-rgb: 23 18 15;
+    --ink-2-rgb: 30 23 20;
+    --ink-3-rgb: 40 31 25;
+    --amber-rgb: 233 178 102;
+    --amber-bright-rgb: 247 205 134;
+    --amber-muted-rgb: 200 146 74;
+    --amber-deep-rgb: 196 134 58;
+    --amber-subtle-rgb: 245 215 153;
+    --moon-rgb: 143 182 203;
+    --ember-rgb: 215 106 73;
+    --ember-soft-rgb: 229 142 111;
+    --paper-rgb: 243 234 217;
+    --paper-dim-rgb: 183 169 148;
+    --paper-faint-rgb: 128 115 95;
+
+    /* ── Surfaces (derived) ── */
+    --void: rgb(var(--void-rgb));
+    --ink: rgb(var(--ink-rgb));
+    --ink-1: rgb(var(--ink-1-rgb));
+    --ink-2: rgb(var(--ink-2-rgb));
+    --ink-3: rgb(var(--ink-3-rgb));
     --line: rgba(245, 230, 210, 0.085);
     --line-2: rgba(245, 230, 210, 0.16);
 
-    /* ── Light (the projector) ── */
-    --amber: #e9b266;
-    --amber-bright: #f7cd86;
-    --amber-deep: #c4863a;
-    --moon: #8fb6cb;
-    --ember: #d76a49;
-    --ember-soft: #e58e6f;
+    /* ── Light (the projector), derived ── */
+    --amber: rgb(var(--amber-rgb));
+    --amber-bright: rgb(var(--amber-bright-rgb));
+    --amber-deep: rgb(var(--amber-deep-rgb));
+    --moon: rgb(var(--moon-rgb));
+    --ember: rgb(var(--ember-rgb));
+    --ember-soft: rgb(var(--ember-soft-rgb));
 
-    /* ── Type ── */
-    --paper: #f3ead9;
-    --paper-dim: #b7a994;
-    --paper-faint: #80735f;
+    /* ── Type (derived) ── */
+    --paper: rgb(var(--paper-rgb));
+    --paper-dim: rgb(var(--paper-dim-rgb));
+    --paper-faint: rgb(var(--paper-faint-rgb));
+
+    /* ── Theme-independent constants ──
+       Poster art is a cinema artifact (stays dark in both themes) and text over
+       poster scrims / the noir takeover must stay light regardless of theme. */
+    --ivory: 243 234 217;     /* constant light — text over dark art */
+    --poster-ink: 17 13 11;   /* constant dark poster surfaces */
+    --poster-ink-2: 30 23 20;
+    /* Ink-on-amber: text/icons sitting on an amber fill. Constant across themes
+       (amber stays a mid-warm tone in both), so it must NOT flip with --void. */
+    --on-amber: #25160a;
+
+    /* ── Theme-aware interaction washes & insets (overridden in light) ── */
+    --inset: rgba(0, 0, 0, 0.3);
+    --inset-strong: rgba(0, 0, 0, 0.42);
+    --wash: rgba(255, 255, 255, 0.05);
 
     --display: "Fraunces", "Hoefler Text", Georgia, serif;
     --ui: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
@@ -74,6 +112,61 @@
     --ring: 38 72% 60%;
 
     --radius: 0.6rem;
+  }
+
+  /* ════ LIGHT THEME — "The Daylight Archive" ════
+     Warm ivory page, espresso ink, deepened gold so accents stay legible on
+     light. Only the triples + a few theme-aware tokens flip here; every named
+     var and Tailwind color derives from these automatically. */
+  :root[data-theme="light"] {
+    --void-rgb: 244 237 224;   /* ivory page */
+    --ink-rgb: 251 246 236;
+    --ink-1-rgb: 253 250 243;
+    --ink-2-rgb: 255 253 248;
+    --ink-3-rgb: 255 255 255;
+    --amber-rgb: 176 116 31;    /* deepened so it reads on ivory */
+    --amber-bright-rgb: 213 154 68;
+    --amber-muted-rgb: 154 106 42;
+    --amber-deep-rgb: 138 86 22;
+    --amber-subtle-rgb: 202 160 90;
+    --moon-rgb: 74 122 150;
+    --ember-rgb: 192 74 45;
+    --ember-soft-rgb: 200 96 68;
+    --paper-rgb: 43 33 24;      /* espresso text */
+    --paper-dim-rgb: 95 84 70;
+    --paper-faint-rgb: 140 127 108;
+
+    --line: rgba(60, 45, 30, 0.12);
+    --line-2: rgba(60, 45, 30, 0.2);
+
+    --inset: rgba(60, 45, 28, 0.06);
+    --inset-strong: rgba(60, 45, 28, 0.1);
+    --wash: rgba(40, 28, 16, 0.05);
+
+    --shadow: 0 24px 50px -30px rgba(60, 40, 20, 0.3), 0 4px 12px -8px rgba(60, 40, 20, 0.18);
+    --shadow-lift: 0 40px 80px -34px rgba(60, 40, 20, 0.34), 0 10px 26px -14px rgba(60, 40, 20, 0.22);
+    --glow: 0 0 0 1px rgba(176, 116, 31, 0.3), 0 18px 50px -18px rgba(176, 116, 31, 0.22);
+
+    /* shadcn semantic tokens (light) */
+    --background: 38 45% 92%;
+    --foreground: 30 30% 13%;
+    --card: 40 50% 97%;
+    --card-foreground: 30 30% 13%;
+    --popover: 40 50% 97%;
+    --popover-foreground: 30 30% 13%;
+    --primary: 35 70% 42%;
+    --primary-foreground: 30 45% 10%;
+    --secondary: 36 30% 88%;
+    --secondary-foreground: 30 30% 20%;
+    --muted: 36 28% 86%;
+    --muted-foreground: 32 12% 40%;
+    --accent: 35 70% 42%;
+    --accent-foreground: 30 45% 10%;
+    --destructive: 12 70% 46%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 32 22% 80%;
+    --input: 32 22% 80%;
+    --ring: 35 72% 45%;
   }
 
   * {
@@ -135,20 +228,20 @@
   /* Slim warm scrollbars everywhere */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(233, 178, 102, 0.25) transparent;
+    scrollbar-color: rgb(var(--amber-rgb) / 0.25) transparent;
   }
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   *::-webkit-scrollbar-thumb {
-    background: rgba(233, 178, 102, 0.2);
+    background: rgb(var(--amber-rgb) / 0.2);
     border-radius: 20px;
     border: 3px solid transparent;
     background-clip: content-box;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(233, 178, 102, 0.4);
+    background: rgb(var(--amber-rgb) / 0.4);
     background-clip: content-box;
   }
 }
@@ -209,7 +302,7 @@
 
   /* ── Editorial helpers ── */
   .text-gold {
-    background: linear-gradient(135deg, #f7cd86 0%, #e9b266 42%, #c4863a 100%);
+    background: linear-gradient(135deg, var(--amber-bright) 0%, var(--amber) 42%, var(--amber-deep) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -252,7 +345,7 @@
 
   /* ── Panel: gradient card with editorial header ── */
   .panel {
-    background: linear-gradient(168deg, var(--ink-1), rgba(17, 13, 11, 0.6));
+    background: linear-gradient(168deg, var(--ink-1), rgb(var(--ink-rgb) / 0.6));
     border: 1px solid var(--line);
     border-radius: 18px;
     box-shadow: var(--shadow);
@@ -318,7 +411,7 @@
   /* ── Buttons (cinematic) ── */
   .btn-amber {
     background: linear-gradient(180deg, var(--amber-bright), var(--amber));
-    color: #25160a;
+    color: var(--on-amber);
     box-shadow: 0 6px 20px -8px rgba(233, 178, 102, 0.7);
     transition: transform 0.18s var(--ease), box-shadow 0.25s;
   }
@@ -341,7 +434,7 @@
   }
   .icon-btn:hover {
     color: var(--amber-bright);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--wash);
   }
   .icon-btn:active {
     transform: scale(0.92);
@@ -352,7 +445,7 @@
     display: flex;
     gap: 4px;
     padding: 4px;
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--inset);
     border: 1px solid var(--line);
     border-radius: 999px;
   }
@@ -371,7 +464,7 @@
     color: var(--paper);
   }
   .navtab.is-active {
-    color: var(--void);
+    color: var(--on-amber);
     background: linear-gradient(180deg, var(--amber-bright), var(--amber));
     box-shadow: 0 4px 16px -6px rgba(233, 178, 102, 0.6);
   }
@@ -381,7 +474,7 @@
     display: flex;
     gap: 2px;
     padding: 4px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--inset);
     border: 1px solid var(--line);
     border-radius: 7px;
   }
@@ -398,7 +491,7 @@
     color: var(--paper);
   }
   .seg__btn.is-active {
-    color: var(--void);
+    color: var(--on-amber);
     background: var(--amber);
   }
 
@@ -408,7 +501,7 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--paper-dim);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--wash);
     border: 1px solid var(--line);
     transition: all 0.2s;
     white-space: nowrap;
@@ -419,7 +512,7 @@
   }
   .chip.is-active {
     background: var(--amber);
-    color: var(--void);
+    color: var(--on-amber);
     border-color: var(--amber);
   }
 
@@ -431,15 +524,15 @@
     gap: 10px;
     padding: 0 12px;
     height: 44px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--inset);
     border: 1px solid var(--line);
     border-radius: 7px;
     transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
   }
   .search-field:focus-within {
     border-color: var(--amber-deep);
-    box-shadow: 0 0 0 3px rgba(233, 178, 102, 0.12);
-    background: rgba(0, 0, 0, 0.42);
+    box-shadow: 0 0 0 3px rgb(var(--amber-rgb) / 0.12);
+    background: var(--inset-strong);
   }
   .search-field input {
     flex: 1;
@@ -473,7 +566,7 @@
     border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    background: var(--ink-2);
+    background: rgb(var(--poster-ink-2));
     border: 1px solid var(--line);
     box-shadow: var(--shadow);
     transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease), border-color 0.3s;
@@ -493,7 +586,7 @@
     padding: 16px 14px;
     background:
       radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--tint) 42%, transparent), transparent 60%),
-      linear-gradient(170deg, color-mix(in oklab, var(--tint) 30%, var(--ink-2)) 0%, var(--ink) 78%);
+      linear-gradient(170deg, color-mix(in oklab, var(--tint) 30%, rgb(var(--poster-ink-2))) 0%, rgb(var(--poster-ink)) 78%);
   }
   .poster__face::before {
     content: "";
@@ -536,7 +629,7 @@
     font-weight: 500;
     line-height: 1.02;
     letter-spacing: -0.015em;
-    color: var(--paper);
+    color: rgb(var(--ivory));
     font-variation-settings: "opsz" 60;
     text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
     display: -webkit-box;
@@ -547,7 +640,7 @@
 
   /* ── Cinematic card (generic surface) ── */
   .card-cinematic {
-    background: linear-gradient(168deg, var(--ink-1), rgba(17, 13, 11, 0.55));
+    background: linear-gradient(168deg, var(--ink-1), rgb(var(--ink-rgb) / 0.55));
     border: 1px solid var(--line);
     border-radius: 14px;
     box-shadow: var(--shadow);
@@ -576,7 +669,7 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgba(233, 178, 102, 0.3) transparent;
+    scrollbar-color: rgb(var(--amber-rgb) / 0.3) transparent;
   }
   .scrollbar-none {
     scrollbar-width: none;
@@ -835,7 +928,7 @@ body.spider-noir-color .projector-beam {
   outline: none;
   border-radius: 16px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--ink-1), rgba(11, 9, 7, 0.96));
+  background: linear-gradient(180deg, var(--ink-1), rgb(var(--void-rgb) / 0.96));
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8);
   transition: opacity 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -903,4 +996,52 @@ body.spider-noir-color .projector-beam {
   font-size: 11px;
   font-family: var(--mono);
   white-space: nowrap;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   THEME TRANSITION — View Transitions API "aperture" iris reveal
+   The default cross-fade is disabled; theme.ts drives a clip-path circle on
+   ::view-transition-new(root) so the new theme irises in from the toggle.
+   ════════════════════════════════════════════════════════════════════════ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) { z-index: 1; }
+::view-transition-old(root) { z-index: 0; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LIGHT THEME ATMOSPHERE OVERRIDES
+   Unlayered so they beat the @layer base/components defaults regardless of
+   specificity. The room's grain/vignette/dust/beam are tuned for daylight:
+   grain multiplies instead of overlays, motes darken, glows soften.
+   ════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="light"] body::before {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(176, 116, 31, 0.08), transparent 45%),
+    radial-gradient(90% 70% at 88% 8%, rgba(74, 122, 150, 0.06), transparent 55%),
+    linear-gradient(180deg, #fbf5ea 0%, var(--void) 55%, #ecdfca 100%);
+}
+:root[data-theme="light"] .grain {
+  mix-blend-mode: multiply;
+  opacity: 0.035;
+}
+:root[data-theme="light"] .vignette {
+  background: radial-gradient(125% 110% at 50% 42%, transparent 55%, rgba(120, 90, 50, 0.06) 88%, rgba(90, 65, 35, 0.12) 100%);
+}
+:root[data-theme="light"] .dust {
+  opacity: 0.4;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(120, 90, 50, 0.35), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(120, 90, 50, 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 85% 20%, rgba(120, 90, 50, 0.28), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(120, 90, 50, 0.3), transparent);
+}
+:root[data-theme="light"] .projector-beam {
+  background: radial-gradient(50% 50% at 50% 50%, rgba(176, 116, 31, 0.1), transparent 70%);
+}
+:root[data-theme="light"] ::selection {
+  background: rgba(176, 116, 31, 0.25);
+  color: var(--on-amber);
 }

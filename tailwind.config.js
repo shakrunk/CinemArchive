@@ -15,30 +15,32 @@ export default {
     },
     extend: {
       colors: {
-        /* ── Cinematic palette (The Projection Room) ── */
-        void: "#0b0907",
+        /* ── Cinematic palette (The Projection Room) ──
+           Sourced from RGB-triple CSS vars in index.css so opacity modifiers
+           (bg-amber/30) work AND the whole palette flips with [data-theme]. */
+        void: "rgb(var(--void-rgb) / <alpha-value>)",
         ink: {
-          DEFAULT: "#110d0b",
-          1: "#17120f",
-          2: "#1e1714",
-          3: "#281f19",
+          DEFAULT: "rgb(var(--ink-rgb) / <alpha-value>)",
+          1: "rgb(var(--ink-1-rgb) / <alpha-value>)",
+          2: "rgb(var(--ink-2-rgb) / <alpha-value>)",
+          3: "rgb(var(--ink-3-rgb) / <alpha-value>)",
         },
         amber: {
-          DEFAULT: "#e9b266",
-          bright: "#f7cd86",
-          muted: "#c8924a",
-          deep: "#c4863a",
-          subtle: "#f5d799",
+          DEFAULT: "rgb(var(--amber-rgb) / <alpha-value>)",
+          bright: "rgb(var(--amber-bright-rgb) / <alpha-value>)",
+          muted: "rgb(var(--amber-muted-rgb) / <alpha-value>)",
+          deep: "rgb(var(--amber-deep-rgb) / <alpha-value>)",
+          subtle: "rgb(var(--amber-subtle-rgb) / <alpha-value>)",
         },
-        moon: "#8fb6cb",
+        moon: "rgb(var(--moon-rgb) / <alpha-value>)",
         ember: {
-          DEFAULT: "#d76a49",
-          soft: "#e58e6f",
+          DEFAULT: "rgb(var(--ember-rgb) / <alpha-value>)",
+          soft: "rgb(var(--ember-soft-rgb) / <alpha-value>)",
         },
         paper: {
-          DEFAULT: "#f3ead9",
-          dim: "#b7a994",
-          faint: "#80735f",
+          DEFAULT: "rgb(var(--paper-rgb) / <alpha-value>)",
+          dim: "rgb(var(--paper-dim-rgb) / <alpha-value>)",
+          faint: "rgb(var(--paper-faint-rgb) / <alpha-value>)",
         },
 
         /* ── shadcn semantic tokens (HSL vars) ── */

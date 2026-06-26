@@ -289,7 +289,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
           {!showSearch ? (
             <div className="space-y-3">
               <Button
-                className="w-full bg-amber hover:bg-amber-muted text-void font-sans font-medium disabled:opacity-40"
+                className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium disabled:opacity-40"
                 onClick={() => applyFrom(toSearchResult(title))}
                 disabled={!title.tmdbId}
               >

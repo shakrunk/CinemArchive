@@ -38,7 +38,7 @@ function ProgressBar({ watched, total }: { watched: number; total: number }) {
   const pct = total > 0 ? Math.round((watched / total) * 100) : 0
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--wash)' }}>
         <div className="h-full rounded-full bg-amber transition-all" style={{ width: `${pct}%` }} />
       </div>
       <span className="font-mono text-[11px] text-paper-faint shrink-0">{watched}/{total}</span>

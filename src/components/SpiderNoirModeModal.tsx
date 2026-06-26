@@ -38,7 +38,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
             style={{
               fontFamily: 'var(--serif)',
               fontSize: 'clamp(20px, 5vw, 28px)',
-              color: 'var(--paper)',
+              color: 'rgb(var(--ivory))',
               marginBottom: '8px',
               textAlign: 'center',
               letterSpacing: '-0.01em',
@@ -53,7 +53,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
               fontSize: '11px',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: 'var(--paper-faint)',
+              color: 'rgba(243, 234, 217, 0.5)',
               marginBottom: '32px',
               textAlign: 'center',
             }}
@@ -180,15 +180,15 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
               marginTop: '24px',
               fontFamily: 'var(--mono)',
               fontSize: '11px',
-              color: 'var(--paper-faint)',
+              color: 'rgba(243, 234, 217, 0.5)',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               letterSpacing: '0.08em',
               transition: 'color 0.15s',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--paper-dim)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--paper-faint)')}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(243, 234, 217, 0.7)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(243, 234, 217, 0.5)')}
           >
             not now
           </button>

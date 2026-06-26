@@ -70,7 +70,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
       style={{
         bottom: 'var(--vv-bottom, 0px)',
         borderColor: 'var(--line)',
-        background: 'linear-gradient(0deg, rgba(11,9,7,0.96), rgba(11,9,7,0.78))',
+        background: 'linear-gradient(0deg, rgb(var(--void-rgb) / 0.96), rgb(var(--void-rgb) / 0.78))',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
       }}
@@ -87,7 +87,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
             className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
             style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}
           >
-            <Plus className="w-5 h-5 text-void" strokeWidth={2.5} />
+            <Plus className="w-5 h-5 text-[color:var(--on-amber)]" strokeWidth={2.5} />
           </div>
           <span className="text-[11px] font-sans text-paper-faint mt-0.5">Add</span>
         </button>

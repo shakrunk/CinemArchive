@@ -113,7 +113,7 @@ function RatingDistribution({ className }: { className?: string }) {
             <div className="font-mono text-[13px] text-amber text-right leading-none select-none">
               {renderStarLabel(d.rating)}
             </div>
-            <div className="h-3 rounded-md overflow-hidden bg-white/[0.04]">
+            <div className="h-3 rounded-md overflow-hidden bg-[var(--wash)]">
               <div
                 className="bar-fill h-full rounded-md"
                 style={{
@@ -149,7 +149,7 @@ function GenreBars({ className }: { className?: string }) {
               <span className="text-[13px] text-paper-dim truncate transition-colors group-hover:text-amber-bright">
                 {g.genre}
               </span>
-              <div className="h-2.5 rounded-md overflow-hidden bg-white/[0.04]">
+              <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
                 <div
                   className="bar-fill h-full rounded-md"
                   style={{
@@ -200,7 +200,7 @@ function Timeline({ className }: { className?: string }) {
                   background:
                     d.count > 0
                       ? 'linear-gradient(180deg, var(--amber-bright), var(--amber-deep))'
-                      : 'rgba(255,255,255,0.05)',
+                      : 'var(--wash)',
                   animation: 'col-grow 0.7s var(--ease) forwards',
                   transform: 'scaleY(0)',
                   animationDelay: `${i * 30}ms`,
@@ -230,7 +230,7 @@ function TheAuteurs({ className }: { className?: string }) {
         {directors.map((d, i) => (
           <li
             key={d.director}
-            className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-white/[0.04]"
+            className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)]"
             style={{ gridTemplateColumns: '26px 1fr auto' }}
           >
             <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>

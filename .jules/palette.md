@@ -8,3 +8,7 @@
 ## 2026-06-25 - Unlinked Labels and Missing ARIA Labels in Custom Forms
 **Learning:** Custom forms in this app frequently use <label> tags without `htmlFor` attributes to connect them to their respective <input> or <textarea> elements. Additionally, some inputs lack explicit labels altogether and are missing `aria-label` attributes for screen readers.
 **Action:** When adding or modifying form fields, always ensure that labels are correctly linked using `htmlFor` and `id`, or add descriptive `aria-label` attributes to inputs that lack visual labels.
+
+## 2024-06-26 - Actionable Empty States
+**Learning:** Empty states caused by active filters can be frustrating. Telling users to "reset the filters" is good, but providing a direct call-to-action button to do so is much better for UX, saving them time and interaction steps.
+**Action:** Always include a "Clear filters" or similar direct action button in empty states where the condition is reversible by the user directly from that context.

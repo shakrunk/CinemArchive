@@ -240,6 +240,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
 
 function EmptyState() {
   const isLibraryEmpty = useAppStore((s) => s.titles.length === 0)
+  const resetFilters = useAppStore((s) => s.resetFilters)
 
   return (
     <div className="text-center py-24 px-5 text-paper-faint">
@@ -253,6 +254,12 @@ function EmptyState() {
         <>
           <p className="font-serif text-2xl text-paper-dim font-light">No titles match the bill.</p>
           <p className="font-sans text-sm mt-2 opacity-70">Try a different search or reset the filters.</p>
+          <button
+            onClick={resetFilters}
+            className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors"
+          >
+            Clear all filters
+          </button>
         </>
       )}
     </div>

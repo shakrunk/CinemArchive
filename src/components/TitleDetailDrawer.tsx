@@ -1084,6 +1084,7 @@ function DrawerTagEditor({
             onKeyDown={handleKey}
             onBlur={() => { commit(); setEditing(false) }}
             placeholder="tag name…"
+            aria-label="New tag name"
             className="px-2 py-0.5 rounded-full bg-secondary border border-amber/30 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber/60 w-28"
           />
         )}

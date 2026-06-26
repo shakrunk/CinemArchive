@@ -262,6 +262,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
       ))}
       <input
         ref={inputRef}
+        aria-label="Add a tag"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKey}

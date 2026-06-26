@@ -1078,6 +1078,7 @@ function DrawerTagEditor({
         {editing && (
           <input
             ref={inputRef}
+            aria-label="Edit tag"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}

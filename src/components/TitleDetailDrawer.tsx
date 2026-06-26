@@ -232,7 +232,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                   )}
                 </div>
                 <div
-                  className="font-sans truncate text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
+                  className="font-sans line-clamp-2 text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
                   style={{ fontSize: '10px', lineHeight: 1.3 }}
                   title={member.name}
                 >
@@ -240,7 +240,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                 </div>
                 {member.character && (
                   <div
-                    className="font-mono truncate"
+                    className="font-mono line-clamp-2"
                     style={{ fontSize: '9px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
                     title={member.character}
                   >
@@ -939,7 +939,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                     )}
                   </div>
                   <div
-                    className="font-sans truncate text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
+                    className="font-sans line-clamp-2 text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
                     style={{ fontSize: '9px', lineHeight: 1.3 }}
                     title={member.name}
                   >
@@ -1356,7 +1356,7 @@ export function TitleDetailDrawer() {
         />
       )}
 
-      <div className="overflow-y-auto flex-1 scrollbar-thin">
+      <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
         {/* Hero: blurred poster background + title info */}
         <div className="relative overflow-hidden shrink-0">
           {title.posterUrl && (
@@ -1566,7 +1566,7 @@ export function TitleDetailDrawer() {
                 </div>
 
                 {showLogForm && (
-                  <div className="bg-secondary/40 rounded-lg p-3 mb-4 space-y-3">
+                  <div className="border-t pt-3 mb-4 space-y-3" style={{ borderColor: 'var(--line)' }}>
                     <div>
                       <label htmlFor="viewing-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
                         <Calendar className="inline w-3 h-3 mr-1" />

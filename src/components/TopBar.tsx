@@ -1,4 +1,4 @@
-import { Plus, LayoutGrid, List, BarChart3, User, PlayCircle, Search } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
@@ -129,19 +129,24 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           )}
 
           {isSupabaseConfigured && !isSharedView && (
-            <button
-              onClick={onProfileClick}
-              className={cn(
-                "icon-btn w-9 h-9 border rounded-md hover:text-amber transition-colors flex items-center justify-center relative",
-                user ? "text-amber border-amber/30 bg-amber/5" : "text-muted-foreground border-border"
-              )}
-              aria-label="Profile and Settings"
-            >
-              <User className="w-[17px] h-[17px]" />
-              {user && (
-                <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-amber rounded-full border border-void animate-pulse" />
-              )}
-            </button>
+            user ? (
+              <button
+                onClick={onProfileClick}
+                className="icon-btn w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center"
+                aria-label="Profile and Settings"
+              >
+                <User className="w-[17px] h-[17px]" />
+              </button>
+            ) : (
+              <button
+                onClick={onProfileClick}
+                className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5"
+                aria-label="Sign in"
+              >
+                <LogIn className="w-[15px] h-[15px]" />
+                <span className="hidden sm:inline font-sans text-[12px]">Sign in</span>
+              </button>
+            )
           )}
 
           {!isSharedView && (

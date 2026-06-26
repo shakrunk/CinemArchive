@@ -249,6 +249,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
 function EmptyState() {
   const isLibraryEmpty = useAppStore((s) => s.titles.length === 0)
   const resetFilters = useAppStore((s) => s.resetFilters)
+  const openAddTitle = useAppStore((s) => s.openAddTitle)
 
   return (
     <div className="text-center py-24 px-5 text-paper-faint">
@@ -256,7 +257,13 @@ function EmptyState() {
       {isLibraryEmpty ? (
         <>
           <p className="font-serif text-2xl text-paper-dim font-light">Your archive is empty.</p>
-          <p className="font-sans text-sm mt-2 opacity-70">Add your first title to start your collection.</p>
+          <p className="font-sans text-sm mt-2 opacity-70 mb-6">Add your first title to start your collection.</p>
+          <button
+            onClick={openAddTitle}
+            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors"
+          >
+            Add a title
+          </button>
         </>
       ) : (
         <>

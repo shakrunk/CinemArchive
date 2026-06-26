@@ -14,6 +14,7 @@ import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
 import { CommandPalette } from 'src/components/CommandPalette'
+import { NotificationStack } from 'src/components/NotificationStack'
 import type { Command } from 'src/store/commands'
 
 export default function App() {
@@ -160,6 +161,7 @@ export default function App() {
         commands={commands}
         onRun={runCommand}
       />
+      <NotificationStack />
     </div>
   )
 }

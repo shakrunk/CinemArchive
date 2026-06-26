@@ -21,6 +21,13 @@ export interface PersonRef {
   name: string
 }
 
+/** A persistent error notification with an optional retry thunk. */
+export interface AppNotification {
+  id: string
+  message: string
+  retry?: () => Promise<void>
+}
+
 export interface LibraryFilters {
   search: string
   type: MediaType | 'all'
@@ -99,6 +106,10 @@ interface UISlice {
   // Filter the library to titles from a studio, then surface it: close the
   // drawer and request the Library view.
   browseByStudio: (studio: string) => void
+
+  notifications: AppNotification[]
+  pushNotification: (n: Omit<AppNotification, 'id'>) => void
+  dismissNotification: (id: string) => void
 }
 
 interface AuthSlice {
@@ -251,8 +262,13 @@ export const useAppStore = create<AppStore>()(
     set((s) => {
       const titles = [title, ...s.titles]
       if (s.user) {
-        insertTitleToDb(s.user.id, title).catch((err) => {
+        const userId = s.user.id
+        insertTitleToDb(userId, title).catch((err) => {
           console.error('Failed to sync added title to DB:', err)
+          get().pushNotification({
+            message: `Couldn't save "${title.title}" — check your connection.`,
+            retry: () => insertTitleToDb(userId, title),
+          })
         })
       }
       return {
@@ -266,8 +282,13 @@ export const useAppStore = create<AppStore>()(
     set((s) => {
       const titles = s.titles.map((t) => (t.id === id ? { ...t, ...patch } : t))
       if (s.user) {
-        updateTitleInDb(s.user.id, id, patch).catch((err) => {
+        const userId = s.user.id
+        updateTitleInDb(userId, id, patch).catch((err) => {
           console.error('Failed to sync updated title to DB:', err)
+          get().pushNotification({
+            message: 'Couldn\'t save changes — check your connection.',
+            retry: () => updateTitleInDb(userId, id, patch),
+          })
         })
       }
       return {
@@ -281,8 +302,13 @@ export const useAppStore = create<AppStore>()(
     set((s) => {
       const titles = s.titles.filter((t) => t.id !== id)
       if (s.user) {
-        deleteTitleFromDb(s.user.id, id).catch((err) => {
+        const userId = s.user.id
+        deleteTitleFromDb(userId, id).catch((err) => {
           console.error('Failed to sync deleted title from DB:', err)
+          get().pushNotification({
+            message: 'Couldn\'t remove title — check your connection.',
+            retry: () => deleteTitleFromDb(userId, id),
+          })
         })
       }
       return {
@@ -320,9 +346,16 @@ export const useAppStore = create<AppStore>()(
         const targetSeason = targetTitle?.seasons?.find((season) => season.seasonNumber === seasonNumber)
         const targetEpisode = targetSeason?.episodes?.find((ep) => ep.episodeNumber === episodeNumber)
         if (targetEpisode) {
-          logEpisodeToDb(s.user.id, targetEpisode.id, { ...opts, watchEventId }).catch((err) =>
+          const userId = s.user.id
+          const episodeId = targetEpisode.id
+          const dbOpts = { ...opts, watchEventId }
+          logEpisodeToDb(userId, episodeId, dbOpts).catch((err) => {
             console.error('Failed to sync episode log to DB:', err)
-          )
+            get().pushNotification({
+              message: 'Couldn\'t save watch event — check your connection.',
+              retry: () => logEpisodeToDb(userId, episodeId, dbOpts),
+            })
+          })
         }
       }
 
@@ -395,9 +428,15 @@ export const useAppStore = create<AppStore>()(
     const watchedAt = new Date().toISOString().slice(0, 10)
 
     if (state.user) {
-      logEpisodeToDb(state.user.id, episodeId, { watchedAt, watchEventId }).catch((err) =>
+      const userId = state.user.id
+      const dbOpts = { watchedAt, watchEventId }
+      logEpisodeToDb(userId, episodeId, dbOpts).catch((err) => {
         console.error('Failed to sync quick episode log to DB:', err)
-      )
+        get().pushNotification({
+          message: 'Couldn\'t save watch event — check your connection.',
+          retry: () => logEpisodeToDb(userId, episodeId, dbOpts),
+        })
+      })
     }
 
     set((s) => {
@@ -432,9 +471,14 @@ export const useAppStore = create<AppStore>()(
         return { ...t, viewings: t.viewings.filter((v) => v.id !== viewingId) }
       })
       if (s.user) {
-        deleteViewingFromDb(s.user.id, viewingId).catch((err) =>
+        const userId = s.user.id
+        deleteViewingFromDb(userId, viewingId).catch((err) => {
           console.error('Failed to sync deleted viewing to DB:', err)
-        )
+          get().pushNotification({
+            message: 'Couldn\'t remove viewing — check your connection.',
+            retry: () => deleteViewingFromDb(userId, viewingId),
+          })
+        })
       }
       return {
         titles,
@@ -446,9 +490,14 @@ export const useAppStore = create<AppStore>()(
   deleteEpisodeWatchEvent: (titleId, seasonNumber, episodeNumber, watchEventId) =>
     set((s) => {
       if (s.user) {
-        deleteEpisodeWatchEventFromDb(s.user.id, watchEventId).catch((err) =>
+        const userId = s.user.id
+        deleteEpisodeWatchEventFromDb(userId, watchEventId).catch((err) => {
           console.error('Failed to sync deleted episode watch event to DB:', err)
-        )
+          get().pushNotification({
+            message: 'Couldn\'t remove watch event — check your connection.',
+            retry: () => deleteEpisodeWatchEventFromDb(userId, watchEventId),
+          })
+        })
       }
       const titles = s.titles.map((t) => {
         if (t.id !== titleId) return t
@@ -537,6 +586,18 @@ export const useAppStore = create<AppStore>()(
         pendingView: 'library',
       }
     }),
+
+  notifications: [],
+
+  pushNotification: (n) =>
+    set((s) => ({
+      notifications: [{ ...n, id: crypto.randomUUID() }, ...s.notifications].slice(0, 5),
+    })),
+
+  dismissNotification: (id) =>
+    set((s) => ({
+      notifications: s.notifications.filter((n) => n.id !== id),
+    })),
 
   // ── Auth ───────────────────────────────────────────────────
   user: null,

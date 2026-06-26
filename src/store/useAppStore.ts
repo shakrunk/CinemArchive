@@ -31,6 +31,7 @@ export interface LibraryFilters {
   decades: string[]
   minRating: number
   person: PersonRef | null
+  studio: string | null
   sortField: SortField
   sortDir: SortDir
 }
@@ -95,6 +96,9 @@ interface UISlice {
   // Filter the library to titles featuring a person, then surface it: close the
   // drawer and request the Library view.
   browseByPerson: (person: PersonRef) => void
+  // Filter the library to titles from a studio, then surface it: close the
+  // drawer and request the Library view.
+  browseByStudio: (studio: string) => void
 }
 
 interface AuthSlice {
@@ -118,6 +122,7 @@ const defaultFilters: LibraryFilters = {
   decades: [],
   minRating: 0,
   person: null,
+  studio: null,
   sortField: 'addedAt',
   sortDir: 'desc',
 }
@@ -187,6 +192,11 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
   if (filters.person) {
     const personId = filters.person.id
     result = result.filter((t) => titleHasPerson(t, personId))
+  }
+
+  if (filters.studio) {
+    const studio = filters.studio
+    result = result.filter((t) => t.studios?.includes(studio))
   }
 
   // Sort
@@ -502,6 +512,19 @@ export const useAppStore = create<AppStore>()(
   browseByPerson: (person) =>
     set((s) => {
       const filters = { ...s.filters, person }
+      return {
+        filters,
+        filteredTitles: applyFiltersToTitles(s.titles, filters),
+        isDetailDrawerOpen: false,
+        isRefreshMetadataOpen: false,
+        selectedTitleId: null,
+        pendingView: 'library',
+      }
+    }),
+
+  browseByStudio: (studio) =>
+    set((s) => {
+      const filters = { ...s.filters, studio }
       return {
         filters,
         filteredTitles: applyFiltersToTitles(s.titles, filters),

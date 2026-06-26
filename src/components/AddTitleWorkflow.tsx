@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { Search, Film, Tv, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
@@ -305,7 +306,14 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 // ─── AddTitleWorkflow Component ───────────────────────────────────────────────
 
 export function AddTitleWorkflow() {
-  const { isAddTitleOpen, closeAddTitle, addTitle } = useAppStore()
+  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
+  const { isAddTitleOpen, closeAddTitle, addTitle } = useAppStore(
+    useShallow((s) => ({
+      isAddTitleOpen: s.isAddTitleOpen,
+      closeAddTitle: s.closeAddTitle,
+      addTitle: s.addTitle,
+    }))
+  )
   const [step, setStep] = useState<Step>('search')
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<SearchResult | null>(null)

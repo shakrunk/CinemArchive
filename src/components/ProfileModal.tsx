@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
@@ -33,7 +34,15 @@ interface SharedKey {
 }
 
 export function ProfileModal({ open, onClose }: ProfileModalProps) {
-  const { user, setUser, titles, setTitles } = useAppStore()
+  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
+  const { user, setUser, titles, setTitles } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      setUser: s.setUser,
+      titles: s.titles,
+      setTitles: s.setTitles,
+    }))
+  )
 
   // Auth state
   const [email, setEmail] = useState('')

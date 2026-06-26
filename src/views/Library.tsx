@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { Search, SlidersHorizontal, X, Film, User, Building2 } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -75,7 +76,14 @@ function FilterGroup({ label, children }: { label: string; children: React.React
 }
 
 function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
-  const { filters, setFilter, resetFilters } = useAppStore()
+  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
+  const { filters, setFilter, resetFilters } = useAppStore(
+    useShallow((s) => ({
+      filters: s.filters,
+      setFilter: s.setFilter,
+      resetFilters: s.resetFilters,
+    }))
+  )
   const allGenres = useAllGenres()
   const allNetworks = useAllNetworks()
   const allDecades = useAllDecades()
@@ -371,7 +379,15 @@ const QUICK_STATUS_FILTERS: { value: WatchStatus | 'all'; label: string }[] = [
 // ─── Library View ─────────────────────────────────────────────────────────────
 
 export function Library() {
-  const { filteredTitles, filters, viewMode, setFilter } = useAppStore()
+  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
+  const { filteredTitles, filters, viewMode, setFilter } = useAppStore(
+    useShallow((s) => ({
+      filteredTitles: s.filteredTitles,
+      filters: s.filters,
+      viewMode: s.viewMode,
+      setFilter: s.setFilter,
+    }))
+  )
   const [filterOpen, setFilterOpen] = useState(false)
 
   const activeFilterCount = useMemo(() => {

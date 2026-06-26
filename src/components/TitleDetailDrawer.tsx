@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -1116,7 +1117,18 @@ function fmtDateTime(iso: string): { date: string; time: string } {
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore()
+  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      isDetailDrawerOpen: s.isDetailDrawerOpen,
+      closeDetailDrawer: s.closeDetailDrawer,
+      updateTitle: s.updateTitle,
+      removeTitle: s.removeTitle,
+      removeViewing: s.removeViewing,
+      openRefreshMetadata: s.openRefreshMetadata,
+      isSharedView: s.isSharedView,
+    }))
+  )
   const browseByStudio = useAppStore((s) => s.browseByStudio)
   const title = useSelectedTitle()
   const user = useAppStore((s) => s.user)

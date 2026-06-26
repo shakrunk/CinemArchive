@@ -5,3 +5,6 @@
 ## 2024-05-18 - Hidden Responsive Text Unintentionally Stripping Button Accessible Names
 **Learning:** Responsive utility classes that hide inline text content (like `hidden sm:inline`) on small viewports will also remove that text from the accessibility tree, inadvertently turning standard text buttons into inaccessible icon-only buttons for mobile screen reader users.
 **Action:** When using responsive utility classes to hide text alongside an icon within an interactive element, ALWAYS provide a dynamic fallback `aria-label` on the parent interactive element to ensure an accessible name is present across all breakpoints.
+## 2026-06-25 - Unlinked Labels and Missing ARIA Labels in Custom Forms
+**Learning:** Custom forms in this app frequently use <label> tags without `htmlFor` attributes to connect them to their respective <input> or <textarea> elements. Additionally, some inputs lack explicit labels altogether and are missing `aria-label` attributes for screen readers.
+**Action:** When adding or modifying form fields, always ensure that labels are correctly linked using `htmlFor` and `id`, or add descriptive `aria-label` attributes to inputs that lack visual labels.

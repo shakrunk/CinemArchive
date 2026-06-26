@@ -588,12 +588,14 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
             {log.includeWatch && (
               <div className="space-y-2 pl-5">
                 <Input
+                  aria-label="Date watched"
                   type="date"
                   value={log.watchedAt}
                   onChange={(e) => setLog((l) => ({ ...l, watchedAt: e.target.value }))}
                   className="h-8 text-xs font-mono bg-secondary/50 border-border"
                 />
                 <Input
+                  aria-label="Watch notes"
                   value={log.watchNotes}
                   onChange={(e) => setLog((l) => ({ ...l, watchNotes: e.target.value }))}
                   placeholder="Watch notes (optional)"
@@ -616,6 +618,7 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
                 Review <span style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>(optional · logged independently)</span>
               </div>
               <textarea
+                aria-label="Episode review"
                 value={log.reviewText}
                 onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))}
                 placeholder="Your thoughts on this episode…"
@@ -1462,11 +1465,12 @@ export function TitleDetailDrawer() {
                 {showLogForm && (
                   <div className="bg-secondary/40 rounded-lg p-3 mb-4 space-y-3">
                     <div>
-                      <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      <label htmlFor="viewing-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
                         <Calendar className="inline w-3 h-3 mr-1" />
                         Date Watched
                       </label>
                       <Input
+                        id="viewing-date"
                         type="date"
                         value={logDate}
                         onChange={(e) => setLogDate(e.target.value)}
@@ -1480,11 +1484,12 @@ export function TitleDetailDrawer() {
                       <StarRating value={logRating} onChange={setLogRating} size="md" />
                     </div>
                     <div>
-                      <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      <label htmlFor="viewing-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
                         <FileText className="inline w-3 h-3 mr-1" />
                         Notes
                       </label>
                       <textarea
+                        id="viewing-notes"
                         value={logNotes}
                         onChange={(e) => setLogNotes(e.target.value)}
                         placeholder="Your thoughts…"

@@ -34,6 +34,7 @@ create table titles (
   rt_score      integer check (rt_score >= 0 and rt_score <= 100),
   metacritic_score integer check (metacritic_score >= 0 and metacritic_score <= 100),
   studios       text[] not null default '{}',
+  release_date  date,                  -- future release date for upcoming titles
   added_at      timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 

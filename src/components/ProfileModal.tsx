@@ -244,12 +244,13 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
 
             <form onSubmit={handleEmailSignIn} className="space-y-4">
               <div>
-                <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                <label htmlFor="email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                   <Input
+                    id="email-input"
                     required
                     type="email"
                     placeholder="name@domain.com"
@@ -354,6 +355,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
               {/* Generate Key Form */}
               <form onSubmit={handleGenerateKey} className="flex gap-2">
                 <Input
+                  aria-label="Label for new shared link"
                   placeholder="Label (e.g. My Website, Friends)"
                   value={newKeyLabel}
                   onChange={(e) => setNewKeyLabel(e.target.value)}

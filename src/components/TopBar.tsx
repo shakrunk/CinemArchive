@@ -1,4 +1,5 @@
 import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
@@ -39,7 +40,17 @@ const NAV: { id: 'upnext' | 'library' | 'ledger'; label: string; Icon: typeof Ba
 ]
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView, openCommandPalette } = useAppStore()
+  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView, openCommandPalette } = useAppStore(
+    useShallow((s) => ({
+      viewMode: s.viewMode,
+      setViewMode: s.setViewMode,
+      openAddTitle: s.openAddTitle,
+      user: s.user,
+      isSharedView: s.isSharedView,
+      openCommandPalette: s.openCommandPalette,
+    }))
+  )
 
   return (
     <header

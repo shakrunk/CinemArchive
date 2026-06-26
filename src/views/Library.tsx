@@ -90,7 +90,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
   const allTags = useAllTags()
 
   return (
-    <BottomSheet open={open} onClose={onClose} side="right">
+    <BottomSheet open={open} onClose={onClose} side="right" title="Refine Collection">
       <div className="space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--line)' }}>
           <SlidersHorizontal className="w-4 h-4 text-amber shrink-0" />
@@ -146,6 +146,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
             max={5}
             step={0.5}
             className="w-full"
+            aria-label="Minimum rating"
           />
         </div>
 
@@ -320,7 +321,7 @@ function LedgerList({ titles }: { titles: Title[] }) {
                   'text-left px-4 py-3.5 font-mono text-[10px] tracking-[0.14em] uppercase font-medium text-paper-faint whitespace-nowrap',
                   i === 2 && 'hidden sm:table-cell'
                 )}
-                style={{ borderBottom: '1px solid var(--line-2)', background: 'rgba(0,0,0,0.25)' }}
+                style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--inset)' }}
               >
                 {h}
               </th>
@@ -358,7 +359,7 @@ function LedgerList({ titles }: { titles: Title[] }) {
               <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-paper-dim">{title.year}</td>
               <td className="px-4 py-3">
                 <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] uppercase text-paper-dim">
-                  <i className={cn('w-[7px] h-[7px] rounded-full', STATUS_DOT[title.status])} />
+                  <span aria-hidden="true" className={cn('w-[7px] h-[7px] rounded-full', STATUS_DOT[title.status])} />
                   {title.status}
                 </span>
               </td>
@@ -457,13 +458,13 @@ export function Library() {
             'icon-btn h-11 px-3.5 gap-2 border text-sm',
             activeFilterCount > 0 ? '!text-amber !border-amber/40' : 'border-[var(--line)] text-paper-dim'
           )}
-          style={{ background: 'rgba(0,0,0,0.3)' }}
+          style={{ background: 'var(--inset)' }}
           aria-label={activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Filters'}
         >
           <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
           <span className="hidden sm:inline">Filters</span>
           {activeFilterCount > 0 && (
-            <span className="bg-amber text-void font-mono text-[11px] rounded-full w-[18px] h-[18px] flex items-center justify-center">
+            <span className="bg-amber text-[color:var(--on-amber)] font-mono text-[11px] rounded-full w-[18px] h-[18px] flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}

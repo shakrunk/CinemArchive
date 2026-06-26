@@ -1,8 +1,9 @@
-import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search, Sun, Moon } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
+import { toggleTheme } from 'src/lib/theme'
 
 interface TopBarProps {
   currentView: 'upnext' | 'library' | 'ledger'
@@ -41,7 +42,7 @@ const NAV: { id: 'upnext' | 'library' | 'ledger'; label: string; Icon: typeof Ba
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView, openCommandPalette } = useAppStore(
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView, openCommandPalette, theme } = useAppStore(
     useShallow((s) => ({
       viewMode: s.viewMode,
       setViewMode: s.setViewMode,
@@ -49,6 +50,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
       user: s.user,
       isSharedView: s.isSharedView,
       openCommandPalette: s.openCommandPalette,
+      theme: s.theme,
     }))
   )
 
@@ -58,7 +60,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
       style={{
         borderColor: 'var(--line)',
         background:
-          'linear-gradient(180deg, rgba(11,9,7,0.92), rgba(11,9,7,0.62) 70%, transparent)',
+          'linear-gradient(180deg, rgb(var(--void-rgb) / 0.92), rgb(var(--void-rgb) / 0.62) 70%, transparent)',
         backdropFilter: 'blur(14px) saturate(1.1)',
         WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
       }}
@@ -81,12 +83,11 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         </div>
 
         {/* Pill nav */}
-        <nav className="navpill ml-1 hidden sm:flex" role="tablist">
+        <nav className="navpill ml-1 hidden sm:flex" aria-label="Main navigation">
           {NAV.map(({ id, label, Icon }) => (
             <button
               key={id}
-              role="tab"
-              aria-selected={currentView === id}
+              aria-current={currentView === id ? 'page' : undefined}
               onClick={() => onViewChange(id)}
               className={cn('navtab', currentView === id && 'is-active')}
             >
@@ -99,10 +100,24 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         {/* Actions */}
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <button
+            onClick={(e) => toggleTheme({ clientX: e.clientX, clientY: e.clientY })}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center"
+            style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-[17px] h-[17px]" />
+            ) : (
+              <Moon className="w-[17px] h-[17px]" />
+            )}
+          </button>
+
+          <button
             onClick={openCommandPalette}
             aria-label="Open command palette"
             className="icon-btn h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center gap-2 px-2.5 sm:px-3"
-            style={{ borderColor: 'var(--line)', background: 'rgba(0,0,0,0.3)' }}
+            style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
           >
             <Search className="w-[17px] h-[17px]" />
             <span className="hidden lg:inline font-sans text-[13px] text-paper-faint">Search</span>

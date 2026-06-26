@@ -222,7 +222,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
               >
                 <div
                   className="w-14 h-14 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
+                  style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
                 >
                   {member.profileUrl ? (
                     <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover" />
@@ -649,7 +649,7 @@ function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: 
                 rows={2}
                 className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40"
                 style={{
-                  background: 'rgba(0,0,0,0.25)',
+                  background: 'var(--inset)',
                   border: '1px solid var(--line)',
                   color: 'var(--paper)',
                 }}
@@ -730,6 +730,8 @@ function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView
       <div
         role="button"
         tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`${episode.episodeName ?? `Episode ${episode.episodeNumber}`}, episode ${episode.episodeNumber}`}
         onClick={onToggle}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
         className={cn('episode-row', expanded && 'is-expanded', watched && 'is-watched')}
@@ -826,7 +828,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
     <div className="space-y-5">
       {/* Series-level stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
+        <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
             {totalWatched}<span className="text-sm font-mono ml-0.5" style={{ color: 'var(--paper-faint)' }}>/{totalCount}</span>
           </div>
@@ -834,7 +836,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
             Episodes
           </div>
         </div>
-        <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
+        <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--amber)', fontVariationSettings: '"opsz" 30' }}>
             {seriesAvg !== null ? `★ ${seriesAvg.toFixed(1)}` : '—'}
           </div>
@@ -842,7 +844,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
             Avg Rating
           </div>
         </div>
-        <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--line)' }}>
+        <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
             {seasons.length}
           </div>
@@ -863,7 +865,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           </h4>
           <div
             className="rounded-xl p-4"
-            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
+            style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
           >
             <SeriesGraph
               seasons={seasons}
@@ -888,11 +890,13 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
               <button
                 key={s.seasonNumber}
                 onClick={() => { setSelectedSeason(s.seasonNumber); setExpandedEpId(null) }}
+                aria-label={`Season ${s.seasonNumber}`}
+                aria-current={selectedSeason === s.seasonNumber ? 'true' : undefined}
                 className={cn(
                   'shrink-0 px-3 py-2 rounded-lg text-left transition-all border',
                   selectedSeason === s.seasonNumber
                     ? 'border-amber/40 bg-amber/10'
-                    : 'border-transparent hover:border-[var(--line)] hover:bg-[rgba(255,255,255,0.03)]'
+                    : 'border-transparent hover:border-[var(--line)] hover:bg-[var(--wash)]'
                 )}
               >
                 <div
@@ -929,7 +933,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                 >
                   <div
                     className="w-12 h-12 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
-                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--line)' }}
+                    style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
                   >
                     {member.profileUrl ? (
                       <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover" />
@@ -1079,7 +1083,6 @@ function DrawerTagEditor({
         {editing && (
           <input
             ref={inputRef}
-            aria-label="Edit tag"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
@@ -1599,9 +1602,9 @@ export function TitleDetailDrawer() {
                       />
                     </div>
                     <div>
-                      <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
                         Rating
-                      </label>
+                      </p>
                       <StarRating value={logRating} onChange={setLogRating} size="md" />
                     </div>
                     <div>
@@ -1620,7 +1623,7 @@ export function TitleDetailDrawer() {
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        className="flex-1 bg-amber hover:bg-amber-muted text-void font-sans font-medium"
+                        className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
                         onClick={logViewing}
                         disabled={showMovieSaved}
                       >

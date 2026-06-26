@@ -278,7 +278,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                 <Button
                   type="submit"
                   disabled={loadingAuth}
-                  className="flex-1 bg-amber hover:bg-amber-muted text-void font-sans font-medium"
+                  className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
                 >
                   {loadingAuth ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -364,7 +364,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                 <Button
                   type="submit"
                   disabled={generatingKey}
-                  className="bg-amber hover:bg-amber-muted text-void shrink-0"
+                  className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] shrink-0"
                 >
                   {generatingKey ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -180,7 +180,7 @@ function StepIndicator({ step }: { step: 'search' | 'log' }) {
         <div className={cn(
           'w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono border transition-all',
           step === 'search'
-            ? 'bg-amber text-void border-amber'
+            ? 'bg-amber text-[color:var(--on-amber)] border-amber'
             : 'bg-amber/15 border-amber/40 text-amber'
         )}>
           {step === 'log' ? <Check className="w-3 h-3" /> : '1'}
@@ -202,7 +202,7 @@ function StepIndicator({ step }: { step: 'search' | 'log' }) {
         <div className={cn(
           'w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono border transition-all',
           step === 'log'
-            ? 'bg-amber text-void border-amber'
+            ? 'bg-amber text-[color:var(--on-amber)] border-amber'
             : 'border-border text-muted-foreground'
         )}>
           2
@@ -554,9 +554,9 @@ export function AddTitleWorkflow() {
 
           {/* Status */}
           <div>
-            <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
               Status
-            </label>
+            </p>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPTIONS.map((opt) => (
                 <button
@@ -577,9 +577,9 @@ export function AddTitleWorkflow() {
 
           {/* Rating */}
           <div>
-            <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
               Your Rating
-            </label>
+            </p>
             <StarRating
               value={log.rating}
               onChange={(r) => setLog((l) => ({ ...l, rating: r }))}
@@ -608,9 +608,9 @@ export function AddTitleWorkflow() {
           {selected.type === 'tv' && log.seasons.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
+                <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
                   Season Progress
-                </label>
+                </p>
                 <button
                   onClick={() => {
                     setLog((l) => ({
@@ -632,10 +632,10 @@ export function AddTitleWorkflow() {
 
           {/* Tags */}
           <div>
-            <label className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
               <Tag className="inline w-3 h-3 mr-1" />
               Tags
-            </label>
+            </p>
             <TagInput
               tags={log.tags}
               onChange={(tags) => setLog((l) => ({ ...l, tags }))}
@@ -660,7 +660,7 @@ export function AddTitleWorkflow() {
 
           {/* Save */}
           <Button
-            className="w-full bg-amber hover:bg-amber-muted text-void font-sans font-medium"
+            className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
             onClick={handleSave}
           >
             <Star className="w-4 h-4 mr-2" />

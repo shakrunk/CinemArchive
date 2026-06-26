@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { X, Film, Tv } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import type { CastMember, CrewMember } from 'src/store/mockData'
@@ -18,6 +19,21 @@ interface PersonDetailPanelProps {
 export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
   const titles = useAppStore((s) => s.titles)
   const browseByPerson = useAppStore((s) => s.browseByPerson)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose })
+
+  useEffect(() => {
+    const returnEl = document.activeElement as HTMLElement
+    closeButtonRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current() }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      returnEl?.focus()
+    }
+  }, [])
 
   const personTitles = titles.filter((t) => {
     if (t.cast?.some((m: CastMember) => m.tmdbPersonId === person.tmdbPersonId)) return true
@@ -33,20 +49,24 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${person.name} details`}
       className="fixed inset-0 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.82)', zIndex: 60 }}
       onClick={onClose}
     >
       <div
         className="relative w-full max-w-sm rounded-xl overflow-hidden"
-        style={{ background: '#16100a', border: '1px solid var(--line)' }}
+        style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          ref={closeButtonRef}
           onClick={onClose}
           className="absolute top-3 right-3 flex items-center justify-center w-7 h-7 rounded-full transition-colors"
           style={{ color: 'var(--paper-faint)' }}
-          aria-label="Close"
+          aria-label={`Close ${person.name} details`}
           onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--paper)')}
           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--paper-faint)')}
         >
@@ -57,7 +77,7 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
         <div className="flex gap-4 px-5 pt-5 pb-4">
           <div
             className="w-20 h-20 rounded-full overflow-hidden shrink-0 flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--line)' }}
+            style={{ background: 'var(--inset-strong)', border: '1px solid var(--line)' }}
           >
             {person.profileUrl ? (
               <img src={person.profileUrl} alt={person.name} className="w-full h-full object-cover" />

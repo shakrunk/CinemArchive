@@ -311,13 +311,16 @@ export const useAppStore = create<AppStore>()(
 
   logEpisode: (titleId, seasonNumber, episodeNumber, opts) =>
     set((s) => {
+      // Stable UUIDs so local IDs match the DB rows — enables reliable delete/undo
+      const watchEventId = opts.watchedAt ? crypto.randomUUID() : undefined
+
       // Sync to DB: resolve episode id from current state, then fire async
       if (s.user) {
         const targetTitle = s.titles.find((t) => t.id === titleId)
         const targetSeason = targetTitle?.seasons?.find((season) => season.seasonNumber === seasonNumber)
         const targetEpisode = targetSeason?.episodes?.find((ep) => ep.episodeNumber === episodeNumber)
         if (targetEpisode) {
-          logEpisodeToDb(s.user.id, targetEpisode.id, opts).catch((err) =>
+          logEpisodeToDb(s.user.id, targetEpisode.id, { ...opts, watchEventId }).catch((err) =>
             console.error('Failed to sync episode log to DB:', err)
           )
         }
@@ -332,11 +335,11 @@ export const useAppStore = create<AppStore>()(
           const episodes = season.episodes.map((ep) => {
             if (ep.episodeNumber !== episodeNumber) return ep
             const updated = { ...ep }
-            if (opts.watchedAt) {
+            if (opts.watchedAt && watchEventId) {
               updated.watchEvents = [
                 ...ep.watchEvents,
                 {
-                  id: `we-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
+                  id: watchEventId,
                   watchedAt: opts.watchedAt,
                   notes: opts.watchNotes || undefined,
                   colorMode: opts.colorMode,
@@ -347,7 +350,7 @@ export const useAppStore = create<AppStore>()(
               updated.ratings = [
                 ...ep.ratings,
                 {
-                  id: `er-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
+                  id: crypto.randomUUID(),
                   rating: opts.rating,
                   ratedAt: now,
                 },
@@ -357,7 +360,7 @@ export const useAppStore = create<AppStore>()(
               updated.reviews = [
                 ...ep.reviews,
                 {
-                  id: `rv-${titleId}-s${seasonNumber}-e${episodeNumber}-${Date.now()}`,
+                  id: crypto.randomUUID(),
                   reviewText: opts.reviewText.trim(),
                   reviewedAt: now,
                   colorMode: opts.colorMode,
@@ -561,6 +564,14 @@ export const useAppStore = create<AppStore>()(
     set({ loadingUser: true })
     try {
       const dbTitles = await fetchUserLibrary(user.id)
+      // Guard: if we have local titles but DB returned empty, the session auth
+      // may not have fully propagated — skip the wipe rather than hiding data.
+      const currentTitles = get().titles
+      const hasRealLocalData = currentTitles.some((t) => !t.id.startsWith('mt-'))
+      if (dbTitles.length === 0 && hasRealLocalData) {
+        console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
+        return
+      }
       set((s) => ({
         titles: dbTitles,
         filteredTitles: applyFiltersToTitles(dbTitles, s.filters),

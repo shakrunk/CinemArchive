@@ -1,10 +1,6 @@
-name: DB Migrate
+name: DB Migrate (manual)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/migrations/**'
   workflow_dispatch:
 
 jobs:

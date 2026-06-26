@@ -163,6 +163,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           {!isSharedView && (
             <button
               onClick={openAddTitle}
+              aria-label="Add Title"
               className="btn-amber inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
             >
               <Plus className="w-4 h-4" />

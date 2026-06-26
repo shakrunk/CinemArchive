@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from 'src/components/ui/sheet'
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from 'src/components/ui/sheet'
 import { cn } from 'src/lib/utils'
 import { type ReactNode } from 'react'
 
@@ -32,20 +32,10 @@ export function BottomSheet({
           className
         )}
       >
-        {(title || description) && (
-          <SheetHeader className="mb-4">
-            {title && (
-              <SheetTitle className="font-serif text-xl font-light text-foreground">
-                {title}
-              </SheetTitle>
-            )}
-            {description && (
-              <SheetDescription className="text-muted-foreground text-sm">
-                {description}
-              </SheetDescription>
-            )}
-          </SheetHeader>
-        )}
+        {/* SheetTitle is always sr-only so callers own the visual header.
+            It still satisfies Radix Dialog's accessible-name requirement. */}
+        {title && <SheetTitle className="sr-only">{title}</SheetTitle>}
+        {description && <SheetDescription className="sr-only">{description}</SheetDescription>}
         {children}
       </SheetContent>
     </Sheet>

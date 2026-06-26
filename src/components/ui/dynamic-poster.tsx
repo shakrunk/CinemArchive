@@ -84,6 +84,7 @@ export function DynamicPoster({ title, className, onClick, rich = false }: Dynam
       onKeyDown={handleKeyDown}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? title.title : undefined}
     >
       {hasImage && (
         <img className="poster__img" src={title.posterUrl} alt={title.title} loading="lazy" />

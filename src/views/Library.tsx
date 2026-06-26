@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal, X, Film, User } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Film, User, Building2 } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
@@ -377,6 +377,7 @@ export function Library() {
     if (filters.tags.length > 0) count++
     if (filters.minRating > 0) count++
     if (filters.person) count++
+    if (filters.studio) count++
     return count
   }, [filters])
 
@@ -463,6 +464,25 @@ export function Library() {
             <button
               onClick={() => setFilter('person', null)}
               aria-label={`Clear ${filters.person.name} filter`}
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </span>
+        </div>
+      )}
+
+      {/* Active studio filter */}
+      {filters.studio && (
+        <div className="mb-4">
+          <span className="inline-flex items-center gap-2 font-sans text-sm text-amber bg-amber/10 border border-amber/25 rounded-full pl-3 pr-1.5 py-1">
+            <Building2 className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              From <b className="font-medium">{filters.studio}</b>
+            </span>
+            <button
+              onClick={() => setFilter('studio', null)}
+              aria-label={`Clear ${filters.studio} studio filter`}
               className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
             >
               <X className="w-3.5 h-3.5" />

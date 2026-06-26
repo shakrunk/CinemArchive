@@ -679,7 +679,9 @@
     left: 50%;
     right: auto;
     bottom: auto;
-    top: 50%;
+    /* Offset by ~half the TopBar height (≈32px) so the modal centers in the
+       visible area below the nav bar rather than the full viewport. */
+    top: calc(50% + 2rem);
     width: calc(100% - 2rem);
     max-height: min(88vh, calc(100vh - 150px));
     border-radius: 1.25rem;

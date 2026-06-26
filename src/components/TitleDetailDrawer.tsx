@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
+import { PosterLightbox } from 'src/components/ui/poster-lightbox'
 import { SeriesGraph } from 'src/components/ui/series-graph'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { CardTitle, BodyText, MetaBadge, StatNumber, StatLabel } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
+import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
   avgEpisodeRating,
   avgSeasonRating,
@@ -188,10 +190,11 @@ interface CastCrewSectionProps {
   cast?: CastMember[]
   crew?: CrewMember[]
   studios?: string[]
+  onPersonClick: (person: PersonDetailTarget) => void
+  onStudioClick: (studio: string) => void
 }
 
-function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
-  const browseByPerson = useAppStore((s) => s.browseByPerson)
+function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: CastCrewSectionProps) {
   const hasCast = cast && cast.length > 0
   const hasCrew = crew && crew.length > 0
   const hasStudios = studios && studios.length > 0
@@ -212,8 +215,8 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
               <button
                 key={member.tmdbPersonId}
                 type="button"
-                onClick={() => browseByPerson({ id: member.tmdbPersonId, name: member.name })}
-                aria-label={`Browse titles featuring ${member.name}`}
+                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+                aria-label={`View details for ${member.name}`}
                 className="group shrink-0 w-14 text-center focus:outline-none"
               >
                 <div
@@ -269,8 +272,8 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
                       {i > 0 && ' · '}
                       <button
                         type="button"
-                        onClick={() => browseByPerson({ id: m.tmdbPersonId, name: m.name })}
-                        aria-label={`Browse titles featuring ${m.name}`}
+                        onClick={() => onPersonClick({ tmdbPersonId: m.tmdbPersonId, name: m.name, profileUrl: m.profileUrl, job: m.job })}
+                        aria-label={`View details for ${m.name}`}
                         className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-none"
                       >
                         {m.name}
@@ -290,7 +293,19 @@ function CastCrewSection({ cast, crew, studios }: CastCrewSectionProps) {
                 Studio
               </span>
               <span className="font-sans" style={{ color: 'var(--paper)' }}>
-                {studios!.join(', ')}
+                {studios!.map((s, i) => (
+                  <span key={s}>
+                    {i > 0 && ', '}
+                    <button
+                      type="button"
+                      onClick={() => onStudioClick(s)}
+                      aria-label={`Browse titles from ${s}`}
+                      className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-none"
+                    >
+                      {s}
+                    </button>
+                  </span>
+                ))}
               </span>
             </div>
           )}
@@ -791,10 +806,10 @@ interface TVSeriesSectionProps {
   seasons: Season[]
   isSharedView: boolean
   isSpiderNoir: boolean
+  onPersonClick: (person: PersonDetailTarget) => void
 }
 
-function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSeriesSectionProps) {
-  const browseByPerson = useAppStore((s) => s.browseByPerson)
+function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPersonClick }: TVSeriesSectionProps) {
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [expandedEpId, setExpandedEpId] = useState<string | null>(null)
 
@@ -907,8 +922,8 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir }: TVSer
                 <button
                   key={member.tmdbPersonId}
                   type="button"
-                  onClick={() => browseByPerson({ id: member.tmdbPersonId, name: member.name })}
-                  aria-label={`Browse titles featuring ${member.name}`}
+                  onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+                  aria-label={`View details for ${member.name}`}
                   className="group shrink-0 w-12 text-center focus:outline-none"
                 >
                   <div
@@ -1102,6 +1117,7 @@ function fmtDateTime(iso: string): { date: string; time: string } {
 
 export function TitleDetailDrawer() {
   const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore()
+  const browseByStudio = useAppStore((s) => s.browseByStudio)
   const title = useSelectedTitle()
   const user = useAppStore((s) => s.user)
 
@@ -1126,9 +1142,13 @@ export function TitleDetailDrawer() {
   const [logNotes, setLogNotes] = useState('')
   const [showMovieSaved, setShowMovieSaved] = useState(false)
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
+  const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
+  const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
 
   function onClose() {
     setPendingDeleteTitle(false)
+    setPosterLightboxOpen(false)
+    setActivePerson(null)
     closeDetailDrawer()
   }
 
@@ -1319,6 +1339,23 @@ export function TitleDetailDrawer() {
       title={title.title}
       description={title.synopsis ?? `Details and viewing history for ${title.title}.`}
     >
+      {/* Poster lightbox — rendered inside portal, above dialog via z-[60] */}
+      {posterLightboxOpen && title.posterUrl && (
+        <PosterLightbox
+          src={title.posterUrl}
+          alt={title.title}
+          onClose={() => setPosterLightboxOpen(false)}
+        />
+      )}
+
+      {/* Person detail panel */}
+      {activePerson && (
+        <PersonDetailPanel
+          person={activePerson}
+          onClose={() => setActivePerson(null)}
+        />
+      )}
+
       <div className="overflow-y-auto flex-1 scrollbar-thin">
         {/* Hero: blurred poster background + title info */}
         <div className="relative overflow-hidden shrink-0">
@@ -1338,7 +1375,19 @@ export function TitleDetailDrawer() {
           <div className="absolute inset-0 bg-gradient-to-b from-secondary/30 via-card/70 to-card" />
           <div className="relative z-10 flex gap-5 px-6 pt-10 pb-6">
             <div className="w-28 sm:w-36 shrink-0">
-              <DynamicPoster title={title} />
+              {title.posterUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setPosterLightboxOpen(true)}
+                  aria-label={`View full poster for ${title.title}`}
+                  className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                  title="View full poster"
+                >
+                  <DynamicPoster title={title} />
+                </button>
+              ) : (
+                <DynamicPoster title={title} />
+              )}
             </div>
             <div className="flex-1 min-w-0 space-y-2 pt-6">
               <div className="flex items-center gap-2">
@@ -1434,7 +1483,13 @@ export function TitleDetailDrawer() {
               <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">
                 Cast &amp; Crew
               </h4>
-              <CastCrewSection cast={title.cast} crew={title.crew} studios={title.studios} />
+              <CastCrewSection
+                cast={title.cast}
+                crew={title.crew}
+                studios={title.studios}
+                onPersonClick={setActivePerson}
+                onStudioClick={browseByStudio}
+              />
             </div>
           ) : null}
 
@@ -1459,6 +1514,7 @@ export function TitleDetailDrawer() {
                 seasons={title.seasons}
                 isSharedView={isSharedView}
                 isSpiderNoir={title.tmdbId === SPIDER_NOIR_TMDB_ID}
+                onPersonClick={setActivePerson}
               />
             </div>
           )}

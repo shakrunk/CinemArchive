@@ -745,7 +745,14 @@ function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView
         {/* Watch + rating indicators */}
         <div className="flex items-center gap-2 shrink-0">
           {watched && (
-            <Eye className="w-3 h-3" style={{ color: 'var(--amber)', opacity: 0.8 }} />
+            <span className="flex items-center gap-0.5">
+              <Eye className="w-3 h-3" style={{ color: 'var(--amber)', opacity: 0.8 }} />
+              {episode.watchEvents.length > 1 && (
+                <span className="font-mono" style={{ fontSize: '10px', color: 'var(--amber)', opacity: 0.8 }}>
+                  ×{episode.watchEvents.length}
+                </span>
+              )}
+            </span>
           )}
           {episode.reviews.length > 0 && (
             <MessageSquare className="w-3 h-3" style={{ color: 'var(--paper-faint)', opacity: 0.7 }} />

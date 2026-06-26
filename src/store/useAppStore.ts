@@ -14,6 +14,7 @@ import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb,
 export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
+export type Theme = 'dark' | 'light'
 
 /** A cast/crew person, keyed by TMDB id with a display name. */
 export interface PersonRef {
@@ -78,6 +79,7 @@ interface LedgerSlice {
 
 interface UISlice {
   viewMode: ViewMode
+  theme: Theme
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
@@ -89,6 +91,7 @@ interface UISlice {
   pendingView: AppView | null
 
   setViewMode: (mode: ViewMode) => void
+  setTheme: (theme: Theme) => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
   closeAddTitle: () => void
@@ -530,11 +533,14 @@ export const useAppStore = create<AppStore>()(
 
   // ── UI ─────────────────────────────────────────────────────
   viewMode: 'grid',
+  theme: 'dark',
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
 
   setViewMode: (viewMode) => set({ viewMode }),
+
+  setTheme: (theme) => set({ theme }),
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -667,7 +673,7 @@ export const useAppStore = create<AppStore>()(
       storage: createJSONStorage(() => localStorage),
       // Only the source of truth is persisted; derived state (filteredTitles,
       // stats) and transient UI flags are recomputed/reset on load.
-      partialize: (s) => ({ titles: s.titles, filters: s.filters, viewMode: s.viewMode }),
+      partialize: (s) => ({ titles: s.titles, filters: s.filters, viewMode: s.viewMode, theme: s.theme }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)

@@ -13,6 +13,7 @@ import { computeUpNextShows } from 'src/store/upNext'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
+import { applyTheme } from 'src/lib/theme'
 import { CommandPalette } from 'src/components/CommandPalette'
 import { NotificationStack } from 'src/components/NotificationStack'
 import type { Command } from 'src/store/commands'
@@ -50,6 +51,12 @@ export default function App() {
         useAppStore.getState().requestView(null)
       }
     })
+  }, [])
+
+  // Re-sync <html data-theme> with the rehydrated store. The inline FOUC script
+  // in index.html sets it before paint; this covers any post-rehydration drift.
+  useEffect(() => {
+    applyTheme(useAppStore.getState().theme)
   }, [])
 
   // ⌘K / Ctrl+K toggles the palette from anywhere.
@@ -127,7 +134,7 @@ export default function App() {
     <div className="relative min-h-screen">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-3 focus:left-3 focus:px-4 focus:py-2 focus:rounded-md focus:bg-amber focus:text-void focus:font-sans focus:text-sm focus:font-medium focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-3 focus:left-3 focus:px-4 focus:py-2 focus:rounded-md focus:bg-amber focus:text-[color:var(--on-amber)] focus:font-sans focus:text-sm focus:font-medium focus:shadow-lg"
       >
         Skip to content
       </a>

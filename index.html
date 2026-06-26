@@ -7,6 +7,24 @@
     <title>CinemArchive</title>
     <meta name="description" content="The Projection Room — your personal cinematic archive" />
     <meta name="theme-color" content="#0b0907" />
+    <!-- Theme FOUC guard: apply the persisted theme to <html> before first paint.
+         Reads the Zustand-persisted store (key must match useAppStore's name). -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('cinemarchive-library');
+          var theme = raw && JSON.parse(raw).state && JSON.parse(raw).state.theme;
+          if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+          document.documentElement.setAttribute('data-theme', theme);
+          if (theme === 'light') {
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', '#f4ede0');
+          }
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

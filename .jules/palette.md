@@ -16,3 +16,7 @@
 ## 2026-06-26 - Input Fields Lacking Accessible Labels
 **Learning:** Several custom input elements (e.g., tag inputs and search inputs) in components like CommandPalette, AddTitleWorkflow, and TitleDetailDrawer lacked explicit `<label>` elements or `aria-label` attributes, making them inaccessible to screen readers.
 **Action:** Always ensure that every input field, especially those acting as search bars or standalone tag inputs, has a clear `aria-label` or an associated `<label>` using `htmlFor` and `id`.
+
+## 2024-05-18 - Missing ARIA Labels on Core Inputs and Actions
+**Learning:** Found multiple instances where core inputs (like Search and Email) and icon-only actions (like Copy/Revoke) missed crucial `aria-label`s, despite having `htmlFor` bindings or text placeholders.
+**Action:** When working on modals (`ProfileModal.tsx`, `RefreshMetadataModal.tsx`), specifically check the `Input` and `Button` components for screen-reader friendly descriptive attributes, rather than assuming standard label behaviors are enough.

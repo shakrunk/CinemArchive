@@ -69,16 +69,27 @@ function ViewingTimeline({
   viewings,
   onDeleteViewing,
   isSharedView,
+  onLogFirstViewing,
 }: {
   viewings: Viewing[]
   onDeleteViewing?: (viewingId: string) => void
   isSharedView?: boolean
+  onLogFirstViewing?: () => void
 }) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   if (viewings.length === 0) {
     return (
-      <div className="text-center py-6 text-muted-foreground text-sm font-sans">
-        No viewings logged yet
+      <div className="text-center py-6 text-muted-foreground text-sm font-sans flex flex-col items-center">
+        <p>No viewings logged yet</p>
+        {!isSharedView && onLogFirstViewing && (
+          <button
+            onClick={onLogFirstViewing}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-amber border border-amber/30 rounded-md hover:bg-amber/10 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            Log a viewing
+          </button>
+        )}
       </div>
     )
   }
@@ -1390,6 +1401,7 @@ export function TitleDetailDrawer() {
                   viewings={title.viewings}
                   isSharedView={isSharedView}
                   onDeleteViewing={(viewingId) => removeViewing(title.id, viewingId)}
+                  onLogFirstViewing={!showLogForm ? () => setShowLogForm(true) : undefined}
                 />
               </div>
             </>

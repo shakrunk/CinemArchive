@@ -561,6 +561,10 @@ export const useAppStore = create<AppStore>()(
   openDetailDrawer: (id) =>
     set({ selectedTitleId: id, isDetailDrawerOpen: true }),
 
+  // selectedTitleId is intentionally NOT nulled here — keeping it non-null lets
+  // TitleDetailDrawer derive the correct body class (e.g. spider-noir-bw) for
+  // pinned easter-egg modes even after the drawer closes. browseByPerson /
+  // browseByStudio DO null it because navigating away is a hard context switch.
   closeDetailDrawer: () =>
     set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false }),
 

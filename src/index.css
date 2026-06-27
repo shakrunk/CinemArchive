@@ -813,6 +813,8 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 .series-graph__cell {
+  position: relative;
+  overflow: hidden;
   transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s;
 }
 .series-graph__cell:hover {
@@ -824,6 +826,22 @@
 .series-graph__cell:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 1px;
+}
+/* Amber bottom-bar marks episodes that have at least one watch event */
+.series-graph__cell--watched::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: rgb(var(--amber-rgb) / 0.80);
+  border-radius: 1px 1px 0 0;
+}
+.series-graph__cell--watched:hover {
+  box-shadow:
+    0 0 0 2px rgba(233, 178, 102, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Episode row in TV detail drawer */

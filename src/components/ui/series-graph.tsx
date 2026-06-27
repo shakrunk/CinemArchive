@@ -106,8 +106,8 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
                 style={{
                   background: ratingColor(avg),
                   aspectRatio: '1',
-                  borderRadius: '3px',
-                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  borderRadius: '4px',
+                  border: '1px solid var(--line)',
                   outline: 'none',
                 }}
               />
@@ -125,7 +125,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
           <div key={l.label} className="flex items-center gap-1">
             <div
               className="rounded-sm"
-              style={{ width: 10, height: 10, background: l.color }}
+              style={{ width: 10, height: 10, background: l.color, border: '1px solid var(--line)' }}
             />
             <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
               {l.label}
@@ -135,10 +135,24 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
         <div className="flex items-center gap-1">
           <div
             className="rounded-sm"
-            style={{ width: 10, height: 10, background: ratingColor(null) }}
+            style={{ width: 10, height: 10, background: ratingColor(null), border: '1px solid var(--line)' }}
           />
           <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
             unrated
+          </span>
+        </div>
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 10, background: 'var(--line-2)', flexShrink: 0 }} />
+
+        {/* Watched indicator swatch */}
+        <div className="flex items-center gap-1">
+          <div
+            className="series-graph__cell--watched rounded-sm"
+            style={{ width: 10, height: 10, background: ratingColor(null), border: '1px solid var(--line)', position: 'relative', overflow: 'hidden' }}
+          />
+          <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+            watched
           </span>
         </div>
       </div>

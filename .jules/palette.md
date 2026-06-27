@@ -5,6 +5,7 @@
 ## 2024-05-18 - Hidden Responsive Text Unintentionally Stripping Button Accessible Names
 **Learning:** Responsive utility classes that hide inline text content (like `hidden sm:inline`) on small viewports will also remove that text from the accessibility tree, inadvertently turning standard text buttons into inaccessible icon-only buttons for mobile screen reader users.
 **Action:** When using responsive utility classes to hide text alongside an icon within an interactive element, ALWAYS provide a dynamic fallback `aria-label` on the parent interactive element to ensure an accessible name is present across all breakpoints.
+
 ## 2026-06-25 - Unlinked Labels and Missing ARIA Labels in Custom Forms
 **Learning:** Custom forms in this app frequently use <label> tags without `htmlFor` attributes to connect them to their respective <input> or <textarea> elements. Additionally, some inputs lack explicit labels altogether and are missing `aria-label` attributes for screen readers.
 **Action:** When adding or modifying form fields, always ensure that labels are correctly linked using `htmlFor` and `id`, or add descriptive `aria-label` attributes to inputs that lack visual labels.
@@ -16,3 +17,11 @@
 ## 2026-06-26 - Input Fields Lacking Accessible Labels
 **Learning:** Several custom input elements (e.g., tag inputs and search inputs) in components like CommandPalette, AddTitleWorkflow, and TitleDetailDrawer lacked explicit `<label>` elements or `aria-label` attributes, making them inaccessible to screen readers.
 **Action:** Always ensure that every input field, especially those acting as search bars or standalone tag inputs, has a clear `aria-label` or an associated `<label>` using `htmlFor` and `id`.
+
+## 2024-05-18 - Missing ARIA Labels on Core Inputs and Actions
+**Learning:** Found multiple instances where core inputs (like Search and Email) and icon-only actions (like Copy/Revoke) missed crucial `aria-label`s, despite having `htmlFor` bindings or text placeholders.
+**Action:** When working on modals (`ProfileModal.tsx`, `RefreshMetadataModal.tsx`), specifically check the `Input` and `Button` components for screen-reader friendly descriptive attributes, rather than assuming standard label behaviors are enough.
+
+## 2024-06-27 - Actionable Empty States
+**Learning:** Empty states caused by active filters or missing data (like no search results or no viewings logged) are often passive and rely purely on informative text. Telling users to try a different search or log a view is okay, but providing a direct call-to-action button to do so is much better for UX, saving them time and interaction steps.
+**Action:** Always include a "Clear search", "Log viewing", or similar direct action button in empty states where the condition is reversible or actionable by the user directly from that context. Ensure that buttons are clearly labeled and accessible.

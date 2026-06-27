@@ -889,17 +889,29 @@ body.spider-noir-color .cinema-content {
   filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg);
 }
 
-/* ── Entry: slow, intentional transition when the mode is first chosen ── */
-body.spider-noir-bw-enter #root,
-body.spider-noir-color-enter #root {
-  transition: filter 2000ms cubic-bezier(0.65, 0, 0.35, 1);
+/* ── Entry: filter reveals only in the final third of the web animation ──
+   Holds neutral (unfiltered) for 65% of the 2000ms duration, then eases
+   the target filter in over the remaining 35% (≈1300–2000ms). CSS animations
+   beat CSS transitions, so this overrides the #root baseline transition. */
+@keyframes spider-noir-bw-filter-in {
+  0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }
+  65%  { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+         animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  100% { filter: grayscale(1) contrast(1.15) saturate(1) hue-rotate(0deg); }
 }
-
-body.spider-noir-bw-enter .cinema-content,
+@keyframes spider-noir-color-filter-in {
+  0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }
+  65%  { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+         animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  100% { filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg); }
+}
+body.spider-noir-bw-enter #root,
+body.spider-noir-bw-enter .cinema-content {
+  animation: spider-noir-bw-filter-in 2000ms linear both;
+}
+body.spider-noir-color-enter #root,
 body.spider-noir-color-enter .cinema-content {
-  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
-              opacity 200ms ease,
-              filter 2000ms cubic-bezier(0.65, 0, 0.35, 1);
+  animation: spider-noir-color-filter-in 2000ms linear both;
 }
 
 /* ── Silk-thread web animation ── */

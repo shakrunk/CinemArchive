@@ -1197,6 +1197,7 @@ export function TitleDetailDrawer() {
       document.body.classList.remove(...ALL)
       if (effectiveNoirMode) {
         document.body.classList.add(effectiveNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
+        document.body.classList.add(effectiveNoirMode === 'bw' ? 'spider-noir-bw-enter' : 'spider-noir-color-enter')
       }
     }
 
@@ -1213,7 +1214,10 @@ export function TitleDetailDrawer() {
         // effect body) — avoids the react-hooks/set-state-in-effect lint rule.
         noirAnimTimerRef.current = setTimeout(() => {
           setNoirAnim(effectiveNoirMode)
-          noirAnimTimerRef.current = setTimeout(() => setNoirAnim(null), 2100)
+          noirAnimTimerRef.current = setTimeout(() => {
+            setNoirAnim(null)
+            document.body.classList.remove('spider-noir-bw-enter', 'spider-noir-color-enter')
+          }, 2100)
         }, 0)
       } else {
         // Exiting: dismiss any lingering web overlay so it doesn't hang over

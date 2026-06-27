@@ -48,13 +48,15 @@ export function EpisodeCard({
     : null
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       aria-expanded={isSelected}
       aria-label={`${episode.episodeName ?? `Episode ${episode.episodeNumber}`} — click to ${isSelected ? 'collapse' : 'expand'} details`}
       className={cn(
-        'group shrink-0 w-[240px] text-left rounded-lg overflow-hidden border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60',
+        'group shrink-0 w-[240px] text-left rounded-lg overflow-hidden border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 cursor-pointer',
         isSelected ? 'border-amber/50' : 'border-[var(--line)] hover:border-amber/30',
       )}
       style={{ background: 'var(--inset)' }}
@@ -135,7 +137,7 @@ export function EpisodeCard({
           </p>
         )}
       </div>
-    </button>
+    </div>
   )
 }
 

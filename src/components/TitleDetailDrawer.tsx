@@ -411,6 +411,13 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           </h4>
           <SeriesGraph
             seasons={seasons}
+            onCellClick={(seasonNumber, episodeNumber) => {
+              handleSeasonChange(seasonNumber)
+              const ep = seasons
+                .find((s) => s.seasonNumber === seasonNumber)
+                ?.episodes?.find((e) => e.episodeNumber === episodeNumber)
+              if (ep) setSelectedEpId(ep.id)
+            }}
           />
         </div>
       )}

@@ -17,6 +17,8 @@ import {
   episodesWatchedInSeason,
   totalEpisodesWatched,
   totalEpisodeCount,
+  getUnlockedModes,
+  getEarnedModes,
 } from 'src/store/episodeUtils'
 import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
@@ -29,7 +31,6 @@ import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb 
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
-import { getUnlockedModes, getEarnedModes } from 'src/store/episodeUtils'
 import { transitionSpiderNoir } from 'src/lib/theme'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
@@ -1166,14 +1167,12 @@ export function TitleDetailDrawer() {
   const [manualMode, setManualMode] = useState<SelectorMode>('normal')
 
   // Seed manualMode from pinned → last watch event → normal when the drawer opens.
-  // Deferred so it runs as an async callback (not synchronously in the effect body)
-  // — avoids the react-hooks/set-state-in-effect lint rule.
   useEffect(() => {
     if (!isSpiderNoir || !title || !isDetailDrawerOpen) return
     const derived = getSpiderNoirActiveMode(title)
     const seeded = pinnedModeRaw ?? derived ?? 'normal'
-    const t = setTimeout(() => setManualMode(seeded), 0)
-    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setManualMode(seeded as SelectorMode)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title?.id, isDetailDrawerOpen])
 

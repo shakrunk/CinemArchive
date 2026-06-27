@@ -3,8 +3,11 @@ import { PlayCircle, Check, Undo2, Clock } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
+import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import type { Title } from 'src/store/mockData'
+
+const SPIDER_NOIR_TMDB_ID = 220102
 
 const UNDO_WINDOW_MS = 6000
 
@@ -78,12 +81,15 @@ function LiveCard({ entry, onFinale }: { entry: UpNextEntry; onFinale: (snapshot
   const epName = episode.episodeName ?? `Episode ${episode.episodeNumber}`
 
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
+  const [showNoirModal, setShowNoirModal] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  function handleMarkWatched() {
+  const isSpiderNoir = title.tmdbId === SPIDER_NOIR_TMDB_ID
+
+  function doMarkWatched(colorMode?: 'bw' | 'color') {
     const label = `S${season.seasonNumber} E${episode.episodeNumber}`
-    const result = logNextEpisodeWatch(title.id)
+    const result = logNextEpisodeWatch(title.id, colorMode)
     if (!result) return
     const undo: PendingUndo = { ...result, label }
     const updated = useAppStore.getState().titles.find((t) => t.id === title.id)
@@ -97,6 +103,24 @@ function LiveCard({ entry, onFinale }: { entry: UpNextEntry; onFinale: (snapshot
     setPendingUndo(undo)
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => setPendingUndo(null), UNDO_WINDOW_MS)
+  }
+
+  function handleMarkWatched() {
+    if (isSpiderNoir) {
+      setShowNoirModal(true)
+    } else {
+      doMarkWatched()
+    }
+  }
+
+  function handleNoirSelect(mode: 'bw' | 'color') {
+    setShowNoirModal(false)
+    doMarkWatched(mode)
+  }
+
+  function handleNoirSkip() {
+    setShowNoirModal(false)
+    doMarkWatched()
   }
 
   function handleUndo() {
@@ -129,6 +153,11 @@ function LiveCard({ entry, onFinale }: { entry: UpNextEntry; onFinale: (snapshot
           )
         )}
       </div>
+      <SpiderNoirModeModal
+        open={showNoirModal}
+        onSelect={handleNoirSelect}
+        onSkip={handleNoirSkip}
+      />
     </CardFrame>
   )
 }

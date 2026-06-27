@@ -29,7 +29,14 @@ import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb 
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
-const SPIDER_NOIR_TMDB_ID = 242484
+const SPIDER_NOIR_TMDB_ID = 220102
+
+const SPIDER_WEB_SVG_BW = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><g stroke="rgba(255,255,255,0.55)" stroke-width="0.8" fill="none"><line x1="100" y1="100" x2="100" y2="5"/><line x1="100" y1="100" x2="167" y2="33"/><line x1="100" y1="100" x2="195" y2="100"/><line x1="100" y1="100" x2="167" y2="167"/><line x1="100" y1="100" x2="100" y2="195"/><line x1="100" y1="100" x2="33" y2="167"/><line x1="100" y1="100" x2="5" y2="100"/><line x1="100" y1="100" x2="33" y2="33"/><circle cx="100" cy="100" r="20"/><circle cx="100" cy="100" r="45"/><circle cx="100" cy="100" r="68"/><circle cx="100" cy="100" r="90"/></g></svg>`
+)
+const SPIDER_WEB_SVG_COLOR = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><g stroke="rgba(233,178,102,0.55)" stroke-width="0.8" fill="none"><line x1="100" y1="100" x2="100" y2="5"/><line x1="100" y1="100" x2="167" y2="33"/><line x1="100" y1="100" x2="195" y2="100"/><line x1="100" y1="100" x2="167" y2="167"/><line x1="100" y1="100" x2="100" y2="195"/><line x1="100" y1="100" x2="33" y2="167"/><line x1="100" y1="100" x2="5" y2="100"/><line x1="100" y1="100" x2="33" y2="33"/><circle cx="100" cy="100" r="20"/><circle cx="100" cy="100" r="45"/><circle cx="100" cy="100" r="68"/><circle cx="100" cy="100" r="90"/></g></svg>`
+)
 
 function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
   let lastMode: 'bw' | 'color' | null = null
@@ -1141,15 +1148,35 @@ export function TitleDetailDrawer() {
   const isSpiderNoir = title?.tmdbId === SPIDER_NOIR_TMDB_ID
   const activeSpiderNoirMode = isSpiderNoir && title ? getSpiderNoirActiveMode(title) : null
 
+  const prevNoirModeRef = useRef<'bw' | 'color' | null | undefined>(undefined)
+  const [noirAnim, setNoirAnim] = useState<'bw' | 'color' | null>(null)
+  const noirAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    document.body.classList.remove('spider-noir-bw', 'spider-noir-color')
+    const ALL = ['spider-noir-bw', 'spider-noir-color', 'spider-noir-bw-enter', 'spider-noir-color-enter'] as const
+    document.body.classList.remove(...ALL)
+
     if (isSpiderNoir && activeSpiderNoirMode) {
-      document.body.classList.add(
-        activeSpiderNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color'
-      )
+      document.body.classList.add(activeSpiderNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
+
+      if (prevNoirModeRef.current !== undefined && prevNoirModeRef.current !== activeSpiderNoirMode) {
+        const enterClass = `spider-noir-${activeSpiderNoirMode}-enter` as const
+        void document.body.offsetWidth // force reflow so animation restarts
+        document.body.classList.add(enterClass)
+        setNoirAnim(activeSpiderNoirMode)
+        if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
+        noirAnimTimerRef.current = setTimeout(() => {
+          document.body.classList.remove(enterClass)
+          setNoirAnim(null)
+        }, 2100)
+      }
     }
+
+    prevNoirModeRef.current = activeSpiderNoirMode ?? null
+
     return () => {
-      document.body.classList.remove('spider-noir-bw', 'spider-noir-color')
+      document.body.classList.remove(...ALL)
+      if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
     }
   }, [isSpiderNoir, activeSpiderNoirMode])
 
@@ -1351,6 +1378,23 @@ export function TitleDetailDrawer() {
   }
 
   return (
+    <>
+    {noirAnim && (
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9998,
+          pointerEvents: 'none',
+          backgroundImage: `url("data:image/svg+xml,${noirAnim === 'bw' ? SPIDER_WEB_SVG_BW : SPIDER_WEB_SVG_COLOR}")`,
+          backgroundSize: 'min(80vw, 80vh)',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          animation: 'spider-web-cast 2100ms ease forwards',
+        }}
+      />
+    )}
     <CinemaModal
       open={isDetailDrawerOpen}
       onClose={onClose}
@@ -1706,5 +1750,6 @@ export function TitleDetailDrawer() {
         </div>
       </div>
     </CinemaModal>
+    </>
   )
 }

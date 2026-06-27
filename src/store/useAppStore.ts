@@ -69,7 +69,7 @@ interface LibrarySlice {
   logEpisode: (titleId: string, seasonNumber: number, episodeNumber: number, opts: EpisodeLogOpts) => void
   removeViewing: (titleId: string, viewingId: string) => void
   deleteEpisodeWatchEvent: (titleId: string, seasonNumber: number, episodeNumber: number, watchEventId: string) => void
-  logNextEpisodeWatch: (titleId: string) => { seasonNumber: number; episodeNumber: number; watchEventId: string } | null
+  logNextEpisodeWatch: (titleId: string, colorMode?: 'bw' | 'color') => { seasonNumber: number; episodeNumber: number; watchEventId: string } | null
 }
 
 interface LedgerSlice {
@@ -417,7 +417,7 @@ export const useAppStore = create<AppStore>()(
       }
     }),
 
-  logNextEpisodeWatch: (titleId) => {
+  logNextEpisodeWatch: (titleId, colorMode) => {
     const state = get()
     const title = state.titles.find((t) => t.id === titleId)
     if (!title || !title.seasons) return null
@@ -432,7 +432,7 @@ export const useAppStore = create<AppStore>()(
 
     if (state.user) {
       const userId = state.user.id
-      const dbOpts = { watchedAt, watchEventId }
+      const dbOpts = { watchedAt, watchEventId, colorMode }
       logEpisodeToDb(userId, episodeId, dbOpts).catch((err) => {
         console.error('Failed to sync quick episode log to DB:', err)
         get().pushNotification({
@@ -449,7 +449,7 @@ export const useAppStore = create<AppStore>()(
           if (season.seasonNumber !== seasonNumber || !season.episodes) return season
           const episodes = season.episodes.map((ep) =>
             ep.episodeNumber === episodeNumber
-              ? { ...ep, watchEvents: [...ep.watchEvents, { id: watchEventId, watchedAt }] }
+              ? { ...ep, watchEvents: [...ep.watchEvents, { id: watchEventId, watchedAt, colorMode }] }
               : ep
           )
           const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length

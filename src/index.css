@@ -760,7 +760,7 @@
   outline: none;
   transform: translateY(0);
   opacity: 1;
-  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease, filter 800ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .cinema-content[data-state='closed'] {
   transform: translateY(100%);
@@ -867,18 +867,47 @@
    Body class is applied/removed by TitleDetailDrawer's useEffect.
    ════════════════════════════════════════════════════════════════════════ */
 
-body.spider-noir-bw #root {
-  filter: grayscale(1) contrast(1.15);
-  transition: filter 600ms ease;
+/* Baseline: short transition for when the drawer opens with an existing mode */
+#root {
+  transition: filter 800ms ease;
+}
+
+/* ── Persistent mode states ──────────────────────────────────────────────
+   Both rules share the same filter-function list so CSS can interpolate
+   between them (grayscale → hue-rotate) without jumping.              */
+body.spider-noir-bw #root,
+body.spider-noir-bw .cinema-content {
+  filter: grayscale(1) contrast(1.15) saturate(1) hue-rotate(0deg);
 }
 
 body.spider-noir-bw .grain {
   opacity: 0.10;
 }
 
-body.spider-noir-color #root {
-  filter: saturate(2.2) contrast(1.05) hue-rotate(-8deg);
-  transition: filter 600ms ease;
+body.spider-noir-color #root,
+body.spider-noir-color .cinema-content {
+  filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg);
+}
+
+/* ── Entry: slow, intentional transition when the mode is first chosen ── */
+body.spider-noir-bw-enter #root,
+body.spider-noir-color-enter #root {
+  transition: filter 2000ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+body.spider-noir-bw-enter .cinema-content,
+body.spider-noir-color-enter .cinema-content {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 200ms ease,
+              filter 2000ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ── Spider web overlay: expands from a point, holds, then drifts away ── */
+@keyframes spider-web-cast {
+  0%   { opacity: 0;    transform: scale(0.04) rotate(-18deg); }
+  18%  { opacity: 0.9;  transform: scale(1)    rotate(3deg);  }
+  60%  { opacity: 0.55; transform: scale(1.04) rotate(0deg);  }
+  100% { opacity: 0;    transform: scale(1.22) rotate(9deg);  }
 }
 
 body.spider-noir-color .btn-amber {

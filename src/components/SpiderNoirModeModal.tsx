@@ -1,4 +1,5 @@
-import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface SpiderNoirModeModalProps {
   open: boolean
@@ -7,34 +8,49 @@ interface SpiderNoirModeModalProps {
 }
 
 export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeModalProps) {
-  return (
-    <DialogPrimitive.Root open={open} onOpenChange={(o) => { if (!o) onSkip() }}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            background: 'rgba(11, 9, 7, 0.92)',
-            backdropFilter: 'blur(8px)',
-            animation: 'spider-noir-fade-in 300ms ease',
-          }}
-        />
-        <DialogPrimitive.Content
-          aria-describedby={undefined}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10001,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-          }}
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogPrimitive.Title
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onSkip()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onSkip])
+
+  if (!open) return null
+
+  return createPortal(
+    <>
+      <div
+        aria-hidden="true"
+        onClick={onSkip}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10000,
+          background: 'rgba(11, 9, 7, 0.92)',
+          backdropFilter: 'blur(8px)',
+          animation: 'spider-noir-fade-in 300ms ease',
+        }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="How did you experience this?"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 10001,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{ display: 'contents', pointerEvents: 'auto' }}>
+          <h2
             style={{
               fontFamily: 'var(--serif)',
               fontSize: 'clamp(20px, 5vw, 28px)',
@@ -45,7 +61,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
             }}
           >
             How did you experience this?
-          </DialogPrimitive.Title>
+          </h2>
 
           <p
             style={{
@@ -112,7 +128,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
                     textTransform: 'uppercase',
                   }}
                 >
-                  Black & White
+                  Black &amp; White
                 </div>
               </div>
             </button>
@@ -192,8 +208,9 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
           >
             not now
           </button>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+        </div>
+      </div>
+    </>,
+    document.body
   )
 }

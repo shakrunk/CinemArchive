@@ -1171,7 +1171,6 @@ export function TitleDetailDrawer() {
     if (!isSpiderNoir || !title || !isDetailDrawerOpen) return
     const derived = getSpiderNoirActiveMode(title)
     const seeded = pinnedModeRaw ?? derived ?? 'normal'
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setManualMode(seeded as SelectorMode)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title?.id, isDetailDrawerOpen])

@@ -251,6 +251,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                   <Input
                     id="email-input"
+                    aria-label="Email address"
                     required
                     type="email"
                     placeholder="name@domain.com"
@@ -404,6 +405,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                             onClick={() => handleCopyLink(k.token, k.id)}
                             className="bg-secondary hover:bg-secondary-muted text-muted-foreground hover:text-foreground w-7 h-7 p-0 flex items-center justify-center"
                             title="Copy Sharing Link"
+                            aria-label="Copy Sharing Link"
                           >
                             {copiedKeyId === k.id ? (
                               <Check className="w-3.5 h-3.5 text-amber" />
@@ -416,6 +418,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                             onClick={() => handleRevokeKey(k.id)}
                             className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
                             title="Revoke Link"
+                            aria-label="Revoke Link"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>

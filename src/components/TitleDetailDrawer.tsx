@@ -217,7 +217,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
             className="font-mono mb-2"
             style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
           >
-            Cast
+            Main Cast
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             {cast.map((member) => (
@@ -477,9 +477,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
 
       {/* Season cast */}
       {season?.cast && season.cast.length > 0 && (
-        <div>
+        <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
           <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-            Season Cast
+            Season {season.seasonNumber} Cast
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             {season.cast.map((member) => (

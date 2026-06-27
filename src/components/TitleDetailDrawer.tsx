@@ -27,6 +27,7 @@ import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMemb
 import { fetchSeasonDetails } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
+import { transitionSpiderNoir } from 'src/lib/theme'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 220102
@@ -1154,28 +1155,52 @@ export function TitleDetailDrawer() {
 
   useEffect(() => {
     const ALL = ['spider-noir-bw', 'spider-noir-color', 'spider-noir-bw-enter', 'spider-noir-color-enter'] as const
-    document.body.classList.remove(...ALL)
+    const targetMode = isSpiderNoir && activeSpiderNoirMode ? activeSpiderNoirMode : null
+    const prevMode = prevNoirModeRef.current
 
-    if (isSpiderNoir && activeSpiderNoirMode) {
-      document.body.classList.add(activeSpiderNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
+    // Skip the transition on the very first render (prev === undefined) —
+    // the drawer isn't open yet so there's nothing to animate between.
+    // Also skip if the mode hasn't actually changed.
+    const isVisualChange = prevMode !== undefined && prevMode !== targetMode
 
-      if (prevNoirModeRef.current !== undefined && prevNoirModeRef.current !== activeSpiderNoirMode) {
-        const enterClass = `spider-noir-${activeSpiderNoirMode}-enter` as const
-        void document.body.offsetWidth // force reflow so animation restarts
-        document.body.classList.add(enterClass)
-        setNoirAnim(activeSpiderNoirMode)
-        if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
-        noirAnimTimerRef.current = setTimeout(() => {
-          document.body.classList.remove(enterClass)
-          setNoirAnim(null)
-        }, 2100)
+    function applyClasses() {
+      document.body.classList.remove(...ALL)
+      if (targetMode) {
+        document.body.classList.add(targetMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
       }
     }
 
-    prevNoirModeRef.current = activeSpiderNoirMode ?? null
+    if (isVisualChange) {
+      // The View Transition must capture the current (pre-change) DOM state
+      // before applyClasses runs. We pass applyClasses as the commit so the
+      // API snapshots before/after correctly — this works for both the enter
+      // (normal → noir) and exit (noir → normal) directions.
+      transitionSpiderNoir(applyClasses)
+      if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
+      if (targetMode) {
+        // Entering or switching: cast the web overlay on top of the VT reveal.
+        // Deferred so it runs as an async callback (not synchronously in the
+        // effect body) — avoids the react-hooks/set-state-in-effect lint rule.
+        noirAnimTimerRef.current = setTimeout(() => {
+          setNoirAnim(targetMode)
+          noirAnimTimerRef.current = setTimeout(() => setNoirAnim(null), 2100)
+        }, 0)
+      } else {
+        // Exiting: dismiss any lingering web overlay so it doesn't hang over
+        // the returned normal view.
+        noirAnimTimerRef.current = setTimeout(() => setNoirAnim(null), 0)
+      }
+    } else {
+      applyClasses()
+    }
 
+    prevNoirModeRef.current = targetMode
+
+    // Do NOT remove body classes in the cleanup — the cleanup fires before the
+    // next effect run, which would cause the exit View Transition to capture
+    // no-noir → no-noir (invisible). Class removal is handled by applyClasses
+    // in the next run. The timer must still be cleared on unmount.
     return () => {
-      document.body.classList.remove(...ALL)
       if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
     }
   }, [isSpiderNoir, activeSpiderNoirMode])

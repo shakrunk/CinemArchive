@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { cn } from 'src/lib/utils'
 import { avgEpisodeRating } from 'src/store/episodeUtils'
 import type { Season } from 'src/store/mockData'
@@ -36,11 +37,91 @@ interface SeriesGraphProps {
   className?: string
 }
 
+interface TooltipState {
+  label: string
+  rating: string | null
+  x: number
+  y: number
+}
+
 export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProps) {
   const maxEpisodes = Math.max(...seasons.map((s) => s.episodeCount), 1)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+
+  // Cap each cell at ~20px wide: label(≈35px) + n*(cell+gap)
+  const maxWidth = `calc(2.2rem + ${maxEpisodes * 23}px)`
+
+  function showTooltip(
+    e: React.MouseEvent<HTMLDivElement>,
+    season: Season,
+    epNum: number,
+    avg: number | null,
+    watched: boolean,
+    epName?: string,
+  ) {
+    const cellEl = e.currentTarget
+    const cRect = containerRef.current?.getBoundingClientRect()
+    if (!cRect) return
+    const r = cellEl.getBoundingClientRect()
+    const label = epName
+      ? `S${season.seasonNumber}E${epNum} · ${epName}`
+      : `S${season.seasonNumber}E${epNum}`
+    const rating = avg !== null ? `★ ${avg.toFixed(1)}` : watched ? 'not rated' : 'unwatched'
+    // Clamp horizontally so the tooltip stays within the container.
+    // 120px is a conservative estimate for the half-width of most episode-name tooltips.
+    const rawX = r.left + r.width / 2 - cRect.left
+    const half = Math.min(120, cRect.width / 2)
+    setTooltip({
+      label,
+      rating,
+      x: Math.max(half, Math.min(cRect.width - half, rawX)),
+      y: r.top - cRect.top - 6,
+    })
+  }
 
   return (
-    <div className={cn('series-graph', className)}>
+    <div
+      ref={containerRef}
+      className={cn('series-graph', className)}
+      style={{ maxWidth, position: 'relative' }}
+    >
+      {/* Floating tooltip */}
+      {tooltip && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 20,
+            pointerEvents: 'none',
+            background: 'var(--ink-1)',
+            border: '1px solid var(--line-2)',
+            borderRadius: '5px',
+            padding: '3px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--paper)' }}>
+            {tooltip.label}
+          </span>
+          {tooltip.rating && (
+            <span style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '10px',
+              color: tooltip.rating.startsWith('★') ? 'var(--amber)' : 'var(--paper-faint)',
+            }}>
+              {tooltip.rating}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Column headers: episode numbers */}
       <div
         className="grid mb-1"
@@ -90,7 +171,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
                 key={i}
                 role={onCellClick ? 'button' : undefined}
                 tabIndex={onCellClick ? 0 : undefined}
-                title={ep ? `S${season.seasonNumber}E${epNum}${ep.episodeName ? ` · ${ep.episodeName}` : ''} — ${ratingLabel(avg)}` : `S${season.seasonNumber}E${epNum}`}
+                aria-label={ep ? `S${season.seasonNumber}E${epNum}${ep.episodeName ? ` · ${ep.episodeName}` : ''} — ${ratingLabel(avg)}` : `S${season.seasonNumber}E${epNum}`}
                 onClick={() => onCellClick?.(season.seasonNumber, epNum)}
                 onKeyDown={(e) => {
                   if (onCellClick && (e.key === 'Enter' || e.key === ' ')) {
@@ -98,6 +179,8 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
                     onCellClick(season.seasonNumber, epNum)
                   }
                 }}
+                onMouseEnter={(e) => showTooltip(e, season, epNum, avg, watched, ep?.episodeName)}
+                onMouseLeave={() => setTooltip(null)}
                 className={cn(
                   'series-graph__cell',
                   watched && 'series-graph__cell--watched',

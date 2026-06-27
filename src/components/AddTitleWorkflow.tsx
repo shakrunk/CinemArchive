@@ -382,6 +382,7 @@ export function AddTitleWorkflow() {
       director: selected.director,
       genres: selected.genres,
       posterUrl: selected.posterUrl,
+      backdropUrl: selected.backdropUrl,
       synopsis: selected.synopsis,
       runtime: selected.runtime,
       network: selected.network,

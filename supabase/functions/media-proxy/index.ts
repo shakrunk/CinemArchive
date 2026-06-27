@@ -133,6 +133,20 @@ async function getTMDBVideos(tmdbId: number, type: 'movie' | 'tv') {
   return data
 }
 
+async function getTMDBImages(tmdbId: number, type: 'movie' | 'tv') {
+  const cacheKey = `tmdb:images:${type}:${tmdbId}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  // include_image_language=en,null returns English-text logos plus textless ones.
+  const url = `${TMDB_BASE}/${type}/${tmdbId}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -179,6 +193,13 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         if (!id) throw new Error('Missing id parameter')
         result = await getTMDBVideos(id, type)
+        break
+      }
+      case 'images': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        const type = parseMediaType(url.searchParams.get('type'))
+        if (!id) throw new Error('Missing id parameter')
+        result = await getTMDBImages(id, type)
         break
       }
       default:

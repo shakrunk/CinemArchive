@@ -335,3 +335,31 @@ export async function fetchTitleVideos(tmdbId: number, type: MediaType): Promise
     return []
   }
 }
+
+/**
+ * Fetch the title's logo image (the stylized name treatment, transparent PNG).
+ * Returns an English-text logo URL, or null when none exists so callers can
+ * fall back to plain text. Display-only — not persisted.
+ */
+export async function fetchTitleLogo(tmdbId: number, type: MediaType): Promise<string | null> {
+  if (!(isSupabaseConfigured && supabase)) return null
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=images&id=${tmdbId}&type=${type}`
+    )
+    if (error) throw error
+
+    // Only English-language logos carry the readable title text; textless
+    // (iso null) logos are dropped so we fall back to plain text instead.
+    const englishLogos = ((data?.logos ?? []) as any[])
+      .filter((l) => l.file_path && l.iso_639_1 === 'en')
+    if (englishLogos.length === 0) return null
+
+    const best = englishLogos.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
+    return `${TMDB_IMG}/w500${best.file_path}`
+  } catch (e) {
+    console.error('Error fetching title logo:', e)
+    return null
+  }
+}

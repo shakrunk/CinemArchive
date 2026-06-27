@@ -792,7 +792,7 @@
 @media (min-width: 640px) {
   .cinema-content--expanded {
     width: calc(100% - 3rem);
-    max-width: none;
+    max-width: 1400px;
     max-height: calc(100vh - 100px);
   }
 }

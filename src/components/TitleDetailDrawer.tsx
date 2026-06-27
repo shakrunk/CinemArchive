@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
-import { fetchSeasonDetails, fetchTitleVideos, type TitleVideo } from 'src/lib/media'
+import { fetchSeasonDetails, fetchTitleVideos, fetchTitleLogo, type TitleVideo } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
@@ -817,8 +817,8 @@ export function TitleDetailDrawer() {
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
-  const [drawerExpanded, setDrawerExpanded] = useState(false)
   const [videos, setVideos] = useState<TitleVideo[]>([])
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isDetailDrawerOpen || !title?.tmdbId) {
@@ -833,11 +833,23 @@ export function TitleDetailDrawer() {
     return () => { cancelled = true }
   }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
 
+  // Logo: TV-with-backdrop hero only — fetched lazily, mirrors the videos effect.
+  useEffect(() => {
+    if (!isDetailDrawerOpen || !title?.tmdbId || title.type !== 'tv' || !title.backdropUrl) {
+      const t = setTimeout(() => setLogoUrl(null), 0)
+      return () => clearTimeout(t)
+    }
+    let cancelled = false
+    fetchTitleLogo(title.tmdbId, title.type).then((url) => {
+      if (!cancelled) setLogoUrl(url)
+    })
+    return () => { cancelled = true }
+  }, [isDetailDrawerOpen, title?.tmdbId, title?.type, title?.backdropUrl])
+
   function onClose() {
     setPendingDeleteTitle(false)
     setPosterLightboxOpen(false)
     setActivePerson(null)
-    setDrawerExpanded(false)
     closeDetailDrawer()
   }
 
@@ -1039,8 +1051,7 @@ export function TitleDetailDrawer() {
       maxWidth="sm:max-w-2xl"
       title={title.title}
       description={title.synopsis ?? `Details and viewing history for ${title.title}.`}
-      expanded={drawerExpanded}
-      onToggleExpand={() => setDrawerExpanded((v) => !v)}
+      expanded
     >
       {/* Poster lightbox — rendered inside portal, above dialog via z-[60] */}
       {posterLightboxOpen && title.posterUrl && (
@@ -1070,7 +1081,15 @@ export function TitleDetailDrawer() {
                 <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
               )}
             </div>
-            <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={title.title}
+                className="object-contain object-left max-h-20 max-w-[80%] drop-shadow-lg"
+              />
+            ) : (
+              <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
+            )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-mono text-sm text-amber">{title.year}</span>
             </div>

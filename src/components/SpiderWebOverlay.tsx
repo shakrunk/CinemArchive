@@ -7,7 +7,7 @@
  * Mount this component when a mode transition fires; unmount after 2100ms
  * (a 100ms buffer past the CSS animation end).
  */
-export function SpiderWebOverlay({ mode }: { mode: 'bw' | 'color' }) {
+export default function SpiderWebOverlay({ mode }: { mode: 'bw' | 'color' }) {
   const w = window.innerWidth
   const h = window.innerHeight
   const cx = w / 2

@@ -22,12 +22,12 @@ export function HeroBackdrop({ title, onPosterClick, children }: HeroBackdropPro
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 50%, var(--card) 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 30%, rgba(0,0,0,0.75) 65%, var(--card) 85%)',
         }}
       />
 
       {/* Spacer that establishes the backdrop height */}
-      <div className="relative z-10 h-28" />
+      <div className="relative z-10 h-48" />
 
       {/* Poster + title info row — sits at the bottom of the backdrop */}
       <div className="relative z-10 flex gap-5 px-6 pb-6">

@@ -725,3 +725,58 @@ export async function deleteEpisodeWatchEventFromDb(userId: string, watchEventId
     throw error
   }
 }
+
+// ─── User Title Pins ──────────────────────────────────────────────────────────
+
+export async function fetchAllTitlePins(
+  userId: string
+): Promise<Array<{ titleId: string; easterEggKey: string; pinnedVariant: 'bw' | 'color' }>> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('user_title_pins')
+    .select('title_id, easter_egg_key, pinned_variant')
+    .eq('user_id', userId)
+  if (error) {
+    console.error('fetchAllTitlePins:', error)
+    return []
+  }
+  return (data ?? []).map((row) => ({
+    titleId: row.title_id as string,
+    easterEggKey: row.easter_egg_key as string,
+    pinnedVariant: row.pinned_variant as 'bw' | 'color',
+  }))
+}
+
+export async function upsertTitlePin(
+  userId: string,
+  titleId: string,
+  easterEggKey: string,
+  pinnedVariant: 'bw' | 'color'
+): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('user_title_pins')
+    .upsert({
+      user_id: userId,
+      title_id: titleId,
+      easter_egg_key: easterEggKey,
+      pinned_variant: pinnedVariant,
+      updated_at: new Date().toISOString(),
+    })
+  if (error) console.error('upsertTitlePin:', error)
+}
+
+export async function deleteTitlePin(
+  userId: string,
+  titleId: string,
+  easterEggKey: string
+): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('user_title_pins')
+    .delete()
+    .eq('user_id', userId)
+    .eq('title_id', titleId)
+    .eq('easter_egg_key', easterEggKey)
+  if (error) console.error('deleteTitlePin:', error)
+}

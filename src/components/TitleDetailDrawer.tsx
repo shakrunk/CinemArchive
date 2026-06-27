@@ -340,6 +340,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const carouselRef = useRef<HTMLDivElement>(null)
+  const graphClickEpIdRef = useRef<string | null>(null)
 
   const season = seasons.find((s) => s.seasonNumber === selectedSeason)
   const hasEpisodes = (s: Season) => (s.episodes?.length ?? 0) > 0
@@ -362,13 +363,16 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
     carouselRef.current?.scrollBy({ left: dir === 'right' ? CARD_WIDTH : -CARD_WIDTH, behavior: 'smooth' })
   }
 
-  // Reset carousel + selection on season change
+  // Reset carousel + selection on season change (honours graph-click ref)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedEpId(null)
+    const pendingEpId = graphClickEpIdRef.current
+    graphClickEpIdRef.current = null
     const el = carouselRef.current
     if (el) el.scrollLeft = 0
-    setCanScrollLeft(false)
+    setTimeout(() => {
+      setSelectedEpId(pendingEpId)
+      setCanScrollLeft(false)
+    }, 0)
     const t = setTimeout(() => {
       const el2 = carouselRef.current
       if (el2) setCanScrollRight(el2.scrollWidth > el2.clientWidth + 4)
@@ -378,7 +382,6 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
 
   function handleSeasonChange(seasonNumber: number) {
     setSelectedSeason(seasonNumber)
-    setSelectedEpId(null)
   }
 
   return (
@@ -412,11 +415,10 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <SeriesGraph
             seasons={seasons}
             onCellClick={(seasonNumber, episodeNumber) => {
+              const targetSeason = seasons.find((s) => s.seasonNumber === seasonNumber)
+              const ep = targetSeason?.episodes?.find((e) => e.episodeNumber === episodeNumber)
+              if (ep) graphClickEpIdRef.current = ep.id
               handleSeasonChange(seasonNumber)
-              const ep = seasons
-                .find((s) => s.seasonNumber === seasonNumber)
-                ?.episodes?.find((e) => e.episodeNumber === episodeNumber)
-              if (ep) setSelectedEpId(ep.id)
             }}
           />
         </div>

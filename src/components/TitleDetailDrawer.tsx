@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
@@ -27,17 +27,15 @@ import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMemb
 import { fetchSeasonDetails } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
+import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
+import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
+import { getUnlockedModes, getEarnedModes } from 'src/store/episodeUtils'
 import { transitionSpiderNoir } from 'src/lib/theme'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 220102
-
-const SPIDER_WEB_SVG_BW = encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><g stroke="rgba(255,255,255,0.55)" stroke-width="0.8" fill="none"><line x1="100" y1="100" x2="100" y2="5"/><line x1="100" y1="100" x2="167" y2="33"/><line x1="100" y1="100" x2="195" y2="100"/><line x1="100" y1="100" x2="167" y2="167"/><line x1="100" y1="100" x2="100" y2="195"/><line x1="100" y1="100" x2="33" y2="167"/><line x1="100" y1="100" x2="5" y2="100"/><line x1="100" y1="100" x2="33" y2="33"/><circle cx="100" cy="100" r="20"/><circle cx="100" cy="100" r="45"/><circle cx="100" cy="100" r="68"/><circle cx="100" cy="100" r="90"/></g></svg>`
-)
-const SPIDER_WEB_SVG_COLOR = encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><g stroke="rgba(233,178,102,0.55)" stroke-width="0.8" fill="none"><line x1="100" y1="100" x2="100" y2="5"/><line x1="100" y1="100" x2="167" y2="33"/><line x1="100" y1="100" x2="195" y2="100"/><line x1="100" y1="100" x2="167" y2="167"/><line x1="100" y1="100" x2="100" y2="195"/><line x1="100" y1="100" x2="33" y2="167"/><line x1="100" y1="100" x2="5" y2="100"/><line x1="100" y1="100" x2="33" y2="33"/><circle cx="100" cy="100" r="20"/><circle cx="100" cy="100" r="45"/><circle cx="100" cy="100" r="68"/><circle cx="100" cy="100" r="90"/></g></svg>`
-)
+type SelectorMode = 'normal' | 'bw' | 'color'
+const EASTER_EGG_KEY = 'spider_noir_color'
 
 function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
   let lastMode: 'bw' | 'color' | null = null
@@ -1147,26 +1145,56 @@ export function TitleDetailDrawer() {
   const user = useAppStore((s) => s.user)
 
   const isSpiderNoir = title?.tmdbId === SPIDER_NOIR_TMDB_ID
-  const activeSpiderNoirMode = isSpiderNoir && title ? getSpiderNoirActiveMode(title) : null
+
+  const pinnedModeRaw = useAppStore((s) =>
+    title ? (s.pinnedModes[`${title.id}:${EASTER_EGG_KEY}`] ?? null) : null
+  ) as 'bw' | 'color' | null
+  const setPinnedMode = useAppStore((s) => s.setPinnedMode)
+
+  const unlockedModes = useMemo(
+    () => (isSpiderNoir && title ? getUnlockedModes(title) : new Set<'bw' | 'color'>()),
+    [isSpiderNoir, title]
+  )
+  const earnedModes = useMemo(
+    () => (isSpiderNoir && title ? getEarnedModes(title) : new Set<'bw' | 'color'>()),
+    [isSpiderNoir, title]
+  )
 
   const prevNoirModeRef = useRef<'bw' | 'color' | null | undefined>(undefined)
   const [noirAnim, setNoirAnim] = useState<'bw' | 'color' | null>(null)
   const noirAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [manualMode, setManualMode] = useState<SelectorMode>('normal')
+
+  // Seed manualMode from pinned → last watch event → normal when the drawer opens.
+  // Deferred so it runs as an async callback (not synchronously in the effect body)
+  // — avoids the react-hooks/set-state-in-effect lint rule.
+  useEffect(() => {
+    if (!isSpiderNoir || !title || !isDetailDrawerOpen) return
+    const derived = getSpiderNoirActiveMode(title)
+    const seeded = pinnedModeRaw ?? derived ?? 'normal'
+    const t = setTimeout(() => setManualMode(seeded), 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title?.id, isDetailDrawerOpen])
+
+  // While drawer is open: use manual selection. When closed: use pinned (if any).
+  const effectiveNoirMode: 'bw' | 'color' | null = isDetailDrawerOpen && isSpiderNoir
+    ? (manualMode !== 'normal' ? (manualMode as 'bw' | 'color') : null)
+    : (isSpiderNoir ? pinnedModeRaw : null)
 
   useEffect(() => {
     const ALL = ['spider-noir-bw', 'spider-noir-color', 'spider-noir-bw-enter', 'spider-noir-color-enter'] as const
-    const targetMode = isSpiderNoir && activeSpiderNoirMode ? activeSpiderNoirMode : null
     const prevMode = prevNoirModeRef.current
 
     // Skip the transition on the very first render (prev === undefined) —
     // the drawer isn't open yet so there's nothing to animate between.
     // Also skip if the mode hasn't actually changed.
-    const isVisualChange = prevMode !== undefined && prevMode !== targetMode
+    const isVisualChange = prevMode !== undefined && prevMode !== effectiveNoirMode
 
     function applyClasses() {
       document.body.classList.remove(...ALL)
-      if (targetMode) {
-        document.body.classList.add(targetMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
+      if (effectiveNoirMode) {
+        document.body.classList.add(effectiveNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
       }
     }
 
@@ -1177,12 +1205,12 @@ export function TitleDetailDrawer() {
       // (normal → noir) and exit (noir → normal) directions.
       transitionSpiderNoir(applyClasses)
       if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
-      if (targetMode) {
+      if (effectiveNoirMode) {
         // Entering or switching: cast the web overlay on top of the VT reveal.
         // Deferred so it runs as an async callback (not synchronously in the
         // effect body) — avoids the react-hooks/set-state-in-effect lint rule.
         noirAnimTimerRef.current = setTimeout(() => {
-          setNoirAnim(targetMode)
+          setNoirAnim(effectiveNoirMode)
           noirAnimTimerRef.current = setTimeout(() => setNoirAnim(null), 2100)
         }, 0)
       } else {
@@ -1194,7 +1222,7 @@ export function TitleDetailDrawer() {
       applyClasses()
     }
 
-    prevNoirModeRef.current = targetMode
+    prevNoirModeRef.current = effectiveNoirMode
 
     // Do NOT remove body classes in the cleanup — the cleanup fires before the
     // next effect run, which would cause the exit View Transition to capture
@@ -1203,7 +1231,7 @@ export function TitleDetailDrawer() {
     return () => {
       if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
     }
-  }, [isSpiderNoir, activeSpiderNoirMode])
+  }, [effectiveNoirMode])
 
   const [showLogForm, setShowLogForm] = useState(false)
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -1402,24 +1430,19 @@ export function TitleDetailDrawer() {
     removeTitle(title.id)
   }
 
+  function handleModeSelect(mode: SelectorMode) {
+    setManualMode(mode)
+  }
+
+  function handleTogglePin(mode: 'bw' | 'color') {
+    if (!title) return
+    const newVariant = pinnedModeRaw === mode ? null : mode
+    setPinnedMode(title.id, EASTER_EGG_KEY, newVariant)
+  }
+
   return (
     <>
-    {noirAnim && (
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9998,
-          pointerEvents: 'none',
-          backgroundImage: `url("data:image/svg+xml,${noirAnim === 'bw' ? SPIDER_WEB_SVG_BW : SPIDER_WEB_SVG_COLOR}")`,
-          backgroundSize: 'min(80vw, 80vh)',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-          animation: 'spider-web-cast 2100ms ease forwards',
-        }}
-      />
-    )}
+    {noirAnim && <SpiderWebOverlay mode={noirAnim} />}
     <CinemaModal
       open={isDetailDrawerOpen}
       onClose={onClose}
@@ -1508,6 +1531,16 @@ export function TitleDetailDrawer() {
                   </div>
                 )}
               </div>
+              {isSpiderNoir && (
+                <SpiderNoirModeSelector
+                  unlockedModes={unlockedModes}
+                  earnedModes={earnedModes}
+                  selected={manualMode}
+                  pinned={pinnedModeRaw}
+                  onSelect={handleModeSelect}
+                  onTogglePin={handleTogglePin}
+                />
+              )}
               <StarRating
                 value={title.rating ?? 0}
                 size="sm"

@@ -13,9 +13,11 @@ import { computeUpNextShows } from 'src/store/upNext'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
-import { applyTheme } from 'src/lib/theme'
+import { applyTheme, toggleTheme } from 'src/lib/theme'
 import { CommandPalette } from 'src/components/CommandPalette'
+import { KeyboardShortcutsHelp } from 'src/components/KeyboardShortcutsHelp'
 import { NotificationStack } from 'src/components/NotificationStack'
+import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 import type { Command } from 'src/store/commands'
 
 export default function App() {
@@ -36,9 +38,15 @@ export default function App() {
   const isSharedView = useAppStore((s) => s.isSharedView)
   const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
   const closeCommandPalette = useAppStore((s) => s.closeCommandPalette)
+  const openCommandPalette = useAppStore((s) => s.openCommandPalette)
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const openAddTitle = useAppStore((s) => s.openAddTitle)
   const setViewMode = useAppStore((s) => s.setViewMode)
+  const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
+  const isRefreshMetadataOpen = useAppStore((s) => s.isRefreshMetadataOpen)
+
+  const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
 
   // A component without access to currentView (e.g. the detail drawer's
   // browse-by-person) requests a view change via the store. We consume it in a
@@ -72,6 +80,27 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // Single-key shortcuts — suppressed while any modal/dialog is open or focus
+  // is in a text field (handled inside the hook).
+  const shortcutsActive =
+    !isAddTitleOpen && !isDetailDrawerOpen && !isRefreshMetadataOpen &&
+    !isCommandPaletteOpen && !isKeyboardHelpOpen
+
+  useKeyboardShortcuts(
+    {
+      '1': () => setCurrentView('upnext'),
+      '2': () => setCurrentView('library'),
+      '3': () => setCurrentView('ledger'),
+      'n': () => { if (!isSharedView) openAddTitle() },
+      '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),
+      'g': () => { setCurrentView('library'); setViewMode('grid') },
+      'l': () => { setCurrentView('library'); setViewMode('list') },
+      't': () => toggleTheme({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 }),
+      '?': () => setIsKeyboardHelpOpen(true),
+    },
+    shortcutsActive,
+  )
 
   // Build the command list + an id→handler map. Title commands open the drawer
   // (which, via useNavigationSync, becomes a back-button-closable history entry).
@@ -168,6 +197,7 @@ export default function App() {
         commands={commands}
         onRun={runCommand}
       />
+      <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onClose={() => setIsKeyboardHelpOpen(false)} />
       <NotificationStack />
     </div>
   )

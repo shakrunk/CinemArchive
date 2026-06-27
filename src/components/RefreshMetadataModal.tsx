@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { Search, Film, Tv, RefreshCw } from 'lucide-react'
+import { Search, Film, Tv, RefreshCw, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -329,7 +329,18 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
               )}
 
               {!searching && typedResults.length === 0 && query.trim().length > 1 && (
-                <div className="text-center py-6 text-muted-foreground text-sm">No results for "{query}"</div>
+                <div className="text-center py-6 text-muted-foreground text-sm flex flex-col items-center gap-3">
+                  <div>No results for "{query}"</div>
+                  <button
+                    onClick={() => {
+                      setQuery('')
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear search
+                  </button>
+                </div>
               )}
 
               {typedResults.length > 0 && (

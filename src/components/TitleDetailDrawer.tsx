@@ -11,7 +11,6 @@ import { CardTitle, BodyText, MetaBadge, StatNumber, StatLabel } from 'src/compo
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
-  avgEpisodeRating,
   avgSeasonRating,
   avgSeriesRating,
   episodesWatchedInSeason,
@@ -20,15 +19,15 @@ import {
   getUnlockedModes,
   getEarnedModes,
 } from 'src/store/episodeUtils'
+import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronDown, ChevronRight, Eye, MessageSquare, RefreshCw, Tag, X,
+  ChevronLeft, ChevronRight, RefreshCw, Tag, X,
 } from 'lucide-react'
 import { cn } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
-import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { transitionSpiderNoir } from 'src/lib/theme'
@@ -323,493 +322,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
   )
 }
 
-// ─── TV: Episode log form (watch event + optional rating + optional review) ───
-
-interface EpLogState {
-  includeWatch: boolean
-  watchedAt: string
-  watchNotes: string
-  rating: number
-  reviewText: string
-}
-
-const EMPTY_EP_LOG: EpLogState = {
-  includeWatch: true,
-  watchedAt: new Date().toISOString().slice(0, 10),
-  watchNotes: '',
-  rating: 0,
-  reviewText: '',
-}
-
-interface EpisodePanelProps {
-  episode: Episode
-  season: Season
-  titleId: string
-  isSharedView: boolean
-  isSpiderNoir: boolean
-}
-
-function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: EpisodePanelProps) {
-  const logEpisode = useAppStore((s) => s.logEpisode)
-  const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
-  const [pendingDeleteWeId, setPendingDeleteWeId] = useState<string | null>(null)
-  const [log, setLog] = useState<EpLogState>(EMPTY_EP_LOG)
-  const [showForm, setShowForm] = useState(false)
-  const [showSaved, setShowSaved] = useState(false)
-  const [pendingLog, setPendingLog] = useState<EpLogState | null>(null)
-  const [showNoirModal, setShowNoirModal] = useState(false)
-
-  const avg = avgEpisodeRating(episode)
-  const watched = episode.watchEvents.length > 0
-  const hasRatings = episode.ratings.length > 0
-  const hasReviews = episode.reviews.length > 0
-  const histCols = [watched, hasRatings, hasReviews].filter(Boolean).length
-
-  function doSave(epLog: EpLogState, colorMode?: 'bw' | 'color') {
-    if (!epLog.includeWatch && epLog.rating === 0 && !epLog.reviewText.trim()) return
-    logEpisode(titleId, season.seasonNumber, episode.episodeNumber, {
-      watchedAt: epLog.includeWatch ? epLog.watchedAt : undefined,
-      watchNotes: epLog.includeWatch ? epLog.watchNotes : undefined,
-      rating: epLog.rating > 0 ? epLog.rating : undefined,
-      reviewText: epLog.reviewText.trim() || undefined,
-      colorMode,
-    })
-    setLog(EMPTY_EP_LOG)
-    setShowForm(false)
-    setShowSaved(true)
-    setTimeout(() => setShowSaved(false), 1500)
-  }
-
-  function handleSubmit() {
-    if (!log.includeWatch && log.rating === 0 && !log.reviewText.trim()) return
-    const hasWatchOrReview = (log.includeWatch && !!log.watchedAt) || !!log.reviewText.trim()
-    if (isSpiderNoir && hasWatchOrReview) {
-      setPendingLog(log)
-      setShowNoirModal(true)
-    } else {
-      doSave(log)
-    }
-  }
-
-  function handleNoirSelect(mode: 'bw' | 'color') {
-    setShowNoirModal(false)
-    if (pendingLog) doSave(pendingLog, mode)
-    setPendingLog(null)
-  }
-
-  function handleNoirSkip() {
-    setShowNoirModal(false)
-    if (pendingLog) doSave(pendingLog)
-    setPendingLog(null)
-  }
-
-  return (
-    <div className="ep-panel px-3 py-3 space-y-3" style={{ borderTop: '1px solid var(--line)' }}>
-      {/* Episode crew — director / writers */}
-      {(episode.director || (episode.writers && episode.writers.length > 0)) && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: '11px' }}>
-          {episode.director && (
-            <span>
-              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>Dir. </span>
-              <span className="font-sans" style={{ color: 'var(--paper-dim)' }}>{episode.director}</span>
-            </span>
-          )}
-          {episode.writers && episode.writers.length > 0 && (
-            <span>
-              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>Written by </span>
-              <span className="font-sans" style={{ color: 'var(--paper-dim)' }}>{episode.writers.join(', ')}</span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Episode still + synopsis */}
-      {(episode.stillUrl || episode.synopsis) && (
-        <div className="flex gap-3">
-          {episode.stillUrl && (
-            <img
-              src={episode.stillUrl}
-              alt={episode.episodeName ?? `Episode ${episode.episodeNumber}`}
-              className="rounded-md object-cover shrink-0"
-              style={{ width: '120px', height: '68px', objectPosition: 'center' }}
-            />
-          )}
-          {episode.synopsis && (
-            <p className="font-sans text-xs leading-relaxed flex-1 min-w-0" style={{ color: 'var(--paper-dim)' }}>
-              {episode.synopsis}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Existing history */}
-      {(episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0) && (
-        <div className={cn('grid gap-2 text-xs', histCols === 1 ? 'grid-cols-1' : histCols === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
-          {/* Watch events — only when watched */}
-          {watched && (
-            <div>
-              <div
-                className="font-mono mb-1.5"
-                style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-              >
-                Watched
-              </div>
-              {episode.watchEvents.map((we) => (
-                <div key={we.id}>
-                  {pendingDeleteWeId === we.id ? (
-                    <div>
-                      <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
-                        Remove?
-                      </div>
-                      <div className="flex gap-2 mt-0.5">
-                        <button
-                          onClick={() => {
-                            deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id)
-                            setPendingDeleteWeId(null)
-                          }}
-                          className="font-mono transition-opacity hover:opacity-80"
-                          style={{ color: 'var(--ember)', fontSize: '10px' }}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => setPendingDeleteWeId(null)}
-                          className="font-mono transition-opacity hover:opacity-80"
-                          style={{ color: 'var(--paper-faint)', fontSize: '10px' }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-1">
-                      <div className="flex-1 font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
-                        {fmtDate(we.watchedAt)}
-                        {we.colorMode && (
-                          <span
-                            className="font-mono ml-1.5 px-1 rounded"
-                            style={{
-                              fontSize: '9px',
-                              letterSpacing: '0.06em',
-                              background: we.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
-                              color: we.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
-                              border: `1px solid ${we.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
-                            }}
-                          >
-                            {we.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
-                          </span>
-                        )}
-                        {we.notes && (
-                          <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
-                            {we.notes}
-                          </div>
-                        )}
-                      </div>
-                      {!isSharedView && (
-                        <button
-                          onClick={() => setPendingDeleteWeId(we.id)}
-                          style={{ color: 'var(--paper-faint)', opacity: 0.45, flexShrink: 0, marginTop: '1px' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
-                          aria-label="Delete watch event"
-                        >
-                          <Trash2 className="w-2.5 h-2.5" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
-            }
-            </div>
-          )}
-
-          {/* Ratings — only when rated */}
-          {hasRatings && (
-            <div>
-              <div
-                className="font-mono mb-1.5"
-                style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-              >
-                Ratings
-              </div>
-              {episode.ratings.map((er) => (
-                <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
-                  ★ {er.rating}
-                  <div className="mt-0.5">
-                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>
-                      {fmtDateTime(er.ratedAt).date}
-                    </div>
-                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>
-                      {fmtDateTime(er.ratedAt).time}
-                    </div>
-                  </div>
-                </div>
-              ))
-              }
-              {episode.ratings.length > 1 && avg !== null && (
-                <div className="font-mono mt-1" style={{ color: 'var(--amber-deep)', fontSize: '10px' }}>
-                  avg ★ {avg.toFixed(1)}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Reviews — only when reviewed */}
-          {hasReviews && (
-            <div>
-              <div
-                className="font-mono mb-1.5"
-                style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-              >
-                Reviews
-              </div>
-              {episode.reviews.map((rv) => (
-                <div key={rv.id}>
-                  <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>
-                    "{rv.reviewText}"
-                  </div>
-                  <div className="mt-0.5" style={{ color: 'var(--paper-faint)' }}>
-                    <div className="font-mono flex items-center gap-1.5" style={{ fontSize: '10px' }}>
-                      <span>{fmtDateTime(rv.reviewedAt).date}</span>
-                      {rv.colorMode && (
-                        <span
-                          className="font-mono px-1 rounded"
-                          style={{
-                            fontSize: '9px',
-                            letterSpacing: '0.06em',
-                            background: rv.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
-                            color: rv.colorMode === 'bw' ? '#aaa' : 'var(--amber)',
-                            border: `1px solid ${rv.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
-                          }}
-                        >
-                          {rv.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="font-mono" style={{ fontSize: '9px' }}>
-                      {fmtDateTime(rv.reviewedAt).time}
-                    </div>
-                  </div>
-                </div>
-              ))
-              }
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Log form */}
-      {!isSharedView && (
-        showForm ? (
-          <div className="space-y-3 pt-2" style={{ borderTop: episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0 ? '1px solid var(--line)' : 'none' }}>
-            {/* Watch event toggle */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={log.includeWatch}
-                onChange={(e) => setLog((l) => ({ ...l, includeWatch: e.target.checked }))}
-                className="accent-amber w-3.5 h-3.5"
-              />
-              <span className="font-sans text-xs" style={{ color: 'var(--paper-dim)' }}>
-                Log a watch event
-              </span>
-            </label>
-
-            {log.includeWatch && (
-              <div className="space-y-2 pl-5">
-                <Input
-                  aria-label="Date watched"
-                  type="date"
-                  value={log.watchedAt}
-                  onChange={(e) => setLog((l) => ({ ...l, watchedAt: e.target.value }))}
-                  className="h-8 text-xs font-mono bg-secondary/50 border-border"
-                />
-                <Input
-                  aria-label="Watch notes"
-                  value={log.watchNotes}
-                  onChange={(e) => setLog((l) => ({ ...l, watchNotes: e.target.value }))}
-                  placeholder="Watch notes (optional)"
-                  className="h-8 text-xs bg-secondary/50 border-border"
-                />
-              </div>
-            )}
-
-            {/* Rating (independent) */}
-            <div>
-              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>
-                Rating <span style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>(optional · logged independently)</span>
-              </div>
-              <StarRating value={log.rating} onChange={(r) => setLog((l) => ({ ...l, rating: r }))} size="sm" />
-            </div>
-
-            {/* Review (independent) */}
-            <div>
-              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>
-                Review <span style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>(optional · logged independently)</span>
-              </div>
-              <textarea
-                aria-label="Episode review"
-                value={log.reviewText}
-                onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))}
-                placeholder="Your thoughts on this episode…"
-                rows={2}
-                className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40"
-                style={{
-                  background: 'var(--inset)',
-                  border: '1px solid var(--line)',
-                  color: 'var(--paper)',
-                }}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleSubmit}
-                disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()}
-                className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40"
-                style={{ background: 'var(--amber)', color: '#1a0e06' }}
-              >
-                Save
-              </button>
-              <button
-                onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }}
-                className="h-8 px-3 rounded-md text-xs font-sans border transition-colors"
-                style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              if (showSaved) return
-              setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10) }))
-              setShowForm(true)
-            }}
-            className="flex items-center gap-1.5 text-xs font-mono transition-colors"
-            style={{ color: showSaved ? 'var(--amber)' : 'var(--amber-deep)' }}
-            onMouseEnter={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber)' }}
-            onMouseLeave={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber-deep)' }}
-          >
-            {showSaved ? (
-              <>
-                <Check className="w-3 h-3" />
-                Logged
-              </>
-            ) : (
-              <>
-                <Plus className="w-3 h-3" />
-                {watched ? 'Add rating, review, or re-watch' : 'Log watch event, rating, or review'}
-              </>
-            )}
-          </button>
-        )
-      )}
-      <SpiderNoirModeModal
-        open={showNoirModal}
-        onSelect={handleNoirSelect}
-        onSkip={handleNoirSkip}
-      />
-    </div>
-  )
-}
-
-// ─── TV: Episode row ──────────────────────────────────────────────────────────
-
-interface EpisodeRowProps {
-  episode: Episode
-  season: Season
-  titleId: string
-  expanded: boolean
-  onToggle: () => void
-  isSharedView: boolean
-  isSpiderNoir: boolean
-}
-
-function EpisodeRow({ episode, season, titleId, expanded, onToggle, isSharedView, isSpiderNoir }: EpisodeRowProps) {
-  const avg = avgEpisodeRating(episode)
-  const watched = episode.watchEvents.length > 0
-
-  return (
-    <div>
-      <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        aria-label={`${episode.episodeName ?? `Episode ${episode.episodeNumber}`}, episode ${episode.episodeNumber}`}
-        onClick={onToggle}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
-        className={cn('episode-row', expanded && 'is-expanded', watched && 'is-watched')}
-      >
-        {/* Episode number */}
-        <span
-          className="ep-num font-mono shrink-0 w-8 text-right"
-          style={{ fontSize: '11px', color: watched ? 'var(--amber)' : 'var(--paper-faint)' }}
-        >
-          E{String(episode.episodeNumber).padStart(2, '0')}
-        </span>
-
-        {/* Name + meta */}
-        <div className="flex-1 min-w-0">
-          <div
-            className="font-sans truncate"
-            style={{ fontSize: '13px', color: 'var(--paper)' }}
-          >
-            {episode.episodeName ?? `Episode ${episode.episodeNumber}`}
-          </div>
-          {episode.airDate && (
-            <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
-              {new Date(episode.airDate).getFullYear()}
-              {episode.runtime ? ` · ${episode.runtime}m` : ''}
-            </div>
-          )}
-        </div>
-
-        {/* Watch + rating indicators */}
-        <div className="flex items-center gap-2 shrink-0">
-          {watched && (
-            <span className="flex items-center gap-0.5">
-              <Eye className="w-3 h-3" style={{ color: 'var(--amber)', opacity: 0.8 }} />
-              {episode.watchEvents.length > 1 && (
-                <span className="font-mono" style={{ fontSize: '10px', color: 'var(--amber)', opacity: 0.8 }}>
-                  ×{episode.watchEvents.length}
-                </span>
-              )}
-            </span>
-          )}
-          {episode.reviews.length > 0 && (
-            <MessageSquare className="w-3 h-3" style={{ color: 'var(--paper-faint)', opacity: 0.7 }} />
-          )}
-          {avg !== null ? (
-            <span className="font-mono" style={{ fontSize: '11px', color: 'var(--amber)' }}>
-              ★ {avg.toFixed(1)}
-            </span>
-          ) : (
-            <span className="font-mono" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>—</span>
-          )}
-          {expanded
-            ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--paper-faint)' }} />
-            : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--paper-faint)' }} />
-          }
-        </div>
-      </div>
-
-      {expanded && (
-        <EpisodePanel
-          episode={episode}
-          season={season}
-          titleId={titleId}
-          isSharedView={isSharedView}
-          isSpiderNoir={isSpiderNoir}
-        />
-      )}
-    </div>
-  )
-}
-
-// ─── TV: Season tab bar + episode list ───────────────────────────────────────
+// ─── TV: Season selector + episode carousel ───────────────────────────────────
 
 interface TVSeriesSectionProps {
   titleId: string
@@ -821,15 +334,50 @@ interface TVSeriesSectionProps {
 
 function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPersonClick }: TVSeriesSectionProps) {
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
-  const [expandedEpId, setExpandedEpId] = useState<string | null>(null)
+  const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const carouselRef = useRef<HTMLDivElement>(null)
 
   const season = seasons.find((s) => s.seasonNumber === selectedSeason)
   const hasEpisodes = (s: Season) => (s.episodes?.length ?? 0) > 0
+  const selectedEp = season?.episodes?.find((e) => e.id === selectedEpId) ?? null
 
-  // Rollup stats
   const totalWatched = totalEpisodesWatched(seasons)
   const totalCount = totalEpisodeCount(seasons)
   const seriesAvg = avgSeriesRating(seasons)
+
+  const CARD_WIDTH = 252 // 240px card + 12px gap
+
+  function handleCarouselScroll() {
+    const el = carouselRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }
+
+  function scrollCarousel(dir: 'left' | 'right') {
+    carouselRef.current?.scrollBy({ left: dir === 'right' ? CARD_WIDTH : -CARD_WIDTH, behavior: 'smooth' })
+  }
+
+  // Reset carousel + selection on season change
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedEpId(null)
+    const el = carouselRef.current
+    if (el) el.scrollLeft = 0
+    setCanScrollLeft(false)
+    const t = setTimeout(() => {
+      const el2 = carouselRef.current
+      if (el2) setCanScrollRight(el2.scrollWidth > el2.clientWidth + 4)
+    }, 50)
+    return () => clearTimeout(t)
+  }, [selectedSeason])
+
+  function handleSeasonChange(seasonNumber: number) {
+    setSelectedSeason(seasonNumber)
+    setSelectedEpId(null)
+  }
 
   return (
     <div className="space-y-5">
@@ -839,56 +387,39 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
             {totalWatched}<span className="text-sm font-mono ml-0.5" style={{ color: 'var(--paper-faint)' }}>/{totalCount}</span>
           </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-            Episodes
-          </div>
+          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Episodes</div>
         </div>
         <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--amber)', fontVariationSettings: '"opsz" 30' }}>
             {seriesAvg !== null ? `★ ${seriesAvg.toFixed(1)}` : '—'}
           </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-            Avg Rating
-          </div>
+          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Avg Rating</div>
         </div>
         <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
-          <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
-            {seasons.length}
-          </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-            Seasons
-          </div>
+          <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>{seasons.length}</div>
+          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Seasons</div>
         </div>
       </div>
 
-      {/* Series Graph heatmap — only when at least one season has episode data */}
+      {/* Series Graph heatmap */}
       {seasons.some(hasEpisodes) && (
         <div>
-          <h4
-            className="font-mono mb-3"
-            style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--paper-faint)' }}
-          >
+          <h4 className="font-mono mb-3" style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--paper-faint)' }}>
             Series Graph
           </h4>
-          <div
-            className="rounded-xl p-4"
-            style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-          >
-            <SeriesGraph
-              seasons={seasons}
-              onCellClick={(sn, en) => {
-                setSelectedSeason(sn)
-                const ep = seasons.find((s) => s.seasonNumber === sn)?.episodes?.find((e) => e.episodeNumber === en)
-                if (ep) setExpandedEpId(ep.id)
-              }}
-            />
-          </div>
+          <SeriesGraph
+            seasons={seasons}
+            getEpisode={(sn, en) => {
+              const ep = seasons.find((s) => s.seasonNumber === sn)?.episodes?.find((e) => e.episodeNumber === en)
+              return ep ?? null
+            }}
+          />
         </div>
       )}
 
-      {/* Season tabs */}
-      <div>
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-none mb-3 -mx-1 px-1">
+      {/* Smart season selector */}
+      {seasons.length <= 3 ? (
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
           {seasons.map((s) => {
             const watched = episodesWatchedInSeason(s)
             const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
@@ -896,7 +427,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
             return (
               <button
                 key={s.seasonNumber}
-                onClick={() => { setSelectedSeason(s.seasonNumber); setExpandedEpId(null) }}
+                onClick={() => handleSeasonChange(s.seasonNumber)}
                 aria-label={`Season ${s.seasonNumber}`}
                 aria-current={selectedSeason === s.seasonNumber ? 'true' : undefined}
                 className={cn(
@@ -906,10 +437,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                     : 'border-transparent hover:border-[var(--line)] hover:bg-[var(--wash)]'
                 )}
               >
-                <div
-                  className="font-mono"
-                  style={{ fontSize: '11px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}
-                >
+                <div className="font-mono" style={{ fontSize: '11px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
                   S{s.seasonNumber}
                 </div>
                 <div className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
@@ -919,88 +447,137 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
             )
           })}
         </div>
+      ) : (
+        <select
+          value={selectedSeason}
+          onChange={(e) => handleSeasonChange(parseInt(e.target.value, 10))}
+          aria-label="Select season"
+          className="font-mono text-sm rounded-lg px-3 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60"
+          style={{ color: 'var(--amber)' }}
+        >
+          {seasons.map((s) => {
+            const watched = episodesWatchedInSeason(s)
+            const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
+            const seasonAvg = avgSeasonRating(s)
+            return (
+              <option key={s.seasonNumber} value={s.seasonNumber}>
+                {`Season ${s.seasonNumber} · ${pct}%${seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}`}
+              </option>
+            )
+          })}
+        </select>
+      )}
 
-        {/* Season cast — shown when the selected season has cast data */}
-        {season?.cast && season.cast.length > 0 && (
-          <div className="mb-4">
+      {/* Season cast */}
+      {season?.cast && season.cast.length > 0 && (
+        <div>
+          <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+            Season Cast
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+            {season.cast.map((member) => (
+              <button
+                key={member.tmdbPersonId}
+                type="button"
+                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+                aria-label={`View details for ${member.name}`}
+                className="group shrink-0 w-12 text-center focus:outline-none"
+              >
+                <div className="w-12 h-12 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
+                  {member.profileUrl ? (
+                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-mono text-base" style={{ color: 'var(--paper-faint)' }}>{member.name.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="font-sans line-clamp-2 text-paper transition-colors group-hover:text-amber" style={{ fontSize: '9px', lineHeight: 1.3 }}>{member.name}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Episode carousel */}
+      {season && hasEpisodes(season) && (
+        <div>
+          <div className="relative">
+            {/* Left arrow */}
+            {canScrollLeft && (
+              <button
+                type="button"
+                onClick={() => scrollCarousel('left')}
+                aria-label="Scroll episodes left"
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 -translate-x-2 rounded-full p-1.5 transition-opacity hover:opacity-100 opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
+              >
+                <ChevronLeft className="w-4 h-4" style={{ color: 'var(--paper)' }} />
+              </button>
+            )}
+
+            {/* Carousel */}
             <div
-              className="font-mono mb-2"
-              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              className="flex gap-3 overflow-x-auto scrollbar-none pb-1"
             >
-              Season Cast
-            </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
-              {season.cast.map((member) => (
-                <button
-                  key={member.tmdbPersonId}
-                  type="button"
-                  onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
-                  aria-label={`View details for ${member.name}`}
-                  className="group shrink-0 w-12 text-center focus:outline-none"
-                >
-                  <div
-                    className="w-12 h-12 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
-                    style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-                  >
-                    {member.profileUrl ? (
-                      <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="font-mono text-base" style={{ color: 'var(--paper-faint)' }}>
-                        {member.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className="font-sans line-clamp-2 text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
-                    style={{ fontSize: '9px', lineHeight: 1.3 }}
-                    title={member.name}
-                  >
-                    {member.name}
-                  </div>
-                </button>
+              {season.episodes!.map((ep) => (
+                <EpisodeCard
+                  key={ep.id}
+                  episode={ep}
+                  season={season}
+                  titleId={titleId}
+                  isSelected={selectedEpId === ep.id}
+                  onSelect={() => setSelectedEpId(selectedEpId === ep.id ? null : ep.id)}
+                  isSharedView={isSharedView}
+                  isSpiderNoir={isSpiderNoir}
+                />
               ))}
             </div>
-          </div>
-        )}
 
-        {/* Episode list for selected season */}
-        {season && (
-          <div>
-            {hasEpisodes(season) ? (
-              <div className="space-y-0.5">
-                {season.episodes!.map((ep) => (
-                  <EpisodeRow
-                    key={ep.id}
-                    episode={ep}
-                    season={season}
-                    titleId={titleId}
-                    expanded={expandedEpId === ep.id}
-                    onToggle={() => setExpandedEpId(expandedEpId === ep.id ? null : ep.id)}
-                    isSharedView={isSharedView}
-                    isSpiderNoir={isSpiderNoir}
-                  />
-                ))}
-              </div>
-            ) : (
-              /* Fallback: coarse progress bar when this season has no episode-level data */
-              (() => {
-                const pct = season.episodeCount > 0 ? (season.episodesWatched / season.episodeCount) * 100 : 0
-                return (
-                  <div className="flex items-center gap-3 px-2 py-3">
-                    <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">S{season.seasonNumber}</span>
-                    <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-amber rounded-full transition-all" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="font-mono text-xs text-muted-foreground w-12 text-right shrink-0">
-                      {season.episodesWatched}/{season.episodeCount}
-                    </span>
-                  </div>
-                )
-              })()
+            {/* Right arrow */}
+            {canScrollRight && (
+              <button
+                type="button"
+                onClick={() => scrollCarousel('right')}
+                aria-label="Scroll episodes right"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 translate-x-2 rounded-full p-1.5 transition-opacity hover:opacity-100 opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
+              >
+                <ChevronRight className="w-4 h-4" style={{ color: 'var(--paper)' }} />
+              </button>
             )}
           </div>
-        )}
-      </div>
+
+          {/* Inline logging panel — renders below the carousel when a card is selected */}
+          {selectedEp && (
+            <div className="mt-3">
+              <EpisodePanel
+                episode={selectedEp}
+                season={season}
+                titleId={titleId}
+                isSharedView={isSharedView}
+                isSpiderNoir={isSpiderNoir}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fallback: coarse progress bar when season has no episode-level data */}
+      {season && !hasEpisodes(season) && (() => {
+        const pct = season.episodeCount > 0 ? (season.episodesWatched / season.episodeCount) * 100 : 0
+        return (
+          <div className="flex items-center gap-3 px-2 py-3">
+            <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">S{season.seasonNumber}</span>
+            <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div className="h-full bg-amber rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="font-mono text-xs text-muted-foreground w-12 text-right shrink-0">
+              {season.episodesWatched}/{season.episodeCount}
+            </span>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -1116,14 +693,6 @@ function DrawerTagEditor({
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function fmtDateTime(iso: string): { date: string; time: string } {
-  const d = new Date(iso)
-  return {
-    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-  }
 }
 
 // ─── Main drawer ─────────────────────────────────────────────────────────────

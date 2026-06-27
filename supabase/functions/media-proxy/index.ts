@@ -120,6 +120,19 @@ async function getOMDbRatings(imdbId: string) {
   return data
 }
 
+async function getTMDBVideos(tmdbId: number, type: 'movie' | 'tv') {
+  const cacheKey = `tmdb:videos:${type}:${tmdbId}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const url = `${TMDB_BASE}/${type}/${tmdbId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -159,6 +172,13 @@ Deno.serve(async (req: Request) => {
         const imdbId = url.searchParams.get('imdb') ?? ''
         if (!imdbId) throw new Error('Missing imdb parameter')
         result = await getOMDbRatings(imdbId)
+        break
+      }
+      case 'videos': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        const type = parseMediaType(url.searchParams.get('type'))
+        if (!id) throw new Error('Missing id parameter')
+        result = await getTMDBVideos(id, type)
         break
       }
       default:

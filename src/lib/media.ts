@@ -298,3 +298,40 @@ export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): 
     return { episodes: [], cast: [] }
   }
 }
+
+export interface TitleVideo {
+  key: string
+  name: string
+  type: string
+  official: boolean
+}
+
+export async function fetchTitleVideos(tmdbId: number, type: MediaType): Promise<TitleVideo[]> {
+  if (!(isSupabaseConfigured && supabase)) return []
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=videos&id=${tmdbId}&type=${type}`
+    )
+    if (error) throw error
+
+    const results: TitleVideo[] = ((data?.results ?? []) as any[])
+      .filter((v) => v.site === 'YouTube' && ['Trailer', 'Teaser'].includes(v.type))
+      .map((v) => ({
+        key: v.key as string,
+        name: v.name as string,
+        type: v.type as string,
+        official: v.official ?? false,
+      }))
+
+    results.sort((a, b) => {
+      const score = (v: TitleVideo) => (v.official ? 2 : 0) + (v.type === 'Trailer' ? 1 : 0)
+      return score(b) - score(a)
+    })
+
+    return results.slice(0, 4)
+  } catch (e) {
+    console.error('Error fetching title videos:', e)
+    return []
+  }
+}

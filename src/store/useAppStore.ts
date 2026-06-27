@@ -562,7 +562,7 @@ export const useAppStore = create<AppStore>()(
     set({ selectedTitleId: id, isDetailDrawerOpen: true }),
 
   closeDetailDrawer: () =>
-    set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false, selectedTitleId: null }),
+    set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false }),
 
   isRefreshMetadataOpen: false,
   openRefreshMetadata: () => set({ isRefreshMetadataOpen: true }),

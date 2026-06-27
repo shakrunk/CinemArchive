@@ -1159,39 +1159,30 @@ export function TitleDetailDrawer() {
     [isSpiderNoir, title]
   )
 
-  const lastSpiderNoirTitleIdRef = useRef<string | null>(null)
   const prevNoirModeRef = useRef<'bw' | 'color' | null | undefined>(undefined)
   const [noirAnim, setNoirAnim] = useState<'bw' | 'color' | null>(null)
   const noirAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [manualMode, setManualMode] = useState<SelectorMode>('normal')
 
-  // Keep a stable ref to the last Spider-Noir title so pinnedModeRaw
-  // can survive the brief window where title=null after the drawer closes.
-  // eslint-disable-next-line react-hooks/refs
-  if (isSpiderNoir && title) lastSpiderNoirTitleIdRef.current = title.id
-  // eslint-disable-next-line react-hooks/refs
-  const _resolvedNoirId = title?.id ?? lastSpiderNoirTitleIdRef.current
-  const pinnedModeRaw = (_resolvedNoirId
-    ? (pinnedModes[`${_resolvedNoirId}:${EASTER_EGG_KEY}`] ?? null)
-    : null) as 'bw' | 'color' | null
+  // closeDetailDrawer only sets isDetailDrawerOpen=false, not selectedTitleId=null,
+  // so title and isSpiderNoir remain valid here even when the drawer is closed.
+  const pinnedModeRaw = (title ? (pinnedModes[`${title.id}:${EASTER_EGG_KEY}`] ?? null) : null) as 'bw' | 'color' | null
 
   // Seed manualMode from pinned → last watch event → normal when the drawer opens.
+  // setTimeout(0) defers the setState out of the effect body to satisfy react-hooks/set-state-in-effect.
   useEffect(() => {
     if (!isSpiderNoir || !title || !isDetailDrawerOpen) return
     const derived = getSpiderNoirActiveMode(title)
     const seeded = pinnedModeRaw ?? derived ?? 'normal'
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setManualMode(seeded as SelectorMode)
+    const t = setTimeout(() => setManualMode(seeded as SelectorMode), 0)
+    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title?.id, isDetailDrawerOpen])
 
   // While drawer is open: use manual selection. When closed: use pinned (if any).
-  // Note: when the drawer closes, title becomes null so isSpiderNoir flips to false —
-  // that's why we use pinnedModeRaw directly (derived from the ref) rather than
-  // gating on isSpiderNoir in the closed-drawer branch.
-  const effectiveNoirMode: 'bw' | 'color' | null = isDetailDrawerOpen
-    ? (isSpiderNoir ? (manualMode !== 'normal' ? (manualMode as 'bw' | 'color') : null) : null)
-    : pinnedModeRaw
+  const effectiveNoirMode: 'bw' | 'color' | null = isSpiderNoir
+    ? (isDetailDrawerOpen ? (manualMode !== 'normal' ? (manualMode as 'bw' | 'color') : null) : pinnedModeRaw)
+    : null
 
   useEffect(() => {
     const ALL = ['spider-noir-bw', 'spider-noir-color', 'spider-noir-bw-enter', 'spider-noir-color-enter'] as const

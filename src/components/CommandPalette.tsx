@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { Search, CornerDownLeft } from 'lucide-react'
+import { Search, CornerDownLeft, X } from 'lucide-react'
 import { rankCommands, type Command } from 'src/store/commands'
 import { cn } from 'src/lib/utils'
 
@@ -49,6 +49,8 @@ function CommandPaletteBody({
     el?.scrollIntoView({ block: 'nearest' })
   }, [active])
 
+  const inputRef = useRef<HTMLInputElement>(null)
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -68,6 +70,7 @@ function CommandPaletteBody({
       <div className="command-input-row">
         <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" />
         <input
+          ref={inputRef}
           autoFocus
           aria-label="Search command palette"
           value={query}
@@ -81,6 +84,16 @@ function CommandPaletteBody({
           aria-controls="command-results"
           aria-activedescendant={results[active] ? `cmd-${results[active].id}` : undefined}
         />
+        {query && (
+          <button
+            type="button"
+            onClick={() => { setQuery(''); setActive(0); inputRef.current?.focus() }}
+            className="text-paper-faint hover:text-ember mr-2"
+            aria-label="Clear search"
+          >
+            <X className="w-[15px] h-[15px]" aria-hidden="true" />
+          </button>
+        )}
         <kbd className="command-kbd">ESC</kbd>
       </div>
 

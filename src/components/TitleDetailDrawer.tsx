@@ -24,13 +24,15 @@ import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
   ChevronLeft, ChevronRight, RefreshCw, Tag, X,
 } from 'lucide-react'
-import { cn } from 'src/lib/utils'
+import { cn, fmtDate } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
-import { fetchSeasonDetails } from 'src/lib/media'
+import { fetchSeasonDetails, fetchTitleVideos, type TitleVideo } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { transitionSpiderNoir } from 'src/lib/theme'
+import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
+import { TrailerRow } from 'src/components/ui/trailer-row'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 220102
@@ -224,10 +226,10 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                 type="button"
                 onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
                 aria-label={`View details for ${member.name}`}
-                className="group shrink-0 w-14 text-center focus:outline-none"
+                className="group shrink-0 w-[72px] text-center focus:outline-none"
               >
                 <div
-                  className="w-14 h-14 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
+                  className="w-16 h-16 rounded-full overflow-hidden mb-1 mx-auto flex items-center justify-center transition-colors group-hover:border-amber/60 group-focus-visible:border-amber/60"
                   style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
                 >
                   {member.profileUrl ? (
@@ -248,7 +250,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                 {member.character && (
                   <div
                     className="font-mono line-clamp-2"
-                    style={{ fontSize: '9px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
+                    style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
                     title={member.character}
                   >
                     {member.character}
@@ -409,10 +411,6 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           </h4>
           <SeriesGraph
             seasons={seasons}
-            getEpisode={(sn, en) => {
-              const ep = seasons.find((s) => s.seasonNumber === sn)?.episodes?.find((e) => e.episodeNumber === en)
-              return ep ?? null
-            }}
           />
         </div>
       )}
@@ -689,12 +687,6 @@ function DrawerTagEditor({
   )
 }
 
-// ─── Timestamp helpers ───────────────────────────────────────────────────────
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
@@ -817,6 +809,20 @@ export function TitleDetailDrawer() {
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
   const [drawerExpanded, setDrawerExpanded] = useState(false)
+  const [videos, setVideos] = useState<TitleVideo[]>([])
+
+  useEffect(() => {
+    if (!isDetailDrawerOpen || !title?.tmdbId) {
+      // Deferred to satisfy react-hooks/set-state-in-effect (same pattern as manualMode seeding above).
+      const t = setTimeout(() => setVideos([]), 0)
+      return () => clearTimeout(t)
+    }
+    let cancelled = false
+    fetchTitleVideos(title.tmdbId, title.type).then((v) => {
+      if (!cancelled) setVideos(v)
+    })
+    return () => { cancelled = true }
+  }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
 
   function onClose() {
     setPendingDeleteTitle(false)
@@ -1045,85 +1051,114 @@ export function TitleDetailDrawer() {
       )}
 
       <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
-        {/* Hero: blurred poster background + title info */}
-        <div className="relative overflow-hidden shrink-0">
-          {title.posterUrl && (
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${title.posterUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center top',
-                filter: 'blur(20px)',
-                transform: 'scale(1.3)',
-                opacity: 0.18,
-              }}
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-secondary/30 via-card/70 to-card" />
-          <div className="relative z-10 flex gap-5 px-6 pt-10 pb-6">
-            <div className="w-28 sm:w-36 shrink-0">
-              {title.posterUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setPosterLightboxOpen(true)}
-                  aria-label={`View full poster for ${title.title}`}
-                  className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
-                  title="View full poster"
-                >
-                  <DynamicPoster title={title} />
-                </button>
-              ) : (
-                <DynamicPoster title={title} />
+        {/* Hero: cinematic backdrop (TV) or blurred-poster (movie / TV without backdrop) */}
+        {title.type === 'tv' && title.backdropUrl ? (
+          <HeroBackdrop title={title} onPosterClick={() => setPosterLightboxOpen(true)}>
+            <div className="flex items-center gap-2">
+              <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Series</span>
+              {title.network && (
+                <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0 space-y-2 pt-6">
-              <div className="flex items-center gap-2">
-                {title.type === 'movie' ? (
-                  <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                ) : (
-                  <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                )}
-                <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-                  {title.type === 'tv' ? 'Series' : 'Film'}
-                </span>
-                {title.network && (
-                  <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
-                )}
-              </div>
-              <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="font-mono text-sm text-amber">{title.year}</span>
-                {title.director && (
-                  <span className="text-xs text-muted-foreground font-sans">
-                    dir. {title.director}
-                  </span>
-                )}
-                {title.runtime && title.type === 'movie' && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    <span className="font-mono">{title.runtime}m</span>
-                  </div>
-                )}
-              </div>
-              {isSpiderNoir && (
-                <SpiderNoirModeSelector
-                  unlockedModes={unlockedModes}
-                  earnedModes={earnedModes}
-                  selected={manualMode}
-                  pinned={pinnedModeRaw}
-                  onSelect={handleModeSelect}
-                  onTogglePin={handleTogglePin}
-                />
-              )}
-              <StarRating
-                value={title.rating ?? 0}
-                size="sm"
-                onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
+            <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-mono text-sm text-amber">{title.year}</span>
+            </div>
+            {isSpiderNoir && (
+              <SpiderNoirModeSelector
+                unlockedModes={unlockedModes}
+                earnedModes={earnedModes}
+                selected={manualMode}
+                pinned={pinnedModeRaw}
+                onSelect={handleModeSelect}
+                onTogglePin={handleTogglePin}
               />
+            )}
+            <StarRating
+              value={title.rating ?? 0}
+              size="sm"
+              onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
+            />
+          </HeroBackdrop>
+        ) : (
+          <div className="relative overflow-hidden shrink-0">
+            {(title.backdropUrl ?? title.posterUrl) && (
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage: `url(${title.backdropUrl ?? title.posterUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center top',
+                  filter: 'blur(20px)',
+                  transform: 'scale(1.3)',
+                  opacity: 0.18,
+                }}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-b from-secondary/30 via-card/70 to-card" />
+            <div className="relative z-10 flex gap-5 px-6 pt-10 pb-6">
+              <div className="w-28 sm:w-36 shrink-0">
+                {title.posterUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setPosterLightboxOpen(true)}
+                    aria-label={`View full poster for ${title.title}`}
+                    className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                    title="View full poster"
+                  >
+                    <DynamicPoster title={title} />
+                  </button>
+                ) : (
+                  <DynamicPoster title={title} />
+                )}
+              </div>
+              <div className="flex-1 min-w-0 space-y-2 pt-6">
+                <div className="flex items-center gap-2">
+                  {title.type === 'movie' ? (
+                    <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  )}
+                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+                    {title.type === 'tv' ? 'Series' : 'Film'}
+                  </span>
+                  {title.network && (
+                    <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
+                  )}
+                </div>
+                <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-mono text-sm text-amber">{title.year}</span>
+                  {title.director && (
+                    <span className="text-xs text-muted-foreground font-sans">dir. {title.director}</span>
+                  )}
+                  {title.runtime && title.type === 'movie' && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span className="font-mono">{title.runtime}m</span>
+                    </div>
+                  )}
+                </div>
+                {isSpiderNoir && (
+                  <SpiderNoirModeSelector
+                    unlockedModes={unlockedModes}
+                    earnedModes={earnedModes}
+                    selected={manualMode}
+                    pinned={pinnedModeRaw}
+                    onSelect={handleModeSelect}
+                    onTogglePin={handleTogglePin}
+                  />
+                )}
+                <StarRating
+                  value={title.rating ?? 0}
+                  size="sm"
+                  onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Scrollable body */}
         <div className="px-6 pb-6 space-y-5">
@@ -1331,6 +1366,9 @@ export function TitleDetailDrawer() {
               </div>
             </>
           )}
+
+          {/* Trailers */}
+          <TrailerRow videos={videos} />
 
           {/* Maintenance actions */}
           {!isSharedView && (

@@ -813,6 +813,8 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 .series-graph__cell {
+  position: relative;
+  overflow: hidden;
   transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s;
 }
 .series-graph__cell:hover {
@@ -824,6 +826,22 @@
 .series-graph__cell:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 1px;
+}
+/* Amber bottom-bar marks episodes that have at least one watch event */
+.series-graph__cell--watched::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: rgb(var(--amber-rgb) / 0.80);
+  border-radius: 1px 1px 0 0;
+}
+.series-graph__cell--watched:hover {
+  box-shadow:
+    0 0 0 2px rgba(233, 178, 102, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Episode row in TV detail drawer */
@@ -889,25 +907,40 @@ body.spider-noir-color .cinema-content {
   filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg);
 }
 
-/* ── Entry: slow, intentional transition when the mode is first chosen ── */
+/* ── Entry: filter reveals only in the final third of the web animation ──
+   Holds neutral (unfiltered) for 65% of the 2000ms duration, then eases
+   the target filter in over the remaining 35% (≈1300–2000ms). CSS animations
+   beat CSS transitions, so this overrides the #root baseline transition. */
+@keyframes spider-noir-bw-filter-in {
+  0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }
+  65%  { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+         animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  100% { filter: grayscale(1) contrast(1.15) saturate(1) hue-rotate(0deg); }
+}
+@keyframes spider-noir-color-filter-in {
+  0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }
+  65%  { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+         animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  100% { filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg); }
+}
 body.spider-noir-bw-enter #root,
-body.spider-noir-color-enter #root {
-  transition: filter 2000ms cubic-bezier(0.65, 0, 0.35, 1);
+body.spider-noir-bw-enter .cinema-content {
+  animation: spider-noir-bw-filter-in 2000ms linear both;
 }
-
-body.spider-noir-bw-enter .cinema-content,
+body.spider-noir-color-enter #root,
 body.spider-noir-color-enter .cinema-content {
-  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
-              opacity 200ms ease,
-              filter 2000ms cubic-bezier(0.65, 0, 0.35, 1);
+  animation: spider-noir-color-filter-in 2000ms linear both;
 }
 
-/* ── Spider web overlay: expands from a point, holds, then drifts away ── */
-@keyframes spider-web-cast {
-  0%   { opacity: 0;    transform: scale(0.04) rotate(-18deg); }
-  18%  { opacity: 0.9;  transform: scale(1)    rotate(3deg);  }
-  60%  { opacity: 0.55; transform: scale(1.04) rotate(0deg);  }
-  100% { opacity: 0;    transform: scale(1.22) rotate(9deg);  }
+/* ── Silk-thread web animation ── */
+@keyframes spider-silk-draw {
+  from { stroke-dashoffset: var(--dash-len); }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes spider-silk-fade {
+  0%, 70% { opacity: 1; }
+  100%    { opacity: 0; }
 }
 
 body.spider-noir-color .btn-amber {

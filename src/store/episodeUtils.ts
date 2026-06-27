@@ -1,4 +1,4 @@
-import type { Episode, Season } from './mockData'
+import type { Episode, Season, Title } from './mockData'
 
 // ─── Canonical rating helpers — single source of truth for all rollups ───────
 
@@ -66,4 +66,32 @@ export function nextUnwatchedEpisode(
     }
   }
   return null
+}
+
+// ─── Spider-Noir color mode progression ──────────────────────────────────────
+
+/** Modes with at least one episode watch event recorded in that mode. */
+export function getUnlockedModes(title: Title): Set<'bw' | 'color'> {
+  const modes = new Set<'bw' | 'color'>()
+  for (const season of title.seasons ?? []) {
+    for (const ep of season.episodes ?? []) {
+      for (const we of ep.watchEvents) {
+        if (we.colorMode) modes.add(we.colorMode)
+      }
+    }
+  }
+  return modes
+}
+
+/** Modes where every episode has at least one watch event in that mode. */
+export function getEarnedModes(title: Title): Set<'bw' | 'color'> {
+  const allEps = (title.seasons ?? []).flatMap((s) => s.episodes ?? [])
+  if (allEps.length === 0) return new Set()
+  const earned = new Set<'bw' | 'color'>()
+  for (const mode of ['bw', 'color'] as const) {
+    if (allEps.every((ep) => ep.watchEvents.some((we) => we.colorMode === mode))) {
+      earned.add(mode)
+    }
+  }
+  return earned
 }

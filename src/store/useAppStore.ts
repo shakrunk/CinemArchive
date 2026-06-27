@@ -7,7 +7,12 @@ import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import type { User } from '@supabase/supabase-js'
 import type { AppView } from '../lib/navigation'
-import { fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb, deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb, deleteEpisodeWatchEventFromDb } from '../lib/db'
+import {
+  fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb,
+  deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
+  deleteEpisodeWatchEventFromDb,
+  fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
+} from '../lib/db'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
@@ -122,6 +127,12 @@ interface AuthSlice {
   setLoadingUser: (loading: boolean) => void
   loadUserLibrary: () => Promise<void>
   loadSharedLibrary: (token: string) => Promise<void>
+}
+
+interface PinsSlice {
+  pinnedModes: Record<string, 'bw' | 'color'>
+  setPinnedMode: (titleId: string, easterEggKey: string, variant: 'bw' | 'color' | null) => void
+  loadPinnedModes: () => Promise<void>
 }
 
 // ─── Default Filters ────────────────────────────────────────────────────────
@@ -241,7 +252,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
-type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice
+type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 2
@@ -550,8 +561,12 @@ export const useAppStore = create<AppStore>()(
   openDetailDrawer: (id) =>
     set({ selectedTitleId: id, isDetailDrawerOpen: true }),
 
+  // selectedTitleId is intentionally NOT nulled here — keeping it non-null lets
+  // TitleDetailDrawer derive the correct body class (e.g. spider-noir-bw) for
+  // pinned easter-egg modes even after the drawer closes. browseByPerson /
+  // browseByStudio DO null it because navigating away is a hard context switch.
   closeDetailDrawer: () =>
-    set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false, selectedTitleId: null }),
+    set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false }),
 
   isRefreshMetadataOpen: false,
   openRefreshMetadata: () => set({ isRefreshMetadataOpen: true }),
@@ -613,12 +628,14 @@ export const useAppStore = create<AppStore>()(
     set({ user })
     if (user) {
       get().loadUserLibrary()
+      get().loadPinnedModes()
     } else {
       // Clear or reload mock data on logout
       set((s) => ({
         titles: mockTitles,
         filteredTitles: applyFiltersToTitles(mockTitles, s.filters),
         stats: computeLedgerStats(mockTitles),
+        pinnedModes: {},
       }))
     }
   },
@@ -665,6 +682,45 @@ export const useAppStore = create<AppStore>()(
     } finally {
       set({ loadingUser: false })
     }
+  },
+
+  // ── Pins ───────────────────────────────────────────────────
+  pinnedModes: {},
+
+  setPinnedMode: (titleId, easterEggKey, variant) => {
+    const key = `${titleId}:${easterEggKey}`
+    if (variant === null) {
+      set((s) => {
+        const next = { ...s.pinnedModes }
+        delete next[key]
+        return { pinnedModes: next }
+      })
+      const user = get().user
+      if (user) {
+        deleteTitlePin(user.id, titleId, easterEggKey).catch((e) =>
+          console.error('deleteTitlePin failed:', e)
+        )
+      }
+    } else {
+      set((s) => ({ pinnedModes: { ...s.pinnedModes, [key]: variant } }))
+      const user = get().user
+      if (user) {
+        upsertTitlePin(user.id, titleId, easterEggKey, variant).catch((e) =>
+          console.error('upsertTitlePin failed:', e)
+        )
+      }
+    }
+  },
+
+  loadPinnedModes: async () => {
+    const user = get().user
+    if (!user) return
+    const pins = await fetchAllTitlePins(user.id)
+    const pinnedModes: Record<string, 'bw' | 'color'> = {}
+    for (const pin of pins) {
+      pinnedModes[`${pin.titleId}:${pin.easterEggKey}`] = pin.pinnedVariant
+    }
+    set({ pinnedModes })
   },
     }),
     {

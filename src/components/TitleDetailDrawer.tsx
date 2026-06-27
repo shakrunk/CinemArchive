@@ -219,7 +219,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
           >
             Main Cast
           </div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             {cast.map((member) => (
               <button
                 key={member.tmdbPersonId}
@@ -240,22 +240,22 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                     </span>
                   )}
                 </div>
+                {/* Fixed height (2 lines) keeps every name/character column the same
+                    height so images stay aligned regardless of text length. */}
                 <div
-                  className="font-sans line-clamp-2 text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber"
+                  className="font-sans line-clamp-2 text-paper transition-colors group-hover:text-amber group-focus-visible:text-amber h-[26px]"
                   style={{ fontSize: '10px', lineHeight: 1.3 }}
                   title={member.name}
                 >
                   {member.name}
                 </div>
-                {member.character && (
-                  <div
-                    className="font-mono line-clamp-2"
-                    style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
-                    title={member.character}
-                  >
-                    {member.character}
-                  </div>
-                )}
+                <div
+                  className="font-mono line-clamp-1 h-[13px]"
+                  style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
+                  title={member.character}
+                >
+                  {member.character}
+                </div>
               </button>
             ))}
           </div>
@@ -481,7 +481,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
             Season {season.seasonNumber} Cast
           </div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             {season.cast.map((member) => (
               <button
                 key={member.tmdbPersonId}

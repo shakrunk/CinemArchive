@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { Search, CornerDownLeft } from 'lucide-react'
+import { Search, CornerDownLeft, X } from 'lucide-react'
 import { rankCommands, type Command } from 'src/store/commands'
 import { cn } from 'src/lib/utils'
 
@@ -86,7 +86,21 @@ function CommandPaletteBody({
 
       <div id="command-results" ref={listRef} role="listbox" className="command-list">
         {results.length === 0 ? (
-          <div className="command-empty">No matches. Try a different search.</div>
+          <div className="command-empty flex flex-col items-center gap-3 py-6">
+            <div>No matches. Try a different search.</div>
+            {query.length > 0 && (
+              <button
+                onClick={() => {
+                  setQuery('')
+                  setActive(0)
+                }}
+                className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear search
+              </button>
+            )}
+          </div>
         ) : (
           results.map((cmd, idx) => (
             <button

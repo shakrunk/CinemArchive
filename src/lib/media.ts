@@ -517,13 +517,28 @@ export async function fetchDiscover(type: MediaType, genreId?: number, page = 1)
   return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
 }
 
+export interface TitleImages {
+  logoUrl: string | null
+  backdropUrl: string | null
+}
+
+/** Score an image by vote quality weighted by confidence (vote count). */
+function imageScore(img: any): number {
+  return (img.vote_average ?? 0) * Math.log1p(img.vote_count ?? 0)
+}
+
 /**
- * Fetch the title's logo image (the stylized name treatment, transparent PNG).
- * Returns an English-text logo URL, or null when none exists so callers can
- * fall back to plain text. Display-only — not persisted.
+ * Fetch the best logo and best backdrop for a title in a single images call.
+ * Both are returned at `original` resolution for crisp retina display.
+ *
+ * Logo: English-text only; scored by vote_average × log(vote_count+1) so a
+ * logo with many high votes beats one with a single perfect score.
+ * Backdrop: highest-scored regardless of language (backdrops are textless).
+ *
+ * Display-only — neither value is persisted.
  */
-export async function fetchTitleLogo(tmdbId: number, type: MediaType): Promise<string | null> {
-  if (!(isSupabaseConfigured && supabase)) return null
+export async function fetchTitleImages(tmdbId: number, type: MediaType): Promise<TitleImages> {
+  if (!(isSupabaseConfigured && supabase)) return { logoUrl: null, backdropUrl: null }
 
   try {
     const { data, error } = await supabase.functions.invoke(
@@ -531,16 +546,20 @@ export async function fetchTitleLogo(tmdbId: number, type: MediaType): Promise<s
     )
     if (error) throw error
 
-    // Only English-language logos carry the readable title text; textless
-    // (iso null) logos are dropped so we fall back to plain text instead.
+    // Logo — English text only; textless (iso null) logos fall back to plain title text.
     const englishLogos = ((data?.logos ?? []) as any[])
       .filter((l) => l.file_path && l.iso_639_1 === 'en')
-    if (englishLogos.length === 0) return null
+    const bestLogo = englishLogos.sort((a, b) => imageScore(b) - imageScore(a))[0]
+    const logoUrl = bestLogo ? `${TMDB_IMG}/original${bestLogo.file_path}` : null
 
-    const best = englishLogos.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
-    return `${TMDB_IMG}/w500${best.file_path}`
+    // Backdrop — pick the highest-scored available image.
+    const backdrops = ((data?.backdrops ?? []) as any[]).filter((b) => b.file_path)
+    const bestBackdrop = backdrops.sort((a, b) => imageScore(b) - imageScore(a))[0]
+    const backdropUrl = bestBackdrop ? `${TMDB_IMG}/original${bestBackdrop.file_path}` : null
+
+    return { logoUrl, backdropUrl }
   } catch (e) {
-    console.error('Error fetching title logo:', e)
-    return null
+    console.error('Error fetching title images:', e)
+    return { logoUrl: null, backdropUrl: null }
   }
 }

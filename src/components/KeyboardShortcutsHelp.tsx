@@ -13,7 +13,8 @@ const SHORTCUTS: { group: string; entries: ShortcutEntry[] }[] = [
     entries: [
       { keys: ['1'], label: 'Up Next' },
       { keys: ['2'], label: 'Library' },
-      { keys: ['3'], label: 'Ledger' },
+      { keys: ['3'], label: 'Discover' },
+      { keys: ['4'], label: 'Ledger' },
     ],
   },
   {

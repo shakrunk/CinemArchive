@@ -97,8 +97,8 @@ export default function App() {
     {
       '1': () => setCurrentView('upnext'),
       '2': () => setCurrentView('library'),
-      '3': () => setCurrentView('ledger'),
-      '4': () => setCurrentView('discover'),
+      '3': () => setCurrentView('discover'),
+      '4': () => setCurrentView('ledger'),
       'n': () => { if (!isSharedView) openAddTitle() },
       '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),
       'g': () => { setCurrentView('library'); setViewMode('grid') },

@@ -5,34 +5,12 @@ import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { toggleTheme } from 'src/lib/theme'
 import type { AppView } from 'src/lib/navigation'
+import { ReelMark } from 'src/components/ui/reel-mark'
 
 interface TopBarProps {
   currentView: AppView
   onViewChange: (view: AppView) => void
   onProfileClick: () => void
-}
-
-/** Spinning film-reel brand mark (matches The Projection Room). */
-function ReelMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="12" cy="6.5" r="1.4" />
-      <circle cx="12" cy="17.5" r="1.4" />
-      <circle cx="6.5" cy="12" r="1.4" />
-      <circle cx="17.5" cy="12" r="1.4" />
-    </svg>
-  )
 }
 
 const NAV: { id: AppView; label: string; Icon: typeof BarChart3 }[] = [

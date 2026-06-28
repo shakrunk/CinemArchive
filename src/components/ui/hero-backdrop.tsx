@@ -20,36 +20,36 @@ function hiResBackdrop(url?: string): string | undefined {
 export function HeroBackdrop({ title, onPosterClick, children }: HeroBackdropProps) {
   return (
     <div className="relative overflow-hidden shrink-0">
-      {title.backdropUrl && (
-        <img
-          src={hiResBackdrop(title.backdropUrl)}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
+      {/* Backdrop shown at its natural aspect ratio so the full art — and every
+          character in the frame — stays visible, rather than cropping to a band. */}
+      <div className="relative w-full">
+        {title.backdropUrl && (
+          <img
+            src={hiResBackdrop(title.backdropUrl)}
+            alt=""
+            aria-hidden="true"
+            className="block w-full h-auto"
+            style={{
+              // Fade only the lower portion to transparent so the image melts into
+              // the card background without hiding the subjects higher in the frame.
+              maskImage: 'linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)',
+            }}
+          />
+        )}
+        {/* Darken the lower band for text legibility, resolving to the card color
+            at the bottom so the hero blends seamlessly into the content. */}
+        <div
+          className="absolute inset-0"
           style={{
-            objectPosition: 'center top',
-            // Fade the image itself to transparent toward the bottom so it melts
-            // into the card background rather than ending on a hard edge.
-            maskImage: 'linear-gradient(to bottom, #000 0%, #000 40%, transparent 92%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 40%, transparent 92%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.04) 45%, rgba(0,0,0,0.4) 78%, var(--card) 100%)',
           }}
         />
-      )}
-      {/* Gradual multi-stop darkening for text legibility, resolving to the card
-          color at the bottom so the hero blends seamlessly into the content. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 30%, rgba(0,0,0,0.35) 58%, rgba(0,0,0,0.72) 80%, var(--card) 100%)',
-        }}
-      />
+      </div>
 
-      {/* Spacer that establishes the backdrop height */}
-      <div className="relative z-10 h-64" />
-
-      {/* Poster + title info row — sits at the bottom of the backdrop */}
-      <div className="relative z-10 flex gap-5 px-6 pb-6">
-        <div className="w-28 sm:w-36 shrink-0 -mt-10">
+      {/* Poster + title info row — overlaps the faded bottom of the backdrop */}
+      <div className="relative z-10 -mt-20 sm:-mt-24 flex gap-5 px-6 pb-6">
+        <div className="w-28 sm:w-36 shrink-0">
           {title.posterUrl ? (
             <button
               type="button"
@@ -63,7 +63,7 @@ export function HeroBackdrop({ title, onPosterClick, children }: HeroBackdropPro
             <DynamicPoster title={title} />
           )}
         </div>
-        <div className="flex-1 min-w-0 space-y-2 pt-4">
+        <div className="flex-1 min-w-0 space-y-2 self-end pb-2">
           {children}
         </div>
       </div>

@@ -25,3 +25,7 @@
 ## 2024-06-27 - Actionable Empty States
 **Learning:** Empty states caused by active filters or missing data (like no search results or no viewings logged) are often passive and rely purely on informative text. Telling users to try a different search or log a view is okay, but providing a direct call-to-action button to do so is much better for UX, saving them time and interaction steps.
 **Action:** Always include a "Clear search", "Log viewing", or similar direct action button in empty states where the condition is reversible or actionable by the user directly from that context. Ensure that buttons are clearly labeled and accessible.
+
+## 2024-08-01 - Empty State Layout Adjustments
+**Learning:** Adding interactive elements like buttons to empty states (e.g. `EmptyState` component wrapper usage) often requires refactoring margin utilities (`mb-3 mx-auto`) to Flexbox (`flex flex-col items-center gap-3`) to maintain visual alignment and proper spacing between the icon, text, and the new button.
+**Action:** When making empty states actionable by adding CTAs, inspect the parent container's layout CSS. Convert legacy margin-based centering to flexbox for better robust vertical stacking of the CTA below the message.

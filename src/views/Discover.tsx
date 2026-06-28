@@ -347,11 +347,20 @@ export function Discover() {
       {loading ? (
         <DiscoverSkeleton />
       ) : displayResults.length === 0 ? (
-        <div className="py-16 text-center">
-          <Compass className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />
-          <p className="font-mono text-sm text-paper-faint">
+        <div className="py-16 text-center flex flex-col items-center gap-3">
+          <Compass className="w-10 h-10 text-paper-faint/30" />
+          <div className="font-mono text-sm text-paper-faint">
             {query.trim() ? 'No results found.' : 'Nothing to show yet.'}
-          </p>
+          </div>
+          {query.trim() !== '' && (
+            <button
+              onClick={clearSearch}
+              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear search
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">

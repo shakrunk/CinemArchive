@@ -195,6 +195,17 @@ function ReviewBadges({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: n
   )
 }
 
+// ─── Details sidebar ──────────────────────────────────────────────────────────
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="font-mono text-xs uppercase tracking-wider text-muted-foreground shrink-0">{label}</dt>
+      <dd className="font-sans text-sm text-foreground text-right min-w-0 break-words">{value}</dd>
+    </div>
+  )
+}
+
 // ─── Cast & Crew section ──────────────────────────────────────────────────────
 
 const CREW_DISPLAY: Array<{ jobs: string[]; label: string }> = [
@@ -1098,7 +1109,7 @@ export function TitleDetailDrawer() {
               <img
                 src={logoUrl}
                 alt={title.title}
-                className="object-contain object-left max-h-20 max-w-[80%] drop-shadow-lg"
+                className="object-contain object-left max-h-28 sm:max-h-36 max-w-[90%] drop-shadow-lg"
               />
             ) : (
               <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
@@ -1203,44 +1214,76 @@ export function TitleDetailDrawer() {
 
         {/* Scrollable body */}
         <div className="px-6 pb-6 space-y-5">
-          {/* Status */}
-          <div>
-            <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Status</h4>
-            <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={isSharedView ? undefined : () => updateTitle(title.id, { status: opt.value })}
-                  className={cn(
-                    'px-3 py-1.5 rounded-md text-xs font-sans border transition-all',
-                    title.status === opt.value
-                      ? 'bg-amber/20 border-amber/50 text-amber'
-                      : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground',
-                    isSharedView && 'opacity-60 cursor-default pointer-events-none'
+          {/* Upper info — two columns on desktop so the right side is used */}
+          <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-8 lg:items-start space-y-5 lg:space-y-0">
+            {/* Left column — status, synopsis, genres */}
+            <div className="space-y-5 min-w-0">
+              {/* Status */}
+              <div>
+                <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Status</h4>
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={isSharedView ? undefined : () => updateTitle(title.id, { status: opt.value })}
+                      className={cn(
+                        'px-3 py-1.5 rounded-md text-xs font-sans border transition-all',
+                        title.status === opt.value
+                          ? 'bg-amber/20 border-amber/50 text-amber'
+                          : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground',
+                        isSharedView && 'opacity-60 cursor-default pointer-events-none'
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Synopsis */}
+              {title.synopsis && (
+                <div>
+                  <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Synopsis</h4>
+                  <BodyText className="text-sm leading-relaxed max-w-2xl">{title.synopsis}</BodyText>
+                </div>
+              )}
+
+              {/* Genres */}
+              {title.genres.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {title.genres.map((g) => (
+                    <MetaBadge key={g} className="border-amber/20 text-amber/70">{g}</MetaBadge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right column — details + critical reception */}
+            <div className="space-y-5">
+              <div>
+                <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Details</h4>
+                <dl className="space-y-2 rounded-lg bg-secondary/30 p-3">
+                  {title.network && <DetailRow label="Network" value={title.network} />}
+                  {title.type === 'movie' && title.director && <DetailRow label="Director" value={title.director} />}
+                  {title.runtime ? <DetailRow label="Runtime" value={`${title.runtime} min`} /> : null}
+                  {title.studios && title.studios.length > 0 && (
+                    <DetailRow label="Studio" value={title.studios.join(', ')} />
                   )}
-                >
-                  {opt.label}
-                </button>
-              ))}
+                  <DetailRow label="Added" value={fmtDate(title.addedAt)} />
+                </dl>
+              </div>
+
+              {/* Critical Reception */}
+              {(title.imdbRating || title.rtScore || title.metacriticScore) && (
+                <div>
+                  <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                    Critical Reception
+                  </h4>
+                  <ReviewBadges imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Synopsis */}
-          {title.synopsis && (
-            <div>
-              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Synopsis</h4>
-              <BodyText className="text-sm leading-relaxed">{title.synopsis}</BodyText>
-            </div>
-          )}
-
-          {/* Genres */}
-          {title.genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {title.genres.map((g) => (
-                <MetaBadge key={g} className="border-amber/20 text-amber/70">{g}</MetaBadge>
-              ))}
-            </div>
-          )}
 
           {/* Tags — editable when not in shared view */}
           {(!isSharedView || title.tags.length > 0) && (
@@ -1266,16 +1309,6 @@ export function TitleDetailDrawer() {
               />
             </div>
           ) : null}
-
-          {/* Critical Reception */}
-          {(title.imdbRating || title.rtScore || title.metacriticScore) && (
-            <div>
-              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                Critical Reception
-              </h4>
-              <ReviewBadges imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
-            </div>
-          )}
 
           {/* ── TV Series section ───────────────────────────────────── */}
           {title.type === 'tv' && title.seasons && title.seasons.length > 0 && (

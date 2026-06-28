@@ -1,13 +1,14 @@
-import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search, Sun, Moon } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search, Sun, Moon, Compass } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { toggleTheme } from 'src/lib/theme'
+import type { AppView } from 'src/lib/navigation'
 
 interface TopBarProps {
-  currentView: 'upnext' | 'library' | 'ledger'
-  onViewChange: (view: 'upnext' | 'library' | 'ledger') => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   onProfileClick: () => void
 }
 
@@ -34,9 +35,10 @@ function ReelMark({ className }: { className?: string }) {
   )
 }
 
-const NAV: { id: 'upnext' | 'library' | 'ledger'; label: string; Icon: typeof BarChart3 }[] = [
+const NAV: { id: AppView; label: string; Icon: typeof BarChart3 }[] = [
   { id: 'upnext', label: 'Up Next', Icon: PlayCircle },
   { id: 'library', label: 'The Library', Icon: LayoutGrid },
+  { id: 'discover', label: 'Discover', Icon: Compass },
   { id: 'ledger', label: 'The Ledger', Icon: BarChart3 },
 ]
 
@@ -125,7 +127,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
               className="hidden lg:inline font-mono text-[10px] tracking-[0.06em] text-paper-faint border rounded px-1.5 py-0.5"
               style={{ borderColor: 'var(--line)' }}
             >
-              ⌘K
+              {modKey}K
             </kbd>
           </button>
 

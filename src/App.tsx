@@ -5,6 +5,7 @@ import { AddTitleWorkflow } from 'src/components/AddTitleWorkflow'
 import { UpNext } from 'src/views/UpNext'
 import { Library } from 'src/views/Library'
 import { Ledger } from 'src/views/Ledger'
+import { Discover } from 'src/views/Discover'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { isSupabaseConfigured, onAuthStateChange } from 'src/lib/auth'
@@ -17,6 +18,7 @@ import { applyTheme, toggleTheme } from 'src/lib/theme'
 import { CommandPalette } from 'src/components/CommandPalette'
 import { KeyboardShortcutsHelp } from 'src/components/KeyboardShortcutsHelp'
 import { NotificationStack } from 'src/components/NotificationStack'
+import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 import type { Command } from 'src/store/commands'
 
@@ -31,9 +33,13 @@ export default function App() {
   useNavigationSync({ currentView, setCurrentView })
 
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  // Start true when Supabase isn't configured (no auth needed) so we never
+  // flash the landing screen in local/mock-data mode.
+  const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured)
   const setUser = useAppStore((s) => s.setUser)
   const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
 
+  const user = useAppStore((s) => s.user)
   const titles = useAppStore((s) => s.titles)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
@@ -92,6 +98,7 @@ export default function App() {
       '1': () => setCurrentView('upnext'),
       '2': () => setCurrentView('library'),
       '3': () => setCurrentView('ledger'),
+      '4': () => setCurrentView('discover'),
       'n': () => { if (!isSharedView) openAddTitle() },
       '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),
       'g': () => { setCurrentView('library'); setViewMode('grid') },
@@ -118,6 +125,8 @@ export default function App() {
     map['action:view-library'] = () => setCurrentView('library')
     list.push({ id: 'action:view-ledger', kind: 'action', label: 'Go to the Ledger', hint: 'view', keywords: 'stats dashboard' })
     map['action:view-ledger'] = () => setCurrentView('ledger')
+    list.push({ id: 'action:view-discover', kind: 'action', label: 'Go to Discover', hint: 'view', keywords: 'explore browse trending genres movies tv' })
+    map['action:view-discover'] = () => setCurrentView('discover')
     list.push({ id: 'action:layout-grid', kind: 'action', label: 'Library: poster wall', hint: 'layout', keywords: 'grid posters' })
     map['action:layout-grid'] = () => { setCurrentView('library'); setViewMode('grid') }
     list.push({ id: 'action:layout-list', kind: 'action', label: 'Library: ledger list', hint: 'layout', keywords: 'list table' })
@@ -140,18 +149,19 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return
+    if (!isSupabaseConfigured) return  // authChecked already true from initial state
 
     const params = new URLSearchParams(window.location.search)
     const shareToken = params.get('share')
 
     if (shareToken) {
-      loadSharedLibrary(shareToken)
+      loadSharedLibrary(shareToken).then(() => setAuthChecked(true))
       return
     }
 
     const subscription = onAuthStateChange((user) => {
       setUser(user)
+      setAuthChecked(true)
     })
 
     return () => {
@@ -174,23 +184,34 @@ export default function App() {
       <div className="vignette" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
 
-      <TopBar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        onProfileClick={() => setIsProfileOpen(true)}
-      />
+      {/* ── Landing screen for unauthenticated visitors on the live site ── */}
+      {isSupabaseConfigured && authChecked && !user && !isSharedView ? (
+        <>
+          <LandingScreen onSignIn={() => setIsProfileOpen(true)} />
+          <ProfileModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+        </>
+      ) : (
+        <>
+          <TopBar
+            currentView={currentView}
+            onViewChange={setCurrentView}
+            onProfileClick={() => setIsProfileOpen(true)}
+          />
 
-      <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
-        {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
-        {currentView === 'library' && <Library />}
-        {currentView === 'ledger' && <Ledger />}
-      </main>
+          <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
+            {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
+            {currentView === 'library' && <Library />}
+            {currentView === 'ledger' && <Ledger />}
+            {currentView === 'discover' && <Discover />}
+          </main>
 
-      <BottomNav currentView={currentView} onViewChange={setCurrentView} />
-      <AddTitleWorkflow />
-      <TitleDetailDrawer />
-      <RefreshMetadataModal />
-      <ProfileModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+          <BottomNav currentView={currentView} onViewChange={setCurrentView} />
+          <AddTitleWorkflow />
+          <TitleDetailDrawer />
+          <RefreshMetadataModal />
+          <ProfileModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+        </>
+      )}
       <CommandPalette
         open={isCommandPaletteOpen}
         onClose={closeCommandPalette}

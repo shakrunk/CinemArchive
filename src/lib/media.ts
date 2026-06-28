@@ -69,6 +69,40 @@ export interface SeasonFetchResult {
 const TMDB_IMG = 'https://image.tmdb.org/t/p'
 const TMDB_IMG_W185 = 'https://image.tmdb.org/t/p/w185'
 
+// ─── Genre Lists (stable TMDB IDs — hardcoded to avoid an extra round-trip) ─
+
+export interface Genre {
+  id: number
+  name: string
+}
+
+export const MOVIE_GENRES: Genre[] = [
+  { id: 28, name: 'Action' },
+  { id: 12, name: 'Adventure' },
+  { id: 16, name: 'Animation' },
+  { id: 35, name: 'Comedy' },
+  { id: 80, name: 'Crime' },
+  { id: 18, name: 'Drama' },
+  { id: 14, name: 'Fantasy' },
+  { id: 27, name: 'Horror' },
+  { id: 9648, name: 'Mystery' },
+  { id: 10749, name: 'Romance' },
+  { id: 878, name: 'Sci-Fi' },
+  { id: 53, name: 'Thriller' },
+]
+
+export const TV_GENRES: Genre[] = [
+  { id: 10759, name: 'Action & Adventure' },
+  { id: 16, name: 'Animation' },
+  { id: 35, name: 'Comedy' },
+  { id: 80, name: 'Crime' },
+  { id: 18, name: 'Drama' },
+  { id: 9648, name: 'Mystery' },
+  { id: 10765, name: 'Sci-Fi & Fantasy' },
+  { id: 10751, name: 'Family' },
+  { id: 37, name: 'Western' },
+]
+
 // ─── Local-dev fallback (no Supabase configured) ─────────────────────────────
 
 const MOCK_RESULTS: SearchResult[] = [
@@ -361,6 +395,126 @@ export async function fetchTitleVideos(tmdbId: number, type: MediaType): Promise
     console.error('Error fetching title videos:', e)
     return []
   }
+}
+
+const MOCK_TRENDING: SearchResult[] = [
+  {
+    tmdbId: 533535,
+    type: 'movie',
+    title: 'Deadpool & Wolverine',
+    year: 2024,
+    posterUrl: `${TMDB_IMG}/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg`,
+    genres: ['Action', 'Comedy', 'Science Fiction'],
+    synopsis: 'Deadpool and a variant of Wolverine must team up against a common threat.',
+    runtime: 127,
+  },
+  {
+    tmdbId: 202555,
+    type: 'tv',
+    title: 'Severance',
+    year: 2022,
+    posterUrl: `${TMDB_IMG}/w500/6eMmJtjE86h8m9s5v23B7Zgg1eJ.jpg`,
+    genres: ['Drama', 'Mystery', 'Science Fiction'],
+    synopsis: "Mark leads a team whose memories are surgically divided between their work and personal lives.",
+    network: 'Apple TV+',
+    seasonCount: 2,
+  },
+  {
+    tmdbId: 945961,
+    type: 'movie',
+    title: 'Alien: Romulus',
+    year: 2024,
+    posterUrl: `${TMDB_IMG}/w500/b33nnKl1GSFbao4l3fZDDqsMx0F.jpg`,
+    genres: ['Horror', 'Science Fiction'],
+    synopsis: 'A group of young colonists face the most terrifying life form in the universe.',
+    runtime: 119,
+  },
+  {
+    tmdbId: 209867,
+    type: 'tv',
+    title: 'The Last of Us',
+    year: 2023,
+    posterUrl: `${TMDB_IMG}/w500/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg`,
+    genres: ['Drama', 'Science Fiction'],
+    synopsis: 'Joel and Ellie travel across a post-pandemic America.',
+    network: 'HBO',
+    seasonCount: 2,
+  },
+  {
+    tmdbId: 1091602,
+    type: 'movie',
+    title: 'Nosferatu',
+    year: 2024,
+    posterUrl: `${TMDB_IMG}/w500/5qGIxdEO841C0tdY8vOdLoRVrr0.jpg`,
+    genres: ['Horror', 'Drama'],
+    synopsis: 'A remake of the 1922 German Expressionist horror film.',
+    runtime: 133,
+  },
+  {
+    tmdbId: 76479,
+    type: 'tv',
+    title: 'The Boys',
+    year: 2019,
+    posterUrl: `${TMDB_IMG}/w500/2zmTngn1tYC1AvfnrFLhxeD82hz.jpg`,
+    genres: ['Action & Adventure', 'Science Fiction'],
+    synopsis: 'A group of vigilantes fight corrupt superheroes.',
+    network: 'Prime Video',
+    seasonCount: 4,
+  },
+]
+
+/**
+ * Fetch this week's trending movies or TV shows. Falls back to a curated
+ * static list in local dev (no Supabase configured).
+ */
+export async function fetchTrending(type: MediaType | 'all'): Promise<SearchResult[]> {
+  if (!(isSupabaseConfigured && supabase)) {
+    if (type === 'all') return MOCK_TRENDING
+    return MOCK_TRENDING.filter((r) => r.type === type)
+  }
+
+  // Cache non-null reference so TypeScript narrowing carries into the nested async map.
+  const client = supabase
+  const types: MediaType[] = type === 'all' ? ['movie', 'tv'] : [type]
+  const fetched = await Promise.all(
+    types.map(async (t) => {
+      const { data, error } = await client.functions.invoke(
+        `media-proxy?action=trending&type=${t}`
+      )
+      if (error) throw error
+      return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]
+    })
+  )
+
+  if (type === 'all') {
+    const [movies, tv] = fetched
+    const combined: SearchResult[] = []
+    const maxLen = Math.max(movies.length, tv.length)
+    for (let i = 0; i < maxLen && combined.length < 20; i++) {
+      if (i < movies.length) combined.push(movies[i])
+      if (i < tv.length) combined.push(tv[i])
+    }
+    return combined
+  }
+
+  return fetched[0].slice(0, 20)
+}
+
+/**
+ * Fetch popular titles for a given media type, optionally filtered by genre.
+ * Falls back to mock data in local dev.
+ */
+export async function fetchDiscover(type: MediaType, genreId?: number, page = 1): Promise<SearchResult[]> {
+  if (!(isSupabaseConfigured && supabase)) {
+    return MOCK_TRENDING.filter((r) => r.type === type).slice(0, 10)
+  }
+
+  const params = new URLSearchParams({ action: 'discover', type, page: String(page) })
+  if (genreId) params.set('genre', String(genreId))
+
+  const { data, error } = await supabase.functions.invoke(`media-proxy?${params.toString()}`)
+  if (error) throw error
+  return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
 }
 
 /**

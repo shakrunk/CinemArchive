@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
-import { LayoutGrid, BarChart3, Plus, PlayCircle } from 'lucide-react'
+import { LayoutGrid, BarChart3, Plus, PlayCircle, Compass } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import type { AppView } from 'src/lib/navigation'
 
 interface BottomNavProps {
-  currentView: 'upnext' | 'library' | 'ledger'
-  onViewChange: (view: 'upnext' | 'library' | 'ledger') => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
 }
 
 function NavTab({
@@ -92,6 +93,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
           <span className="text-[11px] font-sans text-paper-faint mt-0.5">Add</span>
         </button>
 
+        <NavTab active={currentView === 'discover'} onClick={() => onViewChange('discover')} label="Discover" Icon={Compass} />
         <NavTab active={currentView === 'ledger'} onClick={() => onViewChange('ledger')} label="Ledger" Icon={BarChart3} />
       </div>
     </nav>

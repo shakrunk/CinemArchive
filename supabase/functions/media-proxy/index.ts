@@ -152,6 +152,33 @@ async function getTMDBImages(tmdbId: number, type: 'movie' | 'tv') {
   return data
 }
 
+async function getTMDBTrending(type: 'movie' | 'tv') {
+  const cacheKey = `tmdb:trending:${type}:week`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_API_KEY}&language=en-US`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
+async function getTMDBDiscover(type: 'movie' | 'tv', genreId?: number, page = 1) {
+  const cacheKey = `tmdb:discover:${type}:${genreId ?? 'all'}:${page}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  let url = `${TMDB_BASE}/discover/${type}?api_key=${TMDB_API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}`
+  if (genreId) url += `&with_genres=${genreId}`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -205,6 +232,19 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         if (!id) throw new Error('Missing id parameter')
         result = await getTMDBImages(id, type)
+        break
+      }
+      case 'trending': {
+        const type = parseMediaType(url.searchParams.get('type'))
+        result = await getTMDBTrending(type)
+        break
+      }
+      case 'discover': {
+        const type = parseMediaType(url.searchParams.get('type'))
+        const rawGenre = url.searchParams.get('genre')
+        const genreId = rawGenre ? parseInt(rawGenre, 10) : undefined
+        const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+        result = await getTMDBDiscover(type, genreId, page)
         break
       }
       default:

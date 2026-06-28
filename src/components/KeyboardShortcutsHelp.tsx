@@ -1,5 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
+import { modKey } from 'src/lib/utils'
 
 interface ShortcutEntry {
   keys: string[]
@@ -20,7 +21,7 @@ const SHORTCUTS: { group: string; entries: ShortcutEntry[] }[] = [
     entries: [
       { keys: ['n'], label: 'Add a title' },
       { keys: ['/'], label: 'Open command palette' },
-      { keys: ['⌘', 'K'], label: 'Open command palette' },
+      { keys: [modKey, 'K'], label: 'Open command palette' },
     ],
   },
   {

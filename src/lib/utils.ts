@@ -28,6 +28,12 @@ export function languageName(code: string): string {
   return code.toUpperCase()
 }
 
+/** '⌘' on macOS/iOS, 'Ctrl' everywhere else. */
+export const modKey: '⌘' | 'Ctrl' =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    ? '⌘'
+    : 'Ctrl'
+
 export function fmtDateTime(iso: string): { date: string; time: string } {
   const d = new Date(iso)
   return {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Search, Film, Tv, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
@@ -308,11 +308,12 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 
 export function AddTitleWorkflow() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isAddTitleOpen, closeAddTitle, addTitle } = useAppStore(
+  const { isAddTitleOpen, closeAddTitle, addTitle, preselectedResult } = useAppStore(
     useShallow((s) => ({
       isAddTitleOpen: s.isAddTitleOpen,
       closeAddTitle: s.closeAddTitle,
       addTitle: s.addTitle,
+      preselectedResult: s.preselectedResult,
     }))
   )
   const [step, setStep] = useState<Step>('search')
@@ -327,7 +328,7 @@ export function AddTitleWorkflow() {
     search(e.target.value)
   }
 
-  async function selectResult(result: SearchResult) {
+  const selectResult = useCallback(async (result: SearchResult) => {
     setLoadingDetails(true)
     try {
       const { result: detailed, tmdbSeasons } = await fetchMediaDetails(result)
@@ -365,7 +366,20 @@ export function AddTitleWorkflow() {
     } finally {
       setLoadingDetails(false)
     }
-  }
+  }, [])
+
+  // When opened with a pre-selected result (from Discover page), skip to step 2.
+  const preselectedHandledRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!isAddTitleOpen) {
+      preselectedHandledRef.current = null
+      return
+    }
+    if (!preselectedResult) return
+    if (preselectedHandledRef.current === preselectedResult.tmdbId) return
+    preselectedHandledRef.current = preselectedResult.tmdbId
+    selectResult(preselectedResult)
+  }, [isAddTitleOpen, preselectedResult, selectResult])
 
   function handleSave() {
     if (!selected) return

@@ -13,6 +13,7 @@ import {
   deleteEpisodeWatchEventFromDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
 } from '../lib/db'
+import type { SearchResult } from '../lib/media'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
@@ -94,11 +95,14 @@ interface UISlice {
   // A top-level view requested by a component that can't reach App's currentView
   // (e.g. the detail drawer). App consumes and clears it. null = nothing pending.
   pendingView: AppView | null
+  // When non-null, AddTitleWorkflow skips to step 2 with this pre-selected result.
+  preselectedResult: SearchResult | null
 
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
+  openAddTitlePreselected: (result: SearchResult) => void
   closeAddTitle: () => void
   openDetailDrawer: (id: string) => void
   closeDetailDrawer: () => void
@@ -261,9 +265,9 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
   // ── Library ────────────────────────────────────────────────
-  titles: mockTitles,
+  titles: import.meta.env.DEV ? mockTitles : [],
   filters: defaultFilters,
-  filteredTitles: applyFiltersToTitles(mockTitles, defaultFilters),
+  filteredTitles: applyFiltersToTitles(import.meta.env.DEV ? mockTitles : [], defaultFilters),
 
   setTitles: (titles) =>
     set((s) => ({
@@ -538,7 +542,7 @@ export const useAppStore = create<AppStore>()(
     }),
 
   // ── Ledger ─────────────────────────────────────────────────
-  stats: computeLedgerStats(mockTitles),
+  stats: computeLedgerStats(import.meta.env.DEV ? mockTitles : []),
 
   setStats: (stats) => set({ stats }),
 
@@ -548,6 +552,7 @@ export const useAppStore = create<AppStore>()(
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
+  preselectedResult: null,
 
   setViewMode: (viewMode) => set({ viewMode }),
 
@@ -555,8 +560,9 @@ export const useAppStore = create<AppStore>()(
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
-  openAddTitle: () => set({ isAddTitleOpen: true }),
-  closeAddTitle: () => set({ isAddTitleOpen: false }),
+  openAddTitle: () => set({ isAddTitleOpen: true, preselectedResult: null }),
+  openAddTitlePreselected: (result) => set({ isAddTitleOpen: true, preselectedResult: result }),
+  closeAddTitle: () => set({ isAddTitleOpen: false, preselectedResult: null }),
 
   openDetailDrawer: (id) =>
     set({ selectedTitleId: id, isDetailDrawerOpen: true }),
@@ -630,11 +636,12 @@ export const useAppStore = create<AppStore>()(
       get().loadUserLibrary()
       get().loadPinnedModes()
     } else {
-      // Clear or reload mock data on logout
+      // Clear on logout — restore mock data only in dev
+      const fallback = import.meta.env.DEV ? mockTitles : []
       set((s) => ({
-        titles: mockTitles,
-        filteredTitles: applyFiltersToTitles(mockTitles, s.filters),
-        stats: computeLedgerStats(mockTitles),
+        titles: fallback,
+        filteredTitles: applyFiltersToTitles(fallback, s.filters),
+        stats: computeLedgerStats(fallback),
         pinnedModes: {},
       }))
     }

@@ -457,8 +457,17 @@ export function AddTitleWorkflow() {
               )}
 
               {!loading && results.length === 0 && query.length > 1 && (
-                <div className="text-center py-6 text-muted-foreground text-sm">
-                  No results for "{query}"
+                <div className="text-center py-6 text-muted-foreground text-sm flex flex-col items-center gap-3">
+                  <div>No results for "{query}"</div>
+                  <button
+                    onClick={() => {
+                      setQuery('')
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear search
+                  </button>
                 </div>
               )}
 

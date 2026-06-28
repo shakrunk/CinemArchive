@@ -34,7 +34,10 @@ create table titles (
   rt_score      integer check (rt_score >= 0 and rt_score <= 100),
   metacritic_score integer check (metacritic_score >= 0 and metacritic_score <= 100),
   studios       text[] not null default '{}',
-  release_date  date,                  -- future release date for upcoming titles
+  release_date  date,                  -- actual release/first-air date (drives Up Next when in the future)
+  original_language text,              -- ISO 639-1 code, e.g. "en"
+  content_rating    text,              -- age certification, e.g. "PG-13", "TV-MA"
+  imdb_id           text,              -- e.g. "tt1375666" — enables an exact IMDb link
   added_at      timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 

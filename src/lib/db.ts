@@ -41,6 +41,9 @@ function mapDbTitleToLocal(row: any): Title {
       ? new Date(row.added_at).toISOString().slice(0, 10)
       : new Date().toISOString().slice(0, 10),
     releaseDate: row.release_date || undefined,
+    originalLanguage: row.original_language || undefined,
+    contentRating: row.content_rating || undefined,
+    imdbId: row.imdb_id || undefined,
     imdbRating: row.imdb_rating ? parseFloat(row.imdb_rating) : undefined,
     rtScore: row.rt_score || undefined,
     metacriticScore: row.metacritic_score || undefined,
@@ -237,6 +240,9 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
     studios: title.studios ?? [],
     added_at: new Date(title.addedAt).toISOString(),
     release_date: title.releaseDate ?? null,
+    original_language: title.originalLanguage ?? null,
+    content_rating: title.contentRating ?? null,
+    imdb_id: title.imdbId ?? null,
   })
 
   if (titleError) {
@@ -399,6 +405,9 @@ const META_COLUMNS: Array<[keyof Title, string]> = [
   ['runtime', 'runtime'],
   ['network', 'network'],
   ['releaseDate', 'release_date'],
+  ['originalLanguage', 'original_language'],
+  ['contentRating', 'content_rating'],
+  ['imdbId', 'imdb_id'],
   ['imdbRating', 'imdb_rating'],
   ['rtScore', 'rt_score'],
   ['metacriticScore', 'metacritic_score'],

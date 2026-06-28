@@ -96,7 +96,10 @@ export interface Title {
   notes?: string
   tags: string[]
   addedAt: string
-  releaseDate?: string  // YYYY-MM-DD; set for upcoming titles not yet released
+  releaseDate?: string  // YYYY-MM-DD; the title's actual release/first-air date (also drives Up Next when in the future)
+  originalLanguage?: string  // ISO 639-1 code, e.g. "en", "ja"
+  contentRating?: string  // age certification, e.g. "PG-13", "TV-MA"
+  imdbId?: string  // e.g. "tt1375666" — enables an exact IMDb link
   viewings: Viewing[]
   imdbRating?: number
   rtScore?: number

@@ -7,12 +7,22 @@ interface HeroBackdropProps {
   children: React.ReactNode
 }
 
+/**
+ * Upgrade a stored TMDB image URL to a larger size segment. Existing titles were
+ * saved at w780, which upscales blurrily in the expanded hero — rewrite the size
+ * segment to w1280 at render time so the whole library renders crisply.
+ */
+function hiResBackdrop(url?: string): string | undefined {
+  if (!url) return url
+  return url.replace(/\/t\/p\/w\d+\//, '/t/p/w1280/')
+}
+
 export function HeroBackdrop({ title, onPosterClick, children }: HeroBackdropProps) {
   return (
     <div className="relative overflow-hidden shrink-0">
       {title.backdropUrl && (
         <img
-          src={title.backdropUrl}
+          src={hiResBackdrop(title.backdropUrl)}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"

@@ -112,7 +112,7 @@ function mapSearchItem(item: any, type: MediaType): SearchResult {
     title: type === 'movie' ? item.title : item.name,
     year: date ? new Date(date).getFullYear() : 0,
     posterUrl: item.poster_path ? `${TMDB_IMG}/w500${item.poster_path}` : undefined,
-    backdropUrl: item.backdrop_path ? `${TMDB_IMG}/w780${item.backdrop_path}` : undefined,
+    backdropUrl: item.backdrop_path ? `${TMDB_IMG}/w1280${item.backdrop_path}` : undefined,
     synopsis: item.overview,
     genres: [],
   }
@@ -249,7 +249,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     year: date ? new Date(date).getFullYear() : base.year,
     releaseDate,
     posterUrl: data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : base.posterUrl,
-    backdropUrl: data.backdrop_path ? `${TMDB_IMG}/w780${data.backdrop_path}` : base.backdropUrl,
+    backdropUrl: data.backdrop_path ? `${TMDB_IMG}/w1280${data.backdrop_path}` : base.backdropUrl,
     director,
     genres: data.genres?.map((g: any) => g.name) ?? [],
     synopsis: data.overview,

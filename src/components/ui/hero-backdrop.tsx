@@ -3,30 +3,31 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 
 interface HeroBackdropProps {
   title: Title
+  /** Best-rated backdrop from the images endpoint at original resolution. Falls
+   *  back to the stored title.backdropUrl (upgraded to original) when absent. */
+  backdropOverride?: string
   onPosterClick: () => void
   children: React.ReactNode
 }
 
-/**
- * Upgrade a stored TMDB image URL to a larger size segment. Existing titles were
- * saved at w780, which upscales blurrily in the expanded hero — rewrite the size
- * segment to w1280 at render time so the whole library renders crisply.
- */
+/** Rewrite any stored TMDB size segment to `original` for full-resolution display. */
 function hiResBackdrop(url?: string): string | undefined {
   if (!url) return url
-  return url.replace(/\/t\/p\/w\d+\//, '/t/p/w1280/')
+  return url.replace(/\/t\/p\/(w\d+|original)\//, '/t/p/original/')
 }
 
-export function HeroBackdrop({ title, onPosterClick, children }: HeroBackdropProps) {
+export function HeroBackdrop({ title, backdropOverride, onPosterClick, children }: HeroBackdropProps) {
+  const backdropSrc = backdropOverride ?? hiResBackdrop(title.backdropUrl)
+
   return (
     <div className="relative overflow-hidden shrink-0">
       {/* Backdrop at its natural aspect ratio so the full art — and every
           character in the frame — stays visible, rather than cropping to a band.
           The poster + title overlay its faded lower portion. */}
       <div className="relative w-full">
-        {title.backdropUrl && (
+        {backdropSrc && (
           <img
-            src={hiResBackdrop(title.backdropUrl)}
+            src={backdropSrc}
             alt=""
             aria-hidden="true"
             className="block w-full h-auto"

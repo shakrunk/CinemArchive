@@ -1374,7 +1374,12 @@ export function TitleDetailDrawer() {
                   {title.runtime ? <DetailRow label="Runtime" value={`${title.runtime} min`} /> : null}
                   {title.contentRating && <DetailRow label="Rated" value={title.contentRating} />}
                   {title.originalLanguage && <DetailRow label="Language" value={languageName(title.originalLanguage)} />}
-                  {title.releaseDate && <DetailRow label="Released" value={fmtReleaseDate(title.releaseDate)} />}
+                  {title.releaseDate && (
+                    <DetailRow
+                      label={title.releaseDate > new Date().toISOString().slice(0, 10) ? 'Releases' : 'Released'}
+                      value={fmtReleaseDate(title.releaseDate)}
+                    />
+                  )}
                   {title.studios && title.studios.length > 0 && (
                     <DetailRow label="Studio" value={title.studios.join(', ')} />
                   )}

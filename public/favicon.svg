@@ -1,15 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <rect width="32" height="32" rx="7" fill="#0b0907"/>
-  <g transform="translate(16 16)" fill="#e9b266">
-    <circle r="11" fill="none" stroke="#e9b266" stroke-width="1.8"/>
-    <circle r="2.4"/>
-    <circle cx="0" cy="-6.8" r="1.7"/>
-    <circle cx="0" cy="6.8" r="1.7"/>
-    <circle cx="-6.8" cy="0" r="1.7"/>
-    <circle cx="6.8" cy="0" r="1.7"/>
-    <circle cx="4.8" cy="-4.8" r="1.3"/>
-    <circle cx="-4.8" cy="-4.8" r="1.3"/>
-    <circle cx="4.8" cy="4.8" r="1.3"/>
-    <circle cx="-4.8" cy="4.8" r="1.3"/>
+  <g transform="translate(16 16)" stroke="#e9b266" stroke-linecap="round" fill="none">
+    <!-- Outer ring -->
+    <circle r="13.33" stroke-width="2"/>
+    <!-- Inner hub ring -->
+    <circle r="6" stroke-width="1.8"/>
+    <!-- 3 spokes: top (0°), lower-right (120°), lower-left (240°) -->
+    <line x1="0" y1="-6" x2="0" y2="-13.33" stroke-width="2"/>
+    <line x1="5.2" y1="3" x2="11.55" y2="6.67" stroke-width="2"/>
+    <line x1="-5.2" y1="3" x2="-11.55" y2="6.67" stroke-width="2"/>
   </g>
+  <!-- Center axle (filled) -->
+  <circle cx="16" cy="16" r="2" fill="#e9b266"/>
+  <!-- 3 sprocket holes at 60°, 180°, 300°, r=10 from center -->
+  <circle cx="24.66" cy="11" r="1.9" fill="#e9b266"/>
+  <circle cx="16" cy="26" r="1.9" fill="#e9b266"/>
+  <circle cx="7.34" cy="11" r="1.9" fill="#e9b266"/>
 </svg>

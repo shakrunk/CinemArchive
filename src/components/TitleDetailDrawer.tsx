@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
-import { fetchSeasonDetails, fetchTitleVideos, fetchTitleLogo, type TitleVideo } from 'src/lib/media'
+import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, type TitleVideo } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
@@ -943,6 +943,7 @@ export function TitleDetailDrawer() {
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
   const [videos, setVideos] = useState<TitleVideo[]>([])
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [heroBackdropUrl, setHeroBackdropUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isDetailDrawerOpen || !title?.tmdbId) {
@@ -957,15 +958,18 @@ export function TitleDetailDrawer() {
     return () => { cancelled = true }
   }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
 
-  // Logo: fetched for any title with a cinematic backdrop hero.
+  // Images: best logo + best backdrop at original resolution, fetched together.
   useEffect(() => {
     if (!isDetailDrawerOpen || !title?.tmdbId || !title.backdropUrl) {
-      const t = setTimeout(() => setLogoUrl(null), 0)
+      const t = setTimeout(() => { setLogoUrl(null); setHeroBackdropUrl(null) }, 0)
       return () => clearTimeout(t)
     }
     let cancelled = false
-    fetchTitleLogo(title.tmdbId, title.type).then((url) => {
-      if (!cancelled) setLogoUrl(url)
+    fetchTitleImages(title.tmdbId, title.type).then(({ logoUrl: logo, backdropUrl: backdrop }) => {
+      if (!cancelled) {
+        setLogoUrl(logo)
+        setHeroBackdropUrl(backdrop)
+      }
     })
     return () => { cancelled = true }
   }, [isDetailDrawerOpen, title?.tmdbId, title?.type, title?.backdropUrl])
@@ -1197,7 +1201,7 @@ export function TitleDetailDrawer() {
       <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
         {/* Hero: cinematic backdrop (any title with one) or blurred-poster fallback */}
         {title.backdropUrl ? (
-          <HeroBackdrop title={title} onPosterClick={() => setPosterLightboxOpen(true)}>
+          <HeroBackdrop title={title} backdropOverride={heroBackdropUrl ?? undefined} onPosterClick={() => setPosterLightboxOpen(true)}>
             <div className="flex items-center gap-2">
               {title.type === 'movie' ? (
                 <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />

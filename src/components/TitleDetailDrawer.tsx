@@ -957,9 +957,9 @@ export function TitleDetailDrawer() {
     return () => { cancelled = true }
   }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
 
-  // Logo: TV-with-backdrop hero only — fetched lazily, mirrors the videos effect.
+  // Logo: fetched for any title with a cinematic backdrop hero.
   useEffect(() => {
-    if (!isDetailDrawerOpen || !title?.tmdbId || title.type !== 'tv' || !title.backdropUrl) {
+    if (!isDetailDrawerOpen || !title?.tmdbId || !title.backdropUrl) {
       const t = setTimeout(() => setLogoUrl(null), 0)
       return () => clearTimeout(t)
     }
@@ -1195,12 +1195,18 @@ export function TitleDetailDrawer() {
       )}
 
       <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
-        {/* Hero: cinematic backdrop (TV) or blurred-poster (movie / TV without backdrop) */}
-        {title.type === 'tv' && title.backdropUrl ? (
+        {/* Hero: cinematic backdrop (any title with one) or blurred-poster fallback */}
+        {title.backdropUrl ? (
           <HeroBackdrop title={title} onPosterClick={() => setPosterLightboxOpen(true)}>
             <div className="flex items-center gap-2">
-              <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Series</span>
+              {title.type === 'movie' ? (
+                <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              ) : (
+                <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              )}
+              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+                {title.type === 'tv' ? 'Series' : 'Film'}
+              </span>
               {title.network && (
                 <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
               )}
@@ -1216,6 +1222,15 @@ export function TitleDetailDrawer() {
             )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-mono text-sm text-amber">{title.year}</span>
+              {title.director && title.type === 'movie' && (
+                <span className="text-xs text-muted-foreground font-sans">dir. {title.director}</span>
+              )}
+              {title.runtime && title.type === 'movie' && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  <span className="font-mono">{title.runtime}m</span>
+                </div>
+              )}
             </div>
             {isSpiderNoir && (
               <SpiderNoirModeSelector

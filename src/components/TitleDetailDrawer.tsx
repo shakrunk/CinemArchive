@@ -22,9 +22,9 @@ import {
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, RefreshCw, Tag, X,
+  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X,
 } from 'lucide-react'
-import { cn, fmtDate } from 'src/lib/utils'
+import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleLogo, type TitleVideo } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
@@ -202,6 +202,106 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-3">
       <dt className="font-mono text-xs uppercase tracking-wider text-muted-foreground shrink-0">{label}</dt>
       <dd className="font-sans text-sm text-foreground text-right min-w-0 break-words">{value}</dd>
+    </div>
+  )
+}
+
+// ─── External links ───────────────────────────────────────────────────────────
+
+type LinkBrand = 'tmdb' | 'imdb' | 'rt' | 'metacritic'
+
+// TMDB resolves exactly from id+type. IMDb uses the stored imdb_id when present,
+// otherwise a name search. Rotten Tomatoes and Metacritic have no stable id-based
+// URL, so they always use a name search.
+function buildExternalLinks(title: Title): Array<{ brand: LinkBrand; name: string; href: string }> {
+  const links: Array<{ brand: LinkBrand; name: string; href: string }> = []
+  const q = encodeURIComponent(title.title)
+
+  if (title.tmdbId > 0) {
+    links.push({ brand: 'tmdb', name: 'TMDB', href: `https://www.themoviedb.org/${title.type}/${title.tmdbId}` })
+  }
+  links.push({
+    brand: 'imdb',
+    name: 'IMDb',
+    href: title.imdbId
+      ? `https://www.imdb.com/title/${title.imdbId}/`
+      : `https://www.imdb.com/find/?q=${q}&s=tt`,
+  })
+  links.push({ brand: 'rt', name: 'Rotten Tomatoes', href: `https://www.rottentomatoes.com/search?search=${q}` })
+  links.push({ brand: 'metacritic', name: 'Metacritic', href: `https://www.metacritic.com/search/${q}/` })
+
+  return links
+}
+
+// Self-contained inline brand marks (no external image deps). Each renders at a
+// uniform 18px height and carries its own brand colors; the wrapping <a> supplies
+// the accessible name, so the SVGs are aria-hidden.
+function BrandLogo({ brand }: { brand: LinkBrand }) {
+  const cls = 'h-[18px] w-auto'
+  switch (brand) {
+    case 'tmdb':
+      return (
+        <svg viewBox="0 0 84 32" className={cls} aria-hidden="true">
+          <defs>
+            <linearGradient id="tmdbGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor="#90cea1" />
+              <stop offset="1" stopColor="#01b4e4" />
+            </linearGradient>
+          </defs>
+          <rect width="84" height="32" rx="5" fill="url(#tmdbGrad)" />
+          <text x="42" y="22" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="800" fontSize="16" letterSpacing="0.5" fill="#0d253f">TMDB</text>
+        </svg>
+      )
+    case 'imdb':
+      return (
+        <svg viewBox="0 0 64 32" className={cls} aria-hidden="true">
+          <rect width="64" height="32" rx="5" fill="#F5C518" />
+          <text x="32" y="23" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" fontSize="18" fill="#000">IMDb</text>
+        </svg>
+      )
+    case 'rt':
+      return (
+        <svg viewBox="0 0 32 32" className={cls} aria-hidden="true">
+          <circle cx="16" cy="18.5" r="11.5" fill="#FA320A" />
+          <circle cx="11.5" cy="15" r="2" fill="#fff" opacity="0.25" />
+          <g fill="#4a9e2f">
+            <path d="M16 9 l-3.5 -2 l1.2 3.4z" />
+            <path d="M16 9 l3.5 -2 l-1.2 3.4z" />
+            <rect x="15.2" y="4.5" width="1.6" height="5" rx="0.8" />
+          </g>
+        </svg>
+      )
+    case 'metacritic':
+      return (
+        <svg viewBox="0 0 64 32" className={cls} aria-hidden="true">
+          <rect width="64" height="32" rx="5" fill="#1c1c1c" />
+          <text x="32" y="22" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="800" fontSize="16" letterSpacing="0.5" fill="#6ebc24">MC</text>
+        </svg>
+      )
+  }
+}
+
+function ExternalLinks({ title }: { title: Title }) {
+  const links = buildExternalLinks(title)
+  if (links.length === 0) return null
+  return (
+    <div>
+      <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Links</h4>
+      <div className="flex flex-wrap items-center gap-2.5">
+        {links.map((l) => (
+          <a
+            key={l.brand}
+            href={l.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open ${title.title} on ${l.name}`}
+            title={l.name}
+            className="inline-flex items-center rounded p-0.5 opacity-90 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+          >
+            <BrandLogo brand={l.brand} />
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1266,6 +1366,9 @@ export function TitleDetailDrawer() {
                   {title.network && <DetailRow label="Network" value={title.network} />}
                   {title.type === 'movie' && title.director && <DetailRow label="Director" value={title.director} />}
                   {title.runtime ? <DetailRow label="Runtime" value={`${title.runtime} min`} /> : null}
+                  {title.contentRating && <DetailRow label="Rated" value={title.contentRating} />}
+                  {title.originalLanguage && <DetailRow label="Language" value={languageName(title.originalLanguage)} />}
+                  {title.releaseDate && <DetailRow label="Released" value={fmtReleaseDate(title.releaseDate)} />}
                   {title.studios && title.studios.length > 0 && (
                     <DetailRow label="Studio" value={title.studios.join(', ')} />
                   )}
@@ -1282,6 +1385,9 @@ export function TitleDetailDrawer() {
                   <ReviewBadges imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
                 </div>
               )}
+
+              {/* External links */}
+              <ExternalLinks title={title} />
             </div>
           </div>
 

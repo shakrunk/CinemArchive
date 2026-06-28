@@ -22,7 +22,7 @@ import {
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, RefreshCw, Tag, X,
+  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
@@ -1321,22 +1321,28 @@ export function TitleDetailDrawer() {
               {/* Status */}
               <div>
                 <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Status</h4>
-                <div className="flex flex-wrap gap-2">
-                  {STATUS_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={isSharedView ? undefined : () => updateTitle(title.id, { status: opt.value })}
-                      className={cn(
-                        'px-3 py-1.5 rounded-md text-xs font-sans border transition-all',
-                        title.status === opt.value
-                          ? 'bg-amber/20 border-amber/50 text-amber'
-                          : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground',
-                        isSharedView && 'opacity-60 cursor-default pointer-events-none'
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                <div className="relative inline-block">
+                  <select
+                    value={title.status}
+                    onChange={isSharedView ? undefined : (e) => updateTitle(title.id, { status: e.target.value as WatchStatus })}
+                    disabled={isSharedView}
+                    aria-label="Title status"
+                    className={cn(
+                      'appearance-none font-sans text-sm rounded-lg pl-3 pr-9 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60',
+                      isSharedView && 'opacity-60 cursor-default'
+                    )}
+                    style={{ color: 'var(--amber)' }}
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                    style={{ color: 'var(--amber)' }}
+                  />
                 </div>
               </div>
 

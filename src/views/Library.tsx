@@ -444,6 +444,7 @@ export function Library() {
               key={opt.value}
               onClick={() => setFilter('status', opt.value)}
               className={cn('seg__btn', filters.status === opt.value && 'is-active')}
+              aria-pressed={filters.status === opt.value}
             >
               {opt.label}
             </button>
@@ -478,6 +479,7 @@ export function Library() {
             key={opt.value}
             onClick={() => setFilter('status', opt.value)}
             className={cn('chip shrink-0', filters.status === opt.value && 'is-active')}
+            aria-pressed={filters.status === opt.value}
           >
             {opt.label}
           </button>

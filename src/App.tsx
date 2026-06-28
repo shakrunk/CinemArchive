@@ -37,9 +37,11 @@ export default function App() {
   const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
   const closeCommandPalette = useAppStore((s) => s.closeCommandPalette)
   const openCommandPalette = useAppStore((s) => s.openCommandPalette)
-    const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const openAddTitle = useAppStore((s) => s.openAddTitle)
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const isRefreshMetadataOpen = useAppStore((s) => s.isRefreshMetadataOpen)
+  const setViewMode = useAppStore((s) => s.setViewMode)
 
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
 

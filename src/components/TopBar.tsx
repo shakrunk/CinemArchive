@@ -130,7 +130,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           </button>
 
           {currentView === 'library' && (
-            <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
+            <div className="hidden sm:flex items-center gap-0.5 seg !p-1" role="group" aria-label="View mode">
               <button
                 onClick={() => setViewMode('grid')}
                 className={cn(
@@ -138,6 +138,8 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                   viewMode === 'grid' && '!text-amber-bright bg-[rgba(233,178,102,0.12)]'
                 )}
                 aria-label="Poster wall"
+                title="Poster wall"
+                aria-pressed={viewMode === 'grid'}
               >
                 <LayoutGrid className="w-[17px] h-[17px]" />
               </button>
@@ -148,6 +150,8 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                   viewMode === 'list' && '!text-amber-bright bg-[rgba(233,178,102,0.12)]'
                 )}
                 aria-label="Ledger list"
+                title="Ledger list"
+                aria-pressed={viewMode === 'list'}
               >
                 <List className="w-[17px] h-[17px]" />
               </button>

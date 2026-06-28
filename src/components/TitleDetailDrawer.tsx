@@ -343,9 +343,10 @@ interface TVSeriesSectionProps {
   isSharedView: boolean
   isSpiderNoir: boolean
   onPersonClick: (person: PersonDetailTarget) => void
+  onColorModeSelected?: (mode: 'bw' | 'color') => void
 }
 
-function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPersonClick }: TVSeriesSectionProps) {
+function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -575,6 +576,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                 titleId={titleId}
                 isSharedView={isSharedView}
                 isSpiderNoir={isSpiderNoir}
+                onColorModeSelected={onColorModeSelected}
               />
             </div>
           )}
@@ -1287,6 +1289,7 @@ export function TitleDetailDrawer() {
                 isSharedView={isSharedView}
                 isSpiderNoir={title.tmdbId === SPIDER_NOIR_TMDB_ID}
                 onPersonClick={setActivePerson}
+                onColorModeSelected={handleModeSelect}
               />
             </div>
           )}

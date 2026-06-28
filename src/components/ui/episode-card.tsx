@@ -166,9 +166,12 @@ export interface EpisodePanelProps {
   titleId: string
   isSharedView: boolean
   isSpiderNoir: boolean
+  /** Called when the user picks a Spider-Noir colour mode while logging. Lets the
+   *  drawer reflect the freshly-chosen mode immediately (web overlay + theme). */
+  onColorModeSelected?: (mode: 'bw' | 'color') => void
 }
 
-export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir }: EpisodePanelProps) {
+export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir, onColorModeSelected }: EpisodePanelProps) {
   const logEpisode = useAppStore((s) => s.logEpisode)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
   const [pendingDeleteWeId, setPendingDeleteWeId] = useState<string | null>(null)
@@ -214,6 +217,9 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
     setShowNoirModal(false)
     if (pendingLog) doSave(pendingLog, mode)
     setPendingLog(null)
+    // Surface the chosen mode to the drawer so the web overlay + theme fire
+    // immediately on the first log, without needing a close/reopen.
+    onColorModeSelected?.(mode)
   }
 
   function handleNoirSkip() {

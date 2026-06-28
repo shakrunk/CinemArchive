@@ -80,11 +80,16 @@ async function searchTMDB(query: string, type: 'movie' | 'tv') {
 }
 
 async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
-  const cacheKey = `tmdb:details:${type}:${tmdbId}`
+  // Cache key bumped to v2 — v1 entries lack release_dates/content_ratings/external_ids
+  // (added for content certification and the TV imdb_id used by ratings + IMDb links).
+  const cacheKey = `tmdb:details:v2:${type}:${tmdbId}`
   const cached = await getCached(cacheKey)
   if (cached) return cached
 
-  const appendix = type === 'movie' ? 'credits' : 'credits,seasons'
+  // original_language and movie imdb_id are already top-level on the base call;
+  // only certifications (release_dates / content_ratings) and the TV imdb_id
+  // (external_ids) need appending.
+  const appendix = type === 'movie' ? 'credits,release_dates' : 'credits,seasons,content_ratings,external_ids'
   const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=${appendix}&language=en-US`
   const res = await fetch(url)
   const data = await res.json()

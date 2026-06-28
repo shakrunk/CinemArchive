@@ -21,7 +21,10 @@ export interface SearchResult {
   runtime?: number
   network?: string
   seasonCount?: number
-  releaseDate?: string  // YYYY-MM-DD; populated when title hasn't released yet
+  releaseDate?: string  // YYYY-MM-DD; the title's actual release/first-air date
+  originalLanguage?: string  // ISO 639-1 code, e.g. "en"
+  contentRating?: string  // age certification, e.g. "PG-13", "TV-MA"
+  imdbId?: string  // e.g. "tt1375666"
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
@@ -104,6 +107,26 @@ const MOCK_RESULTS: SearchResult[] = [
 
 // ─── Mapping helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Pull the US content certification from a TMDB details payload.
+ * Movies expose it under `release_dates.results[].release_dates[].certification`
+ * — multiple entries (theatrical/digital) exist and only one carries a non-empty
+ * value, so we scan for the first non-empty rather than taking [0].
+ * TV exposes a single `content_ratings.results[].rating`.
+ */
+function extractCertification(data: any, type: MediaType): string | undefined {
+  if (type === 'movie') {
+    const us = (data.release_dates?.results ?? []).find((r: any) => r.iso_3166_1 === 'US')
+    const cert = (us?.release_dates ?? [])
+      .map((rd: any) => rd.certification)
+      .find((c: string) => c && c.trim() !== '')
+    return cert ? cert.trim() : undefined
+  }
+  const us = (data.content_ratings?.results ?? []).find((r: any) => r.iso_3166_1 === 'US')
+  const rating = us?.rating
+  return rating && rating.trim() !== '' ? rating.trim() : undefined
+}
+
 function mapSearchItem(item: any, type: MediaType): SearchResult {
   const date = type === 'movie' ? item.release_date : item.first_air_date
   return {
@@ -169,14 +192,17 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
   )
   if (error) throw error
 
+  // Movie details carry imdb_id at the top level; TV exposes it via external_ids.
+  const imdbId: string | undefined = data.imdb_id || data.external_ids?.imdb_id || undefined
+
   let imdbRating: number | undefined
   let rtScore: number | undefined
   let metacriticScore: number | undefined
 
-  if (data.imdb_id) {
+  if (imdbId) {
     try {
       const { data: ratingsData } = await supabase.functions.invoke(
-        `media-proxy?action=ratings&imdb=${data.imdb_id}`
+        `media-proxy?action=ratings&imdb=${imdbId}`
       )
       if (ratingsData) {
         imdbRating =
@@ -239,15 +265,16 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
 
   const director = crew.find((c) => c.job === 'Director')?.name
   const date = data.release_date || data.first_air_date
-  const today = new Date().toISOString().slice(0, 10)
-  const releaseDate = date && date > today ? date : undefined
 
   const result: SearchResult = {
     tmdbId: data.id,
     type: base.type,
     title: data.title || data.name,
     year: date ? new Date(date).getFullYear() : base.year,
-    releaseDate,
+    releaseDate: date || undefined,
+    originalLanguage: data.original_language || undefined,
+    contentRating: extractCertification(data, base.type),
+    imdbId,
     posterUrl: data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : base.posterUrl,
     backdropUrl: data.backdrop_path ? `${TMDB_IMG}/w1280${data.backdrop_path}` : base.backdropUrl,
     director,

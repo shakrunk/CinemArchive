@@ -464,9 +464,20 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
-                    className="shrink-0 w-[88px] rounded-lg animate-pulse"
-                    style={{ background: 'var(--inset)', aspectRatio: '2/3' }}
-                  />
+                    className="shrink-0 w-[88px] rounded-lg overflow-hidden animate-pulse"
+                    style={{ border: '1px solid var(--line)' }}
+                  >
+                    <div
+                      className="w-full flex items-center justify-center"
+                      style={{ background: 'var(--card)', aspectRatio: '2/3' }}
+                    >
+                      <User className="w-10 h-10" style={{ color: 'var(--line)' }} />
+                    </div>
+                    <div className="p-1.5 space-y-1.5" style={{ background: 'var(--inset)' }}>
+                      <div className="h-2.5 rounded" style={{ background: 'var(--line)', width: '80%' }} />
+                      <div className="h-2 rounded" style={{ background: 'var(--line)', width: '55%' }} />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

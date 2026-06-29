@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Compass, X, Film, Tv, Check, Plus } from 'lucide-react'
+import { Search, Compass, X, Film, Tv, Check, Plus, Info } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
-import { searchMedia, fetchTrending, fetchDiscover, MOVIE_GENRES, TV_GENRES, type SearchResult } from 'src/lib/media'
+import { searchMedia, fetchTrending, fetchDiscover, fetchMediaDetails, MOVIE_GENRES, TV_GENRES, type SearchResult } from 'src/lib/media'
 import type { MediaType } from 'src/store/mockData'
 import { cn } from 'src/lib/utils'
+import { CinemaModal } from 'src/components/ui/cinema-modal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,13 +18,22 @@ interface DiscoverCardProps {
   isOwned: boolean
   isSharedView: boolean
   onAdd: (result: SearchResult) => void
+  onSelect: (result: SearchResult) => void
 }
 
-function DiscoverCard({ result, isOwned, isSharedView, onAdd }: DiscoverCardProps) {
+function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect }: DiscoverCardProps) {
   const [imgError, setImgError] = useState(false)
+  const pushNotification = useAppStore((s) => s.pushNotification)
 
   return (
-    <div className="group relative cursor-default">
+    <div
+      className="group relative cursor-pointer"
+      onClick={() => onSelect(result)}
+      role="button"
+      tabIndex={0}
+      aria-label={`View details for ${result.title}`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(result) } }}
+    >
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden border transition-transform duration-200 group-hover:scale-[1.02] group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
         style={{ background: 'var(--void)', borderColor: 'var(--line)' }}
       >
@@ -66,14 +76,56 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd }: DiscoverCardProp
               In your library
             </div>
           ) : !isSharedView ? (
-            <button
-              onClick={() => onAdd(result)}
-              aria-label={`Add ${result.title} to library`}
-              className="flex items-center justify-center gap-1 w-full py-1.5 rounded text-[11px] font-bold transition-colors btn-amber"
-            >
-              <Plus className="w-3 h-3" />
-              Add to Library
-            </button>
+            <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-[1500ms]">
+              <button
+                onClick={(e) => { e.stopPropagation(); onAdd(result) }}
+                aria-label={`Add ${result.title} to library`}
+                className="flex items-center justify-center gap-1 flex-1 py-1.5 rounded text-[11px] font-bold transition-colors btn-amber"
+              >
+                <Plus className="w-3 h-3" />
+                Add to Library
+              </button>
+
+              {/* Details hint — expands after a long hover, with tooltip */}
+              <div
+                className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-[1500ms]"
+              >
+                {/* Tooltip — always visible once the wrapper fades in */}
+                <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
+                  <div
+                    className="relative px-2 py-1 rounded shadow-lg"
+                    style={{ background: 'var(--void)', border: '1px solid rgba(233,178,102,0.35)' }}
+                  >
+                    <p className="font-mono text-[9px] text-paper-faint whitespace-nowrap">Click for more details</p>
+                    <div
+                      className="absolute top-full right-2.5"
+                      style={{
+                        width: 0, height: 0,
+                        borderLeft: '4px solid transparent',
+                        borderRight: '4px solid transparent',
+                        borderTop: '4px solid rgba(233,178,102,0.35)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSelect(result)
+                    pushNotification({
+                      message: 'Next time, click on the poster itself to see more details.',
+                      kind: 'tip',
+                      autoClose: 5000,
+                    })
+                  }}
+                  aria-label={`See details for ${result.title}`}
+                  className="w-full h-[30px] rounded flex items-center justify-center btn-amber"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           ) : null}
         </div>
 
@@ -101,7 +153,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd }: DiscoverCardProp
             <Check className="w-3 h-3 text-amber shrink-0" />
           ) : !isSharedView ? (
             <button
-              onClick={() => onAdd(result)}
+              onClick={(e) => { e.stopPropagation(); onAdd(result) }}
               aria-label={`Add ${result.title} to library`}
               className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors btn-amber"
             >
@@ -126,6 +178,232 @@ function DiscoverSkeleton() {
   )
 }
 
+// ─── Detail modal ─────────────────────────────────────────────────────────────
+
+interface DiscoverDetailModalProps {
+  result: SearchResult | null
+  isOwned: boolean
+  isSharedView: boolean
+  onClose: () => void
+  onAdd: (result: SearchResult) => void
+}
+
+function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: DiscoverDetailModalProps) {
+  const [details, setDetails] = useState<SearchResult | null>(null)
+  const [hydrating, setHydrating] = useState(false)
+
+  useEffect(() => {
+    if (!result) { setDetails(null); return }
+    setHydrating(true)
+    fetchMediaDetails(result)
+      .then(({ result: r }) => setDetails(r))
+      .catch(() => setDetails(result))
+      .finally(() => setHydrating(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result?.tmdbId])
+
+  const data = details ?? result
+  if (!data) return null
+
+  function handleAdd() {
+    onClose()
+    onAdd(data!)
+  }
+
+  const hasScores = data.imdbRating != null || data.rtScore != null || data.metacriticScore != null
+  const hasBackdrop = !!data.backdropUrl
+
+  return (
+    <CinemaModal
+      open={!!result}
+      onClose={onClose}
+      title={data.title}
+      description={data.synopsis}
+      maxWidth="sm:max-w-2xl"
+    >
+      <div className="overflow-y-auto max-h-[90vh]">
+        {/* Backdrop */}
+        {hasBackdrop ? (
+          <div className="relative aspect-[16/7] overflow-hidden shrink-0">
+            <img
+              src={data.backdropUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div
+              className="absolute inset-0"
+              style={{ background: 'linear-gradient(to bottom, transparent 35%, var(--void) 100%)' }}
+            />
+          </div>
+        ) : (
+          <div className="h-14" />
+        )}
+
+        {/* Content */}
+        <div className={cn('px-5 pb-6', hasBackdrop ? '-mt-20 relative z-10' : 'pt-2')}>
+          {/* Poster + title */}
+          <div className="flex gap-4 items-end mb-4">
+            <div
+              className="w-24 shrink-0 rounded-lg overflow-hidden shadow-xl border"
+              style={{ borderColor: 'var(--line)' }}
+            >
+              {data.posterUrl ? (
+                <img src={data.posterUrl} alt={data.title} className="w-full aspect-[2/3] object-cover" />
+              ) : (
+                <div className="aspect-[2/3] flex items-center justify-center" style={{ background: 'var(--inset)' }}>
+                  {data.type === 'tv'
+                    ? <Tv className="w-6 h-6 text-paper-faint opacity-30" />
+                    : <Film className="w-6 h-6 text-paper-faint opacity-30" />}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 pb-1">
+              <h2 className="font-serif text-xl font-semibold text-paper leading-tight mb-1.5">
+                {data.title}
+              </h2>
+              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                <span className="font-mono text-xs text-paper-faint">
+                  {data.year > 0 ? data.year : ''}
+                  {data.runtime ? ` · ${data.runtime}m` : ''}
+                  {data.type === 'tv' && data.seasonCount
+                    ? ` · ${data.seasonCount} season${data.seasonCount !== 1 ? 's' : ''}`
+                    : ''}
+                </span>
+                {data.contentRating && (
+                  <span
+                    className="font-mono text-[9px] px-1.5 py-0.5 rounded border text-paper-faint"
+                    style={{ borderColor: 'var(--line)' }}
+                  >
+                    {data.contentRating}
+                  </span>
+                )}
+                <span
+                  className="font-mono text-[9px] px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--inset)', color: 'var(--paper-faint)' }}
+                >
+                  {data.type === 'tv' ? 'TV' : 'Movie'}
+                </span>
+              </div>
+              {data.director && (
+                <p className="font-mono text-[11px] text-paper-faint">
+                  {data.type === 'tv' ? 'Created by ' : 'Dir. '}{data.director}
+                </p>
+              )}
+              {data.network && (
+                <p className="font-mono text-[11px] text-amber/70 mt-0.5">{data.network}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Genres */}
+          {data.genres.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {data.genres.map((g) => (
+                <span
+                  key={g}
+                  className="font-mono text-[10px] px-2 py-0.5 rounded-full border text-paper-faint"
+                  style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+                >
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Synopsis */}
+          {hydrating && !data.synopsis ? (
+            <div className="space-y-1.5 mb-4">
+              <div className="h-3 rounded animate-pulse w-full" style={{ background: 'var(--inset)' }} />
+              <div className="h-3 rounded animate-pulse w-5/6" style={{ background: 'var(--inset)' }} />
+              <div className="h-3 rounded animate-pulse w-4/6" style={{ background: 'var(--inset)' }} />
+            </div>
+          ) : data.synopsis ? (
+            <p className="font-sans text-sm text-paper/75 leading-relaxed mb-4">{data.synopsis}</p>
+          ) : null}
+
+          {/* Scores */}
+          {hydrating && !hasScores ? (
+            <div className="flex gap-4 mb-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 w-16 rounded animate-pulse" style={{ background: 'var(--inset)' }} />
+              ))}
+            </div>
+          ) : hasScores ? (
+            <div className="flex gap-5 mb-4 py-3 border-t border-b" style={{ borderColor: 'var(--line)' }}>
+              {data.imdbRating != null && (
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-mono text-lg font-bold text-amber leading-none">
+                    {data.imdbRating.toFixed(1)}
+                  </span>
+                  <span className="font-mono text-[9px] text-paper-faint uppercase tracking-wide">IMDb</span>
+                </div>
+              )}
+              {data.rtScore != null && (
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-mono text-lg font-bold text-amber leading-none">{data.rtScore}%</span>
+                  <span className="font-mono text-[9px] text-paper-faint uppercase tracking-wide">Rotten Tomatoes</span>
+                </div>
+              )}
+              {data.metacriticScore != null && (
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="font-mono text-lg font-bold text-amber leading-none">{data.metacriticScore}</span>
+                  <span className="font-mono text-[9px] text-paper-faint uppercase tracking-wide">Metacritic</span>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* Cast */}
+          {data.cast && data.cast.length > 0 && (
+            <div className="mb-5">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-paper-faint mb-2">Cast</h3>
+              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
+                {data.cast.slice(0, 8).map((c) => (
+                  <div key={c.tmdbPersonId} className="shrink-0 flex flex-col items-center gap-1 w-14">
+                    <div
+                      className="w-11 h-11 rounded-full overflow-hidden border"
+                      style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+                    >
+                      {c.profileUrl ? (
+                        <img src={c.profileUrl} alt={c.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center font-serif text-base text-paper-faint/40">
+                          {c.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <p className="font-mono text-[9px] text-paper-faint text-center leading-tight line-clamp-2">
+                      {c.name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add / In Library */}
+          {isOwned ? (
+            <div className="flex items-center gap-2 text-amber font-mono text-sm py-2.5">
+              <Check className="w-4 h-4" />
+              Already in your library
+            </div>
+          ) : !isSharedView ? (
+            <button
+              onClick={handleAdd}
+              className="w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors btn-amber mt-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add to Library
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </CinemaModal>
+  )
+}
+
 // ─── Discover view ────────────────────────────────────────────────────────────
 
 export function Discover() {
@@ -143,6 +421,7 @@ export function Discover() {
   const [trending, setTrending] = useState<SearchResult[]>([])
   const [discoverResults, setDiscoverResults] = useState<SearchResult[]>([])
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null)
   // Start loading so skeleton shows while the first trending fetch runs.
   const [loading, setLoading] = useState(true)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -157,8 +436,6 @@ export function Discover() {
   const genres = filterType === 'tv' ? TV_GENRES : MOVIE_GENRES
 
   // Load trending when not searching or filtering by genre.
-  // setState is only called inside async .then()/.catch() callbacks — not
-  // synchronously in the effect body — to satisfy react-hooks/set-state-in-effect.
   useEffect(() => {
     if (query.trim() || selectedGenreId !== null) return
     let cancelled = false
@@ -209,7 +486,6 @@ export function Discover() {
     inputRef.current?.focus()
   }
 
-  // Event handlers — setting loading here (not in effects) is allowed.
   function handleGenreSelect(id: number | null) {
     if (id !== null) setLoading(true)
     setSelectedGenreId(id)
@@ -237,10 +513,12 @@ export function Discover() {
     ? (genres.find((g) => g.id === selectedGenreId)?.name ?? 'Genre')
     : 'Trending This Week'
 
+  const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
+
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
-      {/* Page header */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* Page header — centered */}
+      <div className="flex items-center justify-center gap-3 mb-5">
         <Compass className="w-5 h-5 text-amber shrink-0" />
         <div>
           <h1 className="font-serif text-2xl font-light text-paper leading-none">Discover</h1>
@@ -250,8 +528,8 @@ export function Discover() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4 max-w-lg">
+      {/* Search — centered */}
+      <div className="relative mb-4 max-w-lg mx-auto">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-paper-faint pointer-events-none" />
         <input
           ref={inputRef}
@@ -274,8 +552,8 @@ export function Discover() {
         )}
       </div>
 
-      {/* Movie / TV / All toggle */}
-      <div className="flex gap-1 mb-4">
+      {/* Movie / TV / All toggle — centered */}
+      <div className="flex gap-1 mb-4 justify-center">
         {([
           { id: 'all' as FilterType, label: 'All' },
           { id: 'movie' as FilterType, label: 'Movies' },
@@ -362,10 +640,20 @@ export function Discover() {
               isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
               isSharedView={isSharedView}
               onAdd={openAddTitlePreselected}
+              onSelect={setSelectedResult}
             />
           ))}
         </div>
       )}
+
+      {/* Detail modal */}
+      <DiscoverDetailModal
+        result={selectedResult}
+        isOwned={selectedIsOwned}
+        isSharedView={isSharedView}
+        onClose={() => setSelectedResult(null)}
+        onAdd={openAddTitlePreselected}
+      />
     </div>
   )
 }

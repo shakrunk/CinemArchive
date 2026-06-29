@@ -522,10 +522,10 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
   return (
     <>
       <div>
-        <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">
+        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
           Trailers
         </h4>
-        <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-1 px-1 pb-1">
+        <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-6 px-6 pb-1">
           {videos.map((v, i) => (
             <button
               key={v.key}
@@ -576,7 +576,7 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
                 </div>
                 <div
                   className="font-mono uppercase"
-                  style={{ fontSize: '9px', color: 'var(--amber-deep)', letterSpacing: '0.1em' }}
+                  style={{ fontSize: '9px', color: 'var(--amber-deep)', letterSpacing: '0.1em', opacity: 0.6 }}
                 >
                   {v.type}
                 </div>

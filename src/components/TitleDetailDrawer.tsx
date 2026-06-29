@@ -38,6 +38,9 @@ const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 220102
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
+const SPIDER_NOIR_LOGO_NORMAL = 'https://image.tmdb.org/t/p/original/o2D8loRUDlEuOf7BMRgulerNJ6p.png'
+const SPIDER_NOIR_LOGO_COLOR  = 'https://image.tmdb.org/t/p/original/ubGbGqmbfWW1B7kNXDI1KrooK7S.png'
+const SPIDER_NOIR_LOGO_BW     = 'https://image.tmdb.org/t/p/original/tcS3i7X9XvYcFGEEnjHG147sQrq.png'
 
 function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
   let lastMode: 'bw' | 'color' | null = null
@@ -986,6 +989,10 @@ export function TitleDetailDrawer() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [heroBackdropUrl, setHeroBackdropUrl] = useState<string | null>(null)
 
+  const displayLogoUrl = isSpiderNoir
+    ? (effectiveNoirMode === 'color' ? SPIDER_NOIR_LOGO_COLOR : effectiveNoirMode === 'bw' ? SPIDER_NOIR_LOGO_BW : SPIDER_NOIR_LOGO_NORMAL)
+    : logoUrl
+
   useEffect(() => {
     if (!isDetailDrawerOpen || !title?.tmdbId) {
       // Deferred to satisfy react-hooks/set-state-in-effect (same pattern as manualMode seeding above).
@@ -1258,9 +1265,9 @@ export function TitleDetailDrawer() {
                 <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
               )}
             </div>
-            {logoUrl ? (
+            {displayLogoUrl ? (
               <img
-                src={logoUrl}
+                src={displayLogoUrl}
                 alt={title.title}
                 className="object-contain object-left max-h-20 sm:max-h-28 max-w-[90%] drop-shadow-lg"
               />

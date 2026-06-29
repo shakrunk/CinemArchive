@@ -543,12 +543,28 @@ export function Discover() {
     }))
   )
 
+  // ── Core ──
   const [query, setQuery] = useState('')
   const [filterType, setFilterType] = useState<FilterType>('all')
+  const [searchMode, setSearchMode] = useState<SearchMode>('titles')
+
+  // ── Titles mode ──
   const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null)
   const [trending, setTrending] = useState<SearchResult[]>([])
   const [discoverResults, setDiscoverResults] = useState<SearchResult[]>([])
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+
+  // ── People mode ──
+  const [personResults, setPersonResults] = useState<PersonResult[]>([])
+  const [selectedPerson, setSelectedPerson] = useState<PersonResult | null>(null)
+  const [allPersonCredits, setAllPersonCredits] = useState<SearchResult[]>([])
+
+  // ── Studios mode ──
+  const [companyResults, setCompanyResults] = useState<CompanyResult[]>([])
+  const [selectedCompany, setSelectedCompany] = useState<CompanyResult | null>(null)
+  const [companyTitles, setCompanyTitles] = useState<SearchResult[]>([])
+
+  // ── Shared ──
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   // Start loading so skeleton shows while the first trending fetch runs.
@@ -564,54 +580,146 @@ export function Discover() {
 
   const genres = filterType === 'tv' ? TV_GENRES : MOVIE_GENRES
 
-  // Load trending when not searching or filtering by genre.
+  // Person credits filtered client-side by type — no extra fetch when filter changes
+  const personCredits = useMemo(
+    () => filterType === 'all' ? allPersonCredits : allPersonCredits.filter((r) => r.type === filterType),
+    [allPersonCredits, filterType]
+  )
+
+  // ── Effects ──
+
+  // Trending — titles mode, no query, no genre
   useEffect(() => {
-    if (query.trim() || selectedGenreId !== null) return
+    if (searchMode !== 'titles' || query.trim() || selectedGenreId !== null) return
     let cancelled = false
     const type: MediaType | 'all' = filterType
     fetchTrending(type)
       .then((data) => { if (!cancelled) { setTrending(data); setLoading(false) } })
       .catch((err) => { console.error('fetchTrending error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [filterType, query, selectedGenreId])
+  }, [filterType, query, selectedGenreId, searchMode])
 
-  // Load genre results when a genre is selected.
+  // Genre results — titles mode, genre selected, no query
   useEffect(() => {
-    if (selectedGenreId === null || query.trim()) return
+    if (searchMode !== 'titles' || selectedGenreId === null || query.trim()) return
     let cancelled = false
     const mediaType: MediaType = filterType === 'all' ? 'movie' : filterType
     fetchDiscover(mediaType, selectedGenreId)
       .then((data) => { if (!cancelled) { setDiscoverResults(data); setLoading(false) } })
       .catch((err) => { console.error('fetchDiscover error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [filterType, selectedGenreId, query])
+  }, [filterType, selectedGenreId, query, searchMode])
 
-  // Debounced search — called from input onChange (event handler, not effect)
+  // Company titles — re-fetch when type filter changes while a company is selected
+  useEffect(() => {
+    if (searchMode !== 'studios' || !selectedCompany) return
+    let cancelled = false
+    setLoading(true)
+    const type: MediaType = filterType === 'all' ? 'movie' : filterType
+    fetchCompanyTitles(selectedCompany.id, type)
+      .then((data) => { if (!cancelled) { setCompanyTitles(data); setLoading(false) } })
+      .catch((err) => { console.error('company titles error:', err); if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedCompany, filterType, searchMode])
+
+  // ── Handlers ──
+
   const handleSearch = useCallback((value: string) => {
     setQuery(value)
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    // Typing resets any active person/company selection back to picker mode
+    setSelectedPerson(null)
+    setAllPersonCredits([])
+    setSelectedCompany(null)
+    setCompanyTitles([])
     if (!value.trim()) {
       setSearchResults([])
+      setPersonResults([])
+      setCompanyResults([])
       return
     }
     setLoading(true)
     searchTimerRef.current = setTimeout(async () => {
       try {
-        const all = await searchMedia(value)
-        const filtered = filterType === 'all' ? all : all.filter((r) => r.type === filterType)
-        setSearchResults(filtered)
+        if (searchMode === 'titles') {
+          const all = await searchMedia(value)
+          const filtered = filterType === 'all' ? all : all.filter((r) => r.type === filterType)
+          setSearchResults(filtered)
+        } else if (searchMode === 'people') {
+          const results = await searchPersons(value)
+          setPersonResults(results)
+        } else {
+          const results = await searchCompanies(value)
+          setCompanyResults(results)
+        }
       } catch (err) {
         console.error('search error:', err)
         setSearchResults([])
+        setPersonResults([])
+        setCompanyResults([])
       } finally {
         setLoading(false)
       }
     }, 400)
-  }, [filterType])
+  }, [filterType, searchMode])
+
+  async function handlePersonSelect(person: PersonResult) {
+    setPersonResults([])
+    setSelectedPerson(person)
+    setQuery(person.name)
+    setLoading(true)
+    try {
+      const credits = await fetchPersonCredits(person.id)
+      setAllPersonCredits(credits)
+    } catch (err) {
+      console.error('person credits error:', err)
+      setAllPersonCredits([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCompanySelect(company: CompanyResult) {
+    setCompanyResults([])
+    setSelectedCompany(company)
+    setQuery(company.name)
+    setLoading(true)
+    try {
+      const type: MediaType = filterType === 'all' ? 'movie' : filterType
+      const results = await fetchCompanyTitles(company.id, type)
+      setCompanyTitles(results)
+    } catch (err) {
+      console.error('company titles error:', err)
+      setCompanyTitles([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleSearchModeChange(mode: SearchMode) {
+    setSearchMode(mode)
+    setQuery('')
+    setSearchResults([])
+    setPersonResults([])
+    setSelectedPerson(null)
+    setAllPersonCredits([])
+    setCompanyResults([])
+    setSelectedCompany(null)
+    setCompanyTitles([])
+    setSelectedGenreId(null)
+    setLoading(mode === 'titles')
+    inputRef.current?.focus()
+  }
 
   function clearSearch() {
     setQuery('')
     setSearchResults([])
+    setPersonResults([])
+    setSelectedPerson(null)
+    setAllPersonCredits([])
+    setCompanyResults([])
+    setSelectedCompany(null)
+    setCompanyTitles([])
     inputRef.current?.focus()
   }
 
@@ -623,26 +731,50 @@ export function Discover() {
   }
 
   function handleTypeChange(type: FilterType) {
-    setLoading(true)
     setFilterType(type)
     setSelectedGenreId(null)
-    setSearchResults([])
-    setQuery('')
+    if (searchMode === 'titles') {
+      setLoading(true)
+      setSearchResults([])
+      setQuery('')
+    }
+    // People: re-filters via personCredits memo; Studios: re-fetches via effect
   }
 
-  const displayResults = query.trim()
-    ? searchResults
-    : selectedGenreId !== null
-    ? discoverResults
-    : trending
+  // ── Derived display state ──
 
-  const sectionLabel = query.trim()
-    ? `Results for "${query}"`
-    : selectedGenreId !== null
-    ? (genres.find((g) => g.id === selectedGenreId)?.name ?? 'Genre')
-    : 'Trending This Week'
+  const inPickerMode =
+    (searchMode === 'people' && !selectedPerson) ||
+    (searchMode === 'studios' && !selectedCompany)
+
+  const displayResults = (() => {
+    if (searchMode === 'titles') {
+      if (query.trim()) return searchResults
+      if (selectedGenreId !== null) return discoverResults
+      return trending
+    }
+    if (searchMode === 'people') return selectedPerson ? personCredits : []
+    return selectedCompany ? companyTitles : []
+  })()
+
+  const sectionLabel = (() => {
+    if (searchMode === 'people') {
+      if (selectedPerson) return `${selectedPerson.name} · Filmography`
+      if (query.trim()) return `People matching "${query}"`
+      return 'Search for a person'
+    }
+    if (searchMode === 'studios') {
+      if (selectedCompany) return selectedCompany.name
+      if (query.trim()) return `Studios matching "${query}"`
+      return 'Search for a studio'
+    }
+    if (query.trim()) return `Results for "${query}"`
+    if (selectedGenreId !== null) return genres.find((g) => g.id === selectedGenreId)?.name ?? 'Genre'
+    return 'Trending This Week'
+  })()
 
   const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
+  const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
@@ -658,7 +790,7 @@ export function Discover() {
       </div>
 
       {/* Search — centered */}
-      <div className="relative mb-4 max-w-xl mx-auto">
+      <div className="relative mb-3 max-w-xl mx-auto">
         {loading && query.trim() ? (
           <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
             <div className="w-5 h-5 border-2 border-amber/20 border-t-amber/70 rounded-full animate-spin" />
@@ -674,8 +806,8 @@ export function Discover() {
         <input
           ref={inputRef}
           type="text"
-          aria-label="Search movies and TV shows"
-          placeholder="Search movies & TV shows…"
+          aria-label={SEARCH_PLACEHOLDERS[searchMode]}
+          placeholder={SEARCH_PLACEHOLDERS[searchMode]}
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => setIsSearchFocused(true)}
@@ -703,6 +835,29 @@ export function Discover() {
         )}
       </div>
 
+      {/* Search mode: Titles / People / Studios */}
+      <div className="flex gap-1 mb-3 justify-center">
+        {([
+          { id: 'titles' as SearchMode, label: 'Titles', Icon: Film },
+          { id: 'people' as SearchMode, label: 'People', Icon: User },
+          { id: 'studios' as SearchMode, label: 'Studios', Icon: Building2 },
+        ]).map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            onClick={() => handleSearchModeChange(id)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono border transition-colors',
+              searchMode === id
+                ? 'bg-amber/15 border-amber/40 text-amber-bright'
+                : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-paper-faint/30'
+            )}
+          >
+            <Icon className="w-3 h-3" />
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Movie / TV / All toggle — centered */}
       <div className="flex gap-1 mb-4 justify-center">
         {([
@@ -725,8 +880,8 @@ export function Discover() {
         ))}
       </div>
 
-      {/* Genre chips — hidden when search is active */}
-      {!query.trim() && (
+      {/* Genre chips — titles mode only, hidden when search is active */}
+      {searchMode === 'titles' && !query.trim() && (
         <div
           className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-thin"
           role="group"
@@ -762,18 +917,64 @@ export function Discover() {
 
       {/* Section label */}
       <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-mono text-[11px] tracking-[0.12em] uppercase text-paper-faint">
-          {sectionLabel}
-        </h2>
-        {!loading && displayResults.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          {showBack && (
+            <button
+              onClick={clearSearch}
+              aria-label="Back to search"
+              className="text-paper-faint hover:text-paper transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <h2 className="font-mono text-[11px] tracking-[0.12em] uppercase text-paper-faint">
+            {sectionLabel}
+          </h2>
+        </div>
+        {!loading && !inPickerMode && displayResults.length > 0 && (
           <span className="font-mono text-[10px] text-paper-faint/60">
             {displayResults.length} title{displayResults.length !== 1 ? 's' : ''}
           </span>
         )}
       </div>
 
-      {/* Grid */}
-      {loading ? (
+      {/* Main content */}
+      {inPickerMode ? (
+        query.trim() ? (
+          loading ? (
+            <div className="max-w-lg mx-auto space-y-2">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="h-16 rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
+              ))}
+            </div>
+          ) : searchMode === 'people' && personResults.length > 0 ? (
+            <PersonPicker persons={personResults} onSelect={handlePersonSelect} />
+          ) : searchMode === 'studios' && companyResults.length > 0 ? (
+            <CompanyPicker companies={companyResults} onSelect={handleCompanySelect} />
+          ) : (
+            <div className="py-16 text-center">
+              {searchMode === 'people'
+                ? <User className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />
+                : <Building2 className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />}
+              <p className="font-mono text-sm text-paper-faint">No results found.</p>
+            </div>
+          )
+        ) : (
+          <div className="py-16 text-center">
+            {searchMode === 'people' ? (
+              <>
+                <User className="w-10 h-10 text-paper-faint/20 mx-auto mb-3" />
+                <p className="font-mono text-sm text-paper-faint">Type a name to browse by actor, director, or crew.</p>
+              </>
+            ) : (
+              <>
+                <Building2 className="w-10 h-10 text-paper-faint/20 mx-auto mb-3" />
+                <p className="font-mono text-sm text-paper-faint">Type a studio name to browse their catalog.</p>
+              </>
+            )}
+          </div>
+        )
+      ) : loading ? (
         <DiscoverSkeleton />
       ) : displayResults.length === 0 ? (
         <div className="py-16 text-center">

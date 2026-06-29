@@ -32,10 +32,8 @@ export function HeroBackdrop({ title, backdropOverride, onPosterClick, children 
             aria-hidden="true"
             className="absolute inset-0 block w-full h-full object-cover object-center"
             style={{
-              // Fade only the lower portion to transparent so the image melts into
-              // the card background without hiding the subjects higher in the frame.
-              maskImage: 'linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)',
+              maskImage: 'linear-gradient(to bottom, #000 0%, #000 63%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 63%, transparent 100%)',
             }}
           />
         )}
@@ -44,7 +42,7 @@ export function HeroBackdrop({ title, backdropOverride, onPosterClick, children 
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.04) 45%, rgba(0,0,0,0.4) 78%, var(--card) 100%)',
+            background: 'linear-gradient(to bottom, hsl(var(--card) / 0.05) 0%, hsl(var(--card) / 0.3) 45%, hsl(var(--card) / 0.75) 68%, hsl(var(--card)) 88%)',
           }}
         />
 

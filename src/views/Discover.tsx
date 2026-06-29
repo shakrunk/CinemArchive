@@ -289,6 +289,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
 
   useEffect(() => {
     if (!result) { setDetails(null); return }
+    setDetails(null)
     setHydrating(true)
     fetchMediaDetails(result)
       .then(({ result: r }) => setDetails(r))

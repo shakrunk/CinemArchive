@@ -261,7 +261,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
       {isEmpty ? (
         <EmptyState onBrowseLibrary={onBrowseLibrary} />
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {shows.map((entry) => (
             <LiveCard key={entry.title.id} entry={entry} onFinale={handleFinale} />
           ))}
@@ -271,7 +271,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {upcoming.length > 0 && (
             <>
               {(shows.length > 0 || finishedToShow.length > 0) && (
-                <p className="font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
+                <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
               )}
               {upcoming.map((entry) => (
                 <UpcomingCard key={entry.title.id} entry={entry} />

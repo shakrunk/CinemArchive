@@ -94,8 +94,11 @@ export function EpisodeCard({
             type="button"
             onClick={handleQuickWatch}
             aria-label={watched ? 'Mark as watched again' : 'Mark as watched'}
-            className="absolute top-1.5 right-1.5 rounded-full p-1 transition-opacity hover:opacity-80 focus:outline-none"
-            style={{ background: 'rgba(0,0,0,0.55)' }}
+            className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus:outline-none"
+            style={{
+              background: watched ? 'rgba(233,178,102,0.22)' : 'rgba(0,0,0,0.55)',
+              border: watched ? '1px solid rgba(233,178,102,0.4)' : '1px solid transparent',
+            }}
           >
             <Eye
               className="w-3.5 h-3.5"
@@ -130,8 +133,8 @@ export function EpisodeCard({
         )}
         {episode.synopsis && (
           <p
-            className="font-sans line-clamp-2 leading-snug"
-            style={{ fontSize: '11px', color: 'var(--paper-dim)' }}
+            className="font-sans line-clamp-2"
+            style={{ fontSize: '12px', color: 'var(--paper-dim)', lineHeight: 1.5 }}
           >
             {episode.synopsis}
           </p>

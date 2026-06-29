@@ -899,7 +899,7 @@
    between them (grayscale → hue-rotate) without jumping.              */
 body.spider-noir-bw #root,
 body.spider-noir-bw .cinema-content {
-  filter: grayscale(1) contrast(1.15) saturate(1) hue-rotate(0deg);
+  filter: grayscale(1) contrast(1.0) brightness(1.06) saturate(1) hue-rotate(0deg);
 }
 
 body.spider-noir-bw .grain {
@@ -916,10 +916,10 @@ body.spider-noir-color .cinema-content {
    the target filter in over the remaining 35% (≈1300–2000ms). CSS animations
    beat CSS transitions, so this overrides the #root baseline transition. */
 @keyframes spider-noir-bw-filter-in {
-  0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }
-  65%  { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+  0%   { filter: grayscale(0) contrast(1) brightness(1) saturate(1) hue-rotate(0deg); }
+  65%  { filter: grayscale(0) contrast(1) brightness(1) saturate(1) hue-rotate(0deg);
          animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
-  100% { filter: grayscale(1) contrast(1.15) saturate(1) hue-rotate(0deg); }
+  100% { filter: grayscale(1) contrast(1.0) brightness(1.06) saturate(1) hue-rotate(0deg); }
 }
 @keyframes spider-noir-color-filter-in {
   0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }

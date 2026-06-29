@@ -150,12 +150,12 @@ async function getTMDBImages(tmdbId: number, type: 'movie' | 'tv') {
   return data
 }
 
-async function getTMDBTrending(type: 'movie' | 'tv') {
-  const cacheKey = `tmdb:trending:${type}:week`
+async function getTMDBTrending(type: 'movie' | 'tv', page = 1) {
+  const cacheKey = `tmdb:trending:${type}:week:p${page}`
   const cached = await getCached(cacheKey)
   if (cached) return cached
 
-  const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_API_KEY}&language=en-US`
+  const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
   const res = await fetch(url)
   const data = await res.json()
 
@@ -274,7 +274,8 @@ Deno.serve(async (req: Request) => {
       }
       case 'trending': {
         const type = parseMediaType(url.searchParams.get('type'))
-        result = await getTMDBTrending(type)
+        const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+        result = await getTMDBTrending(type, page)
         break
       }
       case 'discover': {

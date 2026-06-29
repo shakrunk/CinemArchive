@@ -479,7 +479,7 @@ const MOCK_TRENDING: SearchResult[] = [
  * Fetch this week's trending movies or TV shows. Falls back to a curated
  * static list in local dev (no Supabase configured).
  */
-export async function fetchTrending(type: MediaType | 'all'): Promise<SearchResult[]> {
+export async function fetchTrending(type: MediaType | 'all', page = 1): Promise<SearchResult[]> {
   if (!(isSupabaseConfigured && supabase)) {
     if (type === 'all') return MOCK_TRENDING
     return MOCK_TRENDING.filter((r) => r.type === type)
@@ -491,7 +491,7 @@ export async function fetchTrending(type: MediaType | 'all'): Promise<SearchResu
   const fetched = await Promise.all(
     types.map(async (t) => {
       const { data, error } = await client.functions.invoke(
-        `media-proxy?action=trending&type=${t}`
+        `media-proxy?action=trending&type=${t}&page=${page}`
       )
       if (error) throw error
       return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]

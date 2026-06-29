@@ -80,7 +80,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         className="flex items-center justify-around h-16 px-2"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <NavTab active={currentView === 'upnext'} onClick={() => onViewChange('upnext')} label="Up Next" Icon={PlayCircle} />
+        <NavTab active={currentView === 'discover'} onClick={() => onViewChange('discover')} label="Discover" Icon={Compass} />
         <NavTab active={currentView === 'library'} onClick={() => onViewChange('library')} label="Library" Icon={LayoutGrid} />
 
         <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2" aria-label="Add Title">
@@ -93,7 +93,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
           <span className="text-[11px] font-sans text-paper-faint mt-0.5">Add</span>
         </button>
 
-        <NavTab active={currentView === 'discover'} onClick={() => onViewChange('discover')} label="Discover" Icon={Compass} />
+        <NavTab active={currentView === 'upnext'} onClick={() => onViewChange('upnext')} label="Up Next" Icon={PlayCircle} />
         <NavTab active={currentView === 'ledger'} onClick={() => onViewChange('ledger')} label="Ledger" Icon={BarChart3} />
       </div>
     </nav>

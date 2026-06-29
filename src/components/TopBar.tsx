@@ -14,9 +14,9 @@ interface TopBarProps {
 }
 
 const NAV: { id: AppView; label: string; Icon: typeof BarChart3 }[] = [
-  { id: 'upnext', label: 'Up Next', Icon: PlayCircle },
-  { id: 'library', label: 'The Library', Icon: LayoutGrid },
   { id: 'discover', label: 'Discover', Icon: Compass },
+  { id: 'library', label: 'The Library', Icon: LayoutGrid },
+  { id: 'upnext', label: 'Up Next', Icon: PlayCircle },
   { id: 'ledger', label: 'The Ledger', Icon: BarChart3 },
 ]
 

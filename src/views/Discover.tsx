@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Search, Compass, X, Film, Tv, Check, Plus, Info } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
-import { searchMedia, fetchTrending, fetchDiscover, fetchMediaDetails, MOVIE_GENRES, TV_GENRES, type SearchResult } from 'src/lib/media'
+import { searchMedia, fetchTrending, fetchDiscover, fetchMediaDetails, fetchTitleImages, MOVIE_GENRES, TV_GENRES, type SearchResult } from 'src/lib/media'
 import type { MediaType } from 'src/store/mockData'
 import { cn } from 'src/lib/utils'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
+import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -325,63 +326,72 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
 
           {/* Scores */}
           {hydrating && !hasScores ? (
-            <div className="flex gap-4 mb-4">
+            <div className="flex gap-2 mb-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-10 w-16 rounded animate-pulse" style={{ background: 'var(--inset)' }} />
+                <div key={i} className="h-8 w-20 rounded animate-pulse" style={{ background: 'var(--inset)' }} />
               ))}
             </div>
           ) : hasScores ? (
-            <div className="flex gap-5 mb-4 py-3 border-t border-b" style={{ borderColor: 'var(--line)' }}>
-              {data.imdbRating != null && (
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="font-mono text-lg font-bold text-amber leading-none">
-                    {data.imdbRating.toFixed(1)}
-                  </span>
-                  <span className="font-mono text-[9px] text-paper-faint uppercase tracking-wide">IMDb</span>
-                </div>
-              )}
-              {data.rtScore != null && (
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="font-mono text-lg font-bold text-amber leading-none">{data.rtScore}%</span>
-                  <span className="font-mono text-[9px] text-paper-faint uppercase tracking-wide">Rotten Tomatoes</span>
-                </div>
-              )}
-              {data.metacriticScore != null && (
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="font-mono text-lg font-bold text-amber leading-none">{data.metacriticScore}</span>
-                  <span className="font-mono text-[9px] text-paper-faint uppercase tracking-wide">Metacritic</span>
-                </div>
-              )}
+            <div className="mb-4">
+              <ReviewBadges imdb={data.imdbRating} rt={data.rtScore} meta={data.metacriticScore} />
             </div>
           ) : null}
 
           {/* Cast */}
-          {data.cast && data.cast.length > 0 && (
+          {hydrating && !data.cast ? (
             <div className="mb-5">
               <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-paper-faint mb-2">Cast</h3>
-              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
-                {data.cast.slice(0, 8).map((c) => (
-                  <div key={c.tmdbPersonId} className="shrink-0 flex flex-col items-center gap-1 w-14">
-                    <div
-                      className="w-11 h-11 rounded-full overflow-hidden border"
-                      style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-                    >
+              <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-5 px-5">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="shrink-0 w-[88px] rounded-lg animate-pulse"
+                    style={{ background: 'var(--inset)', aspectRatio: '2/3' }}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : data.cast && data.cast.length > 0 ? (
+            <div className="mb-5">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-paper-faint mb-2">Cast</h3>
+              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none -mx-5 px-5">
+                {data.cast.slice(0, 10).map((c) => (
+                  <div
+                    key={c.tmdbPersonId}
+                    className="shrink-0 w-[88px] rounded-lg overflow-hidden"
+                    style={{ border: '1px solid var(--line)', background: 'var(--inset)' }}
+                  >
+                    <div className="overflow-hidden" style={{ aspectRatio: '2/3' }}>
                       {c.profileUrl ? (
                         <img src={c.profileUrl} alt={c.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center font-serif text-base text-paper-faint/40">
-                          {c.name.charAt(0)}
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                          <span className="font-serif text-2xl" style={{ color: 'var(--paper-faint)', opacity: 0.4 }}>
+                            {c.name.charAt(0).toUpperCase()}
+                          </span>
                         </div>
                       )}
                     </div>
-                    <p className="font-mono text-[9px] text-paper-faint text-center leading-tight line-clamp-2">
-                      {c.name}
-                    </p>
+                    <div className="p-1.5">
+                      <p className="font-sans font-semibold text-[11px] leading-tight line-clamp-2" style={{ color: 'var(--paper)' }}>
+                        {c.name}
+                      </p>
+                      {c.character && (
+                        <p className="font-mono text-[9px] line-clamp-1 mt-0.5" style={{ color: 'var(--paper-faint)', opacity: 0.6 }}>
+                          {c.character}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
+
+          {/* External links */}
+          <div className="mb-5">
+            <ExternalLinks media={data} />
+          </div>
 
           {/* Add / In Library */}
           {isOwned ? (
@@ -422,6 +432,7 @@ export function Discover() {
   const [discoverResults, setDiscoverResults] = useState<SearchResult[]>([])
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
   // Start loading so skeleton shows while the first trending fetch runs.
   const [loading, setLoading] = useState(true)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -529,8 +540,19 @@ export function Discover() {
       </div>
 
       {/* Search — centered */}
-      <div className="relative mb-4 max-w-lg mx-auto">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-paper-faint pointer-events-none" />
+      <div className="relative mb-4 max-w-xl mx-auto">
+        {loading && query.trim() ? (
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="w-5 h-5 border-2 border-amber/20 border-t-amber/70 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <Search
+            className={cn(
+              'absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none transition-colors duration-150',
+              isSearchFocused ? 'text-amber/60' : 'text-paper-faint',
+            )}
+          />
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -538,16 +560,27 @@ export function Discover() {
           placeholder="Search movies & TV shows…"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full h-10 pl-9 pr-9 rounded-lg border text-sm font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-2 focus:ring-amber/30 transition-colors"
-          style={{ background: 'var(--inset)', borderColor: 'var(--line)' }}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              if (query) clearSearch()
+              else inputRef.current?.blur()
+            }
+          }}
+          className="w-full h-12 pl-11 pr-10 rounded-xl border text-base font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-2 focus:ring-amber/30 transition-all duration-150"
+          style={{
+            background: 'var(--inset)',
+            borderColor: isSearchFocused ? 'rgba(233,178,102,0.35)' : 'var(--line)',
+          }}
         />
         {query && (
           <button
             onClick={clearSearch}
             aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>

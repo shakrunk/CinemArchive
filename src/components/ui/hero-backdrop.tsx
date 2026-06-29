@@ -24,13 +24,13 @@ export function HeroBackdrop({ title, backdropOverride, onPosterClick, children 
       {/* Backdrop at its natural aspect ratio so the full art — and every
           character in the frame — stays visible, rather than cropping to a band.
           The poster + title overlay its faded lower portion. */}
-      <div className="relative w-full">
+      <div className="relative w-full overflow-hidden aspect-[16/8]">
         {backdropSrc && (
           <img
             src={backdropSrc}
             alt=""
             aria-hidden="true"
-            className="block w-full h-auto"
+            className="absolute inset-0 block w-full h-full object-cover object-center"
             style={{
               // Fade only the lower portion to transparent so the image melts into
               // the card background without hiding the subjects higher in the frame.

@@ -3,6 +3,7 @@ export type WatchStatus = 'watched' | 'watchlist' | 'watching' | 'dropped'
 
 export interface CastMember {
   character?: string
+  episodeCount?: number
   name: string
   order: number
   profileUrl?: string

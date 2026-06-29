@@ -264,6 +264,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
       tmdbPersonId: c.id,
       name: c.name,
       character: c.character || undefined,
+      episodeCount: c.episode_count ?? undefined,
       profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
       order: c.order ?? 0,
     }))
@@ -349,6 +350,7 @@ export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): 
         tmdbPersonId: c.id,
         name: c.name,
         character: c.character || undefined,
+        episodeCount: c.episode_count ?? undefined,
         profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
         order: c.order ?? 0,
       }))
@@ -522,19 +524,9 @@ export interface TitleImages {
   backdropUrl: string | null
 }
 
-/** Score an image by vote quality weighted by confidence (vote count). */
-function imageScore(img: any): number {
-  return (img.vote_average ?? 0) * Math.log1p(img.vote_count ?? 0)
-}
-
 /**
- * Fetch the best logo and best backdrop for a title in a single images call.
- * Both are returned at `original` resolution for crisp retina display.
- *
- * Logo: English-text only; scored by vote_average × log(vote_count+1) so a
- * logo with many high votes beats one with a single perfect score.
- * Backdrop: highest-scored regardless of language (backdrops are textless).
- *
+ * Fetch the logo and backdrop for a title. TMDB returns images in its own
+ * preferred order, so we always take the first valid entry.
  * Display-only — neither value is persisted.
  */
 export async function fetchTitleImages(tmdbId: number, type: MediaType): Promise<TitleImages> {
@@ -546,16 +538,15 @@ export async function fetchTitleImages(tmdbId: number, type: MediaType): Promise
     )
     if (error) throw error
 
-    // Logo — English text only; textless (iso null) logos fall back to plain title text.
-    const englishLogos = ((data?.logos ?? []) as any[])
-      .filter((l) => l.file_path && l.iso_639_1 === 'en')
-    const bestLogo = englishLogos.sort((a, b) => imageScore(b) - imageScore(a))[0]
-    const logoUrl = bestLogo ? `${TMDB_IMG}/original${bestLogo.file_path}` : null
+    // Logo — take the first English logo; fall back to first textless (iso null) logo.
+    const allLogos = ((data?.logos ?? []) as any[]).filter((l) => l.file_path)
+    const englishLogos = allLogos.filter((l) => l.iso_639_1 === 'en')
+    const logo = englishLogos[0] ?? allLogos.filter((l) => l.iso_639_1 === null)[0]
+    const logoUrl = logo ? `${TMDB_IMG}/original${logo.file_path}` : null
 
-    // Backdrop — pick the highest-scored available image.
-    const backdrops = ((data?.backdrops ?? []) as any[]).filter((b) => b.file_path)
-    const bestBackdrop = backdrops.sort((a, b) => imageScore(b) - imageScore(a))[0]
-    const backdropUrl = bestBackdrop ? `${TMDB_IMG}/original${bestBackdrop.file_path}` : null
+    // Backdrop — take the first available image.
+    const backdrop = ((data?.backdrops ?? []) as any[]).find((b) => b.file_path)
+    const backdropUrl = backdrop ? `${TMDB_IMG}/original${backdrop.file_path}` : null
 
     return { logoUrl, backdropUrl }
   } catch (e) {

@@ -15,6 +15,7 @@ function mapDbTitleToLocal(row: any): Title {
       tmdbPersonId: c.tmdb_person_id,
       name: c.name,
       character: c.character_name || undefined,
+      episodeCount: c.episode_count ?? undefined,
       profileUrl: c.profile_url || undefined,
       order: c.cast_order,
     }
@@ -640,6 +641,7 @@ export async function upsertTitleCastInDb(userId: string, titleId: string, cast:
       tmdb_person_id: c.tmdbPersonId,
       name: c.name,
       character_name: c.character ?? null,
+      episode_count: c.episodeCount ?? null,
       profile_url: c.profileUrl ?? null,
       cast_order: c.order,
     })),
@@ -680,6 +682,7 @@ export async function upsertSeasonCastInDb(
       tmdb_person_id: c.tmdbPersonId,
       name: c.name,
       character_name: c.character ?? null,
+      episode_count: c.episodeCount ?? null,
       profile_url: c.profileUrl ?? null,
       cast_order: c.order,
     })),

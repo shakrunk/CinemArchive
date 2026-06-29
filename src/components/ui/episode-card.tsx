@@ -294,8 +294,9 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                           onClick={() => { deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id); setPendingDeleteWeId(null) }}
                           className="font-mono transition-opacity hover:opacity-80"
                           style={{ color: 'var(--ember)', fontSize: '10px' }}
+                          aria-label="Confirm delete watch event"
                         >Delete</button>
-                        <button onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>Cancel</button>
+                        <button onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80" style={{ color: 'var(--paper-faint)', fontSize: '10px' }} aria-label="Cancel delete watch event">Cancel</button>
                       </div>
                     </div>
                   ) : (

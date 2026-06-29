@@ -10,7 +10,6 @@ import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { isSupabaseConfigured, onAuthStateChange } from 'src/lib/auth'
 import { useAppStore } from 'src/store/useAppStore'
-import { computeUpNextShows } from 'src/store/upNext'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
@@ -25,9 +24,7 @@ import type { Command } from 'src/store/commands'
 export default function App() {
   // Smart landing unless the URL already names a view (deep link / refresh).
   const [currentView, setCurrentView] = useState<AppView>(() => {
-    const smart: AppView =
-      computeUpNextShows(useAppStore.getState().titles).length > 0 ? 'upnext' : 'library'
-    return parseNav(window.location.search, smart).view
+    return parseNav(window.location.search, 'discover').view
   })
 
   useNavigationSync({ currentView, setCurrentView })
@@ -95,9 +92,9 @@ export default function App() {
 
   useKeyboardShortcuts(
     {
-      '1': () => setCurrentView('upnext'),
+      '1': () => setCurrentView('discover'),
       '2': () => setCurrentView('library'),
-      '3': () => setCurrentView('discover'),
+      '3': () => setCurrentView('upnext'),
       '4': () => setCurrentView('ledger'),
       'n': () => { if (!isSharedView) openAddTitle() },
       '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),

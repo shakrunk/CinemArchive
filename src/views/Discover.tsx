@@ -569,6 +569,9 @@ export function Discover() {
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   // Start loading so skeleton shows while the first trending fetch runs.
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -594,7 +597,7 @@ export function Discover() {
     let cancelled = false
     const type: MediaType | 'all' = filterType
     fetchTrending(type)
-      .then((data) => { if (!cancelled) { setTrending(data); setLoading(false) } })
+      .then((data) => { if (!cancelled) { setTrending(data); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
       .catch((err) => { console.error('fetchTrending error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [filterType, query, selectedGenreId, searchMode])
@@ -605,7 +608,7 @@ export function Discover() {
     let cancelled = false
     const mediaType: MediaType = filterType === 'all' ? 'movie' : filterType
     fetchDiscover(mediaType, selectedGenreId)
-      .then((data) => { if (!cancelled) { setDiscoverResults(data); setLoading(false) } })
+      .then((data) => { if (!cancelled) { setDiscoverResults(data); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
       .catch((err) => { console.error('fetchDiscover error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [filterType, selectedGenreId, query, searchMode])
@@ -728,17 +731,43 @@ export function Discover() {
     setSelectedGenreId(id)
     setSearchResults([])
     setQuery('')
+    setPage(1)
+    setHasMore(false)
   }
 
   function handleTypeChange(type: FilterType) {
     setFilterType(type)
     setSelectedGenreId(null)
+    setPage(1)
+    setHasMore(false)
     if (searchMode === 'titles') {
       setLoading(true)
       setSearchResults([])
       setQuery('')
     }
     // People: re-filters via personCredits memo; Studios: re-fetches via effect
+  }
+
+  async function handleLoadMore() {
+    setLoadingMore(true)
+    const nextPage = page + 1
+    try {
+      let newResults: SearchResult[] = []
+      if (selectedGenreId !== null) {
+        const mediaType: MediaType = filterType === 'all' ? 'movie' : filterType
+        newResults = await fetchDiscover(mediaType, selectedGenreId, nextPage)
+        setDiscoverResults((prev) => [...prev, ...newResults])
+      } else {
+        newResults = await fetchTrending(filterType, nextPage)
+        setTrending((prev) => [...prev, ...newResults])
+      }
+      setPage(nextPage)
+      setHasMore(newResults.length > 0)
+    } catch (err) {
+      console.error('load more error:', err)
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   // ── Derived display state ──
@@ -995,6 +1024,27 @@ export function Discover() {
               onSelect={setSelectedResult}
             />
           ))}
+        </div>
+      )}
+
+      {/* Load more */}
+      {searchMode === 'titles' && !query.trim() && !loading && displayResults.length > 0 && hasMore && (
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-6 py-2.5 rounded-lg font-mono text-sm border transition-colors hover:border-paper-faint/40 hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}
+          >
+            {loadingMore ? (
+              <span className="flex items-center gap-2">
+                <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                Loading…
+              </span>
+            ) : (
+              'Load more'
+            )}
+          </button>
         </div>
       )}
 

@@ -258,13 +258,23 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     'Director of Photography', 'Original Music Composer',
   ])
 
-  const cast: CastMember[] = (data.credits?.cast ?? [])
+  // TV: use aggregate_credits (has total_episode_count + roles[].character).
+  // Movie: use standard credits (no aggregate endpoint).
+  const rawCast = base.type === 'tv'
+    ? (data.aggregate_credits?.cast ?? data.credits?.cast ?? [])
+    : (data.credits?.cast ?? [])
+
+  const cast: CastMember[] = rawCast
     .slice(0, 10)
     .map((c: any) => ({
       tmdbPersonId: c.id,
       name: c.name,
-      character: c.character || undefined,
-      episodeCount: c.episode_count ?? undefined,
+      character: base.type === 'tv'
+        ? (c.roles?.[0]?.character || undefined)
+        : (c.character || undefined),
+      episodeCount: base.type === 'tv'
+        ? (c.total_episode_count ?? undefined)
+        : undefined,
       profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
       order: c.order ?? 0,
     }))

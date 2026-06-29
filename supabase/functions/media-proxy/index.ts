@@ -80,16 +80,14 @@ async function searchTMDB(query: string, type: 'movie' | 'tv') {
 }
 
 async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
-  // Cache key bumped to v2 — v1 entries lack release_dates/content_ratings/external_ids
-  // (added for content certification and the TV imdb_id used by ratings + IMDb links).
-  const cacheKey = `tmdb:details:v2:${type}:${tmdbId}`
+  // Cache key bumped to v3 — v3 adds aggregate_credits for TV (episode counts per cast member).
+  const cacheKey = `tmdb:details:v3:${type}:${tmdbId}`
   const cached = await getCached(cacheKey)
   if (cached) return cached
 
-  // original_language and movie imdb_id are already top-level on the base call;
-  // only certifications (release_dates / content_ratings) and the TV imdb_id
-  // (external_ids) need appending.
-  const appendix = type === 'movie' ? 'credits,release_dates' : 'credits,seasons,content_ratings,external_ids'
+  // TV: aggregate_credits gives total_episode_count per cast member (standard credits doesn't).
+  // credits is still needed for crew. Movies don't have aggregate_credits.
+  const appendix = type === 'movie' ? 'credits,release_dates' : 'credits,aggregate_credits,seasons,content_ratings,external_ids'
   const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=${appendix}&language=en-US`
   const res = await fetch(url)
   const data = await res.json()
@@ -99,8 +97,8 @@ async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
 }
 
 async function getTMDBSeasonDetails(tmdbId: number, seasonNumber: number) {
-  // Cache key bumped to v2 — v1 entries lack the credits field added by append_to_response
-  const cacheKey = `tmdb:season:v2:${tmdbId}:${seasonNumber}`
+  // Cache key bumped to v3 — ensures episode_count is present in season credits cast
+  const cacheKey = `tmdb:season:v3:${tmdbId}:${seasonNumber}`
   const cached = await getCached(cacheKey)
   if (cached) return cached
 

@@ -108,6 +108,7 @@ function CommandPaletteBody({
                   setActive(0)
                 }}
                 className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+                aria-label="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
                 Clear search

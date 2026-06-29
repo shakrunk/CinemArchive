@@ -296,7 +296,7 @@ function ExternalLinks({ title }: { title: Title }) {
   if (links.length === 0) return null
   return (
     <div>
-      <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Links</h4>
+      <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Links</h4>
       <div className="flex flex-wrap items-center gap-2">
         {links.map((l, i) => {
           const { bg, fg } = BRAND_CONFIG[l.brand]
@@ -355,7 +355,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
           >
             Main Cast
           </div>
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
             {cast.map((member) => (
               <button
                 key={member.tmdbPersonId}
@@ -391,7 +391,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                   {member.character && (
                     <div
                       className="font-mono line-clamp-1 mt-0.5"
-                      style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3 }}
+                      style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.6 }}
                       title={member.character}
                     >
                       {member.character}
@@ -538,20 +538,20 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
   return (
     <div className="space-y-5">
       {/* Series-level stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
             {totalWatched}<span className="text-sm font-mono ml-0.5" style={{ color: 'var(--paper-faint)' }}>/{totalCount}</span>
           </div>
           <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Episodes</div>
         </div>
-        <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
+        <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--amber)', fontVariationSettings: '"opsz" 30' }}>
             {seriesAvg !== null ? `★ ${seriesAvg.toFixed(1)}` : '—'}
           </div>
           <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Avg Rating</div>
         </div>
-        <div className="rounded-lg p-3 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
+        <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>{seasons.length}</div>
           <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Seasons</div>
         </div>
@@ -589,16 +589,16 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                 aria-label={`Season ${s.seasonNumber}`}
                 aria-current={selectedSeason === s.seasonNumber ? 'true' : undefined}
                 className={cn(
-                  'shrink-0 px-3 py-2 rounded-lg text-left transition-all border',
+                  'shrink-0 px-3.5 py-2.5 rounded-lg text-left transition-all border',
                   selectedSeason === s.seasonNumber
                     ? 'border-amber/40 bg-amber/10'
                     : 'border-transparent hover:border-[var(--line)] hover:bg-[var(--wash)]'
                 )}
               >
-                <div className="font-mono" style={{ fontSize: '11px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
+                <div className="font-mono" style={{ fontSize: '13px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
                   S{s.seasonNumber}
                 </div>
-                <div className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+                <div className="font-mono" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>
                   {pct}%{seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}
                 </div>
               </button>
@@ -632,7 +632,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
             Season {season.seasonNumber} Cast
           </div>
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
             {season.cast.map((member) => (
               <button
                 key={member.tmdbPersonId}
@@ -654,7 +654,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                 <div className="p-2">
                   <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
                   {member.character && (
-                    <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3 }} title={member.character}>{member.character}</div>
+                    <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.6 }} title={member.character}>{member.character}</div>
                   )}
                   {member.episodeCount != null && (
                     <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
@@ -1310,7 +1310,7 @@ export function TitleDetailDrawer() {
                 }}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-b from-secondary/30 via-card/70 to-card" />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, hsl(var(--card) / 0.55) 0%, hsl(var(--card) / 0.92) 45%, hsl(var(--card)) 65%)' }} />
             <div className="relative z-10 flex gap-5 px-6 pt-10 pb-6">
               <div className="w-28 sm:w-36 shrink-0">
                 {title.posterUrl ? (
@@ -1382,7 +1382,7 @@ export function TitleDetailDrawer() {
             <div className="space-y-5 min-w-0">
               {/* Status */}
               <div>
-                <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Status</h4>
+                <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Status</h4>
                 <div className="relative inline-block">
                   <select
                     value={title.status}
@@ -1411,7 +1411,7 @@ export function TitleDetailDrawer() {
               {/* Synopsis */}
               {title.synopsis && (
                 <div>
-                  <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Synopsis</h4>
+                  <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Synopsis</h4>
                   <BodyText className="text-sm leading-relaxed max-w-2xl">{title.synopsis}</BodyText>
                 </div>
               )}
@@ -1429,7 +1429,7 @@ export function TitleDetailDrawer() {
             {/* Right column — details + critical reception */}
             <div className="space-y-5">
               <div>
-                <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Details</h4>
+                <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Details</h4>
                 <dl className="space-y-2 rounded-lg bg-secondary/30 p-3">
                   {title.network && <DetailRow label="Network" value={title.network} />}
                   {title.type === 'movie' && title.director && <DetailRow label="Director" value={title.director} />}
@@ -1452,7 +1452,7 @@ export function TitleDetailDrawer() {
               {/* Critical Reception */}
               {(title.imdbRating || title.rtScore || title.metacriticScore) && (
                 <div>
-                  <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                  <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
                     Critical Reception
                   </h4>
                   <ReviewBadges imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
@@ -1476,7 +1476,7 @@ export function TitleDetailDrawer() {
           {/* Cast & Crew */}
           {(title.cast?.length || title.crew?.length || title.studios?.length) ? (
             <div>
-              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-3">
+              <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
                 Cast &amp; Crew
               </h4>
               <CastCrewSection
@@ -1492,7 +1492,7 @@ export function TitleDetailDrawer() {
           {/* ── TV Series section ───────────────────────────────────── */}
           {title.type === 'tv' && title.seasons && title.seasons.length > 0 && (
             <div>
-              <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-4">
+              <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
                 Season &amp; Episodes
               </h4>
               <TVSeriesSection
@@ -1511,13 +1511,13 @@ export function TitleDetailDrawer() {
             <>
               {/* Viewing Stats */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-secondary/40 rounded-lg p-3 text-center">
+                <div className="bg-secondary/40 rounded-lg px-3 py-1.5 text-center">
                   <StatNumber className="text-xl">{title.viewings.length}</StatNumber>
                   <div className="mt-0.5">
                     <StatLabel>Viewings</StatLabel>
                   </div>
                 </div>
-                <div className="bg-secondary/40 rounded-lg p-3 text-center">
+                <div className="bg-secondary/40 rounded-lg px-3 py-1.5 text-center">
                   <div className="flex items-center justify-center gap-1 mb-0.5">
                     <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                     <StatNumber className="text-base leading-tight">
@@ -1538,7 +1538,7 @@ export function TitleDetailDrawer() {
               {/* Viewing History */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
+                  <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">
                     Viewing History
                   </h4>
                   {!showLogForm && !isSharedView && (
@@ -1654,17 +1654,17 @@ export function TitleDetailDrawer() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={openRefreshMetadata}
-                    className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-amber transition-colors"
+                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
                   </button>
                   <button
                     onClick={() => setPendingDeleteTitle(true)}
-                    className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-ember transition-colors"
+                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Remove from library

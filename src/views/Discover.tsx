@@ -29,18 +29,20 @@ const SEARCH_PLACEHOLDERS: Record<SearchMode, string> = {
 interface DiscoverCardProps {
   result: SearchResult
   isOwned: boolean
+  style?: React.CSSProperties
   isSharedView: boolean
   onAdd: (result: SearchResult) => void
   onSelect: (result: SearchResult) => void
 }
 
-function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect }: DiscoverCardProps) {
+function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style }: DiscoverCardProps) {
   const [imgError, setImgError] = useState(false)
   const pushNotification = useAppStore((s) => s.pushNotification)
 
   return (
     <div
-      className="group relative cursor-pointer"
+      className="discover-card group relative cursor-pointer"
+      style={style}
       onClick={() => onSelect(result)}
       role="button"
       tabIndex={0}
@@ -814,6 +816,17 @@ export function Discover() {
     return 'Trending This Week'
   })()
 
+  const discoverDelays = (() => {
+    const MAX = 24
+    const n = Math.min(displayResults.length, MAX)
+    const slots = Array.from({ length: n }, (_, i) => i * 15)
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]]
+    }
+    return [...slots, ...new Array(Math.max(0, displayResults.length - MAX)).fill(0)]
+  })()
+
   const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
 
@@ -1025,8 +1038,8 @@ export function Discover() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
-          {displayResults.map((result) => (
+        <div className="discover-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+          {displayResults.map((result, i) => (
             <DiscoverCard
               key={`${result.type}-${result.tmdbId}`}
               result={result}
@@ -1034,6 +1047,7 @@ export function Discover() {
               isSharedView={isSharedView}
               onAdd={openAddTitlePreselected}
               onSelect={setSelectedResult}
+              style={{ ['--poster-delay' as string]: `${discoverDelays[i]}ms` }}
             />
           ))}
         </div>

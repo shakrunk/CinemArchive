@@ -558,7 +558,8 @@
       gap: 12px;
     }
   }
-  .poster-wall .poster {
+  .poster-wall .poster,
+  .discover-grid .discover-card {
     animation: poster-in 0.48s var(--ease) var(--poster-delay, 0ms) both;
   }
 

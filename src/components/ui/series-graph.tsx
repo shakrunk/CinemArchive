@@ -50,7 +50,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
   // Cap each cell at ~20px wide: label(≈35px) + n*(cell+gap)
-  const maxWidth = `calc(2.2rem + ${maxEpisodes * 23}px)`
+  const maxWidth = `calc(2.2rem + ${maxEpisodes * 27}px)`
 
   function showTooltip(
     e: React.MouseEvent<HTMLDivElement>,
@@ -125,7 +125,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
       {/* Column headers: episode numbers */}
       <div
         className="grid mb-1"
-        style={{ gridTemplateColumns: `2.2rem repeat(${maxEpisodes}, 1fr)`, gap: '3px' }}
+        style={{ gridTemplateColumns: `2.2rem repeat(${maxEpisodes}, 1fr)`, gap: '4px' }}
       >
         <div />
         {Array.from({ length: maxEpisodes }, (_, i) => (
@@ -144,7 +144,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
         <div
           key={season.id}
           className="grid"
-          style={{ gridTemplateColumns: `2.2rem repeat(${maxEpisodes}, 1fr)`, gap: '3px', marginBottom: '3px' }}
+          style={{ gridTemplateColumns: `2.2rem repeat(${maxEpisodes}, 1fr)`, gap: '4px', marginBottom: '4px' }}
         >
           {/* Row label */}
           <div

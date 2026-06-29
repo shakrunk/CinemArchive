@@ -5,6 +5,7 @@ import type { Title, WatchStatus } from 'src/store/mockData'
 interface DynamicPosterProps {
   title: Title
   className?: string
+  style?: React.CSSProperties
   onClick?: () => void
   /** Render the full editorial face (title, meta, stars) inside the poster. */
   rich?: boolean
@@ -63,7 +64,7 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export function DynamicPoster({ title, className, onClick, rich = false }: DynamicPosterProps) {
+export function DynamicPoster({ title, className, style, onClick, rich = false }: DynamicPosterProps) {
   const hasImage = Boolean(title.posterUrl)
   const tint = useMemo(() => TINTS[hashString(title.title) % TINTS.length], [title.title])
   const badge = STATUS_BADGE[title.status]
@@ -79,7 +80,7 @@ export function DynamicPoster({ title, className, onClick, rich = false }: Dynam
   return (
     <div
       className={cn('poster', hasImage && 'has-img', className)}
-      style={{ ['--tint' as string]: tint }}
+      style={{ ['--tint' as string]: tint, ...style }}
       onClick={onClick}
       onKeyDown={handleKeyDown}
       role={onClick ? 'button' : undefined}

@@ -284,14 +284,35 @@ function EmptyState() {
 
 // ─── Poster Wall ─────────────────────────────────────────────────────────────
 
+const MAX_ANIMATED = 24
+
 function PosterWall({ titles }: { titles: Title[] }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+
+  const delays = useMemo(() => {
+    const n = Math.min(titles.length, MAX_ANIMATED)
+    // Evenly-spaced delay slots shuffled into random order
+    const slots = Array.from({ length: n }, (_, i) => i * 15)
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]]
+    }
+    // Posters beyond MAX_ANIMATED appear instantly (no delay)
+    return [...slots, ...new Array(Math.max(0, titles.length - MAX_ANIMATED)).fill(0)]
+  }, [titles])
+
   if (titles.length === 0) return <EmptyState />
 
   return (
     <div className="poster-wall">
-      {titles.map((title) => (
-        <DynamicPoster key={title.id} title={title} rich onClick={() => openDetailDrawer(title.id)} />
+      {titles.map((title, i) => (
+        <DynamicPoster
+          key={title.id}
+          title={title}
+          rich
+          onClick={() => openDetailDrawer(title.id)}
+          style={{ ['--poster-delay' as string]: `${delays[i]}ms` }}
+        />
       ))}
     </div>
   )

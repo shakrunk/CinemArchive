@@ -163,13 +163,53 @@ async function getTMDBTrending(type: 'movie' | 'tv') {
   return data
 }
 
-async function getTMDBDiscover(type: 'movie' | 'tv', genreId?: number, page = 1) {
-  const cacheKey = `tmdb:discover:${type}:${genreId ?? 'all'}:${page}`
+async function getTMDBDiscover(type: 'movie' | 'tv', genreId?: number, page = 1, companyId?: number) {
+  const cacheKey = `tmdb:discover:${type}:${genreId ?? 'all'}:${companyId ?? 'all'}:${page}`
   const cached = await getCached(cacheKey)
   if (cached) return cached
 
   let url = `${TMDB_BASE}/discover/${type}?api_key=${TMDB_API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}`
   if (genreId) url += `&with_genres=${genreId}`
+  if (companyId) url += `&with_companies=${companyId}`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
+async function searchPersonTMDB(query: string) {
+  const cacheKey = `tmdb:person_search:${query}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const url = `${TMDB_BASE}/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false&language=en-US&page=1`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
+async function getPersonCredits(personId: number) {
+  const cacheKey = `tmdb:person_credits:${personId}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const url = `${TMDB_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=en-US`
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
+async function searchCompanyTMDB(query: string) {
+  const cacheKey = `tmdb:company_search:${query}`
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const url = `${TMDB_BASE}/search/company?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=1`
   const res = await fetch(url)
   const data = await res.json()
 
@@ -241,8 +281,28 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         const rawGenre = url.searchParams.get('genre')
         const genreId = rawGenre ? parseInt(rawGenre, 10) : undefined
+        const rawCompany = url.searchParams.get('company')
+        const companyId = rawCompany ? parseInt(rawCompany, 10) : undefined
         const page = parseInt(url.searchParams.get('page') ?? '1', 10)
-        result = await getTMDBDiscover(type, genreId, page)
+        result = await getTMDBDiscover(type, genreId, page, companyId)
+        break
+      }
+      case 'person_search': {
+        const query = url.searchParams.get('q') ?? ''
+        if (!query) throw new Error('Missing query parameter')
+        result = await searchPersonTMDB(query)
+        break
+      }
+      case 'person_credits': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        if (!id) throw new Error('Missing id parameter')
+        result = await getPersonCredits(id)
+        break
+      }
+      case 'company_search': {
+        const query = url.searchParams.get('q') ?? ''
+        if (!query) throw new Error('Missing query parameter')
+        result = await searchCompanyTMDB(query)
         break
       }
       default:

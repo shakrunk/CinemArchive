@@ -529,6 +529,134 @@ export async function fetchDiscover(type: MediaType, genreId?: number, page = 1)
   return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
 }
 
+// ─── Person / Company types ───────────────────────────────────────────────────
+
+export interface PersonResult {
+  id: number
+  name: string
+  knownFor: string
+  profileUrl?: string
+  department?: string
+}
+
+export interface CompanyResult {
+  id: number
+  name: string
+  logoUrl?: string
+  originCountry?: string
+}
+
+const TMDB_IMG_LOGO = 'https://image.tmdb.org/t/p/w92'
+
+const MOCK_PERSONS: PersonResult[] = [
+  { id: 31, name: 'Tom Hanks', knownFor: 'Forrest Gump, Cast Away, Saving Private Ryan', department: 'Acting' },
+  { id: 6384, name: 'Keanu Reeves', knownFor: 'The Matrix, John Wick, Speed', department: 'Acting' },
+]
+
+const MOCK_COMPANIES: CompanyResult[] = [
+  { id: 33, name: 'Universal Pictures', originCountry: 'US' },
+  { id: 420, name: 'Marvel Studios', originCountry: 'US' },
+]
+
+/**
+ * Search TMDB for people (cast, crew, directors) by name.
+ */
+export async function searchPersons(query: string): Promise<PersonResult[]> {
+  if (!query.trim()) return []
+
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=person_search&q=${encodeURIComponent(query)}`
+    )
+    if (error) throw error
+
+    return (data?.results ?? []).slice(0, 8).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      knownFor: (p.known_for ?? [])
+        .slice(0, 3)
+        .map((k: any) => (k.title || k.name) as string)
+        .filter(Boolean)
+        .join(', '),
+      profileUrl: p.profile_path ? `${TMDB_IMG_W185}${p.profile_path}` : undefined,
+      department: p.known_for_department,
+    }))
+  }
+
+  const q = query.toLowerCase()
+  return MOCK_PERSONS.filter((p) => p.name.toLowerCase().includes(q))
+}
+
+/**
+ * Fetch all movies and TV shows a person has appeared in or worked on.
+ * Returns combined cast + crew credits sorted by popularity.
+ */
+export async function fetchPersonCredits(personId: number): Promise<SearchResult[]> {
+  if (!(isSupabaseConfigured && supabase)) return []
+
+  const { data, error } = await supabase.functions.invoke(
+    `media-proxy?action=person_credits&id=${personId}`
+  )
+  if (error) throw error
+
+  const cast: any[] = data?.cast ?? []
+  const crew: any[] = data?.crew ?? []
+
+  const seen = new Set<string>()
+  const all = [...cast, ...crew].filter((item) => {
+    const key = `${item.media_type}:${item.id}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  all.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+
+  return all
+    .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
+    .slice(0, 40)
+    .map((item) => mapSearchItem(item, item.media_type as MediaType))
+}
+
+/**
+ * Search TMDB for production companies / studios by name.
+ */
+export async function searchCompanies(query: string): Promise<CompanyResult[]> {
+  if (!query.trim()) return []
+
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=company_search&q=${encodeURIComponent(query)}`
+    )
+    if (error) throw error
+
+    return (data?.results ?? []).slice(0, 8).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      logoUrl: c.logo_path ? `${TMDB_IMG_LOGO}${c.logo_path}` : undefined,
+      originCountry: c.origin_country || undefined,
+    }))
+  }
+
+  const q = query.toLowerCase()
+  return MOCK_COMPANIES.filter((c) => c.name.toLowerCase().includes(q))
+}
+
+/**
+ * Fetch popular titles from a production company using TMDB discover.
+ * Note: company-based TV discover is sparse since TV is network-keyed in TMDB.
+ */
+export async function fetchCompanyTitles(companyId: number, type: MediaType): Promise<SearchResult[]> {
+  if (!(isSupabaseConfigured && supabase)) return []
+
+  const { data, error } = await supabase.functions.invoke(
+    `media-proxy?action=discover&type=${type}&company=${companyId}`
+  )
+  if (error) throw error
+
+  return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
+}
+
 export interface TitleImages {
   logoUrl: string | null
   backdropUrl: string | null

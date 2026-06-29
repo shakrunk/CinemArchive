@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X, RefreshCw, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, RefreshCw, AlertTriangle, Info } from 'lucide-react'
 import { useAppStore, type AppNotification } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 
@@ -32,6 +32,16 @@ function NotificationCard({
 }) {
   const [retrying, setRetrying] = useState(false)
   const [retryFailed, setRetryFailed] = useState(false)
+  const isTip = notification.kind === 'tip'
+
+  // Auto-dismiss tips. Use a ref so the effect never re-runs on onDismiss identity changes.
+  const onDismissRef = useRef(onDismiss)
+  onDismissRef.current = onDismiss
+  useEffect(() => {
+    if (!notification.autoClose) return
+    const id = setTimeout(() => onDismissRef.current(), notification.autoClose)
+    return () => clearTimeout(id)
+  }, [notification.autoClose])
 
   async function handleRetry() {
     if (!notification.retry) return
@@ -48,8 +58,14 @@ function NotificationCard({
   }
 
   return (
-    <div className="pointer-events-auto bg-void border border-amber/40 rounded-lg p-3 shadow-xl flex items-start gap-3">
-      <AlertTriangle className="w-4 h-4 text-amber shrink-0 mt-0.5" />
+    <div className={cn(
+      'pointer-events-auto bg-void rounded-lg p-3 shadow-xl flex items-start gap-3 border',
+      isTip ? 'border-paper-faint/20' : 'border-amber/40',
+    )}>
+      {isTip
+        ? <Info className="w-4 h-4 text-paper-faint shrink-0 mt-0.5" />
+        : <AlertTriangle className="w-4 h-4 text-amber shrink-0 mt-0.5" />
+      }
       <div className="flex-1 min-w-0">
         <p className="font-sans text-xs text-paper leading-normal">{notification.message}</p>
         {retryFailed && (

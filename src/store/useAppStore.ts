@@ -28,10 +28,13 @@ export interface PersonRef {
   name: string
 }
 
-/** A persistent error notification with an optional retry thunk. */
+/** A persistent notification. kind defaults to 'error'. */
 export interface AppNotification {
   id: string
   message: string
+  kind?: 'error' | 'tip'
+  /** Auto-dismiss after this many ms (tips only). */
+  autoClose?: number
   retry?: () => Promise<void>
 }
 

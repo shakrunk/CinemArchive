@@ -185,7 +185,7 @@ export default function App() {
       <div className="grain" aria-hidden="true" />
 
       {/* ── Landing screen for unauthenticated visitors on the live site ── */}
-      {isSupabaseConfigured && authChecked && !user && !isSharedView ? (
+      {!import.meta.env.DEV && isSupabaseConfigured && authChecked && !user && !isSharedView ? (
         <>
           <LandingScreen onSignIn={() => setIsProfileOpen(true)} />
           <ProfileModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />

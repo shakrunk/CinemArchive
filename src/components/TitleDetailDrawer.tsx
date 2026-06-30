@@ -31,12 +31,16 @@ import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb 
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { transitionSpiderNoir } from 'src/lib/theme'
+import { MatrixPillModal } from 'src/components/MatrixPillModal'
+import { MatrixDigitalRain } from 'src/components/MatrixDigitalRain'
+import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
 import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
 import { TrailerRow } from 'src/components/ui/trailer-row'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 const SPIDER_NOIR_TMDB_ID = 220102
+const THE_MATRIX_TMDB_ID = 603
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
 const SPIDER_NOIR_LOGO_NORMAL = 'https://image.tmdb.org/t/p/original/o2D8loRUDlEuOf7BMRgulerNJ6p.png'
@@ -746,6 +750,10 @@ export function TitleDetailDrawer() {
   const user = useAppStore((s) => s.user)
 
   const isSpiderNoir = title?.tmdbId === SPIDER_NOIR_TMDB_ID
+  const isMatrix = title?.tmdbId === THE_MATRIX_TMDB_ID
+
+  const [showMatrixModal, setShowMatrixModal] = useState(false)
+  const [showMatrixRain, setShowMatrixRain] = useState(false)
 
   const pinnedModes = useAppStore((s) => s.pinnedModes)
   const setPinnedMode = useAppStore((s) => s.setPinnedMode)
@@ -1082,9 +1090,30 @@ export function TitleDetailDrawer() {
     setPinnedMode(title.id, EASTER_EGG_KEY, newVariant)
   }
 
+  function handleSaveViewing() {
+    if (isMatrix) {
+      setShowMatrixModal(true)
+    } else {
+      logViewing()
+    }
+  }
+
+  function handleMatrixBlue() {
+    setShowMatrixModal(false)
+    logViewing()
+  }
+
+  function handleMatrixRed() {
+    setShowMatrixModal(false)
+    logViewing()
+    setShowMatrixRain(true)
+  }
+
   return (
     <>
     {noirAnim && <SpiderWebOverlay mode={noirAnim} />}
+    {showMatrixRain && <MatrixDigitalRain onDone={() => setShowMatrixRain(false)} />}
+    <MatrixPillModal open={showMatrixModal} onBlue={handleMatrixBlue} onRed={handleMatrixRed} />
     <CinemaModal
       open={isDetailDrawerOpen}
       onClose={onClose}
@@ -1157,6 +1186,9 @@ export function TitleDetailDrawer() {
                 onSelect={handleModeSelect}
                 onTogglePin={handleTogglePin}
               />
+            )}
+            {isMatrix && (title.viewings.length > 0 || title.status === 'watched') && (
+              <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
             )}
             <StarRating
               value={title.rating ?? 0}
@@ -1232,6 +1264,9 @@ export function TitleDetailDrawer() {
                     onSelect={handleModeSelect}
                     onTogglePin={handleTogglePin}
                   />
+                )}
+                {isMatrix && (title.viewings.length > 0 || title.status === 'watched') && (
+                  <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
                 )}
                 <StarRating
                   value={title.rating ?? 0}
@@ -1459,7 +1494,7 @@ export function TitleDetailDrawer() {
                     <div className="flex gap-2">
                       <Button
                         className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
-                        onClick={logViewing}
+                        onClick={handleSaveViewing}
                         disabled={showMovieSaved}
                       >
                         {showMovieSaved ? (

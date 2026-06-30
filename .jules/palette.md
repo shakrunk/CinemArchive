@@ -29,3 +29,11 @@
 ## 2024-06-29 - Icon-Only Tooltips and Keyboard Focus
 **Learning:** Icon-only buttons and inline interactive elements (like tag remove buttons) often miss `title` attributes for tooltips and `focus-visible` styling for keyboard navigation, making them harder to discover and use.
 **Action:** Always include `focus-visible` ring styling and `title` attributes (in addition to `aria-label`) on all interactive buttons, especially icon-only ones, to ensure they are discoverable via mouse hover and keyboard tabbing.
+
+## 2024-06-30 - Contextual ARIA Labels for Destructive Actions
+**Learning:** Confirmation and cancellation buttons for destructive actions (like "Delete forever" or "Cancel") often share the same text across different contexts on the same page, which can be ambiguous for screen reader users navigating by interactive elements.
+**Action:** Always add explicit `aria-label` attributes to contextual confirmation buttons to clarify the exact action being performed (e.g., `aria-label="Confirm delete viewing"` instead of just "Delete forever").
+
+## 2024-06-30 - WCAG 2.5.3 (Label in Name) Compliance
+**Learning:** Adding an `aria-label` to a button that completely overwrites its visible text violates WCAG 2.5.3, which requires the accessible name to contain the exact visible text. This breaks voice control software where users might command "Click [Visible Text]".
+**Action:** When adding `aria-label` to give extra context to a text button (e.g. "Delete forever"), ensure the label INCLUDES the exact visible words (e.g. `aria-label="Delete viewing forever"`).

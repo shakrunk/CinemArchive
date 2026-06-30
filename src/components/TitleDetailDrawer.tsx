@@ -126,6 +126,7 @@ function ViewingTimeline({
                         }}
                         className="font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--ember)' }}
+                        aria-label="Delete viewing forever"
                       >
                         Delete forever
                       </button>
@@ -133,6 +134,7 @@ function ViewingTimeline({
                         onClick={() => setPendingDeleteId(null)}
                         className="font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--paper-faint)' }}
+                        aria-label="Cancel deleting viewing"
                       >
                         Cancel
                       </button>
@@ -1546,6 +1548,7 @@ export function TitleDetailDrawer() {
                       onClick={handleDelete}
                       className="font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--ember)' }}
+                      aria-label="Delete title from library forever"
                     >
                       Delete forever
                     </button>
@@ -1553,6 +1556,7 @@ export function TitleDetailDrawer() {
                       onClick={() => setPendingDeleteTitle(false)}
                       className="font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--paper-faint)' }}
+                      aria-label="Cancel deleting title from library"
                     >
                       Cancel
                     </button>

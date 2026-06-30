@@ -678,7 +678,7 @@ function DrawerTagEditor({
         {!editing && (
           <button
             onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-            className="text-xs font-mono text-amber/50 hover:text-amber transition-colors"
+            className="text-xs font-mono text-amber/50 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1"
           >
             + add
           </button>
@@ -694,8 +694,9 @@ function DrawerTagEditor({
             <button
               type="button"
               onClick={() => removeTag(t)}
-              className="hover:text-amber-bright transition-colors"
+              className="hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
               aria-label={`Remove tag ${t}`}
+              title={`Remove tag ${t}`}
             >
               <X className="w-2.5 h-2.5" />
             </button>
@@ -716,7 +717,7 @@ function DrawerTagEditor({
         {!editing && tags.length === 0 && (
           <button
             onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             <Tag className="w-2.5 h-2.5" /> add tag
           </button>

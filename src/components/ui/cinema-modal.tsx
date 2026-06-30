@@ -60,6 +60,7 @@ export function CinemaModal({
           <DialogPrimitive.Close
             className="absolute right-4 top-4 z-20 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-amber/50"
             aria-label="Close"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </DialogPrimitive.Close>

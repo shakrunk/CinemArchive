@@ -311,7 +311,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                         {we.notes && <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>"{we.notes}"</div>}
                       </div>
                       {!isSharedView && (
-                        <button onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', opacity: 0.45, flexShrink: 0, marginTop: '1px' }} onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')} onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')} aria-label="Delete watch event">
+                        <button onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', flexShrink: 0, marginTop: '1px' }} className="opacity-[0.45] hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Delete watch event" title="Delete watch event">
                           <Trash2 className="w-2.5 h-2.5" />
                         </button>
                       )}

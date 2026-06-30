@@ -25,3 +25,7 @@
 ## 2024-06-27 - Actionable Empty States
 **Learning:** Empty states caused by active filters or missing data (like no search results or no viewings logged) are often passive and rely purely on informative text. Telling users to try a different search or log a view is okay, but providing a direct call-to-action button to do so is much better for UX, saving them time and interaction steps.
 **Action:** Always include a "Clear search", "Log viewing", or similar direct action button in empty states where the condition is reversible or actionable by the user directly from that context. Ensure that buttons are clearly labeled and accessible.
+
+## 2024-06-29 - Icon-Only Tooltips and Keyboard Focus
+**Learning:** Icon-only buttons and inline interactive elements (like tag remove buttons) often miss `title` attributes for tooltips and `focus-visible` styling for keyboard navigation, making them harder to discover and use.
+**Action:** Always include `focus-visible` ring styling and `title` attributes (in addition to `aria-label`) on all interactive buttons, especially icon-only ones, to ensure they are discoverable via mouse hover and keyboard tabbing.

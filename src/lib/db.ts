@@ -248,6 +248,91 @@ export async function fetchFriendLibrary(friendUserId: string): Promise<Title[]>
   return (data || []).map(mapDbTitleToLocal)
 }
 
+export interface Recommendation {
+  id: string
+  senderUserId: string
+  senderDisplayName: string | null
+  senderUsername: string | null
+  tmdbId: number
+  type: MediaType
+  title: string
+  year: number | null
+  posterUrl: string | null
+  status: 'unread' | 'read' | 'dismissed'
+  createdAt: string
+}
+
+function mapDbRecommendationToLocal(row: any): Recommendation {
+  return {
+    id: row.id,
+    senderUserId: row.sender_user_id,
+    senderDisplayName: row.sender_display_name,
+    senderUsername: row.sender_username,
+    tmdbId: row.tmdb_id,
+    type: row.type as MediaType,
+    title: row.title,
+    year: row.year,
+    posterUrl: row.poster_url,
+    status: row.status,
+    createdAt: row.created_at,
+  }
+}
+
+// Sends a friend a denormalized snapshot of a title (title/year/poster) so the
+// recommendation stays legible even if the sender's own library entry later
+// changes. Requires an accepted friendship — enforced by the send_recommendation
+// SQL function, not the client. Resending the same title to the same friend
+// just bumps the existing row back to unread (see recommendations_unique_idx).
+export async function sendRecommendation(recipientUserId: string, title: Title): Promise<void> {
+  if (!supabase) return
+
+  const { error } = await supabase.rpc('send_recommendation', {
+    recipient_id: recipientUserId,
+    p_tmdb_id: title.tmdbId,
+    p_type: title.type,
+    p_title: title.title,
+    p_year: title.year,
+    p_poster_url: title.posterUrl ?? null,
+  })
+
+  if (error) {
+    console.error('Error sending recommendation:', error)
+    throw error
+  }
+}
+
+// Reads the current user's recommendation inbox (sent by friends), newest first.
+export async function fetchRecommendations(): Promise<Recommendation[]> {
+  if (!supabase) return []
+
+  const { data, error } = await supabase.rpc('list_recommendations')
+
+  if (error) {
+    console.error('Error fetching recommendations:', error)
+    throw error
+  }
+
+  return (data || []).map(mapDbRecommendationToLocal)
+}
+
+export async function markRecommendationRead(id: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('mark_recommendation_read', { rec_id: id })
+  if (error) {
+    console.error('Error marking recommendation read:', error)
+    throw error
+  }
+}
+
+export async function dismissRecommendation(id: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('dismiss_recommendation', { rec_id: id })
+  if (error) {
+    console.error('Error dismissing recommendation:', error)
+    throw error
+  }
+}
+
 export async function insertTitleToDb(userId: string, title: Title): Promise<void> {
   if (!supabase) return
 

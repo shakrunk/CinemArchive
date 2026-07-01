@@ -333,6 +333,53 @@ export async function dismissRecommendation(id: string): Promise<void> {
   }
 }
 
+export interface ActivityEvent {
+  type: 'title_added' | 'viewing_logged'
+  eventAt: string
+  friendUserId: string
+  friendDisplayName: string | null
+  friendUsername: string | null
+  titleId: string
+  tmdbId: number
+  mediaType: MediaType
+  title: string
+  year: number | null
+  posterUrl: string | null
+  rating: number | null
+}
+
+function mapDbActivityEventToLocal(row: any): ActivityEvent {
+  return {
+    type: row.event_type,
+    eventAt: row.event_at,
+    friendUserId: row.friend_user_id,
+    friendDisplayName: row.friend_display_name,
+    friendUsername: row.friend_username,
+    titleId: row.title_id,
+    tmdbId: row.tmdb_id,
+    mediaType: row.type as MediaType,
+    title: row.title,
+    year: row.year,
+    posterUrl: row.poster_url,
+    rating: row.rating ? parseFloat(row.rating) : null,
+  }
+}
+
+// Recent library-add and viewing activity across the user's accepted friends,
+// newest first. See friend_activity_feed() for the merge/cap logic.
+export async function fetchFriendActivityFeed(): Promise<ActivityEvent[]> {
+  if (!supabase) return []
+
+  const { data, error } = await supabase.rpc('friend_activity_feed')
+
+  if (error) {
+    console.error('Error fetching friend activity feed:', error)
+    throw error
+  }
+
+  return (data || []).map(mapDbActivityEventToLocal)
+}
+
 export async function insertTitleToDb(userId: string, title: Title): Promise<void> {
   if (!supabase) return
 

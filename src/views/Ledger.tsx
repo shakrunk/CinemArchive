@@ -7,6 +7,7 @@ import { RadialRing, areaPath, getInitials, linePath, ratingColorVar } from 'src
 
 function DashHero() {
   const stats = useAppStore((s) => s.stats)
+  const friendView = useAppStore((s) => s.friendView)
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -18,13 +19,17 @@ function DashHero() {
   return (
     <div className="mb-[clamp(28px,4vw,44px)]">
       <p className="kicker">
-        <span className="dot" /> now showing · {today}
+        <span className="dot" /> {friendView ? `${friendView.displayName}'s ledger` : `now showing · ${today}`}
       </p>
       <h1 className="display-title text-[clamp(40px,8vw,88px)] mt-3.5">
-        An evening at <em>the&nbsp;pictures.</em>
+        {friendView ? (
+          <>An evening with <em>{friendView.displayName}.</em></>
+        ) : (
+          <>An evening at <em>the&nbsp;pictures.</em></>
+        )}
       </h1>
       <p className="mt-4 max-w-[60ch] text-[clamp(15px,1.6vw,18px)] text-paper-dim">
-        A private record of <strong className="text-paper font-bold">{total}</strong> titles,{' '}
+        {friendView ? 'Their' : 'A private'} record of <strong className="text-paper font-bold">{total}</strong> titles,{' '}
         <strong className="text-paper font-bold">{stats.totalViewings}</strong> screenings, and roughly{' '}
         <strong className="text-paper font-bold">{hours}</strong> hours spent in the dark.
       </p>

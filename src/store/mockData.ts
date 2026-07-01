@@ -118,6 +118,7 @@ export interface LedgerStats {
   totalMinutes: number
   topGenres: { genre: string; count: number }[]
   topDirectors: { director: string; count: number }[]
+  topActors: { actor: string; count: number }[]
   ratingDistribution: { rating: number; count: number }[]
   viewingsByMonth: { month: string; count: number }[]
 }

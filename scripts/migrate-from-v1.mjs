@@ -126,6 +126,11 @@ function computeStats(list) {
     .slice(0, 5)
     .map(([director, count]) => ({ director, count }))
 
+  const actorCounts = tally(list.flatMap((t) => (t.cast ?? []).filter((c) => c.order < 5).map((c) => c.name)))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([actor, count]) => ({ actor, count }))
+
   const ratingDistribution = []
   for (let r = 5; r >= 1; r -= 0.5) {
     ratingDistribution.push({ rating: r, count: list.filter((t) => t.rating === r).length })
@@ -148,6 +153,7 @@ function computeStats(list) {
     totalMinutes: list.reduce((a, t) => a + (t.runtime ?? 0), 0),
     topGenres: genreCounts,
     topDirectors: dirCounts,
+    topActors: actorCounts,
     ratingDistribution,
     viewingsByMonth,
   }

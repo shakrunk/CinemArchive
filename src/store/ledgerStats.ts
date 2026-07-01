@@ -28,6 +28,13 @@ export function computeLedgerStats(titles: Title[]): LedgerStats {
     .slice(0, 5)
     .map(([director, count]) => ({ director, count }))
 
+  const topActors = tally(
+    titles.flatMap((t) => (t.cast ?? []).filter((c) => c.order < 5).map((c) => c.name))
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([actor, count]) => ({ actor, count }))
+
   const ratingDistribution: { rating: number; count: number }[] = []
   for (let r = 5; r >= 1; r -= 0.5) {
     ratingDistribution.push({ rating: r, count: titles.filter((t) => t.rating === r).length })
@@ -53,6 +60,7 @@ export function computeLedgerStats(titles: Title[]): LedgerStats {
     }, 0),
     topGenres,
     topDirectors,
+    topActors,
     ratingDistribution,
     viewingsByMonth,
   }

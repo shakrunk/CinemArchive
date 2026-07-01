@@ -112,3 +112,25 @@ export async function listSharedKeys() {
   if (error) throw error
   return data
 }
+
+// ─── Friend lookup ───────────────────────────────────────────────────────────
+
+export interface FoundProfile {
+  user_id: string
+  username: string | null
+  display_name: string | null
+}
+
+/** Resolve another user's account by exact email match, or null if none exists. */
+export async function findUserByEmail(email: string): Promise<FoundProfile | null> {
+  const { data, error } = await getClient().rpc('find_user_by_email', {
+    lookup_email: normalizeEmail(email),
+  })
+  if (error) throw error
+  return data?.[0] ?? null
+}
+
+/** Trim and lowercase an email for consistent matching against find_user_by_email. */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}

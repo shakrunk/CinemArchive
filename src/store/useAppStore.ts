@@ -186,7 +186,8 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
         t.title.toLowerCase().includes(q) ||
         t.director?.toLowerCase().includes(q) ||
         t.genres.some((g) => g.toLowerCase().includes(q)) ||
-        t.tags.some((tag) => tag.toLowerCase().includes(q))
+        t.tags.some((tag) => tag.toLowerCase().includes(q)) ||
+        t.cast?.some((c) => c.name.toLowerCase().includes(q))
     )
   }
 

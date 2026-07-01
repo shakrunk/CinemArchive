@@ -412,6 +412,57 @@ function TheAuteurs({ className }: { className?: string }) {
   )
 }
 
+// ─── The ensemble (leading cast) ───────────────────────────────────────────────
+
+function TheEnsemble({ className }: { className?: string }) {
+  const actors = useAppStore((s) => s.stats.topActors)
+  const setFilter = useAppStore((s) => s.setFilter)
+  const requestView = useAppStore((s) => s.requestView)
+  if (actors.length === 0) return null
+  const maxCount = actors[0]?.count ?? 1
+
+  return (
+    <Panel title="The ensemble" hint="most-billed leads" className={className}>
+      <ol className="flex flex-col gap-1">
+        {actors.map((a, i) => (
+          <li key={a.actor}>
+            <button
+              onClick={() => {
+                setFilter('search', a.actor)
+                requestView('library')
+              }}
+              className="w-full grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
+              style={{ gridTemplateColumns: '26px minmax(0,1fr) clamp(80px,20vw,220px) 28px' }}
+            >
+              <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>
+              <span
+                className="font-serif text-base font-medium text-paper truncate group-hover:underline decoration-amber/40"
+                style={{ fontVariationSettings: '"opsz" 30' }}
+              >
+                {a.actor}
+              </span>
+              <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
+                <div
+                  className="bar-fill h-full rounded-md"
+                  style={{
+                    width: `${(a.count / maxCount) * 100}%`,
+                    background:
+                      i === 0
+                        ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
+                        : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
+                    animationDelay: `${i * 50}ms`,
+                  }}
+                />
+              </div>
+              <span className="font-mono text-xs text-paper-faint text-right">{a.count}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </Panel>
+  )
+}
+
 // --- Encore performances ---
 
 function EncorePerformances({ className }: { className?: string }) {
@@ -473,7 +524,8 @@ export function Ledger() {
         <RatingDistribution className="col-span-12 lg:col-span-5" />
         <GenreBars className="col-span-12 lg:col-span-7" />
         <DecadeFilmstrip className="col-span-12" />
-        <TheAuteurs className="col-span-12" />
+        <TheAuteurs className="col-span-12 lg:col-span-6" />
+        <TheEnsemble className="col-span-12 lg:col-span-6" />
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban } from 'lucide-react'
+import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -42,12 +42,13 @@ interface SharedKey {
 
 export function ProfileModal({ open, onClose }: ProfileModalProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { user, setUser, titles, setTitles } = useAppStore(
+  const { user, setUser, titles, setTitles, loadFriendLibrary } = useAppStore(
     useShallow((s) => ({
       user: s.user,
       setUser: s.setUser,
       titles: s.titles,
       setTitles: s.setTitles,
+      loadFriendLibrary: s.loadFriendLibrary,
     }))
   )
 
@@ -233,6 +234,11 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     } catch (err) {
       console.error('Failed to decline friend request:', err)
     }
+  }
+
+  function handleViewFriendLibrary(f: FriendshipView) {
+    void loadFriendLibrary(f.friend_user_id, f.display_name || f.username || 'Friend')
+    onClose()
   }
 
   async function handleBlockFriend(targetId: string) {
@@ -597,15 +603,26 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                           </>
                         )}
                         {f.status === 'accepted' && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleBlockFriend(f.friend_user_id)}
-                            className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
-                            title="Block"
-                            aria-label="Block user"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleViewFriendLibrary(f)}
+                              className="bg-secondary hover:bg-amber/20 hover:text-amber text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                              title="View Library"
+                              aria-label={`View ${f.display_name || f.username || 'friend'}'s library`}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleBlockFriend(f.friend_user_id)}
+                              className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                              title="Block"
+                              aria-label="Block user"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>

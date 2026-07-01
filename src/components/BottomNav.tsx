@@ -43,6 +43,7 @@ function NavTab({
 
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const openAddTitle = useAppStore((s) => s.openAddTitle)
+  const isSharedView = useAppStore((s) => s.isSharedView)
 
   // Firefox Android positions fixed elements relative to the layout viewport,
   // not the visual viewport, so the nav floats above the screen bottom when the
@@ -83,15 +84,17 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         <NavTab active={currentView === 'discover'} onClick={() => onViewChange('discover')} label="Discover" Icon={Compass} />
         <NavTab active={currentView === 'library'} onClick={() => onViewChange('library')} label="Library" Icon={LayoutGrid} />
 
-        <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2" aria-label="Add Title">
-          <div
-            className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
-            style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}
-          >
-            <Plus className="w-5 h-5 text-[color:var(--on-amber)]" strokeWidth={2.5} />
-          </div>
-          <span className="text-[11px] font-sans text-paper-faint mt-0.5">Add</span>
-        </button>
+        {!isSharedView && (
+          <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2" aria-label="Add Title">
+            <div
+              className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
+              style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}
+            >
+              <Plus className="w-5 h-5 text-[color:var(--on-amber)]" strokeWidth={2.5} />
+            </div>
+            <span className="text-[11px] font-sans text-paper-faint mt-0.5">Add</span>
+          </button>
+        )}
 
         <NavTab active={currentView === 'upnext'} onClick={() => onViewChange('upnext')} label="Up Next" Icon={PlayCircle} />
         <NavTab active={currentView === 'ledger'} onClick={() => onViewChange('ledger')} label="Ledger" Icon={BarChart3} />

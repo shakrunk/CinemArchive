@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload } from 'lucide-react'
+import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -14,6 +14,13 @@ import {
   createSharedKey,
   revokeSharedKey,
   listSharedKeys,
+  findUserByEmail,
+  sendFriendRequest,
+  acceptFriendRequest,
+  declineFriendRequest,
+  blockFriend,
+  listFriendships,
+  type FriendshipView,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import { insertTitleToDb } from 'src/lib/db'
@@ -61,10 +68,18 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
   const [dataMessage, setDataMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Fetch shared keys on login
+  // Friends state
+  const [friendEmail, setFriendEmail] = useState('')
+  const [sendingRequest, setSendingRequest] = useState(false)
+  const [friendMessage, setFriendMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [friendships, setFriendships] = useState<FriendshipView[]>([])
+  const [loadingFriends, setLoadingFriends] = useState(false)
+
+  // Fetch shared keys and friends on login
   useEffect(() => {
     if (user && open) {
       loadKeys()
+      loadFriendships()
     }
   }, [user, open])
 
@@ -162,6 +177,71 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
       await loadKeys()
     } catch (err) {
       console.error('Failed to revoke key:', err)
+    }
+  }
+
+  // Friend handlers
+  async function loadFriendships() {
+    setLoadingFriends(true)
+    try {
+      const list = await listFriendships()
+      setFriendships(list)
+    } catch (err) {
+      console.error('Failed to load friendships:', err)
+    } finally {
+      setLoadingFriends(false)
+    }
+  }
+
+  async function handleSendFriendRequest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!friendEmail.trim()) return
+
+    setSendingRequest(true)
+    setFriendMessage(null)
+    try {
+      const found = await findUserByEmail(friendEmail)
+      if (!found) {
+        setFriendMessage({ type: 'error', text: 'No user found with that email.' })
+        return
+      }
+      await sendFriendRequest(found.user_id)
+      setFriendEmail('')
+      setFriendMessage({ type: 'success', text: 'Friend request sent.' })
+      await loadFriendships()
+    } catch (err: any) {
+      console.error(err)
+      setFriendMessage({ type: 'error', text: err.message || 'Failed to send friend request.' })
+    } finally {
+      setSendingRequest(false)
+    }
+  }
+
+  async function handleAcceptFriend(requesterId: string) {
+    try {
+      await acceptFriendRequest(requesterId)
+      await loadFriendships()
+    } catch (err) {
+      console.error('Failed to accept friend request:', err)
+    }
+  }
+
+  async function handleDeclineFriend(requesterId: string) {
+    try {
+      await declineFriendRequest(requesterId)
+      await loadFriendships()
+    } catch (err) {
+      console.error('Failed to decline friend request:', err)
+    }
+  }
+
+  async function handleBlockFriend(targetId: string) {
+    if (!confirm('Block this user? They will no longer be able to send you friend requests or view your library.')) return
+    try {
+      await blockFriend(targetId)
+      await loadFriendships()
+    } catch (err) {
+      console.error('Failed to block user:', err)
     }
   }
 
@@ -425,6 +505,111 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                         </div>
                       </div>
                     ))
+                )}
+              </div>
+            </div>
+
+            {/* Friends */}
+            <div className="space-y-4 pt-2 border-t border-border">
+              <h3 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber" />
+                Friends
+              </h3>
+              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                Add a friend by email to share your ledger and send them recommendations.
+              </p>
+
+              <form onSubmit={handleSendFriendRequest} className="flex gap-2">
+                <Input
+                  aria-label="Friend's email"
+                  type="email"
+                  placeholder="friend@example.com"
+                  value={friendEmail}
+                  onChange={(e) => setFriendEmail(e.target.value)}
+                  className="bg-secondary/50 border-border text-xs"
+                />
+                <Button
+                  type="submit"
+                  disabled={sendingRequest}
+                  className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] shrink-0"
+                >
+                  {sendingRequest ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <UserPlus className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </form>
+
+              {friendMessage && (
+                <div
+                  className={cn(
+                    'p-3 rounded-lg text-xs font-sans leading-normal border',
+                    friendMessage.type === 'success'
+                      ? 'bg-amber/10 border-amber/30 text-amber'
+                      : 'bg-destructive/10 border-destructive/30 text-destructive'
+                  )}
+                >
+                  {friendMessage.text}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {loadingFriends ? (
+                  <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading friends...</div>
+                ) : friendships.length === 0 ? (
+                  <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No friends yet.</div>
+                ) : (
+                  friendships.map((f) => (
+                    <div key={f.friend_user_id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-sans text-xs text-paper font-medium truncate">
+                          {f.display_name || f.username || 'Unknown user'}
+                        </p>
+                        <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                          {f.status === 'pending' && f.requested_by === user.id && 'Request sent'}
+                          {f.status === 'pending' && f.requested_by !== user.id && 'Wants to be friends'}
+                          {f.status === 'accepted' && 'Friends'}
+                          {f.status === 'blocked' && (f.blocked_by === user.id ? 'Blocked' : 'Unavailable')}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {f.status === 'pending' && f.requested_by !== user.id && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAcceptFriend(f.friend_user_id)}
+                              className="bg-secondary hover:bg-amber/20 hover:text-amber text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                              title="Accept"
+                              aria-label="Accept friend request"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleDeclineFriend(f.friend_user_id)}
+                              className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                              title="Decline"
+                              aria-label="Decline friend request"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
+                        {f.status === 'accepted' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleBlockFriend(f.friend_user_id)}
+                            className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                            title="Block"
+                            aria-label="Block user"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

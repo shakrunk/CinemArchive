@@ -368,10 +368,11 @@ function TheAuteurs({ className }: { className?: string }) {
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
   if (directors.length === 0) return null
+  const maxCount = directors[0]?.count ?? 1
 
   return (
     <Panel title="The auteurs" hint="most-watched directors" className={className}>
-      <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
+      <ol className="flex flex-col gap-1">
         {directors.map((d, i) => (
           <li key={d.director}>
             <button
@@ -380,7 +381,7 @@ function TheAuteurs({ className }: { className?: string }) {
                 requestView('library')
               }}
               className="w-full grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
-              style={{ gridTemplateColumns: '26px 1fr auto' }}
+              style={{ gridTemplateColumns: '26px minmax(0,1fr) clamp(80px,20vw,220px) 28px' }}
             >
               <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>
               <span
@@ -389,14 +390,20 @@ function TheAuteurs({ className }: { className?: string }) {
               >
                 {d.director}
               </span>
-              <span className="flex items-center gap-2">
-                <span className="font-mono text-xs text-paper-dim">{d.count}</span>
-                <span className="flex gap-0.5">
-                  {Array.from({ length: Math.min(d.count, 5) }, (_, k) => (
-                    <i key={k} className="w-[5px] h-[5px] rounded-full bg-amber" />
-                  ))}
-                </span>
-              </span>
+              <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
+                <div
+                  className="bar-fill h-full rounded-md"
+                  style={{
+                    width: `${(d.count / maxCount) * 100}%`,
+                    background:
+                      i === 0
+                        ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
+                        : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
+                    animationDelay: `${i * 50}ms`,
+                  }}
+                />
+              </div>
+              <span className="font-mono text-xs text-paper-faint text-right">{d.count}</span>
             </button>
           </li>
         ))}

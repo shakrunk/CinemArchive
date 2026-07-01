@@ -12,6 +12,7 @@ import {
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
   deleteEpisodeWatchEventFromDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
+  fetchFriendActivityFeed,
 } from '../lib/db'
 import type { SearchResult } from '../lib/media'
 
@@ -125,6 +126,13 @@ interface UISlice {
   notifications: AppNotification[]
   pushNotification: (n: Omit<AppNotification, 'id'>) => void
   dismissNotification: (id: string) => void
+
+  // Friend activity feed badge — the feed itself is fetched on demand by
+  // ProfileModal; this just tracks the unseen count shown on TopBar.
+  activityFeedLastSeenAt: string | null
+  activityUnseenCount: number
+  markActivityFeedSeen: () => void
+  refreshActivityUnseenCount: () => Promise<void>
 }
 
 /** Identifies whose library is currently loaded when browsing a friend's collection. */
@@ -639,6 +647,24 @@ export const useAppStore = create<AppStore>()(
       notifications: s.notifications.filter((n) => n.id !== id),
     })),
 
+  activityFeedLastSeenAt: null,
+  activityUnseenCount: 0,
+
+  markActivityFeedSeen: () => set({ activityFeedLastSeenAt: new Date().toISOString(), activityUnseenCount: 0 }),
+
+  refreshActivityUnseenCount: async () => {
+    if (!get().user) return
+    try {
+      const feed = await fetchFriendActivityFeed()
+      const lastSeen = get().activityFeedLastSeenAt
+      const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : 0
+      const unseen = feed.filter((e) => new Date(e.eventAt).getTime() > lastSeenMs).length
+      set({ activityUnseenCount: unseen })
+    } catch (err) {
+      console.error('Failed to refresh friend activity feed count:', err)
+    }
+  },
+
   // ── Auth ───────────────────────────────────────────────────
   user: null,
   loadingUser: false,
@@ -649,6 +675,7 @@ export const useAppStore = create<AppStore>()(
     if (user) {
       get().loadUserLibrary()
       get().loadPinnedModes()
+      get().refreshActivityUnseenCount()
     } else {
       // Clear on logout — restore mock data only in dev
       const fallback = import.meta.env.DEV ? mockTitles : []
@@ -797,6 +824,7 @@ export const useAppStore = create<AppStore>()(
         filters: s.filters,
         viewMode: s.viewMode,
         theme: s.theme,
+        activityFeedLastSeenAt: s.activityFeedLastSeenAt,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

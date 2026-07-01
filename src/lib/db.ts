@@ -477,26 +477,24 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
     }
   }
 
-  if (patch.seasons) {
-    for (const s of patch.seasons) {
-      const { error } = await supabase
-        .from('seasons')
-        .upsert(
-          {
-            title_id: titleId,
-            user_id: userId,
-            season_number: s.seasonNumber,
-            episode_count: s.episodeCount,
-            episodes_watched: s.episodesWatched,
-            air_year: s.airYear,
-          },
-          { onConflict: 'title_id,season_number' }
-        )
+  if (patch.seasons && patch.seasons.length > 0) {
+    const { error } = await supabase
+      .from('seasons')
+      .upsert(
+        patch.seasons.map((s) => ({
+          title_id: titleId,
+          user_id: userId,
+          season_number: s.seasonNumber,
+          episode_count: s.episodeCount,
+          episodes_watched: s.episodesWatched,
+          air_year: s.airYear,
+        })),
+        { onConflict: 'title_id,season_number' }
+      )
 
-      if (error) {
-        console.error(`Error updating season ${s.seasonNumber}:`, error)
-        throw error
-      }
+    if (error) {
+      console.error('Error updating seasons:', error)
+      throw error
     }
   }
 

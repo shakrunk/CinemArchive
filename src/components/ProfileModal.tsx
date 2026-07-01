@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye } from 'lucide-react'
+import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -23,7 +23,7 @@ import {
   type FriendshipView,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
-import { insertTitleToDb } from 'src/lib/db'
+import { insertTitleToDb, fetchRecommendations, markRecommendationRead, dismissRecommendation, type Recommendation } from 'src/lib/db'
 
 interface ProfileModalProps {
   open: boolean
@@ -76,11 +76,16 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
   const [friendships, setFriendships] = useState<FriendshipView[]>([])
   const [loadingFriends, setLoadingFriends] = useState(false)
 
-  // Fetch shared keys and friends on login
+  // Recommendations inbox state
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
+
+  // Fetch shared keys, friends, and recommendations on login
   useEffect(() => {
     if (user && open) {
       loadKeys()
       loadFriendships()
+      loadRecommendations()
     }
   }, [user, open])
 
@@ -248,6 +253,39 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
       await loadFriendships()
     } catch (err) {
       console.error('Failed to block user:', err)
+    }
+  }
+
+  // Recommendations handlers
+  async function loadRecommendations() {
+    setLoadingRecommendations(true)
+    try {
+      const list = await fetchRecommendations()
+      setRecommendations(list)
+    } catch (err) {
+      console.error('Failed to load recommendations:', err)
+    } finally {
+      setLoadingRecommendations(false)
+    }
+  }
+
+  async function handleOpenRecommendation(rec: Recommendation) {
+    if (rec.status !== 'unread') return
+    setRecommendations((prev) => prev.map((r) => (r.id === rec.id ? { ...r, status: 'read' } : r)))
+    try {
+      await markRecommendationRead(rec.id)
+    } catch (err) {
+      console.error('Failed to mark recommendation read:', err)
+    }
+  }
+
+  async function handleDismissRecommendation(id: string) {
+    setRecommendations((prev) => prev.filter((r) => r.id !== id))
+    try {
+      await dismissRecommendation(id)
+    } catch (err) {
+      console.error('Failed to dismiss recommendation:', err)
+      await loadRecommendations()
     }
   }
 
@@ -625,6 +663,67 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                           </>
                         )}
                       </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Recommendations inbox */}
+            <div className="space-y-4 pt-2 border-t border-border">
+              <h3 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Inbox className="w-3.5 h-3.5 text-amber" />
+                Recommendations
+                {recommendations.some((r) => r.status === 'unread') && (
+                  <span className="font-mono text-[9px] rounded-full bg-amber/20 text-amber px-1.5 py-0.5">
+                    {recommendations.filter((r) => r.status === 'unread').length} new
+                  </span>
+                )}
+              </h3>
+
+              <div className="space-y-2">
+                {loadingRecommendations ? (
+                  <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading recommendations...</div>
+                ) : recommendations.length === 0 ? (
+                  <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">
+                    Nothing sent your way yet.
+                  </div>
+                ) : (
+                  recommendations.map((r) => (
+                    <div
+                      key={r.id}
+                      onClick={() => handleOpenRecommendation(r)}
+                      className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center gap-3 cursor-default"
+                    >
+                      {r.posterUrl && (
+                        <img
+                          src={r.posterUrl}
+                          alt=""
+                          className="w-8 h-12 object-cover rounded shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-sans text-xs text-paper font-medium truncate flex items-center gap-1.5">
+                          {r.status === 'unread' && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />}
+                          {r.title}
+                          {r.year ? ` (${r.year})` : ''}
+                        </p>
+                        <p className="font-mono text-[9px] text-muted-foreground mt-0.5 truncate">
+                          from {r.senderDisplayName || r.senderUsername || 'a friend'}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDismissRecommendation(r.id)
+                        }}
+                        className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center shrink-0"
+                        title="Dismiss"
+                        aria-label="Dismiss recommendation"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   ))
                 )}

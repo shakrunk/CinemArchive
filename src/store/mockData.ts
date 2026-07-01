@@ -1770,6 +1770,28 @@ export const mockLedgerStats: LedgerStats = {
       "count": 1
     }
   ],
+  "topActors": [
+    {
+      "actor": "Bruce Willis",
+      "count": 3
+    },
+    {
+      "actor": "Joseph Gordon-Levitt",
+      "count": 2
+    },
+    {
+      "actor": "Leonardo DiCaprio",
+      "count": 1
+    },
+    {
+      "actor": "Elliot Page",
+      "count": 1
+    },
+    {
+      "actor": "Tom Hardy",
+      "count": 1
+    }
+  ],
   "ratingDistribution": [
     {
       "rating": 5,

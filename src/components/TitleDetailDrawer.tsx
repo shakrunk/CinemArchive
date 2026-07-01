@@ -22,12 +22,14 @@ import {
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X,
+  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X, Send,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, type TitleVideo } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
+import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb, sendRecommendation } from 'src/lib/db'
+import { listFriendships, type FriendshipView } from 'src/lib/auth'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from 'src/components/ui/dropdown-menu'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { transitionSpiderNoir } from 'src/lib/theme'
@@ -737,7 +739,7 @@ function DrawerTagEditor({
 
 export function TitleDetailDrawer() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore(
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, pushNotification } = useAppStore(
     useShallow((s) => ({
       isDetailDrawerOpen: s.isDetailDrawerOpen,
       closeDetailDrawer: s.closeDetailDrawer,
@@ -746,6 +748,7 @@ export function TitleDetailDrawer() {
       removeViewing: s.removeViewing,
       openRefreshMetadata: s.openRefreshMetadata,
       isSharedView: s.isSharedView,
+      pushNotification: s.pushNotification,
     }))
   )
   const browseByStudio = useAppStore((s) => s.browseByStudio)
@@ -757,6 +760,36 @@ export function TitleDetailDrawer() {
 
   const [showMatrixModal, setShowMatrixModal] = useState(false)
   const [showMatrixRain, setShowMatrixRain] = useState(false)
+
+  const [sendMenuOpen, setSendMenuOpen] = useState(false)
+  const [sendableFriends, setSendableFriends] = useState<FriendshipView[]>([])
+  const [loadingSendableFriends, setLoadingSendableFriends] = useState(false)
+
+  async function handleSendMenuOpenChange(open: boolean) {
+    setSendMenuOpen(open)
+    if (!open) return
+    setLoadingSendableFriends(true)
+    try {
+      const list = await listFriendships()
+      setSendableFriends(list.filter((f) => f.status === 'accepted'))
+    } catch (err) {
+      console.error('Failed to load friends:', err)
+    } finally {
+      setLoadingSendableFriends(false)
+    }
+  }
+
+  async function handleSendRecommendation(friendId: string, friendName: string) {
+    if (!title) return
+    setSendMenuOpen(false)
+    try {
+      await sendRecommendation(friendId, title)
+      pushNotification({ message: `Sent "${title.title}" to ${friendName}.`, kind: 'tip' })
+    } catch (err) {
+      console.error('Failed to send recommendation:', err)
+      pushNotification({ message: `Couldn't send that to ${friendName} — check your connection.` })
+    }
+  }
 
   const pinnedModes = useAppStore((s) => s.pinnedModes)
   const setPinnedMode = useAppStore((s) => s.setPinnedMode)
@@ -1571,6 +1604,32 @@ export function TitleDetailDrawer() {
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
                   </button>
+                  {user && (
+                    <DropdownMenu open={sendMenuOpen} onOpenChange={handleSendMenuOpenChange}>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all">
+                          <Send className="w-3.5 h-3.5" />
+                          Send to a friend
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        {loadingSendableFriends ? (
+                          <DropdownMenuItem disabled>Loading friends…</DropdownMenuItem>
+                        ) : sendableFriends.length === 0 ? (
+                          <DropdownMenuItem disabled>No friends yet</DropdownMenuItem>
+                        ) : (
+                          sendableFriends.map((f) => (
+                            <DropdownMenuItem
+                              key={f.friend_user_id}
+                              onSelect={() => handleSendRecommendation(f.friend_user_id, f.display_name || f.username || 'Friend')}
+                            >
+                              {f.display_name || f.username || 'Unknown user'}
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   <button
                     onClick={() => setPendingDeleteTitle(true)}
                     className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all"

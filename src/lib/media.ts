@@ -265,7 +265,6 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     : (data.credits?.cast ?? [])
 
   const cast: CastMember[] = rawCast
-    .slice(0, 10)
     .map((c: any) => ({
       tmdbPersonId: c.id,
       name: c.name,
@@ -355,7 +354,6 @@ export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): 
     const episodes = (data?.episodes ?? []) as RawTmdbEpisode[]
 
     const cast: CastMember[] = (data?.credits?.cast ?? [])
-      .slice(0, 10)
       .map((c: any) => ({
         tmdbPersonId: c.id,
         name: c.name,

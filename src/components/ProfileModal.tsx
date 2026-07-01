@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X } from 'lucide-react'
+import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X, Activity, Star } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -23,7 +23,11 @@ import {
   type FriendshipView,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
-import { insertTitleToDb, fetchRecommendations, markRecommendationRead, dismissRecommendation, type Recommendation } from 'src/lib/db'
+import {
+  insertTitleToDb,
+  fetchRecommendations, markRecommendationRead, dismissRecommendation, type Recommendation,
+  fetchFriendActivityFeed, type ActivityEvent,
+} from 'src/lib/db'
 
 interface ProfileModalProps {
   open: boolean
@@ -42,13 +46,14 @@ interface SharedKey {
 
 export function ProfileModal({ open, onClose }: ProfileModalProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { user, setUser, titles, setTitles, loadFriendLibrary } = useAppStore(
+  const { user, setUser, titles, setTitles, loadFriendLibrary, markActivityFeedSeen } = useAppStore(
     useShallow((s) => ({
       user: s.user,
       setUser: s.setUser,
       titles: s.titles,
       setTitles: s.setTitles,
       loadFriendLibrary: s.loadFriendLibrary,
+      markActivityFeedSeen: s.markActivityFeedSeen,
     }))
   )
 
@@ -80,13 +85,19 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loadingRecommendations, setLoadingRecommendations] = useState(false)
 
-  // Fetch shared keys, friends, and recommendations on login
+  // Activity feed state
+  const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([])
+  const [loadingActivity, setLoadingActivity] = useState(false)
+
+  // Fetch shared keys, friends, recommendations, and activity on login
   useEffect(() => {
     if (user && open) {
       loadKeys()
       loadFriendships()
       loadRecommendations()
+      loadActivityFeed()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, open])
 
   async function loadKeys() {
@@ -286,6 +297,20 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     } catch (err) {
       console.error('Failed to dismiss recommendation:', err)
       await loadRecommendations()
+    }
+  }
+
+  // Activity feed handlers
+  async function loadActivityFeed() {
+    setLoadingActivity(true)
+    try {
+      const feed = await fetchFriendActivityFeed()
+      setActivityFeed(feed)
+      markActivityFeedSeen()
+    } catch (err) {
+      console.error('Failed to load friend activity feed:', err)
+    } finally {
+      setLoadingActivity(false)
     }
   }
 
@@ -724,6 +749,54 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                       >
                         <X className="w-3.5 h-3.5" />
                       </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Friend activity feed */}
+            <div className="space-y-4 pt-2 border-t border-border">
+              <h3 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-amber" />
+                Friend Activity
+              </h3>
+
+              <div className="space-y-2">
+                {loadingActivity ? (
+                  <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading activity...</div>
+                ) : activityFeed.length === 0 ? (
+                  <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">
+                    No friend activity yet.
+                  </div>
+                ) : (
+                  activityFeed.map((e) => (
+                    <div
+                      key={`${e.type}:${e.titleId}:${e.eventAt}`}
+                      className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center gap-3"
+                    >
+                      {e.posterUrl && (
+                        <img src={e.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-sans text-xs text-paper truncate">
+                          <span className="font-medium">{e.friendDisplayName || e.friendUsername || 'A friend'}</span>{' '}
+                          {e.type === 'title_added' ? 'added' : 'watched'}{' '}
+                          <span className="font-medium">
+                            {e.title}
+                            {e.year ? ` (${e.year})` : ''}
+                          </span>
+                          {e.type === 'viewing_logged' && e.rating != null && (
+                            <span className="inline-flex items-center gap-0.5 ml-1.5 text-amber">
+                              <Star className="w-3 h-3 fill-current" />
+                              {e.rating}
+                            </span>
+                          )}
+                        </p>
+                        <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                          {new Date(e.eventAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
                   ))
                 )}

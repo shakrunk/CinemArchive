@@ -213,6 +213,41 @@ export async function fetchSharedLibrary(token: string): Promise<Title[]> {
   return (data || []).map(mapDbTitleToLocal)
 }
 
+// Reads an accepted friend's library. Relies on the "friend read" RLS
+// policies (is_friend(auth.uid(), user_id)) rather than a bearer token — no
+// RPC setup call needed, since auth.uid() is already the caller's session.
+export async function fetchFriendLibrary(friendUserId: string): Promise<Title[]> {
+  if (!supabase) return []
+
+  const { data, error } = await supabase
+    .from('titles')
+    .select(`
+      *,
+      title_cast (*),
+      title_crew (*),
+      seasons (
+        *,
+        season_cast (*)
+      ),
+      viewings (*),
+      episodes (
+        *,
+        episode_crew (*),
+        episode_watch_events (*),
+        episode_ratings (*),
+        episode_reviews (*)
+      )
+    `)
+    .eq('user_id', friendUserId)
+
+  if (error) {
+    console.error('Error fetching friend library:', error)
+    throw error
+  }
+
+  return (data || []).map(mapDbTitleToLocal)
+}
+
 export async function insertTitleToDb(userId: string, title: Title): Promise<void> {
   if (!supabase) return
 

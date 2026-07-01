@@ -8,7 +8,7 @@ import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type Upcom
 import type { User } from '@supabase/supabase-js'
 import type { AppView } from '../lib/navigation'
 import {
-  fetchUserLibrary, fetchSharedLibrary, insertTitleToDb, updateTitleInDb,
+  fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
   deleteEpisodeWatchEventFromDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
@@ -127,13 +127,22 @@ interface UISlice {
   dismissNotification: (id: string) => void
 }
 
+/** Identifies whose library is currently loaded when browsing a friend's collection. */
+export interface FriendViewInfo {
+  userId: string
+  displayName: string
+}
+
 interface AuthSlice {
   user: User | null
   loadingUser: boolean
+  friendView: FriendViewInfo | null
   setUser: (user: User | null) => void
   setLoadingUser: (loading: boolean) => void
   loadUserLibrary: () => Promise<void>
   loadSharedLibrary: (token: string) => Promise<void>
+  loadFriendLibrary: (friendUserId: string, displayName: string) => Promise<void>
+  exitFriendView: () => void
 }
 
 interface PinsSlice {
@@ -633,6 +642,7 @@ export const useAppStore = create<AppStore>()(
   // ── Auth ───────────────────────────────────────────────────
   user: null,
   loadingUser: false,
+  friendView: null,
 
   setUser: (user) => {
     set({ user })
@@ -695,6 +705,46 @@ export const useAppStore = create<AppStore>()(
     }
   },
 
+  // Reuses isSharedView for the existing read-only gating throughout the app
+  // (TitleDetailDrawer, episode-card, Discover, etc.) — friendView just adds
+  // who's being viewed, for the exit affordance and heading text.
+  loadFriendLibrary: async (friendUserId, displayName) => {
+    set({
+      loadingUser: true,
+      isSharedView: true,
+      friendView: { userId: friendUserId, displayName },
+      pendingView: 'library',
+    })
+    try {
+      const dbTitles = await fetchFriendLibrary(friendUserId)
+      set((s) => ({
+        titles: dbTitles,
+        filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
+        stats: computeLedgerStats(dbTitles),
+      }))
+    } catch (err) {
+      console.error('Failed to load friend library from DB:', err)
+      get().pushNotification({ message: "Couldn't load that friend's library — check your connection." })
+    } finally {
+      set({ loadingUser: false })
+    }
+  },
+
+  exitFriendView: () => {
+    // Clear the friend's titles before refetching — loadUserLibrary's
+    // hasRealLocalData guard would otherwise see the friend's (real, non-mock)
+    // titles still in state and skip the replace if the user's own library is
+    // empty, stranding read-only-disabled friend data with edit controls live.
+    set((s) => ({
+      friendView: null,
+      isSharedView: false,
+      titles: [],
+      filteredTitles: applyFiltersToTitles([], s.filters),
+      stats: computeLedgerStats([]),
+    }))
+    void get().loadUserLibrary()
+  },
+
   // ── Pins ───────────────────────────────────────────────────
   pinnedModes: {},
 
@@ -739,8 +789,15 @@ export const useAppStore = create<AppStore>()(
       version: PERSIST_VERSION,
       storage: createJSONStorage(() => localStorage),
       // Only the source of truth is persisted; derived state (filteredTitles,
-      // stats) and transient UI flags are recomputed/reset on load.
-      partialize: (s) => ({ titles: s.titles, filters: s.filters, viewMode: s.viewMode, theme: s.theme }),
+      // stats) and transient UI flags are recomputed/reset on load. While
+      // browsing a friend's library, `titles` holds THEIR data — never persist
+      // that to the viewer's localStorage.
+      partialize: (s) => ({
+        titles: s.friendView ? [] : s.titles,
+        filters: s.filters,
+        viewMode: s.viewMode,
+        theme: s.theme,
+      }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)

@@ -633,21 +633,21 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
   }
 
   // Upsert all viewings: client-generated UUIDs insert as new rows, DB UUIDs update in-place
-  if (patch.viewings) {
-    for (const v of patch.viewings) {
-      const { error } = await supabase.from('viewings').upsert({
+  if (patch.viewings && patch.viewings.length > 0) {
+    const { error } = await supabase.from('viewings').upsert(
+      patch.viewings.map((v) => ({
         id: v.id,
         title_id: titleId,
         user_id: userId,
         viewed_at: v.date,
         rating: v.rating,
         notes: v.notes,
-      })
+      }))
+    )
 
-      if (error) {
-        console.error('Error upserting viewing:', error)
-        throw error
-      }
+    if (error) {
+      console.error('Error upserting viewings:', error)
+      throw error
     }
   }
 

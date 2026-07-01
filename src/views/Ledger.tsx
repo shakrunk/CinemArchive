@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { RadialRing, areaPath, getInitials, linePath, ratingColorVar } from 'src/components/LedgerCharts'
 
 // ─── Dashboard hero ───────────────────────────────────────────────────────────
 
@@ -104,9 +105,22 @@ function renderStarLabel(rating: number): string {
 function RatingDistribution({ className }: { className?: string }) {
   const dist = useAppStore((s) => s.stats.ratingDistribution)
   const avgRating = useAppStore((s) => s.stats.avgRating)
+  const setFilter = useAppStore((s) => s.setFilter)
+  const requestView = useAppStore((s) => s.requestView)
   const data = dist.filter((d) => d.count > 0).sort((a, b) => b.rating - a.rating)
-  const maxCount = Math.max(...data.map((d) => d.count), 1)
-  const roundedAvg = Math.round(avgRating * 2) / 2
+  const total = data.reduce((sum, d) => sum + d.count, 0)
+
+  const gradient = useMemo(() => {
+    if (total === 0) return 'var(--wash)'
+    let cursor = 0
+    const stops = data.map((d) => {
+      const start = (cursor / total) * 100
+      cursor += d.count
+      const end = (cursor / total) * 100
+      return `${ratingColorVar(d.rating)} ${start}% ${end}%`
+    })
+    return `conic-gradient(${stops.join(', ')})`
+  }, [data, total])
 
   return (
     <Panel
@@ -114,49 +128,53 @@ function RatingDistribution({ className }: { className?: string }) {
       hint={`rating distribution · ${avgRating.toFixed(1)} avg`}
       className={className}
     >
-      <div className="flex flex-col gap-3">
-        {data.map((d, i) => {
-          const isAvg = d.rating === roundedAvg
-          return (
+      {total === 0 ? (
+        <p className="text-center text-sm text-paper-faint py-8">No ratings yet</p>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-center gap-8">
+          <div className="relative w-[168px] h-[168px] shrink-0">
+            <div className="donut-ring absolute inset-0 rounded-full" style={{ background: gradient }} />
             <div
-              key={d.rating}
-              className="grid items-center gap-3"
-              style={{ gridTemplateColumns: '60px 1fr 28px' }}
+              className="donut-hole absolute rounded-full flex flex-col items-center justify-center"
+              style={{
+                inset: '24px',
+                background: 'linear-gradient(168deg, var(--ink-1), var(--ink-2))',
+                border: '1px solid var(--line)',
+              }}
             >
-              <div
-                className={cn(
-                  'font-mono text-[13px] text-right leading-none select-none',
-                  isAvg ? 'text-amber-bright' : 'text-amber',
-                )}
-              >
-                {renderStarLabel(d.rating)}
-              </div>
-              <div className="h-3 rounded-md overflow-hidden bg-[var(--wash)]">
-                <div
-                  className="bar-fill h-full rounded-md"
-                  style={{
-                    width: `${(d.count / maxCount) * 100}%`,
-                    background: 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))',
-                    boxShadow: '0 0 16px -2px rgba(233,178,102,0.5)',
-                    animationDelay: `${i * 60}ms`,
-                  }}
-                />
-              </div>
-              <span
-                className={cn(
-                  'font-mono text-[13px] text-right',
-                  isAvg ? 'text-amber' : 'text-paper-dim',
-                )}
-              >
-                {d.count}
+              <span className="stat-num text-[28px]">{avgRating.toFixed(1)}</span>
+              <span className="font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint mt-1">
+                avg · {total} rated
               </span>
             </div>
-          )
-        })}
-        {data.length === 0 && (
-          <p className="text-center text-sm text-paper-faint py-8">No ratings yet</p>
-        )}
-      </div>
+          </div>
+          <div className="flex-1 w-full flex flex-col gap-0.5">
+            {data.map((d) => (
+              <button
+                key={d.rating}
+                onClick={() => {
+                  setFilter('minRating', d.rating)
+                  requestView('library')
+                }}
+                className="w-full flex items-center justify-between gap-3 px-2 py-1.5 rounded-md transition-colors hover:bg-[var(--wash)] cursor-pointer group"
+              >
+                <span className="flex items-center gap-2.5">
+                  <i
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: ratingColorVar(d.rating), boxShadow: `0 0 8px -1px ${ratingColorVar(d.rating)}` }}
+                  />
+                  <span className="font-mono text-[12px] text-amber group-hover:text-amber-bright transition-colors">
+                    {renderStarLabel(d.rating)}
+                  </span>
+                </span>
+                <span className="font-mono text-[11px] text-paper-faint">
+                  <span className="text-paper-dim">{d.count}</span> · {Math.round((d.count / total) * 100)}%
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </Panel>
   )
 }
@@ -171,45 +189,64 @@ function GenreBars({ className }: { className?: string }) {
 
   return (
     <Panel title="By the genre" hint="top of the marquee" className={className}>
-      <div className="flex flex-col gap-2">
-        {genres.map((g, i) => (
-          <button
-            key={g.genre}
-            onClick={() => {
-              setFilter('genres', [g.genre])
-              requestView('library')
-            }}
-            className="grid items-center gap-3 group w-full text-left rounded-md px-1 py-1 transition-colors hover:bg-[var(--wash)] cursor-pointer"
-            style={{ gridTemplateColumns: '120px 1fr 36px' }}
-          >
-            <span className="text-[13px] text-paper-dim truncate transition-colors group-hover:text-amber-bright">
-              {g.genre}
-            </span>
-            <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
-              <div
-                className="bar-fill h-full rounded-md"
+      {genres.length === 0 ? (
+        <p className="text-center text-sm text-paper-faint py-8">No genres yet</p>
+      ) : (
+        <div className="flex flex-wrap items-center justify-center gap-3 py-2">
+          {genres.map((g, i) => {
+            const t = Math.sqrt(g.count / maxCount)
+            const size = 60 + t * 66
+            return (
+              <button
+                key={g.genre}
+                onClick={() => {
+                  setFilter('genres', [g.genre])
+                  requestView('library')
+                }}
+                className="rounded-full flex flex-col items-center justify-center text-center shrink-0 transition-transform hover:scale-105 cursor-pointer animate-[scaleIn_0.5s_ease-out_forwards]"
                 style={{
-                  width: `${(g.count / maxCount) * 100}%`,
+                  width: size,
+                  height: size,
                   background:
                     i === 0
-                      ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
-                      : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
-                  animationDelay: `${i * 50}ms`,
+                      ? 'radial-gradient(circle at 32% 28%, var(--amber-bright), var(--amber-deep))'
+                      : 'radial-gradient(circle at 32% 28%, var(--ink-3), var(--ink-1))',
+                  border: i === 0 ? 'none' : '1px solid var(--line-2)',
+                  boxShadow: i === 0 ? '0 8px 24px -8px rgba(233,178,102,0.55)' : 'var(--shadow)',
+                  opacity: 0,
+                  transform: 'scale(0)',
+                  animationDelay: `${i * 55}ms`,
                 }}
-              />
-            </div>
-            <span className="font-mono text-xs text-paper-faint text-right">{g.count}</span>
-          </button>
-        ))}
-      </div>
+              >
+                <span
+                  className="font-serif font-medium leading-tight px-2"
+                  style={{ fontSize: 11 + t * 6, color: i === 0 ? 'var(--on-amber)' : 'var(--paper)' }}
+                >
+                  {g.genre}
+                </span>
+                <span
+                  className="font-mono text-[10px] mt-0.5"
+                  style={{ color: i === 0 ? 'var(--on-amber)' : 'var(--paper-faint)', opacity: i === 0 ? 0.75 : 1 }}
+                >
+                  {g.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </Panel>
   )
 }
 
 // --- Decade filmstrip ---
 
+const FILMSTRIP_HOLES = Array.from({ length: 28 })
+
 function DecadeFilmstrip({ className }: { className?: string }) {
   const titles = useAppStore((s) => s.titles)
+  const setFilter = useAppStore((s) => s.setFilter)
+  const requestView = useAppStore((s) => s.requestView)
 
   const decades = useMemo(() => {
     const counts = new Map<number, number>()
@@ -224,36 +261,94 @@ function DecadeFilmstrip({ className }: { className?: string }) {
 
   const maxCount = Math.max(...decades.map((d) => d.count), 1)
 
+  const points = useMemo(
+    () =>
+      decades.map((d, i) => ({
+        x: decades.length === 1 ? 500 : (i / (decades.length - 1)) * 1000,
+        y: 190 - (d.count / maxCount) * 164,
+      })),
+    [decades, maxCount],
+  )
+
   return (
     <Panel title="By the era" hint="decade breakdown" className={className}>
-      <div className="flex flex-col gap-2.5">
-        {decades.map((d, i) => (
-          <div
-            key={d.label}
-            className="grid items-center gap-3"
-            style={{ gridTemplateColumns: '56px 1fr 28px' }}
-          >
-            <span className="font-mono text-[12px] text-paper-dim text-right">{d.label}</span>
-            <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
-              <div
-                className="bar-fill h-full rounded-md"
-                style={{
-                  width: `${(d.count / maxCount) * 100}%`,
-                  background:
-                    d.count === maxCount
-                      ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
-                      : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
-                  animationDelay: `${i * 40}ms`,
-                }}
-              />
+      {decades.length === 0 ? (
+        <p className="text-center text-sm text-paper-faint py-8">No titles yet</p>
+      ) : (
+        <div
+          className="rounded-xl overflow-x-auto overflow-y-hidden scrollbar-thin"
+          style={{ background: 'linear-gradient(180deg, var(--ink-2), var(--ink-1))', border: '1px solid var(--line)' }}
+        >
+          <div style={{ minWidth: Math.max(decades.length * 64, 420) }}>
+            <div className="filmstrip-holes pt-3">
+              {FILMSTRIP_HOLES.map((_, i) => (
+                <span key={i} />
+              ))}
             </div>
-            <span className="font-mono text-xs text-paper-faint text-right">{d.count}</span>
+            <div className="relative w-full h-[150px]">
+              <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="absolute inset-0 w-full h-full block">
+                <defs>
+                  <linearGradient id="filmstrip-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--amber)" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="var(--amber)" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d={areaPath(points, 190)} fill="url(#filmstrip-area)" />
+                <path
+                  d={linePath(points)}
+                  fill="none"
+                  stroke="var(--amber-bright)"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  pathLength={1}
+                  className="chart-path-draw"
+                  style={{ strokeDasharray: 1 }}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              {/* Rendered as HTML dots, not SVG circles — preserveAspectRatio="none"
+                  stretches x/y independently, which would turn <circle> into ellipses. */}
+              {points.map((p, i) => (
+                <span
+                  key={i}
+                  className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
+                  style={{
+                    left: `${(p.x / 1000) * 100}%`,
+                    top: `${(p.y / 200) * 100}%`,
+                    width: 14,
+                    height: 14,
+                    background: 'var(--ink-1)',
+                    border: '2.5px solid var(--amber-bright)',
+                  }}
+                />
+              ))}
+            </div>
+            <div className="filmstrip-holes pb-3">
+              {FILMSTRIP_HOLES.map((_, i) => (
+                <span key={i} />
+              ))}
+            </div>
+            <div className="flex justify-between px-3.5 pb-3.5 pt-1.5">
+              {decades.map((d) => (
+                <button
+                  key={d.label}
+                  onClick={() => {
+                    setFilter('decades', [d.label])
+                    requestView('library')
+                  }}
+                  className="flex flex-col items-center gap-0.5 group cursor-pointer"
+                >
+                  <span className="font-mono text-[11px] text-paper-dim group-hover:text-amber-bright transition-colors">
+                    {d.label}
+                  </span>
+                  <span className="font-mono text-[9px] text-paper-faint">{d.count}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        ))}
-        {decades.length === 0 && (
-          <p className="text-center text-sm text-paper-faint py-8">No titles yet</p>
-        )}
-      </div>
+        </div>
+      )}
     </Panel>
   )
 }
@@ -312,6 +407,11 @@ function ActivityHeatmap({ className }: { className?: string }) {
     return { weeks, monthLabels, totalInYear }
   }, [viewingCounts])
 
+  const maxCellCount = useMemo(
+    () => Math.max(...weeks.flat().map((c) => c.count), 1),
+    [weeks],
+  )
+
   return (
     <Panel title="Time in the dark" hint="past 52 weeks" className={className}>
       <div className="overflow-x-auto -mx-1 px-1">
@@ -342,7 +442,14 @@ function ActivityHeatmap({ className }: { className?: string }) {
                     cell.count > 0 ? 'bg-amber' : 'bg-[var(--wash)]',
                     cell.date === todayStr && 'ring-1 ring-amber-bright/60',
                   )}
-                  style={cell.count > 0 ? { boxShadow: '0 0 6px -1px rgba(233,178,102,0.4)' } : undefined}
+                  style={
+                    cell.count > 0
+                      ? {
+                          opacity: 0.32 + 0.68 * Math.min(cell.count / maxCellCount, 1),
+                          boxShadow: '0 0 6px -1px rgba(233,178,102,0.4)',
+                        }
+                      : undefined
+                  }
                   title={
                     cell.count > 0
                       ? `${cell.date} - ${cell.count} viewing${cell.count !== 1 ? 's' : ''}`
@@ -361,6 +468,111 @@ function ActivityHeatmap({ className }: { className?: string }) {
   )
 }
 
+// --- The run (monthly screening trend) ---
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' })
+}
+
+function TheRun({ className }: { className?: string }) {
+  const viewingsByMonth = useAppStore((s) => s.stats.viewingsByMonth)
+
+  // viewingsByMonth only contains months with at least one viewing — fill the
+  // gaps in between so the x-axis represents a true, evenly-spaced calendar
+  // timeline rather than compressing silent months out of existence.
+  const recent = useMemo(() => {
+    const counts = new Map(viewingsByMonth.map((d) => [d.month, d.count]))
+    const now = new Date()
+    const months: { month: string; count: number }[] = []
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      months.push({ month: key, count: counts.get(key) ?? 0 })
+    }
+    return months
+  }, [viewingsByMonth])
+
+  const maxCount = Math.max(...recent.map((d) => d.count), 1)
+  const total = recent.reduce((sum, d) => sum + d.count, 0)
+
+  const points = useMemo(
+    () =>
+      recent.map((d, i) => ({
+        x: recent.length === 1 ? 500 : (i / (recent.length - 1)) * 1000,
+        y: 170 - (d.count / maxCount) * 140,
+      })),
+    [recent, maxCount],
+  )
+
+  return (
+    <Panel title="The run" hint={`monthly screenings · last ${recent.length} mo`} className={className}>
+      {total === 0 ? (
+        <p className="text-center text-sm text-paper-faint py-8">No screenings in the past year</p>
+      ) : (
+        <div>
+          <div className="overflow-x-auto overflow-y-hidden scrollbar-thin">
+            <div style={{ minWidth: Math.max(recent.length * 52, 420) }}>
+              <div className="relative w-full h-[130px]">
+                <svg viewBox="0 0 1000 190" preserveAspectRatio="none" className="absolute inset-0 w-full h-full block">
+                  <defs>
+                    <linearGradient id="run-area" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--moon)" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="var(--moon)" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path d={areaPath(points, 170)} fill="url(#run-area)" />
+                  <path
+                    d={linePath(points)}
+                    fill="none"
+                    stroke="var(--moon)"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    pathLength={1}
+                    className="chart-path-draw"
+                    style={{ strokeDasharray: 1 }}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                {/* HTML dots, not SVG circles — preserveAspectRatio="none" stretches
+                    x/y independently, which would turn <circle> into ellipses. */}
+                {points.map(
+                  (p, i) =>
+                    recent[i].count > 0 && (
+                      <span
+                        key={i}
+                        title={`${monthLabel(recent[i].month)} — ${recent[i].count} screening${recent[i].count !== 1 ? 's' : ''}`}
+                        className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
+                        style={{
+                          left: `${(p.x / 1000) * 100}%`,
+                          top: `${(p.y / 190) * 100}%`,
+                          width: 10,
+                          height: 10,
+                          background: 'var(--moon)',
+                        }}
+                      />
+                    ),
+                )}
+              </div>
+              <div className="flex justify-between px-1">
+                {recent.map((d) => (
+                  <span key={d.month} className="font-mono text-[9px] text-paper-faint">
+                    {monthLabel(d.month)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
+            {total} screening{total !== 1 ? 's' : ''} across the last {recent.length} months
+          </p>
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 // ─── The auteurs (directors) ──────────────────────────────────────────────────
 
 function TheAuteurs({ className }: { className?: string }) {
@@ -373,40 +585,35 @@ function TheAuteurs({ className }: { className?: string }) {
   return (
     <Panel title="The auteurs" hint="most-watched directors" className={className}>
       <ol className="flex flex-col gap-1">
-        {directors.map((d, i) => (
-          <li key={d.director}>
-            <button
-              onClick={() => {
-                setFilter('search', d.director)
-                requestView('library')
-              }}
-              className="w-full grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
-              style={{ gridTemplateColumns: '26px minmax(0,1fr) clamp(80px,20vw,220px) 28px' }}
-            >
-              <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>
-              <span
-                className="font-serif text-base font-medium text-paper truncate group-hover:underline decoration-amber/40"
-                style={{ fontVariationSettings: '"opsz" 30' }}
+        {directors.map((d, i) => {
+          const pct = d.count / maxCount
+          const color = i === 0 ? 'var(--amber-bright)' : 'rgba(128,115,95,0.6)'
+          return (
+            <li key={d.director}>
+              <button
+                onClick={() => {
+                  setFilter('search', d.director)
+                  requestView('library')
+                }}
+                className="w-full flex items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
               >
-                {d.director}
-              </span>
-              <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
-                <div
-                  className="bar-fill h-full rounded-md"
-                  style={{
-                    width: `${(d.count / maxCount) * 100}%`,
-                    background:
-                      i === 0
-                        ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
-                        : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
-                    animationDelay: `${i * 50}ms`,
-                  }}
-                />
-              </div>
-              <span className="font-mono text-xs text-paper-faint text-right">{d.count}</span>
-            </button>
-          </li>
-        ))}
+                <span className="font-mono text-xs text-amber-deep w-5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                <span
+                  className="font-serif text-base font-medium text-paper truncate flex-1 min-w-0 group-hover:underline decoration-amber/40"
+                  style={{ fontVariationSettings: '"opsz" 30' }}
+                >
+                  {d.director}
+                </span>
+                <span className="relative w-9 h-9 shrink-0">
+                  <RadialRing pct={pct} size={36} stroke={4} color={color} delay={i * 60} />
+                  <span className="absolute inset-0 flex items-center justify-center font-mono text-[10px] text-paper-dim">
+                    {d.count}
+                  </span>
+                </span>
+              </button>
+            </li>
+          )
+        })}
       </ol>
     </Panel>
   )
@@ -423,42 +630,47 @@ function TheEnsemble({ className }: { className?: string }) {
 
   return (
     <Panel title="The ensemble" hint="most-billed leads" className={className}>
-      <ol className="flex flex-col gap-1">
-        {actors.map((a, i) => (
-          <li key={a.actor}>
+      <div className="flex flex-wrap items-start justify-center gap-x-5 gap-y-4 py-2">
+        {actors.map((a, i) => {
+          const t = a.count / maxCount
+          const size = 56 + t * 40
+          return (
             <button
+              key={a.actor}
               onClick={() => {
                 setFilter('search', a.actor)
                 requestView('library')
               }}
-              className="w-full grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
-              style={{ gridTemplateColumns: '26px minmax(0,1fr) clamp(80px,20vw,220px) 28px' }}
+              className="flex flex-col items-center gap-2 group cursor-pointer w-[104px] shrink-0"
             >
-              <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>
               <span
-                className="font-serif text-base font-medium text-paper truncate group-hover:underline decoration-amber/40"
-                style={{ fontVariationSettings: '"opsz" 30' }}
+                className="rounded-full flex items-center justify-center font-serif font-medium transition-transform group-hover:scale-105 animate-[scaleIn_0.5s_ease-out_forwards]"
+                style={{
+                  width: size,
+                  height: size,
+                  fontSize: size * 0.32,
+                  background:
+                    i === 0
+                      ? 'linear-gradient(155deg, var(--amber-bright), var(--amber-deep))'
+                      : 'linear-gradient(155deg, var(--ink-3), var(--ink-1))',
+                  color: i === 0 ? 'var(--on-amber)' : 'var(--paper-dim)',
+                  border: i === 0 ? 'none' : '1px solid var(--line-2)',
+                  boxShadow: i === 0 ? '0 8px 22px -8px rgba(233,178,102,0.55)' : 'var(--shadow)',
+                  opacity: 0,
+                  transform: 'scale(0)',
+                  animationDelay: `${i * 70}ms`,
+                }}
               >
+                {getInitials(a.actor)}
+              </span>
+              <span className="text-[12.5px] text-center text-paper-dim group-hover:text-amber-bright transition-colors truncate max-w-full leading-tight">
                 {a.actor}
               </span>
-              <div className="h-2.5 rounded-md overflow-hidden bg-[var(--wash)]">
-                <div
-                  className="bar-fill h-full rounded-md"
-                  style={{
-                    width: `${(a.count / maxCount) * 100}%`,
-                    background:
-                      i === 0
-                        ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
-                        : 'linear-gradient(90deg, rgba(128,115,95,0.4), rgba(128,115,95,0.7))',
-                    animationDelay: `${i * 50}ms`,
-                  }}
-                />
-              </div>
-              <span className="font-mono text-xs text-paper-faint text-right">{a.count}</span>
+              <span className="font-mono text-[10px] text-paper-faint">{a.count}×</span>
             </button>
-          </li>
-        ))}
-      </ol>
+          )
+        })}
+      </div>
     </Panel>
   )
 }
@@ -521,6 +733,7 @@ export function Ledger() {
       <div className="grid grid-cols-12 gap-4">
         <ActivityHeatmap className="col-span-12 lg:col-span-8" />
         <EncorePerformances className="col-span-12 lg:col-span-4" />
+        <TheRun className="col-span-12" />
         <RatingDistribution className="col-span-12 lg:col-span-5" />
         <GenreBars className="col-span-12 lg:col-span-7" />
         <DecadeFilmstrip className="col-span-12" />

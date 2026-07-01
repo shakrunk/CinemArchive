@@ -134,3 +134,49 @@ export async function findUserByEmail(email: string): Promise<FoundProfile | nul
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
+
+// ─── Friendships ──────────────────────────────────────────────────────────
+
+export type FriendshipStatus = 'pending' | 'accepted' | 'blocked'
+
+export interface FriendshipView {
+  friend_user_id: string
+  status: FriendshipStatus
+  requested_by: string
+  blocked_by: string | null
+  created_at: string
+  updated_at: string
+  display_name: string | null
+  username: string | null
+}
+
+/** Send a friend request to another user. Auto-accepts if they already requested you. */
+export async function sendFriendRequest(targetUserId: string): Promise<void> {
+  const { error } = await getClient().rpc('send_friend_request', { target_user_id: targetUserId })
+  if (error) throw error
+}
+
+/** Accept a pending friend request from the given user. */
+export async function acceptFriendRequest(requesterUserId: string): Promise<void> {
+  const { error } = await getClient().rpc('accept_friend_request', { requester_user_id: requesterUserId })
+  if (error) throw error
+}
+
+/** Decline (delete) a pending friend request from the given user. */
+export async function declineFriendRequest(requesterUserId: string): Promise<void> {
+  const { error } = await getClient().rpc('decline_friend_request', { requester_user_id: requesterUserId })
+  if (error) throw error
+}
+
+/** Block another user, exiting any existing pending/accepted relationship. */
+export async function blockFriend(targetUserId: string): Promise<void> {
+  const { error } = await getClient().rpc('block_user', { target_user_id: targetUserId })
+  if (error) throw error
+}
+
+/** List all friendships (pending, accepted, blocked) involving the current user. */
+export async function listFriendships(): Promise<FriendshipView[]> {
+  const { data, error } = await getClient().rpc('list_friendships')
+  if (error) throw error
+  return data ?? []
+}

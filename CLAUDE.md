@@ -23,6 +23,12 @@ npm run lint       # ESLint
 
 ---
 
+## Git Conventions
+
+**Never add self-attribution to commits or PRs.** Do not include `Co-Authored-By: Claude`, "Generated with Claude Code", or any similar trailer/line in commit messages or PR descriptions in this repo. This is enforced via `attribution.commit` / `attribution.pr` (both set to `""`) in `.claude/settings.json`, but follow it even if editing commit messages by hand.
+
+---
+
 ## Architecture
 
 ### Stack

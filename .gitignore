@@ -38,7 +38,8 @@ graphify-out/
 .code-review-graph/
 
 # Local AI tool configs (machine-specific)
-.claude/
+.claude/*
+!.claude/settings.json
 .cursor/
 .gemini/
 .kiro/

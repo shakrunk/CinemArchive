@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CinemArchive (The Projection Room v2)** is a personal movie and TV series tracking app with a cinematic dark-gold aesthetic. It is a JAMstack app: static React frontend deployed to GitHub Pages, backed by Supabase for database and auth, and TMDB/OMDb for media metadata.
 
-> **Status:** Built and deployed. All phases from `plan.md` are implemented and the app is live on GitHub Pages (https://shakrunk.github.io/CinemArchive/), backed by a connected Supabase project. The phase table at the bottom is retained as historical context. See `README.md` for full setup/architecture docs.
+> **Status:** Built and deployed. All phases from `plan.md` are implemented and the app is live on GitHub Pages (https://cinemarchive.kumarfamilynet.work/, a custom domain), backed by a connected Supabase project. The phase table at the bottom is retained as historical context. See `README.md` for full setup/architecture docs.
 
 ---
 
@@ -77,7 +77,7 @@ RLS: authenticated user gets full CRUD; valid shared-token holders get read-only
 - **Optimistic UI:** Zustand store is updated immediately on user action; backend write follows asynchronously (fire-and-forget with error logging in `db.ts`).
 - **All filtering/sorting is client-side** in the Zustand store (no DB queries for filter changes); the poster wall renders the full filtered set (grid virtualization was planned but is not implemented).
 - **API calls to TMDB/OMDb go through the Edge Function** (never directly from the browser — keeps API keys server-side).
-- **SPA routing on GitHub Pages:** uses a `404.html` redirect fallback; Vite `base` is `/CinemArchive/`.
+- **SPA routing on GitHub Pages:** uses a `404.html` redirect fallback; served from a custom domain (`public/CNAME`) at the domain root, so Vite `base` is `/`.
 - **Schema changes go through migrations, not the SQL editor:** add a timestamped file under `supabase/migrations/`, keep `schema.sql` in sync, and push to `main` — `db-migrate.yml` runs `supabase db push`. (`db push`/`migration repair` are Docker-free; only `db pull` needs Docker.)
 
 ---

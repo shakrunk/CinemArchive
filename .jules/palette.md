@@ -37,6 +37,10 @@
 ## 2024-06-30 - WCAG 2.5.3 (Label in Name) Compliance
 **Learning:** Adding an `aria-label` to a button that completely overwrites its visible text violates WCAG 2.5.3, which requires the accessible name to contain the exact visible text. This breaks voice control software where users might command "Click [Visible Text]".
 **Action:** When adding `aria-label` to give extra context to a text button (e.g. "Delete forever"), ensure the label INCLUDES the exact visible words (e.g. `aria-label="Delete viewing forever"`).
+## 2024-11-20 - [Clear Search in Discover Empty States]
+**Learning:** Empty states without actionable buttons rely on informative text, which increases cognitive load for users trying to recover from an empty result. Adding an explicit CTA to clear a search significantly improves user flow and interaction smoothness.
+**Action:** Always provide direct call-to-action buttons (e.g., 'Clear search', 'Log viewing') in empty states instead of relying purely on informative text.
+
 ## 2026-07-02 - Actionable Empty States in Dashboards
 **Learning:** Empty states in dashboard components (like those in Ledger.tsx) often just display static text (e.g., 'No titles yet'), which is a dead end. Providing a clear CTA like 'Browse Library' helps the user take the next step.
 **Action:** When working on dashboard panels or data visualization components, ensure any empty states include an actionable CTA button that guides the user on how to populate the data.

@@ -517,8 +517,9 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
   // 5. Insert season cast and episode crew (fire-and-forget)
   // ⚡ Bolt: Bulk insert season cast and episode crew to resolve N+1 query problem
   if (title.type === 'tv' && title.seasons) {
+    const seasons = title.seasons
     void (async () => {
-      const allSeasonCast = title.seasons.flatMap((season) =>
+      const allSeasonCast = seasons.flatMap((season) =>
         (season.cast ?? []).map((c) => ({
           user_id: userId,
           title_id: title.id,
@@ -536,7 +537,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
         if (error) console.error('Failed to insert season cast:', error)
       }
 
-      const allEpisodeCrew = title.seasons.flatMap((season) =>
+      const allEpisodeCrew = seasons.flatMap((season) =>
         (season.episodes ?? []).flatMap((ep) =>
           (ep.crew ?? []).map((c) => ({
             user_id: userId,

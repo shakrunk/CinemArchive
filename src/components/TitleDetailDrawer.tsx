@@ -1599,7 +1599,7 @@ export function TitleDetailDrawer() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={openRefreshMetadata}
-                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all"
+                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
@@ -1607,7 +1607,7 @@ export function TitleDetailDrawer() {
                   {user && (
                     <DropdownMenu open={sendMenuOpen} onOpenChange={handleSendMenuOpenChange}>
                       <DropdownMenuTrigger asChild>
-                        <button className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all">
+                        <button className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
                           <Send className="w-3.5 h-3.5" />
                           Send to a friend
                         </button>
@@ -1632,7 +1632,7 @@ export function TitleDetailDrawer() {
                   )}
                   <button
                     onClick={() => setPendingDeleteTitle(true)}
-                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all"
+                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ember/60"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Remove from library

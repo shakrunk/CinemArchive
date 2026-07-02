@@ -2,7 +2,7 @@
 
 A personal movie and TV series tracking app with a cinematic dark-gold aesthetic. Search TMDB, log what you watch (down to the individual episode), rate and review, and browse your library as a poster wall or pore over your viewing stats in **The Ledger**.
 
-**Live:** https://shakrunk.github.io/CinemArchive/
+**Live:** https://cinemarchive.kumarfamilynet.work/
 
 It's a JAMstack app: a static React frontend on GitHub Pages, backed by Supabase (Postgres + Auth + Edge Functions), with TMDB and OMDb for metadata and rating badges.
 
@@ -145,7 +145,7 @@ The workflow needs these set in **GitHub → Settings → Secrets and variables 
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the app (injecting `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` from repository secrets) and publishes `dist/` to GitHub Pages.
 
-Because it's a single-page app served from a project subpath, Vite's `base` is set to `/CinemArchive/` and SPA deep links are handled by a `404.html` redirect fallback.
+The site is served from a custom domain (`public/CNAME`) at the domain root, so Vite's `base` is `/`. SPA deep links are handled by a `404.html` redirect fallback.
 
 ---
 

@@ -134,7 +134,15 @@ function RatingDistribution({ className }: { className?: string }) {
       className={className}
     >
       {total === 0 ? (
-        <p className="text-center text-sm text-paper-faint py-8">No ratings yet</p>
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No ratings yet</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <div className="relative w-[168px] h-[168px] shrink-0">
@@ -195,7 +203,15 @@ function GenreBars({ className }: { className?: string }) {
   return (
     <Panel title="By the genre" hint="top of the marquee" className={className}>
       {genres.length === 0 ? (
-        <p className="text-center text-sm text-paper-faint py-8">No genres yet</p>
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No genres yet</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
       ) : (
         <div className="flex flex-wrap items-center justify-center gap-3 py-2">
           {genres.map((g, i) => {
@@ -278,7 +294,15 @@ function DecadeFilmstrip({ className }: { className?: string }) {
   return (
     <Panel title="By the era" hint="decade breakdown" className={className}>
       {decades.length === 0 ? (
-        <p className="text-center text-sm text-paper-faint py-8">No titles yet</p>
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No titles yet</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
       ) : (
         <div
           className="rounded-xl overflow-x-auto overflow-y-hidden scrollbar-thin"
@@ -510,10 +534,20 @@ function TheRun({ className }: { className?: string }) {
     [recent, maxCount],
   )
 
+  const requestView = useAppStore((s) => s.requestView)
+
   return (
     <Panel title="The run" hint={`monthly screenings · last ${recent.length} mo`} className={className}>
       {total === 0 ? (
-        <p className="text-center text-sm text-paper-faint py-8">No screenings in the past year</p>
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No screenings in the past year</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
       ) : (
         <div>
           <div className="overflow-x-auto overflow-y-hidden scrollbar-thin">
@@ -692,10 +726,20 @@ function EncorePerformances({ className }: { className?: string }) {
       .slice(0, 6)
   }, [titles])
 
+  const requestView = useAppStore((s) => s.requestView)
+
   return (
     <Panel title="Encore performances" hint="most revisited" className={className}>
       {encores.length === 0 ? (
-        <p className="text-center text-sm text-paper-faint py-8">No title has screened twice yet</p>
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No title has screened twice yet</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
       ) : (
         <ol className="flex flex-col gap-1">
           {encores.map((t, i) => (

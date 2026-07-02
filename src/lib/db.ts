@@ -515,46 +515,45 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
   }
 
   // 5. Insert season cast and episode crew (fire-and-forget)
+  // ⚡ Bolt: Bulk insert season cast and episode crew to resolve N+1 query problem
   if (title.type === 'tv' && title.seasons) {
-    for (const season of title.seasons) {
-      if (season.cast && season.cast.length > 0) {
-        const seasonCast = season.cast
-        void (async () => {
-          const { error } = await supabase.from('season_cast').insert(
-            seasonCast.map((c) => ({
-              user_id: userId,
-              title_id: title.id,
-              season_id: season.id,
-              tmdb_person_id: c.tmdbPersonId,
-              name: c.name,
-              character_name: c.character ?? null,
-              profile_url: c.profileUrl ?? null,
-              cast_order: c.order,
-            }))
-          )
-          if (error) console.error('Failed to insert season cast:', error)
-        })()
+    void (async () => {
+      const allSeasonCast = title.seasons.flatMap((season) =>
+        (season.cast ?? []).map((c) => ({
+          user_id: userId,
+          title_id: title.id,
+          season_id: season.id,
+          tmdb_person_id: c.tmdbPersonId,
+          name: c.name,
+          character_name: c.character ?? null,
+          profile_url: c.profileUrl ?? null,
+          cast_order: c.order,
+        }))
+      )
+
+      if (allSeasonCast.length > 0) {
+        const { error } = await supabase.from('season_cast').insert(allSeasonCast)
+        if (error) console.error('Failed to insert season cast:', error)
       }
 
-      for (const ep of (season.episodes ?? [])) {
-        if (ep.crew && ep.crew.length > 0) {
-          const epCrew = ep.crew
-          void (async () => {
-            const { error } = await supabase.from('episode_crew').insert(
-              epCrew.map((c) => ({
-                user_id: userId,
-                title_id: title.id,
-                episode_id: ep.id,
-                tmdb_person_id: c.tmdbPersonId,
-                name: c.name,
-                job: c.job,
-              }))
-            )
-            if (error) console.error('Failed to insert episode crew:', error)
-          })()
-        }
+      const allEpisodeCrew = title.seasons.flatMap((season) =>
+        (season.episodes ?? []).flatMap((ep) =>
+          (ep.crew ?? []).map((c) => ({
+            user_id: userId,
+            title_id: title.id,
+            episode_id: ep.id,
+            tmdb_person_id: c.tmdbPersonId,
+            name: c.name,
+            job: c.job,
+          }))
+        )
+      )
+
+      if (allEpisodeCrew.length > 0) {
+        const { error } = await supabase.from('episode_crew').insert(allEpisodeCrew)
+        if (error) console.error('Failed to insert episode crew:', error)
       }
-    }
+    })()
   }
 }
 

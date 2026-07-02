@@ -1006,11 +1006,18 @@ export function Discover() {
           ) : searchMode === 'studios' && companyResults.length > 0 ? (
             <CompanyPicker companies={companyResults} onSelect={handleCompanySelect} />
           ) : (
-            <div className="py-16 text-center">
+            <div className="py-16 text-center flex flex-col items-center">
               {searchMode === 'people'
                 ? <User className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />
                 : <Building2 className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />}
-              <p className="font-mono text-sm text-paper-faint">No results found.</p>
+              <p className="font-mono text-sm text-paper-faint mb-4">No results found.</p>
+              <button
+                onClick={clearSearch}
+                className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear search
+              </button>
             </div>
           )
         ) : (
@@ -1031,11 +1038,20 @@ export function Discover() {
       ) : loading ? (
         <DiscoverSkeleton />
       ) : displayResults.length === 0 ? (
-        <div className="py-16 text-center">
+        <div className="py-16 text-center flex flex-col items-center">
           <Compass className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />
-          <p className="font-mono text-sm text-paper-faint">
+          <p className="font-mono text-sm text-paper-faint mb-4">
             {query.trim() ? 'No results found.' : 'Nothing to show yet.'}
           </p>
+          {query.trim() && (
+            <button
+              onClick={clearSearch}
+              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear search
+            </button>
+          )}
         </div>
       ) : (
         <div className="discover-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">

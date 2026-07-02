@@ -15,6 +15,7 @@ const SHORTCUTS: { group: string; entries: ShortcutEntry[] }[] = [
       { keys: ['2'], label: 'Library' },
       { keys: ['3'], label: 'Up Next' },
       { keys: ['4'], label: 'Ledger' },
+      { keys: ['5'], label: 'Profile & Settings' },
     ],
   },
   {

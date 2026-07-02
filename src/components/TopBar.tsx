@@ -153,7 +153,11 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
               user ? (
                 <button
                   onClick={onProfileClick}
-                  className="icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center"
+                  aria-current={currentView === 'profile' ? 'page' : undefined}
+                  className={cn(
+                    'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center',
+                    currentView === 'profile' && '!bg-amber/15 border-amber/50'
+                  )}
                   aria-label={activityUnseenCount > 0 ? `Profile and Settings — ${activityUnseenCount} new friend activity` : 'Profile and Settings'}
                 >
                   <User className="w-[17px] h-[17px]" />

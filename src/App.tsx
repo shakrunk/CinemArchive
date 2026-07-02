@@ -6,6 +6,7 @@ import { UpNext } from 'src/views/UpNext'
 import { Library } from 'src/views/Library'
 import { Ledger } from 'src/views/Ledger'
 import { Discover } from 'src/views/Discover'
+import { Profile } from 'src/views/Profile'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { isSupabaseConfigured, onAuthStateChange } from 'src/lib/auth'
@@ -93,6 +94,7 @@ export default function App() {
       '2': () => setCurrentView('library'),
       '3': () => setCurrentView('upnext'),
       '4': () => setCurrentView('ledger'),
+      '5': () => setCurrentView('profile'),
       'n': () => { if (!isSharedView) openAddTitle() },
       '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),
       'g': () => { setCurrentView('library'); setViewMode('grid') },
@@ -150,7 +152,7 @@ export default function App() {
           <TopBar
             currentView={currentView}
             onViewChange={setCurrentView}
-            onProfileClick={() => setIsProfileOpen(true)}
+            onProfileClick={() => setCurrentView('profile')}
           />
 
           <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
@@ -158,13 +160,13 @@ export default function App() {
             {currentView === 'library' && <Library />}
             {currentView === 'ledger' && <Ledger />}
             {currentView === 'discover' && <Discover />}
+            {currentView === 'profile' && <Profile />}
           </main>
 
           <BottomNav currentView={currentView} onViewChange={setCurrentView} />
           <AddTitleWorkflow />
           <TitleDetailDrawer />
           <RefreshMetadataModal />
-          <ProfileModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
         </>
       )}
       <AppCommandPalette onNavigate={setCurrentView} />

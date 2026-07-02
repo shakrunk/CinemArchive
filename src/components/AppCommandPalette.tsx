@@ -49,6 +49,8 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     map['action:view-ledger'] = () => onNavigate('ledger')
     list.push({ id: 'action:view-discover', kind: 'action', label: 'Go to Discover', hint: 'view', keywords: 'explore browse trending genres movies tv' })
     map['action:view-discover'] = () => onNavigate('discover')
+    list.push({ id: 'action:view-profile', kind: 'action', label: 'Go to Profile & Settings', hint: 'view', keywords: 'account settings preferences theme friends sharing sign in out passkey export import' })
+    map['action:view-profile'] = () => onNavigate('profile')
     list.push({ id: 'action:layout-grid', kind: 'action', label: 'Library: poster wall', hint: 'layout', keywords: 'grid posters' })
     map['action:layout-grid'] = () => { onNavigate('library'); setViewMode('grid') }
     list.push({ id: 'action:layout-list', kind: 'action', label: 'Library: ledger list', hint: 'layout', keywords: 'list table' })

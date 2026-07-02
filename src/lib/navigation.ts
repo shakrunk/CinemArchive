@@ -2,7 +2,7 @@
 // by scripts/verify-navigation-logic.mjs. The URL is the source of truth for the
 // active view and which modal (detail drawer / add) is open.
 
-export type AppView = 'upnext' | 'library' | 'ledger' | 'discover'
+export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'profile'
 
 export interface NavState {
   view: AppView
@@ -10,7 +10,7 @@ export interface NavState {
   add: boolean
 }
 
-const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover']
+const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'profile']
 
 // Params that are not part of NavState but must survive every navigation write.
 const PRESERVED_KEYS = ['share']

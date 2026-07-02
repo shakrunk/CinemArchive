@@ -9,7 +9,7 @@ function assert(label, actual, expected) {
   else { console.error(`  ✗ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); fail++ }
 }
 
-const APP_VIEWS = ['upnext', 'library', 'ledger']
+const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'profile']
 const PRESERVED_KEYS = ['share']
 function parseNav(search, fallbackView) {
   const p = new URLSearchParams(search)
@@ -39,6 +39,7 @@ assert('empty → title null', parseNav('', 'library').title, null)
 assert('empty → add false', parseNav('', 'library').add, false)
 assert('unknown view → fallback', parseNav('?view=bogus', 'upnext').view, 'upnext')
 assert('valid view', parseNav('?view=ledger', 'library').view, 'ledger')
+assert('valid view (profile)', parseNav('?view=profile', 'library').view, 'profile')
 assert('title round-trips', parseNav('?view=library&title=abc123', 'library').title, 'abc123')
 assert('add=1 → true', parseNav('?add=1', 'library').add, true)
 assert('add=0 → false', parseNav('?add=0', 'library').add, false)

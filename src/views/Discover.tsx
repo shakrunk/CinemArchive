@@ -1013,7 +1013,7 @@ export function Discover() {
               <p className="font-mono text-sm text-paper-faint mb-4">No results found.</p>
               <button
                 onClick={clearSearch}
-                className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+                className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto"
               >
                 <X className="w-3.5 h-3.5" />
                 Clear search
@@ -1046,7 +1046,7 @@ export function Discover() {
           {query.trim() && (
             <button
               onClick={clearSearch}
-              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto"
             >
               <X className="w-3.5 h-3.5" />
               Clear search

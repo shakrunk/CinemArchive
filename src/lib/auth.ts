@@ -113,6 +113,47 @@ export async function listSharedKeys() {
   return data
 }
 
+// ─── Own profile ─────────────────────────────────────────────────────────────
+
+export interface MyProfile {
+  user_id: string
+  email: string
+  username: string | null
+  display_name: string | null
+  created_at: string
+}
+
+/** Fetch the current user's profile row (owner-only RLS). */
+export async function getMyProfile(): Promise<MyProfile | null> {
+  const { data, error } = await getClient()
+    .from('profiles')
+    .select('user_id, email, username, display_name, created_at')
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/** Update the current user's display name and/or username.
+ *  Throws a friendly error when the username is already taken. */
+export async function updateMyProfile(patch: {
+  username?: string | null
+  display_name?: string | null
+}): Promise<MyProfile> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not signed in.')
+  const { data, error } = await getClient()
+    .from('profiles')
+    .update(patch)
+    .eq('user_id', user.id)
+    .select('user_id, email, username, display_name, created_at')
+    .single()
+  if (error) {
+    if (error.code === '23505') throw new Error('That username is already taken.')
+    throw error
+  }
+  return data
+}
+
 // ─── Friend lookup ───────────────────────────────────────────────────────────
 
 export interface FoundProfile {

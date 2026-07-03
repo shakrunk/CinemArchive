@@ -550,6 +550,10 @@
   .icon-btn:active {
     transform: scale(0.92);
   }
+  .icon-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1.5px rgb(var(--amber-rgb) / 0.6);
+  }
 
   /* ── Pill nav (marquee) ── */
   .navpill {
@@ -573,6 +577,10 @@
   }
   .navtab:hover {
     color: var(--paper);
+  }
+  .navtab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1.5px rgb(var(--amber-rgb) / 0.6);
   }
   .navtab.is-active {
     color: var(--on-amber);

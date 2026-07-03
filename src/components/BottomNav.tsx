@@ -32,7 +32,7 @@ function NavTab({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex flex-col items-center gap-1 px-3 pt-3 pb-1 relative transition-colors',
+        'flex flex-col items-center gap-1 px-3 pt-3 pb-1 relative transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 focus-visible:z-10 rounded-md',
         active ? 'text-amber' : 'text-paper-faint'
       )}
     >
@@ -119,7 +119,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         })}
 
         {!isSharedView && (
-          <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2" aria-label="Add Title">
+          <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-md" aria-label="Add Title">
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
               style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}

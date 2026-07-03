@@ -6,7 +6,8 @@ import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import type { User } from '@supabase/supabase-js'
-import type { AppView } from '../lib/navigation'
+import type { AppView, NavItemId } from '../lib/navigation'
+import { DEFAULT_NAV_ORDER } from '../lib/navigation'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
@@ -21,7 +22,15 @@ import type { SearchResult } from '../lib/media'
 export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
-export type Theme = 'dark' | 'light'
+export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
+
+/** Nav bar layout/visibility preferences — order + hidden apply to both the
+ *  TopBar pill nav and BottomNav; compact hides labels on the desktop pill nav. */
+export interface NavPrefs {
+  order: NavItemId[]
+  hidden: NavItemId[]
+  compact: boolean
+}
 
 /** A cast/crew person, keyed by TMDB id with a display name. */
 export interface PersonRef {
@@ -90,6 +99,11 @@ interface LedgerSlice {
 interface UISlice {
   viewMode: ViewMode
   theme: Theme
+  // Themes beyond dark/light are locked until earned via an in-app easter egg
+  // (e.g. Spider-Noir black & white, The Matrix red pill). Always includes
+  // 'dark' and 'light'.
+  unlockedThemes: Theme[]
+  navPrefs: NavPrefs
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
@@ -104,6 +118,12 @@ interface UISlice {
 
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
+  // No-op if already unlocked or the theme is dark/light (always unlocked).
+  unlockTheme: (theme: Theme) => void
+  moveNavItem: (id: NavItemId, direction: 'up' | 'down') => void
+  toggleNavItemHidden: (id: NavItemId) => void
+  setNavCompact: (compact: boolean) => void
+  resetNavPrefs: () => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
   openAddTitlePreselected: (result: SearchResult) => void
@@ -157,6 +177,14 @@ interface PinsSlice {
   pinnedModes: Record<string, 'bw' | 'color'>
   setPinnedMode: (titleId: string, easterEggKey: string, variant: 'bw' | 'color' | null) => void
   loadPinnedModes: () => Promise<void>
+}
+
+// ─── Default Nav Prefs ──────────────────────────────────────────────────────
+
+const defaultNavPrefs: NavPrefs = {
+  order: DEFAULT_NAV_ORDER,
+  hidden: [],
+  compact: false,
 }
 
 // ─── Default Filters ────────────────────────────────────────────────────────
@@ -570,6 +598,8 @@ export const useAppStore = create<AppStore>()(
   // ── UI ─────────────────────────────────────────────────────
   viewMode: 'grid',
   theme: 'dark',
+  unlockedThemes: ['dark', 'light'],
+  navPrefs: defaultNavPrefs,
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
@@ -578,6 +608,43 @@ export const useAppStore = create<AppStore>()(
   setViewMode: (viewMode) => set({ viewMode }),
 
   setTheme: (theme) => set({ theme }),
+
+  unlockTheme: (theme) => {
+    if (theme === 'dark' || theme === 'light') return
+    if (get().unlockedThemes.includes(theme)) return
+    set((s) => ({ unlockedThemes: [...s.unlockedThemes, theme] }))
+    const label = theme === 'noir' ? 'Spider-Man Noir' : 'The Construct'
+    get().pushNotification({
+      message: `New theme unlocked: "${label}" — pick it in Settings → Appearance.`,
+      kind: 'tip',
+      autoClose: 6000,
+    })
+  },
+
+  moveNavItem: (id, direction) =>
+    set((s) => {
+      const order = [...s.navPrefs.order]
+      const idx = order.indexOf(id)
+      const swapWith = direction === 'up' ? idx - 1 : idx + 1
+      if (idx === -1 || swapWith < 0 || swapWith >= order.length) return {}
+      ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
+      return { navPrefs: { ...s.navPrefs, order } }
+    }),
+
+  toggleNavItemHidden: (id) =>
+    set((s) => {
+      const isHidden = s.navPrefs.hidden.includes(id)
+      const hidden = isHidden
+        ? s.navPrefs.hidden.filter((x) => x !== id)
+        : [...s.navPrefs.hidden, id]
+      // Keep at least one tab visible.
+      if (!isHidden && hidden.length >= s.navPrefs.order.length) return {}
+      return { navPrefs: { ...s.navPrefs, hidden } }
+    }),
+
+  setNavCompact: (compact) => set((s) => ({ navPrefs: { ...s.navPrefs, compact } })),
+
+  resetNavPrefs: () => set({ navPrefs: defaultNavPrefs }),
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -824,6 +891,8 @@ export const useAppStore = create<AppStore>()(
         filters: s.filters,
         viewMode: s.viewMode,
         theme: s.theme,
+        unlockedThemes: s.unlockedThemes,
+        navPrefs: s.navPrefs,
         activityFeedLastSeenAt: s.activityFeedLastSeenAt,
       }),
       onRehydrateStorage: () => (state) => {

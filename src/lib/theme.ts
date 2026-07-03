@@ -5,6 +5,8 @@ import { useAppStore, type Theme } from 'src/store/useAppStore'
 const THEME_COLORS: Record<Theme, string> = {
   dark: '#0b0907',
   light: '#f4ede0',
+  noir: '#0d0d0f',
+  matrix: '#020403',
 }
 
 /** Apply a theme to the document: sets [data-theme] and the address-bar color.

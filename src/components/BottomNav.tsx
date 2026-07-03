@@ -2,11 +2,18 @@ import { useEffect } from 'react'
 import { LayoutGrid, BarChart3, Plus, PlayCircle, Compass } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
-import type { AppView } from 'src/lib/navigation'
+import type { AppView, NavItemId } from 'src/lib/navigation'
 
 interface BottomNavProps {
   currentView: AppView
   onViewChange: (view: AppView) => void
+}
+
+const NAV_META: Record<NavItemId, { label: string; Icon: typeof LayoutGrid }> = {
+  discover: { label: 'Discover', Icon: Compass },
+  library: { label: 'Library', Icon: LayoutGrid },
+  upnext: { label: 'Up Next', Icon: PlayCircle },
+  ledger: { label: 'Ledger', Icon: BarChart3 },
 }
 
 function NavTab({
@@ -32,7 +39,7 @@ function NavTab({
       <span
         className={cn(
           'absolute top-0 left-1/2 -translate-x-1/2 h-0.5 rounded-b-full bg-amber transition-all duration-300',
-          active ? 'w-8 shadow-[0_0_8px_rgba(233,178,102,0.6)]' : 'w-0'
+          active ? 'w-8 shadow-[0_0_8px_rgb(var(--amber-rgb)/0.6)]' : 'w-0'
         )}
       />
       <Icon className="w-5 h-5" />
@@ -44,6 +51,14 @@ function NavTab({
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const openAddTitle = useAppStore((s) => s.openAddTitle)
   const isSharedView = useAppStore((s) => s.isSharedView)
+  const navPrefs = useAppStore((s) => s.navPrefs)
+
+  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  // Split around the central Add button, biasing an odd extra item to the left
+  // (matches the original fixed Discover/Library · Add · Up Next/Ledger layout).
+  const splitAt = Math.ceil(visibleNav.length / 2)
+  const leftNav = visibleNav.slice(0, splitAt)
+  const rightNav = visibleNav.slice(splitAt)
 
   // Firefox Android positions fixed elements relative to the layout viewport,
   // not the visual viewport, so the nav floats above the screen bottom when the
@@ -81,8 +96,10 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         className="flex items-center justify-around h-16 px-2"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <NavTab active={currentView === 'discover'} onClick={() => onViewChange('discover')} label="Discover" Icon={Compass} />
-        <NavTab active={currentView === 'library'} onClick={() => onViewChange('library')} label="Library" Icon={LayoutGrid} />
+        {leftNav.map((id) => {
+          const { label, Icon } = NAV_META[id]
+          return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
+        })}
 
         {!isSharedView && (
           <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2" aria-label="Add Title">
@@ -96,8 +113,10 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
           </button>
         )}
 
-        <NavTab active={currentView === 'upnext'} onClick={() => onViewChange('upnext')} label="Up Next" Icon={PlayCircle} />
-        <NavTab active={currentView === 'ledger'} onClick={() => onViewChange('ledger')} label="Ledger" Icon={BarChart3} />
+        {rightNav.map((id) => {
+          const { label, Icon } = NAV_META[id]
+          return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
+        })}
       </div>
     </nav>
   )

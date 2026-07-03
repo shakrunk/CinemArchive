@@ -4,6 +4,21 @@
 
 export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'profile'
 
+// The four destinations that appear in the customizable nav (TopBar pill nav +
+// BottomNav). 'profile' is excluded — it's the account icon, not a nav tab.
+export type NavItemId = 'discover' | 'library' | 'upnext' | 'ledger'
+
+export const DEFAULT_NAV_ORDER: NavItemId[] = ['discover', 'library', 'upnext', 'ledger']
+
+// Canonical labels for Settings → Navigation. TopBar/BottomNav keep their own
+// (shorter, space-constrained) copy locally rather than importing this.
+export const NAV_ITEM_LABELS: Record<NavItemId, string> = {
+  discover: 'Discover',
+  library: 'The Library',
+  upnext: 'Up Next',
+  ledger: 'The Ledger',
+}
+
 export interface NavState {
   view: AppView
   title: string | null

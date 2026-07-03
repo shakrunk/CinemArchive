@@ -11,14 +11,17 @@
          Reads the Zustand-persisted store (key must match useAppStore's name). -->
     <script>
       (function () {
+        var COLORS = { dark: '#0b0907', light: '#f4ede0', noir: '#0d0d0f', matrix: '#020403' };
         try {
           var raw = localStorage.getItem('cinemarchive-library');
-          var theme = raw && JSON.parse(raw).state && JSON.parse(raw).state.theme;
-          if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+          var state = raw && JSON.parse(raw).state;
+          var theme = state && state.theme;
+          var unlocked = (state && state.unlockedThemes) || ['dark', 'light'];
+          if (!COLORS.hasOwnProperty(theme) || unlocked.indexOf(theme) === -1) theme = 'dark';
           document.documentElement.setAttribute('data-theme', theme);
-          if (theme === 'light') {
+          if (theme !== 'dark') {
             var m = document.querySelector('meta[name="theme-color"]');
-            if (m) m.setAttribute('content', '#f4ede0');
+            if (m) m.setAttribute('content', COLORS[theme]);
           }
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'dark');

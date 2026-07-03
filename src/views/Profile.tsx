@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
-  Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X, Activity, Star,
-  UserCircle, Sun, Moon, Pencil, CalendarDays, Film,
+  Download, Upload, Users, UserPlus, Ban, Eye, EyeOff, Inbox, X, Activity, Star,
+  UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
+  LayoutGrid, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -37,6 +38,7 @@ import {
 } from 'src/lib/db'
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
+import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 
 // ─── Shared bits ──────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: b
   { id: 'identity', label: 'Identity', Icon: Pencil, authOnly: true },
   { id: 'security', label: 'Security', Icon: Shield, authOnly: true },
   { id: 'appearance', label: 'Appearance', Icon: Sun, authOnly: false },
+  { id: 'navigation', label: 'Navigation', Icon: LayoutGrid, authOnly: false },
   { id: 'sharing', label: 'Shared Links', Icon: Key, authOnly: true },
   { id: 'friends', label: 'Friends', Icon: Users, authOnly: true },
   { id: 'inbox', label: 'Recommendations', Icon: Inbox, authOnly: true },
@@ -443,6 +446,7 @@ function SecuritySection() {
 function AppearanceSection() {
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
+  const unlockedThemes = useAppStore((s) => s.unlockedThemes)
 
   function choose(next: Theme) {
     if (next === theme) return
@@ -450,9 +454,23 @@ function AppearanceSection() {
     setTheme(next)
   }
 
-  const options: { value: Theme; label: string; hint: string; Icon: typeof Sun }[] = [
+  const options: { value: Theme; label: string; hint: string; Icon: typeof Sun; lockedHint?: string }[] = [
     { value: 'dark', label: 'Screening Room', hint: 'Dark — the classic projection-booth look.', Icon: Moon },
     { value: 'light', label: 'Matinée', hint: 'Light — parchment and daylight.', Icon: Sun },
+    {
+      value: 'noir',
+      label: 'Spider-Man Noir',
+      hint: 'Black & white, high-contrast — a detective’s screening room.',
+      Icon: Aperture,
+      lockedHint: 'Unlock it: watch Spider-Man: Noir in Black & White.',
+    },
+    {
+      value: 'matrix',
+      label: 'The Construct',
+      hint: 'Green phosphor on black glass — welcome to the desert of the real.',
+      Icon: Terminal,
+      lockedHint: 'Unlock it: take the red pill while logging a viewing of The Matrix.',
+    },
   ]
 
   return (
@@ -460,31 +478,130 @@ function AppearanceSection() {
       id="appearance"
       title="Appearance"
       Icon={Sun}
-      description="Pick a house style. You can also flip it any time with the T key or the toggle in the top bar."
+      description="Pick a house style. You can also flip dark/light any time with the T key or the toggle in the top bar. A couple of styles are secret — find them by watching the right films the right way."
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
-        {options.map(({ value, label, hint, Icon }) => (
-          <button
-            key={value}
-            role="radio"
-            aria-checked={theme === value}
-            onClick={() => choose(value)}
-            className={cn(
-              'text-left rounded-lg border p-4 transition-colors',
-              theme === value
-                ? 'border-amber/50 bg-amber/10'
-                : 'border-border bg-secondary/20 hover:border-amber/25'
-            )}
-          >
-            <span className="flex items-center gap-2 font-sans text-sm text-paper font-medium">
-              <Icon className={cn('w-4 h-4', theme === value ? 'text-amber' : 'text-muted-foreground')} />
-              {label}
-              {theme === value && <Check className="w-3.5 h-3.5 text-amber ml-auto" />}
-            </span>
-            <span className="block font-sans text-xs text-muted-foreground mt-1.5 leading-relaxed">{hint}</span>
-          </button>
-        ))}
+        {options.map(({ value, label, hint, Icon, lockedHint }) => {
+          const locked = !unlockedThemes.includes(value)
+          return (
+            <button
+              key={value}
+              role="radio"
+              aria-checked={theme === value}
+              disabled={locked}
+              onClick={() => choose(value)}
+              className={cn(
+                'text-left rounded-lg border p-4 transition-colors',
+                locked && 'opacity-50 cursor-not-allowed',
+                !locked && theme === value && 'border-amber/50 bg-amber/10',
+                !locked && theme !== value && 'border-border bg-secondary/20 hover:border-amber/25',
+                locked && 'border-border bg-secondary/10'
+              )}
+            >
+              <span className="flex items-center gap-2 font-sans text-sm text-paper font-medium">
+                <Icon className={cn('w-4 h-4', !locked && theme === value ? 'text-amber' : 'text-muted-foreground')} />
+                {label}
+                {locked ? (
+                  <Lock className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
+                ) : (
+                  theme === value && <Check className="w-3.5 h-3.5 text-amber ml-auto" />
+                )}
+              </span>
+              <span className="block font-sans text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                {locked ? lockedHint : hint}
+              </span>
+            </button>
+          )
+        })}
       </div>
+    </Section>
+  )
+}
+
+// ─── Navigation ─────────────────────────────────────────────────────────────
+
+function NavigationSection() {
+  const navPrefs = useAppStore((s) => s.navPrefs)
+  const moveNavItem = useAppStore((s) => s.moveNavItem)
+  const toggleNavItemHidden = useAppStore((s) => s.toggleNavItemHidden)
+  const setNavCompact = useAppStore((s) => s.setNavCompact)
+
+  return (
+    <Section
+      id="navigation"
+      title="Navigation"
+      Icon={LayoutGrid}
+      description="Reorder or hide tabs in the top bar and bottom nav. Hidden tabs stay reachable from the command palette (⌘K)."
+    >
+      <div className="space-y-2" role="list" aria-label="Navigation tabs">
+        {navPrefs.order.map((id: NavItemId, i) => {
+          const hidden = navPrefs.hidden.includes(id)
+          return (
+            <div
+              key={id}
+              role="listitem"
+              className="flex items-center gap-3 rounded-lg border p-2.5"
+              style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+            >
+              <div className="flex flex-col -my-1">
+                <button
+                  disabled={i === 0}
+                  onClick={() => moveNavItem(id, 'up')}
+                  aria-label={`Move ${NAV_ITEM_LABELS[id]} up`}
+                  className="text-paper-faint hover:text-amber disabled:opacity-25 disabled:hover:text-paper-faint transition-colors"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  disabled={i === navPrefs.order.length - 1}
+                  onClick={() => moveNavItem(id, 'down')}
+                  aria-label={`Move ${NAV_ITEM_LABELS[id]} down`}
+                  className="text-paper-faint hover:text-amber disabled:opacity-25 disabled:hover:text-paper-faint transition-colors"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <span className={cn('flex-1 font-sans text-sm', hidden ? 'text-muted-foreground' : 'text-paper')}>
+                {NAV_ITEM_LABELS[id]}
+              </span>
+              <button
+                onClick={() => toggleNavItemHidden(id)}
+                aria-pressed={!hidden}
+                aria-label={hidden ? `Show ${NAV_ITEM_LABELS[id]} in navigation` : `Hide ${NAV_ITEM_LABELS[id]} from navigation`}
+                className={cn(
+                  'icon-btn w-8 h-8 border rounded-md flex items-center justify-center shrink-0',
+                  hidden
+                    ? 'text-muted-foreground border-border'
+                    : 'text-amber border-amber/30 bg-amber/5'
+                )}
+              >
+                {hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      <label className="flex items-center gap-2.5 cursor-pointer pt-1">
+        <input
+          type="checkbox"
+          checked={navPrefs.compact}
+          onChange={(e) => setNavCompact(e.target.checked)}
+          className="sr-only"
+        />
+        <span
+          className={cn('w-9 h-5 rounded-full transition-colors relative shrink-0', navPrefs.compact ? 'bg-amber' : 'bg-secondary')}
+          aria-hidden="true"
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+              navPrefs.compact && 'translate-x-4'
+            )}
+          />
+        </span>
+        <span className="font-sans text-sm text-paper">Compact top bar (icons only)</span>
+      </label>
     </Section>
   )
 }
@@ -1165,6 +1282,8 @@ export function Profile() {
           {authed && <SecuritySection />}
 
           <AppearanceSection />
+
+          <NavigationSection />
 
           {authed && <SharingSection />}
           {authed && <FriendsSection />}

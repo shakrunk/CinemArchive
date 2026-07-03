@@ -4,7 +4,7 @@ import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
   Download, Upload, Users, UserPlus, Ban, Eye, EyeOff, Inbox, X, Activity, Star,
   UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
-  LayoutGrid, ChevronUp, ChevronDown,
+  LayoutGrid, GripVertical,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -533,47 +533,127 @@ function AppearanceSection() {
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 
+// Gap between rows in the reorderable nav list (matches the container's space-y-2).
+const NAV_ROW_GAP = 8
+
+interface NavDragMeta {
+  id: NavItemId
+  startIndex: number
+  itemHeight: number
+}
+
 function NavigationSection() {
   const navPrefs = useAppStore((s) => s.navPrefs)
   const moveNavItem = useAppStore((s) => s.moveNavItem)
+  const reorderNav = useAppStore((s) => s.reorderNav)
   const toggleNavItemHidden = useAppStore((s) => s.toggleNavItemHidden)
   const setNavCompact = useAppStore((s) => s.setNavCompact)
+
+  const order = navPrefs.order
+  const itemRefs = useRef(new Map<NavItemId, HTMLDivElement>())
+  // Only read inside event handlers, never during render — safe as a ref.
+  const startYRef = useRef(0)
+  // Read during render (to offset non-dragged rows), so these live in state.
+  const [dragMeta, setDragMeta] = useState<NavDragMeta | null>(null)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+
+  function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>, id: NavItemId) {
+    const el = itemRefs.current.get(id)
+    if (!el) return
+    const startIndex = order.indexOf(id)
+    const itemHeight = el.getBoundingClientRect().height + NAV_ROW_GAP
+    startYRef.current = e.clientY
+    setDragMeta({ id, startIndex, itemHeight })
+    setDragOffset(0)
+    setDropIndex(startIndex)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragMeta) return
+    const offset = e.clientY - startYRef.current
+    setDragOffset(offset)
+    const rawIndex = dragMeta.startIndex + Math.round(offset / dragMeta.itemHeight)
+    setDropIndex(Math.max(0, Math.min(order.length - 1, rawIndex)))
+  }
+
+  function endDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragMeta) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    // Recompute from the live offset rather than trusting `dropIndex` state,
+    // which may not have committed yet if pointerup follows pointermove
+    // within the same tick.
+    const finalOffset = e.clientY - startYRef.current
+    const rawIndex = dragMeta.startIndex + Math.round(finalOffset / dragMeta.itemHeight)
+    const target = Math.max(0, Math.min(order.length - 1, rawIndex))
+    if (target !== dragMeta.startIndex) {
+      const next = [...order]
+      const [moved] = next.splice(dragMeta.startIndex, 1)
+      next.splice(target, 0, moved)
+      reorderNav(next)
+    }
+    setDragMeta(null)
+    setDragOffset(0)
+    setDropIndex(null)
+  }
+
+  function handleGripKeyDown(e: React.KeyboardEvent, id: NavItemId) {
+    if (e.key === 'ArrowUp') { e.preventDefault(); moveNavItem(id, 'up') }
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveNavItem(id, 'down') }
+  }
 
   return (
     <Section
       id="navigation"
       title="Navigation"
       Icon={LayoutGrid}
-      description="Reorder or hide tabs in the top bar and bottom nav. Hidden tabs stay reachable from the command palette (⌘K)."
+      description="Drag to reorder tabs in the top bar and bottom nav — number-key shortcuts (1, 2, 3…) follow the new order. Hidden tabs stay reachable from the command palette (⌘K)."
     >
       <div className="space-y-2" role="list" aria-label="Navigation tabs">
-        {navPrefs.order.map((id: NavItemId, i) => {
+        {order.map((id: NavItemId, i) => {
           const hidden = navPrefs.hidden.includes(id)
+          const isDragging = dragMeta?.id === id
+          let translateY = 0
+          if (dragMeta && dropIndex !== null) {
+            if (isDragging) {
+              translateY = dragOffset
+            } else if (dragMeta.startIndex < dropIndex && i > dragMeta.startIndex && i <= dropIndex) {
+              translateY = -dragMeta.itemHeight
+            } else if (dragMeta.startIndex > dropIndex && i >= dropIndex && i < dragMeta.startIndex) {
+              translateY = dragMeta.itemHeight
+            }
+          }
           return (
             <div
               key={id}
+              ref={(el) => {
+                if (el) itemRefs.current.set(id, el)
+                else itemRefs.current.delete(id)
+              }}
               role="listitem"
-              className="flex items-center gap-3 rounded-lg border p-2.5"
-              style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+              className={cn('flex items-center gap-3 rounded-lg border p-2.5', isDragging && 'shadow-lg')}
+              style={{
+                borderColor: 'var(--line)',
+                background: 'var(--inset)',
+                transform: translateY ? `translateY(${translateY}px)` : undefined,
+                transition: isDragging ? 'none' : 'transform 180ms ease',
+                position: isDragging ? 'relative' : undefined,
+                zIndex: isDragging ? 10 : undefined,
+              }}
             >
-              <div className="flex flex-col -my-1">
-                <button
-                  disabled={i === 0}
-                  onClick={() => moveNavItem(id, 'up')}
-                  aria-label={`Move ${NAV_ITEM_LABELS[id]} up`}
-                  className="text-paper-faint hover:text-amber disabled:opacity-25 disabled:hover:text-paper-faint transition-colors"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  disabled={i === navPrefs.order.length - 1}
-                  onClick={() => moveNavItem(id, 'down')}
-                  aria-label={`Move ${NAV_ITEM_LABELS[id]} down`}
-                  className="text-paper-faint hover:text-amber disabled:opacity-25 disabled:hover:text-paper-faint transition-colors"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <button
+                onPointerDown={(e) => handlePointerDown(e, id)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onKeyDown={(e) => handleGripKeyDown(e, id)}
+                aria-label={`Reorder ${NAV_ITEM_LABELS[id]} — drag, or use arrow keys`}
+                className="text-paper-faint hover:text-amber cursor-grab active:cursor-grabbing -my-1 p-1 rounded"
+                style={{ touchAction: 'none' }}
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
               <span className={cn('flex-1 font-sans text-sm', hidden ? 'text-muted-foreground' : 'text-paper')}>
                 {NAV_ITEM_LABELS[id]}
               </span>

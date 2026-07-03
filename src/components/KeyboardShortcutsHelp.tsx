@@ -1,23 +1,15 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { modKey } from 'src/lib/utils'
+import { useAppStore } from 'src/store/useAppStore'
+import { NAV_ITEM_LABELS } from 'src/lib/navigation'
 
 interface ShortcutEntry {
   keys: string[]
   label: string
 }
 
-const SHORTCUTS: { group: string; entries: ShortcutEntry[] }[] = [
-  {
-    group: 'Navigate',
-    entries: [
-      { keys: ['1'], label: 'Discover' },
-      { keys: ['2'], label: 'Library' },
-      { keys: ['3'], label: 'Up Next' },
-      { keys: ['4'], label: 'Ledger' },
-      { keys: ['5'], label: 'Profile & Settings' },
-    ],
-  },
+const OTHER_GROUPS: { group: string; entries: ShortcutEntry[] }[] = [
   {
     group: 'Actions',
     entries: [
@@ -54,6 +46,14 @@ interface KeyboardShortcutsHelpProps {
 }
 
 export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpProps) {
+  const navPrefs = useAppStore((s) => s.navPrefs)
+  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  const navigateEntries: ShortcutEntry[] = [
+    ...visibleNav.map((id, i) => ({ keys: [String(i + 1)], label: NAV_ITEM_LABELS[id] })),
+    { keys: [String(visibleNav.length + 1)], label: 'Profile & Settings' },
+  ]
+  const SHORTCUTS = [{ group: 'Navigate', entries: navigateEntries }, ...OTHER_GROUPS]
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>

@@ -23,9 +23,14 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-function fail(message: string, status = 400): Response {
+// Always responds 200 — supabase-js's functions.invoke() surfaces non-2xx
+// responses as a generic FunctionsHttpError and discards the JSON body, so a
+// friendly { error } message only reaches the client on a 2xx response.
+// src/lib/auth.ts's redeemInvite() checks data?.error to distinguish this
+// from the { success: true } happy path.
+function fail(message: string): Response {
   return new Response(JSON.stringify({ error: message }), {
-    status,
+    status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }
@@ -87,6 +92,6 @@ Deno.serve(async (req: Request) => {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error'
-    return fail(message, 500)
+    return fail(message)
   }
 })

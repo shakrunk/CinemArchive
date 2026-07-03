@@ -46,6 +46,7 @@ export default function App() {
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const isRefreshMetadataOpen = useAppStore((s) => s.isRefreshMetadataOpen)
+  const navPrefs = useAppStore((s) => s.navPrefs)
 
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
 
@@ -88,13 +89,18 @@ export default function App() {
     !isAddTitleOpen && !isDetailDrawerOpen && !isRefreshMetadataOpen &&
     !isCommandPaletteOpen && !isKeyboardHelpOpen
 
+  // Number-key shortcuts follow the user's nav order/visibility from Settings
+  // → Navigation, so key N always jumps to whatever sits in slot N. Hidden
+  // tabs get no number key; Profile always gets the next number after them.
+  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  const navShortcuts = Object.fromEntries(
+    visibleNav.map((id, i) => [String(i + 1), () => setCurrentView(id)])
+  )
+
   useKeyboardShortcuts(
     {
-      '1': () => setCurrentView('discover'),
-      '2': () => setCurrentView('library'),
-      '3': () => setCurrentView('upnext'),
-      '4': () => setCurrentView('ledger'),
-      '5': () => setCurrentView('profile'),
+      ...navShortcuts,
+      [String(visibleNav.length + 1)]: () => setCurrentView('profile'),
       'n': () => { if (!isSharedView) openAddTitle() },
       '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),
       'g': () => { setCurrentView('library'); setViewMode('grid') },

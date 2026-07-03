@@ -6,8 +6,7 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import type { Title } from 'src/store/mockData'
-
-const SPIDER_NOIR_TMDB_ID = 220102
+import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
 
 const UNDO_WINDOW_MS = 6000
 

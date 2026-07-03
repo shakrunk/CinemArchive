@@ -121,6 +121,7 @@ interface UISlice {
   // No-op if already unlocked or the theme is dark/light (always unlocked).
   unlockTheme: (theme: Theme) => void
   moveNavItem: (id: NavItemId, direction: 'up' | 'down') => void
+  reorderNav: (order: NavItemId[]) => void
   toggleNavItemHidden: (id: NavItemId) => void
   setNavCompact: (compact: boolean) => void
   resetNavPrefs: () => void
@@ -630,6 +631,8 @@ export const useAppStore = create<AppStore>()(
       ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
       return { navPrefs: { ...s.navPrefs, order } }
     }),
+
+  reorderNav: (order) => set((s) => ({ navPrefs: { ...s.navPrefs, order } })),
 
   toggleNavItemHidden: (id) =>
     set((s) => {

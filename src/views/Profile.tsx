@@ -4,7 +4,7 @@ import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
   Download, Upload, Users, UserPlus, Ban, Eye, EyeOff, Inbox, X, Activity, Star,
   UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
-  LayoutGrid, GripVertical, BarChart3,
+  LayoutGrid, GripVertical, BarChart3, Ticket,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -27,8 +27,12 @@ import {
   listFriendships,
   getMyProfile,
   updateMyProfile,
+  createInviteCode,
+  listMyInviteCodes,
+  deleteInviteCode,
   type FriendshipView,
   type MyProfile,
+  type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import {
@@ -41,6 +45,7 @@ import type { Theme } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { LEDGER_PANEL_LABELS, type LedgerPanelId } from 'src/lib/ledgerPanels'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
+import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 
 // ─── Shared bits ──────────────────────────────────────────────────────────────
 
@@ -73,6 +78,7 @@ const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: b
   { id: 'navigation', label: 'Navigation', Icon: LayoutGrid, authOnly: false },
   { id: 'ledger-layout', label: 'Ledger Layout', Icon: BarChart3, authOnly: false },
   { id: 'sharing', label: 'Shared Links', Icon: Key, authOnly: true },
+  { id: 'invites', label: 'Invites', Icon: Ticket, authOnly: true },
   { id: 'friends', label: 'Friends', Icon: Users, authOnly: true },
   { id: 'inbox', label: 'Recommendations', Icon: Inbox, authOnly: true },
   { id: 'activity', label: 'Friend Activity', Icon: Activity, authOnly: true },
@@ -165,52 +171,59 @@ function SignInCard() {
   }
 
   return (
-    <form onSubmit={handleEmailSignIn} className="space-y-4">
-      <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-        Enter your email to sign in. You will receive a passwordless magic link to log in securely.
-      </p>
-      <div>
-        <label htmlFor="settings-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-          Email Address
-        </label>
-        <div className="relative max-w-sm">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <Input
-            id="settings-email-input"
-            aria-label="Email address"
-            required
-            type="email"
-            placeholder="name@domain.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pl-9 bg-secondary/50 border-border"
-          />
+    <div className="space-y-4">
+      <form onSubmit={handleEmailSignIn} className="space-y-4">
+        <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+          Enter your email to sign in. You will receive a passwordless magic link to log in securely.
+        </p>
+        <div>
+          <label htmlFor="settings-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            Email Address
+          </label>
+          <div className="relative max-w-sm">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              id="settings-email-input"
+              aria-label="Email address"
+              required
+              type="email"
+              placeholder="name@domain.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-9 bg-secondary/50 border-border"
+            />
+          </div>
         </div>
-      </div>
 
-      <MessageBanner message={message} />
+        <MessageBanner message={message} />
 
-      <div className="flex gap-2 max-w-sm">
-        <Button
-          type="submit"
-          disabled={loading}
-          className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
-        >
-          {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
-          Send Magic Link
-        </Button>
-        <Button
-          type="button"
-          onClick={handlePasskeySignIn}
-          disabled={loading}
-          variant="outline"
-          className="border-border text-muted-foreground hover:text-foreground"
-          title="Sign In with Passkey"
-        >
-          <Fingerprint className="w-4 h-4" />
-        </Button>
-      </div>
-    </form>
+        <div className="flex gap-2 max-w-sm">
+          <Button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+          >
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+            Send Magic Link
+          </Button>
+          <Button
+            type="button"
+            onClick={handlePasskeySignIn}
+            disabled={loading}
+            variant="outline"
+            className="border-border text-muted-foreground hover:text-foreground"
+            title="Sign In with Passkey"
+          >
+            <Fingerprint className="w-4 h-4" />
+          </Button>
+        </div>
+      </form>
+
+      <InviteRedeemForm
+        onRedeemed={(text) => setMessage({ type: 'success', text })}
+        onError={(text) => setMessage({ type: 'error', text })}
+      />
+    </div>
   )
 }
 
@@ -982,6 +995,137 @@ function SharingSection() {
   )
 }
 
+// ─── Invites ──────────────────────────────────────────────────────────────────
+
+const OWNER_EMAIL = 'bioengineerkk@gmail.com'
+
+function InvitesSection() {
+  const user = useAppStore((s) => s.user)
+  const isOwner = user?.email === OWNER_EMAIL
+  const [codes, setCodes] = useState<InviteCode[]>([])
+  const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [message, setMessage] = useState<Message | null>(null)
+
+  useEffect(() => {
+    void loadCodes()
+  }, [])
+
+  async function loadCodes() {
+    setLoading(true)
+    try {
+      setCodes(await listMyInviteCodes())
+    } catch (err) {
+      console.error('Failed to load invite codes:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setMessage(null)
+    try {
+      await createInviteCode()
+      await loadCodes()
+    } catch (err: any) {
+      console.error('Failed to generate invite code:', err)
+      setMessage({ type: 'error', text: err.message || 'Failed to generate invite code.' })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteInviteCode(id)
+      await loadCodes()
+    } catch (err) {
+      console.error('Failed to delete invite code:', err)
+    }
+  }
+
+  function handleCopy(code: string, id: string) {
+    navigator.clipboard.writeText(code)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const unredeemedCount = codes.filter((c) => !c.redeemed_by).length
+  const atCap = !isOwner && codes.length >= 2
+
+  return (
+    <Section
+      id="invites"
+      title="Invites"
+      Icon={Ticket}
+      description={
+        isOwner
+          ? 'This is a private, invite-only archive. Generate codes for people you want to give access to.'
+          : `This is a private, invite-only archive. You can generate up to 2 invite codes${unredeemedCount > 0 ? ` (${unredeemedCount} unredeemed)` : ''}.`
+      }
+    >
+      <Button
+        onClick={handleGenerate}
+        disabled={generating || atCap}
+        className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium w-fit gap-1.5"
+        title={atCap ? "You've used both of your invites" : undefined}
+      >
+        {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+        Generate Invite Code
+      </Button>
+
+      <MessageBanner message={message} />
+
+      <div className="space-y-2">
+        {loading ? (
+          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading invites...</div>
+        ) : codes.length === 0 ? (
+          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No invite codes generated yet.</div>
+        ) : (
+          codes.map((c) => (
+            <div key={c.id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-sm text-paper font-medium tracking-wider">{c.code}</p>
+                <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                  {c.redeemed_by
+                    ? `Redeemed ${c.redeemed_at ? new Date(c.redeemed_at).toLocaleDateString() : ''}`
+                    : `Created ${new Date(c.created_at).toLocaleDateString()}`}
+                </p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                {!c.redeemed_by && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => handleCopy(c.code, c.id)}
+                      className="bg-secondary hover:bg-secondary-muted text-muted-foreground hover:text-foreground w-7 h-7 p-0 flex items-center justify-center"
+                      title="Copy Invite Code"
+                      aria-label="Copy Invite Code"
+                    >
+                      {copiedId === c.id ? <Check className="w-3.5 h-3.5 text-amber" /> : <Copy className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleDelete(c.id)}
+                      className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                      title="Delete Invite Code"
+                      aria-label="Delete Invite Code"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Section>
+  )
+}
+
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
 function FriendsSection() {
@@ -1524,6 +1668,7 @@ export function Profile() {
           <LedgerLayoutSection />
 
           {authed && <SharingSection />}
+          {authed && <InvitesSection />}
           {authed && <FriendsSection />}
           {authed && <InboxSection />}
           {authed && <ActivitySection />}

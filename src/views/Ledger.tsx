@@ -618,12 +618,22 @@ function TheAuteurs({ className }: { className?: string }) {
   const directors = useAppStore((s) => s.stats.topDirectors)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  if (directors.length === 0) return null
   const maxCount = directors[0]?.count ?? 1
 
   return (
     <Panel title="The auteurs" hint="most-watched directors" className={className}>
-      <ol className="flex flex-col gap-1">
+      {directors.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No directors yet</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
+      ) : (
+        <ol className="flex flex-col gap-1">
         {directors.map((d, i) => {
           const pct = d.count / maxCount
           const color = i === 0 ? 'var(--amber-bright)' : 'rgba(128,115,95,0.6)'
@@ -654,6 +664,7 @@ function TheAuteurs({ className }: { className?: string }) {
           )
         })}
       </ol>
+      )}
     </Panel>
   )
 }
@@ -664,12 +675,22 @@ function TheEnsemble({ className }: { className?: string }) {
   const actors = useAppStore((s) => s.stats.topActors)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  if (actors.length === 0) return null
   const maxCount = actors[0]?.count ?? 1
 
   return (
     <Panel title="The ensemble" hint="most-billed leads" className={className}>
-      <div className="flex flex-wrap items-start justify-center gap-x-5 gap-y-4 py-2">
+      {actors.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No actors yet</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-start justify-center gap-x-5 gap-y-4 py-2">
         {actors.map((a, i) => {
           const t = a.count / maxCount
           const size = 56 + t * 40
@@ -710,6 +731,7 @@ function TheEnsemble({ className }: { className?: string }) {
           )
         })}
       </div>
+      )}
     </Panel>
   )
 }

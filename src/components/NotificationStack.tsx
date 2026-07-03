@@ -14,7 +14,7 @@ export function NotificationStack() {
     <div
       aria-live="assertive"
       aria-atomic="false"
-      className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[200] flex flex-col gap-2 w-full max-w-xs pointer-events-none"
+      className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[220] flex flex-col gap-2 w-full max-w-xs pointer-events-none"
     >
       {notifications.map((n) => (
         <NotificationCard key={n.id} notification={n} onDismiss={() => dismissNotification(n.id)} />

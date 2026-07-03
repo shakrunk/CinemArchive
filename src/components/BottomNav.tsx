@@ -76,9 +76,13 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
     update()
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
+    // Some engines fire a layout-viewport resize (toolbar collapse) without a
+    // matching visualViewport event — catch those too.
+    window.addEventListener('resize', update)
     return () => {
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
     }
   }, [])
 

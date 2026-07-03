@@ -268,7 +268,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
       role="dialog"
       aria-modal="true"
       aria-label={`${video.name} — trailer`}
-      className="fixed inset-0 z-[70] flex items-center justify-center"
+      className="fixed inset-0 z-[215] flex items-center justify-center"
       style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(11,9,7,0.9) 0%, rgba(4,3,2,0.98) 100%)' }}
       onClick={onClose}
     >
@@ -525,14 +525,14 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
         <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
           Trailers
         </h4>
-        <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-6 px-6 pb-1">
+        <div className="flex gap-4 overflow-x-auto scrollbar-none -mx-6 px-6 pb-1">
           {videos.map((v, i) => (
             <button
               key={v.key}
               type="button"
               onClick={() => setActiveIndex(i)}
               aria-label={`Watch ${v.name}`}
-              className="group shrink-0 w-[160px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg"
+              className="group shrink-0 w-[220px] sm:w-[260px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg"
             >
               <div
                 className="relative w-full rounded-lg overflow-hidden group-hover:shadow-[0_0_0_1.5px_rgba(233,178,102,0.5)]"
@@ -556,27 +556,27 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
                   <div
                     className="rounded-full transition-all duration-200 group-hover:scale-110"
                     style={{
-                      padding: '8px',
+                      padding: '11px',
                       background: 'rgba(7,5,4,0.62)',
                       border: '1.5px solid rgba(233,178,102,0.4)',
                       backdropFilter: 'blur(4px)',
                     }}
                   >
-                    <Play className="w-4 h-4" style={{ color: 'var(--amber)' }} fill="var(--amber)" />
+                    <Play className="w-5 h-5" style={{ color: 'var(--amber)' }} fill="var(--amber)" />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-1.5 px-0.5">
+              <div className="mt-2 px-0.5">
                 <div
                   className="font-sans line-clamp-1"
-                  style={{ fontSize: '11px', color: 'var(--paper)' }}
+                  style={{ fontSize: '12.5px', color: 'var(--paper)' }}
                 >
                   {v.name}
                 </div>
                 <div
                   className="font-mono uppercase"
-                  style={{ fontSize: '9px', color: 'var(--amber-deep)', letterSpacing: '0.1em', opacity: 0.6 }}
+                  style={{ fontSize: '10px', color: 'var(--amber-deep)', letterSpacing: '0.1em', opacity: 0.6 }}
                 >
                   {v.type}
                 </div>

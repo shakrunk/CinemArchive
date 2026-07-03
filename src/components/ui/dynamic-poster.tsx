@@ -9,6 +9,8 @@ interface DynamicPosterProps {
   onClick?: () => void
   /** Render the full editorial face (title, meta, stars) inside the poster. */
   rich?: boolean
+  /** Hide the top-row category (Series/Film) + status badges — for contexts where they're redundant. */
+  hideBadges?: boolean
 }
 
 /* Moody, cinematic tints keyed off the title — never neon. */
@@ -64,7 +66,7 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export function DynamicPoster({ title, className, style, onClick, rich = false }: DynamicPosterProps) {
+export function DynamicPoster({ title, className, style, onClick, rich = false, hideBadges = false }: DynamicPosterProps) {
   const hasImage = Boolean(title.posterUrl)
   const tint = useMemo(() => TINTS[hashString(title.title) % TINTS.length], [title.title])
   const badge = STATUS_BADGE[title.status]
@@ -93,19 +95,21 @@ export function DynamicPoster({ title, className, style, onClick, rich = false }
 
       <div className="poster__face">
         {/* top row: category + status */}
-        <div className="relative z-[2] flex items-center justify-between">
-          <span className="font-mono text-[10px] tracking-[0.12em] uppercase text-white/60">
-            {title.type === 'tv' ? 'Series' : 'Film'}
-          </span>
-          <span
-            className={cn(
-              'inline-flex items-center px-2 py-[3px] rounded-full font-mono text-[9px] tracking-[0.1em] uppercase backdrop-blur-sm',
-              badge.cls
-            )}
-          >
-            {badge.label}
-          </span>
-        </div>
+        {!hideBadges && (
+          <div className="relative z-[2] flex items-center justify-between">
+            <span className="font-mono text-[10px] tracking-[0.12em] uppercase text-white/60">
+              {title.type === 'tv' ? 'Series' : 'Film'}
+            </span>
+            <span
+              className={cn(
+                'inline-flex items-center px-2 py-[3px] rounded-full font-mono text-[9px] tracking-[0.1em] uppercase backdrop-blur-sm',
+                badge.cls
+              )}
+            >
+              {badge.label}
+            </span>
+          </div>
+        )}
 
         {/* body */}
         {rich ? (

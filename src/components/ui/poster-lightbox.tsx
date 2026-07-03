@@ -33,7 +33,7 @@ export function PosterLightbox({ src, alt, onClose }: PosterLightboxProps) {
       aria-modal="true"
       aria-label={`${alt} poster`}
       className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.92)', zIndex: 60 }}
+      style={{ background: 'rgba(0,0,0,0.92)', zIndex: 215 }}
       onClick={onClose}
     >
       <button

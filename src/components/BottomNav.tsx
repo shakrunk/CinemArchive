@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { LayoutGrid, BarChart3, Plus, PlayCircle, Compass } from 'lucide-react'
+import { LayoutGrid, List, BarChart3, Plus, PlayCircle, Compass } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { AppView, NavItemId } from 'src/lib/navigation'
@@ -52,6 +52,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const openAddTitle = useAppStore((s) => s.openAddTitle)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const navPrefs = useAppStore((s) => s.navPrefs)
+  const viewMode = useAppStore((s) => s.viewMode)
 
   const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
   // Split around the central Add button, biasing an odd extra item to the left
@@ -97,7 +98,8 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {leftNav.map((id) => {
-          const { label, Icon } = NAV_META[id]
+          const { label, Icon: DefaultIcon } = NAV_META[id]
+          const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
           return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
         })}
 
@@ -114,7 +116,8 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         )}
 
         {rightNav.map((id) => {
-          const { label, Icon } = NAV_META[id]
+          const { label, Icon: DefaultIcon } = NAV_META[id]
+          const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
           return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
         })}
       </div>

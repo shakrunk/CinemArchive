@@ -61,24 +61,39 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const leftNav = visibleNav.slice(0, splitAt)
   const rightNav = visibleNav.slice(splitAt)
 
-  // Firefox Android positions fixed elements relative to the layout viewport,
-  // not the visual viewport, so the nav floats above the screen bottom when the
-  // browser toolbar hides. Track the visual viewport and compensate.
+  // Firefox Android (and Samsung Internet) position fixed elements relative to
+  // the layout viewport, not the visual viewport, so the nav floats above the
+  // screen bottom when the browser toolbar hides. Track the visual viewport
+  // and compensate.
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
 
+    let lastGap = -1
     function update() {
       const gap = Math.max(0, window.innerHeight - vv!.offsetTop - vv!.height)
+      if (gap === lastGap) return
+      lastGap = gap
       document.documentElement.style.setProperty('--vv-bottom', `${gap}px`)
     }
 
     update()
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
+    // Some engines fire a layout-viewport resize (toolbar collapse) without a
+    // matching visualViewport event — catch those too.
+    window.addEventListener('resize', update)
+    // Samsung Internet auto-hides its toolbar on page-content scroll without
+    // firing any of the above (the toolbar collapse is neither a visualViewport
+    // resize/scroll nor a window resize) — the gap goes stale, leaving the nav
+    // floating at its old toolbar-visible offset. Document scroll is the one
+    // event that reliably fires as that happens, so recompute there too.
+    window.addEventListener('scroll', update, { passive: true })
     return () => {
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update)
     }
   }, [])
 

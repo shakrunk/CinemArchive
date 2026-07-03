@@ -670,7 +670,8 @@
     }
   }
   .poster-wall .poster,
-  .discover-grid .discover-card {
+  .discover-grid .discover-card,
+  .upnext-grid > * {
     animation: poster-in 0.48s var(--ease) var(--poster-delay, 0ms) both;
   }
 
@@ -899,7 +900,7 @@
 .cinema-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 210;
   background: rgba(0, 0, 0, 0.78);
   transition: opacity 220ms ease;
 }
@@ -911,8 +912,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 51;
+  z-index: 211;
   max-height: 92vh;
+  /* vh resolves against the large (toolbar-hidden) viewport, so on browsers
+     with a visible address bar the modal can render taller than what's
+     actually on screen — pushing the close button (top-anchored) off the
+     visible area. dvh tracks the current viewport, keeping it reachable. */
+  max-height: 92dvh;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-top-left-radius: 1.25rem;

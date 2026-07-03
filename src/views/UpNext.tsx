@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { PlayCircle, Check, Undo2, Clock, Bookmark } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
@@ -9,20 +9,25 @@ import type { Title } from 'src/store/mockData'
 import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
 
 const UNDO_WINDOW_MS = 6000
+const MAX_ANIMATED = 24
 
 type PendingUndo = { seasonNumber: number; episodeNumber: number; watchEventId: string; label: string }
 type FinishedCard = { snapshot: UpNextEntry; undo: PendingUndo }
 
 // ─── Shared frame (poster + clickable title) ─────────────────────────────────
 
-function CardFrame({ title, onOpen, children }: { title: Title; onOpen: () => void; children: React.ReactNode }) {
+function CardFrame({ title, onOpen, children, delayMs }: { title: Title; onOpen: () => void; children: React.ReactNode; delayMs?: number }) {
   return (
     <div
       className="flex gap-4 rounded-xl p-3 sm:p-4"
-      style={{ border: '1px solid var(--line)', background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))' }}
+      style={{
+        border: '1px solid var(--line)',
+        background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))',
+        ...(delayMs !== undefined ? { ['--poster-delay' as string]: `${delayMs}ms` } : {}),
+      }}
     >
       <button onClick={onOpen} className="w-16 sm:w-20 shrink-0" aria-label={`Open ${title.title}`}>
-        <DynamicPoster title={title} />
+        <DynamicPoster title={title} hideBadges />
       </button>
       <div className="flex-1 min-w-0 flex flex-col">
         <button onClick={onOpen} className="text-left">
@@ -70,7 +75,7 @@ function EmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
 
 // ─── Live (in-progress) card ─────────────────────────────────────────────────
 
-function LiveCard({ entry, onFinale }: { entry: UpNextEntry; onFinale: (snapshot: UpNextEntry, undo: PendingUndo) => void }) {
+function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: (snapshot: UpNextEntry, undo: PendingUndo) => void; delayMs?: number }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const logNextEpisodeWatch = useAppStore((s) => s.logNextEpisodeWatch)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
@@ -130,7 +135,7 @@ function LiveCard({ entry, onFinale }: { entry: UpNextEntry; onFinale: (snapshot
   }
 
   return (
-    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)}>
+    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
       <p className="font-mono text-xs text-amber mt-0.5">S{season.seasonNumber} E{episode.episodeNumber} · Next</p>
       <p className="font-sans text-sm text-paper-dim truncate">{epName}</p>
       <div className="mt-auto pt-3">
@@ -163,7 +168,7 @@ function LiveCard({ entry, onFinale }: { entry: UpNextEntry; onFinale: (snapshot
 
 // ─── Caught-up (just-finished) card ──────────────────────────────────────────
 
-function CaughtUpCard({ snapshot, undo, onDismiss }: { snapshot: UpNextEntry; undo: PendingUndo; onDismiss: (titleId: string) => void }) {
+function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNextEntry; undo: PendingUndo; onDismiss: (titleId: string) => void; delayMs?: number }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
   const updateTitle = useAppStore((s) => s.updateTitle)
@@ -190,7 +195,7 @@ function CaughtUpCard({ snapshot, undo, onDismiss }: { snapshot: UpNextEntry; un
   }
 
   return (
-    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)}>
+    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
       <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
         <Check className="w-3.5 h-3.5" /> All caught up
       </p>
@@ -216,11 +221,11 @@ function formatReleaseDate(iso: string): string {
   return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
-function UpcomingCard({ entry }: { entry: UpcomingEntry }) {
+function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: number }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const { title, releaseDate } = entry
   return (
-    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)}>
+    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
       {releaseDate ? (
         <>
           <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
@@ -263,6 +268,19 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
 
   const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0
 
+  const totalCards = shows.length + finishedToShow.length + availableWatchlist.length + comingSoon.length
+  const delays = useMemo(() => {
+    const n = Math.min(totalCards, MAX_ANIMATED)
+    // Evenly-spaced delay slots shuffled into random order (matches Library/Discover)
+    const slots = Array.from({ length: n }, (_, i) => i * 15)
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]]
+    }
+    return [...slots, ...new Array(Math.max(0, totalCards - MAX_ANIMATED)).fill(0)]
+  }, [totalCards])
+  let cardIndex = 0
+
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
       <header className="mb-6">
@@ -272,12 +290,12 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
       {isEmpty ? (
         <EmptyState onBrowseLibrary={onBrowseLibrary} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="upnext-grid grid grid-cols-1 sm:grid-cols-2 gap-3">
           {shows.map((entry) => (
-            <LiveCard key={entry.title.id} entry={entry} onFinale={handleFinale} />
+            <LiveCard key={entry.title.id} entry={entry} onFinale={handleFinale} delayMs={delays[cardIndex++]} />
           ))}
           {finishedToShow.map((c) => (
-            <CaughtUpCard key={c.snapshot.title.id} snapshot={c.snapshot} undo={c.undo} onDismiss={dismissFinished} />
+            <CaughtUpCard key={c.snapshot.title.id} snapshot={c.snapshot} undo={c.undo} onDismiss={dismissFinished} delayMs={delays[cardIndex++]} />
           ))}
           {availableWatchlist.length > 0 && (
             <>
@@ -285,7 +303,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
                 <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">On your watchlist</p>
               )}
               {availableWatchlist.map((entry) => (
-                <UpcomingCard key={entry.title.id} entry={entry} />
+                <UpcomingCard key={entry.title.id} entry={entry} delayMs={delays[cardIndex++]} />
               ))}
             </>
           )}
@@ -295,7 +313,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
                 <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
               )}
               {comingSoon.map((entry) => (
-                <UpcomingCard key={entry.title.id} entry={entry} />
+                <UpcomingCard key={entry.title.id} entry={entry} delayMs={delays[cardIndex++]} />
               ))}
             </>
           )}

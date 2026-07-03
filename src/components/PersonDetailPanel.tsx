@@ -53,7 +53,7 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
       aria-modal="true"
       aria-label={`${person.name} details`}
       className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.82)', zIndex: 60 }}
+      style={{ background: 'rgba(0,0,0,0.82)', zIndex: 215 }}
       onClick={onClose}
     >
       <div

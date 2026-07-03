@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { GripVertical, Eye, EyeOff, Pencil, Check } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { RadialRing, areaPath, getInitials, linePath, ratingColorVar } from 'src/components/LedgerCharts'
-import type { LedgerPanelId } from 'src/lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth } from 'src/lib/ledgerPanels'
+import { LEDGER_PANEL_LABELS, LEDGER_PANEL_WIDTH_ORDER, LEDGER_PANEL_WIDTH_LABELS } from 'src/lib/ledgerPanels'
 
 // ─── Dashboard hero ───────────────────────────────────────────────────────────
 
@@ -796,33 +798,193 @@ function EncorePerformances({ className }: { className?: string }) {
 
 // ─── Ledger View ─────────────────────────────────────────────────────────────
 
-// Each panel keeps its editorial column width regardless of order — only
-// which panels show and in what sequence is user-customizable (Settings →
-// Ledger Layout), matching the reorder/hide (not resize) scope of nav prefs.
-const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: { className?: string }) => React.ReactElement | null; className: string }> = {
-  activity: { Component: ActivityHeatmap, className: 'col-span-12 lg:col-span-8' },
-  encores: { Component: EncorePerformances, className: 'col-span-12 lg:col-span-4' },
-  run: { Component: TheRun, className: 'col-span-12' },
-  ratings: { Component: RatingDistribution, className: 'col-span-12 lg:col-span-5' },
-  genres: { Component: GenreBars, className: 'col-span-12 lg:col-span-7' },
-  decades: { Component: DecadeFilmstrip, className: 'col-span-12' },
-  auteurs: { Component: TheAuteurs, className: 'col-span-12 lg:col-span-6' },
-  ensemble: { Component: TheEnsemble, className: 'col-span-12 lg:col-span-6' },
+const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: { className?: string }) => React.ReactElement | null }> = {
+  activity: { Component: ActivityHeatmap },
+  encores: { Component: EncorePerformances },
+  run: { Component: TheRun },
+  ratings: { Component: RatingDistribution },
+  genres: { Component: GenreBars },
+  decades: { Component: DecadeFilmstrip },
+  auteurs: { Component: TheAuteurs },
+  ensemble: { Component: TheEnsemble },
+}
+
+// Grid column span per width preset — panels are always full-width below `lg`.
+const WIDTH_GRID_CLASSES: Record<LedgerPanelWidth, string> = {
+  sm: 'col-span-12 lg:col-span-4',
+  md: 'col-span-12 lg:col-span-6',
+  lg: 'col-span-12 lg:col-span-8',
+  full: 'col-span-12',
+}
+
+interface LedgerDragMeta {
+  id: LedgerPanelId
+  startX: number
+  startY: number
 }
 
 export function Ledger() {
   const ledgerPrefs = useAppStore((s) => s.ledgerPrefs)
+  const moveLedgerPanel = useAppStore((s) => s.moveLedgerPanel)
+  const reorderLedgerPanels = useAppStore((s) => s.reorderLedgerPanels)
+  const toggleLedgerPanelHidden = useAppStore((s) => s.toggleLedgerPanelHidden)
+  const setLedgerPanelWidth = useAppStore((s) => s.setLedgerPanelWidth)
+  const friendView = useAppStore((s) => s.friendView)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const canEdit = !friendView && !isSharedView
+
+  const [editing, setEditing] = useState(false)
+  const itemRefs = useRef(new Map<LedgerPanelId, HTMLDivElement>())
+  const dragStartRef = useRef({ x: 0, y: 0 })
+  const [dragMeta, setDragMeta] = useState<LedgerDragMeta | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [overId, setOverId] = useState<LedgerPanelId | null>(null)
+
   const visiblePanels = ledgerPrefs.order.filter((id) => !ledgerPrefs.hidden.includes(id))
+  const panelsToRender = editing ? ledgerPrefs.order : visiblePanels
+
+  function handleDragStart(e: React.PointerEvent<HTMLButtonElement>, id: LedgerPanelId) {
+    dragStartRef.current = { x: e.clientX, y: e.clientY }
+    setDragMeta({ id, startX: e.clientX, startY: e.clientY })
+    setDragOffset({ x: 0, y: 0 })
+    setOverId(null)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleDragMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragMeta) return
+    setDragOffset({ x: e.clientX - dragStartRef.current.x, y: e.clientY - dragStartRef.current.y })
+    let hit: LedgerPanelId | null = null
+    for (const [id, el] of itemRefs.current) {
+      if (id === dragMeta.id) continue
+      const rect = el.getBoundingClientRect()
+      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        hit = id
+        break
+      }
+    }
+    setOverId(hit)
+  }
+
+  function endDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragMeta) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    if (overId && overId !== dragMeta.id) {
+      const next = [...ledgerPrefs.order]
+      const from = next.indexOf(dragMeta.id)
+      const to = next.indexOf(overId)
+      next.splice(from, 1)
+      next.splice(to, 0, dragMeta.id)
+      reorderLedgerPanels(next)
+    }
+    setDragMeta(null)
+    setDragOffset({ x: 0, y: 0 })
+    setOverId(null)
+  }
+
+  function handleGripKeyDown(e: React.KeyboardEvent, id: LedgerPanelId) {
+    if (e.key === 'ArrowUp') { e.preventDefault(); moveLedgerPanel(id, 'up') }
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveLedgerPanel(id, 'down') }
+  }
+
+  function cycleWidth(id: LedgerPanelId) {
+    const idx = LEDGER_PANEL_WIDTH_ORDER.indexOf(ledgerPrefs.widths[id])
+    setLedgerPanelWidth(id, LEDGER_PANEL_WIDTH_ORDER[(idx + 1) % LEDGER_PANEL_WIDTH_ORDER.length])
+  }
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
-      <DashHero />
+      <div className="flex items-start justify-between gap-4">
+        <DashHero />
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setEditing((e) => !e)}
+            className={cn(
+              'shrink-0 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 mt-1 text-xs font-sans border transition-colors',
+              editing ? 'border-amber/40 bg-amber/10 text-amber' : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-[var(--line-2)]'
+            )}
+          >
+            {editing ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+            {editing ? 'Done' : 'Edit layout'}
+          </button>
+        )}
+      </div>
       <StatRibbon />
 
       <div className="grid grid-cols-12 gap-4">
-        {visiblePanels.map((id) => {
-          const { Component, className } = PANEL_REGISTRY[id]
-          return <Component key={id} className={className} />
+        {panelsToRender.map((id) => {
+          const { Component } = PANEL_REGISTRY[id]
+          const hidden = ledgerPrefs.hidden.includes(id)
+          const width = ledgerPrefs.widths[id]
+          const isDragging = dragMeta?.id === id
+          const isOver = editing && overId === id && !isDragging
+
+          return (
+            <div
+              key={id}
+              ref={(el) => {
+                if (el) itemRefs.current.set(id, el)
+                else itemRefs.current.delete(id)
+              }}
+              className={cn('relative flex flex-col', WIDTH_GRID_CLASSES[width])}
+              style={{
+                transform: isDragging ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined,
+                transition: isDragging ? 'none' : 'transform 180ms ease',
+                zIndex: isDragging ? 20 : undefined,
+                outline: isOver ? '2px dashed var(--amber)' : undefined,
+                outlineOffset: isOver ? '2px' : undefined,
+                borderRadius: isOver ? '0.75rem' : undefined,
+                boxShadow: isDragging ? '0 20px 50px -12px rgba(0,0,0,0.6)' : undefined,
+              }}
+            >
+              {editing && (
+                <div className="flex items-center justify-between gap-2 mb-2 px-0.5">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-paper-faint truncate">
+                    {LEDGER_PANEL_LABELS[id]}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => cycleWidth(id)}
+                      aria-label={`Resize ${LEDGER_PANEL_LABELS[id]} — currently ${LEDGER_PANEL_WIDTH_LABELS[width]}`}
+                      className="font-mono text-[10px] w-7 h-7 rounded-md border border-[var(--line)] text-paper-faint hover:text-amber hover:border-amber/30 transition-colors"
+                    >
+                      {LEDGER_PANEL_WIDTH_LABELS[width]}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleLedgerPanelHidden(id)}
+                      aria-pressed={!hidden}
+                      aria-label={hidden ? `Show ${LEDGER_PANEL_LABELS[id]} on the Ledger` : `Hide ${LEDGER_PANEL_LABELS[id]} from the Ledger`}
+                      className={cn(
+                        'w-7 h-7 rounded-md border flex items-center justify-center',
+                        hidden ? 'text-muted-foreground border-[var(--line)]' : 'text-amber border-amber/30 bg-amber/5'
+                      )}
+                    >
+                      {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onPointerDown={(e) => handleDragStart(e, id)}
+                      onPointerMove={handleDragMove}
+                      onPointerUp={endDrag}
+                      onPointerCancel={endDrag}
+                      onKeyDown={(e) => handleGripKeyDown(e, id)}
+                      aria-label={`Reorder ${LEDGER_PANEL_LABELS[id]} — drag, or use arrow keys`}
+                      className="w-7 h-7 rounded-md border border-[var(--line)] flex items-center justify-center text-paper-faint hover:text-amber hover:border-amber/30 cursor-grab active:cursor-grabbing transition-colors"
+                      style={{ touchAction: 'none' }}
+                    >
+                      <GripVertical className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className={cn('flex-1', editing && 'pointer-events-none', editing && hidden && 'opacity-40')}>
+                <Component className="h-full" />
+              </div>
+            </div>
+          )
         })}
       </div>
     </div>

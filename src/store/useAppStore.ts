@@ -8,8 +8,8 @@ import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type Upcom
 import type { User } from '@supabase/supabase-js'
 import type { AppView, NavItemId } from '../lib/navigation'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
-import type { LedgerPanelId } from '../lib/ledgerPanels'
-import { DEFAULT_LEDGER_PANEL_ORDER } from '../lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth } from '../lib/ledgerPanels'
+import { DEFAULT_LEDGER_PANEL_ORDER, DEFAULT_LEDGER_PANEL_WIDTHS } from '../lib/ledgerPanels'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
@@ -39,6 +39,7 @@ export interface NavPrefs {
 export interface LedgerPrefs {
   order: LedgerPanelId[]
   hidden: LedgerPanelId[]
+  widths: Record<LedgerPanelId, LedgerPanelWidth>
 }
 
 /** A cast/crew person, keyed by TMDB id with a display name. */
@@ -138,6 +139,7 @@ interface UISlice {
   moveLedgerPanel: (id: LedgerPanelId, direction: 'up' | 'down') => void
   reorderLedgerPanels: (order: LedgerPanelId[]) => void
   toggleLedgerPanelHidden: (id: LedgerPanelId) => void
+  setLedgerPanelWidth: (id: LedgerPanelId, width: LedgerPanelWidth) => void
   resetLedgerPrefs: () => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
@@ -205,6 +207,7 @@ const defaultNavPrefs: NavPrefs = {
 const defaultLedgerPrefs: LedgerPrefs = {
   order: DEFAULT_LEDGER_PANEL_ORDER,
   hidden: [],
+  widths: DEFAULT_LEDGER_PANEL_WIDTHS,
 }
 
 // ─── Default Filters ────────────────────────────────────────────────────────
@@ -692,6 +695,9 @@ export const useAppStore = create<AppStore>()(
       return { ledgerPrefs: { ...s.ledgerPrefs, hidden } }
     }),
 
+  setLedgerPanelWidth: (id, width) =>
+    set((s) => ({ ledgerPrefs: { ...s.ledgerPrefs, widths: { ...s.ledgerPrefs.widths, [id]: width } } })),
+
   resetLedgerPrefs: () => set({ ledgerPrefs: defaultLedgerPrefs }),
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
@@ -948,6 +954,8 @@ export const useAppStore = create<AppStore>()(
         if (!state) return
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)
+        // Older persisted payloads predate per-panel widths — backfill any missing ones.
+        state.ledgerPrefs.widths = { ...DEFAULT_LEDGER_PANEL_WIDTHS, ...state.ledgerPrefs.widths }
       },
     }
   )

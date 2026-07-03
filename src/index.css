@@ -914,6 +914,11 @@
   bottom: 0;
   z-index: 211;
   max-height: 92vh;
+  /* vh resolves against the large (toolbar-hidden) viewport, so on browsers
+     with a visible address bar the modal can render taller than what's
+     actually on screen — pushing the close button (top-anchored) off the
+     visible area. dvh tracks the current viewport, keeping it reachable. */
+  max-height: 92dvh;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-top-left-radius: 1.25rem;

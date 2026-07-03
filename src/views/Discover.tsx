@@ -508,11 +508,9 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
                       <p className="font-sans font-semibold text-[11px] leading-tight line-clamp-2" style={{ color: 'var(--paper)' }}>
                         {c.name}
                       </p>
-                      {c.character && (
-                        <p className="font-mono text-[9px] line-clamp-1 mt-0.5" style={{ color: 'var(--paper-faint)', opacity: 0.6 }}>
-                          {c.character}
-                        </p>
-                      )}
+                      <p className="font-mono text-[9px] line-clamp-1 mt-0.5" style={{ color: 'var(--paper-faint)', opacity: c.character ? 0.6 : 0 }}>
+                        {c.character || ' '}
+                      </p>
                     </div>
                   </div>
                 ))}

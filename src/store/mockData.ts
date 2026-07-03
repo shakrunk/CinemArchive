@@ -101,6 +101,7 @@ export interface Title {
   originalLanguage?: string  // ISO 639-1 code, e.g. "en", "ja"
   contentRating?: string  // age certification, e.g. "PG-13", "TV-MA"
   imdbId?: string  // e.g. "tt1375666" — enables an exact IMDb link
+  customWatchUrl?: string  // owner override for "where to watch", shown preferentially in shared views
   viewings: Viewing[]
   imdbRating?: number
   rtScore?: number

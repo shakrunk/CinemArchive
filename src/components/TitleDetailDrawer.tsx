@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
-import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, type TitleVideo } from 'src/lib/media'
+import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb, sendRecommendation } from 'src/lib/db'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from 'src/components/ui/dropdown-menu'
@@ -38,6 +38,7 @@ import { MatrixDigitalRain } from 'src/components/MatrixDigitalRain'
 import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
 import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
 import { TrailerRow } from 'src/components/ui/trailer-row'
+import { WatchProvidersSection } from 'src/components/ui/watch-providers'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 
@@ -918,6 +919,7 @@ export function TitleDetailDrawer() {
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
   const [videos, setVideos] = useState<TitleVideo[]>([])
+  const [watchProviders, setWatchProviders] = useState<WatchProviders | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [heroBackdropUrl, setHeroBackdropUrl] = useState<string | null>(null)
 
@@ -934,6 +936,18 @@ export function TitleDetailDrawer() {
     let cancelled = false
     fetchTitleVideos(title.tmdbId, title.type).then((v) => {
       if (!cancelled) setVideos(v)
+    })
+    return () => { cancelled = true }
+  }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
+
+  useEffect(() => {
+    if (!isDetailDrawerOpen || !title?.tmdbId) {
+      const t = setTimeout(() => setWatchProviders(null), 0)
+      return () => clearTimeout(t)
+    }
+    let cancelled = false
+    fetchWatchProviders(title.tmdbId, title.type).then((wp) => {
+      if (!cancelled) setWatchProviders(wp)
     })
     return () => { cancelled = true }
   }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
@@ -1427,6 +1441,14 @@ export function TitleDetailDrawer() {
 
               {/* External links */}
               <ExternalLinks media={title} />
+
+              {/* Where to watch */}
+              <WatchProvidersSection
+                providers={watchProviders}
+                customUrl={title.customWatchUrl}
+                isSharedView={isSharedView}
+                onSaveCustomUrl={(url) => updateTitle(title.id, { customWatchUrl: url })}
+              />
             </div>
           </div>
 

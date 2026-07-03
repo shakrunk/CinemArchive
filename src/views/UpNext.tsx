@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { PlayCircle, Check, Undo2, Clock } from 'lucide-react'
+import { PlayCircle, Check, Undo2, Clock, Bookmark } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -210,7 +210,7 @@ function CaughtUpCard({ snapshot, undo, onDismiss }: { snapshot: UpNextEntry; un
   )
 }
 
-// ─── Upcoming (unreleased watchlist) card ────────────────────────────────────
+// ─── Watchlist card (available now, or upcoming/unreleased) ──────────────────
 
 function formatReleaseDate(iso: string): string {
   const [year, month, day] = iso.split('-').map(Number)
@@ -222,10 +222,18 @@ function UpcomingCard({ entry }: { entry: UpcomingEntry }) {
   const { title, releaseDate } = entry
   return (
     <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)}>
-      <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
-        <Clock className="w-3.5 h-3.5" /> Upcoming
-      </p>
-      <p className="font-sans text-sm text-paper-dim">Releases {formatReleaseDate(releaseDate)}</p>
+      {releaseDate ? (
+        <>
+          <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" /> Upcoming
+          </p>
+          <p className="font-sans text-sm text-paper-dim">Releases {formatReleaseDate(releaseDate)}</p>
+        </>
+      ) : (
+        <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
+          <Bookmark className="w-3.5 h-3.5" /> On your watchlist
+        </p>
+      )}
     </CardFrame>
   )
 }
@@ -250,6 +258,10 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const liveIds = new Set(shows.map((s) => s.title.id))
   const finishedToShow = finished.filter((c) => !liveIds.has(c.snapshot.title.id))
 
+  const availableWatchlist = upcoming.filter((e) => !e.releaseDate)
+  const comingSoon = upcoming.filter((e) => e.releaseDate)
+  const hasLiveSection = shows.length > 0 || finishedToShow.length > 0
+
   const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0
 
   return (
@@ -268,12 +280,22 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {finishedToShow.map((c) => (
             <CaughtUpCard key={c.snapshot.title.id} snapshot={c.snapshot} undo={c.undo} onDismiss={dismissFinished} />
           ))}
-          {upcoming.length > 0 && (
+          {availableWatchlist.length > 0 && (
             <>
-              {(shows.length > 0 || finishedToShow.length > 0) && (
+              {hasLiveSection && (
+                <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">On your watchlist</p>
+              )}
+              {availableWatchlist.map((entry) => (
+                <UpcomingCard key={entry.title.id} entry={entry} />
+              ))}
+            </>
+          )}
+          {comingSoon.length > 0 && (
+            <>
+              {(hasLiveSection || availableWatchlist.length > 0) && (
                 <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
               )}
-              {upcoming.map((entry) => (
+              {comingSoon.map((entry) => (
                 <UpcomingCard key={entry.title.id} entry={entry} />
               ))}
             </>

@@ -31,10 +31,14 @@ export async function registerPasskey() {
 /** Authenticate using a passkey (WebAuthn assertion). */
 export async function signInWithPasskey(email: string) {
   // Phase 1: initiate the challenge
+  // shouldCreateUser: false — this app is invite-only. Accounts are created
+  // exclusively by the redeem-invite Edge Function (see redeemInvite below);
+  // an unknown email must never silently become a new account here.
   const { data: challengeData, error: challengeError } =
     await getClient().auth.signInWithOtp({
       email,
       options: {
+        shouldCreateUser: false,
         emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
       },
     })
@@ -45,9 +49,11 @@ export async function signInWithPasskey(email: string) {
 
 /** Sign in with email magic link (fallback when passkey unavailable). */
 export async function signInWithEmail(email: string) {
+  // shouldCreateUser: false — see signInWithPasskey above.
   const { data, error } = await getClient().auth.signInWithOtp({
     email,
     options: {
+      shouldCreateUser: false,
       emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
     },
   })
@@ -111,6 +117,64 @@ export async function listSharedKeys() {
     .order('created_at', { ascending: false })
   if (error) throw error
   return data
+}
+
+// ─── Invite-only signup ─────────────────────────────────────────────────────
+
+export interface InviteCode {
+  id: string
+  code: string
+  created_at: string
+  redeemed_by: string | null
+  redeemed_at: string | null
+}
+
+/** Generate and persist a new invite code for the current user.
+ *  Throws (via the `invite_codes: capped insert` RLS policy) once a
+ *  non-owner account has already created 2 codes. */
+export async function createInviteCode(): Promise<InviteCode> {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not signed in.')
+  const code = crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()
+  const { data, error } = await getClient()
+    .from('invite_codes')
+    .insert({ code, created_by: user.id })
+    .select()
+    .single()
+  if (error) {
+    if (error.code === '23505') throw new Error('That code collided — please try again.')
+    if (error.code === '42501') throw new Error("You've used both of your invites.")
+    throw error
+  }
+  return data
+}
+
+/** List invite codes created by the current user, newest first. */
+export async function listMyInviteCodes(): Promise<InviteCode[]> {
+  const { data, error } = await getClient()
+    .from('invite_codes')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+/** Delete an unredeemed invite code (frees up the cap slot it was using). */
+export async function deleteInviteCode(id: string): Promise<void> {
+  const { error } = await getClient().from('invite_codes').delete().eq('id', id)
+  if (error) throw error
+}
+
+/** Redeem an invite code for a brand-new account. On success, the email is
+ *  now a known user — follow up with signInWithEmail/signInWithPasskey to
+ *  actually log in. */
+export async function redeemInvite(email: string, code: string): Promise<void> {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('redeem-invite', {
+    body: { email, code },
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
 }
 
 // ─── Own profile ─────────────────────────────────────────────────────────────

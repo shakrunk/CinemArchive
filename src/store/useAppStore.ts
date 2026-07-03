@@ -8,6 +8,8 @@ import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type Upcom
 import type { User } from '@supabase/supabase-js'
 import type { AppView, NavItemId } from '../lib/navigation'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
+import type { LedgerPanelId } from '../lib/ledgerPanels'
+import { DEFAULT_LEDGER_PANEL_ORDER } from '../lib/ledgerPanels'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
@@ -30,6 +32,13 @@ export interface NavPrefs {
   order: NavItemId[]
   hidden: NavItemId[]
   compact: boolean
+}
+
+/** Ledger dashboard panel layout preferences — order + hidden apply to the
+ *  panel grid rendered by Ledger.tsx. */
+export interface LedgerPrefs {
+  order: LedgerPanelId[]
+  hidden: LedgerPanelId[]
 }
 
 /** A cast/crew person, keyed by TMDB id with a display name. */
@@ -104,6 +113,7 @@ interface UISlice {
   // 'dark' and 'light'.
   unlockedThemes: Theme[]
   navPrefs: NavPrefs
+  ledgerPrefs: LedgerPrefs
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
@@ -125,6 +135,10 @@ interface UISlice {
   toggleNavItemHidden: (id: NavItemId) => void
   setNavCompact: (compact: boolean) => void
   resetNavPrefs: () => void
+  moveLedgerPanel: (id: LedgerPanelId, direction: 'up' | 'down') => void
+  reorderLedgerPanels: (order: LedgerPanelId[]) => void
+  toggleLedgerPanelHidden: (id: LedgerPanelId) => void
+  resetLedgerPrefs: () => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
   openAddTitlePreselected: (result: SearchResult) => void
@@ -186,6 +200,11 @@ const defaultNavPrefs: NavPrefs = {
   order: DEFAULT_NAV_ORDER,
   hidden: [],
   compact: false,
+}
+
+const defaultLedgerPrefs: LedgerPrefs = {
+  order: DEFAULT_LEDGER_PANEL_ORDER,
+  hidden: [],
 }
 
 // ─── Default Filters ────────────────────────────────────────────────────────
@@ -601,6 +620,7 @@ export const useAppStore = create<AppStore>()(
   theme: 'dark',
   unlockedThemes: ['dark', 'light'],
   navPrefs: defaultNavPrefs,
+  ledgerPrefs: defaultLedgerPrefs,
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
@@ -648,6 +668,31 @@ export const useAppStore = create<AppStore>()(
   setNavCompact: (compact) => set((s) => ({ navPrefs: { ...s.navPrefs, compact } })),
 
   resetNavPrefs: () => set({ navPrefs: defaultNavPrefs }),
+
+  moveLedgerPanel: (id, direction) =>
+    set((s) => {
+      const order = [...s.ledgerPrefs.order]
+      const idx = order.indexOf(id)
+      const swapWith = direction === 'up' ? idx - 1 : idx + 1
+      if (idx === -1 || swapWith < 0 || swapWith >= order.length) return {}
+      ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
+      return { ledgerPrefs: { ...s.ledgerPrefs, order } }
+    }),
+
+  reorderLedgerPanels: (order) => set((s) => ({ ledgerPrefs: { ...s.ledgerPrefs, order } })),
+
+  toggleLedgerPanelHidden: (id) =>
+    set((s) => {
+      const isHidden = s.ledgerPrefs.hidden.includes(id)
+      const hidden = isHidden
+        ? s.ledgerPrefs.hidden.filter((x) => x !== id)
+        : [...s.ledgerPrefs.hidden, id]
+      // Keep at least one panel visible.
+      if (!isHidden && hidden.length >= s.ledgerPrefs.order.length) return {}
+      return { ledgerPrefs: { ...s.ledgerPrefs, hidden } }
+    }),
+
+  resetLedgerPrefs: () => set({ ledgerPrefs: defaultLedgerPrefs }),
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -896,6 +941,7 @@ export const useAppStore = create<AppStore>()(
         theme: s.theme,
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,
+        ledgerPrefs: s.ledgerPrefs,
         activityFeedLastSeenAt: s.activityFeedLastSeenAt,
       }),
       onRehydrateStorage: () => (state) => {

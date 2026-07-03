@@ -39,10 +39,9 @@ import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
 import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
 import { TrailerRow } from 'src/components/ui/trailer-row'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
+import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 
 const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
-const SPIDER_NOIR_TMDB_ID = 220102
-const THE_MATRIX_TMDB_ID = 603
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
 const SPIDER_NOIR_LOGO_NORMAL = 'https://image.tmdb.org/t/p/original/o2D8loRUDlEuOf7BMRgulerNJ6p.png'

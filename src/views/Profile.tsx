@@ -39,6 +39,7 @@ import {
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
+import { isThemeDiscovered } from 'src/lib/easterEggThemes'
 
 // ─── Shared bits ──────────────────────────────────────────────────────────────
 
@@ -447,6 +448,7 @@ function AppearanceSection() {
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
   const unlockedThemes = useAppStore((s) => s.unlockedThemes)
+  const titles = useAppStore((s) => s.titles)
 
   function choose(next: Theme) {
     if (next === theme) return
@@ -473,6 +475,17 @@ function AppearanceSection() {
     },
   ]
 
+  // Secret themes stay off this list entirely until their linked title has
+  // been added to the library somehow — they're easter eggs to stumble on,
+  // not a spoiler list of "locked" cards.
+  const visibleOptions = options.filter(
+    ({ value }) =>
+      value === 'dark' ||
+      value === 'light' ||
+      unlockedThemes.includes(value) ||
+      isThemeDiscovered(value as 'noir' | 'matrix', titles)
+  )
+
   return (
     <Section
       id="appearance"
@@ -481,7 +494,7 @@ function AppearanceSection() {
       description="Pick a house style. You can also flip dark/light any time with the T key or the toggle in the top bar. A couple of styles are secret — find them by watching the right films the right way."
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
-        {options.map(({ value, label, hint, Icon, lockedHint }) => {
+        {visibleOptions.map(({ value, label, hint, Icon, lockedHint }) => {
           const locked = !unlockedThemes.includes(value)
           return (
             <button

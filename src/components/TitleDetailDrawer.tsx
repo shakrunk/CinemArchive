@@ -212,13 +212,29 @@ interface CastCrewSectionProps {
 }
 
 function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: CastCrewSectionProps) {
+  const [expanded, setExpanded] = useState(true)
   const hasCast = cast && cast.length > 0
   const hasCrew = crew && crew.length > 0
   const hasStudios = studios && studios.length > 0
   if (!hasCast && !hasCrew && !hasStudios) return null
 
   return (
-    <div className="space-y-4">
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+        className="flex items-center gap-2 mb-4 group focus:outline-none"
+      >
+        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim group-hover:text-amber transition-colors">
+          Cast &amp; Crew
+        </h4>
+        <ChevronDown
+          className={cn('w-3.5 h-3.5 text-paper-faint transition-transform group-hover:text-amber', expanded ? 'rotate-180' : '')}
+        />
+      </button>
+      {expanded && (
+      <div className="space-y-4">
       {hasCast && (
         <div>
           <div
@@ -339,6 +355,8 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
             </div>
           )}
         </div>
+      )}
+      </div>
       )}
     </div>
   )
@@ -1423,18 +1441,13 @@ export function TitleDetailDrawer() {
 
           {/* Cast & Crew */}
           {(title.cast?.length || title.crew?.length || title.studios?.length) ? (
-            <div>
-              <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
-                Cast &amp; Crew
-              </h4>
-              <CastCrewSection
-                cast={title.cast}
-                crew={title.crew}
-                studios={title.studios}
-                onPersonClick={setActivePerson}
-                onStudioClick={browseByStudio}
-              />
-            </div>
+            <CastCrewSection
+              cast={title.cast}
+              crew={title.crew}
+              studios={title.studios}
+              onPersonClick={setActivePerson}
+              onStudioClick={browseByStudio}
+            />
           ) : null}
 
           {/* ── TV Series section ───────────────────────────────────── */}

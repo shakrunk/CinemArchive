@@ -51,7 +51,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
       <div className="max-w-[1500px] mx-auto flex items-center gap-3 sm:gap-6 px-4 sm:px-8 py-3.5">
         {/* Brand */}
         <div className="flex items-center gap-3 shrink-0 select-none">
-          <ReelMark className="w-[30px] h-[30px] text-amber animate-spin-slow drop-shadow-[0_0_10px_rgba(233,178,102,0.5)]" />
+          <ReelMark className="w-[30px] h-[30px] text-amber animate-spin-slow drop-shadow-[0_0_10px_rgb(var(--amber-rgb)/0.5)]" />
           <div className="hidden sm:flex flex-col leading-[1.05]">
             <span
               className="font-serif text-xl font-semibold text-paper tracking-tight"
@@ -118,7 +118,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                 onClick={() => setViewMode('grid')}
                 className={cn(
                   'icon-btn w-8 h-8',
-                  viewMode === 'grid' && '!text-amber-bright bg-[rgba(233,178,102,0.12)]'
+                  viewMode === 'grid' && '!text-amber-bright bg-amber/12'
                 )}
                 aria-label="Poster wall"
               >
@@ -128,7 +128,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                 onClick={() => setViewMode('list')}
                 className={cn(
                   'icon-btn w-8 h-8',
-                  viewMode === 'list' && '!text-amber-bright bg-[rgba(233,178,102,0.12)]'
+                  viewMode === 'list' && '!text-amber-bright bg-amber/12'
                 )}
                 aria-label="Ledger list"
               >

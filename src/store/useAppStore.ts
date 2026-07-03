@@ -21,7 +21,7 @@ import type { SearchResult } from '../lib/media'
 export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
-export type Theme = 'dark' | 'light'
+export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
 
 /** A cast/crew person, keyed by TMDB id with a display name. */
 export interface PersonRef {
@@ -90,6 +90,10 @@ interface LedgerSlice {
 interface UISlice {
   viewMode: ViewMode
   theme: Theme
+  // Themes beyond dark/light are locked until earned via an in-app easter egg
+  // (e.g. Spider-Noir black & white, The Matrix red pill). Always includes
+  // 'dark' and 'light'.
+  unlockedThemes: Theme[]
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
@@ -104,6 +108,8 @@ interface UISlice {
 
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
+  // No-op if already unlocked or the theme is dark/light (always unlocked).
+  unlockTheme: (theme: Theme) => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
   openAddTitlePreselected: (result: SearchResult) => void
@@ -570,6 +576,7 @@ export const useAppStore = create<AppStore>()(
   // ── UI ─────────────────────────────────────────────────────
   viewMode: 'grid',
   theme: 'dark',
+  unlockedThemes: ['dark', 'light'],
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
@@ -578,6 +585,18 @@ export const useAppStore = create<AppStore>()(
   setViewMode: (viewMode) => set({ viewMode }),
 
   setTheme: (theme) => set({ theme }),
+
+  unlockTheme: (theme) => {
+    if (theme === 'dark' || theme === 'light') return
+    if (get().unlockedThemes.includes(theme)) return
+    set((s) => ({ unlockedThemes: [...s.unlockedThemes, theme] }))
+    const label = theme === 'noir' ? 'Spider-Man Noir' : 'The Construct'
+    get().pushNotification({
+      message: `New theme unlocked: "${label}" — pick it in Settings → Appearance.`,
+      kind: 'tip',
+      autoClose: 6000,
+    })
+  },
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -824,6 +843,7 @@ export const useAppStore = create<AppStore>()(
         filters: s.filters,
         viewMode: s.viewMode,
         theme: s.theme,
+        unlockedThemes: s.unlockedThemes,
         activityFeedLastSeenAt: s.activityFeedLastSeenAt,
       }),
       onRehydrateStorage: () => (state) => {

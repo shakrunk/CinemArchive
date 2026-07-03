@@ -32,7 +32,7 @@ function NavTab({
       <span
         className={cn(
           'absolute top-0 left-1/2 -translate-x-1/2 h-0.5 rounded-b-full bg-amber transition-all duration-300',
-          active ? 'w-8 shadow-[0_0_8px_rgba(233,178,102,0.6)]' : 'w-0'
+          active ? 'w-8 shadow-[0_0_8px_rgb(var(--amber-rgb)/0.6)]' : 'w-0'
         )}
       />
       <Icon className="w-5 h-5" />

@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
   Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X, Activity, Star,
-  UserCircle, Sun, Moon, Pencil, CalendarDays, Film,
+  UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -443,6 +443,7 @@ function SecuritySection() {
 function AppearanceSection() {
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
+  const unlockedThemes = useAppStore((s) => s.unlockedThemes)
 
   function choose(next: Theme) {
     if (next === theme) return
@@ -450,9 +451,23 @@ function AppearanceSection() {
     setTheme(next)
   }
 
-  const options: { value: Theme; label: string; hint: string; Icon: typeof Sun }[] = [
+  const options: { value: Theme; label: string; hint: string; Icon: typeof Sun; lockedHint?: string }[] = [
     { value: 'dark', label: 'Screening Room', hint: 'Dark — the classic projection-booth look.', Icon: Moon },
     { value: 'light', label: 'Matinée', hint: 'Light — parchment and daylight.', Icon: Sun },
+    {
+      value: 'noir',
+      label: 'Spider-Man Noir',
+      hint: 'Black & white, high-contrast — a detective’s screening room.',
+      Icon: Aperture,
+      lockedHint: 'Unlock it: watch Spider-Man: Noir in Black & White.',
+    },
+    {
+      value: 'matrix',
+      label: 'The Construct',
+      hint: 'Green phosphor on black glass — welcome to the desert of the real.',
+      Icon: Terminal,
+      lockedHint: 'Unlock it: take the red pill while logging a viewing of The Matrix.',
+    },
   ]
 
   return (
@@ -460,30 +475,41 @@ function AppearanceSection() {
       id="appearance"
       title="Appearance"
       Icon={Sun}
-      description="Pick a house style. You can also flip it any time with the T key or the toggle in the top bar."
+      description="Pick a house style. You can also flip dark/light any time with the T key or the toggle in the top bar. A couple of styles are secret — find them by watching the right films the right way."
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
-        {options.map(({ value, label, hint, Icon }) => (
-          <button
-            key={value}
-            role="radio"
-            aria-checked={theme === value}
-            onClick={() => choose(value)}
-            className={cn(
-              'text-left rounded-lg border p-4 transition-colors',
-              theme === value
-                ? 'border-amber/50 bg-amber/10'
-                : 'border-border bg-secondary/20 hover:border-amber/25'
-            )}
-          >
-            <span className="flex items-center gap-2 font-sans text-sm text-paper font-medium">
-              <Icon className={cn('w-4 h-4', theme === value ? 'text-amber' : 'text-muted-foreground')} />
-              {label}
-              {theme === value && <Check className="w-3.5 h-3.5 text-amber ml-auto" />}
-            </span>
-            <span className="block font-sans text-xs text-muted-foreground mt-1.5 leading-relaxed">{hint}</span>
-          </button>
-        ))}
+        {options.map(({ value, label, hint, Icon, lockedHint }) => {
+          const locked = !unlockedThemes.includes(value)
+          return (
+            <button
+              key={value}
+              role="radio"
+              aria-checked={theme === value}
+              disabled={locked}
+              onClick={() => choose(value)}
+              className={cn(
+                'text-left rounded-lg border p-4 transition-colors',
+                locked && 'opacity-50 cursor-not-allowed',
+                !locked && theme === value && 'border-amber/50 bg-amber/10',
+                !locked && theme !== value && 'border-border bg-secondary/20 hover:border-amber/25',
+                locked && 'border-border bg-secondary/10'
+              )}
+            >
+              <span className="flex items-center gap-2 font-sans text-sm text-paper font-medium">
+                <Icon className={cn('w-4 h-4', !locked && theme === value ? 'text-amber' : 'text-muted-foreground')} />
+                {label}
+                {locked ? (
+                  <Lock className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
+                ) : (
+                  theme === value && <Check className="w-3.5 h-3.5 text-amber ml-auto" />
+                )}
+              </span>
+              <span className="block font-sans text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                {locked ? lockedHint : hint}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </Section>
   )

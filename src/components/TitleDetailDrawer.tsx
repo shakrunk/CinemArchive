@@ -266,7 +266,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                     style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }}
                     title={member.character}
                   >
-                    {member.character || ' '}
+                    {member.character || ' '}
                   </div>
                   {member.episodeCount != null && (
                     <div
@@ -789,6 +789,7 @@ export function TitleDetailDrawer() {
 
   const pinnedModes = useAppStore((s) => s.pinnedModes)
   const setPinnedMode = useAppStore((s) => s.setPinnedMode)
+  const unlockTheme = useAppStore((s) => s.unlockTheme)
 
   const unlockedModes = useMemo(
     () => (isSpiderNoir && title ? getUnlockedModes(title) : new Set<'bw' | 'color'>()),
@@ -798,6 +799,18 @@ export function TitleDetailDrawer() {
     () => (isSpiderNoir && title ? getEarnedModes(title) : new Set<'bw' | 'color'>()),
     [isSpiderNoir, title]
   )
+
+  // Global theme easter eggs: earning the Spider-Noir black & white mode, or
+  // taking the Matrix red pill, unlocks the matching app-wide theme (Settings
+  // → Appearance). Keyed on the "earned"/"rain shown" signals so it fires
+  // regardless of whether the title was already watched before this session.
+  useEffect(() => {
+    if (earnedModes.has('bw')) unlockTheme('noir')
+  }, [earnedModes, unlockTheme])
+
+  useEffect(() => {
+    if (showMatrixRain) unlockTheme('matrix')
+  }, [showMatrixRain, unlockTheme])
 
   const prevNoirModeRef = useRef<'bw' | 'color' | null | undefined>(undefined)
   const [noirAnim, setNoirAnim] = useState<'bw' | 'color' | null>(null)

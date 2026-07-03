@@ -9,7 +9,7 @@ export function LandingScreen({ onSignIn }: Props) {
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center px-6">
       <div className="flex flex-col items-center gap-8 text-center">
         {/* Spinning reel mark — large, amber-glowing */}
-        <ReelMark className="w-20 h-20 text-amber animate-spin-slow drop-shadow-[0_0_32px_rgba(233,178,102,0.4)]" />
+        <ReelMark className="w-20 h-20 text-amber animate-spin-slow drop-shadow-[0_0_32px_rgb(var(--amber-rgb)/0.4)]" />
 
         {/* Title block */}
         <div className="flex flex-col items-center gap-3">

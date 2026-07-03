@@ -169,6 +169,117 @@
     --ring: 35 72% 45%;
   }
 
+  /* ════ NOIR THEME — "Spider-Man Noir" ════
+     Unlocked by watching Spider-Man: Noir in Black & White.
+     Desaturated black-and-white detective-film palette: amber becomes silver,
+     everything else stays near-black. */
+  :root[data-theme="noir"] {
+    --void-rgb: 8 8 9;
+    --ink-rgb: 15 15 16;
+    --ink-1-rgb: 20 20 21;
+    --ink-2-rgb: 27 27 29;
+    --ink-3-rgb: 36 36 38;
+    --amber-rgb: 200 200 205;
+    --amber-bright-rgb: 230 230 234;
+    --amber-muted-rgb: 160 160 165;
+    --amber-deep-rgb: 140 140 146;
+    --amber-subtle-rgb: 210 210 214;
+    --moon-rgb: 160 170 180;
+    --ember-rgb: 200 90 65;
+    --ember-soft-rgb: 220 130 100;
+    --paper-rgb: 235 235 232;
+    --paper-dim-rgb: 175 175 172;
+    --paper-faint-rgb: 120 120 118;
+
+    --line: rgba(230, 230, 230, 0.09);
+    --line-2: rgba(230, 230, 230, 0.17);
+
+    --inset: rgba(0, 0, 0, 0.35);
+    --inset-strong: rgba(0, 0, 0, 0.48);
+    --wash: rgba(255, 255, 255, 0.05);
+
+    --on-amber: #141414;
+
+    --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.9), 0 4px 14px -8px rgba(0, 0, 0, 0.65);
+    --shadow-lift: 0 40px 90px -32px rgba(0, 0, 0, 0.94), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
+    --glow: 0 0 0 1px rgba(200, 200, 205, 0.32), 0 18px 50px -18px rgba(200, 200, 205, 0.26);
+
+    --background: 220 3% 4%;
+    --foreground: 0 0% 91%;
+    --card: 220 3% 9%;
+    --card-foreground: 0 0% 91%;
+    --popover: 220 3% 8%;
+    --popover-foreground: 0 0% 91%;
+    --primary: 220 3% 79%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 220 3% 13%;
+    --secondary-foreground: 0 0% 80%;
+    --muted: 220 3% 15%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 220 3% 79%;
+    --accent-foreground: 0 0% 6%;
+    --destructive: 8 62% 52%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 3% 17%;
+    --input: 220 3% 17%;
+    --ring: 220 3% 74%;
+  }
+
+  /* ════ MATRIX THEME — "The Construct" ════
+     Unlocked by taking the red pill while logging a viewing of The Matrix.
+     Green phosphor on black glass; amber becomes terminal green. */
+  :root[data-theme="matrix"] {
+    --void-rgb: 3 5 3;
+    --ink-rgb: 6 12 7;
+    --ink-1-rgb: 9 18 10;
+    --ink-2-rgb: 13 26 14;
+    --ink-3-rgb: 18 36 19;
+    --amber-rgb: 74 222 128;
+    --amber-bright-rgb: 134 255 176;
+    --amber-muted-rgb: 54 176 98;
+    --amber-deep-rgb: 40 150 80;
+    --amber-subtle-rgb: 150 240 180;
+    --moon-rgb: 90 210 210;
+    --ember-rgb: 220 70 70;
+    --ember-soft-rgb: 230 110 100;
+    --paper-rgb: 200 245 210;
+    --paper-dim-rgb: 140 190 150;
+    --paper-faint-rgb: 90 140 100;
+
+    --line: rgba(150, 255, 180, 0.1);
+    --line-2: rgba(150, 255, 180, 0.18);
+
+    --inset: rgba(0, 20, 5, 0.35);
+    --inset-strong: rgba(0, 25, 8, 0.5);
+    --wash: rgba(120, 255, 150, 0.06);
+
+    --on-amber: #03150a;
+
+    --shadow: 0 24px 60px -28px rgba(0, 10, 2, 0.9), 0 4px 14px -8px rgba(0, 10, 2, 0.65);
+    --shadow-lift: 0 40px 90px -32px rgba(0, 10, 2, 0.94), 0 10px 30px -12px rgba(0, 10, 2, 0.75);
+    --glow: 0 0 0 1px rgba(74, 222, 128, 0.35), 0 18px 50px -18px rgba(74, 222, 128, 0.3);
+
+    --background: 140 60% 3%;
+    --foreground: 130 55% 87%;
+    --card: 140 45% 7%;
+    --card-foreground: 130 55% 87%;
+    --popover: 140 45% 6%;
+    --popover-foreground: 130 55% 87%;
+    --primary: 140 65% 58%;
+    --primary-foreground: 140 60% 5%;
+    --secondary: 140 30% 11%;
+    --secondary-foreground: 130 40% 75%;
+    --muted: 140 28% 12%;
+    --muted-foreground: 130 20% 50%;
+    --accent: 140 65% 58%;
+    --accent-foreground: 140 60% 5%;
+    --destructive: 5 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 140 30% 15%;
+    --input: 140 30% 15%;
+    --ring: 140 60% 52%;
+  }
+
   * {
     @apply border-border;
     box-sizing: border-box;
@@ -713,8 +824,8 @@
 
   .amber-glow {
     box-shadow:
-      0 0 16px rgba(233, 178, 102, 0.4),
-      0 0 40px rgba(233, 178, 102, 0.15),
+      0 0 16px rgb(var(--amber-rgb) / 0.4),
+      0 0 40px rgb(var(--amber-rgb) / 0.15),
       0 4px 12px rgba(0, 0, 0, 0.5);
   }
 }
@@ -1159,4 +1270,69 @@ body.spider-noir-color .projector-beam {
 :root[data-theme="light"] ::selection {
   background: rgba(176, 116, 31, 0.25);
   color: var(--on-amber);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   NOIR THEME ATMOSPHERE OVERRIDES
+   Heavier grain and a harder vignette for a detective-film screening room;
+   the projector beam and dust go silver instead of amber.
+   ════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="noir"] body::before {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(200, 200, 205, 0.08), transparent 45%),
+    radial-gradient(90% 70% at 88% 8%, rgba(160, 170, 180, 0.05), transparent 55%),
+    linear-gradient(180deg, #0e0e0f 0%, var(--void) 60%, #050505 100%);
+}
+:root[data-theme="noir"] .grain {
+  opacity: 0.09;
+}
+:root[data-theme="noir"] .vignette {
+  background: radial-gradient(125% 110% at 50% 42%, transparent 48%, rgba(0, 0, 0, 0.58) 86%, rgba(0, 0, 0, 0.88) 100%);
+}
+:root[data-theme="noir"] .dust {
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(220, 220, 224, 0.4), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(220, 220, 224, 0.32), transparent),
+    radial-gradient(1.5px 1.5px at 85% 20%, rgba(220, 220, 224, 0.28), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(220, 220, 224, 0.32), transparent);
+}
+:root[data-theme="noir"] .projector-beam {
+  background: radial-gradient(50% 50% at 50% 50%, rgba(200, 200, 205, 0.12), transparent 70%);
+}
+:root[data-theme="noir"] ::selection {
+  background: rgba(200, 200, 205, 0.28);
+  color: #0a0a0a;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   MATRIX THEME ATMOSPHERE OVERRIDES
+   Green phosphor glow in place of the amber projector beam; grain reads as
+   scanline noise, dust as falling code motes.
+   ════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="matrix"] body::before {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(74, 222, 128, 0.09), transparent 45%),
+    radial-gradient(90% 70% at 88% 8%, rgba(90, 210, 210, 0.05), transparent 55%),
+    linear-gradient(180deg, #050b05 0%, var(--void) 60%, #010201 100%);
+}
+:root[data-theme="matrix"] .grain {
+  opacity: 0.06;
+  mix-blend-mode: screen;
+}
+:root[data-theme="matrix"] .vignette {
+  background: radial-gradient(125% 110% at 50% 42%, transparent 50%, rgba(0, 8, 2, 0.55) 86%, rgba(0, 5, 1, 0.86) 100%);
+}
+:root[data-theme="matrix"] .dust {
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(134, 255, 176, 0.55), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(134, 255, 176, 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 85% 20%, rgba(134, 255, 176, 0.4), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(134, 255, 176, 0.45), transparent);
+}
+:root[data-theme="matrix"] .projector-beam {
+  background: radial-gradient(50% 50% at 50% 50%, rgba(74, 222, 128, 0.14), transparent 70%);
+}
+:root[data-theme="matrix"] ::selection {
+  background: rgba(74, 222, 128, 0.3);
+  color: #03150a;
 }

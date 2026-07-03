@@ -35,7 +35,7 @@ function hashString(str: string): number {
 }
 
 const STATUS_BADGE: Record<WatchStatus, { label: string; cls: string }> = {
-  watched: { label: 'Seen', cls: 'bg-[rgba(233,178,102,0.18)] text-amber-bright' },
+  watched: { label: 'Seen', cls: 'bg-amber/18 text-amber-bright' },
   watchlist: { label: 'Watchlist', cls: 'bg-[rgba(143,182,203,0.18)] text-moon' },
   watching: { label: 'Watching', cls: 'bg-[rgba(247,205,134,0.16)] text-amber' },
   dropped: { label: 'Dropped', cls: 'bg-[rgba(215,106,73,0.18)] text-ember-soft' },
@@ -43,7 +43,7 @@ const STATUS_BADGE: Record<WatchStatus, { label: string; cls: string }> = {
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <div className="flex gap-px text-amber drop-shadow-[0_1px_4px_rgba(233,178,102,0.5)]">
+    <div className="flex gap-px text-amber drop-shadow-[0_1px_4px_rgb(var(--amber-rgb)/0.5)]">
       {Array.from({ length: 5 }, (_, i) => {
         const filled = rating - i
         return (

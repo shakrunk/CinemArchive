@@ -12,7 +12,9 @@ export interface UpNextEntry {
 
 export interface UpcomingEntry {
   title: Title
-  releaseDate: string  // YYYY-MM-DD
+  /** YYYY-MM-DD if the title has a future release date, otherwise null (already
+   *  released, or no known release date) — used to label/order the card. */
+  releaseDate: string | null
 }
 
 /** Latest `watchedAt` across all of a title's episode watch events, or null. */
@@ -28,12 +30,23 @@ function lastWatchedAtForTitle(title: Title): string | null {
   return max
 }
 
-/** Watchlist movies/tv that have a future releaseDate, sorted soonest first. */
+/** All watchlist movies/tv — not just unreleased ones. Already-released (or
+ *  undated) titles are actionable now, so they lead, sorted most-recently-added
+ *  first; titles with a future releaseDate follow, sorted soonest first. */
 export function computeUpcomingTitles(titles: Title[], today: string): UpcomingEntry[] {
-  return titles
-    .filter((t) => t.status === 'watchlist' && t.releaseDate && t.releaseDate > today)
-    .map((t) => ({ title: t, releaseDate: t.releaseDate! }))
-    .sort((a, b) => (a.releaseDate < b.releaseDate ? -1 : a.releaseDate > b.releaseDate ? 1 : 0))
+  const watchlist = titles.filter((t) => t.status === 'watchlist')
+
+  const available = watchlist
+    .filter((t) => !t.releaseDate || t.releaseDate <= today)
+    .map((t): UpcomingEntry => ({ title: t, releaseDate: null }))
+    .sort((a, b) => (a.title.addedAt < b.title.addedAt ? 1 : a.title.addedAt > b.title.addedAt ? -1 : 0))
+
+  const upcoming = watchlist
+    .filter((t) => t.releaseDate && t.releaseDate > today)
+    .map((t): UpcomingEntry => ({ title: t, releaseDate: t.releaseDate! }))
+    .sort((a, b) => (a.releaseDate! < b.releaseDate! ? -1 : a.releaseDate! > b.releaseDate! ? 1 : 0))
+
+  return [...available, ...upcoming]
 }
 
 /** In-progress TV shows (status 'watching') that have a next unwatched episode,

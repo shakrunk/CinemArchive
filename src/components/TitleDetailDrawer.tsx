@@ -261,15 +261,13 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
                   >
                     {member.name}
                   </div>
-                  {member.character && (
-                    <div
-                      className="font-mono line-clamp-1 mt-0.5"
-                      style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.6 }}
-                      title={member.character}
-                    >
-                      {member.character}
-                    </div>
-                  )}
+                  <div
+                    className="font-mono line-clamp-1 mt-0.5"
+                    style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }}
+                    title={member.character}
+                  >
+                    {member.character || ' '}
+                  </div>
                   {member.episodeCount != null && (
                     <div
                       className="font-mono mt-0.5"
@@ -526,9 +524,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                 </div>
                 <div className="p-2">
                   <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
-                  {member.character && (
-                    <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.6 }} title={member.character}>{member.character}</div>
-                  )}
+                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
                   {member.episodeCount != null && (
                     <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
                       {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X, Activity, Star } from 'lucide-react'
+import { Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2, Download, Upload, Users, UserPlus, Ban, Eye, Inbox, X, Activity, Star, Ticket } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -20,7 +20,11 @@ import {
   declineFriendRequest,
   blockFriend,
   listFriendships,
+  createInviteCode,
+  listMyInviteCodes,
+  deleteInviteCode,
   type FriendshipView,
+  type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import {
@@ -28,6 +32,9 @@ import {
   fetchRecommendations, markRecommendationRead, dismissRecommendation, type Recommendation,
   fetchFriendActivityFeed, type ActivityEvent,
 } from 'src/lib/db'
+import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
+
+const OWNER_EMAIL = 'bioengineerkk@gmail.com'
 
 interface ProfileModalProps {
   open: boolean
@@ -89,13 +96,21 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([])
   const [loadingActivity, setLoadingActivity] = useState(false)
 
-  // Fetch shared keys, friends, recommendations, and activity on login
+  // Invite codes state
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
+  const [loadingInvites, setLoadingInvites] = useState(false)
+  const [generatingInvite, setGeneratingInvite] = useState(false)
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null)
+  const [inviteMessage, setInviteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Fetch shared keys, friends, recommendations, activity, and invites on login
   useEffect(() => {
     if (user && open) {
       loadKeys()
       loadFriendships()
       loadRecommendations()
       loadActivityFeed()
+      loadInviteCodes()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, open])
@@ -195,6 +210,47 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     } catch (err) {
       console.error('Failed to revoke key:', err)
     }
+  }
+
+  // Invite handlers
+  async function loadInviteCodes() {
+    setLoadingInvites(true)
+    try {
+      setInviteCodes(await listMyInviteCodes())
+    } catch (err) {
+      console.error('Failed to load invite codes:', err)
+    } finally {
+      setLoadingInvites(false)
+    }
+  }
+
+  async function handleGenerateInvite() {
+    setGeneratingInvite(true)
+    setInviteMessage(null)
+    try {
+      await createInviteCode()
+      await loadInviteCodes()
+    } catch (err: any) {
+      console.error('Failed to generate invite code:', err)
+      setInviteMessage({ type: 'error', text: err.message || 'Failed to generate invite code.' })
+    } finally {
+      setGeneratingInvite(false)
+    }
+  }
+
+  async function handleDeleteInvite(id: string) {
+    try {
+      await deleteInviteCode(id)
+      await loadInviteCodes()
+    } catch (err) {
+      console.error('Failed to delete invite code:', err)
+    }
+  }
+
+  function handleCopyInvite(code: string, id: string) {
+    navigator.clipboard.writeText(code)
+    setCopiedInviteId(id)
+    setTimeout(() => setCopiedInviteId(null), 2000)
   }
 
   // Friend handlers
@@ -449,6 +505,11 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                 </Button>
               </div>
             </form>
+
+            <InviteRedeemForm
+              onRedeemed={(text) => setAuthMessage({ type: 'success', text })}
+              onError={(text) => setAuthMessage({ type: 'error', text })}
+            />
           </div>
         ) : (
           /* ─── Logged In UI ─── */
@@ -574,6 +635,83 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                         </div>
                       </div>
                     ))
+                )}
+              </div>
+            </div>
+
+            {/* Invites */}
+            <div className="space-y-4 pt-2 border-t border-border">
+              <h3 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-amber" />
+                Invites
+              </h3>
+              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                This is a private, invite-only archive.{' '}
+                {user.email === OWNER_EMAIL ? 'Generate codes for people you want to give access to.' : 'You can generate up to 2 invite codes.'}
+              </p>
+
+              <Button
+                onClick={handleGenerateInvite}
+                disabled={generatingInvite || (user.email !== OWNER_EMAIL && inviteCodes.length >= 2)}
+                className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans text-xs font-medium gap-1.5"
+              >
+                {generatingInvite ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Generate Invite Code
+              </Button>
+
+              {inviteMessage && (
+                <div
+                  className={cn(
+                    'p-3 rounded-lg text-xs font-sans leading-normal border',
+                    inviteMessage.type === 'success'
+                      ? 'bg-amber/10 border-amber/30 text-amber'
+                      : 'bg-destructive/10 border-destructive/30 text-destructive'
+                  )}
+                >
+                  {inviteMessage.text}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {loadingInvites ? (
+                  <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading invites...</div>
+                ) : inviteCodes.length === 0 ? (
+                  <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No invite codes generated yet.</div>
+                ) : (
+                  inviteCodes.map((c) => (
+                    <div key={c.id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm text-paper font-medium tracking-wider">{c.code}</p>
+                        <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                          {c.redeemed_by
+                            ? `Redeemed ${c.redeemed_at ? new Date(c.redeemed_at).toLocaleDateString() : ''}`
+                            : `Created ${new Date(c.created_at).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      {!c.redeemed_by && (
+                        <div className="flex gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => handleCopyInvite(c.code, c.id)}
+                            className="bg-secondary hover:bg-secondary-muted text-muted-foreground hover:text-foreground w-7 h-7 p-0 flex items-center justify-center"
+                            title="Copy Invite Code"
+                            aria-label="Copy Invite Code"
+                          >
+                            {copiedInviteId === c.id ? <Check className="w-3.5 h-3.5 text-amber" /> : <Copy className="w-3.5 h-3.5" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleDeleteInvite(c.id)}
+                            className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                            title="Delete Invite Code"
+                            aria-label="Delete Invite Code"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))
                 )}
               </div>
             </div>

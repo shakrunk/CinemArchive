@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { RadialRing, areaPath, getInitials, linePath, ratingColorVar } from 'src/components/LedgerCharts'
+import type { LedgerPanelId } from 'src/lib/ledgerPanels'
 
 // ─── Dashboard hero ───────────────────────────────────────────────────────────
 
@@ -795,21 +796,34 @@ function EncorePerformances({ className }: { className?: string }) {
 
 // ─── Ledger View ─────────────────────────────────────────────────────────────
 
+// Each panel keeps its editorial column width regardless of order — only
+// which panels show and in what sequence is user-customizable (Settings →
+// Ledger Layout), matching the reorder/hide (not resize) scope of nav prefs.
+const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: { className?: string }) => React.ReactElement | null; className: string }> = {
+  activity: { Component: ActivityHeatmap, className: 'col-span-12 lg:col-span-8' },
+  encores: { Component: EncorePerformances, className: 'col-span-12 lg:col-span-4' },
+  run: { Component: TheRun, className: 'col-span-12' },
+  ratings: { Component: RatingDistribution, className: 'col-span-12 lg:col-span-5' },
+  genres: { Component: GenreBars, className: 'col-span-12 lg:col-span-7' },
+  decades: { Component: DecadeFilmstrip, className: 'col-span-12' },
+  auteurs: { Component: TheAuteurs, className: 'col-span-12 lg:col-span-6' },
+  ensemble: { Component: TheEnsemble, className: 'col-span-12 lg:col-span-6' },
+}
+
 export function Ledger() {
+  const ledgerPrefs = useAppStore((s) => s.ledgerPrefs)
+  const visiblePanels = ledgerPrefs.order.filter((id) => !ledgerPrefs.hidden.includes(id))
+
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
       <DashHero />
       <StatRibbon />
 
       <div className="grid grid-cols-12 gap-4">
-        <ActivityHeatmap className="col-span-12 lg:col-span-8" />
-        <EncorePerformances className="col-span-12 lg:col-span-4" />
-        <TheRun className="col-span-12" />
-        <RatingDistribution className="col-span-12 lg:col-span-5" />
-        <GenreBars className="col-span-12 lg:col-span-7" />
-        <DecadeFilmstrip className="col-span-12" />
-        <TheAuteurs className="col-span-12 lg:col-span-6" />
-        <TheEnsemble className="col-span-12 lg:col-span-6" />
+        {visiblePanels.map((id) => {
+          const { Component, className } = PANEL_REGISTRY[id]
+          return <Component key={id} className={className} />
+        })}
       </div>
     </div>
   )

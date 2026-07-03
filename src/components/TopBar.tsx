@@ -71,7 +71,8 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         {/* Pill nav */}
         <nav className="navpill ml-1 hidden sm:flex" aria-label="Main navigation">
           {visibleNav.map((id) => {
-            const { label, Icon } = NAV_META[id]
+            const { label, Icon: DefaultIcon } = NAV_META[id]
+            const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
             return (
               <button
                 key={id}

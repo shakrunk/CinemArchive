@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
-import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, type TitleVideo } from 'src/lib/media'
+import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb, sendRecommendation } from 'src/lib/db'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from 'src/components/ui/dropdown-menu'
@@ -38,6 +38,7 @@ import { MatrixDigitalRain } from 'src/components/MatrixDigitalRain'
 import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
 import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
 import { TrailerRow } from 'src/components/ui/trailer-row'
+import { WatchProvidersSection } from 'src/components/ui/watch-providers'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 
@@ -212,13 +213,29 @@ interface CastCrewSectionProps {
 }
 
 function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: CastCrewSectionProps) {
+  const [expanded, setExpanded] = useState(true)
   const hasCast = cast && cast.length > 0
   const hasCrew = crew && crew.length > 0
   const hasStudios = studios && studios.length > 0
   if (!hasCast && !hasCrew && !hasStudios) return null
 
   return (
-    <div className="space-y-4">
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+        className="flex items-center gap-2 mb-4 group focus:outline-none"
+      >
+        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim group-hover:text-amber transition-colors">
+          Cast &amp; Crew
+        </h4>
+        <ChevronDown
+          className={cn('w-3.5 h-3.5 text-paper-faint transition-transform group-hover:text-amber', expanded ? 'rotate-180' : '')}
+        />
+      </button>
+      {expanded && (
+      <div className="space-y-4">
       {hasCast && (
         <div>
           <div
@@ -339,6 +356,8 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
             </div>
           )}
         </div>
+      )}
+      </div>
       )}
     </div>
   )
@@ -900,6 +919,7 @@ export function TitleDetailDrawer() {
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
   const [videos, setVideos] = useState<TitleVideo[]>([])
+  const [watchProviders, setWatchProviders] = useState<WatchProviders | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [heroBackdropUrl, setHeroBackdropUrl] = useState<string | null>(null)
 
@@ -916,6 +936,18 @@ export function TitleDetailDrawer() {
     let cancelled = false
     fetchTitleVideos(title.tmdbId, title.type).then((v) => {
       if (!cancelled) setVideos(v)
+    })
+    return () => { cancelled = true }
+  }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
+
+  useEffect(() => {
+    if (!isDetailDrawerOpen || !title?.tmdbId) {
+      const t = setTimeout(() => setWatchProviders(null), 0)
+      return () => clearTimeout(t)
+    }
+    let cancelled = false
+    fetchWatchProviders(title.tmdbId, title.type).then((wp) => {
+      if (!cancelled) setWatchProviders(wp)
     })
     return () => { cancelled = true }
   }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
@@ -1409,6 +1441,14 @@ export function TitleDetailDrawer() {
 
               {/* External links */}
               <ExternalLinks media={title} />
+
+              {/* Where to watch */}
+              <WatchProvidersSection
+                providers={watchProviders}
+                customUrl={title.customWatchUrl}
+                isSharedView={isSharedView}
+                onSaveCustomUrl={(url) => updateTitle(title.id, { customWatchUrl: url })}
+              />
             </div>
           </div>
 
@@ -1423,18 +1463,13 @@ export function TitleDetailDrawer() {
 
           {/* Cast & Crew */}
           {(title.cast?.length || title.crew?.length || title.studios?.length) ? (
-            <div>
-              <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
-                Cast &amp; Crew
-              </h4>
-              <CastCrewSection
-                cast={title.cast}
-                crew={title.crew}
-                studios={title.studios}
-                onPersonClick={setActivePerson}
-                onStudioClick={browseByStudio}
-              />
-            </div>
+            <CastCrewSection
+              cast={title.cast}
+              crew={title.crew}
+              studios={title.studios}
+              onPersonClick={setActivePerson}
+              onStudioClick={browseByStudio}
+            />
           ) : null}
 
           {/* ── TV Series section ───────────────────────────────────── */}

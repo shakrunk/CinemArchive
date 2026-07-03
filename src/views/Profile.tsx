@@ -4,7 +4,7 @@ import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
   Download, Upload, Users, UserPlus, Ban, Eye, EyeOff, Inbox, X, Activity, Star,
   UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
-  LayoutGrid, GripVertical,
+  LayoutGrid, GripVertical, BarChart3, Ticket,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -27,8 +27,12 @@ import {
   listFriendships,
   getMyProfile,
   updateMyProfile,
+  createInviteCode,
+  listMyInviteCodes,
+  deleteInviteCode,
   type FriendshipView,
   type MyProfile,
+  type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import {
@@ -39,7 +43,9 @@ import {
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
+import { LEDGER_PANEL_LABELS, type LedgerPanelId } from 'src/lib/ledgerPanels'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
+import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 
 // ─── Shared bits ──────────────────────────────────────────────────────────────
 
@@ -70,7 +76,9 @@ const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: b
   { id: 'security', label: 'Security', Icon: Shield, authOnly: true },
   { id: 'appearance', label: 'Appearance', Icon: Sun, authOnly: false },
   { id: 'navigation', label: 'Navigation', Icon: LayoutGrid, authOnly: false },
+  { id: 'ledger-layout', label: 'Ledger Layout', Icon: BarChart3, authOnly: false },
   { id: 'sharing', label: 'Shared Links', Icon: Key, authOnly: true },
+  { id: 'invites', label: 'Invites', Icon: Ticket, authOnly: true },
   { id: 'friends', label: 'Friends', Icon: Users, authOnly: true },
   { id: 'inbox', label: 'Recommendations', Icon: Inbox, authOnly: true },
   { id: 'activity', label: 'Friend Activity', Icon: Activity, authOnly: true },
@@ -163,52 +171,59 @@ function SignInCard() {
   }
 
   return (
-    <form onSubmit={handleEmailSignIn} className="space-y-4">
-      <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-        Enter your email to sign in. You will receive a passwordless magic link to log in securely.
-      </p>
-      <div>
-        <label htmlFor="settings-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-          Email Address
-        </label>
-        <div className="relative max-w-sm">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <Input
-            id="settings-email-input"
-            aria-label="Email address"
-            required
-            type="email"
-            placeholder="name@domain.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pl-9 bg-secondary/50 border-border"
-          />
+    <div className="space-y-4">
+      <form onSubmit={handleEmailSignIn} className="space-y-4">
+        <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+          Enter your email to sign in. You will receive a passwordless magic link to log in securely.
+        </p>
+        <div>
+          <label htmlFor="settings-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            Email Address
+          </label>
+          <div className="relative max-w-sm">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              id="settings-email-input"
+              aria-label="Email address"
+              required
+              type="email"
+              placeholder="name@domain.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-9 bg-secondary/50 border-border"
+            />
+          </div>
         </div>
-      </div>
 
-      <MessageBanner message={message} />
+        <MessageBanner message={message} />
 
-      <div className="flex gap-2 max-w-sm">
-        <Button
-          type="submit"
-          disabled={loading}
-          className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
-        >
-          {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
-          Send Magic Link
-        </Button>
-        <Button
-          type="button"
-          onClick={handlePasskeySignIn}
-          disabled={loading}
-          variant="outline"
-          className="border-border text-muted-foreground hover:text-foreground"
-          title="Sign In with Passkey"
-        >
-          <Fingerprint className="w-4 h-4" />
-        </Button>
-      </div>
-    </form>
+        <div className="flex gap-2 max-w-sm">
+          <Button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+          >
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+            Send Magic Link
+          </Button>
+          <Button
+            type="button"
+            onClick={handlePasskeySignIn}
+            disabled={loading}
+            variant="outline"
+            className="border-border text-muted-foreground hover:text-foreground"
+            title="Sign In with Passkey"
+          >
+            <Fingerprint className="w-4 h-4" />
+          </Button>
+        </div>
+      </form>
+
+      <InviteRedeemForm
+        onRedeemed={(text) => setMessage({ type: 'success', text })}
+        onError={(text) => setMessage({ type: 'error', text })}
+      />
+    </div>
   )
 }
 
@@ -699,6 +714,147 @@ function NavigationSection() {
   )
 }
 
+// ─── Ledger dashboard layout ────────────────────────────────────────────────
+
+// Gap between rows in the reorderable ledger panel list (matches the container's space-y-2).
+const LEDGER_ROW_GAP = 8
+
+interface LedgerDragMeta {
+  id: LedgerPanelId
+  startIndex: number
+  itemHeight: number
+}
+
+function LedgerLayoutSection() {
+  const ledgerPrefs = useAppStore((s) => s.ledgerPrefs)
+  const moveLedgerPanel = useAppStore((s) => s.moveLedgerPanel)
+  const reorderLedgerPanels = useAppStore((s) => s.reorderLedgerPanels)
+  const toggleLedgerPanelHidden = useAppStore((s) => s.toggleLedgerPanelHidden)
+
+  const order = ledgerPrefs.order
+  const itemRefs = useRef(new Map<LedgerPanelId, HTMLDivElement>())
+  const startYRef = useRef(0)
+  const [dragMeta, setDragMeta] = useState<LedgerDragMeta | null>(null)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+
+  function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>, id: LedgerPanelId) {
+    const el = itemRefs.current.get(id)
+    if (!el) return
+    const startIndex = order.indexOf(id)
+    const itemHeight = el.getBoundingClientRect().height + LEDGER_ROW_GAP
+    startYRef.current = e.clientY
+    setDragMeta({ id, startIndex, itemHeight })
+    setDragOffset(0)
+    setDropIndex(startIndex)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragMeta) return
+    const offset = e.clientY - startYRef.current
+    setDragOffset(offset)
+    const rawIndex = dragMeta.startIndex + Math.round(offset / dragMeta.itemHeight)
+    setDropIndex(Math.max(0, Math.min(order.length - 1, rawIndex)))
+  }
+
+  function endDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragMeta) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    const finalOffset = e.clientY - startYRef.current
+    const rawIndex = dragMeta.startIndex + Math.round(finalOffset / dragMeta.itemHeight)
+    const target = Math.max(0, Math.min(order.length - 1, rawIndex))
+    if (target !== dragMeta.startIndex) {
+      const next = [...order]
+      const [moved] = next.splice(dragMeta.startIndex, 1)
+      next.splice(target, 0, moved)
+      reorderLedgerPanels(next)
+    }
+    setDragMeta(null)
+    setDragOffset(0)
+    setDropIndex(null)
+  }
+
+  function handleGripKeyDown(e: React.KeyboardEvent, id: LedgerPanelId) {
+    if (e.key === 'ArrowUp') { e.preventDefault(); moveLedgerPanel(id, 'up') }
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveLedgerPanel(id, 'down') }
+  }
+
+  return (
+    <Section
+      id="ledger-layout"
+      title="Ledger Layout"
+      Icon={BarChart3}
+      description="Drag to reorder panels on the Ledger dashboard, or hide the ones you don't care about."
+    >
+      <div className="space-y-2" role="list" aria-label="Ledger panels">
+        {order.map((id: LedgerPanelId, i) => {
+          const hidden = ledgerPrefs.hidden.includes(id)
+          const isDragging = dragMeta?.id === id
+          let translateY = 0
+          if (dragMeta && dropIndex !== null) {
+            if (isDragging) {
+              translateY = dragOffset
+            } else if (dragMeta.startIndex < dropIndex && i > dragMeta.startIndex && i <= dropIndex) {
+              translateY = -dragMeta.itemHeight
+            } else if (dragMeta.startIndex > dropIndex && i >= dropIndex && i < dragMeta.startIndex) {
+              translateY = dragMeta.itemHeight
+            }
+          }
+          return (
+            <div
+              key={id}
+              ref={(el) => {
+                if (el) itemRefs.current.set(id, el)
+                else itemRefs.current.delete(id)
+              }}
+              role="listitem"
+              className={cn('flex items-center gap-3 rounded-lg border p-2.5', isDragging && 'shadow-lg')}
+              style={{
+                borderColor: 'var(--line)',
+                background: 'var(--inset)',
+                transform: translateY ? `translateY(${translateY}px)` : undefined,
+                transition: isDragging ? 'none' : 'transform 180ms ease',
+                position: isDragging ? 'relative' : undefined,
+                zIndex: isDragging ? 10 : undefined,
+              }}
+            >
+              <button
+                onPointerDown={(e) => handlePointerDown(e, id)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onKeyDown={(e) => handleGripKeyDown(e, id)}
+                aria-label={`Reorder ${LEDGER_PANEL_LABELS[id]} — drag, or use arrow keys`}
+                className="text-paper-faint hover:text-amber cursor-grab active:cursor-grabbing -my-1 p-1 rounded"
+                style={{ touchAction: 'none' }}
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+              <span className={cn('flex-1 font-sans text-sm', hidden ? 'text-muted-foreground' : 'text-paper')}>
+                {LEDGER_PANEL_LABELS[id]}
+              </span>
+              <button
+                onClick={() => toggleLedgerPanelHidden(id)}
+                aria-pressed={!hidden}
+                aria-label={hidden ? `Show ${LEDGER_PANEL_LABELS[id]} on the Ledger` : `Hide ${LEDGER_PANEL_LABELS[id]} from the Ledger`}
+                className={cn(
+                  'icon-btn w-8 h-8 border rounded-md flex items-center justify-center shrink-0',
+                  hidden
+                    ? 'text-muted-foreground border-border'
+                    : 'text-amber border-amber/30 bg-amber/5'
+                )}
+              >
+                {hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </Section>
+  )
+}
+
 // ─── Shared access links ──────────────────────────────────────────────────────
 
 interface SharedKey {
@@ -830,6 +986,137 @@ function SharingSection() {
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Section>
+  )
+}
+
+// ─── Invites ──────────────────────────────────────────────────────────────────
+
+const OWNER_EMAIL = 'bioengineerkk@gmail.com'
+
+function InvitesSection() {
+  const user = useAppStore((s) => s.user)
+  const isOwner = user?.email === OWNER_EMAIL
+  const [codes, setCodes] = useState<InviteCode[]>([])
+  const [loading, setLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [message, setMessage] = useState<Message | null>(null)
+
+  useEffect(() => {
+    void loadCodes()
+  }, [])
+
+  async function loadCodes() {
+    setLoading(true)
+    try {
+      setCodes(await listMyInviteCodes())
+    } catch (err) {
+      console.error('Failed to load invite codes:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setMessage(null)
+    try {
+      await createInviteCode()
+      await loadCodes()
+    } catch (err: any) {
+      console.error('Failed to generate invite code:', err)
+      setMessage({ type: 'error', text: err.message || 'Failed to generate invite code.' })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteInviteCode(id)
+      await loadCodes()
+    } catch (err) {
+      console.error('Failed to delete invite code:', err)
+    }
+  }
+
+  function handleCopy(code: string, id: string) {
+    navigator.clipboard.writeText(code)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const unredeemedCount = codes.filter((c) => !c.redeemed_by).length
+  const atCap = !isOwner && codes.length >= 2
+
+  return (
+    <Section
+      id="invites"
+      title="Invites"
+      Icon={Ticket}
+      description={
+        isOwner
+          ? 'This is a private, invite-only archive. Generate codes for people you want to give access to.'
+          : `This is a private, invite-only archive. You can generate up to 2 invite codes${unredeemedCount > 0 ? ` (${unredeemedCount} unredeemed)` : ''}.`
+      }
+    >
+      <Button
+        onClick={handleGenerate}
+        disabled={generating || atCap}
+        className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium w-fit gap-1.5"
+        title={atCap ? "You've used both of your invites" : undefined}
+      >
+        {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+        Generate Invite Code
+      </Button>
+
+      <MessageBanner message={message} />
+
+      <div className="space-y-2">
+        {loading ? (
+          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading invites...</div>
+        ) : codes.length === 0 ? (
+          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No invite codes generated yet.</div>
+        ) : (
+          codes.map((c) => (
+            <div key={c.id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-sm text-paper font-medium tracking-wider">{c.code}</p>
+                <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                  {c.redeemed_by
+                    ? `Redeemed ${c.redeemed_at ? new Date(c.redeemed_at).toLocaleDateString() : ''}`
+                    : `Created ${new Date(c.created_at).toLocaleDateString()}`}
+                </p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                {!c.redeemed_by && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => handleCopy(c.code, c.id)}
+                      className="bg-secondary hover:bg-secondary-muted text-muted-foreground hover:text-foreground w-7 h-7 p-0 flex items-center justify-center"
+                      title="Copy Invite Code"
+                      aria-label="Copy Invite Code"
+                    >
+                      {copiedId === c.id ? <Check className="w-3.5 h-3.5 text-amber" /> : <Copy className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleDelete(c.id)}
+                      className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                      title="Delete Invite Code"
+                      aria-label="Delete Invite Code"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ))
@@ -1378,7 +1665,10 @@ export function Profile() {
 
           <NavigationSection />
 
+          <LedgerLayoutSection />
+
           {authed && <SharingSection />}
+          {authed && <InvitesSection />}
           {authed && <FriendsSection />}
           {authed && <InboxSection />}
           {authed && <ActivitySection />}

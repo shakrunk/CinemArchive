@@ -25,3 +25,6 @@ jobs:
 
       - name: Deploy media-proxy Edge Function
         run: supabase functions deploy media-proxy --project-ref ${{ vars.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy redeem-invite Edge Function
+        run: supabase functions deploy redeem-invite --project-ref ${{ vars.SUPABASE_PROJECT_REF }}

@@ -407,6 +407,66 @@ export async function fetchTitleVideos(tmdbId: number, type: MediaType): Promise
   }
 }
 
+// ─── Watch providers ────────────────────────────────────────────────────────
+
+export interface WatchProvider {
+  providerId: number
+  name: string
+  logoUrl: string
+}
+
+export interface WatchProviders {
+  link?: string
+  flatrate: WatchProvider[]
+  free: WatchProvider[]
+  ads: WatchProvider[]
+  rent: WatchProvider[]
+  buy: WatchProvider[]
+}
+
+const TMDB_LOGO_BASE = 'https://image.tmdb.org/t/p/w92'
+
+function detectWatchRegion(): string {
+  const lang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US'
+  const parts = lang.split('-')
+  return parts.length > 1 ? parts[1].toUpperCase() : 'US'
+}
+
+function mapWatchProviderList(list: any[] | undefined): WatchProvider[] {
+  return (list ?? []).map((p) => ({
+    providerId: p.provider_id,
+    name: p.provider_name,
+    logoUrl: p.logo_path ? `${TMDB_LOGO_BASE}${p.logo_path}` : '',
+  }))
+}
+
+export async function fetchWatchProviders(tmdbId: number, type: MediaType): Promise<WatchProviders | null> {
+  if (!(isSupabaseConfigured && supabase)) return null
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=watch_providers&id=${tmdbId}&type=${type}`
+    )
+    if (error) throw error
+
+    const region = detectWatchRegion()
+    const regionData = data?.results?.[region] ?? data?.results?.US
+    if (!regionData) return null
+
+    return {
+      link: regionData.link,
+      flatrate: mapWatchProviderList(regionData.flatrate),
+      free: mapWatchProviderList(regionData.free),
+      ads: mapWatchProviderList(regionData.ads),
+      rent: mapWatchProviderList(regionData.rent),
+      buy: mapWatchProviderList(regionData.buy),
+    }
+  } catch (e) {
+    console.error('Error fetching watch providers:', e)
+    return null
+  }
+}
+
 const MOCK_TRENDING: SearchResult[] = [
   {
     tmdbId: 533535,

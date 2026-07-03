@@ -4,7 +4,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { toggleTheme } from 'src/lib/theme'
-import type { AppView } from 'src/lib/navigation'
+import type { AppView, NavItemId } from 'src/lib/navigation'
 import { ReelMark } from 'src/components/ui/reel-mark'
 
 interface TopBarProps {
@@ -13,16 +13,16 @@ interface TopBarProps {
   onProfileClick: () => void
 }
 
-const NAV: { id: AppView; label: string; Icon: typeof BarChart3 }[] = [
-  { id: 'discover', label: 'Discover', Icon: Compass },
-  { id: 'library', label: 'The Library', Icon: LayoutGrid },
-  { id: 'upnext', label: 'Up Next', Icon: PlayCircle },
-  { id: 'ledger', label: 'The Ledger', Icon: BarChart3 },
-]
+const NAV_META: Record<NavItemId, { label: string; Icon: typeof BarChart3 }> = {
+  discover: { label: 'Discover', Icon: Compass },
+  library: { label: 'The Library', Icon: LayoutGrid },
+  upnext: { label: 'Up Next', Icon: PlayCircle },
+  ledger: { label: 'The Ledger', Icon: BarChart3 },
+}
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView, friendView, exitFriendView, openCommandPalette, theme, activityUnseenCount } = useAppStore(
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView, friendView, exitFriendView, openCommandPalette, theme, activityUnseenCount, navPrefs } = useAppStore(
     useShallow((s) => ({
       viewMode: s.viewMode,
       setViewMode: s.setViewMode,
@@ -34,8 +34,11 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
       openCommandPalette: s.openCommandPalette,
       theme: s.theme,
       activityUnseenCount: s.activityUnseenCount,
+      navPrefs: s.navPrefs,
     }))
   )
+
+  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
 
   return (
     <header
@@ -67,17 +70,21 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
 
         {/* Pill nav */}
         <nav className="navpill ml-1 hidden sm:flex" aria-label="Main navigation">
-          {NAV.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              aria-current={currentView === id ? 'page' : undefined}
-              onClick={() => onViewChange(id)}
-              className={cn('navtab', currentView === id && 'is-active')}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="whitespace-nowrap">{label}</span>
-            </button>
-          ))}
+          {visibleNav.map((id) => {
+            const { label, Icon } = NAV_META[id]
+            return (
+              <button
+                key={id}
+                aria-current={currentView === id ? 'page' : undefined}
+                onClick={() => onViewChange(id)}
+                className={cn('navtab', currentView === id && 'is-active')}
+                title={navPrefs.compact ? label : undefined}
+              >
+                <Icon className="w-4 h-4" />
+                <span className={cn('whitespace-nowrap', navPrefs.compact && 'sr-only')}>{label}</span>
+              </button>
+            )
+          })}
         </nav>
 
         {/* Actions */}

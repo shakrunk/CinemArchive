@@ -41,14 +41,15 @@ export async function parseImportFile(file: File): Promise<Title[]> {
       throw new Error(`Entry ${i + 1} is missing required fields (tmdbId, type, title).`)
     }
     // Regenerate all IDs to avoid UUID collisions with existing records
+    const newTitleId = crypto.randomUUID()
     return {
       ...t,
-      id: crypto.randomUUID(),
+      id: newTitleId,
       seasons: (t.seasons ?? []).map((s: any) => ({ ...s, id: crypto.randomUUID() })),
       viewings: (t.viewings ?? []).map((v: any) => ({
         ...v,
         id: crypto.randomUUID(),
-        titleId: undefined, // will be resolved after insert
+        titleId: newTitleId,
       })),
     } as Title
   })

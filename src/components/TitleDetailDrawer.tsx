@@ -1512,6 +1512,9 @@ export function TitleDetailDrawer() {
                   {title.studios && title.studios.length > 0 && (
                     <DetailRow label="Studio" value={title.studios.join(', ')} />
                   )}
+                  {title.collectionName && (
+                    <DetailRow label="Franchise" value={title.collectionName.replace(/\s+Collection$/i, '')} />
+                  )}
                   <DetailRow label="Added" value={fmtDate(title.addedAt)} />
                 </dl>
               </div>

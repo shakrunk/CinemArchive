@@ -420,6 +420,8 @@ export function AddTitleWorkflow() {
       cast: selected.cast,
       crew: selected.crew,
       studios: selected.studios,
+      collectionId: selected.collectionId,
+      collectionName: selected.collectionName,
     }
 
     addTitle(newTitle)

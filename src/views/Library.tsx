@@ -7,7 +7,7 @@ import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
 import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
-import type { SortField, SortDir } from 'src/store/useAppStore'
+import type { SortField, SortDir, ViewMode } from 'src/store/useAppStore'
 
 // ─── Status colors for the ledger list ───────────────────────────────────────
 
@@ -116,6 +116,15 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
               {opt.label}
             </Chip>
           ))}
+        </FilterGroup>
+
+        <FilterGroup label="Group">
+          <Chip active={!filters.groupByFranchise} onClick={() => setFilter('groupByFranchise', false)}>
+            None
+          </Chip>
+          <Chip active={filters.groupByFranchise} onClick={() => setFilter('groupByFranchise', true)}>
+            Franchise
+          </Chip>
         </FilterGroup>
 
         <FilterGroup label="Sort By">
@@ -395,6 +404,83 @@ function LedgerList({ titles }: { titles: Title[] }) {
   )
 }
 
+// ─── Franchise Grouping ──────────────────────────────────────────────────────
+
+interface FranchiseGroup {
+  key: string
+  name: string | null  // null = the trailing non-franchise remainder
+  titles: Title[]
+}
+
+// TMDB collection names read like "The Lord of the Rings Collection" — trim
+// the suffix for a cleaner section header.
+function franchiseDisplayName(name: string): string {
+  return name.replace(/\s+Collection$/i, '')
+}
+
+// Sections appear in order of each franchise's first title under the active
+// sort; within a franchise, titles always run in release order.
+function buildFranchiseGroups(titles: Title[]): FranchiseGroup[] {
+  const groups = new Map<string, FranchiseGroup>()
+  const standalone: Title[] = []
+
+  for (const t of titles) {
+    if (!t.collectionName) {
+      standalone.push(t)
+      continue
+    }
+    const key = t.collectionId != null ? String(t.collectionId) : t.collectionName
+    const group = groups.get(key)
+    if (group) {
+      group.titles.push(t)
+    } else {
+      groups.set(key, { key, name: t.collectionName, titles: [t] })
+    }
+  }
+
+  const releaseTime = (t: Title) =>
+    t.releaseDate ? new Date(t.releaseDate).getTime() : new Date(t.year, 0, 1).getTime()
+  for (const group of groups.values()) {
+    group.titles.sort((a, b) => releaseTime(a) - releaseTime(b))
+  }
+
+  const result = [...groups.values()]
+  if (standalone.length > 0) {
+    result.push({ key: '__standalone__', name: null, titles: standalone })
+  }
+  return result
+}
+
+function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: ViewMode }) {
+  const groups = useMemo(() => buildFranchiseGroups(titles), [titles])
+
+  if (titles.length === 0) return <EmptyState />
+
+  // Nothing in the current view belongs to a franchise — render flat.
+  if (groups.length === 1 && groups[0].name === null) {
+    return viewMode === 'grid' ? <PosterWall titles={titles} /> : <LedgerList titles={titles} />
+  }
+
+  return (
+    <div className="space-y-10">
+      {groups.map((g) => (
+        <section key={g.key} aria-label={g.name ? franchiseDisplayName(g.name) : 'Standalone titles'}>
+          <div className="flex items-baseline gap-3 mb-4">
+            <h3 className="font-serif text-xl font-light text-paper whitespace-nowrap">
+              {g.name ? franchiseDisplayName(g.name) : 'Standalone'}
+            </h3>
+            <span className="font-mono text-[11px] tracking-[0.06em] text-paper-faint whitespace-nowrap">
+              {g.titles.length} title{g.titles.length !== 1 ? 's' : ''}
+            </span>
+            <div className="flex-1 h-px self-center" style={{ background: 'var(--line)' }} />
+          </div>
+          {viewMode === 'grid' ? <PosterWall titles={g.titles} /> : <LedgerList titles={g.titles} />}
+        </section>
+      ))}
+    </div>
+  )
+}
+
 // ─── Quick Status Filters ─────────────────────────────────────────────────────
 
 const QUICK_STATUS_FILTERS: { value: WatchStatus | 'all'; label: string }[] = [
@@ -430,6 +516,7 @@ export function Library() {
     if (filters.minRating > 0) count++
     if (filters.person) count++
     if (filters.studio) count++
+    if (filters.groupByFranchise) count++
     return count
   }, [filters])
 
@@ -551,7 +638,13 @@ export function Library() {
 
       {/* Content */}
       <div className="animate-view-in">
-        {viewMode === 'grid' ? <PosterWall titles={filteredTitles} /> : <LedgerList titles={filteredTitles} />}
+        {filters.groupByFranchise ? (
+          <FranchiseSections titles={filteredTitles} viewMode={viewMode} />
+        ) : viewMode === 'grid' ? (
+          <PosterWall titles={filteredTitles} />
+        ) : (
+          <LedgerList titles={filteredTitles} />
+        )}
       </div>
 
       <FilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} activeFilterCount={activeFilterCount} />

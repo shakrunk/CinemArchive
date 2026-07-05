@@ -56,6 +56,8 @@ function mapDbTitleToLocal(row: any): Title {
     rtScore: row.rt_score || undefined,
     metacriticScore: row.metacritic_score || undefined,
     studios: row.studios || [],
+    collectionId: row.collection_id ?? undefined,
+    collectionName: row.collection_name || undefined,
     cast: (row.title_cast || [])
       .sort((a: any, b: any) => a.cast_order - b.cast_order)
       .map(mapCastRow),
@@ -418,6 +420,8 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
     content_rating: title.contentRating ?? null,
     imdb_id: title.imdbId ?? null,
     custom_watch_url: title.customWatchUrl ?? null,
+    collection_id: title.collectionId ?? null,
+    collection_name: title.collectionName ?? null,
   })
 
   if (titleError) {
@@ -588,6 +592,8 @@ const META_COLUMNS: Array<[keyof Title, string]> = [
   ['rtScore', 'rt_score'],
   ['metacriticScore', 'metacritic_score'],
   ['studios', 'studios'],
+  ['collectionId', 'collection_id'],
+  ['collectionName', 'collection_name'],
 ]
 
 export async function updateTitleInDb(userId: string, titleId: string, patch: Partial<Title>): Promise<void> {

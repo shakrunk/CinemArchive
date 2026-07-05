@@ -39,6 +39,8 @@ create table titles (
   content_rating    text,              -- age certification, e.g. "PG-13", "TV-MA"
   imdb_id           text,              -- e.g. "tt1375666" — enables an exact IMDb link
   custom_watch_url  text,              -- owner override for "where to watch", shown preferentially in shared views
+  collection_id     integer,           -- TMDB collection id (movies) — franchise grouping
+  collection_name   text,              -- TMDB collection name, e.g. "The Lord of the Rings Collection"
   added_at      timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 

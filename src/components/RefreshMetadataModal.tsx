@@ -31,6 +31,8 @@ function toSearchResult(t: Title): SearchResult {
     cast: t.cast,
     crew: t.crew,
     studios: t.studios,
+    collectionId: t.collectionId,
+    collectionName: t.collectionName,
   }
 }
 
@@ -114,6 +116,8 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
         cast: result.cast,
         crew: result.crew,
         studios: result.studios,
+        collectionId: result.collectionId,
+        collectionName: result.collectionName,
       }
 
       const EP_CREW_JOBS = new Set(['Director', 'Writer', 'Teleplay', 'Story'])

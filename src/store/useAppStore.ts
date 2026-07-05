@@ -69,6 +69,9 @@ export interface LibraryFilters {
   minRating: number
   person: PersonRef | null
   studio: string | null
+  // Group the library into franchise sections (TMDB collections, e.g.
+  // "The Lord of the Rings Collection"); non-franchise titles trail behind.
+  groupByFranchise: boolean
   sortField: SortField
   sortDir: SortDir
 }
@@ -228,6 +231,7 @@ const defaultFilters: LibraryFilters = {
   minRating: 0,
   person: null,
   studio: null,
+  groupByFranchise: false,
   sortField: 'addedAt',
   sortDir: 'desc',
 }
@@ -1006,6 +1010,8 @@ export const useAppStore = create<AppStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
+        // Older persisted payloads may lack newer filter keys — backfill them.
+        state.filters = { ...defaultFilters, ...state.filters }
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)
         // Older persisted payloads predate per-panel widths — backfill any missing ones.

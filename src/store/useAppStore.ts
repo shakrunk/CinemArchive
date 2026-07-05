@@ -13,7 +13,7 @@ import { DEFAULT_LEDGER_PANEL_ORDER, DEFAULT_LEDGER_PANEL_WIDTHS } from '../lib/
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
-  deleteEpisodeWatchEventFromDb,
+  deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
   fetchFriendActivityFeed,
 } from '../lib/db'
@@ -69,6 +69,9 @@ export interface LibraryFilters {
   minRating: number
   person: PersonRef | null
   studio: string | null
+  // Group the library into franchise sections (TMDB collections, e.g.
+  // "The Lord of the Rings Collection"); non-franchise titles trail behind.
+  groupByFranchise: boolean
   sortField: SortField
   sortDir: SortDir
 }
@@ -77,6 +80,7 @@ export interface LibraryFilters {
 
 interface EpisodeLogOpts {
   watchedAt?: string   // ISO date — creates a WatchEvent if provided
+  prePlatform?: boolean // watched before joining — creates a WatchEvent with no date (indeterminate)
   watchNotes?: string
   rating?: number      // creates an EpisodeRating stamped at call-time
   reviewText?: string  // creates an EpisodeReview stamped at call-time
@@ -96,6 +100,10 @@ interface LibrarySlice {
   resetFilters: () => void
   applyFilters: () => void
   logEpisode: (titleId: string, seasonNumber: number, episodeNumber: number, opts: EpisodeLogOpts) => void
+  // Marks every unwatched episode of a season (or the whole series when
+  // seasonNumber is omitted) as watched before joining the platform: each gets
+  // a dateless watch event. Series-wide marking also sets status to 'watched'.
+  markPrePlatformWatched: (titleId: string, seasonNumber?: number) => void
   removeViewing: (titleId: string, viewingId: string) => void
   deleteEpisodeWatchEvent: (titleId: string, seasonNumber: number, episodeNumber: number, watchEventId: string) => void
   logNextEpisodeWatch: (titleId: string, colorMode?: 'bw' | 'color') => { seasonNumber: number; episodeNumber: number; watchEventId: string } | null
@@ -223,6 +231,7 @@ const defaultFilters: LibraryFilters = {
   minRating: 0,
   person: null,
   studio: null,
+  groupByFranchise: false,
   sortField: 'addedAt',
   sortDir: 'desc',
 }
@@ -428,7 +437,8 @@ export const useAppStore = create<AppStore>()(
   logEpisode: (titleId, seasonNumber, episodeNumber, opts) =>
     set((s) => {
       // Stable UUIDs so local IDs match the DB rows — enables reliable delete/undo
-      const watchEventId = opts.watchedAt ? crypto.randomUUID() : undefined
+      const createsWatchEvent = Boolean(opts.watchedAt || opts.prePlatform)
+      const watchEventId = createsWatchEvent ? crypto.randomUUID() : undefined
 
       // Sync to DB: resolve episode id from current state, then fire async
       if (s.user) {
@@ -458,12 +468,12 @@ export const useAppStore = create<AppStore>()(
           const episodes = season.episodes.map((ep) => {
             if (ep.episodeNumber !== episodeNumber) return ep
             const updated = { ...ep }
-            if (opts.watchedAt && watchEventId) {
+            if (watchEventId) {
               updated.watchEvents = [
                 ...ep.watchEvents,
                 {
                   id: watchEventId,
-                  watchedAt: opts.watchedAt,
+                  watchedAt: opts.prePlatform ? undefined : opts.watchedAt,
                   notes: opts.watchNotes || undefined,
                   colorMode: opts.colorMode,
                 },
@@ -553,6 +563,54 @@ export const useAppStore = create<AppStore>()(
 
     return { seasonNumber, episodeNumber, watchEventId }
   },
+
+  markPrePlatformWatched: (titleId, seasonNumber) =>
+    set((s) => {
+      const newEvents: Array<{ id: string; episodeId: string }> = []
+
+      const titles = s.titles.map((t) => {
+        if (t.id !== titleId) return t
+        const seasons = (t.seasons ?? []).map((season) => {
+          if (seasonNumber !== undefined && season.seasonNumber !== seasonNumber) return season
+          if (!season.episodes) return season
+          const episodes = season.episodes.map((ep) => {
+            if (ep.watchEvents.length > 0) return ep
+            const watchEventId = crypto.randomUUID()
+            newEvents.push({ id: watchEventId, episodeId: ep.id })
+            return { ...ep, watchEvents: [{ id: watchEventId }] }
+          })
+          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
+          return { ...season, episodes, episodesWatched }
+        })
+        const status = seasonNumber === undefined ? 'watched' : t.status
+        return { ...t, seasons, status }
+      })
+
+      if (newEvents.length === 0 && seasonNumber !== undefined) return s
+
+      if (s.user && newEvents.length > 0) {
+        const userId = s.user.id
+        insertPrePlatformWatchEventsToDb(userId, newEvents).catch((err) => {
+          console.error('Failed to sync pre-platform watch events to DB:', err)
+          get().pushNotification({
+            message: 'Couldn\'t save watch events — check your connection.',
+            retry: () => insertPrePlatformWatchEventsToDb(userId, newEvents),
+          })
+        })
+      }
+      if (s.user && seasonNumber === undefined) {
+        const userId = s.user.id
+        updateTitleInDb(userId, titleId, { status: 'watched' }).catch((err) => {
+          console.error('Failed to sync watched status to DB:', err)
+        })
+      }
+
+      return {
+        titles,
+        filteredTitles: applyFiltersToTitles(titles, s.filters),
+        stats: computeLedgerStats(titles),
+      }
+    }),
 
   removeViewing: (titleId, viewingId) =>
     set((s) => {
@@ -952,6 +1010,8 @@ export const useAppStore = create<AppStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
+        // Older persisted payloads may lack newer filter keys — backfill them.
+        state.filters = { ...defaultFilters, ...state.filters }
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)
         // Older persisted payloads predate per-panel widths — backfill any missing ones.

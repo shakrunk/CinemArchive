@@ -39,6 +39,8 @@ create table titles (
   content_rating    text,              -- age certification, e.g. "PG-13", "TV-MA"
   imdb_id           text,              -- e.g. "tt1375666" — enables an exact IMDb link
   custom_watch_url  text,              -- owner override for "where to watch", shown preferentially in shared views
+  collection_id     integer,           -- TMDB collection id (movies) — franchise grouping
+  collection_name   text,              -- TMDB collection name, e.g. "The Lord of the Rings Collection"
   added_at      timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 
@@ -64,7 +66,7 @@ create table viewings (
   id          uuid primary key default gen_random_uuid(),
   title_id    uuid not null references titles(id) on delete cascade,
   user_id     uuid not null references auth.users(id) on delete cascade,
-  viewed_at   date not null,
+  viewed_at   date,               -- null = watched before joining the platform (indeterminate date)
   rating      numeric(3,1) check (rating >= 0 and rating <= 5),
   notes       text,
   created_at  timestamptz not null default now()
@@ -91,7 +93,7 @@ create table episode_watch_events (
   id          uuid primary key default gen_random_uuid(),
   episode_id  uuid not null references episodes(id) on delete cascade,
   user_id     uuid not null references auth.users(id) on delete cascade,
-  watched_at  date not null,
+  watched_at  date,               -- null = watched before joining the platform (indeterminate date)
   notes       text,
   color_mode  text check (color_mode in ('bw', 'color')),
   created_at  timestamptz not null default now()

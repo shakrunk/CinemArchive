@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Ticket, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { redeemInvite, signInWithEmail } from 'src/lib/auth'
@@ -11,9 +11,10 @@ interface InviteRedeemFormProps {
 
 /** Shared by the sign-in UI in both Profile.tsx and ProfileModal.tsx — this
  *  app is invite-only, so redeeming a code is the only way a new email
- *  becomes an account (see redeemInvite / redeem-invite Edge Function). */
+ *  becomes an account (see redeemInvite / redeem-invite Edge Function).
+ *  The parent owns the sign-in-vs-sign-up tab toggle; this always renders
+ *  the full form. */
 export function InviteRedeemForm({ onRedeemed, onError }: InviteRedeemFormProps) {
-  const [open, setOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,7 +27,6 @@ export function InviteRedeemForm({ onRedeemed, onError }: InviteRedeemFormProps)
       await redeemInvite(email.trim(), code.trim())
       await signInWithEmail(email.trim())
       onRedeemed('Account created — check your inbox for a magic link to finish signing in.')
-      setOpen(false)
       setCode('')
     } catch (err: any) {
       console.error('Failed to redeem invite:', err)
@@ -36,65 +36,45 @@ export function InviteRedeemForm({ onRedeemed, onError }: InviteRedeemFormProps)
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="font-mono text-xs text-amber/60 hover:text-amber transition-colors"
-      >
-        Have an invite code?
-      </button>
-    )
-  }
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-3 max-w-sm rounded-lg border p-3.5"
-      style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-    >
-      <div className="flex items-center gap-2">
-        <Ticket className="w-3.5 h-3.5 text-amber" />
-        <span className="font-sans text-xs text-paper">Redeem an invite code</span>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="invite-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          Email Address
+        </label>
+        <Input
+          id="invite-email-input"
+          aria-label="Email address for invite redemption"
+          required
+          type="email"
+          placeholder="name@domain.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="bg-secondary/50 border-border"
+        />
       </div>
-      <Input
-        aria-label="Email address for invite redemption"
-        required
-        type="email"
-        placeholder="name@domain.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="bg-secondary/50 border-border text-sm"
-      />
-      <Input
-        aria-label="Invite code"
-        required
-        value={code}
-        onChange={(e) => setCode(e.target.value.toUpperCase())}
-        placeholder="INVITE CODE"
-        className="bg-secondary/50 border-border text-sm font-mono uppercase"
-      />
-      <div className="flex gap-2">
-        <Button
-          type="submit"
-          size="sm"
-          disabled={loading}
-          className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
-        >
-          {loading && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-          Create Account
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setOpen(false)}
-          className="border-border text-muted-foreground"
-        >
-          Cancel
-        </Button>
+      <div>
+        <label htmlFor="invite-code-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          Invite Code
+        </label>
+        <Input
+          id="invite-code-input"
+          aria-label="Invite code"
+          required
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="INVITE CODE"
+          className="bg-secondary/50 border-border font-mono uppercase"
+        />
       </div>
+      <Button
+        type="submit"
+        disabled={loading}
+        className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+      >
+        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+        Create Account
+      </Button>
     </form>
   )
 }

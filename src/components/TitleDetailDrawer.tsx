@@ -75,6 +75,11 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 
 // ─── Movie-only: viewing timeline ────────────────────────────────────────────
 
+// Undated viewings are pre-platform (watched before joining) and order as oldest.
+function viewingTime(v: Viewing): number {
+  return v.date ? new Date(v.date).getTime() : -Infinity
+}
+
 function ViewingTimeline({
   viewings,
   onDeleteViewing,
@@ -110,7 +115,8 @@ function ViewingTimeline({
       <div className="space-y-4">
         {viewings
           .slice()
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          // undated (pre-platform) viewings sort as oldest → bottom of the timeline
+          .sort((a, b) => viewingTime(b) - viewingTime(a))
           .map((v) => (
             <div key={v.id} className="relative">
               <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />
@@ -146,9 +152,11 @@ function ViewingTimeline({
                   <>
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono text-xs text-amber">
-                        {new Date(v.date).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric',
-                        })}
+                        {v.date
+                          ? new Date(v.date).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric', year: 'numeric',
+                            })
+                          : <span className="italic">Before CinemArchive</span>}
                       </span>
                       <div className="flex items-center gap-2">
                         {v.rating && (
@@ -374,7 +382,18 @@ interface TVSeriesSectionProps {
   onColorModeSelected?: (mode: 'bw' | 'color') => void
 }
 
+// Episodes in the given seasons with no watch event yet — the set a
+// pre-platform bulk mark would touch.
+function unwatchedEpisodeCount(seasons: Season[]): number {
+  return seasons.reduce(
+    (sum, s) => sum + (s.episodes?.filter((e) => e.watchEvents.length === 0).length ?? 0),
+    0
+  )
+}
+
 function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
+  const markPrePlatformWatched = useAppStore((s) => s.markPrePlatformWatched)
+  const [confirmPrePlatform, setConfirmPrePlatform] = useState<'series' | 'season' | null>(null)
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
   const [castExpanded, setCastExpanded] = useState(true)
@@ -423,6 +442,53 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
 
   function handleSeasonChange(seasonNumber: number) {
     setSelectedSeason(seasonNumber)
+    setConfirmPrePlatform(null)
+  }
+
+  const seriesUnwatched = unwatchedEpisodeCount(seasons)
+  const seasonUnwatched = season ? unwatchedEpisodeCount([season]) : 0
+
+  function renderPrePlatformMark(scope: 'series' | 'season') {
+    const count = scope === 'series' ? seriesUnwatched : seasonUnwatched
+    if (isSharedView || count === 0) return null
+    const label = scope === 'series'
+      ? 'Watched entire series before joining'
+      : `Watched season ${season?.seasonNumber} before joining`
+    return confirmPrePlatform === scope ? (
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
+          Mark {count} episode{count === 1 ? '' : 's'} as watched (no date)?
+        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              markPrePlatformWatched(titleId, scope === 'season' ? season?.seasonNumber : undefined)
+              setConfirmPrePlatform(null)
+            }}
+            className="font-mono text-xs transition-colors text-amber hover:text-amber/80"
+            aria-label={`Confirm marking ${count} episodes as watched before joining`}
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => setConfirmPrePlatform(null)}
+            className="font-mono text-xs transition-opacity hover:opacity-80"
+            style={{ color: 'var(--paper-faint)' }}
+            aria-label="Cancel marking as watched before joining"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ) : (
+      <button
+        onClick={() => setConfirmPrePlatform(scope)}
+        className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+      >
+        <Clock className="w-3 h-3" />
+        {label}
+      </button>
+    )
   }
 
   return (
@@ -446,6 +512,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Seasons</div>
         </div>
       </div>
+
+      {/* Bulk pre-platform mark: series scope */}
+      {renderPrePlatformMark('series')}
 
       {/* Series Graph heatmap */}
       {seasons.some(hasEpisodes) && (
@@ -515,6 +584,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           })}
         </select>
       )}
+
+      {/* Bulk pre-platform mark: selected-season scope */}
+      {renderPrePlatformMark('season')}
 
       {/* Season cast */}
       {season?.cast && season.cast.length > 0 && (
@@ -925,6 +997,7 @@ export function TitleDetailDrawer() {
 
   const [showLogForm, setShowLogForm] = useState(false)
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [logPrePlatform, setLogPrePlatform] = useState(false)
   const [logRating, setLogRating] = useState(0)
   const [logNotes, setLogNotes] = useState('')
   const [showMovieSaved, setShowMovieSaved] = useState(false)
@@ -1140,11 +1213,11 @@ export function TitleDetailDrawer() {
   if (!title) return null
 
   function logViewing() {
-    if (!title || !logDate) return
+    if (!title || (!logPrePlatform && !logDate)) return
     const viewing: Viewing = {
       id: crypto.randomUUID(),
       titleId: title.id,
-      date: logDate,
+      date: logPrePlatform ? undefined : logDate,
       rating: logRating > 0 ? logRating : undefined,
       notes: logNotes || undefined,
     }
@@ -1158,6 +1231,7 @@ export function TitleDetailDrawer() {
       setShowMovieSaved(false)
       setShowLogForm(false)
       setLogDate(new Date().toISOString().slice(0, 10))
+      setLogPrePlatform(false)
       setLogRating(0)
       setLogNotes('')
     }, 1500)
@@ -1438,6 +1512,9 @@ export function TitleDetailDrawer() {
                   {title.studios && title.studios.length > 0 && (
                     <DetailRow label="Studio" value={title.studios.join(', ')} />
                   )}
+                  {title.collectionName && (
+                    <DetailRow label="Franchise" value={title.collectionName.replace(/\s+Collection$/i, '')} />
+                  )}
                   <DetailRow label="Added" value={fmtDate(title.addedAt)} />
                 </dl>
               </div>
@@ -1517,14 +1594,11 @@ export function TitleDetailDrawer() {
                   <div className="flex items-center justify-center gap-1 mb-0.5">
                     <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                     <StatNumber className="text-base leading-tight">
-                      {title.viewings.length > 0
-                        ? fmtDate(
-                            title.viewings
-                              .slice()
-                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-                              .date
-                          )
-                        : '—'}
+                      {(() => {
+                        if (title.viewings.length === 0) return '—'
+                        const latest = title.viewings.slice().sort((a, b) => viewingTime(b) - viewingTime(a))[0]
+                        return latest.date ? fmtDate(latest.date) : 'Before joining'
+                      })()}
                     </StatNumber>
                   </div>
                   <StatLabel>Last Seen</StatLabel>
@@ -1555,13 +1629,26 @@ export function TitleDetailDrawer() {
                         <Calendar className="inline w-3 h-3 mr-1" />
                         Date Watched
                       </label>
-                      <Input
-                        id="viewing-date"
-                        type="date"
-                        value={logDate}
-                        onChange={(e) => setLogDate(e.target.value)}
-                        className="bg-secondary/50 border-border font-mono"
-                      />
+                      {!logPrePlatform && (
+                        <Input
+                          id="viewing-date"
+                          type="date"
+                          value={logDate}
+                          onChange={(e) => setLogDate(e.target.value)}
+                          className="bg-secondary/50 border-border font-mono"
+                        />
+                      )}
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={logPrePlatform}
+                          onChange={(e) => setLogPrePlatform(e.target.checked)}
+                          className="accent-amber w-3.5 h-3.5"
+                        />
+                        <span className="font-sans text-xs text-muted-foreground">
+                          Watched before joining CinemArchive (no date)
+                        </span>
+                      </label>
                     </div>
                     <div>
                       <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">

@@ -42,6 +42,7 @@ export function computeLedgerStats(titles: Title[]): LedgerStats {
 
   const monthCounts = new Map<string, number>()
   for (const v of viewings) {
+    if (!v.date) continue // pre-platform viewings have no date to bucket
     const month = v.date.slice(0, 7)
     monthCounts.set(month, (monthCounts.get(month) ?? 0) + 1)
   }

@@ -26,7 +26,7 @@ export interface EpisodeCrew {
 
 export interface EpisodeWatchEvent {
   id: string
-  watchedAt: string  // ISO date (YYYY-MM-DD)
+  watchedAt?: string  // ISO date (YYYY-MM-DD); absent = watched before joining the platform (indeterminate date)
   notes?: string
   colorMode?: 'bw' | 'color'  // Spider Noir only
 }
@@ -73,7 +73,7 @@ export interface Season {
 export interface Viewing {
   id: string
   titleId: string
-  date: string
+  date?: string  // ISO date (YYYY-MM-DD); absent = watched before joining the platform (indeterminate date)
   rating?: number
   notes?: string
 }
@@ -102,6 +102,8 @@ export interface Title {
   contentRating?: string  // age certification, e.g. "PG-13", "TV-MA"
   imdbId?: string  // e.g. "tt1375666" — enables an exact IMDb link
   customWatchUrl?: string  // owner override for "where to watch", shown preferentially in shared views
+  collectionId?: number    // TMDB collection id (movies) — franchise grouping
+  collectionName?: string  // TMDB collection name, e.g. "The Lord of the Rings Collection"
   viewings: Viewing[]
   imdbRating?: number
   rtScore?: number
@@ -237,6 +239,8 @@ export const mockTitles: Title[] = [
       "rewatch"
     ],
     "addedAt": "2008-07-16",
+    "collectionId": 263,
+    "collectionName": "The Dark Knight Collection",
     "viewings": []
   },
   {
@@ -372,6 +376,8 @@ export const mockTitles: Title[] = [
       "rewatch"
     ],
     "addedAt": "1999-03-31",
+    "collectionId": 2344,
+    "collectionName": "The Matrix Collection",
     "viewings": []
   },
   {

@@ -150,6 +150,7 @@ export function EpisodeCard({
 interface EpLogState {
   includeWatch: boolean
   watchedAt: string
+  prePlatform: boolean // watched before joining CinemArchive — no date
   watchNotes: string
   rating: number
   reviewText: string
@@ -158,6 +159,7 @@ interface EpLogState {
 const EMPTY_EP_LOG: EpLogState = {
   includeWatch: true,
   watchedAt: new Date().toISOString().slice(0, 10),
+  prePlatform: false,
   rating: 0,
   watchNotes: '',
   reviewText: '',
@@ -193,7 +195,8 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
   function doSave(epLog: EpLogState, colorMode?: 'bw' | 'color') {
     if (!epLog.includeWatch && epLog.rating === 0 && !epLog.reviewText.trim()) return
     logEpisode(titleId, season.seasonNumber, episode.episodeNumber, {
-      watchedAt: epLog.includeWatch ? epLog.watchedAt : undefined,
+      watchedAt: epLog.includeWatch && !epLog.prePlatform ? epLog.watchedAt : undefined,
+      prePlatform: epLog.includeWatch && epLog.prePlatform ? true : undefined,
       watchNotes: epLog.includeWatch ? epLog.watchNotes : undefined,
       rating: epLog.rating > 0 ? epLog.rating : undefined,
       reviewText: epLog.reviewText.trim() || undefined,
@@ -207,7 +210,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
 
   function handleSubmit() {
     if (!log.includeWatch && log.rating === 0 && !log.reviewText.trim()) return
-    const hasWatchOrReview = (log.includeWatch && !!log.watchedAt) || !!log.reviewText.trim()
+    const hasWatchOrReview = (log.includeWatch && (!!log.watchedAt || log.prePlatform)) || !!log.reviewText.trim()
     if (isSpiderNoir && hasWatchOrReview) {
       setPendingLog(log)
       setShowNoirModal(true)
@@ -302,7 +305,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                   ) : (
                     <div className="flex items-start gap-1">
                       <div className="flex-1 font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
-                        {fmtDate(we.watchedAt)}
+                        {we.watchedAt ? fmtDate(we.watchedAt) : <span className="italic">Before CinemArchive</span>}
                         {we.colorMode && (
                           <span className="font-mono ml-1.5 px-1 rounded" style={{ fontSize: '9px', letterSpacing: '0.06em', background: we.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)', color: we.colorMode === 'bw' ? '#aaa' : 'var(--amber)', border: `1px solid ${we.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}` }}>
                             {we.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
@@ -374,7 +377,13 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
             </label>
             {log.includeWatch && (
               <div className="space-y-2 pl-5">
-                <Input aria-label="Date watched" type="date" value={log.watchedAt} onChange={(e) => setLog((l) => ({ ...l, watchedAt: e.target.value }))} className="h-8 text-xs font-mono bg-secondary/50 border-border" />
+                {!log.prePlatform && (
+                  <Input aria-label="Date watched" type="date" value={log.watchedAt} onChange={(e) => setLog((l) => ({ ...l, watchedAt: e.target.value }))} className="h-8 text-xs font-mono bg-secondary/50 border-border" />
+                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={log.prePlatform} onChange={(e) => setLog((l) => ({ ...l, prePlatform: e.target.checked }))} className="accent-amber w-3.5 h-3.5" />
+                  <span className="font-sans text-xs" style={{ color: 'var(--paper-faint)' }}>Watched before joining CinemArchive (no date)</span>
+                </label>
                 <Input aria-label="Watch notes" value={log.watchNotes} onChange={(e) => setLog((l) => ({ ...l, watchNotes: e.target.value }))} placeholder="Watch notes (optional)" className="h-8 text-xs bg-secondary/50 border-border" />
               </div>
             )}
@@ -393,7 +402,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
           </div>
         ) : (
           <button
-            onClick={() => { if (showSaved) return; setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10) })); setShowForm(true) }}
+            onClick={() => { if (showSaved) return; setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10), prePlatform: false })); setShowForm(true) }}
             className="flex items-center gap-1.5 text-xs font-mono transition-colors"
             style={{ color: showSaved ? 'var(--amber)' : 'var(--amber-deep)' }}
             onMouseEnter={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber)' }}

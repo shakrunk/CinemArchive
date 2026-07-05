@@ -31,6 +31,8 @@ export interface SearchResult {
   cast?: CastMember[]
   crew?: CrewMember[]
   studios?: string[]
+  collectionId?: number    // TMDB collection id (movies) — franchise grouping
+  collectionName?: string  // TMDB collection name, e.g. "The Lord of the Rings Collection"
 }
 
 export interface RawTmdbSeason {
@@ -307,6 +309,9 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
 
   const studios: string[] = (data.production_companies ?? []).map((c: any) => c.name as string)
 
+  // Movies only — TMDB has no collection concept for TV.
+  const collection = data.belongs_to_collection ?? null
+
   const director = crew.find((c) => c.job === 'Director')?.name
   const date = data.release_date || data.first_air_date
 
@@ -333,6 +338,8 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     cast,
     crew,
     studios,
+    collectionId: collection?.id ?? undefined,
+    collectionName: collection?.name ?? undefined,
   }
 
   return { result, tmdbSeasons: data.seasons ?? [] }

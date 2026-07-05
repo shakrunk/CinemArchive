@@ -65,9 +65,15 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
   )
 
   // Auth state
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [loadingAuth, setLoadingAuth] = useState(false)
   const [authMessage, setAuthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  function switchAuthMode(next: 'signin' | 'signup') {
+    setAuthMode(next)
+    setAuthMessage(null)
+  }
   
   // Shared keys state
   const [sharedKeys, setSharedKeys] = useState<SharedKey[]>([])
@@ -432,84 +438,133 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
       open={open}
       onClose={onClose}
       maxWidth="sm:max-w-md"
-      title={user ? 'Your Archive Profile' : 'Private Access Sign In'}
-      description={user ? 'Manage your account security and shared library links.' : 'Sign in to access your private film archive.'}
+      title={user ? 'Your Archive Profile' : authMode === 'signin' ? 'Private Access Sign In' : 'Redeem Invite Code'}
+      description={
+        user
+          ? 'Manage your account security and shared library links.'
+          : authMode === 'signin'
+            ? 'Sign in to access your private film archive.'
+            : 'Redeem an invite code to create your account.'
+      }
     >
       <div className="overflow-y-auto flex-1 scrollbar-thin px-6 py-6">
         <h2 className="font-serif text-xl font-light text-paper mb-5">
-          {user ? 'Archive Profile' : 'Sign In'}
+          {user ? 'Archive Profile' : authMode === 'signin' ? 'Sign In' : 'Sign Up'}
         </h2>
 
         {!user ? (
           /* ─── Logged Out UI ─── */
           <div className="space-y-6">
-            <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-              Enter your email to sign in. You will receive a passwordless magic link to log in securely.
-            </p>
-
-            <form onSubmit={handleEmailSignIn} className="space-y-4">
-              <div>
-                <label htmlFor="email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    id="email-input"
-                    aria-label="Email address"
-                    required
-                    type="email"
-                    placeholder="name@domain.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-9 bg-secondary/50 border-border"
-                  />
-                </div>
-              </div>
-
-              {authMessage && (
-                <div
-                  className={cn(
-                    'p-3 rounded-lg text-xs font-sans leading-normal border',
-                    authMessage.type === 'success'
-                      ? 'bg-amber/10 border-amber/30 text-amber'
-                      : 'bg-destructive/10 border-destructive/30 text-destructive'
-                  )}
-                >
-                  {authMessage.text}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  type="submit"
-                  disabled={loadingAuth}
-                  className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
-                >
-                  {loadingAuth ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Mail className="w-4 h-4 mr-2" />
-                  )}
-                  Send Magic Link
-                </Button>
-                <Button
+            <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Sign in or sign up">
+              {(['signin', 'signup'] as const).map((m) => (
+                <button
+                  key={m}
                   type="button"
-                  onClick={handlePasskeySignIn}
-                  disabled={loadingAuth}
-                  variant="outline"
-                  className="border-border text-muted-foreground hover:text-foreground"
-                  title="Sign In with Passkey"
+                  role="tab"
+                  aria-selected={authMode === m}
+                  onClick={() => switchAuthMode(m)}
+                  className={cn(
+                    'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors',
+                    authMode === m
+                      ? 'border-amber/50 bg-amber/10 text-amber'
+                      : 'border-border bg-secondary/20 text-muted-foreground hover:border-amber/25'
+                  )}
                 >
-                  <Fingerprint className="w-4 h-4" />
-                </Button>
-              </div>
-            </form>
+                  {m === 'signin' ? 'Sign In' : 'Sign Up'}
+                </button>
+              ))}
+            </div>
 
-            <InviteRedeemForm
-              onRedeemed={(text) => setAuthMessage({ type: 'success', text })}
-              onError={(text) => setAuthMessage({ type: 'error', text })}
-            />
+            {authMode === 'signin' ? (
+              <>
+                <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                  Enter your email to sign in. You will receive a passwordless magic link to log in securely.
+                </p>
+
+                <form onSubmit={handleEmailSignIn} className="space-y-4">
+                  <div>
+                    <label htmlFor="email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        id="email-input"
+                        aria-label="Email address"
+                        required
+                        type="email"
+                        placeholder="name@domain.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-9 bg-secondary/50 border-border"
+                      />
+                    </div>
+                  </div>
+
+                  {authMessage && (
+                    <div
+                      className={cn(
+                        'p-3 rounded-lg text-xs font-sans leading-normal border',
+                        authMessage.type === 'success'
+                          ? 'bg-amber/10 border-amber/30 text-amber'
+                          : 'bg-destructive/10 border-destructive/30 text-destructive'
+                      )}
+                    >
+                      {authMessage.text}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      type="submit"
+                      disabled={loadingAuth}
+                      className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+                    >
+                      {loadingAuth ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Mail className="w-4 h-4 mr-2" />
+                      )}
+                      Send Magic Link
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handlePasskeySignIn}
+                      disabled={loadingAuth}
+                      variant="outline"
+                      className="border-border text-muted-foreground hover:text-foreground"
+                      title="Sign In with Passkey"
+                    >
+                      <Fingerprint className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                  This is a private, invite-only archive. Enter the email and invite code you were given to create an account.
+                </p>
+
+                {authMessage && (
+                  <div
+                    className={cn(
+                      'p-3 rounded-lg text-xs font-sans leading-normal border',
+                      authMessage.type === 'success'
+                        ? 'bg-amber/10 border-amber/30 text-amber'
+                        : 'bg-destructive/10 border-destructive/30 text-destructive'
+                    )}
+                  >
+                    {authMessage.text}
+                  </div>
+                )}
+
+                <InviteRedeemForm
+                  onRedeemed={(text) => setAuthMessage({ type: 'success', text })}
+                  onError={(text) => setAuthMessage({ type: 'error', text })}
+                />
+              </>
+            )}
           </div>
         ) : (
           /* ─── Logged In UI ─── */

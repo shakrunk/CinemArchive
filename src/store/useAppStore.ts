@@ -8,8 +8,15 @@ import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type Upcom
 import type { User } from '@supabase/supabase-js'
 import type { AppView, NavItemId } from '../lib/navigation'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
-import type { LedgerPanelId, LedgerPanelWidth } from '../lib/ledgerPanels'
-import { DEFAULT_LEDGER_PANEL_ORDER, DEFAULT_LEDGER_PANEL_WIDTHS } from '../lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth, LedgerWidget } from '../lib/ledgerPanels'
+import {
+  DEFAULT_LEDGER_PANEL_ORDER,
+  DEFAULT_LEDGER_PANEL_WIDTHS,
+  LEDGER_PANEL_LABELS,
+  createLedgerWidget,
+  defaultLedgerWidgets,
+  newLedgerWidgetId,
+} from '../lib/ledgerPanels'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
@@ -34,12 +41,21 @@ export interface NavPrefs {
   compact: boolean
 }
 
-/** Ledger dashboard panel layout preferences — order + hidden apply to the
- *  panel grid rendered by Ledger.tsx. */
+/** Ledger dashboard layout preferences — an ordered list of widget instances
+ *  on the board. A panel type not present in `widgets` is simply not on the
+ *  board (re-addable from the layout editor's palette); the same panel type
+ *  may appear more than once. */
 export interface LedgerPrefs {
-  order: LedgerPanelId[]
-  hidden: LedgerPanelId[]
-  widths: Record<LedgerPanelId, LedgerPanelWidth>
+  widgets: LedgerWidget[]
+}
+
+/** Pre-widget-instance persisted shape (order/hidden/widths/heights keyed by
+ *  panel type) — migrated to `widgets` on rehydrate. */
+interface LegacyLedgerPrefs {
+  order?: LedgerPanelId[]
+  hidden?: LedgerPanelId[]
+  widths?: Partial<Record<LedgerPanelId, LedgerPanelWidth>>
+  heights?: Partial<Record<LedgerPanelId, number>>
 }
 
 /** A cast/crew person, keyed by TMDB id with a display name. */
@@ -144,10 +160,12 @@ interface UISlice {
   toggleNavItemHidden: (id: NavItemId) => void
   setNavCompact: (compact: boolean) => void
   resetNavPrefs: () => void
-  moveLedgerPanel: (id: LedgerPanelId, direction: 'up' | 'down') => void
-  reorderLedgerPanels: (order: LedgerPanelId[]) => void
-  toggleLedgerPanelHidden: (id: LedgerPanelId) => void
-  setLedgerPanelWidth: (id: LedgerPanelId, width: LedgerPanelWidth) => void
+  addLedgerWidget: (panel: LedgerPanelId) => string
+  duplicateLedgerWidget: (id: string) => string | null
+  removeLedgerWidget: (id: string) => void
+  moveLedgerWidget: (id: string, direction: 'up' | 'down') => void
+  reorderLedgerWidgets: (ids: string[]) => void
+  setLedgerWidgetWidth: (id: string, width: LedgerPanelWidth) => void
   resetLedgerPrefs: () => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
@@ -213,9 +231,7 @@ const defaultNavPrefs: NavPrefs = {
 }
 
 const defaultLedgerPrefs: LedgerPrefs = {
-  order: DEFAULT_LEDGER_PANEL_ORDER,
-  hidden: [],
-  widths: DEFAULT_LEDGER_PANEL_WIDTHS,
+  widgets: defaultLedgerWidgets(),
 }
 
 // ─── Default Filters ────────────────────────────────────────────────────────
@@ -730,33 +746,55 @@ export const useAppStore = create<AppStore>()(
 
   resetNavPrefs: () => set({ navPrefs: defaultNavPrefs }),
 
-  moveLedgerPanel: (id, direction) =>
+  addLedgerWidget: (panel) => {
+    const widget = createLedgerWidget(panel)
+    set((s) => ({ ledgerPrefs: { widgets: [...s.ledgerPrefs.widgets, widget] } }))
+    return widget.id
+  },
+
+  duplicateLedgerWidget: (id) => {
+    const source = get().ledgerPrefs.widgets.find((w) => w.id === id)
+    if (!source) return null
+    const copy: LedgerWidget = { ...source, id: newLedgerWidgetId() }
     set((s) => {
-      const order = [...s.ledgerPrefs.order]
-      const idx = order.indexOf(id)
+      const widgets = [...s.ledgerPrefs.widgets]
+      const idx = widgets.findIndex((w) => w.id === id)
+      widgets.splice(idx + 1, 0, copy)
+      return { ledgerPrefs: { widgets } }
+    })
+    return copy.id
+  },
+
+  removeLedgerWidget: (id) =>
+    set((s) => ({ ledgerPrefs: { widgets: s.ledgerPrefs.widgets.filter((w) => w.id !== id) } })),
+
+  moveLedgerWidget: (id, direction) =>
+    set((s) => {
+      const widgets = [...s.ledgerPrefs.widgets]
+      const idx = widgets.findIndex((w) => w.id === id)
       const swapWith = direction === 'up' ? idx - 1 : idx + 1
-      if (idx === -1 || swapWith < 0 || swapWith >= order.length) return {}
-      ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
-      return { ledgerPrefs: { ...s.ledgerPrefs, order } }
+      if (idx === -1 || swapWith < 0 || swapWith >= widgets.length) return {}
+      ;[widgets[idx], widgets[swapWith]] = [widgets[swapWith], widgets[idx]]
+      return { ledgerPrefs: { widgets } }
     }),
 
-  reorderLedgerPanels: (order) => set((s) => ({ ledgerPrefs: { ...s.ledgerPrefs, order } })),
-
-  toggleLedgerPanelHidden: (id) =>
+  reorderLedgerWidgets: (ids) =>
     set((s) => {
-      const isHidden = s.ledgerPrefs.hidden.includes(id)
-      const hidden = isHidden
-        ? s.ledgerPrefs.hidden.filter((x) => x !== id)
-        : [...s.ledgerPrefs.hidden, id]
-      // Keep at least one panel visible.
-      if (!isHidden && hidden.length >= s.ledgerPrefs.order.length) return {}
-      return { ledgerPrefs: { ...s.ledgerPrefs, hidden } }
+      const byId = new Map(s.ledgerPrefs.widgets.map((w) => [w.id, w]))
+      const widgets = ids.map((id) => byId.get(id)).filter((w): w is LedgerWidget => Boolean(w))
+      // Anything omitted from `ids` (shouldn't happen) is kept rather than dropped.
+      for (const w of s.ledgerPrefs.widgets) if (!ids.includes(w.id)) widgets.push(w)
+      return { ledgerPrefs: { widgets } }
     }),
 
-  setLedgerPanelWidth: (id, width) =>
-    set((s) => ({ ledgerPrefs: { ...s.ledgerPrefs, widths: { ...s.ledgerPrefs.widths, [id]: width } } })),
+  setLedgerWidgetWidth: (id, width) =>
+    set((s) => ({
+      ledgerPrefs: {
+        widgets: s.ledgerPrefs.widgets.map((w) => (w.id === id ? { ...w, width } : w)),
+      },
+    })),
 
-  resetLedgerPrefs: () => set({ ledgerPrefs: defaultLedgerPrefs }),
+  resetLedgerPrefs: () => set({ ledgerPrefs: { widgets: defaultLedgerWidgets() } }),
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -1014,8 +1052,33 @@ export const useAppStore = create<AppStore>()(
         state.filters = { ...defaultFilters, ...state.filters }
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)
-        // Older persisted payloads predate per-panel widths — backfill any missing ones.
-        state.ledgerPrefs.widths = { ...DEFAULT_LEDGER_PANEL_WIDTHS, ...state.ledgerPrefs.widths }
+        // Migrate ledger layout prefs. Older payloads used per-panel-type
+        // order/hidden/widths/heights; the board is now a list of widget
+        // instances. Hidden panels become "not on the board".
+        const rawPrefs = (state.ledgerPrefs ?? {}) as LedgerPrefs & LegacyLedgerPrefs
+        if (!Array.isArray(rawPrefs.widgets)) {
+          if (Array.isArray(rawPrefs.order)) {
+            const widths = { ...DEFAULT_LEDGER_PANEL_WIDTHS, ...(rawPrefs.widths ?? {}) }
+            const hidden = rawPrefs.hidden ?? []
+            const known = rawPrefs.order.filter((id) => id in LEDGER_PANEL_LABELS)
+            const order = [...known, ...DEFAULT_LEDGER_PANEL_ORDER.filter((id) => !known.includes(id))]
+            state.ledgerPrefs = {
+              widgets: order
+                .filter((panel) => !hidden.includes(panel))
+                .map((panel) => createLedgerWidget(panel, widths[panel])),
+            }
+          } else {
+            state.ledgerPrefs = { widgets: defaultLedgerWidgets() }
+          }
+        } else {
+          // Drop instances whose panel type no longer exists, and strip any
+          // per-widget height from before heights were standardized.
+          state.ledgerPrefs = {
+            widgets: rawPrefs.widgets
+              .filter((w) => w.panel in LEDGER_PANEL_LABELS)
+              .map((w) => ({ id: w.id, panel: w.panel, width: w.width ?? DEFAULT_LEDGER_PANEL_WIDTHS[w.panel] })),
+          }
+        }
       },
     }
   )

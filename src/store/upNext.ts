@@ -17,13 +17,14 @@ export interface UpcomingEntry {
   releaseDate: string | null
 }
 
-/** Latest `watchedAt` across all of a title's episode watch events, or null. */
+/** Latest `watchedAt` across all of a title's episode watch events, or null.
+ *  Dateless (pre-platform) watch events are skipped — they carry no recency signal. */
 function lastWatchedAtForTitle(title: Title): string | null {
   let max: string | null = null
   for (const season of title.seasons ?? []) {
     for (const episode of season.episodes ?? []) {
       for (const we of episode.watchEvents) {
-        if (max === null || we.watchedAt > max) max = we.watchedAt
+        if (we.watchedAt && (max === null || we.watchedAt > max)) max = we.watchedAt
       }
     }
   }

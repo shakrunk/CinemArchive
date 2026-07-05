@@ -283,6 +283,7 @@ interface LogFormState {
   status: WatchStatus
   rating: number
   date: string
+  prePlatform: boolean // watched before joining CinemArchive — logs the viewing with no date
   notes: string
   tags: string[]
   seasons: Season[]
@@ -292,6 +293,7 @@ const DEFAULT_LOG: LogFormState = {
   status: 'watched',
   rating: 0,
   date: new Date().toISOString().slice(0, 10),
+  prePlatform: false,
   notes: '',
   tags: [],
   seasons: [],
@@ -409,8 +411,8 @@ export function AddTitleWorkflow() {
       tags: log.tags,
       addedAt: new Date().toISOString().slice(0, 10),
       seasons: log.seasons.length > 0 ? log.seasons : undefined,
-      viewings: log.status === 'watched' && log.date
-        ? [{ id: crypto.randomUUID(), titleId: id, date: log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
+      viewings: log.status === 'watched' && (log.prePlatform || log.date)
+        ? [{ id: crypto.randomUUID(), titleId: id, date: log.prePlatform ? undefined : log.date, rating: log.rating || undefined, notes: log.notes || undefined }]
         : [],
       imdbRating: selected.imdbRating,
       rtScore: selected.rtScore,
@@ -621,13 +623,26 @@ export function AddTitleWorkflow() {
                 <Calendar className="inline w-3 h-3 mr-1" />
                 Date Watched
               </label>
-              <Input
-                id="log-date"
-                type="date"
-                value={log.date}
-                onChange={(e) => setLog((l) => ({ ...l, date: e.target.value }))}
-                className="bg-secondary/50 border-border font-mono"
-              />
+              {!log.prePlatform && (
+                <Input
+                  id="log-date"
+                  type="date"
+                  value={log.date}
+                  onChange={(e) => setLog((l) => ({ ...l, date: e.target.value }))}
+                  className="bg-secondary/50 border-border font-mono"
+                />
+              )}
+              <label className="flex items-center gap-2 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={log.prePlatform}
+                  onChange={(e) => setLog((l) => ({ ...l, prePlatform: e.target.checked }))}
+                  className="accent-amber w-3.5 h-3.5"
+                />
+                <span className="font-sans text-xs text-muted-foreground">
+                  Watched before joining CinemArchive (no date)
+                </span>
+              </label>
             </div>
           )}
 

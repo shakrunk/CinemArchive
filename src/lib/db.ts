@@ -3,6 +3,12 @@ import type { CastMember, CrewMember, EpisodeCrew, Title, WatchStatus, MediaType
 
 // ─── Mapping Helpers ─────────────────────────────────────────────────────────
 
+// Sort key for watch dates: a missing date means "watched before joining the
+// platform" and orders before any dated watch.
+function watchTime(date: string | null | undefined): number {
+  return date ? new Date(date).getTime() : -Infinity
+}
+
 function mapDbTitleToLocal(row: any): Title {
   const episodesBySeason: Record<number, any[]> = {}
   for (const ep of (row.episodes || [])) {
@@ -85,13 +91,11 @@ function mapDbTitleToLocal(row: any): Title {
                 .map((c) => c.name),
               crew: epCrew.length > 0 ? epCrew : undefined,
               watchEvents: (ep.episode_watch_events || [])
-                .sort(
-                  (a: any, b: any) =>
-                    new Date(a.watched_at).getTime() - new Date(b.watched_at).getTime()
-                )
+                // null watched_at = pre-platform watch (indeterminate date) — sorts as oldest
+                .sort((a: any, b: any) => watchTime(a.watched_at) - watchTime(b.watched_at))
                 .map((we: any) => ({
                   id: we.id,
-                  watchedAt: we.watched_at,
+                  watchedAt: we.watched_at || undefined,
                   notes: we.notes || undefined,
                   colorMode: we.color_mode || undefined,
                 })),
@@ -135,11 +139,12 @@ function mapDbTitleToLocal(row: any): Title {
       .map((v: any) => ({
         id: v.id,
         titleId: v.title_id,
-        date: v.viewed_at,
+        date: v.viewed_at || undefined,
         rating: v.rating ? parseFloat(v.rating) : undefined,
         notes: v.notes || undefined,
       }))
-      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      // undated (pre-platform) viewings sort as oldest → end of the desc list
+      .sort((a: any, b: any) => watchTime(b.date) - watchTime(a.date)),
   }
 }
 
@@ -470,7 +475,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
         id: v.id,
         title_id: title.id,
         user_id: userId,
-        viewed_at: v.date,
+        viewed_at: v.date ?? null,
         rating: v.rating,
         notes: v.notes,
       }))
@@ -640,7 +645,7 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
         id: v.id,
         title_id: titleId,
         user_id: userId,
-        viewed_at: v.date,
+        viewed_at: v.date ?? null,
         rating: v.rating,
         notes: v.notes,
       }))
@@ -696,6 +701,7 @@ export async function logEpisodeToDb(
   episodeId: string,
   opts: {
     watchedAt?: string
+    prePlatform?: boolean // watched before joining — creates a watch event with a null (indeterminate) date
     watchNotes?: string
     rating?: number
     reviewText?: string
@@ -705,12 +711,12 @@ export async function logEpisodeToDb(
 ): Promise<void> {
   if (!supabase) return
 
-  if (opts.watchedAt) {
+  if (opts.watchedAt || opts.prePlatform) {
     const { error } = await supabase.from('episode_watch_events').insert({
       ...(opts.watchEventId ? { id: opts.watchEventId } : {}),
       episode_id: episodeId,
       user_id: userId,
-      watched_at: opts.watchedAt,
+      watched_at: opts.watchedAt ?? null,
       notes: opts.watchNotes || undefined,
       color_mode: opts.colorMode ?? null,
     })
@@ -743,6 +749,29 @@ export async function logEpisodeToDb(
       console.error('Error inserting episode review:', error)
       throw error
     }
+  }
+}
+
+// Bulk-insert pre-platform (dateless) watch events — used when marking a whole
+// season or series as watched before joining. IDs are client-supplied so the
+// optimistic store rows match the DB rows.
+export async function insertPrePlatformWatchEventsToDb(
+  userId: string,
+  events: Array<{ id: string; episodeId: string }>
+): Promise<void> {
+  if (!supabase || events.length === 0) return
+
+  const { error } = await supabase.from('episode_watch_events').insert(
+    events.map((e) => ({
+      id: e.id,
+      episode_id: e.episodeId,
+      user_id: userId,
+      watched_at: null,
+    }))
+  )
+  if (error) {
+    console.error('Error inserting pre-platform watch events:', error)
+    throw error
   }
 }
 

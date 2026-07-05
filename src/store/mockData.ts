@@ -26,7 +26,7 @@ export interface EpisodeCrew {
 
 export interface EpisodeWatchEvent {
   id: string
-  watchedAt: string  // ISO date (YYYY-MM-DD)
+  watchedAt?: string  // ISO date (YYYY-MM-DD); absent = watched before joining the platform (indeterminate date)
   notes?: string
   colorMode?: 'bw' | 'color'  // Spider Noir only
 }
@@ -73,7 +73,7 @@ export interface Season {
 export interface Viewing {
   id: string
   titleId: string
-  date: string
+  date?: string  // ISO date (YYYY-MM-DD); absent = watched before joining the platform (indeterminate date)
   rating?: number
   notes?: string
 }

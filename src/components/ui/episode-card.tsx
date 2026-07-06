@@ -396,8 +396,8 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
               <textarea aria-label="Episode review" value={log.reviewText} onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))} placeholder="Your thoughts on this episode…" rows={2} className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40" style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }} />
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSubmit} disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()} className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40" style={{ background: 'var(--amber)', color: '#1a0e06' }}>Save</button>
-              <button onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }} className="h-8 px-3 rounded-md text-xs font-sans border transition-colors" style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}>Cancel</button>
+              <button onClick={handleSubmit} disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()} className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ background: 'var(--amber)', color: '#1a0e06' }}>Save</button>
+              <button onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }} className="h-8 px-3 rounded-md text-xs font-sans border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}>Cancel</button>
             </div>
           </div>
         ) : (

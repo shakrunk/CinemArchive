@@ -134,7 +134,7 @@ function ViewingTimeline({
                         }}
                         className="font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--ember)' }}
-                        aria-label="Delete viewing forever"
+                        aria-label="Delete forever: viewing"
                       >
                         Delete forever
                       </button>
@@ -1724,7 +1724,7 @@ export function TitleDetailDrawer() {
                       onClick={handleDelete}
                       className="font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--ember)' }}
-                      aria-label="Delete title from library forever"
+                      aria-label="Delete forever: title from library"
                     >
                       Delete forever
                     </button>

@@ -44,3 +44,6 @@
 ## 2026-07-02 - Actionable Empty States in Dashboards
 **Learning:** Empty states in dashboard components (like those in Ledger.tsx) often just display static text (e.g., 'No titles yet'), which is a dead end. Providing a clear CTA like 'Browse Library' helps the user take the next step.
 **Action:** When working on dashboard panels or data visualization components, ensure any empty states include an actionable CTA button that guides the user on how to populate the data.
+## 2026-07-05 - WCAG 2.5.3 Compliance for Confirmations
+**Learning:** Adding an `aria-label` to a button that completely overwrites its visible text violates WCAG 2.5.3 (Label in Name), which requires the accessible name to contain the exact visible text. This breaks voice control software where users might command 'Click [Visible Text]'.
+**Action:** When adding `aria-label` to give extra context to a text button (e.g. 'Delete forever'), ensure the label INCLUDES the exact visible words (e.g. `aria-label="Delete forever: viewing"`).

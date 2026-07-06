@@ -106,7 +106,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
 
           <button
             onClick={openCommandPalette}
-            aria-label="Open command palette"
+            aria-label="Search (open command palette)"
             className="icon-btn h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center gap-2 px-2.5 sm:px-3"
             style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
           >

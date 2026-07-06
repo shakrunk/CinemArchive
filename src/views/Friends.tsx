@@ -432,10 +432,25 @@ function InboxSection() {
 
 // ─── Friend activity ──────────────────────────────────────────────────────────
 
+const ACTIVITY_PAGE_SIZE = 30
+
+function activityVerb(type: ActivityEvent['type']): string {
+  switch (type) {
+    case 'title_added': return 'added'
+    case 'viewing_logged': return 'watched'
+    case 'comment_added': return 'commented on'
+    case 'reaction_added': return 'reacted to'
+  }
+}
+
 function ActivitySection() {
   const markActivityFeedSeen = useAppStore((s) => s.markActivityFeedSeen)
+  const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const [feed, setFeed] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -443,6 +458,7 @@ function ActivitySection() {
       .then((f) => {
         if (cancelled) return
         setFeed(f)
+        setHasMore(f.length === ACTIVITY_PAGE_SIZE)
         markActivityFeedSeen()
       })
       .catch((err) => console.error('Failed to load friend activity feed:', err))
@@ -455,41 +471,79 @@ function ActivitySection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  async function handleLoadMore() {
+    const last = feed[feed.length - 1]
+    if (!last) return
+    setLoadingMore(true)
+    try {
+      const more = await fetchFriendActivityFeed(last.eventAt)
+      setFeed((prev) => [...prev, ...more])
+      setHasMore(more.length === ACTIVITY_PAGE_SIZE)
+    } catch (err) {
+      console.error('Failed to load more activity:', err)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  async function handleOpen(e: ActivityEvent) {
+    try {
+      await loadFriendLibrary(e.friendUserId, e.friendDisplayName || e.friendUsername || 'Friend')
+      openDetailDrawer(e.titleId)
+    } catch (err) {
+      console.error('Failed to open activity event:', err)
+    }
+  }
+
   return (
-    <Section title="Friend Activity" Icon={Activity} description="What your friends have been adding and watching lately.">
+    <Section title="Friend Activity" Icon={Activity} description="What your friends have been adding, watching, and saying lately.">
       <div className="space-y-2">
         {loading ? (
           <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading activity...</div>
         ) : feed.length === 0 ? (
           <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No friend activity yet.</div>
         ) : (
-          feed.map((e) => (
-            <div
-              key={`${e.type}:${e.titleId}:${e.eventAt}`}
-              className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center gap-3"
-            >
-              {e.posterUrl && <img src={e.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />}
-              <div className="min-w-0 flex-1">
-                <p className="font-sans text-xs text-paper truncate">
-                  <span className="font-medium">{e.friendDisplayName || e.friendUsername || 'A friend'}</span>{' '}
-                  {e.type === 'title_added' ? 'added' : 'watched'}{' '}
-                  <span className="font-medium">
-                    {e.title}
-                    {e.year ? ` (${e.year})` : ''}
-                  </span>
-                  {e.type === 'viewing_logged' && e.rating != null && (
-                    <span className="inline-flex items-center gap-0.5 ml-1.5 text-amber">
-                      <Star className="w-3 h-3 fill-current" />
-                      {e.rating}
+          <>
+            {feed.map((e) => (
+              <button
+                key={`${e.type}:${e.titleId}:${e.friendUserId}:${e.eventAt}`}
+                onClick={() => handleOpen(e)}
+                className="w-full text-left bg-secondary/20 hover:bg-secondary/40 rounded-lg p-3 border border-border flex items-center gap-3 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              >
+                {e.posterUrl && <img src={e.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />}
+                <div className="min-w-0 flex-1">
+                  <p className="font-sans text-xs text-paper truncate">
+                    <span className="font-medium">{e.friendDisplayName || e.friendUsername || 'A friend'}</span>{' '}
+                    {activityVerb(e.type)}{' '}
+                    <span className="font-medium">
+                      {e.title}
+                      {e.year ? ` (${e.year})` : ''}
                     </span>
-                  )}
-                </p>
-                <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                  {new Date(e.eventAt).toLocaleDateString()}
-                </p>
+                    {e.type === 'viewing_logged' && e.rating != null && (
+                      <span className="inline-flex items-center gap-0.5 ml-1.5 text-amber">
+                        <Star className="w-3 h-3 fill-current" />
+                        {e.rating}
+                      </span>
+                    )}
+                  </p>
+                  <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                    {new Date(e.eventAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </button>
+            ))}
+            {hasMore && (
+              <div className="text-center pt-1">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="font-sans text-[11px] uppercase tracking-widest text-muted-foreground hover:text-paper transition-colors disabled:opacity-60"
+                >
+                  {loadingMore ? 'Loading...' : 'Load more'}
+                </button>
               </div>
-            </div>
-          ))
+            )}
+          </>
         )}
       </div>
     </Section>

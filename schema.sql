@@ -1237,14 +1237,24 @@ $$;
 -- FRIEND ACTIVITY FEED
 -- ============================================================
 
--- Merges two activity kinds across the caller's accepted friends: titles
--- they've added to their library, and viewings they've logged. Runs as
--- SECURITY DEFINER (bypassing RLS on titles/viewings/profiles) and instead
--- filters explicitly via is_friend(auth.uid(), <owner>) per branch — the same
--- predicate as the friend-read RLS policies, just aggregated across every
--- friend at once instead of scoped to a single one. Capped to the 100 most
--- recent events across all friends combined.
-create or replace function friend_activity_feed()
+-- Merges four activity kinds across the caller's accepted friends: titles
+-- added, viewings logged, comments added, and reactions added. Runs as
+-- SECURITY DEFINER (bypassing RLS on titles/viewings/profiles/title_comments/
+-- title_reactions) and instead filters explicitly via
+-- can_view_title(t.user_id, t.genres, t.status) per branch — the same
+-- predicate the shared/friend-read RLS policies use, aggregated across every
+-- friend at once instead of scoped to a single one, and (unlike the plain
+-- is_friend() check this replaced) share_scopes-aware: a friend scoped to
+-- e.g. Horror-only no longer sees feed entries about titles outside their
+-- granted scope. The comment/reaction branches additionally exclude the
+-- caller's own actions, matching how the first two branches already only
+-- ever show friend-authored events (your own titles never match
+-- is_friend(auth.uid(), auth.uid()) = false).
+--
+-- Keyset-paginated via p_before/p_limit (capped at 50) rather than a flat
+-- limit, so the client can "Load more" instead of only ever seeing the
+-- latest 50 events across all friends combined.
+create or replace function friend_activity_feed(p_before timestamptz default null, p_limit integer default 30)
 returns table (
   event_type text,
   event_at timestamptz,
@@ -1276,7 +1286,7 @@ language sql security definer stable as $$
       null::numeric(3,1) as rating
     from titles t
     join profiles p on p.user_id = t.user_id
-    where is_friend(auth.uid(), t.user_id)
+    where can_view_title(t.user_id, t.genres, t.status)
 
     union all
 
@@ -1296,10 +1306,53 @@ language sql security definer stable as $$
     from viewings v
     join titles t on t.id = v.title_id
     join profiles p on p.user_id = t.user_id
-    where is_friend(auth.uid(), t.user_id)
+    where can_view_title(t.user_id, t.genres, t.status)
+
+    union all
+
+    select
+      'comment_added' as event_type,
+      c.created_at as event_at,
+      c.author_id as friend_user_id,
+      p.display_name as friend_display_name,
+      p.username as friend_username,
+      t.id as title_id,
+      t.tmdb_id,
+      t.type,
+      t.title,
+      t.year,
+      t.poster_url,
+      null::numeric(3,1) as rating
+    from title_comments c
+    join titles t on t.id = c.title_id
+    join profiles p on p.user_id = c.author_id
+    where can_view_title(t.user_id, t.genres, t.status)
+      and c.author_id <> auth.uid()
+
+    union all
+
+    select
+      'reaction_added' as event_type,
+      r.created_at as event_at,
+      r.author_id as friend_user_id,
+      p.display_name as friend_display_name,
+      p.username as friend_username,
+      t.id as title_id,
+      t.tmdb_id,
+      t.type,
+      t.title,
+      t.year,
+      t.poster_url,
+      null::numeric(3,1) as rating
+    from title_reactions r
+    join titles t on t.id = r.title_id
+    join profiles p on p.user_id = r.author_id
+    where can_view_title(t.user_id, t.genres, t.status)
+      and r.author_id <> auth.uid()
   ) feed
+  where p_before is null or event_at < p_before
   order by event_at desc
-  limit 100;
+  limit least(coalesce(p_limit, 30), 50);
 $$;
 
 -- ============================================================

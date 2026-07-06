@@ -483,7 +483,7 @@ export async function setTitleReaction(titleId: string, emoji: ReactionEmoji | n
 }
 
 export interface ActivityEvent {
-  type: 'title_added' | 'viewing_logged'
+  type: 'title_added' | 'viewing_logged' | 'comment_added' | 'reaction_added'
   eventAt: string
   friendUserId: string
   friendDisplayName: string | null
@@ -514,12 +514,17 @@ function mapDbActivityEventToLocal(row: any): ActivityEvent {
   }
 }
 
-// Recent library-add and viewing activity across the user's accepted friends,
-// newest first. See friend_activity_feed() for the merge/cap logic.
-export async function fetchFriendActivityFeed(): Promise<ActivityEvent[]> {
+// Recent library-add/viewing/comment/reaction activity across the user's
+// accepted friends, newest first, keyset-paginated by event timestamp. Pass
+// the `eventAt` of the last row from the previous page as `before` to load
+// the next one. See friend_activity_feed() for the merge/cap logic.
+export async function fetchFriendActivityFeed(before?: string, limit = 30): Promise<ActivityEvent[]> {
   if (!supabase) return []
 
-  const { data, error } = await supabase.rpc('friend_activity_feed')
+  const { data, error } = await supabase.rpc('friend_activity_feed', {
+    p_before: before ?? null,
+    p_limit: limit,
+  })
 
   if (error) {
     console.error('Error fetching friend activity feed:', error)

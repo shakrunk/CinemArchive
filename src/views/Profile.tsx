@@ -894,7 +894,7 @@ function SharingSection() {
 
 // ─── Invites ──────────────────────────────────────────────────────────────────
 
-const OWNER_EMAIL = 'bioengineerkk@gmail.com'
+const OWNER_EMAIL = 'denkrishna@gmail.com'
 
 function InvitesSection() {
   const user = useAppStore((s) => s.user)

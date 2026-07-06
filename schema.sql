@@ -985,7 +985,7 @@ $$;
 -- src/lib/auth.ts) fails for any email that isn't already a known user.
 --
 -- Each account may generate at most 2 invite codes, ever — except the owner
--- account (auth.email() = 'bioengineerkk@gmail.com'), which is uncapped.
+-- account (auth.email() = 'denkrishna@gmail.com'), which is uncapped.
 create table invite_codes (
   id           uuid primary key default gen_random_uuid(),
   code         text not null unique,
@@ -1008,7 +1008,7 @@ create policy "invite_codes: capped insert"
   with check (
     auth.uid() = created_by
     and (
-      auth.email() = 'bioengineerkk@gmail.com'
+      auth.email() = 'denkrishna@gmail.com'
       or (select count(*) from invite_codes where created_by = auth.uid()) < 2
     )
   );

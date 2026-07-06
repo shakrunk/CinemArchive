@@ -34,7 +34,7 @@ import {
 } from 'src/lib/db'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 
-const OWNER_EMAIL = 'bioengineerkk@gmail.com'
+const OWNER_EMAIL = 'denkrishna@gmail.com'
 
 interface ProfileModalProps {
   open: boolean

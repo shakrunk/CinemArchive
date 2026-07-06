@@ -2,13 +2,14 @@
 // instances, with an edit mode (floating palette/details, drag reorder, edge
 // resize). Panels live in ./panels, editor chrome in ./editor.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pencil, Check, ChevronUp, PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { LEDGER_PANEL_LABELS, LEDGER_PANEL_STANDARD_HEIGHT, defaultLedgerWidgets } from 'src/lib/ledgerPanels'
 import { DashHero, StatRibbon } from './LedgerHero'
+import { LedgerSkeleton } from './LedgerSkeleton'
 import { PANEL_REGISTRY, WIDTH_GRID_CLASSES } from './panelRegistry'
 import { WidgetPalette } from './editor/WidgetPalette'
 import { WidgetDetails } from './editor/WidgetDetails'
@@ -22,6 +23,10 @@ export function Ledger() {
   const resetLedgerPrefs = useAppStore((s) => s.resetLedgerPrefs)
   const friendView = useAppStore((s) => s.friendView)
   const isSharedView = useAppStore((s) => s.isSharedView)
+  const loadingUser = useAppStore((s) => s.loadingUser)
+  const libraryLoadError = useAppStore((s) => s.libraryLoadError)
+  const titlesEmpty = useAppStore((s) => s.titles.length === 0)
+  const loadUserLibrary = useAppStore((s) => s.loadUserLibrary)
   const canEdit = !friendView && !isSharedView
   // Shared/friend views render the owner's synced board arrangement, falling
   // back to the default board when they never synced one. Editing is disabled
@@ -34,6 +39,8 @@ export function Ledger() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [paletteHidden, setPaletteHidden] = useState(false)
   const [detailsHidden, setDetailsHidden] = useState(false)
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  const paletteContainerRef = useRef<HTMLDivElement>(null)
 
   function widgetById(id: string) {
     return widgets.find((w) => w.id === id)
@@ -51,12 +58,33 @@ export function Ledger() {
     setSelectedId(null)
   }
 
+  // Esc: first press deselects the widget, second exits edit mode (focus
+  // returns to the Edit button so keyboard users aren't stranded).
+  useEffect(() => {
+    if (!editing) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (selectedId) {
+        setSelectedId(null)
+      } else {
+        setEditing(false)
+        editButtonRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editing, selectedId])
+
+  // Move focus into the palette when edit mode opens (non-modal region).
+  useEffect(() => {
+    if (editing) paletteContainerRef.current?.focus()
+  }, [editing])
+
   const {
     itemRefs,
     gridRef,
     boardRef,
     draggingId,
-    dragOffset,
     overId,
     resizingId,
     paletteGhost,
@@ -70,6 +98,38 @@ export function Ledger() {
     handlePaletteItemPointerEnd,
   } = useBoardDrag({ selectWidget })
 
+  // Initial fetch (or shared/friend load) with nothing to show yet — shimmer
+  // instead of a flash of zeroed stats and empty-state panels.
+  if (loadingUser && titlesEmpty) {
+    return (
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+        <LedgerSkeleton />
+      </div>
+    )
+  }
+
+  // The load failed outright — surface it instead of a misleading empty board.
+  if (libraryLoadError && titlesEmpty) {
+    return (
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+        <DashHero />
+        <div className="rounded-xl border border-dashed py-14 px-6 text-center" style={{ borderColor: 'rgba(200,90,60,0.4)' }}>
+          <p className="font-serif text-lg text-paper">The projector jammed.</p>
+          <p className="mt-2 text-sm text-paper-faint">{libraryLoadError}</p>
+          {!isSharedView && (
+            <button
+              type="button"
+              onClick={() => void loadUserLibrary()}
+              className="mt-5 text-xs font-mono text-amber border border-amber/30 rounded-md px-4 py-2 hover:bg-amber/10 transition-colors"
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
       <div className="flex items-start justify-between gap-4">
@@ -77,6 +137,7 @@ export function Ledger() {
         {canEdit && (
           <button
             type="button"
+            ref={editButtonRef}
             onClick={() => (editing ? stopEditing() : setEditing(true))}
             className={cn(
               'shrink-0 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 mt-1 text-xs font-sans border transition-colors',
@@ -139,7 +200,8 @@ export function Ledger() {
               )}
               style={{
                 height: LEDGER_PANEL_STANDARD_HEIGHT,
-                transform: isDragging ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined,
+                // The drag translate is applied imperatively by useBoardDrag
+                // (element.style.transform) to avoid per-pointermove renders.
                 transition: isDragging || isResizing ? 'none' : 'transform 180ms ease',
                 zIndex: isDragging ? 20 : undefined,
                 outline: isOver
@@ -212,7 +274,11 @@ export function Ledger() {
               </span>
             </button>
           ) : (
-            <div className="hidden lg:flex fixed left-4 xl:left-6 top-24 bottom-6 w-[280px] z-40">
+            <div
+              ref={paletteContainerRef}
+              tabIndex={-1}
+              className="hidden lg:flex fixed left-4 xl:left-6 top-24 bottom-6 w-[280px] z-40 outline-none"
+            >
               <WidgetPalette
                 className="flex-1 min-h-0"
                 onItemPointerDown={handlePaletteItemPointerDown}
@@ -263,14 +329,14 @@ export function Ledger() {
                 selectedId && widgetById(selectedId) ? setDetailsHidden(false) : setPaletteHidden(false)
               }
               aria-label="Show layout editor panel"
-              className="lg:hidden fixed right-3 bottom-20 z-40 inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] uppercase text-amber"
+              className="lg:hidden fixed right-3 bottom-20 z-[210] inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] uppercase text-amber"
               style={floatingPanelStyle}
             >
               <ChevronUp className="w-3.5 h-3.5" />
               {selectedId && widgetById(selectedId) ? 'Details' : 'Widgets'}
             </button>
           ) : (
-            <div className="lg:hidden fixed inset-x-3 bottom-20 z-40 flex max-h-[46vh]">
+            <div className="lg:hidden fixed inset-x-3 bottom-20 z-[210] flex max-h-[min(62vh,520px)] pb-[env(safe-area-inset-bottom)]">
               {selectedId && widgetById(selectedId) ? (
                 <WidgetDetails
                   className="flex-1"
@@ -298,7 +364,7 @@ export function Ledger() {
           {/* Drag ghost following the pointer while adding from the palette */}
           {paletteGhost && (
             <div
-              className="fixed z-[60] pointer-events-none -translate-x-1/2 -translate-y-1/2"
+              className="fixed z-[220] pointer-events-none -translate-x-1/2 -translate-y-1/2"
               style={{ left: paletteGhost.x, top: paletteGhost.y }}
             >
               <span

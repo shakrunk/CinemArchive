@@ -60,7 +60,6 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
   const dragRef = useRef<DragMeta | null>(null)
   const overRef = useRef<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [overId, setOverId] = useState<string | null>(null)
 
   // Resize drag — handles live on the panel's side edges.
@@ -98,18 +97,23 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
       drag.active = true
       setDraggingId(drag.id)
     }
-    setDragOffset({ x: dx, y: dy })
+    // Apply the drag transform imperatively — routing it through React state
+    // re-rendered the entire board on every pointermove.
+    const el = itemRefs.current.get(drag.id)
+    if (el) el.style.transform = `translate(${dx}px, ${dy}px)`
     let hit: string | null = null
-    for (const [id, el] of itemRefs.current) {
+    for (const [id, item] of itemRefs.current) {
       if (id === drag.id) continue
-      const rect = el.getBoundingClientRect()
+      const rect = item.getBoundingClientRect()
       if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
         hit = id
         break
       }
     }
-    overRef.current = hit
-    setOverId(hit)
+    if (hit !== overRef.current) {
+      overRef.current = hit
+      setOverId(hit)
+    }
   }
 
   function handlePanelPointerEnd(e: React.PointerEvent<HTMLDivElement>, id: string) {
@@ -117,6 +121,8 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     dragRef.current = null
     if (!drag) return
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    const dragged = itemRefs.current.get(drag.id)
+    if (dragged) dragged.style.transform = ''
     const over = overRef.current
     if (!drag.active) {
       // A press without movement is a selection, not a drag.
@@ -131,7 +137,6 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     }
     overRef.current = null
     setDraggingId(null)
-    setDragOffset({ x: 0, y: 0 })
     setOverId(null)
   }
 
@@ -252,7 +257,6 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     gridRef,
     boardRef,
     draggingId,
-    dragOffset,
     overId,
     resizingId,
     paletteGhost,

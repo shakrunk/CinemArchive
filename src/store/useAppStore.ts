@@ -218,6 +218,9 @@ export interface FriendViewInfo {
 interface AuthSlice {
   user: User | null
   loadingUser: boolean
+  // Set when the last library load failed; cleared when a load starts or
+  // succeeds. Views surface it instead of a misleading empty state.
+  libraryLoadError: string | null
   friendView: FriendViewInfo | null
   setUser: (user: User | null) => void
   setLoadingUser: (loading: boolean) => void
@@ -976,6 +979,7 @@ export const useAppStore = create<AppStore>()(
   // ── Auth ───────────────────────────────────────────────────
   user: null,
   loadingUser: false,
+  libraryLoadError: null,
   friendView: null,
 
   setUser: (user) => {
@@ -1001,7 +1005,7 @@ export const useAppStore = create<AppStore>()(
   loadUserLibrary: async () => {
     const user = get().user
     if (!user) return
-    set({ loadingUser: true })
+    set({ loadingUser: true, libraryLoadError: null })
     try {
       const dbTitles = await fetchUserLibrary(user.id)
       // The synced board layout rides along with the library fetch. Server
@@ -1028,13 +1032,18 @@ export const useAppStore = create<AppStore>()(
       }))
     } catch (err) {
       console.error('Failed to load user library from DB:', err)
+      set({ libraryLoadError: "Couldn't load your library — check your connection." })
+      get().pushNotification({
+        message: "Couldn't load your library — check your connection.",
+        retry: () => get().loadUserLibrary(),
+      })
     } finally {
       set({ loadingUser: false })
     }
   },
 
   loadSharedLibrary: async (token) => {
-    set({ loadingUser: true, isSharedView: true })
+    set({ loadingUser: true, isSharedView: true, libraryLoadError: null })
     try {
       const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
       set((s) => ({
@@ -1051,6 +1060,7 @@ export const useAppStore = create<AppStore>()(
       }
     } catch (err) {
       console.error('Failed to load shared library from DB:', err)
+      set({ libraryLoadError: "Couldn't load this shared library — the link may have expired." })
     } finally {
       set({ loadingUser: false })
     }
@@ -1063,6 +1073,7 @@ export const useAppStore = create<AppStore>()(
     set({
       loadingUser: true,
       isSharedView: true,
+      libraryLoadError: null,
       friendView: { userId: friendUserId, displayName },
       pendingView: 'library',
     })
@@ -1079,6 +1090,7 @@ export const useAppStore = create<AppStore>()(
         .catch(() => set({ viewedLedgerWidgets: null }))
     } catch (err) {
       console.error('Failed to load friend library from DB:', err)
+      set({ libraryLoadError: "Couldn't load that friend's library — check your connection." })
       get().pushNotification({ message: "Couldn't load that friend's library — check your connection." })
     } finally {
       set({ loadingUser: false })

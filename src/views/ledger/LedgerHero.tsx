@@ -53,7 +53,7 @@ export function StatRibbon() {
       {items.map((item, i) => (
         <div key={item.sub} className="flex items-stretch shrink-0">
           {i > 0 && (
-            <div className="w-px bg-[var(--line-2)] mx-6 sm:mx-8 self-stretch" />
+            <div className="w-px bg-[var(--line-2)] mx-4 sm:mx-8 self-stretch" />
           )}
           <div className="flex flex-col">
             <div className="stat-num text-[clamp(26px,3vw,40px)]">

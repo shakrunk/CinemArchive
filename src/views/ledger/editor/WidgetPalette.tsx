@@ -1,7 +1,7 @@
 // Floating widget palette for the Ledger's layout editor: live previews of
 // every panel type, draggable (or tappable) onto the board.
 
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { Check, Plus, RotateCcw, PanelLeftClose } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
@@ -14,8 +14,10 @@ import {
 import { PANEL_REGISTRY } from '../panelRegistry'
 import { floatingPanelStyle } from './chrome'
 
-/** Live, scaled-down render of a panel type for the palette. */
-function WidgetPreview({ panel }: { panel: LedgerPanelId }) {
+/** Live, scaled-down render of a panel type for the palette. Memoized — the
+ *  palette renders one live preview per panel type and re-renders on every
+ *  widget-count change otherwise. */
+const WidgetPreview = memo(function WidgetPreview({ panel }: { panel: LedgerPanelId }) {
   const { Component } = PANEL_REGISTRY[panel]
   return (
     <div
@@ -31,7 +33,7 @@ function WidgetPreview({ panel }: { panel: LedgerPanelId }) {
       />
     </div>
   )
-}
+})
 
 export function WidgetPalette({
   onItemPointerDown,

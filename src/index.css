@@ -895,6 +895,25 @@
   to   { opacity: 1; }
 }
 
+/* Loading placeholder sweep (Ledger skeleton). Neutralized automatically by
+   the global prefers-reduced-motion block. */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--wash);
+}
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(233, 178, 102, 0.06), transparent);
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    CINEMA MODAL — responsive bottom-sheet → centered dialog
    Mobile (<640px): slides up from bottom with rounded top corners

@@ -48,12 +48,17 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
 
     const monthLabels: Array<{ weekIndex: number; label: string }> = []
     let lastMonth = -1
+    let lastLabelWeek = -Infinity
     weeks.forEach((week, wi) => {
       const month = Number(week[0].date.slice(5, 7))
       if (month !== lastMonth) {
+        lastMonth = month
+        // Collision guard: a month boundary within 4 columns of the previous
+        // label would overlap it (labels are wider than a 13px column).
+        if (wi - lastLabelWeek < 4) return
         const d = new Date(Number(week[0].date.slice(0, 4)), month - 1, 1)
         monthLabels.push({ weekIndex: wi, label: d.toLocaleDateString('en-US', { month: 'short' }) })
-        lastMonth = month
+        lastLabelWeek = wi
       }
     })
 
@@ -72,7 +77,11 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
       hint={`past 52 weeks${describeLedgerSettings(settings)}`}
       className={className}
     >
-      <div className="overflow-x-auto -mx-1 px-1">
+      <div
+        className="overflow-x-auto -mx-1 px-1"
+        role="img"
+        aria-label={`52-week screening heatmap: ${totalInYear} screening${totalInYear !== 1 ? 's' : ''} in the past year`}
+      >
         {/* Month labels */}
         <div className="flex mb-1.5">
           {weeks.map((_, wi) => {

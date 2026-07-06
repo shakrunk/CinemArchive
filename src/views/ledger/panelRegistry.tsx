@@ -1,5 +1,9 @@
 // Maps panel ids to their components and width presets to grid classes.
+// Every panel is memoized: they subscribe to the store internally and their
+// props (className, settings) are referentially stable, so board-level state
+// changes (drag hover, selection) don't re-render 19 charts.
 
+import { memo } from 'react'
 import type { LedgerPanelId, LedgerPanelWidth, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { ActivityHeatmap } from './panels/ActivityHeatmap'
 import { EncorePerformances } from './panels/EncorePerformances'
@@ -26,26 +30,26 @@ export interface PanelProps {
   settings?: LedgerWidgetSettings
 }
 
-export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: PanelProps) => React.ReactElement | null }> = {
-  activity: { Component: ActivityHeatmap },
-  encores: { Component: EncorePerformances },
-  run: { Component: TheRun },
-  ratings: { Component: RatingDistribution },
-  genres: { Component: GenreBars },
-  decades: { Component: DecadeFilmstrip },
-  auteurs: { Component: TheAuteurs },
-  ensemble: { Component: TheEnsemble },
-  runtimes: { Component: RuntimeSpectrum },
-  networks: { Component: OnTheAir },
-  verdicts: { Component: SecondOpinions },
-  languages: { Component: InTranslation },
-  weekdays: { Component: ScreeningNights },
-  streaks: { Component: TheMarathon },
-  trajectory: { Component: ShiftingStandards },
-  revivals: { Component: PremieresRevivals },
-  timewarp: { Component: TheRevivalHouse },
-  progress: { Component: StillRolling },
-  attractions: { Component: ComingAttractions },
+export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: React.ComponentType<PanelProps> }> = {
+  activity: { Component: memo(ActivityHeatmap) },
+  encores: { Component: memo(EncorePerformances) },
+  run: { Component: memo(TheRun) },
+  ratings: { Component: memo(RatingDistribution) },
+  genres: { Component: memo(GenreBars) },
+  decades: { Component: memo(DecadeFilmstrip) },
+  auteurs: { Component: memo(TheAuteurs) },
+  ensemble: { Component: memo(TheEnsemble) },
+  runtimes: { Component: memo(RuntimeSpectrum) },
+  networks: { Component: memo(OnTheAir) },
+  verdicts: { Component: memo(SecondOpinions) },
+  languages: { Component: memo(InTranslation) },
+  weekdays: { Component: memo(ScreeningNights) },
+  streaks: { Component: memo(TheMarathon) },
+  trajectory: { Component: memo(ShiftingStandards) },
+  revivals: { Component: memo(PremieresRevivals) },
+  timewarp: { Component: memo(TheRevivalHouse) },
+  progress: { Component: memo(StillRolling) },
+  attractions: { Component: memo(ComingAttractions) },
 }
 
 // Grid column span per width preset — panels are always full-width below `lg`.

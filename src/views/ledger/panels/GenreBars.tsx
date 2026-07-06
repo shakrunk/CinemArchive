@@ -1,16 +1,29 @@
 // ─── Genre bars ───────────────────────────────────────────────────────────────
 
+import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { deriveTopGenres } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'
 
-export function GenreBars({ className }: { className?: string }) {
-  const genres = useAppStore((s) => s.stats.topGenres)
+export function GenreBars({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+  const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const settingsKey = JSON.stringify(settings ?? {})
+  const genres = useMemo(
+    () => deriveTopGenres(titles, settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [titles, settingsKey],
+  )
   const maxCount = genres[0]?.count ?? 1
 
   return (
-    <Panel title="By the genre" hint="top of the marquee" className={className}>
+    <Panel
+      title={settings?.title || 'By the genre'}
+      hint={`top of the marquee${describeLedgerSettings(settings)}`}
+      className={className}
+    >
       {genres.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 gap-3">
           <p className="text-center text-sm text-paper-faint">No genres yet</p>

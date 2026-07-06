@@ -8,7 +8,7 @@ import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type Upcom
 import type { User } from '@supabase/supabase-js'
 import type { AppView, NavItemId } from '../lib/navigation'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
-import type { LedgerPanelId, LedgerPanelWidth, LedgerWidget } from '../lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth, LedgerWidget, LedgerWidgetSettings } from '../lib/ledgerPanels'
 import {
   DEFAULT_LEDGER_PANEL_ORDER,
   DEFAULT_LEDGER_PANEL_WIDTHS,
@@ -16,6 +16,7 @@ import {
   createLedgerWidget,
   defaultLedgerWidgets,
   newLedgerWidgetId,
+  normalizeLedgerWidgets,
 } from '../lib/ledgerPanels'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
@@ -166,6 +167,9 @@ interface UISlice {
   moveLedgerWidget: (id: string, direction: 'up' | 'down') => void
   reorderLedgerWidgets: (ids: string[]) => void
   setLedgerWidgetWidth: (id: string, width: LedgerPanelWidth) => void
+  // Merge-patch a widget's settings; keys set to undefined are removed, and a
+  // settings object with no remaining keys is dropped entirely.
+  setLedgerWidgetSettings: (id: string, patch: Partial<LedgerWidgetSettings>) => void
   resetLedgerPrefs: () => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
@@ -794,6 +798,25 @@ export const useAppStore = create<AppStore>()(
       },
     })),
 
+  setLedgerWidgetSettings: (id, patch) =>
+    set((s) => ({
+      ledgerPrefs: {
+        widgets: s.ledgerPrefs.widgets.map((w) => {
+          if (w.id !== id) return w
+          const settings: LedgerWidgetSettings = { ...w.settings, ...patch }
+          for (const key of Object.keys(settings) as Array<keyof LedgerWidgetSettings>) {
+            if (settings[key] === undefined) delete settings[key]
+          }
+          if (Object.keys(settings).length === 0) {
+            const rest = { ...w }
+            delete rest.settings
+            return rest
+          }
+          return { ...w, settings }
+        }),
+      },
+    })),
+
   resetLedgerPrefs: () => set({ ledgerPrefs: { widgets: defaultLedgerWidgets() } }),
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
@@ -1071,12 +1094,11 @@ export const useAppStore = create<AppStore>()(
             state.ledgerPrefs = { widgets: defaultLedgerWidgets() }
           }
         } else {
-          // Drop instances whose panel type no longer exists, and strip any
-          // per-widget height from before heights were standardized.
+          // Sanitize widget instances: drop unknown panel types, backfill
+          // widths, keep only well-typed settings keys, strip stray fields
+          // (e.g. per-widget heights from before heights were standardized).
           state.ledgerPrefs = {
-            widgets: rawPrefs.widgets
-              .filter((w) => w.panel in LEDGER_PANEL_LABELS)
-              .map((w) => ({ id: w.id, panel: w.panel, width: w.width ?? DEFAULT_LEDGER_PANEL_WIDTHS[w.panel] })),
+            widgets: normalizeLedgerWidgets(rawPrefs.widgets) ?? defaultLedgerWidgets(),
           }
         }
       },

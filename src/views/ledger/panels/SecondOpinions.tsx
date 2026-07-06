@@ -2,15 +2,19 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { scopedTitles } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
-export function SecondOpinions({ className }: { className?: string }) {
+export function SecondOpinions({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const settingsKey = JSON.stringify(settings ?? {})
 
   const rows = useMemo(() => {
-    return titles
+    const { titles: scoped, topN } = scopedTitles('verdicts', titles, settings)
+    return scoped
       .filter((t) => typeof t.rating === 'number' && typeof t.imdbRating === 'number')
       .map((t) => {
         const mine = (t.rating as number) * 2 // 0–5 stars → 0–10 scale
@@ -18,11 +22,16 @@ export function SecondOpinions({ className }: { className?: string }) {
         return { title: t, mine, critics, delta: mine - critics }
       })
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
-      .slice(0, 6)
-  }, [titles])
+      .slice(0, topN)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titles, settingsKey])
 
   return (
-    <Panel title="Second opinions" hint="your call vs the critics" className={className}>
+    <Panel
+      title={settings?.title || 'Second opinions'}
+      hint={`your call vs the critics${describeLedgerSettings(settings)}`}
+      className={className}
+    >
       {rows.length === 0 ? (
         <PanelEmpty message="Rate a few titles to compare against IMDb" />
       ) : (

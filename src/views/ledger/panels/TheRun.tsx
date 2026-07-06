@@ -3,26 +3,22 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { areaPath, linePath } from 'src/components/LedgerCharts'
+import { deriveMonthlySeries } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'
 import { monthLabel } from '../labels'
 
-export function TheRun({ className }: { className?: string }) {
-  const viewingsByMonth = useAppStore((s) => s.stats.viewingsByMonth)
+export function TheRun({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+  const titles = useAppStore((s) => s.titles)
+  const settingsKey = JSON.stringify(settings ?? {})
 
-  // viewingsByMonth only contains months with at least one viewing — fill the
-  // gaps in between so the x-axis represents a true, evenly-spaced calendar
-  // timeline rather than compressing silent months out of existence.
-  const recent = useMemo(() => {
-    const counts = new Map(viewingsByMonth.map((d) => [d.month, d.count]))
-    const now = new Date()
-    const months: { month: string; count: number }[] = []
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      months.push({ month: key, count: counts.get(key) ?? 0 })
-    }
-    return months
-  }, [viewingsByMonth])
+  // Gap-filled month series: the x-axis represents a true, evenly-spaced
+  // calendar timeline rather than compressing silent months out of existence.
+  const recent = useMemo(
+    () => deriveMonthlySeries(titles, settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [titles, settingsKey],
+  )
 
   const maxCount = Math.max(...recent.map((d) => d.count), 1)
   const total = recent.reduce((sum, d) => sum + d.count, 0)
@@ -39,7 +35,11 @@ export function TheRun({ className }: { className?: string }) {
   const requestView = useAppStore((s) => s.requestView)
 
   return (
-    <Panel title="The run" hint={`monthly screenings · last ${recent.length} mo`} className={className}>
+    <Panel
+      title={settings?.title || 'The run'}
+      hint={`monthly screenings · last ${recent.length} mo${describeLedgerSettings(settings)}`}
+      className={className}
+    >
       {total === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 gap-3">
           <p className="text-center text-sm text-paper-faint">No screenings in the past year</p>

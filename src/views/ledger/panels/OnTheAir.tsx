@@ -2,28 +2,33 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { scopedTitles } from 'src/store/ledgerDerive'
+import type { LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
-export function OnTheAir({ className }: { className?: string }) {
+export function OnTheAir({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const settingsKey = JSON.stringify(settings ?? {})
 
   const networks = useMemo(() => {
+    const { topN } = scopedTitles('networks', titles, settings)
     const counts = new Map<string, number>()
     for (const t of titles) {
       if (t.type === 'tv' && t.network) counts.set(t.network, (counts.get(t.network) ?? 0) + 1)
     }
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .slice(0, topN)
       .map(([network, count]) => ({ network, count }))
-  }, [titles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titles, settingsKey])
 
   const maxCount = networks[0]?.count ?? 1
 
   return (
-    <Panel title="On the air" hint="where the series live" className={className}>
+    <Panel title={settings?.title || 'On the air'} hint="where the series live" className={className}>
       {networks.length === 0 ? (
         <PanelEmpty message="No series with a network yet" />
       ) : (

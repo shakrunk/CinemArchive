@@ -1,24 +1,35 @@
 // ─── The auteurs (directors) ──────────────────────────────────────────────────
 
+import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { RadialRing } from 'src/components/LedgerCharts'
+import { deriveTopDirectors } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
-export function TheAuteurs({ className }: { className?: string }) {
-  const directors = useAppStore((s) => s.stats.topDirectors)
+export function TheAuteurs({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+  const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const settingsKey = JSON.stringify(settings ?? {})
+  const directors = useMemo(
+    () => deriveTopDirectors(titles, settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [titles, settingsKey],
+  )
   const maxCount = directors[0]?.count ?? 1
+  const panelTitle = settings?.title || 'The auteurs'
+  const hint = `most-watched directors${describeLedgerSettings(settings)}`
   if (directors.length === 0) {
     return (
-      <Panel title="The auteurs" hint="most-watched directors" className={className}>
+      <Panel title={panelTitle} hint={hint} className={className}>
         <PanelEmpty message="No directors yet" />
       </Panel>
     )
   }
 
   return (
-    <Panel title="The auteurs" hint="most-watched directors" className={className}>
+    <Panel title={panelTitle} hint={hint} className={className}>
       <ol className="flex flex-col gap-1">
         {directors.map((d, i) => {
           const pct = d.count / maxCount

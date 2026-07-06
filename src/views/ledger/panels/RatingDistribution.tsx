@@ -3,15 +3,22 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { ratingColorVar } from 'src/components/LedgerCharts'
+import { deriveRatingDistribution } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'
 import { renderStarLabel } from '../labels'
 
-export function RatingDistribution({ className }: { className?: string }) {
-  const dist = useAppStore((s) => s.stats.ratingDistribution)
-  const avgRating = useAppStore((s) => s.stats.avgRating)
+export function RatingDistribution({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+  const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  const data = dist.filter((d) => d.count > 0).sort((a, b) => b.rating - a.rating)
+  const settingsKey = JSON.stringify(settings ?? {})
+  const { distribution, avgRating } = useMemo(
+    () => deriveRatingDistribution(titles, settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [titles, settingsKey],
+  )
+  const data = distribution.filter((d) => d.count > 0).sort((a, b) => b.rating - a.rating)
   const total = data.reduce((sum, d) => sum + d.count, 0)
 
   const gradient = useMemo(() => {
@@ -28,8 +35,8 @@ export function RatingDistribution({ className }: { className?: string }) {
 
   return (
     <Panel
-      title="Critical record"
-      hint={`rating distribution · ${avgRating.toFixed(1)} avg`}
+      title={settings?.title || 'Critical record'}
+      hint={`rating distribution · ${avgRating.toFixed(1)} avg${describeLedgerSettings(settings)}`}
       className={className}
     >
       {total === 0 ? (

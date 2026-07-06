@@ -3,18 +3,22 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { scopedTitles, dateInRange } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function ScreeningNights({ className }: { className?: string }) {
+export function ScreeningNights({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
+  const settingsKey = JSON.stringify(settings ?? {})
 
   const { counts, total, peak } = useMemo(() => {
+    const { titles: scoped, rangeStart } = scopedTitles('weekdays', titles, settings)
     const counts = Array.from({ length: 7 }, () => 0)
-    for (const t of titles) {
+    for (const t of scoped) {
       for (const v of t.viewings) {
-        if (!v.date) continue
+        if (!v.date || !dateInRange(v.date, rangeStart)) continue
         const [y, m, d] = v.date.split('-').map(Number)
         counts[new Date(y, m - 1, d).getDay()]++
       }
@@ -22,14 +26,15 @@ export function ScreeningNights({ className }: { className?: string }) {
     const total = counts.reduce((sum, c) => sum + c, 0)
     const peak = counts.indexOf(Math.max(...counts))
     return { counts, total, peak }
-  }, [titles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titles, settingsKey])
 
   const maxCount = Math.max(...counts, 1)
 
   return (
     <Panel
-      title="Screening nights"
-      hint={total ? `by day of week · ${DAY_LABELS[peak]} is busiest` : 'by day of week'}
+      title={settings?.title || 'Screening nights'}
+      hint={(total ? `by day of week · ${DAY_LABELS[peak]} is busiest` : 'by day of week') + describeLedgerSettings(settings)}
       className={className}
     >
       {total === 0 ? (

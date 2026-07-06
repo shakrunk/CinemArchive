@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { scopedTitles } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 function languageName(code: string): string {
@@ -12,25 +14,32 @@ function languageName(code: string): string {
   }
 }
 
-export function InTranslation({ className }: { className?: string }) {
+export function InTranslation({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
+  const settingsKey = JSON.stringify(settings ?? {})
 
   const langs = useMemo(() => {
+    const { titles: scoped, topN } = scopedTitles('languages', titles, settings)
     const counts = new Map<string, number>()
-    for (const t of titles) {
+    for (const t of scoped) {
       if (t.originalLanguage) counts.set(t.originalLanguage, (counts.get(t.originalLanguage) ?? 0) + 1)
     }
     return [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .slice(0, topN)
       .map(([code, count]) => ({ code, name: languageName(code), count }))
-  }, [titles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titles, settingsKey])
 
   const total = langs.reduce((sum, l) => sum + l.count, 0)
   const maxCount = langs[0]?.count ?? 1
 
   return (
-    <Panel title="In translation" hint="original languages" className={className}>
+    <Panel
+      title={settings?.title || 'In translation'}
+      hint={`original languages${describeLedgerSettings(settings)}`}
+      className={className}
+    >
       {langs.length === 0 ? (
         <PanelEmpty message="No language data yet" />
       ) : (

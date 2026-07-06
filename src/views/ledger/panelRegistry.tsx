@@ -1,6 +1,6 @@
 // Maps panel ids to their components and width presets to grid classes.
 
-import type { LedgerPanelId, LedgerPanelWidth } from 'src/lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { ActivityHeatmap } from './panels/ActivityHeatmap'
 import { EncorePerformances } from './panels/EncorePerformances'
 import { TheRun } from './panels/TheRun'
@@ -15,7 +15,12 @@ import { SecondOpinions } from './panels/SecondOpinions'
 import { InTranslation } from './panels/InTranslation'
 import { ScreeningNights } from './panels/ScreeningNights'
 
-export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: { className?: string }) => React.ReactElement | null }> = {
+export interface PanelProps {
+  className?: string
+  settings?: LedgerWidgetSettings
+}
+
+export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: PanelProps) => React.ReactElement | null }> = {
   activity: { Component: ActivityHeatmap },
   encores: { Component: EncorePerformances },
   run: { Component: TheRun },

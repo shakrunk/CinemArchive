@@ -3,25 +3,30 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { areaPath, linePath } from 'src/components/LedgerCharts'
+import { scopedTitles } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'
 
 const FILMSTRIP_HOLES = Array.from({ length: 28 })
 
-export function DecadeFilmstrip({ className }: { className?: string }) {
+export function DecadeFilmstrip({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const settingsKey = JSON.stringify(settings ?? {})
 
   const decades = useMemo(() => {
+    const { titles: scoped } = scopedTitles('decades', titles, settings)
     const counts = new Map<number, number>()
-    for (const t of titles) {
+    for (const t of scoped) {
       const decade = Math.floor(t.year / 10) * 10
       counts.set(decade, (counts.get(decade) ?? 0) + 1)
     }
     return [...counts.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([decade, count]) => ({ label: `${decade}s`, count }))
-  }, [titles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titles, settingsKey])
 
   const maxCount = Math.max(...decades.map((d) => d.count), 1)
 
@@ -35,7 +40,11 @@ export function DecadeFilmstrip({ className }: { className?: string }) {
   )
 
   return (
-    <Panel title="By the era" hint="decade breakdown" className={className}>
+    <Panel
+      title={settings?.title || 'By the era'}
+      hint={`decade breakdown${describeLedgerSettings(settings)}`}
+      className={className}
+    >
       {decades.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 gap-3">
           <p className="text-center text-sm text-paper-faint">No titles yet</p>

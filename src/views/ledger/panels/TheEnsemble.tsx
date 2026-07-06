@@ -1,24 +1,35 @@
 // ─── The ensemble (leading cast) ──────────────────────────────────────────────
 
+import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { getInitials } from 'src/components/LedgerCharts'
+import { deriveTopActors } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
-export function TheEnsemble({ className }: { className?: string }) {
-  const actors = useAppStore((s) => s.stats.topActors)
+export function TheEnsemble({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+  const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const settingsKey = JSON.stringify(settings ?? {})
+  const actors = useMemo(
+    () => deriveTopActors(titles, settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [titles, settingsKey],
+  )
   const maxCount = actors[0]?.count ?? 1
+  const panelTitle = settings?.title || 'The ensemble'
+  const hint = `most-billed leads${describeLedgerSettings(settings)}`
   if (actors.length === 0) {
     return (
-      <Panel title="The ensemble" hint="most-billed leads" className={className}>
+      <Panel title={panelTitle} hint={hint} className={className}>
         <PanelEmpty message="No cast data yet" />
       </Panel>
     )
   }
 
   return (
-    <Panel title="The ensemble" hint="most-billed leads" className={className}>
+    <Panel title={panelTitle} hint={hint} className={className}>
       <div className="flex flex-wrap items-start justify-center gap-x-5 gap-y-4 py-2">
         {actors.map((a, i) => {
           const t = a.count / maxCount

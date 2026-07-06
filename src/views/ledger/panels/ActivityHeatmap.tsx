@@ -3,21 +3,26 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { scopedTitles } from 'src/store/ledgerDerive'
+import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'
 import { localDateStr } from '../labels'
 
-export function ActivityHeatmap({ className }: { className?: string }) {
+export function ActivityHeatmap({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
+  const settingsKey = JSON.stringify(settings ?? {})
 
   const viewingCounts = useMemo(() => {
+    const { titles: scoped } = scopedTitles('activity', titles, settings)
     const map = new Map<string, number>()
-    for (const t of titles) {
+    for (const t of scoped) {
       for (const v of t.viewings) {
         if (v.date) map.set(v.date, (map.get(v.date) ?? 0) + 1)
       }
     }
     return map
-  }, [titles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titles, settingsKey])
 
   const todayStr = localDateStr(new Date())
 
@@ -60,7 +65,11 @@ export function ActivityHeatmap({ className }: { className?: string }) {
   )
 
   return (
-    <Panel title="Time in the dark" hint="past 52 weeks" className={className}>
+    <Panel
+      title={settings?.title || 'Time in the dark'}
+      hint={`past 52 weeks${describeLedgerSettings(settings)}`}
+      className={className}
+    >
       <div className="overflow-x-auto -mx-1 px-1">
         {/* Month labels */}
         <div className="flex mb-1.5">

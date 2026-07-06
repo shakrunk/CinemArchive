@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import type { LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 const RUNTIME_BUCKETS = [
@@ -11,7 +12,7 @@ const RUNTIME_BUCKETS = [
   { label: 'An epic', range: '150m and up', min: 150, max: Infinity },
 ]
 
-export function RuntimeSpectrum({ className }: { className?: string }) {
+export function RuntimeSpectrum({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
 
   const { rows, total, avg } = useMemo(() => {
@@ -32,7 +33,7 @@ export function RuntimeSpectrum({ className }: { className?: string }) {
 
   return (
     <Panel
-      title="Feature lengths"
+      title={settings?.title || 'Feature lengths'}
       hint={total ? `movie runtimes · ${avg}m avg` : 'movie runtimes'}
       className={className}
     >

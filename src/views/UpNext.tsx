@@ -65,7 +65,7 @@ function EmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
       </p>
       <button
         onClick={onBrowseLibrary}
-        className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors"
+        className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
       >
         Browse the Library
       </button>

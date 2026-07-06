@@ -14,6 +14,12 @@ import { OnTheAir } from './panels/OnTheAir'
 import { SecondOpinions } from './panels/SecondOpinions'
 import { InTranslation } from './panels/InTranslation'
 import { ScreeningNights } from './panels/ScreeningNights'
+import { TheMarathon } from './panels/TheMarathon'
+import { ShiftingStandards } from './panels/ShiftingStandards'
+import { PremieresRevivals } from './panels/PremieresRevivals'
+import { TheRevivalHouse } from './panels/TheRevivalHouse'
+import { StillRolling } from './panels/StillRolling'
+import { ComingAttractions } from './panels/ComingAttractions'
 
 export interface PanelProps {
   className?: string
@@ -34,6 +40,12 @@ export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: (props: PanelPro
   verdicts: { Component: SecondOpinions },
   languages: { Component: InTranslation },
   weekdays: { Component: ScreeningNights },
+  streaks: { Component: TheMarathon },
+  trajectory: { Component: ShiftingStandards },
+  revivals: { Component: PremieresRevivals },
+  timewarp: { Component: TheRevivalHouse },
+  progress: { Component: StillRolling },
+  attractions: { Component: ComingAttractions },
 }
 
 // Grid column span per width preset — panels are always full-width below `lg`.

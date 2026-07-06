@@ -16,6 +16,12 @@ export type LedgerPanelId =
   | 'verdicts'
   | 'languages'
   | 'weekdays'
+  | 'streaks'
+  | 'trajectory'
+  | 'revivals'
+  | 'timewarp'
+  | 'progress'
+  | 'attractions'
 
 export const DEFAULT_LEDGER_PANEL_ORDER: LedgerPanelId[] = [
   'activity',
@@ -31,6 +37,12 @@ export const DEFAULT_LEDGER_PANEL_ORDER: LedgerPanelId[] = [
   'verdicts',
   'languages',
   'weekdays',
+  'streaks',
+  'trajectory',
+  'revivals',
+  'timewarp',
+  'progress',
+  'attractions',
 ]
 
 export const LEDGER_PANEL_LABELS: Record<LedgerPanelId, string> = {
@@ -47,6 +59,12 @@ export const LEDGER_PANEL_LABELS: Record<LedgerPanelId, string> = {
   verdicts: 'Second Opinions',
   languages: 'In Translation',
   weekdays: 'Screening Nights',
+  streaks: 'The Marathon',
+  trajectory: 'Shifting Standards',
+  revivals: 'Premieres & Revivals',
+  timewarp: 'The Revival House',
+  progress: 'Still Rolling',
+  attractions: 'Coming Attractions',
 }
 
 /** Short blurbs shown in the layout editor's widget palette. */
@@ -64,6 +82,12 @@ export const LEDGER_PANEL_DESCRIPTIONS: Record<LedgerPanelId, string> = {
   verdicts: 'Your ratings vs IMDb',
   languages: 'Original language breakdown',
   weekdays: 'Screenings by day of week',
+  streaks: 'Longest & current screening streaks',
+  trajectory: 'Your average rating over time',
+  revivals: 'First watches vs. encores by month',
+  timewarp: 'How old the films you screen are',
+  progress: 'Series in progress, by completion',
+  attractions: 'The watchlist, weighed',
 }
 
 /** Panel width, expressed as a 12-column grid span (desktop only — panels are
@@ -120,6 +144,12 @@ export const DEFAULT_LEDGER_PANEL_WIDTHS: Record<LedgerPanelId, LedgerPanelWidth
   verdicts: 'lg',
   languages: 'sm',
   weekdays: 'full',
+  streaks: 'sm',
+  trajectory: 'md',
+  revivals: 'md',
+  timewarp: 'md',
+  progress: 'md',
+  attractions: 'sm',
 }
 
 // ─── Per-widget settings ─────────────────────────────────────────────────────
@@ -175,6 +205,12 @@ export const PANEL_SETTING_KEYS: Record<LedgerPanelId, Array<keyof LedgerWidgetS
   verdicts: ['scope', 'topN', 'title'],
   languages: ['scope', 'topN', 'title'],
   weekdays: ['timeRange', 'scope', 'title'],
+  streaks: ['scope', 'title'],
+  trajectory: ['timeRange', 'scope', 'title'],
+  revivals: ['timeRange', 'scope', 'title'],
+  timewarp: ['scope', 'title'],
+  progress: ['topN', 'title'],
+  attractions: ['title'],
 }
 
 /** Per-panel defaults for knobs whose neutral value isn't the global one
@@ -188,6 +224,9 @@ const PANEL_SETTING_DEFAULTS: Partial<Record<LedgerPanelId, { timeRange?: Ledger
   networks: { topN: 6 },
   verdicts: { topN: 6 },
   languages: { topN: 6 },
+  trajectory: { timeRange: '5y' },
+  revivals: { timeRange: '12mo' },
+  progress: { topN: 5 },
 }
 
 export interface EffectiveLedgerSettings {

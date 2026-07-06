@@ -1206,6 +1206,13 @@ function FriendsSection() {
 // ─── Recommendations inbox ────────────────────────────────────────────────────
 
 function InboxSection() {
+  const { titles, openDetailDrawer, openAddTitlePreselected } = useAppStore(
+    useShallow((s) => ({
+      titles: s.titles,
+      openDetailDrawer: s.openDetailDrawer,
+      openAddTitlePreselected: s.openAddTitlePreselected,
+    }))
+  )
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -1226,12 +1233,27 @@ function InboxSection() {
   }
 
   async function handleOpen(rec: Recommendation) {
-    if (rec.status !== 'unread') return
-    setRecommendations((prev) => prev.map((r) => (r.id === rec.id ? { ...r, status: 'read' } : r)))
-    try {
-      await markRecommendationRead(rec.id)
-    } catch (err) {
-      console.error('Failed to mark recommendation read:', err)
+    if (rec.status === 'unread') {
+      setRecommendations((prev) => prev.map((r) => (r.id === rec.id ? { ...r, status: 'read' } : r)))
+      try {
+        await markRecommendationRead(rec.id)
+      } catch (err) {
+        console.error('Failed to mark recommendation read:', err)
+      }
+    }
+
+    const owned = titles.find((t) => t.tmdbId === rec.tmdbId && t.type === rec.type)
+    if (owned) {
+      openDetailDrawer(owned.id)
+    } else {
+      openAddTitlePreselected({
+        tmdbId: rec.tmdbId,
+        type: rec.type,
+        title: rec.title,
+        year: rec.year ?? 0,
+        posterUrl: rec.posterUrl ?? undefined,
+        genres: [],
+      })
     }
   }
 
@@ -1260,39 +1282,57 @@ function InboxSection() {
         ) : recommendations.length === 0 ? (
           <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</div>
         ) : (
-          recommendations.map((r) => (
-            <div
-              key={r.id}
-              onClick={() => handleOpen(r)}
-              className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center gap-3 cursor-default"
-            >
-              {r.posterUrl && (
-                <img src={r.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="font-sans text-xs text-paper font-medium truncate flex items-center gap-1.5">
-                  {r.status === 'unread' && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />}
-                  {r.title}
-                  {r.year ? ` (${r.year})` : ''}
-                </p>
-                <p className="font-mono text-[9px] text-muted-foreground mt-0.5 truncate">
-                  from {r.senderDisplayName || r.senderUsername || 'a friend'}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDismiss(r.id)
+          recommendations.map((r) => {
+            const owned = titles.some((t) => t.tmdbId === r.tmdbId && t.type === r.type)
+            return (
+              <div
+                key={r.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOpen(r)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleOpen(r)
+                  }
                 }}
-                className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center shrink-0"
-                title="Dismiss"
-                aria-label="Dismiss recommendation"
+                className="bg-secondary/20 hover:bg-secondary/40 rounded-lg p-3 border border-border flex items-center gap-3 cursor-pointer transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               >
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          ))
+                {r.posterUrl && (
+                  <img src={r.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-sans text-xs text-paper font-medium truncate flex items-center gap-1.5">
+                    {r.status === 'unread' && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />}
+                    {r.title}
+                    {r.year ? ` (${r.year})` : ''}
+                  </p>
+                  <p className="font-mono text-[9px] text-muted-foreground mt-0.5 truncate">
+                    from {r.senderDisplayName || r.senderUsername || 'a friend'}
+                    {' · '}
+                    {owned ? 'in your library' : 'tap to add'}
+                  </p>
+                  {r.note && (
+                    <p className="font-sans text-[11px] text-muted-foreground italic mt-1 line-clamp-2">
+                      "{r.note}"
+                    </p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDismiss(r.id)
+                  }}
+                  className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center shrink-0"
+                  title="Dismiss"
+                  aria-label="Dismiss recommendation"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )
+          })
         )}
       </div>
     </Section>

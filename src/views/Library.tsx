@@ -58,7 +58,7 @@ function Chip({
   children: React.ReactNode
 }) {
   return (
-    <button onClick={onClick} className={cn('chip', active && 'is-active')}>
+    <button onClick={onClick} className={cn('chip', active && 'is-active', 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}>
       {children}
     </button>
   )
@@ -238,7 +238,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
         <button
           onClick={resetFilters}
           className={cn(
-            'w-full py-2.5 rounded-lg text-sm font-sans border transition-all',
+            'w-full py-2.5 rounded-lg text-sm font-sans border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
             activeFilterCount > 0
               ? 'border-amber/30 text-amber hover:bg-amber/10 hover:border-amber/50'
               : 'border-[var(--line)] text-paper-faint/60 cursor-default'
@@ -270,7 +270,7 @@ function EmptyState() {
           <p className="font-sans text-sm mt-2 opacity-70 mb-6">Add your first title to start your collection.</p>
           <button
             onClick={openAddTitle}
-            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors"
+            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             Add a title
           </button>
@@ -281,7 +281,7 @@ function EmptyState() {
           <p className="font-sans text-sm mt-2 opacity-70">Try a different search or reset the filters.</p>
           <button
             onClick={resetFilters}
-            className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors"
+            className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             Clear all filters
           </button>

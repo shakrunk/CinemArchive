@@ -36,7 +36,10 @@ function NotificationCard({
 
   // Auto-dismiss tips. Use a ref so the effect never re-runs on onDismiss identity changes.
   const onDismissRef = useRef(onDismiss)
-  onDismissRef.current = onDismiss
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  }, [onDismiss])
+
   useEffect(() => {
     if (!notification.autoClose) return
     const id = setTimeout(() => onDismissRef.current(), notification.autoClose)

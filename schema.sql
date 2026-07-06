@@ -802,6 +802,7 @@ create table recommendations (
   title             text not null,
   year              integer,
   poster_url        text,
+  note              text,
   status            text not null default 'unread' check (status in ('unread', 'read', 'dismissed')),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
@@ -836,7 +837,8 @@ create or replace function send_recommendation(
   p_type media_type,
   p_title text,
   p_year integer,
-  p_poster_url text
+  p_poster_url text,
+  p_note text default null
 )
 returns void
 language plpgsql security definer as $$
@@ -853,11 +855,11 @@ begin
     raise exception 'Can only send recommendations to accepted friends';
   end if;
 
-  insert into recommendations (sender_user_id, recipient_user_id, tmdb_id, type, title, year, poster_url)
-  values (me, recipient_id, p_tmdb_id, p_type, p_title, p_year, p_poster_url)
+  insert into recommendations (sender_user_id, recipient_user_id, tmdb_id, type, title, year, poster_url, note)
+  values (me, recipient_id, p_tmdb_id, p_type, p_title, p_year, p_poster_url, nullif(trim(p_note), ''))
   on conflict (sender_user_id, recipient_user_id, tmdb_id, type)
   do update set title = excluded.title, year = excluded.year, poster_url = excluded.poster_url,
-    status = 'unread', updated_at = now();
+    note = excluded.note, status = 'unread', updated_at = now();
 end;
 $$;
 
@@ -894,12 +896,13 @@ returns table (
   title text,
   year integer,
   poster_url text,
+  note text,
   status text,
   created_at timestamptz
 )
 language sql security definer stable as $$
   select r.id, r.sender_user_id, p.display_name, p.username, r.tmdb_id, r.type,
-    r.title, r.year, r.poster_url, r.status, r.created_at
+    r.title, r.year, r.poster_url, r.note, r.status, r.created_at
   from recommendations r
   join profiles p on p.user_id = r.sender_user_id
   where r.recipient_user_id = auth.uid()

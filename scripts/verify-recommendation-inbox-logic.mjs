@@ -15,12 +15,20 @@ function recKey(senderId, recipientId, tmdbId, type) {
   return `${senderId}:${recipientId}:${tmdbId}:${type}`
 }
 
+// Mirrors `nullif(trim(p_note), '')` — blank/whitespace-only notes are
+// stored as null rather than an empty string, so the recipient UI's
+// `r.note &&` truthiness check never renders a stray quote pair.
+function normalizeNote(note) {
+  const trimmed = (note ?? '').trim()
+  return trimmed === '' ? null : trimmed
+}
+
 /**
  * @param {Map<string, object>} table
  * @param {string} me
  * @param {string} recipientId
  * @param {boolean} isFriend
- * @param {{ tmdbId: number, type: string, title: string, year: number, posterUrl: string | null }} snapshot
+ * @param {{ tmdbId: number, type: string, title: string, year: number, posterUrl: string | null, note?: string | null }} snapshot
  */
 function sendRecommendation(table, me, recipientId, isFriend, snapshot) {
   if (me === recipientId) throw new Error('Cannot send a recommendation to yourself')
@@ -39,6 +47,7 @@ function sendRecommendation(table, me, recipientId, isFriend, snapshot) {
     title: snapshot.title,
     year: snapshot.year,
     poster_url: snapshot.posterUrl,
+    note: normalizeNote(snapshot.note),
     status: 'unread',
     created_at: existing?.created_at ?? 'created',
   })
@@ -157,6 +166,18 @@ table.set(dismissedKey, { ...table.get(dismissedKey), id: 'r5', status: 'dismiss
 sendRecommendation(table, ALICE, BOB, true, DUNE)
 assert(table.size === 1, 'resending after dismissal does not create a second row')
 assert(table.get(dismissedKey).status === 'unread', 'resending after dismissal resurfaces the recommendation as unread')
+
+// A personal note travels with the snapshot and is overwritten on resend,
+// same as title/year/poster.
+table = new Map()
+sendRecommendation(table, ALICE, BOB, true, { ...DUNE, note: 'You have to see this one' })
+assert(table.get(recKey(ALICE, BOB, DUNE.tmdbId, DUNE.type)).note === 'You have to see this one', 'a note sent with a recommendation is stored on the row')
+
+sendRecommendation(table, ALICE, BOB, true, { ...DUNE_REDUX, note: '  ' })
+assert(table.get(recKey(ALICE, BOB, DUNE.tmdbId, DUNE.type)).note === null, 'resending with a blank note clears the previous note (whitespace normalizes to null)')
+
+sendRecommendation(table, ALICE, BOB, true, DUNE)
+assert(table.get(recKey(ALICE, BOB, DUNE.tmdbId, DUNE.type)).note === null, 'omitting a note on send stores null, not an empty string')
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

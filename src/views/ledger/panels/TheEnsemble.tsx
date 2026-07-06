@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { getInitials } from 'src/components/LedgerCharts'
+import { getInitials } from 'src/lib/utils'
 import { deriveTopActors } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'

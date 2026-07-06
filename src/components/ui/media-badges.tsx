@@ -38,7 +38,7 @@ export interface MediaRef {
 
 type LinkBrand = 'tmdb' | 'imdb' | 'rt' | 'metacritic'
 
-export function buildExternalLinks(m: MediaRef): Array<{ brand: LinkBrand; name: string; href: string }> {
+function buildExternalLinks(m: MediaRef): Array<{ brand: LinkBrand; name: string; href: string }> {
   const links: Array<{ brand: LinkBrand; name: string; href: string }> = []
   const q = encodeURIComponent(m.title)
 

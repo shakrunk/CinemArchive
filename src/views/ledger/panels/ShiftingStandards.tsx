@@ -2,7 +2,7 @@
 
 import { useId, useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { areaPath, linePath } from 'src/components/LedgerCharts'
+import { areaPath, linePath } from 'src/lib/utils'
 import { deriveTrajectory } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'

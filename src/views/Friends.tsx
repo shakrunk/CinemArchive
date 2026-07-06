@@ -444,7 +444,6 @@ function activityVerb(type: ActivityEvent['type']): string {
 }
 
 function ActivitySection() {
-  const markActivityFeedSeen = useAppStore((s) => s.markActivityFeedSeen)
   const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const [feed, setFeed] = useState<ActivityEvent[]>([])
@@ -452,6 +451,8 @@ function ActivitySection() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
 
+  // Purely a browsable list now — "seen" tracking lives in the separate
+  // notification inbox (server-side read_at), not tied to opening this feed.
   useEffect(() => {
     let cancelled = false
     fetchFriendActivityFeed()
@@ -459,7 +460,6 @@ function ActivitySection() {
         if (cancelled) return
         setFeed(f)
         setHasMore(f.length === ACTIVITY_PAGE_SIZE)
-        markActivityFeedSeen()
       })
       .catch((err) => console.error('Failed to load friend activity feed:', err))
       .finally(() => {
@@ -468,7 +468,6 @@ function ActivitySection() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleLoadMore() {

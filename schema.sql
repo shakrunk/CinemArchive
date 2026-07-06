@@ -272,16 +272,32 @@ $$;
 -- Also updates last_used_at on the matching key — this is the one RPC every
 -- shared-link read actually calls, so it's the one place that can't be
 -- forgotten (the previous touch_shared_key() required a second call site
--- that no client code ever made). $1 (positional) is used instead of the
--- bare parameter name because the parameter is named `token`, same as the
--- column being updated — referencing it by name would be ambiguous.
+-- that no client code ever made) — and notifies the owner (see NOTIFICATIONS
+-- section below), at most once per hour per key so repeat page loads by the
+-- same visitor don't spam their inbox. Uses a local v_token variable rather
+-- than referencing the `token` parameter by name in the same statement as
+-- the `token` column, which would be ambiguous.
 create or replace function set_shared_token(token text)
-returns void language sql security definer as $$
-  select set_config('app.shared_token', $1, false);
-  update shared_access_keys
-  set last_used_at = now()
-  where shared_access_keys.token = $1
-    and is_active = true;
+returns void
+language plpgsql security definer as $$
+declare
+  v_token text := token;
+  key shared_access_keys;
+begin
+  perform set_config('app.shared_token', v_token, false);
+
+  select * into key from shared_access_keys k where k.token = v_token and k.is_active = true;
+  if key.id is null then
+    return;
+  end if;
+
+  if key.last_used_at is null or key.last_used_at < now() - interval '1 hour' then
+    insert into notifications (recipient_id, type, payload)
+    values (key.user_id, 'share_link_used', jsonb_build_object('label', key.label));
+  end if;
+
+  update shared_access_keys k set last_used_at = now() where k.id = key.id;
+end;
 $$;
 
 -- Resolves a share link's owner independent of whether they own any titles
@@ -741,6 +757,8 @@ begin
   if existing is null then
     insert into friendships (user_id_a, user_id_b, requested_by, status)
     values (a, b, me, 'pending');
+    insert into notifications (recipient_id, type, actor_id)
+    values (target_user_id, 'friend_request_received', me);
     return;
   end if;
 
@@ -752,10 +770,14 @@ begin
     return; -- already friends, or already requested — no-op
   end if;
 
-  -- The other party already requested us — mutual request accepts it.
+  -- The other party already requested us — mutual request accepts it. From
+  -- their perspective this IS an acceptance, so notify them as such.
   update friendships
   set status = 'accepted', updated_at = now()
   where user_id_a = a and user_id_b = b;
+
+  insert into notifications (recipient_id, type, actor_id)
+  values (target_user_id, 'friend_request_accepted', me);
 end;
 $$;
 
@@ -780,6 +802,9 @@ begin
   if not found then
     raise exception 'No pending friend request from this user';
   end if;
+
+  insert into notifications (recipient_id, type, actor_id)
+  values (requester_user_id, 'friend_request_accepted', me);
 end;
 $$;
 
@@ -1003,6 +1028,9 @@ begin
   on conflict (sender_user_id, recipient_user_id, tmdb_id, type)
   do update set title = excluded.title, year = excluded.year, poster_url = excluded.poster_url,
     note = excluded.note, status = 'unread', updated_at = now();
+
+  insert into notifications (recipient_id, type, actor_id, payload)
+  values (recipient_id, 'recommendation_received', me, jsonb_build_object('tmdb_id', p_tmdb_id, 'type', p_type, 'title', p_title));
 end;
 $$;
 
@@ -1119,6 +1147,11 @@ begin
   values (p_title_id, me, p_body)
   returning * into result;
 
+  if owner_id <> me then
+    insert into notifications (recipient_id, type, actor_id, title_id)
+    values (owner_id, 'comment_received', me, p_title_id);
+  end if;
+
   return result;
 end;
 $$;
@@ -1175,6 +1208,11 @@ begin
   insert into title_reactions (title_id, author_id, emoji)
   values (p_title_id, me, p_emoji)
   on conflict (title_id, author_id) do update set emoji = p_emoji, created_at = now();
+
+  if owner_id <> me then
+    insert into notifications (recipient_id, type, actor_id, title_id, payload)
+    values (owner_id, 'reaction_received', me, p_title_id, jsonb_build_object('emoji', p_emoji));
+  end if;
 end;
 $$;
 
@@ -1231,6 +1269,102 @@ begin
     join profiles p on p.user_id = r.author_id
     where r.title_id = p_title_id;
 end;
+$$;
+
+-- ============================================================
+-- NOTIFICATIONS — persistent, per-recipient inbox
+-- ============================================================
+--
+-- Distinct from the client's ephemeral pushNotification()/<NotificationStack/>
+-- toast system, which is untouched and keeps handling transient success/
+-- error feedback. This is a durable, dismissable, unread-counted inbox that
+-- replaces the earlier client-side activityFeedLastSeenAt/activityUnseenCount
+-- watermark.
+--
+-- No client insert policy at all (same "single choke-point" philosophy as
+-- friendships/recommendations/title_comments) — every row is inserted from
+-- inside the existing SECURITY DEFINER action function that causes it.
+create table notifications (
+  id           uuid primary key default gen_random_uuid(),
+  recipient_id uuid not null references auth.users(id) on delete cascade,
+  type         text not null check (type in (
+                 'friend_request_received', 'friend_request_accepted',
+                 'share_link_used', 'recommendation_received',
+                 'comment_received', 'reaction_received'
+               )),
+  actor_id     uuid references auth.users(id) on delete set null,
+  title_id     uuid references titles(id) on delete set null,
+  payload      jsonb not null default '{}',
+  created_at   timestamptz not null default now(),
+  read_at      timestamptz
+);
+
+create index notifications_recipient_idx on notifications(recipient_id, created_at desc);
+
+alter table notifications enable row level security;
+
+create policy "notifications: recipient can read"
+  on notifications for select
+  using (auth.uid() = recipient_id);
+
+create policy "notifications: recipient can mark read/delete"
+  on notifications for update
+  using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
+
+create policy "notifications: recipient can delete"
+  on notifications for delete
+  using (auth.uid() = recipient_id);
+
+create or replace function list_notifications(p_before timestamptz default null, p_limit integer default 30)
+returns table (
+  id uuid,
+  type text,
+  actor_id uuid,
+  actor_display_name text,
+  actor_username text,
+  title_id uuid,
+  tmdb_id integer,
+  media_type media_type,
+  title text,
+  poster_url text,
+  payload jsonb,
+  created_at timestamptz,
+  read_at timestamptz
+)
+language sql security definer stable as $$
+  select
+    n.id, n.type, n.actor_id, p.display_name, p.username,
+    n.title_id, t.tmdb_id, t.type, t.title, t.poster_url,
+    n.payload, n.created_at, n.read_at
+  from notifications n
+  left join profiles p on p.user_id = n.actor_id
+  left join titles t on t.id = n.title_id
+  where n.recipient_id = auth.uid()
+    and (p_before is null or n.created_at < p_before)
+  order by n.created_at desc
+  limit least(coalesce(p_limit, 30), 50);
+$$;
+
+create or replace function mark_notification_read(p_id uuid)
+returns void
+language sql security definer as $$
+  update notifications set read_at = now()
+  where id = p_id and recipient_id = auth.uid() and read_at is null;
+$$;
+
+create or replace function mark_all_notifications_read()
+returns void
+language sql security definer as $$
+  update notifications set read_at = now()
+  where recipient_id = auth.uid() and read_at is null;
+$$;
+
+create or replace function unread_notification_count()
+returns integer
+language sql security definer stable as $$
+  select count(*)::integer from notifications
+  where recipient_id = auth.uid() and read_at is null;
 $$;
 
 -- ============================================================

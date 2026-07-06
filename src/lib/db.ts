@@ -534,6 +534,89 @@ export async function fetchFriendActivityFeed(before?: string, limit = 30): Prom
   return (data || []).map(mapDbActivityEventToLocal)
 }
 
+// ─── Notifications (persistent inbox — distinct from the ephemeral toast
+// stack in useAppStore) ───────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'friend_request_received'
+  | 'friend_request_accepted'
+  | 'share_link_used'
+  | 'recommendation_received'
+  | 'comment_received'
+  | 'reaction_received'
+
+export interface AppNotificationItem {
+  id: string
+  type: NotificationType
+  actorId: string | null
+  actorDisplayName: string | null
+  actorUsername: string | null
+  titleId: string | null
+  tmdbId: number | null
+  mediaType: MediaType | null
+  title: string | null
+  posterUrl: string | null
+  payload: Record<string, unknown>
+  createdAt: string
+  readAt: string | null
+}
+
+function mapDbNotificationToLocal(row: any): AppNotificationItem {
+  return {
+    id: row.id,
+    type: row.type,
+    actorId: row.actor_id,
+    actorDisplayName: row.actor_display_name,
+    actorUsername: row.actor_username,
+    titleId: row.title_id,
+    tmdbId: row.tmdb_id,
+    mediaType: row.media_type,
+    title: row.title,
+    posterUrl: row.poster_url,
+    payload: row.payload ?? {},
+    createdAt: row.created_at,
+    readAt: row.read_at,
+  }
+}
+
+export async function fetchNotifications(before?: string, limit = 30): Promise<AppNotificationItem[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('list_notifications', { p_before: before ?? null, p_limit: limit })
+  if (error) {
+    console.error('Error fetching notifications:', error)
+    throw error
+  }
+  return (data || []).map(mapDbNotificationToLocal)
+}
+
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  if (!supabase) return 0
+  const { data, error } = await supabase.rpc('unread_notification_count')
+  if (error) {
+    console.error('Error fetching unread notification count:', error)
+    throw error
+  }
+  return data ?? 0
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('mark_notification_read', { p_id: id })
+  if (error) {
+    console.error('Error marking notification read:', error)
+    throw error
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('mark_all_notifications_read')
+  if (error) {
+    console.error('Error marking all notifications read:', error)
+    throw error
+  }
+}
+
 export async function insertTitleToDb(userId: string, title: Title): Promise<void> {
   if (!supabase) return
 

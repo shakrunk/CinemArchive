@@ -23,8 +23,9 @@ import {
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
   deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
-  fetchFriendActivityFeed,
   fetchLedgerLayout, saveLedgerLayout,
+  fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
+  type AppNotificationItem,
 } from '../lib/db'
 import type { SearchResult } from '../lib/media'
 
@@ -201,12 +202,16 @@ interface UISlice {
   pushNotification: (n: Omit<AppNotification, 'id'>) => void
   dismissNotification: (id: string) => void
 
-  // Friend activity feed badge — the feed itself is fetched on demand by
-  // ProfileModal; this just tracks the unseen count shown on TopBar.
-  activityFeedLastSeenAt: string | null
-  activityUnseenCount: number
-  markActivityFeedSeen: () => void
-  refreshActivityUnseenCount: () => Promise<void>
+  // Persistent notification inbox (bell icon) — distinct from the ephemeral
+  // toast stack above. The list is fetched on demand by the bell dropdown;
+  // this tracks the unread count shown as a badge, sourced from the server
+  // (read_at), not a client-side "last seen" watermark.
+  notificationInbox: AppNotificationItem[]
+  unreadNotificationCount: number
+  refreshUnreadNotificationCount: () => Promise<void>
+  loadNotificationInbox: (before?: string) => Promise<void>
+  markOneNotificationRead: (id: string) => Promise<void>
+  markAllNotificationsSeen: () => Promise<void>
 }
 
 /**
@@ -963,21 +968,56 @@ export const useAppStore = create<AppStore>()(
       notifications: s.notifications.filter((n) => n.id !== id),
     })),
 
-  activityFeedLastSeenAt: null,
-  activityUnseenCount: 0,
+  notificationInbox: [],
+  unreadNotificationCount: 0,
 
-  markActivityFeedSeen: () => set({ activityFeedLastSeenAt: new Date().toISOString(), activityUnseenCount: 0 }),
-
-  refreshActivityUnseenCount: async () => {
+  refreshUnreadNotificationCount: async () => {
     if (!get().user) return
     try {
-      const feed = await fetchFriendActivityFeed()
-      const lastSeen = get().activityFeedLastSeenAt
-      const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : 0
-      const unseen = feed.filter((e) => new Date(e.eventAt).getTime() > lastSeenMs).length
-      set({ activityUnseenCount: unseen })
+      const count = await fetchUnreadNotificationCount()
+      set({ unreadNotificationCount: count })
     } catch (err) {
-      console.error('Failed to refresh friend activity feed count:', err)
+      console.error('Failed to refresh unread notification count:', err)
+    }
+  },
+
+  loadNotificationInbox: async (before) => {
+    try {
+      const page = await fetchNotifications(before)
+      set((s) => ({ notificationInbox: before ? [...s.notificationInbox, ...page] : page }))
+    } catch (err) {
+      console.error('Failed to load notification inbox:', err)
+    }
+  },
+
+  markOneNotificationRead: async (id) => {
+    const prev = get().notificationInbox
+    set((s) => ({
+      notificationInbox: s.notificationInbox.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
+      unreadNotificationCount: Math.max(0, s.unreadNotificationCount - (prev.find((n) => n.id === id)?.readAt ? 0 : 1)),
+    }))
+    try {
+      await markNotificationRead(id)
+    } catch (err) {
+      console.error('Failed to mark notification read:', err)
+      set({ notificationInbox: prev })
+      void get().refreshUnreadNotificationCount()
+    }
+  },
+
+  markAllNotificationsSeen: async () => {
+    const prev = get().notificationInbox
+    const now = new Date().toISOString()
+    set((s) => ({
+      notificationInbox: s.notificationInbox.map((n) => (n.readAt ? n : { ...n, readAt: now })),
+      unreadNotificationCount: 0,
+    }))
+    try {
+      await markAllNotificationsRead()
+    } catch (err) {
+      console.error('Failed to mark all notifications read:', err)
+      set({ notificationInbox: prev })
+      void get().refreshUnreadNotificationCount()
     }
   },
 
@@ -992,7 +1032,7 @@ export const useAppStore = create<AppStore>()(
     if (user) {
       get().loadUserLibrary()
       get().loadPinnedModes()
-      get().refreshActivityUnseenCount()
+      get().refreshUnreadNotificationCount()
     } else {
       // Clear on logout — restore mock data only in dev
       const fallback = import.meta.env.DEV ? mockTitles : []
@@ -1173,7 +1213,6 @@ export const useAppStore = create<AppStore>()(
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,
         ledgerPrefs: s.ledgerPrefs,
-        activityFeedLastSeenAt: s.activityFeedLastSeenAt,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

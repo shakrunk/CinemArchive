@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from 'src/lib/auth'
 import { toggleTheme } from 'src/lib/theme'
 import type { AppView, NavItemId } from 'src/lib/navigation'
 import { ReelMark } from 'src/components/ui/reel-mark'
+import { NotificationCenter } from 'src/components/NotificationCenter'
 
 interface TopBarProps {
   currentView: AppView
@@ -22,7 +23,7 @@ const NAV_META: Record<NavItemId, { label: string; Icon: typeof BarChart3 }> = {
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, activityUnseenCount, navPrefs } = useAppStore(
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
     useShallow((s) => ({
       viewMode: s.viewMode,
       setViewMode: s.setViewMode,
@@ -33,7 +34,6 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
       exitFriendView: s.exitFriendView,
       openCommandPalette: s.openCommandPalette,
       theme: s.theme,
-      activityUnseenCount: s.activityUnseenCount,
       navPrefs: s.navPrefs,
     }))
   )
@@ -195,6 +195,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                     <Users className="w-[17px] h-[17px]" />
                   </button>
                 )}
+                {user && <NotificationCenter onNavigate={onViewChange} />}
                 {user ? (
                   <button
                     onClick={onProfileClick}
@@ -203,17 +204,9 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                       'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center',
                       currentView === 'profile' && '!bg-amber/15 border-amber/50'
                     )}
-                    aria-label={activityUnseenCount > 0 ? `Profile and Settings — ${activityUnseenCount} new friend activity` : 'Profile and Settings'}
+                    aria-label="Profile and Settings"
                   >
                     <User className="w-[17px] h-[17px]" />
-                    {activityUnseenCount > 0 && (
-                      <span
-                        className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber text-[color:var(--on-amber)] text-[9px] font-mono font-bold flex items-center justify-center"
-                        aria-hidden="true"
-                      >
-                        {activityUnseenCount > 9 ? '9+' : activityUnseenCount}
-                      </span>
-                    )}
                   </button>
                 ) : (
                   <button

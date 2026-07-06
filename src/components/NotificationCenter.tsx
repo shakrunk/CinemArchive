@@ -1,0 +1,154 @@
+import { useEffect, useRef, useState } from 'react'
+import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile } from 'lucide-react'
+import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
+import type { AppView } from 'src/lib/navigation'
+import type { AppNotificationItem, NotificationType } from 'src/lib/db'
+
+const TYPE_META: Record<NotificationType, { Icon: typeof Bell; verb: (n: AppNotificationItem) => string }> = {
+  friend_request_received: { Icon: UserPlus, verb: () => 'sent you a friend request' },
+  friend_request_accepted: { Icon: UserCheck, verb: () => 'accepted your friend request' },
+  share_link_used: { Icon: Eye, verb: (n) => `viewed your shared link${n.payload.label ? ` "${n.payload.label}"` : ''}` },
+  recommendation_received: { Icon: Send, verb: (n) => `sent you "${n.payload.title ?? 'a title'}"` },
+  comment_received: { Icon: MessageCircle, verb: (n) => `commented on "${n.title ?? 'a title'}"` },
+  reaction_received: { Icon: Smile, verb: (n) => `reacted ${n.payload.emoji ?? ''} to "${n.title ?? 'a title'}"` },
+}
+
+function actorName(n: AppNotificationItem): string {
+  return n.actorDisplayName || n.actorUsername || 'Someone'
+}
+
+interface NotificationCenterProps {
+  onNavigate: (view: AppView) => void
+}
+
+export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
+  const { notificationInbox, unreadNotificationCount, loadNotificationInbox, markOneNotificationRead, markAllNotificationsSeen, openDetailDrawer } =
+    useAppStore((s) => ({
+      notificationInbox: s.notificationInbox,
+      unreadNotificationCount: s.unreadNotificationCount,
+      loadNotificationInbox: s.loadNotificationInbox,
+      markOneNotificationRead: s.markOneNotificationRead,
+      markAllNotificationsSeen: s.markAllNotificationsSeen,
+      openDetailDrawer: s.openDetailDrawer,
+    }))
+
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [open])
+
+  async function handleToggle() {
+    const next = !open
+    setOpen(next)
+    if (next && notificationInbox.length === 0) {
+      setLoading(true)
+      await loadNotificationInbox()
+      setLoading(false)
+    }
+  }
+
+  async function handleItemClick(n: AppNotificationItem) {
+    if (!n.readAt) void markOneNotificationRead(n.id)
+    setOpen(false)
+    if ((n.type === 'comment_received' || n.type === 'reaction_received') && n.titleId) {
+      openDetailDrawer(n.titleId)
+    } else if (n.type === 'friend_request_received' || n.type === 'friend_request_accepted' || n.type === 'recommendation_received') {
+      onNavigate('friends')
+    }
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        onClick={handleToggle}
+        aria-label={unreadNotificationCount > 0 ? `Notifications — ${unreadNotificationCount} unread` : 'Notifications'}
+        aria-expanded={open}
+        className={cn(
+          'icon-btn relative w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center',
+          open && '!bg-amber/15 border-amber/50 text-amber'
+        )}
+        style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+      >
+        <Bell className="w-[17px] h-[17px]" />
+        {unreadNotificationCount > 0 && (
+          <span
+            className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber text-[color:var(--on-amber)] text-[9px] font-mono font-bold flex items-center justify-center"
+            aria-hidden="true"
+          >
+            {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Notifications"
+          className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl overflow-hidden z-[220] shadow-xl"
+          style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
+        >
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
+            <span className="font-sans text-xs uppercase tracking-widest text-muted-foreground">Notifications</span>
+            {unreadNotificationCount > 0 && (
+              <button
+                onClick={() => markAllNotificationsSeen()}
+                className="font-mono text-[10px] text-amber hover:opacity-80 transition-opacity"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-96 overflow-y-auto scrollbar-thin">
+            {loading ? (
+              <div className="text-center py-6 text-xs font-mono text-muted-foreground">Loading...</div>
+            ) : notificationInbox.length === 0 ? (
+              <div className="text-center py-6 text-xs font-sans text-muted-foreground italic">Nothing yet.</div>
+            ) : (
+              notificationInbox.map((n) => {
+                const meta = TYPE_META[n.type]
+                const Icon = meta.Icon
+                return (
+                  <button
+                    key={n.id}
+                    role="menuitem"
+                    onClick={() => handleItemClick(n)}
+                    className="w-full text-left flex items-start gap-2.5 px-4 py-3 transition-colors hover:bg-secondary/30"
+                    style={{ background: n.readAt ? 'transparent' : 'rgb(var(--amber-rgb) / 0.06)' }}
+                  >
+                    <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-sans text-xs text-paper leading-snug">
+                        <span className="font-medium">{actorName(n)}</span> {meta.verb(n)}
+                      </p>
+                      <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                        {new Date(n.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -119,6 +119,70 @@ export async function listSharedKeys() {
   return data
 }
 
+// ─── Share Scopes (per-friend / per-link narrowing) ──────────────────────────
+// Absence of a row means unrestricted (the default, pre-scoping behavior) —
+// setShareScope(target, null) deletes the row rather than storing an "allow
+// everything" row, so that invariant has exactly one representation.
+
+export type ShareScopeTarget = { sharedKeyId: string } | { friendUserId: string }
+
+export interface ShareScope {
+  allowed_genres: string[] | null
+  allowed_statuses: string[] | null
+}
+
+function shareScopeColumn(target: ShareScopeTarget): 'shared_key_id' | 'friend_user_id' {
+  return 'sharedKeyId' in target ? 'shared_key_id' : 'friend_user_id'
+}
+
+function shareScopeValue(target: ShareScopeTarget): string {
+  return 'sharedKeyId' in target ? target.sharedKeyId : target.friendUserId
+}
+
+/** Fetch the current scope for a share link or friend — null means unrestricted. */
+export async function getShareScope(target: ShareScopeTarget): Promise<ShareScope | null> {
+  const { data, error } = await getClient()
+    .from('share_scopes')
+    .select('allowed_genres, allowed_statuses')
+    .eq(shareScopeColumn(target), shareScopeValue(target))
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/** Set (or clear, with scope=null) the scope for a share link or friend. */
+export async function setShareScope(target: ShareScopeTarget, scope: ShareScope | null): Promise<void> {
+  const column = shareScopeColumn(target)
+  const value = shareScopeValue(target)
+
+  if (!scope) {
+    const { error } = await getClient().from('share_scopes').delete().eq(column, value)
+    if (error) throw error
+    return
+  }
+
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not signed in.')
+
+  // onConflict must name the actual unique constraint: share links are
+  // unique on shared_key_id alone, friends on the (owner, friend) pair.
+  const onConflict = column === 'shared_key_id' ? 'shared_key_id' : 'owner_user_id,friend_user_id'
+
+  const { error } = await getClient()
+    .from('share_scopes')
+    .upsert(
+      {
+        owner_user_id: user.id,
+        [column]: value,
+        allowed_genres: scope.allowed_genres,
+        allowed_statuses: scope.allowed_statuses,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict }
+    )
+  if (error) throw error
+}
+
 // ─── Invite-only signup ─────────────────────────────────────────────────────
 
 export interface InviteCode {

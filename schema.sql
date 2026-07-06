@@ -296,6 +296,94 @@ returns uuid language sql security definer stable as $$
   limit 1;
 $$;
 
+-- ============================================================
+-- SHARE SCOPES — per-friend / per-link narrowing of library visibility
+-- ============================================================
+--
+-- Absence of a row for a given link/friend means UNRESTRICTED — this is
+-- opt-in narrowing only, never opt-in widening. Exercised by
+-- scripts/verify-share-scope-logic.mjs.
+create table share_scopes (
+  id                uuid primary key default gen_random_uuid(),
+  owner_user_id     uuid not null references auth.users(id) on delete cascade,
+  shared_key_id     uuid references shared_access_keys(id) on delete cascade,
+  friend_user_id    uuid references auth.users(id) on delete cascade,
+  allowed_genres    text[],         -- null = all genres
+  allowed_statuses  watch_status[], -- null = all statuses
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  constraint share_scopes_one_target check (
+    (shared_key_id is not null and friend_user_id is null) or
+    (shared_key_id is null and friend_user_id is not null)
+  ),
+  constraint share_scopes_unique_link unique (shared_key_id),
+  constraint share_scopes_unique_friend unique (owner_user_id, friend_user_id)
+);
+
+create index share_scopes_owner_idx on share_scopes(owner_user_id);
+
+alter table share_scopes enable row level security;
+
+create policy "share_scopes: owner full access"
+  on share_scopes for all
+  using (auth.uid() = owner_user_id)
+  with check (auth.uid() = owner_user_id);
+
+create trigger share_scopes_updated_at
+  before update on share_scopes
+  for each row execute function update_updated_at();
+
+-- Pure predicate, no table access — null on either side means "no
+-- restriction on that dimension."
+create or replace function title_in_scope(
+  p_genres text[],
+  p_status watch_status,
+  p_allowed_genres text[],
+  p_allowed_statuses watch_status[]
+) returns boolean
+language sql immutable as $$
+  select (p_allowed_genres is null or p_genres && p_allowed_genres)
+     and (p_allowed_statuses is null or p_status = any(p_allowed_statuses));
+$$;
+
+-- Single predicate replacing the separate is_valid_shared_token(...)/
+-- is_friend(...) USING clauses that used to live across every shareable
+-- content table. SECURITY DEFINER so it can read shared_access_keys/
+-- share_scopes (owner-only RLS) and friendships regardless of the caller's
+-- own visibility into those tables. Takes the title's columns as parameters
+-- rather than a title_id + an internal re-select from `titles`: this
+-- function is invoked from `titles`' own SELECT policy, and reading
+-- `titles` again internally would be a self-referential RLS evaluation on
+-- the very table whose policy calls it. Child tables join to titles once to
+-- fetch genres/status instead (see their policies below).
+create or replace function can_view_title(
+  p_owner_user_id uuid,
+  p_genres text[],
+  p_status watch_status
+) returns boolean
+language sql security definer stable as $$
+  select
+    exists (
+      select 1
+      from shared_access_keys k
+      left join share_scopes s on s.shared_key_id = k.id
+      where k.token = current_setting('app.shared_token', true)
+        and k.user_id = p_owner_user_id
+        and k.is_active = true
+        and (k.expires_at is null or k.expires_at > now())
+        and title_in_scope(p_genres, p_status, s.allowed_genres, s.allowed_statuses)
+    )
+    or (
+      is_friend(auth.uid(), p_owner_user_id)
+      and title_in_scope(
+        p_genres,
+        p_status,
+        (select allowed_genres from share_scopes where friend_user_id = auth.uid() and owner_user_id = p_owner_user_id),
+        (select allowed_statuses from share_scopes where friend_user_id = auth.uid() and owner_user_id = p_owner_user_id)
+      )
+    );
+$$;
+
 -- -----------------------------------------------------------
 -- TITLES policies
 -- -----------------------------------------------------------
@@ -306,15 +394,12 @@ create policy "titles: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Shared key holder: read-only (token passed via request header/setting)
-create policy "titles: shared key read"
+-- Shared-link visitor or accepted friend, subject to any share_scopes
+-- narrowing (see can_view_title above). Replaces the former separate
+-- "shared key read" / "friend read" policy pair.
+create policy "titles: shared/friend read"
   on titles for select
-  using (
-    is_valid_shared_token(
-      current_setting('app.shared_token', true),
-      user_id
-    )
-  );
+  using (can_view_title(user_id, genres, status));
 
 -- -----------------------------------------------------------
 -- SEASONS policies
@@ -325,12 +410,13 @@ create policy "seasons: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "seasons: shared key read"
+create policy "seasons: shared/friend read"
   on seasons for select
   using (
-    is_valid_shared_token(
-      current_setting('app.shared_token', true),
-      user_id
+    exists (
+      select 1 from titles t
+      where t.id = seasons.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
     )
   );
 
@@ -343,18 +429,19 @@ create policy "viewings: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "viewings: shared key read"
+create policy "viewings: shared/friend read"
   on viewings for select
   using (
-    is_valid_shared_token(
-      current_setting('app.shared_token', true),
-      user_id
+    exists (
+      select 1 from titles t
+      where t.id = viewings.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
     )
   );
 
 -- -----------------------------------------------------------
 -- EPISODES / EPISODE_WATCH_EVENTS / EPISODE_RATINGS / EPISODE_REVIEWS policies
--- (same pattern as seasons: owner full access + shared key read)
+-- (same pattern as seasons: owner full access + shared/friend read)
 -- -----------------------------------------------------------
 
 create policy "episodes: owner full access"
@@ -362,36 +449,63 @@ create policy "episodes: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episodes: shared key read"
+create policy "episodes: shared/friend read"
   on episodes for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = episodes.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_watch_events: owner full access"
   on episode_watch_events for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episode_watch_events: shared key read"
+create policy "episode_watch_events: shared/friend read"
   on episode_watch_events for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from episodes e
+      join titles t on t.id = e.title_id
+      where e.id = episode_watch_events.episode_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_ratings: owner full access"
   on episode_ratings for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episode_ratings: shared key read"
+create policy "episode_ratings: shared/friend read"
   on episode_ratings for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from episodes e
+      join titles t on t.id = e.title_id
+      where e.id = episode_ratings.episode_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_reviews: owner full access"
   on episode_reviews for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episode_reviews: shared key read"
+create policy "episode_reviews: shared/friend read"
   on episode_reviews for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from episodes e
+      join titles t on t.id = e.title_id
+      where e.id = episode_reviews.episode_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 -- -----------------------------------------------------------
 -- TITLE_CAST / TITLE_CREW / SEASON_CAST / EPISODE_CREW policies
@@ -400,30 +514,54 @@ create policy "episode_reviews: shared key read"
 create policy "title_cast: owner full access"
   on title_cast for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "title_cast: shared key read"
+create policy "title_cast: shared/friend read"
   on title_cast for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = title_cast.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "title_crew: owner full access"
   on title_crew for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "title_crew: shared key read"
+create policy "title_crew: shared/friend read"
   on title_crew for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = title_crew.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "season_cast: owner full access"
   on season_cast for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "season_cast: shared key read"
+create policy "season_cast: shared/friend read"
   on season_cast for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = season_cast.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_crew: owner full access"
   on episode_crew for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "episode_crew: shared key read"
+create policy "episode_crew: shared/friend read"
   on episode_crew for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = episode_crew.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 -- -----------------------------------------------------------
 -- SHARED_ACCESS_KEYS policies
@@ -745,53 +883,13 @@ $$;
 -- ============================================================
 -- FRIEND LIBRARY READ ACCESS
 -- ============================================================
-
--- Grants accepted friends read-only access to a user's library, mirroring the
--- "shared key read" policies but gated on is_friend(auth.uid(), user_id)
--- instead of a bearer token.
-create policy "titles: friend read"
-  on titles for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "seasons: friend read"
-  on seasons for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "viewings: friend read"
-  on viewings for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episodes: friend read"
-  on episodes for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_watch_events: friend read"
-  on episode_watch_events for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_ratings: friend read"
-  on episode_ratings for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_reviews: friend read"
-  on episode_reviews for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "title_cast: friend read"
-  on title_cast for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "title_crew: friend read"
-  on title_crew for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "season_cast: friend read"
-  on season_cast for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_crew: friend read"
-  on episode_crew for select
-  using (is_friend(auth.uid(), user_id));
+--
+-- Friend read access for titles/seasons/viewings/episodes/etc. is unified
+-- with shared-link read access into the single "<table>: shared/friend
+-- read" policy defined alongside each table's owner policy above (see
+-- can_view_title, defined near the SHARE SCOPES section). This section
+-- previously held 11 separate "X: friend read" policies before that
+-- unification shipped.
 
 -- ============================================================
 -- USER PREFS (account-synced preferences, e.g. Ledger board layout)

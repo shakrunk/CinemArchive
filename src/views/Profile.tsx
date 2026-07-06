@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
-  Download, Upload, Eye, EyeOff,
+  Download, Upload, Eye, EyeOff, Settings2,
   UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
   LayoutGrid, GripVertical, Ticket,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
+import { ShareScopeEditor } from 'src/components/ShareScopeEditor'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import {
@@ -765,6 +766,7 @@ function SharingSection() {
   const [newLabel, setNewLabel] = useState('')
   const [expiryHours, setExpiryHours] = useState<string>('')
   const [generating, setGenerating] = useState(false)
+  const [editingScopeFor, setEditingScopeFor] = useState<SharedKey | null>(null)
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null)
   const [showRevoked, setShowRevoked] = useState(false)
 
@@ -896,6 +898,15 @@ function SharingSection() {
                 </Button>
                 <Button
                   size="sm"
+                  onClick={() => setEditingScopeFor(k)}
+                  className="bg-secondary hover:bg-amber/20 hover:text-amber text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                  title="Edit access"
+                  aria-label="Edit access"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="sm"
                   onClick={() => handleRevoke(k.id)}
                   className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
                   title="Revoke Link"
@@ -933,6 +944,14 @@ function SharingSection() {
             </div>
           )}
         </div>
+      )}
+
+      {editingScopeFor && (
+        <ShareScopeEditor
+          target={{ sharedKeyId: editingScopeFor.id }}
+          label={editingScopeFor.label || 'Unnamed Link'}
+          onClose={() => setEditingScopeFor(null)}
+        />
       )}
     </Section>
   )

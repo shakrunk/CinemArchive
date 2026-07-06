@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Inbox, X, Activity, Star, Loader2 } from 'lucide-react'
+import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
+import { ShareScopeEditor } from 'src/components/ShareScopeEditor'
 import {
   findUserByEmail,
   sendFriendRequest,
@@ -88,6 +89,7 @@ function FriendsSection() {
   const [message, setMessage] = useState<Message | null>(null)
   const [friendships, setFriendships] = useState<FriendshipView[]>([])
   const [loading, setLoading] = useState(false)
+  const [editingScopeFor, setEditingScopeFor] = useState<FriendshipView | null>(null)
 
   useEffect(() => {
     void loadFriendships()
@@ -247,6 +249,15 @@ function FriendsSection() {
                     </Button>
                     <Button
                       size="sm"
+                      onClick={() => setEditingScopeFor(f)}
+                      className="bg-secondary hover:bg-amber/20 hover:text-amber text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                      title="Edit access"
+                      aria-label={`Edit access for ${f.display_name || f.username || 'friend'}`}
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
                       onClick={() => handleBlock(f.friend_user_id)}
                       className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
                       title="Block"
@@ -272,6 +283,14 @@ function FriendsSection() {
           ))
         )}
       </div>
+
+      {editingScopeFor && (
+        <ShareScopeEditor
+          target={{ friendUserId: editingScopeFor.friend_user_id }}
+          label={editingScopeFor.display_name || editingScopeFor.username || 'Friend'}
+          onClose={() => setEditingScopeFor(null)}
+        />
+      )}
     </Section>
   )
 }

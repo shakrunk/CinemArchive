@@ -5,6 +5,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { areaPath, linePath } from 'src/components/LedgerCharts'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel } from '../PanelShell'
 
 const FILMSTRIP_HOLES = Array.from({ length: 28 })
@@ -14,6 +15,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
   const settingsKey = JSON.stringify(settings ?? {})
+  const tip = useChartTip()
 
   const decades = useMemo(() => {
     const { titles: scoped } = scopedTitles('decades', titles, settings)
@@ -93,6 +95,10 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
               {points.map((p, i) => (
                 <span
                   key={i}
+                  {...tip.bind({
+                    label: decades[i].label,
+                    value: `${decades[i].count} title${decades[i].count !== 1 ? 's' : ''}`,
+                  })}
                   className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
                   style={{
                     left: `${(p.x / 1000) * 100}%`,
@@ -130,6 +136,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
           </div>
         </div>
       )}
+      {tip.node}
     </Panel>
   )
 }

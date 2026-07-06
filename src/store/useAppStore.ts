@@ -83,6 +83,8 @@ export interface LibraryFilters {
   tags: string[]
   networks: string[]
   decades: string[]
+  // ISO 639-1 original-language codes (e.g. "en", "ja")
+  languages: string[]
   minRating: number
   person: PersonRef | null
   studio: string | null
@@ -248,6 +250,7 @@ const defaultFilters: LibraryFilters = {
   tags: [],
   networks: [],
   decades: [],
+  languages: [],
   minRating: 0,
   person: null,
   studio: null,
@@ -313,6 +316,10 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
       const decade = `${Math.floor(t.year / 10) * 10}s`
       return filters.decades.includes(decade)
     })
+  }
+
+  if (filters.languages.length > 0) {
+    result = result.filter((t) => t.originalLanguage && filters.languages.includes(t.originalLanguage))
   }
 
   if (filters.minRating > 0) {
@@ -1124,6 +1131,14 @@ export const useAllNetworks = () => {
 export const useAllDecades = () => {
   const titles = useAppStore((s) => s.titles)
   return useMemo(() => [...new Set(titles.map((t) => `${Math.floor(t.year / 10) * 10}s`))].sort(), [titles])
+}
+
+export const useAllLanguages = () => {
+  const titles = useAppStore((s) => s.titles)
+  return useMemo(
+    () => [...new Set(titles.map((t) => t.originalLanguage).filter(Boolean) as string[])].sort(),
+    [titles],
+  )
 }
 
 export const useAllTags = () => {

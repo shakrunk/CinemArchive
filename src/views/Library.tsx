@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Search, SlidersHorizontal, X, Film, User, Building2 } from 'lucide-react'
-import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags } from 'src/store/useAppStore'
+import { Search, SlidersHorizontal, X, Film, User, Building2, Languages } from 'lucide-react'
+import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
-import { cn } from 'src/lib/utils'
+import { cn, languageName } from 'src/lib/utils'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode } from 'src/store/useAppStore'
 
@@ -88,6 +88,7 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
   const allNetworks = useAllNetworks()
   const allDecades = useAllDecades()
   const allTags = useAllTags()
+  const allLanguages = useAllLanguages()
 
   return (
     <BottomSheet open={open} onClose={onClose} side="right" title="Refine Collection">
@@ -211,6 +212,25 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
                 }}
               >
                 {n}
+              </Chip>
+            ))}
+          </FilterGroup>
+        )}
+
+        {allLanguages.length > 1 && (
+          <FilterGroup label="Language">
+            {allLanguages.map((code) => (
+              <Chip
+                key={code}
+                active={filters.languages.includes(code)}
+                onClick={() => {
+                  const next = filters.languages.includes(code)
+                    ? filters.languages.filter((x) => x !== code)
+                    : [...filters.languages, code]
+                  setFilter('languages', next)
+                }}
+              >
+                {languageName(code)}
               </Chip>
             ))}
           </FilterGroup>
@@ -512,6 +532,7 @@ export function Library() {
     if (filters.genres.length > 0) count++
     if (filters.networks.length > 0) count++
     if (filters.decades.length > 0) count++
+    if (filters.languages.length > 0) count++
     if (filters.tags.length > 0) count++
     if (filters.minRating > 0) count++
     if (filters.person) count++
@@ -603,6 +624,26 @@ export function Library() {
             <button
               onClick={() => setFilter('person', null)}
               aria-label={`Clear ${filters.person.name} filter`}
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </span>
+        </div>
+      )}
+
+      {/* Active language filter (also set by clicking a row in the Ledger's
+          "In translation" panel) */}
+      {filters.languages.length > 0 && (
+        <div className="mb-4">
+          <span className="inline-flex items-center gap-2 font-sans text-sm text-amber bg-amber/10 border border-amber/25 rounded-full pl-3 pr-1.5 py-1">
+            <Languages className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              In <b className="font-medium">{filters.languages.map(languageName).join(', ')}</b>
+            </span>
+            <button
+              onClick={() => setFilter('languages', [])}
+              aria-label="Clear language filter"
               className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
             >
               <X className="w-3.5 h-3.5" />

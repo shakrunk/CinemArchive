@@ -11,6 +11,7 @@ export function TheEnsemble({ className, settings }: { className?: string; setti
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const browseByPerson = useAppStore((s) => s.browseByPerson)
   const settingsKey = JSON.stringify(settings ?? {})
   const actors = useMemo(
     () => deriveTopActors(titles, settings),
@@ -36,10 +37,15 @@ export function TheEnsemble({ className, settings }: { className?: string; setti
           const size = 56 + t * 40
           return (
             <button
-              key={a.actor}
+              key={a.tmdbPersonId ?? a.actor}
               onClick={() => {
-                setFilter('search', a.actor)
-                requestView('library')
+                // Person filter matches by TMDB id across all credits; fall
+                // back to a name search when the id is missing.
+                if (a.tmdbPersonId) browseByPerson({ id: a.tmdbPersonId, name: a.actor })
+                else {
+                  setFilter('search', a.actor)
+                  requestView('library')
+                }
               }}
               className="flex flex-col items-center gap-2 group cursor-pointer w-[104px] shrink-0"
             >

@@ -11,6 +11,7 @@ export function TheAuteurs({ className, settings }: { className?: string; settin
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
+  const browseByPerson = useAppStore((s) => s.browseByPerson)
   const settingsKey = JSON.stringify(settings ?? {})
   const directors = useMemo(
     () => deriveTopDirectors(titles, settings),
@@ -38,8 +39,13 @@ export function TheAuteurs({ className, settings }: { className?: string; settin
             <li key={d.director}>
               <button
                 onClick={() => {
-                  setFilter('search', d.director)
-                  requestView('library')
+                  // Person filter matches by TMDB id across all credits; fall
+                  // back to a name search when the id is missing.
+                  if (d.tmdbPersonId) browseByPerson({ id: d.tmdbPersonId, name: d.director })
+                  else {
+                    setFilter('search', d.director)
+                    requestView('library')
+                  }
                 }}
                 className="w-full flex items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
               >

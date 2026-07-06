@@ -4,12 +4,14 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { deriveRevivals } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
 import { monthLabel } from '../labels'
 
 export function PremieresRevivals({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = JSON.stringify(settings ?? {})
+  const tip = useChartTip()
 
   const months = useMemo(
     () => deriveRevivals(titles, settings),
@@ -42,7 +44,10 @@ export function PremieresRevivals({ className, settings }: { className?: string;
             <div
               key={m.month}
               className="flex-1 min-w-[30px] flex flex-col items-center"
-              title={`${monthLabel(m.month)} — ${m.premieres} premiere${m.premieres !== 1 ? 's' : ''}, ${m.revivals} revival${m.revivals !== 1 ? 's' : ''}`}
+              {...tip.bind({
+                label: `${monthLabel(m.month)} ${m.month.slice(0, 4)}`,
+                value: `${m.premieres} premiere${m.premieres !== 1 ? 's' : ''} · ${m.revivals} revival${m.revivals !== 1 ? 's' : ''}`,
+              })}
             >
               {/* Premieres grow up from the center axis */}
               <div className="h-[92px] w-full flex items-end justify-center">
@@ -91,6 +96,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
           <i className="w-2 h-2 rounded-sm" style={{ background: 'var(--moon)' }} /> {totals.revivals} revivals
         </span>
       </p>
+      {tip.node}
     </Panel>
   )
 }

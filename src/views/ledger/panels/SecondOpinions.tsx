@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 export function SecondOpinions({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
@@ -11,6 +12,7 @@ export function SecondOpinions({ className, settings }: { className?: string; se
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
   const settingsKey = JSON.stringify(settings ?? {})
+  const tip = useChartTip()
 
   const rows = useMemo(() => {
     const { titles: scoped, topN } = scopedTitles('verdicts', titles, settings)
@@ -83,7 +85,10 @@ export function SecondOpinions({ className, settings }: { className?: string; se
                       color: up ? 'var(--amber-bright)' : 'var(--ember)',
                       borderColor: up ? 'rgba(233,178,102,0.3)' : 'rgba(200,90,60,0.35)',
                     }}
-                    title={`You: ${r.mine.toFixed(1)} · IMDb: ${r.critics.toFixed(1)}`}
+                    {...tip.bind({
+                      label: r.title.title,
+                      value: `you ${r.mine.toFixed(1)} · imdb ${r.critics.toFixed(1)}`,
+                    })}
                   >
                     {up ? '+' : '−'}{Math.abs(r.delta).toFixed(1)}
                   </span>
@@ -93,6 +98,7 @@ export function SecondOpinions({ className, settings }: { className?: string; se
           })}
         </ol>
       )}
+      {tip.node}
     </Panel>
   )
 }

@@ -68,12 +68,30 @@ export function deriveTopGenres(titles: Title[], settings?: LedgerWidgetSettings
     .map(([genre, count]) => ({ genre, count }))
 }
 
-export function deriveTopDirectors(titles: Title[], settings?: LedgerWidgetSettings) {
+export interface TopDirector {
+  director: string
+  count: number
+  tmdbPersonId: number | null
+}
+
+export function deriveTopDirectors(titles: Title[], settings?: LedgerWidgetSettings): TopDirector[] {
   const { titles: scoped, topN } = scopedTitles('auteurs', titles, settings)
-  return tally(scoped.map((t) => t.director).filter((d): d is string => Boolean(d)))
-    .sort((a, b) => b[1] - a[1])
+  const counts = new Map<string, { count: number; id: number | null }>()
+  for (const t of scoped) {
+    if (!t.director) continue
+    const entry = counts.get(t.director) ?? { count: 0, id: null }
+    entry.count += 1
+    // `Title.director` is a display string; recover the TMDB person id from
+    // the crew credits when available so click-through can filter precisely.
+    if (entry.id === null) {
+      entry.id = t.crew?.find((c) => c.job === 'Director' && c.name === t.director)?.tmdbPersonId ?? null
+    }
+    counts.set(t.director, entry)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, topN)
-    .map(([director, count]) => ({ director, count }))
+    .map(([director, e]) => ({ director, count: e.count, tmdbPersonId: e.id }))
 }
 
 export interface TopActor {

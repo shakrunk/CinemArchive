@@ -5,12 +5,14 @@ import { useAppStore } from 'src/store/useAppStore'
 import { areaPath, linePath } from 'src/components/LedgerCharts'
 import { deriveMonthlySeries } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel } from '../PanelShell'
 import { monthLabel } from '../labels'
 
 export function TheRun({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = JSON.stringify(settings ?? {})
+  const tip = useChartTip()
 
   // Gap-filled month series: the x-axis represents a true, evenly-spaced
   // calendar timeline rather than compressing silent months out of existence.
@@ -83,7 +85,10 @@ export function TheRun({ className, settings }: { className?: string; settings?:
                     recent[i].count > 0 && (
                       <span
                         key={i}
-                        title={`${monthLabel(recent[i].month)} — ${recent[i].count} screening${recent[i].count !== 1 ? 's' : ''}`}
+                        {...tip.bind({
+                          label: `${monthLabel(recent[i].month)} ${recent[i].month.slice(0, 4)}`,
+                          value: `${recent[i].count} screening${recent[i].count !== 1 ? 's' : ''}`,
+                        })}
                         className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
                         style={{
                           left: `${(p.x / 1000) * 100}%`,
@@ -108,6 +113,7 @@ export function TheRun({ className, settings }: { className?: string; settings?:
           <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
             {total} screening{total !== 1 ? 's' : ''} across the last {recent.length} months
           </p>
+          {tip.node}
         </div>
       )}
     </Panel>

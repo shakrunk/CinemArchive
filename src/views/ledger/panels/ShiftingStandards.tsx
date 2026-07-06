@@ -5,12 +5,14 @@ import { useAppStore } from 'src/store/useAppStore'
 import { areaPath, linePath } from 'src/components/LedgerCharts'
 import { deriveTrajectory } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 export function ShiftingStandards({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = JSON.stringify(settings ?? {})
   const gradientId = useId()
+  const tip = useChartTip()
 
   const { points: quarters, allTimeAvg } = useMemo(
     () => deriveTrajectory(titles, settings),
@@ -85,7 +87,10 @@ export function ShiftingStandards({ className, settings }: { className?: string;
             {chartPoints.map((p, i) => (
               <span
                 key={i}
-                title={`${quarters[i].quarter} — ${quarters[i].avg.toFixed(1)}★ over ${quarters[i].count} title${quarters[i].count !== 1 ? 's' : ''}`}
+                {...tip.bind({
+                  label: quarters[i].quarter,
+                  value: `${quarters[i].avg.toFixed(1)}★ over ${quarters[i].count} title${quarters[i].count !== 1 ? 's' : ''}`,
+                })}
                 className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
                 style={{
                   left: `${(p.x / 1000) * 100}%`,
@@ -110,6 +115,7 @@ export function ShiftingStandards({ className, settings }: { className?: string;
       <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
         dashed line marks your {allTimeAvg.toFixed(1)}★ all-time average
       </p>
+      {tip.node}
     </Panel>
   )
 }

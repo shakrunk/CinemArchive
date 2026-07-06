@@ -2,21 +2,18 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { languageName } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
-
-function languageName(code: string): string {
-  try {
-    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code.toUpperCase()
-  } catch {
-    return code.toUpperCase()
-  }
-}
 
 export function InTranslation({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
+  const setFilter = useAppStore((s) => s.setFilter)
+  const requestView = useAppStore((s) => s.requestView)
   const settingsKey = JSON.stringify(settings ?? {})
+  const tip = useChartTip()
 
   const langs = useMemo(() => {
     const { titles: scoped, topN } = scopedTitles('languages', titles, settings)
@@ -45,10 +42,18 @@ export function InTranslation({ className, settings }: { className?: string; set
       ) : (
         <div className="flex flex-col gap-1">
           {langs.map((l, i) => (
-            <div key={l.code} className="flex items-center gap-3 px-1.5 py-2 rounded-md transition-colors hover:bg-[var(--wash)]">
+            <button
+              key={l.code}
+              onClick={() => {
+                setFilter('languages', [l.code])
+                requestView('library')
+              }}
+              className="w-full flex items-center gap-3 px-1.5 py-2 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
+              {...tip.bind({ label: l.name, value: `${l.count} title${l.count !== 1 ? 's' : ''}` })}
+            >
               <span className="font-mono text-[10px] uppercase text-amber-deep w-7 shrink-0">{l.code}</span>
               <span
-                className="font-serif text-sm font-medium text-paper truncate w-[34%] shrink-0"
+                className="font-serif text-sm font-medium text-paper truncate w-[34%] shrink-0 group-hover:underline decoration-amber/40"
                 style={{ fontVariationSettings: '"opsz" 30' }}
               >
                 {l.name}
@@ -68,10 +73,11 @@ export function InTranslation({ className, settings }: { className?: string; set
               <span className="font-mono text-[10px] text-paper-faint w-12 text-right shrink-0">
                 {Math.round((l.count / total) * 100)}%
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
+      {tip.node}
     </Panel>
   )
 }

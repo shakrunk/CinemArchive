@@ -2,9 +2,10 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, fmtReleaseDate } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel } from '../PanelShell'
 import { localDateStr } from '../labels'
 
@@ -25,6 +26,7 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
   }, [titles, settingsKey])
 
   const todayStr = localDateStr(new Date())
+  const tip = useChartTip()
 
   const { weeks, monthLabels, totalInYear } = useMemo(() => {
     const end = new Date()
@@ -106,11 +108,10 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
                         }
                       : undefined
                   }
-                  title={
-                    cell.count > 0
-                      ? `${cell.date} - ${cell.count} viewing${cell.count !== 1 ? 's' : ''}`
-                      : cell.date
-                  }
+                  {...tip.bind({
+                    label: fmtReleaseDate(cell.date),
+                    value: cell.count > 0 ? `${cell.count} screening${cell.count !== 1 ? 's' : ''}` : 'no screenings',
+                  })}
                 />
               ))}
             </div>
@@ -120,6 +121,7 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
       <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
         {totalInYear} screening{totalInYear !== 1 ? 's' : ''} in the past year
       </p>
+      {tip.node}
     </Panel>
   )
 }

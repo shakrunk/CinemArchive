@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { deriveTimewarp } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 /** Amber→ink ramp across the age buckets, newest first. */
@@ -18,6 +19,7 @@ const BUCKET_COLORS = [
 export function TheRevivalHouse({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = JSON.stringify(settings ?? {})
+  const tip = useChartTip()
 
   const { buckets, median, total } = useMemo(
     () => deriveTimewarp(titles, settings),
@@ -45,7 +47,10 @@ export function TheRevivalHouse({ className, settings }: { className?: string; s
             b.count > 0 && (
               <div
                 key={b.key}
-                title={`${b.label} (${b.range}) — ${b.count} screening${b.count !== 1 ? 's' : ''}`}
+                {...tip.bind({
+                  label: `${b.label} (${b.range})`,
+                  value: `${b.count} screening${b.count !== 1 ? 's' : ''}`,
+                })}
                 className="flex items-center justify-center min-w-[34px]"
                 style={{ flexGrow: b.count, background: BUCKET_COLORS[i] }}
               >
@@ -82,6 +87,7 @@ export function TheRevivalHouse({ className, settings }: { className?: string; s
         </strong>{' '}
         at showtime.
       </p>
+      {tip.node}
     </Panel>
   )
 }

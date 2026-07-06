@@ -544,6 +544,7 @@ export type NotificationType =
   | 'recommendation_received'
   | 'comment_received'
   | 'reaction_received'
+  | 'invite_redeemed'
 
 export interface AppNotificationItem {
   id: string

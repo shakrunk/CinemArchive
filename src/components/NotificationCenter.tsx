@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X } from 'lucide-react'
+import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { AppView } from 'src/lib/navigation'
@@ -12,6 +12,7 @@ const TYPE_META: Record<NotificationType, { Icon: typeof Bell; verb: (n: AppNoti
   recommendation_received: { Icon: Send, verb: (n) => `sent you "${n.payload.title ?? 'a title'}"` },
   comment_received: { Icon: MessageCircle, verb: (n) => `commented on "${n.title ?? 'a title'}"` },
   reaction_received: { Icon: Smile, verb: (n) => `reacted ${n.payload.emoji ?? ''} to "${n.title ?? 'a title'}"` },
+  invite_redeemed: { Icon: Ticket, verb: (n) => `redeemed your invite code${typeof n.payload.email === 'string' ? ` (${n.payload.email})` : ''}` },
 }
 
 function actorName(n: AppNotificationItem): string {
@@ -78,6 +79,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       openDetailDrawer(n.titleId)
     } else if (n.type === 'friend_request_received' || n.type === 'friend_request_accepted' || n.type === 'recommendation_received') {
       onNavigate('friends')
+    } else if (n.type === 'invite_redeemed') {
+      onNavigate('profile')
     }
   }
 

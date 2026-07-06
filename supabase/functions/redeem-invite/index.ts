@@ -87,7 +87,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: invite, error: inviteError } = await supabase
       .from('invite_codes')
-      .select('id, redeemed_by')
+      .select('id, created_by, redeemed_by')
       .eq('code', code)
       .maybeSingle()
 
@@ -123,6 +123,15 @@ Deno.serve(async (req: Request) => {
       await supabase.auth.admin.deleteUser(created.user.id)
       return fail('This invite code has already been used.')
     }
+
+    // Best-effort — the account is already created and the code already
+    // claimed, so a notification failure here shouldn't fail the request.
+    await supabase
+      .from('notifications')
+      .insert({ recipient_id: invite.created_by, type: 'invite_redeemed', actor_id: created.user.id, payload: { email } })
+      .then(({ error }) => {
+        if (error) console.error('Failed to insert invite_redeemed notification:', error)
+      })
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -266,20 +266,34 @@ returns boolean language sql security definer as $$
   );
 $$;
 
--- Update last_used_at when a shared key is validated
-create or replace function touch_shared_key(token_val text)
-returns void language sql security definer as $$
-  update shared_access_keys
-  set last_used_at = now()
-  where token = token_val;
-$$;
-
 -- Wrapper exposing set_config via RPC (the pg_catalog builtin isn't
 -- callable directly through PostgREST) so clients can set the
 -- shared-token session setting that the "shared key read" policies check.
+-- Also updates last_used_at on the matching key — this is the one RPC every
+-- shared-link read actually calls, so it's the one place that can't be
+-- forgotten (the previous touch_shared_key() required a second call site
+-- that no client code ever made). $1 (positional) is used instead of the
+-- bare parameter name because the parameter is named `token`, same as the
+-- column being updated — referencing it by name would be ambiguous.
 create or replace function set_shared_token(token text)
 returns void language sql security definer as $$
-  select set_config('app.shared_token', token, false)
+  select set_config('app.shared_token', $1, false);
+  update shared_access_keys
+  set last_used_at = now()
+  where shared_access_keys.token = $1
+    and is_active = true;
+$$;
+
+-- Resolves a share link's owner independent of whether they own any titles
+-- (fetchSharedLibrary previously derived this from the first returned title
+-- row, which was null for an owner with zero titles).
+create or replace function shared_key_owner(token_val text)
+returns uuid language sql security definer stable as $$
+  select user_id from shared_access_keys
+  where token = token_val
+    and is_active = true
+    and (expires_at is null or expires_at > now())
+  limit 1;
 $$;
 
 -- -----------------------------------------------------------
@@ -468,7 +482,11 @@ create table profiles (
   email         text not null,
   username      text unique,
   display_name  text,
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  -- Single source of truth for the "uncapped invite codes" exception — was
+  -- previously three independently-hardcoded email literals (one RLS policy,
+  -- two client files) that had already drifted out of sync once.
+  is_owner      boolean not null default false
 );
 
 create index profiles_email_idx on profiles(lower(email));
@@ -486,8 +504,8 @@ create policy "profiles: owner full access"
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into public.profiles (user_id, email, display_name)
-  values (new.id, new.email, split_part(new.email, '@', 1))
+  insert into public.profiles (user_id, email, display_name, is_owner)
+  values (new.id, new.email, split_part(new.email, '@', 1), lower(new.email) = 'denkrishna@gmail.com')
   on conflict (user_id) do nothing;
   return new;
 end;
@@ -522,8 +540,9 @@ $$;
 --   pending -> accepted  via accept_friend_request, or automatically if the
 --              other party also sends a request (mutual request)
 --   pending -> (removed) via decline_friend_request
---   any     -> blocked   via block_user (one-directional exit; only
---              blocked_by can act on it again — no unblock yet)
+--   any     -> blocked   via block_user (only blocked_by can act on it again)
+--   blocked -> (removed) via unblock_user (blocked_by only); re-friending
+--              requires a fresh send_friend_request afterward
 create table friendships (
   user_id_a    uuid not null references auth.users(id) on delete cascade,
   user_id_b    uuid not null references auth.users(id) on delete cascade,
@@ -664,6 +683,32 @@ begin
   values (a, b, me, 'blocked', me)
   on conflict (user_id_a, user_id_b)
   do update set status = 'blocked', blocked_by = me, updated_at = now();
+end;
+$$;
+
+-- Drops the relationship entirely (like decline_friend_request) rather than
+-- reverting to 'pending'/'accepted' automatically — re-friending requires a
+-- fresh send_friend_request from either party. Only the blocking party may act.
+create or replace function unblock_user(target_user_id uuid)
+returns void
+language plpgsql security definer as $$
+declare
+  me uuid := auth.uid();
+  a uuid := least(me, target_user_id);
+  b uuid := greatest(me, target_user_id);
+begin
+  if me is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from friendships
+  where user_id_a = a and user_id_b = b
+    and status = 'blocked'
+    and blocked_by = me;
+
+  if not found then
+    raise exception 'No block from you on this user to remove';
+  end if;
 end;
 $$;
 
@@ -988,7 +1033,7 @@ $$;
 -- src/lib/auth.ts) fails for any email that isn't already a known user.
 --
 -- Each account may generate at most 2 invite codes, ever — except the owner
--- account (auth.email() = 'denkrishna@gmail.com'), which is uncapped.
+-- account (profiles.is_owner), which is uncapped.
 create table invite_codes (
   id           uuid primary key default gen_random_uuid(),
   code         text not null unique,
@@ -1011,7 +1056,7 @@ create policy "invite_codes: capped insert"
   with check (
     auth.uid() = created_by
     and (
-      auth.email() = 'denkrishna@gmail.com'
+      (select is_owner from profiles where user_id = auth.uid()) = true
       or (select count(*) from invite_codes where created_by = auth.uid()) < 2
     )
   );
@@ -1022,3 +1067,18 @@ create policy "invite_codes: owner can delete own unredeemed"
 
 -- No update policy: redemption is written exclusively by the redeem-invite
 -- Edge Function using the service role key, which bypasses RLS.
+
+-- Rate-limiting log for the redeem-invite Edge Function. Service-role-only
+-- (same pattern as api_cache): RLS enabled with zero policies denies all
+-- client access.
+create table invite_redeem_attempts (
+  id           uuid primary key default gen_random_uuid(),
+  ip_hash      text,
+  email        text,
+  attempted_at timestamptz not null default now()
+);
+
+create index invite_redeem_attempts_ip_hash_idx on invite_redeem_attempts(ip_hash, attempted_at);
+create index invite_redeem_attempts_email_idx on invite_redeem_attempts(email, attempted_at);
+
+alter table invite_redeem_attempts enable row level security;

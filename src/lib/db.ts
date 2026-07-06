@@ -185,8 +185,9 @@ export async function fetchUserLibrary(userId: string): Promise<Title[]> {
   return (data || []).map(mapDbTitleToLocal)
 }
 
-/** Shared-token view returns the titles plus the owner's user id (recovered
- *  from the title rows) so the owner's synced prefs can be read too. */
+/** Shared-token view returns the titles plus the owner's user id (looked up
+ *  directly from the key, independent of whether the owner has any titles)
+ *  so the owner's synced prefs can be read too. */
 export async function fetchSharedLibrary(
   token: string
 ): Promise<{ titles: Title[]; ownerUserId: string | null }> {
@@ -198,34 +199,38 @@ export async function fetchSharedLibrary(
     throw rpcError
   }
 
-  const { data, error } = await supabase
-    .from('titles')
-    .select(`
-      *,
-      title_cast (*),
-      title_crew (*),
-      seasons (
+  const [{ data, error }, { data: ownerUserId, error: ownerError }] = await Promise.all([
+    supabase
+      .from('titles')
+      .select(`
         *,
-        season_cast (*)
-      ),
-      viewings (*),
-      episodes (
-        *,
-        episode_crew (*),
-        episode_watch_events (*),
-        episode_ratings (*),
-        episode_reviews (*)
-      )
-    `)
+        title_cast (*),
+        title_crew (*),
+        seasons (
+          *,
+          season_cast (*)
+        ),
+        viewings (*),
+        episodes (
+          *,
+          episode_crew (*),
+          episode_watch_events (*),
+          episode_ratings (*),
+          episode_reviews (*)
+        )
+      `),
+    supabase.rpc('shared_key_owner', { token_val: token }),
+  ])
 
   if (error) {
     console.error('Error fetching shared library:', error)
     throw error
   }
+  if (ownerError) console.error('Error resolving shared link owner:', ownerError)
 
   return {
     titles: (data || []).map(mapDbTitleToLocal),
-    ownerUserId: (data?.[0]?.user_id as string | undefined) ?? null,
+    ownerUserId: (ownerUserId as string | null) ?? null,
   }
 }
 

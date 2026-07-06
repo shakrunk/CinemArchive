@@ -14,6 +14,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
   const {
     titles,
     isSharedView,
+    user,
     isCommandPaletteOpen,
     closeCommandPalette,
     openAddTitle,
@@ -23,6 +24,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     useShallow((s) => ({
       titles: s.titles,
       isSharedView: s.isSharedView,
+      user: s.user,
       isCommandPaletteOpen: s.isCommandPaletteOpen,
       closeCommandPalette: s.closeCommandPalette,
       openAddTitle: s.openAddTitle,
@@ -49,8 +51,12 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     map['action:view-ledger'] = () => onNavigate('ledger')
     list.push({ id: 'action:view-discover', kind: 'action', label: 'Go to Discover', hint: 'view', keywords: 'explore browse trending genres movies tv' })
     map['action:view-discover'] = () => onNavigate('discover')
-    list.push({ id: 'action:view-profile', kind: 'action', label: 'Go to Profile & Settings', hint: 'view', keywords: 'account settings preferences theme friends sharing sign in out passkey export import' })
+    list.push({ id: 'action:view-profile', kind: 'action', label: 'Go to Profile & Settings', hint: 'view', keywords: 'account settings preferences theme shared links sign in out passkey export import' })
     map['action:view-profile'] = () => onNavigate('profile')
+    if (user && !isSharedView) {
+      list.push({ id: 'action:view-friends', kind: 'action', label: 'Go to Friends', hint: 'view', keywords: 'friends social recommendations activity inbox' })
+      map['action:view-friends'] = () => onNavigate('friends')
+    }
     list.push({ id: 'action:layout-grid', kind: 'action', label: 'Library: poster wall', hint: 'layout', keywords: 'grid posters' })
     map['action:layout-grid'] = () => { onNavigate('library'); setViewMode('grid') }
     list.push({ id: 'action:layout-list', kind: 'action', label: 'Library: ledger list', hint: 'layout', keywords: 'list table' })
@@ -65,7 +71,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
       map[id] = () => openDetailDrawer(t.id)
     }
     return { commands: list, runMap: map }
-  }, [titles, isSharedView, openAddTitle, openDetailDrawer, setViewMode, onNavigate])
+  }, [titles, isSharedView, user, openAddTitle, openDetailDrawer, setViewMode, onNavigate])
 
   function runCommand(cmd: Command) {
     closeCommandPalette()

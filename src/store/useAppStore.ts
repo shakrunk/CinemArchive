@@ -209,11 +209,16 @@ interface UISlice {
   refreshActivityUnseenCount: () => Promise<void>
 }
 
-/** Identifies whose library is currently loaded when browsing a friend's collection. */
-export interface FriendViewInfo {
-  userId: string
-  displayName: string
-}
+/**
+ * Who's actually looking at this library right now. `isSharedView` (below)
+ * remains the single boolean every read-only-gated component checks — this
+ * type only matters where the *kind* of visitor matters (exit affordances,
+ * per-friend/per-link scoping, comment write-gating).
+ */
+export type ViewerContext =
+  | { kind: 'owner' }
+  | { kind: 'shared-link'; token: string }
+  | { kind: 'friend'; userId: string; displayName: string }
 
 interface AuthSlice {
   user: User | null
@@ -221,7 +226,7 @@ interface AuthSlice {
   // Set when the last library load failed; cleared when a load starts or
   // succeeds. Views surface it instead of a misleading empty state.
   libraryLoadError: string | null
-  friendView: FriendViewInfo | null
+  viewerContext: ViewerContext
   setUser: (user: User | null) => void
   setLoadingUser: (loading: boolean) => void
   loadUserLibrary: () => Promise<void>
@@ -394,7 +399,7 @@ function flushLedgerLayoutSave() {
   if (!get) return
   const s = get()
   // Viewers must never write the owner's board into their own prefs.
-  if (!s.user || s.isSharedView || s.friendView) return
+  if (!s.user || s.isSharedView || s.viewerContext.kind === 'friend') return
   const user = s.user
   saveLedgerLayout(user.id, s.ledgerPrefs.widgets).catch(() => {
     s.pushNotification({
@@ -980,7 +985,7 @@ export const useAppStore = create<AppStore>()(
   user: null,
   loadingUser: false,
   libraryLoadError: null,
-  friendView: null,
+  viewerContext: { kind: 'owner' },
 
   setUser: (user) => {
     set({ user })
@@ -1012,7 +1017,7 @@ export const useAppStore = create<AppStore>()(
       // wins; a user who has never synced adopts their local board once.
       void fetchLedgerLayout(user.id)
         .then((widgets) => {
-          if (get().isSharedView || get().friendView) return
+          if (get().isSharedView || get().viewerContext.kind === 'friend') return
           if (widgets) set({ ledgerPrefs: { widgets } })
           else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
         })
@@ -1043,7 +1048,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadSharedLibrary: async (token) => {
-    set({ loadingUser: true, isSharedView: true, libraryLoadError: null })
+    set({ loadingUser: true, isSharedView: true, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null })
     try {
       const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
       set((s) => ({
@@ -1067,14 +1072,14 @@ export const useAppStore = create<AppStore>()(
   },
 
   // Reuses isSharedView for the existing read-only gating throughout the app
-  // (TitleDetailDrawer, episode-card, Discover, etc.) — friendView just adds
+  // (TitleDetailDrawer, episode-card, Discover, etc.) — viewerContext just adds
   // who's being viewed, for the exit affordance and heading text.
   loadFriendLibrary: async (friendUserId, displayName) => {
     set({
       loadingUser: true,
       isSharedView: true,
       libraryLoadError: null,
-      friendView: { userId: friendUserId, displayName },
+      viewerContext: { kind: 'friend', userId: friendUserId, displayName },
       pendingView: 'library',
     })
     try {
@@ -1103,7 +1108,7 @@ export const useAppStore = create<AppStore>()(
     // titles still in state and skip the replace if the user's own library is
     // empty, stranding read-only-disabled friend data with edit controls live.
     set((s) => ({
-      friendView: null,
+      viewerContext: { kind: 'owner' },
       isSharedView: false,
       viewedLedgerWidgets: null,
       titles: [],
@@ -1161,7 +1166,7 @@ export const useAppStore = create<AppStore>()(
       // browsing a friend's library, `titles` holds THEIR data — never persist
       // that to the viewer's localStorage.
       partialize: (s) => ({
-        titles: s.friendView ? [] : s.titles,
+        titles: s.viewerContext.kind === 'friend' ? [] : s.titles,
         filters: s.filters,
         viewMode: s.viewMode,
         theme: s.theme,

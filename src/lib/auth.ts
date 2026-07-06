@@ -185,13 +185,14 @@ export interface MyProfile {
   username: string | null
   display_name: string | null
   created_at: string
+  is_owner: boolean
 }
 
 /** Fetch the current user's profile row (owner-only RLS). */
 export async function getMyProfile(): Promise<MyProfile | null> {
   const { data, error } = await getClient()
     .from('profiles')
-    .select('user_id, email, username, display_name, created_at')
+    .select('user_id, email, username, display_name, created_at, is_owner')
     .maybeSingle()
   if (error) throw error
   return data
@@ -209,7 +210,7 @@ export async function updateMyProfile(patch: {
     .from('profiles')
     .update(patch)
     .eq('user_id', user.id)
-    .select('user_id, email, username, display_name, created_at')
+    .select('user_id, email, username, display_name, created_at, is_owner')
     .single()
   if (error) {
     if (error.code === '23505') throw new Error('That username is already taken.')
@@ -276,6 +277,12 @@ export async function declineFriendRequest(requesterUserId: string): Promise<voi
 /** Block another user, exiting any existing pending/accepted relationship. */
 export async function blockFriend(targetUserId: string): Promise<void> {
   const { error } = await getClient().rpc('block_user', { target_user_id: targetUserId })
+  if (error) throw error
+}
+
+/** Remove a block you placed. Drops the relationship entirely — re-friending needs a fresh request. */
+export async function unblockFriend(targetUserId: string): Promise<void> {
+  const { error } = await getClient().rpc('unblock_user', { target_user_id: targetUserId })
   if (error) throw error
 }
 

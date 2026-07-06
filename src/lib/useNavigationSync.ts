@@ -17,6 +17,7 @@ export function useNavigationSync({
   const selectedTitleId = useAppStore((s) => s.selectedTitleId)
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const friendId = useAppStore((s) => (s.viewerContext.kind === 'friend' ? s.viewerContext.userId : null))
 
   const drawerTitle = isDetailDrawerOpen ? selectedTitleId : null
   const desired: NavState = { view: currentView, title: drawerTitle, add: isAddTitleOpen }
@@ -80,12 +81,20 @@ export function useNavigationSync({
       return
     }
 
-    const preserved = preservedParams(window.location.search)
+    // `friend` is sourced from the live store (not just carried forward from
+    // the URL) so exiting a friend's library reliably drops it even when
+    // view/title/add happen not to change in the same tick.
+    const urlPreserved = preservedParams(window.location.search)
+    const preserved = { ...urlPreserved }
+    if (friendId) preserved.friend = friendId
+    else delete preserved.friend
+
     const currentNav = parseNav(window.location.search, desired.view)
     const sameAsUrl =
       currentNav.view === desired.view &&
       currentNav.title === desired.title &&
-      currentNav.add === desired.add
+      currentNav.add === desired.add &&
+      (urlPreserved.friend ?? null) === (friendId ?? null)
     if (sameAsUrl) {
       prevRef.current = desired
       return
@@ -121,5 +130,5 @@ export function useNavigationSync({
     }
     prevRef.current = desired
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [desired.view, desired.title, desired.add])
+  }, [desired.view, desired.title, desired.add, friendId])
 }

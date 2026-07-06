@@ -85,7 +85,7 @@ export function Ledger() {
     gridRef,
     boardRef,
     draggingId,
-    overId,
+    settlingId,
     resizingId,
     paletteGhost,
     paletteOverId,
@@ -176,9 +176,12 @@ export function Ledger() {
           const id = widget.id
           const { Component } = PANEL_REGISTRY[widget.panel]
           const isDragging = draggingId === id
+          const isSettling = settlingId === id
           const isResizing = resizingId === id
           const isSelected = editing && selectedId === id
-          const isOver = editing && !isDragging && (overId === id || paletteOverId === id)
+          // Reorder drags rearrange the board live, so only palette drags
+          // still need a drop-target outline.
+          const isOver = editing && !isDragging && paletteOverId === id
 
           return (
             <div
@@ -203,7 +206,7 @@ export function Ledger() {
                 // The drag translate is applied imperatively by useBoardDrag
                 // (element.style.transform) to avoid per-pointermove renders.
                 transition: isDragging || isResizing ? 'none' : 'transform 180ms ease',
-                zIndex: isDragging ? 20 : undefined,
+                zIndex: isDragging || isSettling ? 20 : undefined,
                 outline: isOver
                   ? '2px dashed var(--amber)'
                   : isResizing || isSelected
@@ -211,7 +214,7 @@ export function Ledger() {
                     : undefined,
                 outlineOffset: '2px',
                 borderRadius: '0.75rem',
-                boxShadow: isDragging ? '0 20px 50px -12px rgba(0,0,0,0.6)' : undefined,
+                boxShadow: isDragging || isSettling ? '0 20px 50px -12px rgba(0,0,0,0.6)' : undefined,
               }}
             >
               <div

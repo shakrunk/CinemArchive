@@ -2,7 +2,7 @@
 // edge resize (width presets only — heights are standardized), and dragging a
 // panel type from the palette onto the board.
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import type { LedgerPanelId } from 'src/lib/ledgerPanels'
 import { LEDGER_PANEL_WIDTH_SPANS, nearestPanelWidth } from 'src/lib/ledgerPanels'
@@ -24,6 +24,16 @@ interface DragMeta {
   startX: number
   startY: number
   active: boolean
+  // Live-reorder bookkeeping: the panel's untransformed layout position at
+  // activation, the cumulative layout shift from reorders committed mid-drag,
+  // and the last pointer delta — together they keep the held panel pinned
+  // under the cursor while its grid slot moves out from beneath it.
+  layoutLeft: number
+  layoutTop: number
+  shiftX: number
+  shiftY: number
+  lastDX: number
+  lastDY: number
 }
 
 interface PaletteDragMeta {
@@ -57,10 +67,15 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
   const boardRef = useRef<HTMLDivElement>(null)
 
   // Reorder drag — the whole panel is the drag surface in edit mode.
+  // Reorders commit live while the pointer is still down; `overRef` only
+  // gates re-triggering while the pointer stays over the same panel.
   const dragRef = useRef<DragMeta | null>(null)
   const overRef = useRef<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
+  // Keeps the released panel elevated while it settles into its slot.
+  const [settlingId, setSettlingId] = useState<string | null>(null)
+  const settleTimerRef = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(settleTimerRef.current), [])
 
   // Resize drag — handles live on the panel's side edges.
   const resizeRef = useRef<ResizeMeta | null>(null)
@@ -96,7 +111,21 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     const before = flipRectsRef.current
     flipRectsRef.current = null
     if (!before) return
+    const drag = dragRef.current
     for (const [id, el] of itemRefs.current) {
+      if (drag?.active && id === drag.id) {
+        // Don't FLIP the held panel — its pointer-follow transform must stay
+        // put. Re-anchor it to the new grid slot so the panel doesn't jump
+        // when its layout position changes under it.
+        const rect = el.getBoundingClientRect()
+        const currentX = drag.lastDX - drag.shiftX
+        const currentY = drag.lastDY - drag.shiftY
+        drag.shiftX = rect.left - currentX - drag.layoutLeft
+        drag.shiftY = rect.top - currentY - drag.layoutTop
+        el.style.transition = 'none'
+        el.style.transform = `translate(${drag.lastDX - drag.shiftX}px, ${drag.lastDY - drag.shiftY}px)`
+        continue
+      }
       const from = before.get(id)
       if (!from) continue
       const to = el.getBoundingClientRect()
@@ -119,7 +148,18 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     if (e.button !== 0 || resizeRef.current) return
     // Toolbar buttons and resize handles opt out of starting a reorder drag.
     if ((e.target as HTMLElement).closest('[data-ledger-control]')) return
-    dragRef.current = { id, startX: e.clientX, startY: e.clientY, active: false }
+    dragRef.current = {
+      id,
+      startX: e.clientX,
+      startY: e.clientY,
+      active: false,
+      layoutLeft: 0,
+      layoutTop: 0,
+      shiftX: 0,
+      shiftY: 0,
+      lastDX: 0,
+      lastDY: 0,
+    }
     overRef.current = null
     capturePointer(e.currentTarget, e.pointerId)
   }
@@ -132,12 +172,19 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     if (!drag.active) {
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
       drag.active = true
+      const rect = itemRefs.current.get(drag.id)?.getBoundingClientRect()
+      if (rect) {
+        drag.layoutLeft = rect.left
+        drag.layoutTop = rect.top
+      }
       setDraggingId(drag.id)
     }
+    drag.lastDX = dx
+    drag.lastDY = dy
     // Apply the drag transform imperatively — routing it through React state
     // re-rendered the entire board on every pointermove.
     const el = itemRefs.current.get(drag.id)
-    if (el) el.style.transform = `translate(${dx}px, ${dy}px)`
+    if (el) el.style.transform = `translate(${dx - drag.shiftX}px, ${dy - drag.shiftY}px)`
     let hit: string | null = null
     for (const [id, item] of itemRefs.current) {
       if (id === drag.id) continue
@@ -149,7 +196,23 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     }
     if (hit !== overRef.current) {
       overRef.current = hit
-      setOverId(hit)
+      if (hit) {
+        // Commit the reorder while the panel is still held — the FLIP effect
+        // slides the other panels around it, and re-anchors the held panel's
+        // transform to its new slot. Read the order from the store: with
+        // rapid pointermoves the `widgets` closure can be a render behind.
+        captureFlipRects()
+        const ids = useAppStore.getState().ledgerPrefs.widgets.map((w) => w.id)
+        const from = ids.indexOf(drag.id)
+        const to = ids.indexOf(hit)
+        if (from !== -1 && to !== -1 && from !== to) {
+          ids.splice(from, 1)
+          ids.splice(to, 0, drag.id)
+          reorderLedgerWidgets(ids)
+        } else {
+          flipRectsRef.current = null
+        }
+      }
     }
   }
 
@@ -159,23 +222,20 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     if (!drag) return
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
     const dragged = itemRefs.current.get(drag.id)
-    if (dragged) dragged.style.transform = ''
-    const over = overRef.current
     if (!drag.active) {
       // A press without movement is a selection, not a drag.
       selectWidget(id)
-    } else if (over && over !== drag.id) {
-      captureFlipRects()
-      const ids = widgets.map((w) => w.id)
-      const from = ids.indexOf(drag.id)
-      const to = ids.indexOf(over)
-      ids.splice(from, 1)
-      ids.splice(to, 0, drag.id)
-      reorderLedgerWidgets(ids)
+    } else if (dragged) {
+      // The order is already committed; ease the panel into its slot instead
+      // of snapping, keeping it elevated until the settle finishes.
+      dragged.style.transition = 'transform 180ms ease'
+      dragged.style.transform = ''
+      setSettlingId(drag.id)
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = window.setTimeout(() => setSettlingId(null), 200)
     }
     overRef.current = null
     setDraggingId(null)
-    setOverId(null)
   }
 
   // ── Resize handlers (width only — heights are standardized) ──────────────
@@ -299,7 +359,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     gridRef,
     boardRef,
     draggingId,
-    overId,
+    settlingId,
     resizingId,
     paletteGhost,
     paletteOverId,

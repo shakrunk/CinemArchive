@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { AppView } from 'src/lib/navigation'
@@ -32,15 +33,17 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
     markAllNotificationsSeen,
     deleteNotificationItem,
     openDetailDrawer,
-  } = useAppStore((s) => ({
-    notificationInbox: s.notificationInbox,
-    unreadNotificationCount: s.unreadNotificationCount,
-    loadNotificationInbox: s.loadNotificationInbox,
-    markOneNotificationRead: s.markOneNotificationRead,
-    markAllNotificationsSeen: s.markAllNotificationsSeen,
-    deleteNotificationItem: s.deleteNotificationItem,
-    openDetailDrawer: s.openDetailDrawer,
-  }))
+  } = useAppStore(
+    useShallow((s) => ({
+      notificationInbox: s.notificationInbox,
+      unreadNotificationCount: s.unreadNotificationCount,
+      loadNotificationInbox: s.loadNotificationInbox,
+      markOneNotificationRead: s.markOneNotificationRead,
+      markAllNotificationsSeen: s.markAllNotificationsSeen,
+      deleteNotificationItem: s.deleteNotificationItem,
+      openDetailDrawer: s.openDetailDrawer,
+    }))
+  )
 
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)

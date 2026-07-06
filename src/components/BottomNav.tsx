@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { LayoutGrid, List, BarChart3, Plus, PlayCircle, Compass } from 'lucide-react'
+import { LayoutGrid, List, BarChart3, Plus, PlayCircle, Compass, Users } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { AppView, NavItemId } from 'src/lib/navigation'
@@ -53,6 +53,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const isSharedView = useAppStore((s) => s.isSharedView)
   const navPrefs = useAppStore((s) => s.navPrefs)
   const viewMode = useAppStore((s) => s.viewMode)
+  const user = useAppStore((s) => s.user)
 
   const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
   // Split around the central Add button, biasing an odd extra item to the left
@@ -135,6 +136,11 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
           const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
           return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
         })}
+
+        {/* Fixed, non-reorderable — mirrors the Add button's placement, not part of navPrefs.order. */}
+        {user && !isSharedView && (
+          <NavTab active={currentView === 'friends'} onClick={() => onViewChange('friends')} label="Friends" Icon={Users} />
+        )}
       </div>
     </nav>
   )

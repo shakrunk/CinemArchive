@@ -23,8 +23,10 @@ import {
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
   deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
-  fetchFriendActivityFeed,
   fetchLedgerLayout, saveLedgerLayout,
+  fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
+  deleteNotification,
+  type AppNotificationItem,
 } from '../lib/db'
 import type { SearchResult } from '../lib/media'
 
@@ -201,19 +203,29 @@ interface UISlice {
   pushNotification: (n: Omit<AppNotification, 'id'>) => void
   dismissNotification: (id: string) => void
 
-  // Friend activity feed badge — the feed itself is fetched on demand by
-  // ProfileModal; this just tracks the unseen count shown on TopBar.
-  activityFeedLastSeenAt: string | null
-  activityUnseenCount: number
-  markActivityFeedSeen: () => void
-  refreshActivityUnseenCount: () => Promise<void>
+  // Persistent notification inbox (bell icon) — distinct from the ephemeral
+  // toast stack above. The list is fetched on demand by the bell dropdown;
+  // this tracks the unread count shown as a badge, sourced from the server
+  // (read_at), not a client-side "last seen" watermark.
+  notificationInbox: AppNotificationItem[]
+  unreadNotificationCount: number
+  refreshUnreadNotificationCount: () => Promise<void>
+  loadNotificationInbox: (before?: string) => Promise<void>
+  markOneNotificationRead: (id: string) => Promise<void>
+  markAllNotificationsSeen: () => Promise<void>
+  deleteNotificationItem: (id: string) => Promise<void>
 }
 
-/** Identifies whose library is currently loaded when browsing a friend's collection. */
-export interface FriendViewInfo {
-  userId: string
-  displayName: string
-}
+/**
+ * Who's actually looking at this library right now. `isSharedView` (below)
+ * remains the single boolean every read-only-gated component checks — this
+ * type only matters where the *kind* of visitor matters (exit affordances,
+ * per-friend/per-link scoping, comment write-gating).
+ */
+export type ViewerContext =
+  | { kind: 'owner' }
+  | { kind: 'shared-link'; token: string }
+  | { kind: 'friend'; userId: string; displayName: string }
 
 interface AuthSlice {
   user: User | null
@@ -221,7 +233,7 @@ interface AuthSlice {
   // Set when the last library load failed; cleared when a load starts or
   // succeeds. Views surface it instead of a misleading empty state.
   libraryLoadError: string | null
-  friendView: FriendViewInfo | null
+  viewerContext: ViewerContext
   setUser: (user: User | null) => void
   setLoadingUser: (loading: boolean) => void
   loadUserLibrary: () => Promise<void>
@@ -387,6 +399,12 @@ const LEDGER_SAVE_DEBOUNCE_MS = 800
 let ledgerSaveTimer: number | undefined
 let ledgerSaveGet: (() => AppStore) | null = null
 
+// Polls the unread notification count while a user is logged in — the inbox
+// has no Supabase Realtime subscription, so this is what keeps the bell
+// current for a friend's comment/reaction/request arriving mid-session.
+const NOTIFICATION_POLL_MS = 45_000
+let notificationPollTimer: number | undefined
+
 function flushLedgerLayoutSave() {
   window.clearTimeout(ledgerSaveTimer)
   ledgerSaveTimer = undefined
@@ -394,7 +412,7 @@ function flushLedgerLayoutSave() {
   if (!get) return
   const s = get()
   // Viewers must never write the owner's board into their own prefs.
-  if (!s.user || s.isSharedView || s.friendView) return
+  if (!s.user || s.isSharedView || s.viewerContext.kind === 'friend') return
   const user = s.user
   saveLedgerLayout(user.id, s.ledgerPrefs.widgets).catch(() => {
     s.pushNotification({
@@ -958,21 +976,72 @@ export const useAppStore = create<AppStore>()(
       notifications: s.notifications.filter((n) => n.id !== id),
     })),
 
-  activityFeedLastSeenAt: null,
-  activityUnseenCount: 0,
+  notificationInbox: [],
+  unreadNotificationCount: 0,
 
-  markActivityFeedSeen: () => set({ activityFeedLastSeenAt: new Date().toISOString(), activityUnseenCount: 0 }),
-
-  refreshActivityUnseenCount: async () => {
+  refreshUnreadNotificationCount: async () => {
     if (!get().user) return
     try {
-      const feed = await fetchFriendActivityFeed()
-      const lastSeen = get().activityFeedLastSeenAt
-      const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : 0
-      const unseen = feed.filter((e) => new Date(e.eventAt).getTime() > lastSeenMs).length
-      set({ activityUnseenCount: unseen })
+      const count = await fetchUnreadNotificationCount()
+      set({ unreadNotificationCount: count })
     } catch (err) {
-      console.error('Failed to refresh friend activity feed count:', err)
+      console.error('Failed to refresh unread notification count:', err)
+    }
+  },
+
+  loadNotificationInbox: async (before) => {
+    try {
+      const page = await fetchNotifications(before)
+      set((s) => ({ notificationInbox: before ? [...s.notificationInbox, ...page] : page }))
+    } catch (err) {
+      console.error('Failed to load notification inbox:', err)
+    }
+  },
+
+  markOneNotificationRead: async (id) => {
+    const prev = get().notificationInbox
+    set((s) => ({
+      notificationInbox: s.notificationInbox.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
+      unreadNotificationCount: Math.max(0, s.unreadNotificationCount - (prev.find((n) => n.id === id)?.readAt ? 0 : 1)),
+    }))
+    try {
+      await markNotificationRead(id)
+    } catch (err) {
+      console.error('Failed to mark notification read:', err)
+      set({ notificationInbox: prev })
+      void get().refreshUnreadNotificationCount()
+    }
+  },
+
+  markAllNotificationsSeen: async () => {
+    const prev = get().notificationInbox
+    const now = new Date().toISOString()
+    set((s) => ({
+      notificationInbox: s.notificationInbox.map((n) => (n.readAt ? n : { ...n, readAt: now })),
+      unreadNotificationCount: 0,
+    }))
+    try {
+      await markAllNotificationsRead()
+    } catch (err) {
+      console.error('Failed to mark all notifications read:', err)
+      set({ notificationInbox: prev })
+      void get().refreshUnreadNotificationCount()
+    }
+  },
+
+  deleteNotificationItem: async (id) => {
+    const prev = get().notificationInbox
+    const removed = prev.find((n) => n.id === id)
+    set((s) => ({
+      notificationInbox: s.notificationInbox.filter((n) => n.id !== id),
+      unreadNotificationCount: removed && !removed.readAt ? Math.max(0, s.unreadNotificationCount - 1) : s.unreadNotificationCount,
+    }))
+    try {
+      await deleteNotification(id)
+    } catch (err) {
+      console.error('Failed to delete notification:', err)
+      set({ notificationInbox: prev })
+      void get().refreshUnreadNotificationCount()
     }
   },
 
@@ -980,14 +1049,17 @@ export const useAppStore = create<AppStore>()(
   user: null,
   loadingUser: false,
   libraryLoadError: null,
-  friendView: null,
+  viewerContext: { kind: 'owner' },
 
   setUser: (user) => {
     set({ user })
+    window.clearInterval(notificationPollTimer)
+    notificationPollTimer = undefined
     if (user) {
       get().loadUserLibrary()
       get().loadPinnedModes()
-      get().refreshActivityUnseenCount()
+      get().refreshUnreadNotificationCount()
+      notificationPollTimer = window.setInterval(() => get().refreshUnreadNotificationCount(), NOTIFICATION_POLL_MS)
     } else {
       // Clear on logout — restore mock data only in dev
       const fallback = import.meta.env.DEV ? mockTitles : []
@@ -1012,7 +1084,7 @@ export const useAppStore = create<AppStore>()(
       // wins; a user who has never synced adopts their local board once.
       void fetchLedgerLayout(user.id)
         .then((widgets) => {
-          if (get().isSharedView || get().friendView) return
+          if (get().isSharedView || get().viewerContext.kind === 'friend') return
           if (widgets) set({ ledgerPrefs: { widgets } })
           else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
         })
@@ -1043,7 +1115,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadSharedLibrary: async (token) => {
-    set({ loadingUser: true, isSharedView: true, libraryLoadError: null })
+    set({ loadingUser: true, isSharedView: true, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null })
     try {
       const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
       set((s) => ({
@@ -1067,14 +1139,14 @@ export const useAppStore = create<AppStore>()(
   },
 
   // Reuses isSharedView for the existing read-only gating throughout the app
-  // (TitleDetailDrawer, episode-card, Discover, etc.) — friendView just adds
+  // (TitleDetailDrawer, episode-card, Discover, etc.) — viewerContext just adds
   // who's being viewed, for the exit affordance and heading text.
   loadFriendLibrary: async (friendUserId, displayName) => {
     set({
       loadingUser: true,
       isSharedView: true,
       libraryLoadError: null,
-      friendView: { userId: friendUserId, displayName },
+      viewerContext: { kind: 'friend', userId: friendUserId, displayName },
       pendingView: 'library',
     })
     try {
@@ -1103,7 +1175,7 @@ export const useAppStore = create<AppStore>()(
     // titles still in state and skip the replace if the user's own library is
     // empty, stranding read-only-disabled friend data with edit controls live.
     set((s) => ({
-      friendView: null,
+      viewerContext: { kind: 'owner' },
       isSharedView: false,
       viewedLedgerWidgets: null,
       titles: [],
@@ -1161,14 +1233,13 @@ export const useAppStore = create<AppStore>()(
       // browsing a friend's library, `titles` holds THEIR data — never persist
       // that to the viewer's localStorage.
       partialize: (s) => ({
-        titles: s.friendView ? [] : s.titles,
+        titles: s.viewerContext.kind === 'friend' ? [] : s.titles,
         filters: s.filters,
         viewMode: s.viewMode,
         theme: s.theme,
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,
         ledgerPrefs: s.ledgerPrefs,
-        activityFeedLastSeenAt: s.activityFeedLastSeenAt,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

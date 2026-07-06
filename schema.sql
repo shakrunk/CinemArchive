@@ -266,20 +266,138 @@ returns boolean language sql security definer as $$
   );
 $$;
 
--- Update last_used_at when a shared key is validated
-create or replace function touch_shared_key(token_val text)
-returns void language sql security definer as $$
-  update shared_access_keys
-  set last_used_at = now()
-  where token = token_val;
-$$;
-
 -- Wrapper exposing set_config via RPC (the pg_catalog builtin isn't
 -- callable directly through PostgREST) so clients can set the
 -- shared-token session setting that the "shared key read" policies check.
+-- Also updates last_used_at on the matching key — this is the one RPC every
+-- shared-link read actually calls, so it's the one place that can't be
+-- forgotten (the previous touch_shared_key() required a second call site
+-- that no client code ever made) — and notifies the owner (see NOTIFICATIONS
+-- section below), at most once per hour per key so repeat page loads by the
+-- same visitor don't spam their inbox. Uses a local v_token variable rather
+-- than referencing the `token` parameter by name in the same statement as
+-- the `token` column, which would be ambiguous.
 create or replace function set_shared_token(token text)
-returns void language sql security definer as $$
-  select set_config('app.shared_token', token, false)
+returns void
+language plpgsql security definer as $$
+declare
+  v_token text := token;
+  key shared_access_keys;
+begin
+  perform set_config('app.shared_token', v_token, false);
+
+  select * into key from shared_access_keys k where k.token = v_token and k.is_active = true;
+  if key.id is null then
+    return;
+  end if;
+
+  if key.last_used_at is null or key.last_used_at < now() - interval '1 hour' then
+    insert into notifications (recipient_id, type, payload)
+    values (key.user_id, 'share_link_used', jsonb_build_object('label', key.label));
+  end if;
+
+  update shared_access_keys k set last_used_at = now() where k.id = key.id;
+end;
+$$;
+
+-- Resolves a share link's owner independent of whether they own any titles
+-- (fetchSharedLibrary previously derived this from the first returned title
+-- row, which was null for an owner with zero titles).
+create or replace function shared_key_owner(token_val text)
+returns uuid language sql security definer stable as $$
+  select user_id from shared_access_keys
+  where token = token_val
+    and is_active = true
+    and (expires_at is null or expires_at > now())
+  limit 1;
+$$;
+
+-- ============================================================
+-- SHARE SCOPES — per-friend / per-link narrowing of library visibility
+-- ============================================================
+--
+-- Absence of a row for a given link/friend means UNRESTRICTED — this is
+-- opt-in narrowing only, never opt-in widening. Exercised by
+-- scripts/verify-share-scope-logic.mjs.
+create table share_scopes (
+  id                uuid primary key default gen_random_uuid(),
+  owner_user_id     uuid not null references auth.users(id) on delete cascade,
+  shared_key_id     uuid references shared_access_keys(id) on delete cascade,
+  friend_user_id    uuid references auth.users(id) on delete cascade,
+  allowed_genres    text[],         -- null = all genres
+  allowed_statuses  watch_status[], -- null = all statuses
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  constraint share_scopes_one_target check (
+    (shared_key_id is not null and friend_user_id is null) or
+    (shared_key_id is null and friend_user_id is not null)
+  ),
+  constraint share_scopes_unique_link unique (shared_key_id),
+  constraint share_scopes_unique_friend unique (owner_user_id, friend_user_id)
+);
+
+create index share_scopes_owner_idx on share_scopes(owner_user_id);
+
+alter table share_scopes enable row level security;
+
+create policy "share_scopes: owner full access"
+  on share_scopes for all
+  using (auth.uid() = owner_user_id)
+  with check (auth.uid() = owner_user_id);
+
+create trigger share_scopes_updated_at
+  before update on share_scopes
+  for each row execute function update_updated_at();
+
+-- Pure predicate, no table access — null on either side means "no
+-- restriction on that dimension."
+create or replace function title_in_scope(
+  p_genres text[],
+  p_status watch_status,
+  p_allowed_genres text[],
+  p_allowed_statuses watch_status[]
+) returns boolean
+language sql immutable as $$
+  select (p_allowed_genres is null or p_genres && p_allowed_genres)
+     and (p_allowed_statuses is null or p_status = any(p_allowed_statuses));
+$$;
+
+-- Single predicate replacing the separate is_valid_shared_token(...)/
+-- is_friend(...) USING clauses that used to live across every shareable
+-- content table. SECURITY DEFINER so it can read shared_access_keys/
+-- share_scopes (owner-only RLS) and friendships regardless of the caller's
+-- own visibility into those tables. Takes the title's columns as parameters
+-- rather than a title_id + an internal re-select from `titles`: this
+-- function is invoked from `titles`' own SELECT policy, and reading
+-- `titles` again internally would be a self-referential RLS evaluation on
+-- the very table whose policy calls it. Child tables join to titles once to
+-- fetch genres/status instead (see their policies below).
+create or replace function can_view_title(
+  p_owner_user_id uuid,
+  p_genres text[],
+  p_status watch_status
+) returns boolean
+language sql security definer stable as $$
+  select
+    exists (
+      select 1
+      from shared_access_keys k
+      left join share_scopes s on s.shared_key_id = k.id
+      where k.token = current_setting('app.shared_token', true)
+        and k.user_id = p_owner_user_id
+        and k.is_active = true
+        and (k.expires_at is null or k.expires_at > now())
+        and title_in_scope(p_genres, p_status, s.allowed_genres, s.allowed_statuses)
+    )
+    or (
+      is_friend(auth.uid(), p_owner_user_id)
+      and title_in_scope(
+        p_genres,
+        p_status,
+        (select allowed_genres from share_scopes where friend_user_id = auth.uid() and owner_user_id = p_owner_user_id),
+        (select allowed_statuses from share_scopes where friend_user_id = auth.uid() and owner_user_id = p_owner_user_id)
+      )
+    );
 $$;
 
 -- -----------------------------------------------------------
@@ -292,15 +410,12 @@ create policy "titles: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Shared key holder: read-only (token passed via request header/setting)
-create policy "titles: shared key read"
+-- Shared-link visitor or accepted friend, subject to any share_scopes
+-- narrowing (see can_view_title above). Replaces the former separate
+-- "shared key read" / "friend read" policy pair.
+create policy "titles: shared/friend read"
   on titles for select
-  using (
-    is_valid_shared_token(
-      current_setting('app.shared_token', true),
-      user_id
-    )
-  );
+  using (can_view_title(user_id, genres, status));
 
 -- -----------------------------------------------------------
 -- SEASONS policies
@@ -311,12 +426,13 @@ create policy "seasons: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "seasons: shared key read"
+create policy "seasons: shared/friend read"
   on seasons for select
   using (
-    is_valid_shared_token(
-      current_setting('app.shared_token', true),
-      user_id
+    exists (
+      select 1 from titles t
+      where t.id = seasons.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
     )
   );
 
@@ -329,18 +445,19 @@ create policy "viewings: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "viewings: shared key read"
+create policy "viewings: shared/friend read"
   on viewings for select
   using (
-    is_valid_shared_token(
-      current_setting('app.shared_token', true),
-      user_id
+    exists (
+      select 1 from titles t
+      where t.id = viewings.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
     )
   );
 
 -- -----------------------------------------------------------
 -- EPISODES / EPISODE_WATCH_EVENTS / EPISODE_RATINGS / EPISODE_REVIEWS policies
--- (same pattern as seasons: owner full access + shared key read)
+-- (same pattern as seasons: owner full access + shared/friend read)
 -- -----------------------------------------------------------
 
 create policy "episodes: owner full access"
@@ -348,36 +465,63 @@ create policy "episodes: owner full access"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episodes: shared key read"
+create policy "episodes: shared/friend read"
   on episodes for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = episodes.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_watch_events: owner full access"
   on episode_watch_events for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episode_watch_events: shared key read"
+create policy "episode_watch_events: shared/friend read"
   on episode_watch_events for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from episodes e
+      join titles t on t.id = e.title_id
+      where e.id = episode_watch_events.episode_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_ratings: owner full access"
   on episode_ratings for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episode_ratings: shared key read"
+create policy "episode_ratings: shared/friend read"
   on episode_ratings for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from episodes e
+      join titles t on t.id = e.title_id
+      where e.id = episode_ratings.episode_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_reviews: owner full access"
   on episode_reviews for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "episode_reviews: shared key read"
+create policy "episode_reviews: shared/friend read"
   on episode_reviews for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from episodes e
+      join titles t on t.id = e.title_id
+      where e.id = episode_reviews.episode_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 -- -----------------------------------------------------------
 -- TITLE_CAST / TITLE_CREW / SEASON_CAST / EPISODE_CREW policies
@@ -386,30 +530,54 @@ create policy "episode_reviews: shared key read"
 create policy "title_cast: owner full access"
   on title_cast for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "title_cast: shared key read"
+create policy "title_cast: shared/friend read"
   on title_cast for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = title_cast.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "title_crew: owner full access"
   on title_crew for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "title_crew: shared key read"
+create policy "title_crew: shared/friend read"
   on title_crew for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = title_crew.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "season_cast: owner full access"
   on season_cast for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "season_cast: shared key read"
+create policy "season_cast: shared/friend read"
   on season_cast for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = season_cast.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 create policy "episode_crew: owner full access"
   on episode_crew for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "episode_crew: shared key read"
+create policy "episode_crew: shared/friend read"
   on episode_crew for select
-  using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));
+  using (
+    exists (
+      select 1 from titles t
+      where t.id = episode_crew.title_id
+        and can_view_title(t.user_id, t.genres, t.status)
+    )
+  );
 
 -- -----------------------------------------------------------
 -- SHARED_ACCESS_KEYS policies
@@ -468,7 +636,11 @@ create table profiles (
   email         text not null,
   username      text unique,
   display_name  text,
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  -- Single source of truth for the "uncapped invite codes" exception — was
+  -- previously three independently-hardcoded email literals (one RLS policy,
+  -- two client files) that had already drifted out of sync once.
+  is_owner      boolean not null default false
 );
 
 create index profiles_email_idx on profiles(lower(email));
@@ -486,8 +658,8 @@ create policy "profiles: owner full access"
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into public.profiles (user_id, email, display_name)
-  values (new.id, new.email, split_part(new.email, '@', 1))
+  insert into public.profiles (user_id, email, display_name, is_owner)
+  values (new.id, new.email, split_part(new.email, '@', 1), lower(new.email) = 'denkrishna@gmail.com')
   on conflict (user_id) do nothing;
   return new;
 end;
@@ -522,8 +694,9 @@ $$;
 --   pending -> accepted  via accept_friend_request, or automatically if the
 --              other party also sends a request (mutual request)
 --   pending -> (removed) via decline_friend_request
---   any     -> blocked   via block_user (one-directional exit; only
---              blocked_by can act on it again — no unblock yet)
+--   any     -> blocked   via block_user (only blocked_by can act on it again)
+--   blocked -> (removed) via unblock_user (blocked_by only); re-friending
+--              requires a fresh send_friend_request afterward
 create table friendships (
   user_id_a    uuid not null references auth.users(id) on delete cascade,
   user_id_b    uuid not null references auth.users(id) on delete cascade,
@@ -584,6 +757,8 @@ begin
   if existing is null then
     insert into friendships (user_id_a, user_id_b, requested_by, status)
     values (a, b, me, 'pending');
+    insert into notifications (recipient_id, type, actor_id)
+    values (target_user_id, 'friend_request_received', me);
     return;
   end if;
 
@@ -595,10 +770,14 @@ begin
     return; -- already friends, or already requested — no-op
   end if;
 
-  -- The other party already requested us — mutual request accepts it.
+  -- The other party already requested us — mutual request accepts it. From
+  -- their perspective this IS an acceptance, so notify them as such.
   update friendships
   set status = 'accepted', updated_at = now()
   where user_id_a = a and user_id_b = b;
+
+  insert into notifications (recipient_id, type, actor_id)
+  values (target_user_id, 'friend_request_accepted', me);
 end;
 $$;
 
@@ -623,6 +802,9 @@ begin
   if not found then
     raise exception 'No pending friend request from this user';
   end if;
+
+  insert into notifications (recipient_id, type, actor_id)
+  values (requester_user_id, 'friend_request_accepted', me);
 end;
 $$;
 
@@ -667,6 +849,32 @@ begin
 end;
 $$;
 
+-- Drops the relationship entirely (like decline_friend_request) rather than
+-- reverting to 'pending'/'accepted' automatically — re-friending requires a
+-- fresh send_friend_request from either party. Only the blocking party may act.
+create or replace function unblock_user(target_user_id uuid)
+returns void
+language plpgsql security definer as $$
+declare
+  me uuid := auth.uid();
+  a uuid := least(me, target_user_id);
+  b uuid := greatest(me, target_user_id);
+begin
+  if me is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from friendships
+  where user_id_a = a and user_id_b = b
+    and status = 'blocked'
+    and blocked_by = me;
+
+  if not found then
+    raise exception 'No block from you on this user to remove';
+  end if;
+end;
+$$;
+
 -- Friend list for the current user, joined against profiles for display —
 -- avoids the client needing separate profile lookups per row (profiles has
 -- no broad SELECT policy).
@@ -700,53 +908,13 @@ $$;
 -- ============================================================
 -- FRIEND LIBRARY READ ACCESS
 -- ============================================================
-
--- Grants accepted friends read-only access to a user's library, mirroring the
--- "shared key read" policies but gated on is_friend(auth.uid(), user_id)
--- instead of a bearer token.
-create policy "titles: friend read"
-  on titles for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "seasons: friend read"
-  on seasons for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "viewings: friend read"
-  on viewings for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episodes: friend read"
-  on episodes for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_watch_events: friend read"
-  on episode_watch_events for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_ratings: friend read"
-  on episode_ratings for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_reviews: friend read"
-  on episode_reviews for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "title_cast: friend read"
-  on title_cast for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "title_crew: friend read"
-  on title_crew for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "season_cast: friend read"
-  on season_cast for select
-  using (is_friend(auth.uid(), user_id));
-
-create policy "episode_crew: friend read"
-  on episode_crew for select
-  using (is_friend(auth.uid(), user_id));
+--
+-- Friend read access for titles/seasons/viewings/episodes/etc. is unified
+-- with shared-link read access into the single "<table>: shared/friend
+-- read" policy defined alongside each table's owner policy above (see
+-- can_view_title, defined near the SHARE SCOPES section). This section
+-- previously held 11 separate "X: friend read" policies before that
+-- unification shipped.
 
 -- ============================================================
 -- USER PREFS (account-synced preferences, e.g. Ledger board layout)
@@ -860,6 +1028,9 @@ begin
   on conflict (sender_user_id, recipient_user_id, tmdb_id, type)
   do update set title = excluded.title, year = excluded.year, poster_url = excluded.poster_url,
     note = excluded.note, status = 'unread', updated_at = now();
+
+  insert into notifications (recipient_id, type, actor_id, payload)
+  values (recipient_id, 'recommendation_received', me, jsonb_build_object('tmdb_id', p_tmdb_id, 'type', p_type, 'title', p_title));
 end;
 $$;
 
@@ -910,17 +1081,314 @@ language sql security definer stable as $$
 $$;
 
 -- ============================================================
+-- TITLE COMMENTS & REACTIONS — friends-only social layer
+-- ============================================================
+--
+-- Deliberately friends-only: no shared-key-read policy exists anywhere on
+-- these tables, so an anonymous share-link session (no auth.uid()) can never
+-- read or write here. Flat comments (no replies), fixed emoji reaction set.
+--
+-- Same pattern as `recommendations`: no client-facing insert/update/delete
+-- policy at all — every mutation goes exclusively through a SECURITY
+-- DEFINER RPC below, which validates ownership/friendship itself and then
+-- bypasses RLS for the write. Reads likewise go through
+-- list_title_comments/list_title_reactions rather than a SELECT policy.
+
+create table title_comments (
+  id          uuid primary key default gen_random_uuid(),
+  title_id    uuid not null references titles(id) on delete cascade,
+  author_id   uuid not null references auth.users(id) on delete cascade,
+  body        text not null check (char_length(body) between 1 and 1000),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index title_comments_title_id_idx on title_comments(title_id, created_at);
+
+alter table title_comments enable row level security;
+
+create table title_reactions (
+  title_id    uuid not null references titles(id) on delete cascade,
+  author_id   uuid not null references auth.users(id) on delete cascade,
+  emoji       text not null check (emoji in ('👍', '❤️', '😂', '😮')),
+  created_at  timestamptz not null default now(),
+  primary key (title_id, author_id) -- one reaction per user per title; changing emoji replaces it
+);
+
+create index title_reactions_title_id_idx on title_reactions(title_id);
+
+alter table title_reactions enable row level security;
+
+create trigger title_comments_updated_at
+  before update on title_comments
+  for each row execute function update_updated_at();
+
+create or replace function add_title_comment(p_title_id uuid, p_body text)
+returns title_comments
+language plpgsql security definer as $$
+declare
+  me uuid := auth.uid();
+  owner_id uuid;
+  result title_comments;
+begin
+  if me is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select user_id into owner_id from titles where id = p_title_id;
+  if owner_id is null then
+    raise exception 'Title not found';
+  end if;
+  if owner_id <> me and not is_friend(me, owner_id) then
+    raise exception 'Not authorized to comment on this title';
+  end if;
+
+  insert into title_comments (title_id, author_id, body)
+  values (p_title_id, me, p_body)
+  returning * into result;
+
+  if owner_id <> me then
+    insert into notifications (recipient_id, type, actor_id, title_id)
+    values (owner_id, 'comment_received', me, p_title_id);
+  end if;
+
+  return result;
+end;
+$$;
+
+create or replace function delete_title_comment(p_comment_id uuid)
+returns void
+language plpgsql security definer as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from title_comments c
+  where c.id = p_comment_id
+    and (
+      c.author_id = me
+      or exists (select 1 from titles t where t.id = c.title_id and t.user_id = me)
+    );
+
+  if not found then
+    raise exception 'Comment not found or not authorized to delete it';
+  end if;
+end;
+$$;
+
+-- Upsert-or-delete-on-null: single call to add, change, or remove a reaction.
+create or replace function set_title_reaction(p_title_id uuid, p_emoji text)
+returns void
+language plpgsql security definer as $$
+declare
+  me uuid := auth.uid();
+  owner_id uuid;
+begin
+  if me is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select user_id into owner_id from titles where id = p_title_id;
+  if owner_id is null then
+    raise exception 'Title not found';
+  end if;
+
+  if p_emoji is null then
+    delete from title_reactions where title_id = p_title_id and author_id = me;
+    return;
+  end if;
+
+  if owner_id <> me and not is_friend(me, owner_id) then
+    raise exception 'Not authorized to react to this title';
+  end if;
+
+  insert into title_reactions (title_id, author_id, emoji)
+  values (p_title_id, me, p_emoji)
+  on conflict (title_id, author_id) do update set emoji = p_emoji, created_at = now();
+
+  if owner_id <> me then
+    insert into notifications (recipient_id, type, actor_id, title_id, payload)
+    values (owner_id, 'reaction_received', me, p_title_id, jsonb_build_object('emoji', p_emoji));
+  end if;
+end;
+$$;
+
+-- Joined against profiles for display, same shape as list_friendships().
+-- Callable by owner or friend (checked here, not via a SELECT policy).
+create or replace function list_title_comments(p_title_id uuid)
+returns table (
+  id uuid,
+  author_id uuid,
+  body text,
+  created_at timestamptz,
+  display_name text,
+  username text
+)
+language plpgsql security definer stable as $$
+declare
+  me uuid := auth.uid();
+  owner_id uuid;
+begin
+  select user_id into owner_id from titles where id = p_title_id;
+  if owner_id is null or (owner_id <> me and not is_friend(me, owner_id)) then
+    return;
+  end if;
+
+  return query
+    select c.id, c.author_id, c.body, c.created_at, p.display_name, p.username
+    from title_comments c
+    join profiles p on p.user_id = c.author_id
+    where c.title_id = p_title_id
+    order by c.created_at asc;
+end;
+$$;
+
+create or replace function list_title_reactions(p_title_id uuid)
+returns table (
+  author_id uuid,
+  emoji text,
+  display_name text,
+  username text
+)
+language plpgsql security definer stable as $$
+declare
+  me uuid := auth.uid();
+  owner_id uuid;
+begin
+  select user_id into owner_id from titles where id = p_title_id;
+  if owner_id is null or (owner_id <> me and not is_friend(me, owner_id)) then
+    return;
+  end if;
+
+  return query
+    select r.author_id, r.emoji, p.display_name, p.username
+    from title_reactions r
+    join profiles p on p.user_id = r.author_id
+    where r.title_id = p_title_id;
+end;
+$$;
+
+-- ============================================================
+-- NOTIFICATIONS — persistent, per-recipient inbox
+-- ============================================================
+--
+-- Distinct from the client's ephemeral pushNotification()/<NotificationStack/>
+-- toast system, which is untouched and keeps handling transient success/
+-- error feedback. This is a durable, dismissable, unread-counted inbox that
+-- replaces the earlier client-side activityFeedLastSeenAt/activityUnseenCount
+-- watermark.
+--
+-- No client insert policy at all (same "single choke-point" philosophy as
+-- friendships/recommendations/title_comments) — every row is inserted from
+-- inside the existing SECURITY DEFINER action function that causes it.
+create table notifications (
+  id           uuid primary key default gen_random_uuid(),
+  recipient_id uuid not null references auth.users(id) on delete cascade,
+  type         text not null check (type in (
+                 'friend_request_received', 'friend_request_accepted',
+                 'share_link_used', 'recommendation_received',
+                 'comment_received', 'reaction_received'
+               )),
+  actor_id     uuid references auth.users(id) on delete set null,
+  title_id     uuid references titles(id) on delete set null,
+  payload      jsonb not null default '{}',
+  created_at   timestamptz not null default now(),
+  read_at      timestamptz
+);
+
+create index notifications_recipient_idx on notifications(recipient_id, created_at desc);
+
+alter table notifications enable row level security;
+
+create policy "notifications: recipient can read"
+  on notifications for select
+  using (auth.uid() = recipient_id);
+
+create policy "notifications: recipient can mark read/delete"
+  on notifications for update
+  using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
+
+create policy "notifications: recipient can delete"
+  on notifications for delete
+  using (auth.uid() = recipient_id);
+
+create or replace function list_notifications(p_before timestamptz default null, p_limit integer default 30)
+returns table (
+  id uuid,
+  type text,
+  actor_id uuid,
+  actor_display_name text,
+  actor_username text,
+  title_id uuid,
+  tmdb_id integer,
+  media_type media_type,
+  title text,
+  poster_url text,
+  payload jsonb,
+  created_at timestamptz,
+  read_at timestamptz
+)
+language sql security definer stable as $$
+  select
+    n.id, n.type, n.actor_id, p.display_name, p.username,
+    n.title_id, t.tmdb_id, t.type, t.title, t.poster_url,
+    n.payload, n.created_at, n.read_at
+  from notifications n
+  left join profiles p on p.user_id = n.actor_id
+  left join titles t on t.id = n.title_id
+  where n.recipient_id = auth.uid()
+    and (p_before is null or n.created_at < p_before)
+  order by n.created_at desc
+  limit least(coalesce(p_limit, 30), 50);
+$$;
+
+create or replace function mark_notification_read(p_id uuid)
+returns void
+language sql security definer as $$
+  update notifications set read_at = now()
+  where id = p_id and recipient_id = auth.uid() and read_at is null;
+$$;
+
+create or replace function mark_all_notifications_read()
+returns void
+language sql security definer as $$
+  update notifications set read_at = now()
+  where recipient_id = auth.uid() and read_at is null;
+$$;
+
+create or replace function unread_notification_count()
+returns integer
+language sql security definer stable as $$
+  select count(*)::integer from notifications
+  where recipient_id = auth.uid() and read_at is null;
+$$;
+
+-- ============================================================
 -- FRIEND ACTIVITY FEED
 -- ============================================================
 
--- Merges two activity kinds across the caller's accepted friends: titles
--- they've added to their library, and viewings they've logged. Runs as
--- SECURITY DEFINER (bypassing RLS on titles/viewings/profiles) and instead
--- filters explicitly via is_friend(auth.uid(), <owner>) per branch — the same
--- predicate as the friend-read RLS policies, just aggregated across every
--- friend at once instead of scoped to a single one. Capped to the 100 most
--- recent events across all friends combined.
-create or replace function friend_activity_feed()
+-- Merges four activity kinds across the caller's accepted friends: titles
+-- added, viewings logged, comments added, and reactions added. Runs as
+-- SECURITY DEFINER (bypassing RLS on titles/viewings/profiles/title_comments/
+-- title_reactions) and instead filters explicitly via
+-- can_view_title(t.user_id, t.genres, t.status) per branch — the same
+-- predicate the shared/friend-read RLS policies use, aggregated across every
+-- friend at once instead of scoped to a single one, and (unlike the plain
+-- is_friend() check this replaced) share_scopes-aware: a friend scoped to
+-- e.g. Horror-only no longer sees feed entries about titles outside their
+-- granted scope. The comment/reaction branches additionally exclude the
+-- caller's own actions, matching how the first two branches already only
+-- ever show friend-authored events (your own titles never match
+-- is_friend(auth.uid(), auth.uid()) = false).
+--
+-- Keyset-paginated via p_before/p_limit (capped at 50) rather than a flat
+-- limit, so the client can "Load more" instead of only ever seeing the
+-- latest 50 events across all friends combined.
+create or replace function friend_activity_feed(p_before timestamptz default null, p_limit integer default 30)
 returns table (
   event_type text,
   event_at timestamptz,
@@ -952,7 +1420,7 @@ language sql security definer stable as $$
       null::numeric(3,1) as rating
     from titles t
     join profiles p on p.user_id = t.user_id
-    where is_friend(auth.uid(), t.user_id)
+    where can_view_title(t.user_id, t.genres, t.status)
 
     union all
 
@@ -972,10 +1440,53 @@ language sql security definer stable as $$
     from viewings v
     join titles t on t.id = v.title_id
     join profiles p on p.user_id = t.user_id
-    where is_friend(auth.uid(), t.user_id)
+    where can_view_title(t.user_id, t.genres, t.status)
+
+    union all
+
+    select
+      'comment_added' as event_type,
+      c.created_at as event_at,
+      c.author_id as friend_user_id,
+      p.display_name as friend_display_name,
+      p.username as friend_username,
+      t.id as title_id,
+      t.tmdb_id,
+      t.type,
+      t.title,
+      t.year,
+      t.poster_url,
+      null::numeric(3,1) as rating
+    from title_comments c
+    join titles t on t.id = c.title_id
+    join profiles p on p.user_id = c.author_id
+    where can_view_title(t.user_id, t.genres, t.status)
+      and c.author_id <> auth.uid()
+
+    union all
+
+    select
+      'reaction_added' as event_type,
+      r.created_at as event_at,
+      r.author_id as friend_user_id,
+      p.display_name as friend_display_name,
+      p.username as friend_username,
+      t.id as title_id,
+      t.tmdb_id,
+      t.type,
+      t.title,
+      t.year,
+      t.poster_url,
+      null::numeric(3,1) as rating
+    from title_reactions r
+    join titles t on t.id = r.title_id
+    join profiles p on p.user_id = r.author_id
+    where can_view_title(t.user_id, t.genres, t.status)
+      and r.author_id <> auth.uid()
   ) feed
+  where p_before is null or event_at < p_before
   order by event_at desc
-  limit 100;
+  limit least(coalesce(p_limit, 30), 50);
 $$;
 
 -- ============================================================
@@ -988,7 +1499,7 @@ $$;
 -- src/lib/auth.ts) fails for any email that isn't already a known user.
 --
 -- Each account may generate at most 2 invite codes, ever — except the owner
--- account (auth.email() = 'denkrishna@gmail.com'), which is uncapped.
+-- account (profiles.is_owner), which is uncapped.
 create table invite_codes (
   id           uuid primary key default gen_random_uuid(),
   code         text not null unique,
@@ -1011,7 +1522,7 @@ create policy "invite_codes: capped insert"
   with check (
     auth.uid() = created_by
     and (
-      auth.email() = 'denkrishna@gmail.com'
+      (select is_owner from profiles where user_id = auth.uid()) = true
       or (select count(*) from invite_codes where created_by = auth.uid()) < 2
     )
   );
@@ -1022,3 +1533,18 @@ create policy "invite_codes: owner can delete own unredeemed"
 
 -- No update policy: redemption is written exclusively by the redeem-invite
 -- Edge Function using the service role key, which bypasses RLS.
+
+-- Rate-limiting log for the redeem-invite Edge Function. Service-role-only
+-- (same pattern as api_cache): RLS enabled with zero policies denies all
+-- client access.
+create table invite_redeem_attempts (
+  id           uuid primary key default gen_random_uuid(),
+  ip_hash      text,
+  email        text,
+  attempted_at timestamptz not null default now()
+);
+
+create index invite_redeem_attempts_ip_hash_idx on invite_redeem_attempts(ip_hash, attempted_at);
+create index invite_redeem_attempts_email_idx on invite_redeem_attempts(email, attempted_at);
+
+alter table invite_redeem_attempts enable row level security;

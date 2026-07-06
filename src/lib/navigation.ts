@@ -2,10 +2,11 @@
 // by scripts/verify-navigation-logic.mjs. The URL is the source of truth for the
 // active view and which modal (detail drawer / add) is open.
 
-export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'profile'
+export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'profile' | 'friends'
 
 // The four destinations that appear in the customizable nav (TopBar pill nav +
-// BottomNav). 'profile' is excluded — it's the account icon, not a nav tab.
+// BottomNav). 'profile' and 'friends' are excluded — they're fixed account/social
+// icons, not reorderable nav tabs.
 export type NavItemId = 'discover' | 'library' | 'upnext' | 'ledger'
 
 export const DEFAULT_NAV_ORDER: NavItemId[] = ['discover', 'library', 'upnext', 'ledger']
@@ -25,10 +26,14 @@ export interface NavState {
   add: boolean
 }
 
-const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'profile']
+const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'profile', 'friends']
 
 // Params that are not part of NavState but must survive every navigation write.
-const PRESERVED_KEYS = ['share']
+// 'friend' additionally gets overridden by useNavigationSync from the live
+// viewerContext store state on every write (not just carried forward from the
+// URL), so exiting a friend's library reliably drops it even if view/title/add
+// happen not to change in the same tick.
+const PRESERVED_KEYS = ['share', 'friend']
 
 export function parseNav(search: string, fallbackView: AppView): NavState {
   const params = new URLSearchParams(search)

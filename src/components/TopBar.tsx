@@ -1,4 +1,4 @@
-import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search, Sun, Moon, Compass, Users, X } from 'lucide-react'
+import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search, Sun, Moon, Compass, Users, X, Eye } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from 'src/lib/auth'
 import { toggleTheme } from 'src/lib/theme'
 import type { AppView, NavItemId } from 'src/lib/navigation'
 import { ReelMark } from 'src/components/ui/reel-mark'
+import { NotificationCenter } from 'src/components/NotificationCenter'
 
 interface TopBarProps {
   currentView: AppView
@@ -22,21 +23,30 @@ const NAV_META: Record<NavItemId, { label: string; Icon: typeof BarChart3 }> = {
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView, friendView, exitFriendView, openCommandPalette, theme, activityUnseenCount, navPrefs } = useAppStore(
+  const { viewMode, setViewMode, openAddTitle, user, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
     useShallow((s) => ({
       viewMode: s.viewMode,
       setViewMode: s.setViewMode,
       openAddTitle: s.openAddTitle,
       user: s.user,
       isSharedView: s.isSharedView,
-      friendView: s.friendView,
+      viewerContext: s.viewerContext,
       exitFriendView: s.exitFriendView,
       openCommandPalette: s.openCommandPalette,
       theme: s.theme,
-      activityUnseenCount: s.activityUnseenCount,
       navPrefs: s.navPrefs,
     }))
   )
+  const friendView = viewerContext.kind === 'friend' ? viewerContext : null
+
+  function handleExitSharedLink() {
+    // An anonymous shared-link session never authenticated, so there's no
+    // client state to reset (unlike exitFriendView) — a clean reload into the
+    // normal auth flow is the simplest correct exit.
+    const url = new URL(window.location.href)
+    url.searchParams.delete('share')
+    window.location.href = url.toString()
+  }
 
   const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
 
@@ -156,38 +166,59 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
               <span className="hidden sm:inline font-sans text-[12px] truncate max-w-[140px]">{friendView.displayName}</span>
               <X className="w-[13px] h-[13px]" />
             </button>
+          ) : viewerContext.kind === 'shared-link' ? (
+            <button
+              onClick={handleExitSharedLink}
+              className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5"
+              aria-label="Exit shared view"
+              title="Viewing a shared, read-only link — click to exit"
+            >
+              <Eye className="w-[15px] h-[15px]" />
+              <span className="hidden sm:inline font-sans text-[12px]">Shared view</span>
+              <X className="w-[13px] h-[13px]" />
+            </button>
           ) : (
             isSupabaseConfigured && !isSharedView && (
-              user ? (
-                <button
-                  onClick={onProfileClick}
-                  aria-current={currentView === 'profile' ? 'page' : undefined}
-                  className={cn(
-                    'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center',
-                    currentView === 'profile' && '!bg-amber/15 border-amber/50'
-                  )}
-                  aria-label={activityUnseenCount > 0 ? `Profile and Settings — ${activityUnseenCount} new friend activity` : 'Profile and Settings'}
-                >
-                  <User className="w-[17px] h-[17px]" />
-                  {activityUnseenCount > 0 && (
-                    <span
-                      className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber text-[color:var(--on-amber)] text-[9px] font-mono font-bold flex items-center justify-center"
-                      aria-hidden="true"
-                    >
-                      {activityUnseenCount > 9 ? '9+' : activityUnseenCount}
-                    </span>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={onProfileClick}
-                  className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5"
-                  aria-label="Sign in"
-                >
-                  <LogIn className="w-[15px] h-[15px]" />
-                  <span className="hidden sm:inline font-sans text-[12px]">Sign in</span>
-                </button>
-              )
+              <>
+                {user && (
+                  <button
+                    onClick={() => onViewChange('friends')}
+                    aria-current={currentView === 'friends' ? 'page' : undefined}
+                    className={cn(
+                      'icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center',
+                      currentView === 'friends' && '!bg-amber/15 border-amber/50 text-amber'
+                    )}
+                    style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+                    aria-label="Friends"
+                    title="Friends"
+                  >
+                    <Users className="w-[17px] h-[17px]" />
+                  </button>
+                )}
+                {user && <NotificationCenter onNavigate={onViewChange} />}
+                {user ? (
+                  <button
+                    onClick={onProfileClick}
+                    aria-current={currentView === 'profile' ? 'page' : undefined}
+                    className={cn(
+                      'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center',
+                      currentView === 'profile' && '!bg-amber/15 border-amber/50'
+                    )}
+                    aria-label="Profile and Settings"
+                  >
+                    <User className="w-[17px] h-[17px]" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={onProfileClick}
+                    className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5"
+                    aria-label="Sign in"
+                  >
+                    <LogIn className="w-[15px] h-[15px]" />
+                    <span className="hidden sm:inline font-sans text-[12px]">Sign in</span>
+                  </button>
+                )}
+              </>
             )
           )}
 

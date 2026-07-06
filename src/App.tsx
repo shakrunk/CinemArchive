@@ -7,9 +7,10 @@ import { Library } from 'src/views/Library'
 import { Ledger } from 'src/views/Ledger'
 import { Discover } from 'src/views/Discover'
 import { Profile } from 'src/views/Profile'
+import { Friends } from 'src/views/Friends'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
-import { isSupabaseConfigured, onAuthStateChange } from 'src/lib/auth'
+import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
 import { useAppStore } from 'src/store/useAppStore'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
@@ -35,6 +36,7 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured)
   const setUser = useAppStore((s) => s.setUser)
   const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
+  const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
 
   const user = useAppStore((s) => s.user)
   const isSharedView = useAppStore((s) => s.isSharedView)
@@ -101,6 +103,7 @@ export default function App() {
     {
       ...navShortcuts,
       [String(visibleNav.length + 1)]: () => setCurrentView('profile'),
+      [String(visibleNav.length + 2)]: () => setCurrentView('friends'),
       'n': () => { if (!isSharedView) openAddTitle() },
       '/': () => isCommandPaletteOpen ? closeCommandPalette() : openCommandPalette(),
       'g': () => { setCurrentView('library'); setViewMode('grid') },
@@ -122,15 +125,46 @@ export default function App() {
       return
     }
 
+    // A friend-view deep link (?friend=<userId>) needs auth.uid() to already
+    // exist for the friend-read RLS policy to apply — unlike the anonymous
+    // share-link path above, so it's resolved from inside the auth callback
+    // (after a user exists) rather than before subscribing.
+    const friendId = params.get('friend')
+    let friendResolved = false
+
     const subscription = onAuthStateChange((user) => {
       setUser(user)
       setAuthChecked(true)
+
+      if (!friendId || friendResolved) return
+      friendResolved = true
+
+      if (!user) {
+        // No session to back a friend view — drop the stale/shared-out param.
+        const url = new URL(window.location.href)
+        url.searchParams.delete('friend')
+        window.history.replaceState({}, '', url.toString())
+        return
+      }
+
+      listFriendships()
+        .then((friendships) => {
+          const match = friendships.find((f) => f.friend_user_id === friendId && f.status === 'accepted')
+          if (match) {
+            void loadFriendLibrary(friendId, match.display_name || match.username || 'Friend')
+          } else {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('friend')
+            window.history.replaceState({}, '', url.toString())
+          }
+        })
+        .catch((err) => console.error('Failed to resolve friend from URL:', err))
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [setUser, loadSharedLibrary])
+  }, [setUser, loadSharedLibrary, loadFriendLibrary])
 
   return (
     <div className="relative min-h-screen">
@@ -167,6 +201,7 @@ export default function App() {
             {currentView === 'ledger' && <Ledger />}
             {currentView === 'discover' && <Discover />}
             {currentView === 'profile' && <Profile />}
+            {currentView === 'friends' && <Friends />}
           </main>
 
           <BottomNav currentView={currentView} onViewChange={setCurrentView} />

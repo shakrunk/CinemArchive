@@ -271,13 +271,11 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const totalCards = shows.length + finishedToShow.length + availableWatchlist.length + comingSoon.length
   const delays = useMemo(() => {
     const n = Math.min(totalCards, MAX_ANIMATED)
-    // Evenly-spaced delay slots shuffled into random order (matches Library/Discover)
-    const slots = Array.from({ length: n }, (_, i) => i * 15)
-    for (let i = slots.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [slots[i], slots[j]] = [slots[j], slots[i]]
-    }
-    return [...slots, ...new Array(Math.max(0, totalCards - MAX_ANIMATED)).fill(0)]
+    return Array.from({ length: totalCards }, (_, i) => {
+      if (i >= MAX_ANIMATED) return 0
+      const slot = n > 0 ? (i * 7) % n : 0
+      return slot * 15
+    })
   }, [totalCards])
   let cardIndex = 0
 

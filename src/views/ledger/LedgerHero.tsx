@@ -4,7 +4,7 @@ import { useAppStore } from 'src/store/useAppStore'
 
 export function DashHero() {
   const stats = useAppStore((s) => s.stats)
-  const friendView = useAppStore((s) => s.friendView)
+  const friendView = useAppStore((s) => (s.viewerContext.kind === 'friend' ? s.viewerContext : null))
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',

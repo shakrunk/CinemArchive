@@ -9,8 +9,8 @@ function assert(label, actual, expected) {
   else { console.error(`  ✗ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); fail++ }
 }
 
-const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'profile']
-const PRESERVED_KEYS = ['share']
+const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'profile', 'friends']
+const PRESERVED_KEYS = ['share', 'friend']
 function parseNav(search, fallbackView) {
   const p = new URLSearchParams(search)
   const raw = p.get('view')
@@ -40,6 +40,7 @@ assert('empty → add false', parseNav('', 'library').add, false)
 assert('unknown view → fallback', parseNav('?view=bogus', 'upnext').view, 'upnext')
 assert('valid view', parseNav('?view=ledger', 'library').view, 'ledger')
 assert('valid view (profile)', parseNav('?view=profile', 'library').view, 'profile')
+assert('valid view (friends)', parseNav('?view=friends', 'library').view, 'friends')
 assert('title round-trips', parseNav('?view=library&title=abc123', 'library').title, 'abc123')
 assert('add=1 → true', parseNav('?add=1', 'library').add, true)
 assert('add=0 → false', parseNav('?add=0', 'library').add, false)
@@ -47,6 +48,8 @@ assert('add=0 → false', parseNav('?add=0', 'library').add, false)
 console.log('\n── 2. preservedParams ──')
 assert('share extracted', preservedParams('?share=tok&view=ledger').share, 'tok')
 assert('no share → undefined', preservedParams('?view=ledger').share, undefined)
+assert('friend extracted', preservedParams('?friend=u1&view=library').friend, 'u1')
+assert('no friend → undefined', preservedParams('?view=ledger').friend, undefined)
 
 console.log('\n── 3. serializeNav ──')
 assert('includes view', serializeNav({ view: 'ledger', title: null, add: false }, {}), '?view=ledger')

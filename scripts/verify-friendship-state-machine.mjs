@@ -74,6 +74,20 @@ function blockUser(state, me, target) {
   return { user_id_a: a, user_id_b: b, requested_by: state?.requested_by ?? me, status: 'blocked', blocked_by: me }
 }
 
+/**
+ * Drops the row entirely (like declineFriendRequest) rather than reverting to
+ * 'pending'/'accepted' — only the blocking party may unblock.
+ * @param {object|null} state
+ * @param {string} me
+ * @param {string} target
+ */
+function unblockUser(state, me, target) {
+  const [a, b] = canonicalPair(me, target)
+  const matches = state && state.user_id_a === a && state.user_id_b === b && state.status === 'blocked' && state.blocked_by === me
+  if (!matches) throw new Error('No block from you on this user to remove')
+  return null // row deleted
+}
+
 // ─── Test cases ───────────────────────────────────────────────────────────────
 
 let passed = 0
@@ -176,6 +190,31 @@ try {
   threw = true
 }
 assert(threw, 'sending a friend request while blocked throws')
+
+// Unblock: only the blocking party may act, and it drops the row entirely
+let s9 = blockUser(null, BOB, ALICE)
+threw = false
+try {
+  unblockUser(s9, ALICE, BOB) // ALICE was blocked, not the blocker — cannot unblock
+} catch {
+  threw = true
+}
+assert(threw, 'unblocking as the blocked party (not the blocker) throws')
+
+const s9Unblocked = unblockUser(s9, BOB, ALICE)
+assert(s9Unblocked === null, 'unblocking as the blocking party removes the row')
+
+threw = false
+try {
+  unblockUser(null, ALICE, BOB) // nothing to unblock
+} catch {
+  threw = true
+}
+assert(threw, 'unblocking a non-existent relationship throws')
+
+// Re-friending after unblock requires a fresh request, starting clean
+let s10 = sendFriendRequest(null, ALICE, BOB)
+assert(s10.status === 'pending' && s10.requested_by === ALICE, 'sending a fresh request after unblock starts a normal pending flow')
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

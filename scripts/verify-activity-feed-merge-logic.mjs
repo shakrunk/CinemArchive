@@ -1,47 +1,49 @@
 /**
- * Verifies the friend activity feed's merge/cap logic and the client-side
- * unseen-count logic. Mirrors supabase/migrations/20260701010000_friend_activity_feed.sql
- * (friend_activity_feed: union of title_added + viewing_logged, filtered to
- * accepted friends, ordered newest-first, capped) and the
- * refreshActivityUnseenCount action in src/store/useAppStore.ts, so both stay
- * honest without spinning up a real Postgres instance or a browser.
+ * Verifies the friend activity feed's merge/pagination logic. Mirrors
+ * supabase/migrations/20260706080000_activity_feed_pagination.sql
+ * (friend_activity_feed: union of title_added + viewing_logged +
+ * comment_added + reaction_added, filtered to what the caller can view,
+ * ordered newest-first, keyset-paginated by event_at), so it stays honest
+ * without spinning up a real Postgres instance.
+ *
+ * The client-side "unseen count" watermark this script used to also verify
+ * (countUnseen/markActivityFeedSeen) was retired in favor of the persistent,
+ * server-side notifications table (see verify-share-scope-logic.mjs's
+ * sibling checklist and 20260706090000_notifications.sql) — there is no
+ * longer any client-side merge logic for that concept to mirror.
  *
  * Run: node scripts/verify-activity-feed-merge-logic.mjs
  */
 
-// ─── Pure logic (mirrored from the migration + store) ───────────────────────
+// ─── Pure logic (mirrored from the migration) ────────────────────────────────
 
 /**
- * Mirrors the `friend_activity_feed()` SQL function: union both event
- * sources, drop anything from a non-friend (the is_friend(...) predicate on
- * each branch), sort newest-first, cap to `limit`.
+ * Mirrors the `friend_activity_feed()` SQL function: union all four event
+ * sources, drop anything the caller can't view (the can_view_title(...)
+ * predicate on each branch — here reduced to a simple canView callback),
+ * sort newest-first, then apply keyset pagination (only events strictly
+ * before `before`, capped to `limit`).
  *
  * @param {object[]} titleAddedEvents
  * @param {object[]} viewingEvents
- * @param {(friendUserId: string) => boolean} isFriend
+ * @param {object[]} commentEvents
+ * @param {object[]} reactionEvents
+ * @param {(friendUserId: string) => boolean} canView
+ * @param {string|null} before
  * @param {number} limit
  */
-function mergeActivityFeed(titleAddedEvents, viewingEvents, isFriend, limit = 100) {
+function mergeActivityFeed(titleAddedEvents, viewingEvents, commentEvents, reactionEvents, canView, before = null, limit = 30) {
   const merged = [
     ...titleAddedEvents.map((e) => ({ ...e, event_type: 'title_added' })),
     ...viewingEvents.map((e) => ({ ...e, event_type: 'viewing_logged' })),
-  ].filter((e) => isFriend(e.friend_user_id))
+    ...commentEvents.map((e) => ({ ...e, event_type: 'comment_added' })),
+    ...reactionEvents.map((e) => ({ ...e, event_type: 'reaction_added' })),
+  ].filter((e) => canView(e.friend_user_id))
 
   merged.sort((a, b) => new Date(b.event_at).getTime() - new Date(a.event_at).getTime())
-  return merged.slice(0, limit)
-}
 
-/**
- * Mirrors refreshActivityUnseenCount: null lastSeenAt means nothing has ever
- * been seen (everything counts); otherwise only events strictly newer than
- * the watermark count, matching markActivityFeedSeen's `>` comparison.
- *
- * @param {{ event_at: string }[]} feed
- * @param {string | null} lastSeenAt
- */
-function countUnseen(feed, lastSeenAt) {
-  const lastSeenMs = lastSeenAt ? new Date(lastSeenAt).getTime() : 0
-  return feed.filter((e) => new Date(e.event_at).getTime() > lastSeenMs).length
+  const cursored = before ? merged.filter((e) => new Date(e.event_at).getTime() < new Date(before).getTime()) : merged
+  return cursored.slice(0, Math.min(limit, 50))
 }
 
 // ─── Test cases ───────────────────────────────────────────────────────────────
@@ -61,61 +63,59 @@ function assert(condition, label) {
 
 const ALICE = 'a1111111-1111-1111-1111-111111111111'
 const BOB = 'b2222222-2222-2222-2222-222222222222'
-const CAROL = 'c3333333-3333-3333-3333-333333333333' // not a friend
+const CAROL = 'c3333333-3333-3333-3333-333333333333' // out of view (not a friend, or scoped out)
 
-const isFriendOfCaller = (friendUserId) => friendUserId === ALICE || friendUserId === BOB
+const canViewOfCaller = (friendUserId) => friendUserId === ALICE || friendUserId === BOB
 
-console.log('Friend activity feed merge logic check:')
+console.log('Friend activity feed merge/pagination logic check:')
 
-// Merges both event kinds, newest first
+// Merges all four event kinds, newest first
 const titleAdds = [
   { friend_user_id: ALICE, title: 'Dune', event_at: '2026-06-01T00:00:00Z' },
   { friend_user_id: BOB, title: 'Arrival', event_at: '2026-06-03T00:00:00Z' },
 ]
-const viewings = [
-  { friend_user_id: ALICE, title: 'Sicario', event_at: '2026-06-02T00:00:00Z' },
-]
-let feed = mergeActivityFeed(titleAdds, viewings, isFriendOfCaller)
-assert(feed.length === 3, 'merges title-added and viewing events into one feed')
+const viewings = [{ friend_user_id: ALICE, title: 'Sicario', event_at: '2026-06-02T00:00:00Z' }]
+const comments = [{ friend_user_id: BOB, title: 'Dune', event_at: '2026-06-04T00:00:00Z' }]
+const reactions = [{ friend_user_id: ALICE, title: 'Arrival', event_at: '2026-06-05T00:00:00Z' }]
+
+let feed = mergeActivityFeed(titleAdds, viewings, comments, reactions, canViewOfCaller)
+assert(feed.length === 5, 'merges all four event kinds into one feed')
 assert(
-  feed.map((e) => e.title).join(',') === 'Arrival,Sicario,Dune',
-  'feed is ordered newest-first across both event kinds'
+  feed.map((e) => e.title).join(',') === 'Arrival,Dune,Arrival,Sicario,Dune',
+  'feed is ordered newest-first across every event kind'
 )
 
-// Events from a non-friend are excluded even if present in the raw rows
-// (defense in depth — the SQL predicate should already exclude these)
-const withNonFriend = [
-  ...titleAdds,
-  { friend_user_id: CAROL, title: 'Not a friend', event_at: '2026-06-05T00:00:00Z' },
-]
-feed = mergeActivityFeed(withNonFriend, viewings, isFriendOfCaller)
+// Events the caller can't view are excluded even if present in the raw rows
+// (defense in depth — the SQL predicate should already exclude these, and
+// now also accounts for share_scopes narrowing, not just is_friend)
+const withUnviewable = [...titleAdds, { friend_user_id: CAROL, title: 'Not visible', event_at: '2026-06-06T00:00:00Z' }]
+feed = mergeActivityFeed(withUnviewable, viewings, comments, reactions, canViewOfCaller)
 assert(
-  feed.every((e) => e.title !== 'Not a friend'),
-  'events from a non-friend are excluded from the merged feed'
+  feed.every((e) => e.title !== 'Not visible'),
+  'events the caller cannot view (non-friend or scoped out) are excluded from the merged feed'
 )
 
-// Cap keeps only the newest `limit` events
-const manyAdds = Array.from({ length: 150 }, (_, i) => ({
+// Keyset pagination: no cursor returns the newest page
+feed = mergeActivityFeed(titleAdds, viewings, comments, reactions, canViewOfCaller, null, 2)
+assert(feed.map((e) => e.title).join(',') === 'Arrival,Dune', 'first page (no cursor) returns the newest events up to the limit')
+
+// Keyset pagination: passing the last event's timestamp as the cursor
+// returns the next page, never repeating or skipping an event
+const secondPage = mergeActivityFeed(titleAdds, viewings, comments, reactions, canViewOfCaller, feed[feed.length - 1].event_at, 2)
+assert(
+  secondPage.map((e) => e.title).join(',') === 'Arrival,Sicario',
+  'passing the previous page\'s last event_at as the cursor returns the next page'
+)
+
+// Limit is capped at 50 regardless of what's requested
+const manyAdds = Array.from({ length: 80 }, (_, i) => ({
   friend_user_id: ALICE,
   title: `Title ${i}`,
   event_at: new Date(2026, 0, 1 + i).toISOString(),
 }))
-feed = mergeActivityFeed(manyAdds, [], isFriendOfCaller, 100)
-assert(feed.length === 100, 'the feed is capped to the limit')
-assert(feed[0].title === 'Title 149', 'capping keeps the newest events, not the oldest')
-
-// Unseen count: null watermark means everything is unseen
-const smallFeed = [
-  { event_at: '2026-06-01T00:00:00Z' },
-  { event_at: '2026-06-02T00:00:00Z' },
-]
-assert(countUnseen(smallFeed, null) === 2, 'a null last-seen watermark treats every event as unseen')
-
-// Unseen count: only events strictly newer than the watermark count
-assert(countUnseen(smallFeed, '2026-06-01T00:00:00Z') === 1, 'only events after the watermark count as unseen')
-
-// Unseen count: an event exactly at the watermark does not count (strict >)
-assert(countUnseen(smallFeed, '2026-06-02T00:00:00Z') === 0, 'an event exactly at the watermark is not counted as unseen')
+feed = mergeActivityFeed(manyAdds, [], [], [], canViewOfCaller, null, 999)
+assert(feed.length === 50, 'the page size is capped at 50 even if a larger limit is requested')
+assert(feed[0].title === 'Title 79', 'capping keeps the newest events, not the oldest')
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

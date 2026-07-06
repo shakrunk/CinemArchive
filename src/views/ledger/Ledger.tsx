@@ -21,7 +21,7 @@ export function Ledger() {
   const viewedLedgerWidgets = useAppStore((s) => s.viewedLedgerWidgets)
   const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
   const resetLedgerPrefs = useAppStore((s) => s.resetLedgerPrefs)
-  const friendView = useAppStore((s) => s.friendView)
+  const friendView = useAppStore((s) => (s.viewerContext.kind === 'friend' ? s.viewerContext : null))
   const isSharedView = useAppStore((s) => s.isSharedView)
   const loadingUser = useAppStore((s) => s.loadingUser)
   const libraryLoadError = useAppStore((s) => s.libraryLoadError)

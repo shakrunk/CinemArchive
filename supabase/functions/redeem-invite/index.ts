@@ -23,6 +23,31 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+const MAX_ATTEMPTS = 10
+const WINDOW_MINUTES = 15
+
+async function hashIp(ip: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip))
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Codes are already high-entropy (8 chars from a UUID) — brute force isn't
+// the real risk here. This closes the "unlimited endpoint calls" gap: too
+// many attempts from the same IP or against the same email in a short
+// window gets rejected before touching invite_codes or the admin API.
+async function checkRateLimit(ipHash: string, email: string): Promise<boolean> {
+  const since = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000).toISOString()
+  // Two parameterized .eq() queries rather than one .or() with a
+  // string-interpolated filter — email is user-controlled input and
+  // PostgREST's or() filter syntax takes a raw string, so building it via
+  // template literal would need manual escaping to be safe.
+  const [byIp, byEmail] = await Promise.all([
+    supabase.from('invite_redeem_attempts').select('id', { count: 'exact', head: true }).gt('attempted_at', since).eq('ip_hash', ipHash),
+    supabase.from('invite_redeem_attempts').select('id', { count: 'exact', head: true }).gt('attempted_at', since).eq('email', email),
+  ])
+  return Math.max(byIp.count ?? 0, byEmail.count ?? 0) < MAX_ATTEMPTS
+}
+
 // Always responds 200 — supabase-js's functions.invoke() surfaces non-2xx
 // responses as a generic FunctionsHttpError and discards the JSON body, so a
 // friendly { error } message only reaches the client on a 2xx response.
@@ -48,9 +73,21 @@ Deno.serve(async (req: Request) => {
     if (!email || !isValidEmail(email)) return fail('A valid email is required.')
     if (!code) return fail('An invite code is required.')
 
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const ipHash = await hashIp(ip)
+
+    // Log the attempt before checking — a burst arriving concurrently still
+    // gets counted against the next request, closing the race a check-then-log
+    // order would leave open.
+    await supabase.from('invite_redeem_attempts').insert({ ip_hash: ipHash, email })
+
+    if (!(await checkRateLimit(ipHash, email))) {
+      return fail('Too many attempts — please try again later.')
+    }
+
     const { data: invite, error: inviteError } = await supabase
       .from('invite_codes')
-      .select('id, redeemed_by')
+      .select('id, created_by, redeemed_by')
       .eq('code', code)
       .maybeSingle()
 
@@ -86,6 +123,15 @@ Deno.serve(async (req: Request) => {
       await supabase.auth.admin.deleteUser(created.user.id)
       return fail('This invite code has already been used.')
     }
+
+    // Best-effort — the account is already created and the code already
+    // claimed, so a notification failure here shouldn't fail the request.
+    await supabase
+      .from('notifications')
+      .insert({ recipient_id: invite.created_by, type: 'invite_redeemed', actor_id: created.user.id, payload: { email } })
+      .then(({ error }) => {
+        if (error) console.error('Failed to insert invite_redeemed notification:', error)
+      })
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

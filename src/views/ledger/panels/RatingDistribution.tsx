@@ -2,8 +2,7 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
-import { ratingColorVar } from 'src/components/LedgerCharts'
+import { cn, ratingColorVar } from 'src/lib/utils'
 import { deriveRatingDistribution } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'

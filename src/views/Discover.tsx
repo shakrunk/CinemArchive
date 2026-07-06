@@ -814,16 +814,15 @@ export function Discover() {
     return 'Trending This Week'
   })()
 
-  const discoverDelays = (() => {
+  const discoverDelays = useMemo(() => {
     const MAX = 24
     const n = Math.min(displayResults.length, MAX)
-    const slots = Array.from({ length: n }, (_, i) => i * 15)
-    for (let i = slots.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [slots[i], slots[j]] = [slots[j], slots[i]]
-    }
-    return [...slots, ...new Array(Math.max(0, displayResults.length - MAX)).fill(0)]
-  })()
+    return Array.from({ length: displayResults.length }, (_, i) => {
+      if (i >= MAX) return 0
+      const slot = n > 0 ? (i * 7) % n : 0
+      return slot * 15
+    })
+  }, [displayResults.length])
 
   const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)

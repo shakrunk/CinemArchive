@@ -1,0 +1,115 @@
+// ─── The run (monthly screening trend) ────────────────────────────────────────
+
+import { useMemo } from 'react'
+import { useAppStore } from 'src/store/useAppStore'
+import { areaPath, linePath } from 'src/components/LedgerCharts'
+import { Panel } from '../PanelShell'
+import { monthLabel } from '../labels'
+
+export function TheRun({ className }: { className?: string }) {
+  const viewingsByMonth = useAppStore((s) => s.stats.viewingsByMonth)
+
+  // viewingsByMonth only contains months with at least one viewing — fill the
+  // gaps in between so the x-axis represents a true, evenly-spaced calendar
+  // timeline rather than compressing silent months out of existence.
+  const recent = useMemo(() => {
+    const counts = new Map(viewingsByMonth.map((d) => [d.month, d.count]))
+    const now = new Date()
+    const months: { month: string; count: number }[] = []
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      months.push({ month: key, count: counts.get(key) ?? 0 })
+    }
+    return months
+  }, [viewingsByMonth])
+
+  const maxCount = Math.max(...recent.map((d) => d.count), 1)
+  const total = recent.reduce((sum, d) => sum + d.count, 0)
+
+  const points = useMemo(
+    () =>
+      recent.map((d, i) => ({
+        x: recent.length === 1 ? 500 : (i / (recent.length - 1)) * 1000,
+        y: 170 - (d.count / maxCount) * 140,
+      })),
+    [recent, maxCount],
+  )
+
+  const requestView = useAppStore((s) => s.requestView)
+
+  return (
+    <Panel title="The run" hint={`monthly screenings · last ${recent.length} mo`} className={className}>
+      {total === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-center text-sm text-paper-faint">No screenings in the past year</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
+          >
+            Browse Library
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="overflow-x-auto overflow-y-hidden scrollbar-thin">
+            <div style={{ minWidth: Math.max(recent.length * 52, 420) }}>
+              <div className="relative w-full h-[130px]">
+                <svg viewBox="0 0 1000 190" preserveAspectRatio="none" className="absolute inset-0 w-full h-full block">
+                  <defs>
+                    <linearGradient id="run-area" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--moon)" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="var(--moon)" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path d={areaPath(points, 170)} fill="url(#run-area)" />
+                  <path
+                    d={linePath(points)}
+                    fill="none"
+                    stroke="var(--moon)"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    pathLength={1}
+                    className="chart-path-draw"
+                    style={{ strokeDasharray: 1 }}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                {/* HTML dots, not SVG circles — preserveAspectRatio="none" stretches
+                    x/y independently, which would turn <circle> into ellipses. */}
+                {points.map(
+                  (p, i) =>
+                    recent[i].count > 0 && (
+                      <span
+                        key={i}
+                        title={`${monthLabel(recent[i].month)} — ${recent[i].count} screening${recent[i].count !== 1 ? 's' : ''}`}
+                        className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
+                        style={{
+                          left: `${(p.x / 1000) * 100}%`,
+                          top: `${(p.y / 190) * 100}%`,
+                          width: 10,
+                          height: 10,
+                          background: 'var(--moon)',
+                        }}
+                      />
+                    ),
+                )}
+              </div>
+              <div className="flex justify-between px-1">
+                {recent.map((d) => (
+                  <span key={d.month} className="font-mono text-[9px] text-paper-faint">
+                    {monthLabel(d.month)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
+            {total} screening{total !== 1 ? 's' : ''} across the last {recent.length} months
+          </p>
+        </div>
+      )}
+    </Panel>
+  )
+}

@@ -27,9 +27,8 @@ import {
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, type TitleVideo, type WatchProviders } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb, sendRecommendation } from 'src/lib/db'
-import { listFriendships, type FriendshipView } from 'src/lib/auth'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from 'src/components/ui/dropdown-menu'
+import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
+import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { transitionSpiderNoir } from 'src/lib/theme'
@@ -838,7 +837,7 @@ function DrawerTagEditor({
 
 export function TitleDetailDrawer() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, pushNotification } = useAppStore(
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore(
     useShallow((s) => ({
       isDetailDrawerOpen: s.isDetailDrawerOpen,
       closeDetailDrawer: s.closeDetailDrawer,
@@ -847,7 +846,6 @@ export function TitleDetailDrawer() {
       removeViewing: s.removeViewing,
       openRefreshMetadata: s.openRefreshMetadata,
       isSharedView: s.isSharedView,
-      pushNotification: s.pushNotification,
     }))
   )
   const browseByStudio = useAppStore((s) => s.browseByStudio)
@@ -860,35 +858,7 @@ export function TitleDetailDrawer() {
   const [showMatrixModal, setShowMatrixModal] = useState(false)
   const [showMatrixRain, setShowMatrixRain] = useState(false)
 
-  const [sendMenuOpen, setSendMenuOpen] = useState(false)
-  const [sendableFriends, setSendableFriends] = useState<FriendshipView[]>([])
-  const [loadingSendableFriends, setLoadingSendableFriends] = useState(false)
-
-  async function handleSendMenuOpenChange(open: boolean) {
-    setSendMenuOpen(open)
-    if (!open) return
-    setLoadingSendableFriends(true)
-    try {
-      const list = await listFriendships()
-      setSendableFriends(list.filter((f) => f.status === 'accepted'))
-    } catch (err) {
-      console.error('Failed to load friends:', err)
-    } finally {
-      setLoadingSendableFriends(false)
-    }
-  }
-
-  async function handleSendRecommendation(friendId: string, friendName: string) {
-    if (!title) return
-    setSendMenuOpen(false)
-    try {
-      await sendRecommendation(friendId, title)
-      pushNotification({ message: `Sent "${title.title}" to ${friendName}.`, kind: 'tip' })
-    } catch (err) {
-      console.error('Failed to send recommendation:', err)
-      pushNotification({ message: `Couldn't send that to ${friendName} — check your connection.` })
-    }
-  }
+  const [sendPanelOpen, setSendPanelOpen] = useState(false)
 
   const pinnedModes = useAppStore((s) => s.pinnedModes)
   const setPinnedMode = useAppStore((s) => s.setPinnedMode)
@@ -1299,6 +1269,14 @@ export function TitleDetailDrawer() {
         <PersonDetailPanel
           person={activePerson}
           onClose={() => setActivePerson(null)}
+        />
+      )}
+
+      {/* Send to a friend */}
+      {sendPanelOpen && (
+        <SendRecommendationPanel
+          title={title}
+          onClose={() => setSendPanelOpen(false)}
         />
       )}
 
@@ -1748,30 +1726,13 @@ export function TitleDetailDrawer() {
                     Refresh poster &amp; metadata
                   </button>
                   {user && (
-                    <DropdownMenu open={sendMenuOpen} onOpenChange={handleSendMenuOpenChange}>
-                      <DropdownMenuTrigger asChild>
-                        <button className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
-                          <Send className="w-3.5 h-3.5" />
-                          Send to a friend
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        {loadingSendableFriends ? (
-                          <DropdownMenuItem disabled>Loading friends…</DropdownMenuItem>
-                        ) : sendableFriends.length === 0 ? (
-                          <DropdownMenuItem disabled>No friends yet</DropdownMenuItem>
-                        ) : (
-                          sendableFriends.map((f) => (
-                            <DropdownMenuItem
-                              key={f.friend_user_id}
-                              onSelect={() => handleSendRecommendation(f.friend_user_id, f.display_name || f.username || 'Friend')}
-                            >
-                              {f.display_name || f.username || 'Unknown user'}
-                            </DropdownMenuItem>
-                          ))
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <button
+                      onClick={() => setSendPanelOpen(true)}
+                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Send to a friend
+                    </button>
                   )}
                   <button
                     onClick={() => setPendingDeleteTitle(true)}

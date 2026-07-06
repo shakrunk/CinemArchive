@@ -274,6 +274,7 @@ export interface Recommendation {
   title: string
   year: number | null
   posterUrl: string | null
+  note: string | null
   status: 'unread' | 'read' | 'dismissed'
   createdAt: string
 }
@@ -289,6 +290,7 @@ function mapDbRecommendationToLocal(row: any): Recommendation {
     title: row.title,
     year: row.year,
     posterUrl: row.poster_url,
+    note: row.note,
     status: row.status,
     createdAt: row.created_at,
   }
@@ -299,7 +301,7 @@ function mapDbRecommendationToLocal(row: any): Recommendation {
 // changes. Requires an accepted friendship — enforced by the send_recommendation
 // SQL function, not the client. Resending the same title to the same friend
 // just bumps the existing row back to unread (see recommendations_unique_idx).
-export async function sendRecommendation(recipientUserId: string, title: Title): Promise<void> {
+export async function sendRecommendation(recipientUserId: string, title: Title, note?: string): Promise<void> {
   if (!supabase) return
 
   const { error } = await supabase.rpc('send_recommendation', {
@@ -309,12 +311,41 @@ export async function sendRecommendation(recipientUserId: string, title: Title):
     p_title: title.title,
     p_year: title.year,
     p_poster_url: title.posterUrl ?? null,
+    p_note: note?.trim() || null,
   })
 
   if (error) {
     console.error('Error sending recommendation:', error)
     throw error
   }
+}
+
+// Recipient user IDs (and their current status) this user has already sent
+// this exact title to — lets the send UI show "already sent" instead of a
+// blank slate. RLS ("recommendations: sender can read") scopes this to rows
+// the current user sent, so no explicit sender filter is needed here.
+export async function fetchSentRecommendationStatus(
+  tmdbId: number,
+  type: MediaType
+): Promise<Record<string, 'unread' | 'read' | 'dismissed'>> {
+  if (!supabase) return {}
+
+  const { data, error } = await supabase
+    .from('recommendations')
+    .select('recipient_user_id, status')
+    .eq('tmdb_id', tmdbId)
+    .eq('type', type)
+
+  if (error) {
+    console.error('Error fetching sent recommendation status:', error)
+    throw error
+  }
+
+  const result: Record<string, 'unread' | 'read' | 'dismissed'> = {}
+  for (const row of data || []) {
+    result[row.recipient_user_id] = row.status
+  }
+  return result
 }
 
 // Reads the current user's recommendation inbox (sent by friends), newest first.

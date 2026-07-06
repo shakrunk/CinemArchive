@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { CastMember, CrewMember, EpisodeCrew, Title, WatchStatus, MediaType } from '../store/mockData'
+import { normalizeLedgerWidgets, type LedgerWidget } from './ledgerPanels'
 
 // ─── Mapping Helpers ─────────────────────────────────────────────────────────
 
@@ -184,8 +185,12 @@ export async function fetchUserLibrary(userId: string): Promise<Title[]> {
   return (data || []).map(mapDbTitleToLocal)
 }
 
-export async function fetchSharedLibrary(token: string): Promise<Title[]> {
-  if (!supabase) return []
+/** Shared-token view returns the titles plus the owner's user id (recovered
+ *  from the title rows) so the owner's synced prefs can be read too. */
+export async function fetchSharedLibrary(
+  token: string
+): Promise<{ titles: Title[]; ownerUserId: string | null }> {
+  if (!supabase) return { titles: [], ownerUserId: null }
 
   const { error: rpcError } = await supabase.rpc('set_shared_token', { token })
   if (rpcError) {
@@ -218,7 +223,10 @@ export async function fetchSharedLibrary(token: string): Promise<Title[]> {
     throw error
   }
 
-  return (data || []).map(mapDbTitleToLocal)
+  return {
+    titles: (data || []).map(mapDbTitleToLocal),
+    ownerUserId: (data?.[0]?.user_id as string | undefined) ?? null,
+  }
 }
 
 // Reads an accepted friend's library. Relies on the "friend read" RLS
@@ -994,4 +1002,35 @@ export async function deleteTitlePin(
     .eq('title_id', titleId)
     .eq('easter_egg_key', easterEggKey)
   if (error) console.error('deleteTitlePin:', error)
+}
+
+// ─── User Prefs (account-synced Ledger board layout) ────────────────────────
+
+/** Read a user's synced Ledger layout. Also works for shared-token and friend
+ *  views (read-only RLS policies on user_prefs). Returns null when the user
+ *  has never synced a layout. */
+export async function fetchLedgerLayout(ownerUserId: string): Promise<LedgerWidget[] | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('user_prefs')
+    .select('ledger_layout')
+    .eq('user_id', ownerUserId)
+    .maybeSingle()
+  if (error) {
+    console.error('fetchLedgerLayout:', error)
+    throw error
+  }
+  if (!data || data.ledger_layout == null) return null
+  return normalizeLedgerWidgets(data.ledger_layout)
+}
+
+export async function saveLedgerLayout(userId: string, widgets: LedgerWidget[]): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('user_prefs')
+    .upsert({ user_id: userId, ledger_layout: widgets, updated_at: new Date().toISOString() })
+  if (error) {
+    console.error('saveLedgerLayout:', error)
+    throw error
+  }
 }

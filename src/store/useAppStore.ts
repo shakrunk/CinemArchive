@@ -24,6 +24,7 @@ import {
   deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
   fetchFriendActivityFeed,
+  fetchLedgerLayout, saveLedgerLayout,
 } from '../lib/db'
 import type { SearchResult } from '../lib/media'
 
@@ -142,6 +143,10 @@ interface UISlice {
   unlockedThemes: Theme[]
   navPrefs: NavPrefs
   ledgerPrefs: LedgerPrefs
+  // The board arrangement of whoever is being viewed in a shared/friend view.
+  // Transient (never persisted) — it must not clobber the viewer's own
+  // ledgerPrefs, which partialize writes to localStorage.
+  viewedLedgerWidgets: LedgerWidget[] | null
   selectedTitleId: string | null
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
@@ -368,6 +373,46 @@ type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 2
+
+// ─── Ledger layout write-behind ─────────────────────────────────────────────
+// Layout edits are rapid (drags fire many width/order updates), so the synced
+// copy is written on a debounce rather than per-action. localStorage persist
+// still captures every change immediately (anon/offline fallback).
+
+const LEDGER_SAVE_DEBOUNCE_MS = 800
+
+let ledgerSaveTimer: number | undefined
+let ledgerSaveGet: (() => AppStore) | null = null
+
+function flushLedgerLayoutSave() {
+  window.clearTimeout(ledgerSaveTimer)
+  ledgerSaveTimer = undefined
+  const get = ledgerSaveGet
+  if (!get) return
+  const s = get()
+  // Viewers must never write the owner's board into their own prefs.
+  if (!s.user || s.isSharedView || s.friendView) return
+  const user = s.user
+  saveLedgerLayout(user.id, s.ledgerPrefs.widgets).catch(() => {
+    s.pushNotification({
+      message: "Couldn't sync your Ledger layout — it's saved on this device.",
+      retry: () => saveLedgerLayout(user.id, get().ledgerPrefs.widgets),
+    })
+  })
+}
+
+function scheduleLedgerLayoutSave(get: () => AppStore) {
+  ledgerSaveGet = get
+  window.clearTimeout(ledgerSaveTimer)
+  ledgerSaveTimer = window.setTimeout(flushLedgerLayoutSave, LEDGER_SAVE_DEBOUNCE_MS)
+}
+
+// A drag session followed by closing the tab shouldn't lose the layout.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && ledgerSaveTimer !== undefined) flushLedgerLayoutSave()
+  })
+}
 
 export const useAppStore = create<AppStore>()(
   persist(
@@ -709,6 +754,7 @@ export const useAppStore = create<AppStore>()(
   unlockedThemes: ['dark', 'light'],
   navPrefs: defaultNavPrefs,
   ledgerPrefs: defaultLedgerPrefs,
+  viewedLedgerWidgets: null,
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
@@ -760,6 +806,7 @@ export const useAppStore = create<AppStore>()(
   addLedgerWidget: (panel) => {
     const widget = createLedgerWidget(panel)
     set((s) => ({ ledgerPrefs: { widgets: [...s.ledgerPrefs.widgets, widget] } }))
+    scheduleLedgerLayoutSave(get)
     return widget.id
   },
 
@@ -773,13 +820,16 @@ export const useAppStore = create<AppStore>()(
       widgets.splice(idx + 1, 0, copy)
       return { ledgerPrefs: { widgets } }
     })
+    scheduleLedgerLayoutSave(get)
     return copy.id
   },
 
-  removeLedgerWidget: (id) =>
-    set((s) => ({ ledgerPrefs: { widgets: s.ledgerPrefs.widgets.filter((w) => w.id !== id) } })),
+  removeLedgerWidget: (id) => {
+    set((s) => ({ ledgerPrefs: { widgets: s.ledgerPrefs.widgets.filter((w) => w.id !== id) } }))
+    scheduleLedgerLayoutSave(get)
+  },
 
-  moveLedgerWidget: (id, direction) =>
+  moveLedgerWidget: (id, direction) => {
     set((s) => {
       const widgets = [...s.ledgerPrefs.widgets]
       const idx = widgets.findIndex((w) => w.id === id)
@@ -787,25 +837,31 @@ export const useAppStore = create<AppStore>()(
       if (idx === -1 || swapWith < 0 || swapWith >= widgets.length) return {}
       ;[widgets[idx], widgets[swapWith]] = [widgets[swapWith], widgets[idx]]
       return { ledgerPrefs: { widgets } }
-    }),
+    })
+    scheduleLedgerLayoutSave(get)
+  },
 
-  reorderLedgerWidgets: (ids) =>
+  reorderLedgerWidgets: (ids) => {
     set((s) => {
       const byId = new Map(s.ledgerPrefs.widgets.map((w) => [w.id, w]))
       const widgets = ids.map((id) => byId.get(id)).filter((w): w is LedgerWidget => Boolean(w))
       // Anything omitted from `ids` (shouldn't happen) is kept rather than dropped.
       for (const w of s.ledgerPrefs.widgets) if (!ids.includes(w.id)) widgets.push(w)
       return { ledgerPrefs: { widgets } }
-    }),
+    })
+    scheduleLedgerLayoutSave(get)
+  },
 
-  setLedgerWidgetWidth: (id, width) =>
+  setLedgerWidgetWidth: (id, width) => {
     set((s) => ({
       ledgerPrefs: {
         widgets: s.ledgerPrefs.widgets.map((w) => (w.id === id ? { ...w, width } : w)),
       },
-    })),
+    }))
+    scheduleLedgerLayoutSave(get)
+  },
 
-  setLedgerWidgetSettings: (id, patch) =>
+  setLedgerWidgetSettings: (id, patch) => {
     set((s) => ({
       ledgerPrefs: {
         widgets: s.ledgerPrefs.widgets.map((w) => {
@@ -822,9 +878,14 @@ export const useAppStore = create<AppStore>()(
           return { ...w, settings }
         }),
       },
-    })),
+    }))
+    scheduleLedgerLayoutSave(get)
+  },
 
-  resetLedgerPrefs: () => set({ ledgerPrefs: { widgets: defaultLedgerWidgets() } }),
+  resetLedgerPrefs: () => {
+    set({ ledgerPrefs: { widgets: defaultLedgerWidgets() } })
+    scheduleLedgerLayoutSave(get)
+  },
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -943,6 +1004,15 @@ export const useAppStore = create<AppStore>()(
     set({ loadingUser: true })
     try {
       const dbTitles = await fetchUserLibrary(user.id)
+      // The synced board layout rides along with the library fetch. Server
+      // wins; a user who has never synced adopts their local board once.
+      void fetchLedgerLayout(user.id)
+        .then((widgets) => {
+          if (get().isSharedView || get().friendView) return
+          if (widgets) set({ ledgerPrefs: { widgets } })
+          else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
+        })
+        .catch((err) => console.error('Failed to load synced Ledger layout:', err))
       // Guard: if we have local titles but DB returned empty, the session auth
       // may not have fully propagated — skip the wipe rather than hiding data.
       const currentTitles = get().titles
@@ -966,12 +1036,19 @@ export const useAppStore = create<AppStore>()(
   loadSharedLibrary: async (token) => {
     set({ loadingUser: true, isSharedView: true })
     try {
-      const dbTitles = await fetchSharedLibrary(token)
+      const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
       set((s) => ({
         titles: dbTitles,
         filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
         stats: computeLedgerStats(dbTitles),
       }))
+      // Show the owner's board arrangement (falls back to the default board
+      // when they never synced one). Never written into the viewer's prefs.
+      if (ownerUserId) {
+        void fetchLedgerLayout(ownerUserId)
+          .then((widgets) => set({ viewedLedgerWidgets: widgets }))
+          .catch(() => set({ viewedLedgerWidgets: null }))
+      }
     } catch (err) {
       console.error('Failed to load shared library from DB:', err)
     } finally {
@@ -996,6 +1073,10 @@ export const useAppStore = create<AppStore>()(
         filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
         stats: computeLedgerStats(dbTitles),
       }))
+      // Show the friend's board arrangement (read-only RLS policy).
+      void fetchLedgerLayout(friendUserId)
+        .then((widgets) => set({ viewedLedgerWidgets: widgets }))
+        .catch(() => set({ viewedLedgerWidgets: null }))
     } catch (err) {
       console.error('Failed to load friend library from DB:', err)
       get().pushNotification({ message: "Couldn't load that friend's library — check your connection." })
@@ -1012,6 +1093,7 @@ export const useAppStore = create<AppStore>()(
     set((s) => ({
       friendView: null,
       isSharedView: false,
+      viewedLedgerWidgets: null,
       titles: [],
       filteredTitles: applyFiltersToTitles([], s.filters),
       stats: computeLedgerStats([]),

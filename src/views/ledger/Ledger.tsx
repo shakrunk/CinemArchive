@@ -2,12 +2,12 @@
 // instances, with an edit mode (floating palette/details, drag reorder, edge
 // resize). Panels live in ./panels, editor chrome in ./editor.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pencil, Check, ChevronUp, PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
-import { LEDGER_PANEL_LABELS, LEDGER_PANEL_STANDARD_HEIGHT } from 'src/lib/ledgerPanels'
+import { LEDGER_PANEL_LABELS, LEDGER_PANEL_STANDARD_HEIGHT, defaultLedgerWidgets } from 'src/lib/ledgerPanels'
 import { DashHero, StatRibbon } from './LedgerHero'
 import { PANEL_REGISTRY, WIDTH_GRID_CLASSES } from './panelRegistry'
 import { WidgetPalette } from './editor/WidgetPalette'
@@ -16,12 +16,19 @@ import { useBoardDrag } from './editor/useBoardDrag'
 import { floatingPanelStyle } from './editor/chrome'
 
 export function Ledger() {
-  const widgets = useAppStore((s) => s.ledgerPrefs.widgets)
+  const ownWidgets = useAppStore((s) => s.ledgerPrefs.widgets)
+  const viewedLedgerWidgets = useAppStore((s) => s.viewedLedgerWidgets)
   const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
   const resetLedgerPrefs = useAppStore((s) => s.resetLedgerPrefs)
   const friendView = useAppStore((s) => s.friendView)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const canEdit = !friendView && !isSharedView
+  // Shared/friend views render the owner's synced board arrangement, falling
+  // back to the default board when they never synced one. Editing is disabled
+  // there, so the drag hook (which operates on the viewer's own prefs) never
+  // touches these. Memoized: defaultLedgerWidgets() mints fresh ids per call.
+  const defaultBoard = useMemo(() => defaultLedgerWidgets(), [])
+  const widgets = canEdit ? ownWidgets : (viewedLedgerWidgets ?? defaultBoard)
 
   const [editing, setEditing] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)

@@ -320,15 +320,12 @@ function PosterWall({ titles }: { titles: Title[] }) {
 
   const delays = useMemo(() => {
     const n = Math.min(titles.length, MAX_ANIMATED)
-    // Evenly-spaced delay slots shuffled into random order
-    const slots = Array.from({ length: n }, (_, i) => i * 15)
-    for (let i = slots.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [slots[i], slots[j]] = [slots[j], slots[i]]
-    }
-    // Posters beyond MAX_ANIMATED appear instantly (no delay)
-    return [...slots, ...new Array(Math.max(0, titles.length - MAX_ANIMATED)).fill(0)]
-  }, [titles])
+    return Array.from({ length: titles.length }, (_, i) => {
+      if (i >= MAX_ANIMATED) return 0
+      const slot = n > 0 ? (i * 7) % n : 0
+      return slot * 15
+    })
+  }, [titles.length])
 
   if (titles.length === 0) return <EmptyState />
 

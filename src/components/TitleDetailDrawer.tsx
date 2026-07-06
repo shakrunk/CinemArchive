@@ -117,7 +117,9 @@ function ViewingTimeline({
           .slice()
           // undated (pre-platform) viewings sort as oldest → bottom of the timeline
           .sort((a, b) => viewingTime(b) - viewingTime(a))
-          .map((v) => (
+          .map((v) => {
+            const formattedDate = v.date ? fmtDate(v.date) : 'Before CinemArchive'
+            return (
             <div key={v.id} className="relative">
               <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />
               <div className="bg-secondary/50 rounded-lg p-3">
@@ -134,7 +136,7 @@ function ViewingTimeline({
                         }}
                         className="font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--ember)' }}
-                        aria-label="Delete forever: viewing"
+                        aria-label={`Delete forever: viewing from ${formattedDate}`}
                       >
                         Delete forever
                       </button>
@@ -142,7 +144,7 @@ function ViewingTimeline({
                         onClick={() => setPendingDeleteId(null)}
                         className="font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--paper-faint)' }}
-                        aria-label="Cancel deleting viewing"
+                        aria-label={`Cancel deleting viewing from ${formattedDate}`}
                       >
                         Cancel
                       </button>
@@ -153,9 +155,7 @@ function ViewingTimeline({
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono text-xs text-amber">
                         {v.date
-                          ? new Date(v.date).toLocaleDateString('en-US', {
-                              month: 'short', day: 'numeric', year: 'numeric',
-                            })
+                          ? fmtDate(v.date)
                           : <span className="italic">Before CinemArchive</span>}
                       </span>
                       <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ function ViewingTimeline({
                             style={{ color: 'var(--paper-faint)', opacity: 0.45 }}
                             onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                             onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
-                            aria-label="Delete viewing"
+                            aria-label={`Delete viewing from ${formattedDate}`}
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -184,7 +184,7 @@ function ViewingTimeline({
                 )}
               </div>
             </div>
-          ))}
+          )})}
       </div>
     </div>
   )

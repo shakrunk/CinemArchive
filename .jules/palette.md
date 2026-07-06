@@ -47,3 +47,6 @@
 ## 2026-07-05 - WCAG 2.5.3 Compliance for Confirmations
 **Learning:** Adding an `aria-label` to a button that completely overwrites its visible text violates WCAG 2.5.3 (Label in Name), which requires the accessible name to contain the exact visible text. This breaks voice control software where users might command 'Click [Visible Text]'.
 **Action:** When adding `aria-label` to give extra context to a text button (e.g. 'Delete forever'), ensure the label INCLUDES the exact visible words (e.g. `aria-label="Delete forever: viewing"`).
+## 2026-07-06 - Component Prop Safety in React
+**Learning:** When passing object props to nested components (e.g., `entry` or `snapshot`), directly destructuring fields like `title.title` deep inside the component can crash the entire React tree with `ReferenceError` or `TypeError` if the parent data resolves to undefined. Also, reusing complex date-formatting logic inline creates maintainability issues.
+**Action:** Always safely check object existence (e.g., `const title = snapshot?.title; if (!title) return null;`) before destructuring, and use existing formatting utilities (like `fmtDate` from `src/lib/utils`) instead of repeating `new Date()`, to prevent timezone shift bugs and DRY violations.

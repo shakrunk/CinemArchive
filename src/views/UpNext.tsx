@@ -146,7 +146,7 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
               <span className="font-mono text-xs text-amber inline-flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" /> Watched {pendingUndo.label}
               </span>
-              <button onClick={handleUndo} className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors">
+              <button onClick={handleUndo} aria-label={`Undo marking ${title.title} as watched`} className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors">
                 <Undo2 className="w-3.5 h-3.5" /> Undo
               </button>
             </div>
@@ -173,26 +173,31 @@ function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNext
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
   const updateTitle = useAppStore((s) => s.updateTitle)
   const isSharedView = useAppStore((s) => s.isSharedView)
-  const { title } = snapshot
+  const title = snapshot?.title
 
   // Keep the latest onDismiss without resetting the dismissal timer each render.
   // The ref is updated in an effect (not during render) to satisfy the React
-  // refs lint rule, while the timer effect below keys only on title.id.
+  // refs lint rule, while the timer effect below keys only on title?.id.
   const onDismissRef = useRef(onDismiss)
   useEffect(() => { onDismissRef.current = onDismiss })
   useEffect(() => {
+    if (!title) return
     const id = setTimeout(() => onDismissRef.current(title.id), UNDO_WINDOW_MS)
     return () => clearTimeout(id)
-  }, [title.id])
+  }, [title?.id])
 
   function handleUndo() {
+    if (!title) return
     deleteEpisodeWatchEvent(title.id, undo.seasonNumber, undo.episodeNumber, undo.watchEventId)
     onDismiss(title.id)
   }
   function handleMarkSeriesWatched() {
+    if (!title) return
     updateTitle(title.id, { status: 'watched' })
     onDismiss(title.id)
   }
+
+  if (!title) return null
 
   return (
     <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
@@ -205,7 +210,7 @@ function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNext
           <button onClick={handleMarkSeriesWatched} className="font-mono text-xs text-amber hover:opacity-80 transition-opacity">
             Mark series watched
           </button>
-          <button onClick={handleUndo} className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors">
+          <button onClick={handleUndo} aria-label={`Undo marking ${title.title} series as watched`} className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors">
             <Undo2 className="w-3.5 h-3.5" /> Undo
           </button>
         </div>

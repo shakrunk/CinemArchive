@@ -397,6 +397,12 @@ const LEDGER_SAVE_DEBOUNCE_MS = 800
 let ledgerSaveTimer: number | undefined
 let ledgerSaveGet: (() => AppStore) | null = null
 
+// Polls the unread notification count while a user is logged in — the inbox
+// has no Supabase Realtime subscription, so this is what keeps the bell
+// current for a friend's comment/reaction/request arriving mid-session.
+const NOTIFICATION_POLL_MS = 45_000
+let notificationPollTimer: number | undefined
+
 function flushLedgerLayoutSave() {
   window.clearTimeout(ledgerSaveTimer)
   ledgerSaveTimer = undefined
@@ -1029,10 +1035,13 @@ export const useAppStore = create<AppStore>()(
 
   setUser: (user) => {
     set({ user })
+    window.clearInterval(notificationPollTimer)
+    notificationPollTimer = undefined
     if (user) {
       get().loadUserLibrary()
       get().loadPinnedModes()
       get().refreshUnreadNotificationCount()
+      notificationPollTimer = window.setInterval(() => get().refreshUnreadNotificationCount(), NOTIFICATION_POLL_MS)
     } else {
       // Clear on logout — restore mock data only in dev
       const fallback = import.meta.env.DEV ? mockTitles : []

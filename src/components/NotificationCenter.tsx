@@ -56,8 +56,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
   async function handleToggle() {
     const next = !open
     setOpen(next)
-    if (next && notificationInbox.length === 0) {
-      setLoading(true)
+    if (next) {
+      setLoading(notificationInbox.length === 0)
       await loadNotificationInbox()
       setLoading(false)
     }

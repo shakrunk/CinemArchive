@@ -220,7 +220,7 @@ export function Ledger() {
                   editing ? 'pointer-events-none overflow-hidden' : 'overflow-y-auto overflow-x-hidden scrollbar-thin',
                 )}
               >
-                <Component className="min-h-full" settings={widget.settings} />
+                <Component className="min-h-full" settings={widget.settings} width={widget.width} />
               </div>
               {editing && (
                 <>

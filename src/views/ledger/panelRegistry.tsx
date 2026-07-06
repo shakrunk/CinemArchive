@@ -28,6 +28,13 @@ import { ComingAttractions } from './panels/ComingAttractions'
 export interface PanelProps {
   className?: string
   settings?: LedgerWidgetSettings
+  /** The widget's current board width preset. Most panels ignore this and
+   *  rely on flex-wrap to reflow, but a few adapt their internal layout
+   *  (donut/list orientation, calendar density, stat-block direction) to it
+   *  since it's known up front from the board layout — no ResizeObserver
+   *  needed. Absent in isolated previews (e.g. the layout editor's palette),
+   *  where panels should fall back to a reasonable default. */
+  width?: LedgerPanelWidth
 }
 
 export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: React.ComponentType<PanelProps> }> = {

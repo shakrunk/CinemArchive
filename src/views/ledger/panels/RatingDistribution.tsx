@@ -2,13 +2,22 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
 import { ratingColorVar } from 'src/components/LedgerCharts'
 import { deriveRatingDistribution } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel } from '../PanelShell'
 import { renderStarLabel } from '../labels'
 
-export function RatingDistribution({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function RatingDistribution({
+  className,
+  settings,
+  width = 'md',
+}: {
+  className?: string
+  settings?: LedgerWidgetSettings
+  width?: LedgerPanelWidth
+}) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -50,13 +59,21 @@ export function RatingDistribution({ className, settings }: { className?: string
           </button>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-center gap-8">
-          <div className="relative w-[168px] h-[168px] shrink-0">
-            <div className="donut-ring absolute inset-0 rounded-full" style={{ background: gradient }} />
+        <div
+          className={cn(
+            'flex items-center gap-8',
+            width === 'sm' ? 'flex-col' : 'flex-row',
+            (width === 'lg' || width === 'full') && 'max-w-[640px] mx-auto',
+          )}
+        >
+          <div
+            className="donut-ring relative shrink-0 rounded-full"
+            style={{ width: width === 'sm' ? 136 : 168, height: width === 'sm' ? 136 : 168, background: gradient }}
+          >
             <div
               className="donut-hole absolute rounded-full flex flex-col items-center justify-center"
               style={{
-                inset: '24px',
+                inset: width === 'sm' ? '20px' : '24px',
                 background: 'linear-gradient(168deg, var(--ink-1), var(--ink-2))',
                 border: '1px solid var(--line)',
               }}
@@ -67,7 +84,7 @@ export function RatingDistribution({ className, settings }: { className?: string
               </span>
             </div>
           </div>
-          <div className="flex-1 w-full flex flex-col gap-0.5">
+          <div className="flex-1 w-full min-w-0 flex flex-col gap-0.5">
             {data.map((d) => (
               <button
                 key={d.rating}

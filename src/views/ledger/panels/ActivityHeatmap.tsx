@@ -4,14 +4,33 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, fmtReleaseDate } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel } from '../PanelShell'
 import { localDateStr } from '../labels'
 
-export function ActivityHeatmap({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+// Weeks shown and cell size scale down with the card's width so a narrow
+// widget reads as a deliberately compact calendar rather than a full-size
+// grid forced through a horizontal scrollbar.
+const HEATMAP_CONFIG: Record<LedgerPanelWidth, { weeksBack: number; cellPx: number }> = {
+  sm: { weeksBack: 38, cellPx: 9 },
+  md: { weeksBack: 52, cellPx: 10 },
+  lg: { weeksBack: 52, cellPx: 13 },
+  full: { weeksBack: 52, cellPx: 14 },
+}
+
+export function ActivityHeatmap({
+  className,
+  settings,
+  width = 'lg',
+}: {
+  className?: string
+  settings?: LedgerWidgetSettings
+  width?: LedgerPanelWidth
+}) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = JSON.stringify(settings ?? {})
+  const { weeksBack, cellPx } = HEATMAP_CONFIG[width]
 
   const viewingCounts = useMemo(() => {
     const { titles: scoped } = scopedTitles('activity', titles, settings)
@@ -33,7 +52,7 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
     end.setDate(end.getDate() + (6 - end.getDay())) // advance to Saturday
 
     const start = new Date(end)
-    start.setDate(end.getDate() - 52 * 7 + 1)
+    start.setDate(end.getDate() - weeksBack * 7 + 1)
 
     const days: Array<{ date: string; count: number }> = []
     const cursor = new Date(start)
@@ -49,13 +68,15 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
     const monthLabels: Array<{ weekIndex: number; label: string }> = []
     let lastMonth = -1
     let lastLabelWeek = -Infinity
+    // Collision guard: a month boundary too close to the previous label would
+    // overlap it — the min gap scales with column width (smaller cells need
+    // fewer columns of clearance, larger cells need more).
+    const minLabelGapWeeks = Math.max(3, Math.ceil(34 / (cellPx + 2)))
     weeks.forEach((week, wi) => {
       const month = Number(week[0].date.slice(5, 7))
       if (month !== lastMonth) {
         lastMonth = month
-        // Collision guard: a month boundary within 4 columns of the previous
-        // label would overlap it (labels are wider than a 13px column).
-        if (wi - lastLabelWeek < 4) return
+        if (wi - lastLabelWeek < minLabelGapWeeks) return
         const d = new Date(Number(week[0].date.slice(0, 4)), month - 1, 1)
         monthLabels.push({ weekIndex: wi, label: d.toLocaleDateString('en-US', { month: 'short' }) })
         lastLabelWeek = wi
@@ -64,7 +85,8 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
 
     const totalInYear = days.reduce((sum, d) => sum + d.count, 0)
     return { weeks, monthLabels, totalInYear }
-  }, [viewingCounts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingCounts, weeksBack, cellPx])
 
   const maxCellCount = useMemo(
     () => Math.max(...weeks.flat().map((c) => c.count), 1),
@@ -74,20 +96,20 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
   return (
     <Panel
       title={settings?.title || 'Time in the dark'}
-      hint={`past 52 weeks${describeLedgerSettings(settings)}`}
+      hint={`past ${weeksBack} weeks${describeLedgerSettings(settings)}`}
       className={className}
     >
       <div
         className="overflow-x-auto -mx-1 px-1"
         role="img"
-        aria-label={`52-week screening heatmap: ${totalInYear} screening${totalInYear !== 1 ? 's' : ''} in the past year`}
+        aria-label={`${weeksBack}-week screening heatmap: ${totalInYear} screening${totalInYear !== 1 ? 's' : ''} in the past ${weeksBack === 52 ? 'year' : `${weeksBack} weeks`}`}
       >
         {/* Month labels */}
         <div className="flex mb-1.5">
           {weeks.map((_, wi) => {
             const label = monthLabels.find((m) => m.weekIndex === wi)?.label
             return (
-              <div key={wi} className="w-[13px] overflow-visible shrink-0 mr-[2px]">
+              <div key={wi} style={{ width: cellPx, marginRight: 2 }} className="overflow-visible shrink-0">
                 {label && (
                   <span className="font-mono text-[9px] text-paper-faint leading-none whitespace-nowrap">
                     {label}
@@ -105,18 +127,20 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
                 <div
                   key={cell.date}
                   className={cn(
-                    'w-[13px] h-[13px] rounded-[2px] transition-opacity',
+                    'rounded-[2px] transition-opacity',
                     cell.count > 0 ? 'bg-amber' : 'bg-[var(--wash)]',
                     cell.date === todayStr && 'ring-1 ring-amber-bright/60',
                   )}
-                  style={
-                    cell.count > 0
+                  style={{
+                    width: cellPx,
+                    height: cellPx,
+                    ...(cell.count > 0
                       ? {
                           opacity: 0.32 + 0.68 * Math.min(cell.count / maxCellCount, 1),
                           boxShadow: '0 0 6px -1px rgba(233,178,102,0.4)',
                         }
-                      : undefined
-                  }
+                      : undefined),
+                  }}
                   {...tip.bind({
                     label: fmtReleaseDate(cell.date),
                     value: cell.count > 0 ? `${cell.count} screening${cell.count !== 1 ? 's' : ''}` : 'no screenings',
@@ -128,7 +152,7 @@ export function ActivityHeatmap({ className, settings }: { className?: string; s
         </div>
       </div>
       <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
-        {totalInYear} screening{totalInYear !== 1 ? 's' : ''} in the past year
+        {totalInYear} screening{totalInYear !== 1 ? 's' : ''} in the past {weeksBack === 52 ? 'year' : `${weeksBack} weeks`}
       </p>
       {tip.node}
     </Panel>

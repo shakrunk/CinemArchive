@@ -29,6 +29,7 @@ import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMemb
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
+import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { transitionSpiderNoir } from 'src/lib/theme'
@@ -837,7 +838,7 @@ function DrawerTagEditor({
 
 export function TitleDetailDrawer() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView } = useAppStore(
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, viewerContext } = useAppStore(
     useShallow((s) => ({
       isDetailDrawerOpen: s.isDetailDrawerOpen,
       closeDetailDrawer: s.closeDetailDrawer,
@@ -846,6 +847,7 @@ export function TitleDetailDrawer() {
       removeViewing: s.removeViewing,
       openRefreshMetadata: s.openRefreshMetadata,
       isSharedView: s.isSharedView,
+      viewerContext: s.viewerContext,
     }))
   )
   const browseByStudio = useAppStore((s) => s.browseByStudio)
@@ -1685,6 +1687,9 @@ export function TitleDetailDrawer() {
 
           {/* Trailers */}
           <TrailerRow videos={videos} />
+
+          {/* Comments & reactions — friends-only, hidden for anonymous share-link visitors */}
+          {viewerContext.kind !== 'shared-link' && <TitleCommentsPanel titleId={title.id} />}
 
           {/* Maintenance actions */}
           {!isSharedView && (

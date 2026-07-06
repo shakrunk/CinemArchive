@@ -385,6 +385,103 @@ export async function dismissRecommendation(id: string): Promise<void> {
   }
 }
 
+// ─── Title comments & reactions (friends-only) ───────────────────────────────
+
+export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮'] as const
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number]
+
+export interface TitleComment {
+  id: string
+  authorId: string
+  authorDisplayName: string | null
+  authorUsername: string | null
+  body: string
+  createdAt: string
+}
+
+export interface TitleReaction {
+  authorId: string
+  authorDisplayName: string | null
+  authorUsername: string | null
+  emoji: ReactionEmoji
+}
+
+function mapDbTitleCommentToLocal(row: any): TitleComment {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    authorDisplayName: row.display_name,
+    authorUsername: row.username,
+    body: row.body,
+    createdAt: row.created_at,
+  }
+}
+
+function mapDbTitleReactionToLocal(row: any): TitleReaction {
+  return {
+    authorId: row.author_id,
+    authorDisplayName: row.display_name,
+    authorUsername: row.username,
+    emoji: row.emoji,
+  }
+}
+
+export async function fetchTitleComments(titleId: string): Promise<TitleComment[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('list_title_comments', { p_title_id: titleId })
+  if (error) {
+    console.error('Error fetching title comments:', error)
+    throw error
+  }
+  return (data || []).map(mapDbTitleCommentToLocal)
+}
+
+export async function addTitleComment(titleId: string, body: string): Promise<TitleComment> {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { data, error } = await supabase.rpc('add_title_comment', { p_title_id: titleId, p_body: body })
+  if (error) {
+    console.error('Error adding title comment:', error)
+    throw error
+  }
+  return {
+    id: data.id,
+    authorId: data.author_id,
+    authorDisplayName: null,
+    authorUsername: null,
+    body: data.body,
+    createdAt: data.created_at,
+  }
+}
+
+export async function deleteTitleComment(commentId: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('delete_title_comment', { p_comment_id: commentId })
+  if (error) {
+    console.error('Error deleting title comment:', error)
+    throw error
+  }
+}
+
+export async function fetchTitleReactions(titleId: string): Promise<TitleReaction[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('list_title_reactions', { p_title_id: titleId })
+  if (error) {
+    console.error('Error fetching title reactions:', error)
+    throw error
+  }
+  return (data || []).map(mapDbTitleReactionToLocal)
+}
+
+/** Set (or, with emoji=null, clear) the current user's reaction to a title. */
+export async function setTitleReaction(titleId: string, emoji: ReactionEmoji | null): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('set_title_reaction', { p_title_id: titleId, p_emoji: emoji })
+  if (error) {
+    console.error('Error setting title reaction:', error)
+    throw error
+  }
+}
+
 export interface ActivityEvent {
   type: 'title_added' | 'viewing_logged'
   eventAt: string

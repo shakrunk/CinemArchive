@@ -2,7 +2,7 @@
 // edge resize (width presets only — heights are standardized), and dragging a
 // panel type from the palette onto the board.
 
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import type { LedgerPanelId } from 'src/lib/ledgerPanels'
 import { LEDGER_PANEL_WIDTH_SPANS, nearestPanelWidth } from 'src/lib/ledgerPanels'
@@ -76,6 +76,43 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     return widgets.find((w) => w.id === id)
   }
 
+  // ── FLIP animation ────────────────────────────────────────────────────────
+  // When a reorder, insert, or resize changes the board arrangement, the other
+  // panels should slide into their new spot instead of snapping (CSS grid has
+  // no native transition for implicit position changes). Call captureFlipRects
+  // right before triggering the store update that will move things; the
+  // layout effect below then measures the after-state and plays the delta.
+  const flipRectsRef = useRef<Map<string, DOMRect> | null>(null)
+
+  function captureFlipRects() {
+    const rects = new Map<string, DOMRect>()
+    for (const [id, el] of itemRefs.current) rects.set(id, el.getBoundingClientRect())
+    flipRectsRef.current = rects
+  }
+
+  const widgetArrangementKey = widgets.map((w) => `${w.id}:${w.width}`).join('|')
+
+  useLayoutEffect(() => {
+    const before = flipRectsRef.current
+    flipRectsRef.current = null
+    if (!before) return
+    for (const [id, el] of itemRefs.current) {
+      const from = before.get(id)
+      if (!from) continue
+      const to = el.getBoundingClientRect()
+      const dx = from.left - to.left
+      const dy = from.top - to.top
+      if (!dx && !dy) continue
+      el.style.transition = 'none'
+      el.style.transform = `translate(${dx}px, ${dy}px)`
+      // Force layout so the browser commits the inverted start position
+      // before we transition it back to identity.
+      el.getBoundingClientRect()
+      el.style.transition = 'transform 220ms ease'
+      el.style.transform = ''
+    }
+  }, [widgetArrangementKey])
+
   // ── Reorder handlers ──────────────────────────────────────────────────────
 
   function handlePanelPointerDown(e: React.PointerEvent<HTMLDivElement>, id: string) {
@@ -128,6 +165,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
       // A press without movement is a selection, not a drag.
       selectWidget(id)
     } else if (over && over !== drag.id) {
+      captureFlipRects()
       const ids = widgets.map((w) => w.id)
       const from = ids.indexOf(drag.id)
       const to = ids.indexOf(over)
@@ -168,7 +206,10 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     const dir = r.edge === 'w' ? -1 : 1
     const span = r.startSpan + (dir * (e.clientX - r.startX)) / r.colWidth
     const width = nearestPanelWidth(span)
-    if (width !== widgetById(r.id)?.width) setLedgerWidgetWidth(r.id, width)
+    if (width !== widgetById(r.id)?.width) {
+      captureFlipRects()
+      setLedgerWidgetWidth(r.id, width)
+    }
   }
 
   function endResize(e: React.PointerEvent<HTMLDivElement>) {
@@ -243,6 +284,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
       return
     }
     if (!over) return // dropped outside the board — cancel
+    captureFlipRects()
     const newId = addLedgerWidget(drag.panel)
     if (over !== 'end') {
       const ids = widgets.map((w) => w.id)

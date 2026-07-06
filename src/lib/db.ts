@@ -617,6 +617,15 @@ export async function markAllNotificationsRead(): Promise<void> {
   }
 }
 
+export async function deleteNotification(id: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('notifications').delete().eq('id', id)
+  if (error) {
+    console.error('Error deleting notification:', error)
+    throw error
+  }
+}
+
 export async function insertTitleToDb(userId: string, title: Title): Promise<void> {
   if (!supabase) return
 

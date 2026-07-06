@@ -25,6 +25,7 @@ import {
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
   fetchLedgerLayout, saveLedgerLayout,
   fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
+  deleteNotification,
   type AppNotificationItem,
 } from '../lib/db'
 import type { SearchResult } from '../lib/media'
@@ -212,6 +213,7 @@ interface UISlice {
   loadNotificationInbox: (before?: string) => Promise<void>
   markOneNotificationRead: (id: string) => Promise<void>
   markAllNotificationsSeen: () => Promise<void>
+  deleteNotificationItem: (id: string) => Promise<void>
 }
 
 /**
@@ -1022,6 +1024,22 @@ export const useAppStore = create<AppStore>()(
       await markAllNotificationsRead()
     } catch (err) {
       console.error('Failed to mark all notifications read:', err)
+      set({ notificationInbox: prev })
+      void get().refreshUnreadNotificationCount()
+    }
+  },
+
+  deleteNotificationItem: async (id) => {
+    const prev = get().notificationInbox
+    const removed = prev.find((n) => n.id === id)
+    set((s) => ({
+      notificationInbox: s.notificationInbox.filter((n) => n.id !== id),
+      unreadNotificationCount: removed && !removed.readAt ? Math.max(0, s.unreadNotificationCount - 1) : s.unreadNotificationCount,
+    }))
+    try {
+      await deleteNotification(id)
+    } catch (err) {
+      console.error('Failed to delete notification:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
     }

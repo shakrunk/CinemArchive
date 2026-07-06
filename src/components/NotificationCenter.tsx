@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile } from 'lucide-react'
+import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { AppView } from 'src/lib/navigation'
@@ -23,15 +23,23 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
-  const { notificationInbox, unreadNotificationCount, loadNotificationInbox, markOneNotificationRead, markAllNotificationsSeen, openDetailDrawer } =
-    useAppStore((s) => ({
-      notificationInbox: s.notificationInbox,
-      unreadNotificationCount: s.unreadNotificationCount,
-      loadNotificationInbox: s.loadNotificationInbox,
-      markOneNotificationRead: s.markOneNotificationRead,
-      markAllNotificationsSeen: s.markAllNotificationsSeen,
-      openDetailDrawer: s.openDetailDrawer,
-    }))
+  const {
+    notificationInbox,
+    unreadNotificationCount,
+    loadNotificationInbox,
+    markOneNotificationRead,
+    markAllNotificationsSeen,
+    deleteNotificationItem,
+    openDetailDrawer,
+  } = useAppStore((s) => ({
+    notificationInbox: s.notificationInbox,
+    unreadNotificationCount: s.unreadNotificationCount,
+    loadNotificationInbox: s.loadNotificationInbox,
+    markOneNotificationRead: s.markOneNotificationRead,
+    markAllNotificationsSeen: s.markAllNotificationsSeen,
+    deleteNotificationItem: s.deleteNotificationItem,
+    openDetailDrawer: s.openDetailDrawer,
+  }))
 
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -125,24 +133,38 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                 const meta = TYPE_META[n.type]
                 const Icon = meta.Icon
                 return (
-                  <button
+                  <div
                     key={n.id}
-                    role="menuitem"
-                    onClick={() => handleItemClick(n)}
-                    className="w-full text-left flex items-start gap-2.5 px-4 py-3 transition-colors hover:bg-secondary/30"
+                    className="group relative flex items-start"
                     style={{ background: n.readAt ? 'transparent' : 'rgb(var(--amber-rgb) / 0.06)' }}
                   >
-                    <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-sans text-xs text-paper leading-snug">
-                        <span className="font-medium">{actorName(n)}</span> {meta.verb(n)}
-                      </p>
-                      <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                        {new Date(n.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}
-                  </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => handleItemClick(n)}
+                      className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30"
+                    >
+                      <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-sans text-xs text-paper leading-snug">
+                          <span className="font-medium">{actorName(n)}</span> {meta.verb(n)}
+                        </p>
+                        <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                          {new Date(n.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void deleteNotificationItem(n.id)
+                      }}
+                      aria-label="Dismiss notification"
+                      className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 )
               })
             )}

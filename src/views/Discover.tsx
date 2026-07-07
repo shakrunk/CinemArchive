@@ -471,7 +471,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
                   >
                     <div
                       className="w-full flex items-center justify-center"
-                      style={{ background: 'var(--card)', aspectRatio: '2/3' }}
+                      style={{ background: 'hsl(var(--card))', aspectRatio: '2/3' }}
                     >
                       <User className="w-10 h-10" style={{ color: 'var(--line)' }} />
                     </div>
@@ -497,7 +497,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
                       {c.profileUrl ? (
                         <img src={c.profileUrl} alt={c.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'hsl(var(--card))' }}>
                           <span className="font-serif text-2xl" style={{ color: 'var(--paper-faint)', opacity: 0.4 }}>
                             {c.name.charAt(0).toUpperCase()}
                           </span>

@@ -11,6 +11,7 @@ import { Friends } from 'src/views/Friends'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
+import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
@@ -34,21 +35,40 @@ export default function App() {
   // Start true when Supabase isn't configured (no auth needed) so we never
   // flash the landing screen in local/mock-data mode.
   const [authChecked, setAuthChecked] = useState(!isSupabaseConfigured)
-  const setUser = useAppStore((s) => s.setUser)
-  const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
-  const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
-
-  const user = useAppStore((s) => s.user)
-  const isSharedView = useAppStore((s) => s.isSharedView)
-  const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
-  const closeCommandPalette = useAppStore((s) => s.closeCommandPalette)
-  const openCommandPalette = useAppStore((s) => s.openCommandPalette)
-  const openAddTitle = useAppStore((s) => s.openAddTitle)
-  const setViewMode = useAppStore((s) => s.setViewMode)
-  const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
-  const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
-  const isRefreshMetadataOpen = useAppStore((s) => s.isRefreshMetadataOpen)
-  const navPrefs = useAppStore((s) => s.navPrefs)
+  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
+  const {
+    setUser,
+    loadSharedLibrary,
+    loadFriendLibrary,
+    user,
+    isSharedView,
+    isCommandPaletteOpen,
+    closeCommandPalette,
+    openCommandPalette,
+    openAddTitle,
+    setViewMode,
+    isAddTitleOpen,
+    isDetailDrawerOpen,
+    isRefreshMetadataOpen,
+    navPrefs
+  } = useAppStore(
+    useShallow((s) => ({
+      setUser: s.setUser,
+      loadSharedLibrary: s.loadSharedLibrary,
+      loadFriendLibrary: s.loadFriendLibrary,
+      user: s.user,
+      isSharedView: s.isSharedView,
+      isCommandPaletteOpen: s.isCommandPaletteOpen,
+      closeCommandPalette: s.closeCommandPalette,
+      openCommandPalette: s.openCommandPalette,
+      openAddTitle: s.openAddTitle,
+      setViewMode: s.setViewMode,
+      isAddTitleOpen: s.isAddTitleOpen,
+      isDetailDrawerOpen: s.isDetailDrawerOpen,
+      isRefreshMetadataOpen: s.isRefreshMetadataOpen,
+      navPrefs: s.navPrefs
+    }))
+  )
 
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
 

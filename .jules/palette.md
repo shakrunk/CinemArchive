@@ -50,3 +50,7 @@
 ## 2026-07-06 - Component Prop Safety in React
 **Learning:** When passing object props to nested components (e.g., `entry` or `snapshot`), directly destructuring fields like `title.title` deep inside the component can crash the entire React tree with `ReferenceError` or `TypeError` if the parent data resolves to undefined. Also, reusing complex date-formatting logic inline creates maintainability issues.
 **Action:** Always safely check object existence (e.g., `const title = snapshot?.title; if (!title) return null;`) before destructuring, and use existing formatting utilities (like `fmtDate` from `src/lib/utils`) instead of repeating `new Date()`, to prevent timezone shift bugs and DRY violations.
+
+## 2024-07-07 - Actionable Empty States in Friends View
+**Learning:** Empty states in social/activity sections (like "No friend activity yet" or "Nothing sent your way yet") leave users at a dead end if they only show informative text. They should guide users toward relevant actions like browsing the library or discovering titles to encourage interaction.
+**Action:** When implementing empty states, always include a relevant call-to-action button (using `requestView` or similar app actions) rather than just passive text.

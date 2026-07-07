@@ -411,6 +411,84 @@
     animation: drift 26s linear infinite;
   }
 
+  /* ── Reel rail: instead of dissolving the carousel edge (which just reads as a
+     rendering glitch against bright poster art), an opaque scrim deliberately
+     covers the last sliver of the row, and a perforated amber rail — literally a
+     strip of 35mm film sprocket holes — sits on top as an unambiguous "there's
+     more, keep scrolling" affordance. It's chrome, not camouflage. ── */
+  .reel-scrim {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .reel-scrim.is-visible {
+    opacity: 1;
+  }
+  .reel-scrim--left {
+    left: 0;
+    background: linear-gradient(to right, var(--void) 0%, rgb(var(--void-rgb) / 0.8) 55%, transparent 100%);
+  }
+  .reel-scrim--right {
+    right: 0;
+    background: linear-gradient(to left, var(--void) 0%, rgb(var(--void-rgb) / 0.8) 55%, transparent 100%);
+  }
+
+  .reel-rail {
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    width: 13px;
+    pointer-events: none;
+    z-index: 6;
+    border-radius: 7px;
+    opacity: 0;
+    transform: scaleY(0.92);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    background:
+      radial-gradient(circle at center, var(--void) 2.6px, transparent 2.8px) center top / 100% 17px repeat-y,
+      linear-gradient(180deg, rgb(var(--amber-rgb) / 0.85), rgb(var(--amber-rgb) / 0.5));
+    box-shadow: 0 0 10px rgb(var(--amber-rgb) / 0.3);
+  }
+  .reel-rail.is-visible {
+    opacity: 0.9;
+    transform: scaleY(1);
+  }
+  .reel-rail--left {
+    left: 6px;
+  }
+  .reel-rail--right {
+    right: 6px;
+  }
+
+  /* ── Reel strip: the top/bottom sprocket rails that turn the whole carousel row
+     into a strip of film — the posters read as frames threaded between them. The
+     hole pattern's background-position is driven by --reel-scroll-x (set in JS on
+     scroll), so the perforations glide past in sync with the posters, like film
+     actually running through a projector gate rather than a static border. ── */
+  .reel-strip {
+    position: relative;
+    height: 9px;
+    margin: 0 2px;
+    border-radius: 5px;
+    opacity: 0.8;
+    background:
+      radial-gradient(circle at center, var(--void) 2.3px, transparent 2.5px) 0 center / 24px 100% repeat-x,
+      linear-gradient(90deg, rgb(var(--amber-rgb) / 0.55), rgb(var(--amber-rgb) / 0.32) 50%, rgb(var(--amber-rgb) / 0.55));
+    background-position-x: var(--reel-scroll-x, 0px);
+    box-shadow: 0 0 8px rgb(var(--amber-rgb) / 0.18);
+  }
+  .reel-strip--top {
+    margin-bottom: 8px;
+  }
+  .reel-strip--bottom {
+    margin-top: 8px;
+  }
+
   /* ── Editorial helpers ── */
   .text-gold {
     background: linear-gradient(135deg, var(--amber-bright) 0%, var(--amber) 42%, var(--amber-deep) 100%);

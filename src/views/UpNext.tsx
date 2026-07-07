@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { PlayCircle, Check, Undo2, Clock, Bookmark } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -76,10 +77,15 @@ function EmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
 // ─── Live (in-progress) card ─────────────────────────────────────────────────
 
 function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: (snapshot: UpNextEntry, undo: PendingUndo) => void; delayMs?: number }) {
-  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-  const logNextEpisodeWatch = useAppStore((s) => s.logNextEpisodeWatch)
-  const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
-  const isSharedView = useAppStore((s) => s.isSharedView)
+  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
+  const { openDetailDrawer, logNextEpisodeWatch, deleteEpisodeWatchEvent, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      openDetailDrawer: s.openDetailDrawer,
+      logNextEpisodeWatch: s.logNextEpisodeWatch,
+      deleteEpisodeWatchEvent: s.deleteEpisodeWatchEvent,
+      isSharedView: s.isSharedView
+    }))
+  )
 
   const { title, season, episode, watchedCount, totalCount } = entry
   const epName = episode.episodeName ?? `Episode ${episode.episodeNumber}`
@@ -169,10 +175,15 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
 // ─── Caught-up (just-finished) card ──────────────────────────────────────────
 
 function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNextEntry; undo: PendingUndo; onDismiss: (titleId: string) => void; delayMs?: number }) {
-  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-  const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
-  const updateTitle = useAppStore((s) => s.updateTitle)
-  const isSharedView = useAppStore((s) => s.isSharedView)
+  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
+  const { openDetailDrawer, deleteEpisodeWatchEvent, updateTitle, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      openDetailDrawer: s.openDetailDrawer,
+      deleteEpisodeWatchEvent: s.deleteEpisodeWatchEvent,
+      updateTitle: s.updateTitle,
+      isSharedView: s.isSharedView
+    }))
+  )
   const title = snapshot?.title
 
   // Keep the latest onDismiss without resetting the dismissal timer each render.

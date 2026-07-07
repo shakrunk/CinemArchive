@@ -298,11 +298,12 @@ function FriendsSection() {
 // ─── Recommendations inbox ────────────────────────────────────────────────────
 
 function InboxSection() {
-  const { titles, openDetailDrawer, openAddTitlePreselected } = useAppStore(
+  const { titles, openDetailDrawer, openAddTitlePreselected, requestView } = useAppStore(
     useShallow((s) => ({
       titles: s.titles,
       openDetailDrawer: s.openDetailDrawer,
       openAddTitlePreselected: s.openAddTitlePreselected,
+      requestView: s.requestView,
     }))
   )
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
@@ -371,7 +372,15 @@ function InboxSection() {
         {loading ? (
           <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading recommendations...</div>
         ) : recommendations.length === 0 ? (
-          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</div>
+          <div className="flex flex-col items-center justify-center py-6 gap-3">
+          <p className="text-center text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</p>
+          <button
+            onClick={() => requestView('library')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          >
+            Browse Library
+          </button>
+        </div>
         ) : (
           recommendations.map((r) => {
             const owned = titles.some((t) => t.tmdbId === r.tmdbId && t.type === r.type)
@@ -446,6 +455,7 @@ function activityVerb(type: ActivityEvent['type']): string {
 function ActivitySection() {
   const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const requestView = useAppStore((s) => s.requestView)
   const [feed, setFeed] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -500,7 +510,15 @@ function ActivitySection() {
         {loading ? (
           <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading activity...</div>
         ) : feed.length === 0 ? (
-          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No friend activity yet.</div>
+          <div className="flex flex-col items-center justify-center py-6 gap-3">
+          <p className="text-center text-xs font-sans text-muted-foreground italic">No friend activity yet.</p>
+          <button
+            onClick={() => requestView('discover')}
+            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          >
+            Discover Titles
+          </button>
+        </div>
         ) : (
           <>
             {feed.map((e) => (

@@ -54,3 +54,6 @@
 ## 2024-07-07 - Actionable Empty States in Friends View
 **Learning:** Empty states in social/activity sections (like "No friend activity yet" or "Nothing sent your way yet") leave users at a dead end if they only show informative text. They should guide users toward relevant actions like browsing the library or discovering titles to encourage interaction.
 **Action:** When implementing empty states, always include a relevant call-to-action button (using `requestView` or similar app actions) rather than just passive text.
+## 2024-07-07 - Empty State Visual Consistency
+**Learning:** In AddTitleWorkflow.tsx, the initial empty state features a stylized search icon in a circle, but the "no results" state lacked this visual anchor, making it feel less polished and inconsistent.
+**Action:** When designing or updating empty states, ensure visual consistency by reusing established empty-state icons or illustrations (like a muted `<Search />` icon) to anchor the message and make the interface more pleasant to use.

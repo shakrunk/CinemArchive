@@ -23,9 +23,31 @@ npm run lint       # ESLint
 
 ---
 
-## Git Conventions
+## Verification
+
+After every code change, run typecheck, lint, and build before committing; do not consider a task complete until all gates pass.
+
+---
+
+## Git & Commit Conventions
+
+Always create atomic, logically-grouped commits with professional messages, and NEVER add Claude/Co-Authored-By self-attribution to commits or PRs.
 
 **Never add self-attribution to commits or PRs.** Do not include `Co-Authored-By: Claude`, "Generated with Claude Code", or any similar trailer/line in commit messages or PR descriptions in this repo. This is enforced via `attribution.commit` / `attribution.pr` (both set to `""`) in `.claude/settings.json`, but follow it even if editing commit messages by hand.
+
+Before committing, check `git diff --stat` to confirm the diff matches the intended atomic scope; watch for CRLF/LF line-ending normalization silently swallowing unrelated changes.
+
+---
+
+## Branching & Release
+
+When targeting a version-bump or release PR, target `main` (not `dev`) if commits already exist in dev; confirm branch topology before opening the PR.
+
+---
+
+## Dependencies
+
+Do not revert dependency migrations as suspected supply-chain issues without verifying against the official package registry first.
 
 ---
 

@@ -58,8 +58,8 @@
     /* ── Theme-independent constants ──
        Poster art is a cinema artifact (stays dark in both themes) and text over
        poster scrims / the noir takeover must stay light regardless of theme. */
-    --ivory: 243 234 217;     /* constant light — text over dark art */
-    --poster-ink: 17 13 11;   /* constant dark poster surfaces */
+    --ivory: 243 234 217; /* constant light — text over dark art */
+    --poster-ink: 17 13 11; /* constant dark poster surfaces */
     --poster-ink-2: 30 23 20;
     /* Ink-on-amber: text/icons sitting on an amber fill. Constant across themes
        (amber stays a mid-warm tone in both), so it must NOT flip with --void. */
@@ -70,9 +70,9 @@
     --inset-strong: rgba(0, 0, 0, 0.42);
     --wash: rgba(255, 255, 255, 0.05);
 
-    --display: "Fraunces", "Hoefler Text", Georgia, serif;
-    --ui: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
-    --mono: "DM Mono", ui-monospace, Consolas, monospace;
+    --display: 'Fraunces', 'Hoefler Text', Georgia, serif;
+    --ui: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+    --mono: 'DM Mono', ui-monospace, Consolas, monospace;
 
     /* ── Motion ── */
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -118,13 +118,13 @@
      Warm ivory page, espresso ink, deepened gold so accents stay legible on
      light. Only the triples + a few theme-aware tokens flip here; every named
      var and Tailwind color derives from these automatically. */
-  :root[data-theme="light"] {
-    --void-rgb: 244 237 224;   /* ivory page */
+  :root[data-theme='light'] {
+    --void-rgb: 244 237 224; /* ivory page */
     --ink-rgb: 251 246 236;
     --ink-1-rgb: 253 250 243;
     --ink-2-rgb: 255 253 248;
     --ink-3-rgb: 255 255 255;
-    --amber-rgb: 176 116 31;    /* deepened so it reads on ivory */
+    --amber-rgb: 176 116 31; /* deepened so it reads on ivory */
     --amber-bright-rgb: 213 154 68;
     --amber-muted-rgb: 154 106 42;
     --amber-deep-rgb: 138 86 22;
@@ -132,7 +132,7 @@
     --moon-rgb: 74 122 150;
     --ember-rgb: 192 74 45;
     --ember-soft-rgb: 200 96 68;
-    --paper-rgb: 43 33 24;      /* espresso text */
+    --paper-rgb: 43 33 24; /* espresso text */
     --paper-dim-rgb: 95 84 70;
     --paper-faint-rgb: 140 127 108;
 
@@ -144,7 +144,8 @@
     --wash: rgba(40, 28, 16, 0.05);
 
     --shadow: 0 24px 50px -30px rgba(60, 40, 20, 0.3), 0 4px 12px -8px rgba(60, 40, 20, 0.18);
-    --shadow-lift: 0 40px 80px -34px rgba(60, 40, 20, 0.34), 0 10px 26px -14px rgba(60, 40, 20, 0.22);
+    --shadow-lift:
+      0 40px 80px -34px rgba(60, 40, 20, 0.34), 0 10px 26px -14px rgba(60, 40, 20, 0.22);
     --glow: 0 0 0 1px rgba(176, 116, 31, 0.3), 0 18px 50px -18px rgba(176, 116, 31, 0.22);
 
     /* shadcn semantic tokens (light) */
@@ -173,7 +174,7 @@
      Unlocked by watching Spider-Man: Noir in Black & White.
      Desaturated black-and-white detective-film palette: amber becomes silver,
      everything else stays near-black. */
-  :root[data-theme="noir"] {
+  :root[data-theme='noir'] {
     --void-rgb: 8 8 9;
     --ink-rgb: 15 15 16;
     --ink-1-rgb: 20 20 21;
@@ -228,7 +229,7 @@
   /* ════ MATRIX THEME — "The Construct" ════
      Unlocked by taking the red pill while logging a viewing of The Matrix.
      Green phosphor on black glass; amber becomes terminal green. */
-  :root[data-theme="matrix"] {
+  :root[data-theme='matrix'] {
     --void-rgb: 3 5 3;
     --ink-rgb: 6 12 7;
     --ink-1-rgb: 9 18 10;
@@ -302,7 +303,7 @@
 
   /* Ambient warm base gradient — the room itself */
   body::before {
-    content: "";
+    content: '';
     position: fixed;
     inset: 0;
     z-index: -2;
@@ -313,11 +314,15 @@
       linear-gradient(180deg, #100b09 0%, var(--void) 60%, #080605 100%);
   }
 
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     font-family: var(--display);
   }
 
-  code, .stat, .number {
+  code,
+  .stat,
+  .number {
     font-family: var(--mono);
   }
 
@@ -379,7 +384,12 @@
     inset: 0;
     z-index: 8000;
     pointer-events: none;
-    background: radial-gradient(125% 110% at 50% 42%, transparent 52%, rgba(5, 3, 2, 0.5) 86%, rgba(3, 2, 1, 0.82) 100%);
+    background: radial-gradient(
+      125% 110% at 50% 42%,
+      transparent 52%,
+      rgba(5, 3, 2, 0.5) 86%,
+      rgba(3, 2, 1, 0.82) 100%
+    );
   }
 
   .projector-beam {
@@ -431,67 +441,198 @@
   }
   .reel-scrim--left {
     left: 0;
-    background: linear-gradient(to right, var(--void) 0%, rgb(var(--void-rgb) / 0.8) 55%, transparent 100%);
+    background: linear-gradient(
+      to right,
+      var(--void) 0%,
+      rgb(var(--void-rgb) / 0.8) 55%,
+      transparent 100%
+    );
   }
   .reel-scrim--right {
     right: 0;
-    background: linear-gradient(to left, var(--void) 0%, rgb(var(--void-rgb) / 0.8) 55%, transparent 100%);
+    background: linear-gradient(
+      to left,
+      var(--void) 0%,
+      rgb(var(--void-rgb) / 0.8) 55%,
+      transparent 100%
+    );
   }
 
-  .reel-rail {
-    position: absolute;
-    top: 10px;
-    bottom: 10px;
-    width: 13px;
-    pointer-events: none;
-    z-index: 6;
-    border-radius: 7px;
-    opacity: 0;
-    transform: scaleY(0.92);
-    transition: opacity 0.25s ease, transform 0.25s ease;
-    background:
-      radial-gradient(circle at center, var(--void) 2.6px, transparent 2.8px) center top / 100% 17px repeat-y,
-      linear-gradient(180deg, rgb(var(--amber-rgb) / 0.85), rgb(var(--amber-rgb) / 0.5));
-    box-shadow: 0 0 10px rgb(var(--amber-rgb) / 0.3);
-  }
-  .reel-rail.is-visible {
-    opacity: 0.9;
-    transform: scaleY(1);
-  }
-  .reel-rail--left {
-    left: 6px;
-  }
-  .reel-rail--right {
-    right: 6px;
-  }
-
-  /* ── Reel strip: the top/bottom sprocket rails that turn the whole carousel row
-     into a strip of film — the posters read as frames threaded between them. The
-     hole pattern's background-position is driven by --reel-scroll-x (set in JS on
-     scroll), so the perforations glide past in sync with the posters, like film
-     actually running through a projector gate rather than a static border. ── */
-  .reel-strip {
+  /* ── Film strip: the whole DiscoverCarousel dresses up as a continuous
+        physical strip of 35mm film stock. Deliberately has NO background of its
+        own — matching the design's outer track container exactly (`position:
+        relative; overflow: hidden; box-shadow: ...`, no `background`). Each frame
+        already carries its own opaque black fill (.film-frame), so the row still
+        reads as continuous dark stock; the only areas that were relying on this
+        box's own background were the .discover-grid padding and the .reel-strip
+        sprocket bands — and those are exactly the areas that need to stay truly
+        transparent, so the punched holes are real cutouts to whatever's behind the
+        carousel, not a flat color. ── */
+  .film-strip {
     position: relative;
-    height: 9px;
-    margin: 0 2px;
-    border-radius: 5px;
-    opacity: 0.8;
-    background:
-      radial-gradient(circle at center, var(--void) 2.3px, transparent 2.5px) 0 center / 24px 100% repeat-x,
-      linear-gradient(90deg, rgb(var(--amber-rgb) / 0.55), rgb(var(--amber-rgb) / 0.32) 50%, rgb(var(--amber-rgb) / 0.55));
-    background-position-x: var(--reel-scroll-x, 0px);
-    box-shadow: 0 0 8px rgb(var(--amber-rgb) / 0.18);
+    /* Shared film-stock tone for the sprocket rail (.reel-strip) and the vertical
+         frame dividers (.film-frame's left/right border) — kept as one variable so
+         they can't drift apart. */
+    --film-stock: 38 36 32;
+    /* Clean, straight edge — no border-radius. */
+    border-radius: 0;
+    /* Simplified, subtle inner depth on the top and bottom edges.
+         Makes the strip look like a physical object. */
+    box-shadow:
+      inset 0 2px 5px rgb(0 0 0 / 0.45),
+      inset 0 -2px 5px rgb(0 0 0 / 0.45);
+    overflow: hidden;
+  }
+  /* Continuous, diagonal micro-scratch texture — kept subtle underneath the gloss. */
+  .film-strip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Made much subtler for a premium feel. */
+    opacity: 0.02;
+    background-image: repeating-linear-gradient(
+      100deg,
+      transparent 0 18px,
+      rgb(255 255 255 / 0.5) 18px 19px,
+      transparent 19px 46px
+    );
+  }
+  /* Subtle, low-opacity glossy plastic sheen hugging just the very top edge,
+       like light catching the physical curved edge of the celluloid stock.
+       Made shorter and fainter to prevent art washout. */
+  .film-strip::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Reduced height and opacity for a subtler, non-washing highlight. */
+    height: 18px;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.08) 0%, transparent 100%);
+  }
+
+  /* ── Reel strip: the top/bottom sprocket bands, ported 1:1 from the design
+        (Film Strip Carousel.dc.html) — a single absolutely-positioned div per band,
+        directly inside `.film-strip` alongside the track, with the sprocket-hole
+        mask applied straight to it (no extra pseudo-element wrapper).
+        Two stacked `mask-image` layers do the punching: layer 1 is a horizontal
+        repeating gradient (8px hole / 30.4px stock, every 38.4px) spanning the full
+        height; layer 2 is a static vertical gradient that's transparent only in the
+        middle 8px (3px–11px of this 14px bar). With the default `mask-composite: add`
+        (union of opaque regions), a point is only masked out where BOTH layers are
+        transparent — so the punched hole is an 8×8 rect centered in the bar, not a
+        full-height slot. This is a hard 14px coupling: the 3px/11px/14px stops only
+        line up at that exact height. `.film-strip` has no background of its own, so
+        the holes are real cutouts straight down to whatever's genuinely behind the
+        carousel, not a painted-on rectangle.
+        The dynamic scrolling (`--reel-scroll-x`, kept in sync with the pitch, not
+        the poster-loop width — see DiscoverCarousel) moves layer 1's position,
+        faking the film running through a projector gate. ── */
+  .reel-strip {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 14px;
+    z-index: 5;
+    pointer-events: none;
+
+    /* Solid film edge stock color — this is what gets punched through. */
+    background: rgb(var(--film-stock));
+
+    -webkit-mask-image:
+      repeating-linear-gradient(to right, transparent 0, transparent 8px, black 8px, black 38.4px),
+      linear-gradient(to bottom, black 0, black 3px, transparent 3px, transparent 11px, black 11px, black 14px);
+    mask-image:
+      repeating-linear-gradient(to right, transparent 0, transparent 8px, black 8px, black 38.4px),
+      linear-gradient(to bottom, black 0, black 3px, transparent 3px, transparent 11px, black 11px, black 14px);
+    -webkit-mask-repeat: repeat-x, no-repeat;
+    mask-repeat: repeat-x, no-repeat;
+    -webkit-mask-position: var(--reel-scroll-x, 0px) 0, 0 0;
+    mask-position: var(--reel-scroll-x, 0px) 0, 0 0;
   }
   .reel-strip--top {
-    margin-bottom: 8px;
+    top: 0;
   }
   .reel-strip--bottom {
-    margin-top: 8px;
+    bottom: 0;
+  }
+
+  /* ── Film frame: one contiguous frame containing poster + caption, with
+        thick solid black lines separating it from adjacent frames, creating the
+        vertical 'stamped-cut line' between contiguous items. Zero gaps between
+        frames. Top/bottom padding matches the design's per-frame 14px spacer —
+        flush with the .reel-strip band height, so posters start right at its edge.
+        `.discover-grid` (== the animated track — this is the flex row that gets
+        `transform: translateX(...)` applied every frame in DiscoverCarousel) gets a
+        film-stock-colored backdrop via ::before so a sub-pixel compositing seam
+        between two adjacent frames — the transform can put neighboring frames'
+        edges a device pixel apart, worst in Firefox — reveals more of the same
+        film-stock tone instead of flashing the true page behind `.film-strip`
+        (which must stay transparent for the .reel-strip holes to be real cutouts).
+        The backdrop is inset 2px less than the padding on the vertical axis (12px
+        vs. the 14px padding/.reel-strip height) so it bleeds slightly past the
+        content edge and bridges the same kind of seam at the reel-strip/track
+        boundary — safe because that 2px margin is already covered by the sprocket
+        band's own opaque (non-hole) material regardless (holes only punch the
+        middle 8px of the 14px band, well clear of this edge). Horizontal inset
+        stays flush with the padding (no bleed needed there). ── */
+  .discover-grid {
+    position: relative;
+    /* No gaps between items, making it look like a continuous strip. */
+    gap: 0;
+    padding: 14px 10px;
+  }
+  .discover-grid::before {
+    content: '';
+    position: absolute;
+    inset: 12px 10px;
+    z-index: -1;
+    pointer-events: none;
+    background: rgb(var(--film-stock));
+  }
+  .film-frame {
+    display: flex;
+    flex-direction: column;
+    /* Single, deep black color, not the theme-swapping gradient, to maintain continuous black film stock. */
+    background: #0a0a0a;
+    border-top: 1px solid rgb(0 0 0 / 0.6);
+    border-bottom: 1px solid rgb(0 0 0 / 0.6);
+    /* Thick 5px borders on left and right become a 10px continuous frame separator,
+         in the same film-stock tone as the sprocket rail (--film-stock). */
+    border-left: 5px solid rgb(var(--film-stock));
+    border-right: 5px solid rgb(var(--film-stock));
+    border-radius: 0;
+    overflow: hidden;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  .film-frame:hover {
+    /* Subtle amber frame focus color for the contiguous frames. */
+    border-color: rgb(var(--amber-rgb) / 0.4);
+    box-shadow: none; /* Removed the hover inner shadow for clarity. */
+  }
+  /* Thin black mat around the poster art itself, making it look nested. */
+  .film-frame__window {
+    padding: 3px;
+    background: rgb(0 0 0);
+  }
+  .film-frame__caption {
+    /* Gradient base that fits seamlessly with the frame separator logic. */
+    background: linear-gradient(180deg, rgb(var(--poster-ink) / 0.6), transparent);
   }
 
   /* ── Editorial helpers ── */
   .text-gold {
-    background: linear-gradient(135deg, var(--amber-bright) 0%, var(--amber) 42%, var(--amber-deep) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--amber-bright) 0%,
+      var(--amber) 42%,
+      var(--amber-deep) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -524,7 +665,7 @@
     line-height: 0.96;
     letter-spacing: -0.015em;
     color: var(--paper);
-    font-variation-settings: "opsz" 144;
+    font-variation-settings: 'opsz' 144;
   }
   .display-title em {
     font-weight: 500;
@@ -550,7 +691,7 @@
     font-family: var(--display);
     font-weight: 500;
     letter-spacing: -0.01em;
-    font-variation-settings: "opsz" 50;
+    font-variation-settings: 'opsz' 50;
     color: var(--paper);
   }
   .panel__hint {
@@ -568,10 +709,12 @@
     border-radius: 12px;
     background: linear-gradient(165deg, var(--ink-2), var(--ink-1));
     border: 1px solid var(--line);
-    transition: transform 0.3s var(--ease), border-color 0.3s;
+    transition:
+      transform 0.3s var(--ease),
+      border-color 0.3s;
   }
   .stat-card::after {
-    content: "";
+    content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -587,7 +730,7 @@
     line-height: 1;
     letter-spacing: -0.02em;
     color: var(--paper);
-    font-variation-settings: "opsz" 80;
+    font-variation-settings: 'opsz' 80;
   }
   .stat-num .unit {
     font-size: 0.46em;
@@ -602,7 +745,9 @@
     background: linear-gradient(180deg, var(--amber-bright), var(--amber));
     color: var(--on-amber);
     box-shadow: 0 6px 20px -8px rgba(233, 178, 102, 0.7);
-    transition: transform 0.18s var(--ease), box-shadow 0.25s;
+    transition:
+      transform 0.18s var(--ease),
+      box-shadow 0.25s;
   }
   .btn-amber:hover {
     box-shadow: 0 10px 28px -8px rgba(233, 178, 102, 0.85);
@@ -619,7 +764,11 @@
     border-radius: 7px;
     color: var(--paper-dim);
     border: 1px solid transparent;
-    transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.18s var(--ease);
+    transition:
+      color 0.2s,
+      background 0.2s,
+      border-color 0.2s,
+      transform 0.18s var(--ease);
   }
   .icon-btn:hover {
     color: var(--amber-bright);
@@ -651,7 +800,9 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--paper-dim);
-    transition: color 0.25s, background 0.25s;
+    transition:
+      color 0.25s,
+      background 0.25s;
   }
   .navtab:hover {
     color: var(--paper);
@@ -681,7 +832,9 @@
     font-size: 12.5px;
     font-weight: 600;
     color: var(--paper-dim);
-    transition: color 0.2s, background 0.2s;
+    transition:
+      color 0.2s,
+      background 0.2s;
     white-space: nowrap;
   }
   .seg__btn:hover {
@@ -724,7 +877,10 @@
     background: var(--inset);
     border: 1px solid var(--line);
     border-radius: 7px;
-    transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+    transition:
+      border-color 0.25s,
+      box-shadow 0.25s,
+      background 0.25s;
   }
   .search-field:focus-within {
     border-color: var(--amber-deep);
@@ -771,7 +927,10 @@
     background: rgb(var(--poster-ink-2));
     border: 1px solid var(--line);
     box-shadow: var(--shadow);
-    transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease), border-color 0.3s;
+    transition:
+      transform 0.4s var(--ease),
+      box-shadow 0.4s var(--ease),
+      border-color 0.3s;
     --tint: #6b7480;
   }
   .poster:hover {
@@ -787,11 +946,19 @@
     flex-direction: column;
     padding: 16px 14px;
     background:
-      radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--tint) 42%, transparent), transparent 60%),
-      linear-gradient(170deg, color-mix(in oklab, var(--tint) 30%, rgb(var(--poster-ink-2))) 0%, rgb(var(--poster-ink)) 78%);
+      radial-gradient(
+        120% 80% at 50% 0%,
+        color-mix(in oklab, var(--tint) 42%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(
+        170deg,
+        color-mix(in oklab, var(--tint) 30%, rgb(var(--poster-ink-2))) 0%,
+        rgb(var(--poster-ink)) 78%
+      );
   }
   .poster__face::before {
-    content: "";
+    content: '';
     position: absolute;
     inset: 0;
     background:
@@ -807,19 +974,29 @@
     object-fit: cover;
   }
   .poster.has-img .poster__face {
-    background: linear-gradient(180deg, transparent 35%, rgba(8, 5, 3, 0.55) 62%, rgba(8, 5, 3, 0.94) 100%);
+    background: linear-gradient(
+      180deg,
+      transparent 35%,
+      rgba(8, 5, 3, 0.55) 62%,
+      rgba(8, 5, 3, 0.94) 100%
+    );
   }
   .poster.has-img .poster__face::before {
     opacity: 0;
   }
   /* sheen sweep on hover */
   .poster::after {
-    content: "";
+    content: '';
     position: absolute;
     inset: 0;
     z-index: 3;
     pointer-events: none;
-    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.14) 48%, transparent 62%);
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.14) 48%,
+      transparent 62%
+    );
     transform: translateX(-130%);
     transition: transform 0.7s var(--ease);
   }
@@ -832,7 +1009,7 @@
     line-height: 1.02;
     letter-spacing: -0.015em;
     color: rgb(var(--ivory));
-    font-variation-settings: "opsz" 60;
+    font-variation-settings: 'opsz' 60;
     text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
     display: -webkit-box;
     -webkit-line-clamp: 4;
@@ -846,7 +1023,9 @@
     border: 1px solid var(--line);
     border-radius: 14px;
     box-shadow: var(--shadow);
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    transition:
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
   }
   .card-cinematic:hover {
     border-color: var(--line-2);
@@ -923,62 +1102,133 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 @keyframes grain {
-  0% { background-position: 0 0; }
-  33% { background-position: -28px 12px; }
-  66% { background-position: 22px -18px; }
-  100% { background-position: -12px 16px; }
+  0% {
+    background-position: 0 0;
+  }
+  33% {
+    background-position: -28px 12px;
+  }
+  66% {
+    background-position: 22px -18px;
+  }
+  100% {
+    background-position: -12px 16px;
+  }
 }
 @keyframes flicker {
-  0%, 100% { opacity: 0.9; }
-  48% { opacity: 0.72; }
-  50% { opacity: 1; }
-  52% { opacity: 0.8; }
-  70% { opacity: 0.95; }
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  48% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+  52% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.95;
+  }
 }
 @keyframes drift {
-  from { transform: translateY(0); }
-  to { transform: translateY(-40px); }
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-40px);
+  }
 }
 @keyframes blink {
-  50% { opacity: 0.3; }
+  50% {
+    opacity: 0.3;
+  }
 }
 @keyframes bar-grow {
-  to { transform: scaleX(1); }
+  to {
+    transform: scaleX(1);
+  }
 }
 @keyframes col-grow {
-  to { transform: scaleY(1); }
+  to {
+    transform: scaleY(1);
+  }
 }
 @keyframes spin-slow {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 @keyframes view-in {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 @keyframes poster-in {
-  from { opacity: 0; transform: scale(0.88) translateY(16px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 @keyframes ring-draw {
-  from { stroke-dashoffset: var(--ring-circumference); }
-  to   { stroke-dashoffset: var(--ring-offset); }
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+  to {
+    stroke-dashoffset: var(--ring-offset);
+  }
 }
 @keyframes path-draw {
-  from { stroke-dashoffset: 1; opacity: 0; }
-  15%  { opacity: 1; }
-  to   { stroke-dashoffset: 0; opacity: 1; }
+  from {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
 }
 @keyframes donut-in {
-  from { opacity: 0; transform: scale(0.85); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 @keyframes chart-tip-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Loading placeholder sweep (Ledger skeleton). Neutralized automatically by
@@ -997,7 +1247,9 @@
   animation: skeleton-sweep 1.6s ease-in-out infinite;
 }
 @keyframes skeleton-sweep {
-  to { transform: translateX(100%); }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -1013,8 +1265,13 @@
   background: rgba(0, 0, 0, 0.78);
   transition: opacity 220ms ease;
 }
-.cinema-overlay[data-state='closed'] { opacity: 0; pointer-events: none; }
-.cinema-overlay[data-state='open']   { opacity: 1; }
+.cinema-overlay[data-state='closed'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.cinema-overlay[data-state='open'] {
+  opacity: 1;
+}
 
 .cinema-content {
   position: fixed;
@@ -1039,7 +1296,10 @@
   outline: none;
   transform: translateY(0);
   opacity: 1;
-  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease, filter 800ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease,
+    filter 800ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .cinema-content[data-state='closed'] {
   transform: translateY(100%);
@@ -1057,8 +1317,9 @@
     width: calc(100% - 2rem);
     max-height: min(88vh, calc(100vh - 150px));
     border-radius: 1.25rem;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.75),
-                0 0 0 1px rgba(245, 230, 210, 0.06);
+    box-shadow:
+      0 24px 80px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(245, 230, 210, 0.06);
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
   }
@@ -1077,12 +1338,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.08s !important;
   }
-  .grain, .dust, .projector-beam {
+  .grain,
+  .dust,
+  .projector-beam {
     animation: none !important;
   }
 }
@@ -1094,11 +1359,15 @@
 .series-graph__cell {
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s;
+  transition:
+    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.15s;
 }
 .series-graph__cell:hover {
   transform: scale(1.25);
-  box-shadow: 0 0 0 2px rgba(233, 178, 102, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 0 0 2px rgba(233, 178, 102, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1;
   position: relative;
 }
@@ -1114,7 +1383,7 @@
   left: 15%;
   right: 15%;
   height: 2px;
-  background: rgb(var(--amber-rgb) / 0.80);
+  background: rgb(var(--amber-rgb) / 0.8);
   border-radius: 1px 1px 0 0;
 }
 .series-graph__cell--watched:hover {
@@ -1147,12 +1416,22 @@
 }
 
 @keyframes ep-panel-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 @keyframes spider-noir-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .ep-panel {
   animation: ep-panel-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -1174,11 +1453,11 @@
    between them (grayscale → hue-rotate) without jumping.              */
 body.spider-noir-bw #root,
 body.spider-noir-bw .cinema-content {
-  filter: grayscale(1) contrast(1.0) brightness(1.06) saturate(1) hue-rotate(0deg);
+  filter: grayscale(1) contrast(1) brightness(1.06) saturate(1) hue-rotate(0deg);
 }
 
 body.spider-noir-bw .grain {
-  opacity: 0.10;
+  opacity: 0.1;
 }
 
 body.spider-noir-color #root,
@@ -1191,16 +1470,28 @@ body.spider-noir-color .cinema-content {
    the target filter in over the remaining 35% (≈1300–2000ms). CSS animations
    beat CSS transitions, so this overrides the #root baseline transition. */
 @keyframes spider-noir-bw-filter-in {
-  0%   { filter: grayscale(0) contrast(1) brightness(1) saturate(1) hue-rotate(0deg); }
-  65%  { filter: grayscale(0) contrast(1) brightness(1) saturate(1) hue-rotate(0deg);
-         animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
-  100% { filter: grayscale(1) contrast(1.0) brightness(1.06) saturate(1) hue-rotate(0deg); }
+  0% {
+    filter: grayscale(0) contrast(1) brightness(1) saturate(1) hue-rotate(0deg);
+  }
+  65% {
+    filter: grayscale(0) contrast(1) brightness(1) saturate(1) hue-rotate(0deg);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  100% {
+    filter: grayscale(1) contrast(1) brightness(1.06) saturate(1) hue-rotate(0deg);
+  }
 }
 @keyframes spider-noir-color-filter-in {
-  0%   { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg); }
-  65%  { filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
-         animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
-  100% { filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg); }
+  0% {
+    filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+  }
+  65% {
+    filter: grayscale(0) contrast(1) saturate(1) hue-rotate(0deg);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  100% {
+    filter: grayscale(0) contrast(1.05) saturate(2.2) hue-rotate(-8deg);
+  }
 }
 body.spider-noir-bw-enter #root,
 body.spider-noir-bw-enter .cinema-content {
@@ -1213,13 +1504,22 @@ body.spider-noir-color-enter .cinema-content {
 
 /* ── Silk-thread web animation ── */
 @keyframes spider-silk-draw {
-  from { stroke-dashoffset: var(--dash-len); }
-  to   { stroke-dashoffset: 0; }
+  from {
+    stroke-dashoffset: var(--dash-len);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes spider-silk-fade {
-  0%, 70% { opacity: 1; }
-  100%    { opacity: 0; }
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 body.spider-noir-color .btn-amber {
@@ -1227,19 +1527,32 @@ body.spider-noir-color .btn-amber {
 }
 
 body.spider-noir-color .projector-beam {
-  animation: flicker 7s ease-in-out infinite,
-             spider-noir-beam-hue 8s ease-in-out infinite;
+  animation:
+    flicker 7s ease-in-out infinite,
+    spider-noir-beam-hue 8s ease-in-out infinite;
 }
 
 @keyframes spider-noir-shimmer {
-  0%, 100% { box-shadow: 0 6px 20px -8px rgba(233, 178, 102, 0.7); }
-  50%       { box-shadow: 0 6px 28px -6px rgba(233, 100, 40, 0.95); }
+  0%,
+  100% {
+    box-shadow: 0 6px 20px -8px rgba(233, 178, 102, 0.7);
+  }
+  50% {
+    box-shadow: 0 6px 28px -6px rgba(233, 100, 40, 0.95);
+  }
 }
 
 @keyframes spider-noir-beam-hue {
-  0%, 100% { filter: blur(30px) hue-rotate(0deg); }
-  33%       { filter: blur(30px) hue-rotate(25deg); }
-  66%       { filter: blur(30px) hue-rotate(-90deg); }
+  0%,
+  100% {
+    filter: blur(30px) hue-rotate(0deg);
+  }
+  33% {
+    filter: blur(30px) hue-rotate(25deg);
+  }
+  66% {
+    filter: blur(30px) hue-rotate(-90deg);
+  }
 }
 
 /* ── Command palette ─────────────────────────────────────────────── */
@@ -1252,8 +1565,13 @@ body.spider-noir-color .projector-beam {
   -webkit-backdrop-filter: blur(2px);
   transition: opacity 180ms ease;
 }
-.command-overlay[data-state='closed'] { opacity: 0; pointer-events: none; }
-.command-overlay[data-state='open']   { opacity: 1; }
+.command-overlay[data-state='closed'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.command-overlay[data-state='open'] {
+  opacity: 1;
+}
 
 .command-content {
   position: fixed;
@@ -1271,7 +1589,9 @@ body.spider-noir-color .projector-beam {
   border: 1px solid var(--line);
   background: linear-gradient(180deg, var(--ink-1), rgb(var(--void-rgb) / 0.96));
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8);
-  transition: opacity 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 160ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .command-content[data-state='closed'] {
   opacity: 0;
@@ -1294,7 +1614,9 @@ body.spider-noir-color .projector-beam {
   font-family: inherit;
   font-size: 15px;
 }
-.command-input::placeholder { color: var(--paper-faint); }
+.command-input::placeholder {
+  color: var(--paper-faint);
+}
 .command-kbd {
   font-family: var(--mono);
   font-size: 10px;
@@ -1304,7 +1626,10 @@ body.spider-noir-color .projector-beam {
   border-radius: 5px;
   padding: 2px 6px;
 }
-.command-list { overflow-y: auto; padding: 8px; }
+.command-list {
+  overflow-y: auto;
+  padding: 8px;
+}
 .command-empty {
   padding: 28px 12px;
   text-align: center;
@@ -1321,8 +1646,14 @@ body.spider-noir-color .projector-beam {
   border-radius: 9px;
   transition: background 0.12s ease;
 }
-.command-item.is-active { background: rgba(233, 178, 102, 0.1); }
-.command-item__kind { font-family: var(--mono); font-size: 12px; width: 12px; }
+.command-item.is-active {
+  background: rgba(233, 178, 102, 0.1);
+}
+.command-item__kind {
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 12px;
+}
 .command-item__label {
   flex: 1;
   min-width: 0;
@@ -1349,8 +1680,12 @@ body.spider-noir-color .projector-beam {
   animation: none;
   mix-blend-mode: normal;
 }
-::view-transition-new(root) { z-index: 1; }
-::view-transition-old(root) { z-index: 0; }
+::view-transition-new(root) {
+  z-index: 1;
+}
+::view-transition-old(root) {
+  z-index: 0;
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    LIGHT THEME ATMOSPHERE OVERRIDES
@@ -1358,20 +1693,25 @@ body.spider-noir-color .projector-beam {
    specificity. The room's grain/vignette/dust/beam are tuned for daylight:
    grain multiplies instead of overlays, motes darken, glows soften.
    ════════════════════════════════════════════════════════════════════════ */
-:root[data-theme="light"] body::before {
+:root[data-theme='light'] body::before {
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(176, 116, 31, 0.08), transparent 45%),
     radial-gradient(90% 70% at 88% 8%, rgba(74, 122, 150, 0.06), transparent 55%),
     linear-gradient(180deg, #fbf5ea 0%, var(--void) 55%, #ecdfca 100%);
 }
-:root[data-theme="light"] .grain {
+:root[data-theme='light'] .grain {
   mix-blend-mode: multiply;
   opacity: 0.035;
 }
-:root[data-theme="light"] .vignette {
-  background: radial-gradient(125% 110% at 50% 42%, transparent 55%, rgba(120, 90, 50, 0.06) 88%, rgba(90, 65, 35, 0.12) 100%);
+:root[data-theme='light'] .vignette {
+  background: radial-gradient(
+    125% 110% at 50% 42%,
+    transparent 55%,
+    rgba(120, 90, 50, 0.06) 88%,
+    rgba(90, 65, 35, 0.12) 100%
+  );
 }
-:root[data-theme="light"] .dust {
+:root[data-theme='light'] .dust {
   opacity: 0.4;
   background-image:
     radial-gradient(1.5px 1.5px at 20% 30%, rgba(120, 90, 50, 0.35), transparent),
@@ -1379,10 +1719,10 @@ body.spider-noir-color .projector-beam {
     radial-gradient(1.5px 1.5px at 85% 20%, rgba(120, 90, 50, 0.28), transparent),
     radial-gradient(1px 1px at 40% 80%, rgba(120, 90, 50, 0.3), transparent);
 }
-:root[data-theme="light"] .projector-beam {
+:root[data-theme='light'] .projector-beam {
   background: radial-gradient(50% 50% at 50% 50%, rgba(176, 116, 31, 0.1), transparent 70%);
 }
-:root[data-theme="light"] ::selection {
+:root[data-theme='light'] ::selection {
   background: rgba(176, 116, 31, 0.25);
   color: var(--on-amber);
 }
@@ -1392,29 +1732,34 @@ body.spider-noir-color .projector-beam {
    Heavier grain and a harder vignette for a detective-film screening room;
    the projector beam and dust go silver instead of amber.
    ════════════════════════════════════════════════════════════════════════ */
-:root[data-theme="noir"] body::before {
+:root[data-theme='noir'] body::before {
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(200, 200, 205, 0.08), transparent 45%),
     radial-gradient(90% 70% at 88% 8%, rgba(160, 170, 180, 0.05), transparent 55%),
     linear-gradient(180deg, #0e0e0f 0%, var(--void) 60%, #050505 100%);
 }
-:root[data-theme="noir"] .grain {
+:root[data-theme='noir'] .grain {
   opacity: 0.09;
 }
-:root[data-theme="noir"] .vignette {
-  background: radial-gradient(125% 110% at 50% 42%, transparent 48%, rgba(0, 0, 0, 0.58) 86%, rgba(0, 0, 0, 0.88) 100%);
+:root[data-theme='noir'] .vignette {
+  background: radial-gradient(
+    125% 110% at 50% 42%,
+    transparent 48%,
+    rgba(0, 0, 0, 0.58) 86%,
+    rgba(0, 0, 0, 0.88) 100%
+  );
 }
-:root[data-theme="noir"] .dust {
+:root[data-theme='noir'] .dust {
   background-image:
     radial-gradient(1.5px 1.5px at 20% 30%, rgba(220, 220, 224, 0.4), transparent),
     radial-gradient(1px 1px at 70% 60%, rgba(220, 220, 224, 0.32), transparent),
     radial-gradient(1.5px 1.5px at 85% 20%, rgba(220, 220, 224, 0.28), transparent),
     radial-gradient(1px 1px at 40% 80%, rgba(220, 220, 224, 0.32), transparent);
 }
-:root[data-theme="noir"] .projector-beam {
+:root[data-theme='noir'] .projector-beam {
   background: radial-gradient(50% 50% at 50% 50%, rgba(200, 200, 205, 0.12), transparent 70%);
 }
-:root[data-theme="noir"] ::selection {
+:root[data-theme='noir'] ::selection {
   background: rgba(200, 200, 205, 0.28);
   color: #0a0a0a;
 }
@@ -1424,30 +1769,35 @@ body.spider-noir-color .projector-beam {
    Green phosphor glow in place of the amber projector beam; grain reads as
    scanline noise, dust as falling code motes.
    ════════════════════════════════════════════════════════════════════════ */
-:root[data-theme="matrix"] body::before {
+:root[data-theme='matrix'] body::before {
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(74, 222, 128, 0.09), transparent 45%),
     radial-gradient(90% 70% at 88% 8%, rgba(90, 210, 210, 0.05), transparent 55%),
     linear-gradient(180deg, #050b05 0%, var(--void) 60%, #010201 100%);
 }
-:root[data-theme="matrix"] .grain {
+:root[data-theme='matrix'] .grain {
   opacity: 0.06;
   mix-blend-mode: screen;
 }
-:root[data-theme="matrix"] .vignette {
-  background: radial-gradient(125% 110% at 50% 42%, transparent 50%, rgba(0, 8, 2, 0.55) 86%, rgba(0, 5, 1, 0.86) 100%);
+:root[data-theme='matrix'] .vignette {
+  background: radial-gradient(
+    125% 110% at 50% 42%,
+    transparent 50%,
+    rgba(0, 8, 2, 0.55) 86%,
+    rgba(0, 5, 1, 0.86) 100%
+  );
 }
-:root[data-theme="matrix"] .dust {
+:root[data-theme='matrix'] .dust {
   background-image:
     radial-gradient(1.5px 1.5px at 20% 30%, rgba(134, 255, 176, 0.55), transparent),
     radial-gradient(1px 1px at 70% 60%, rgba(134, 255, 176, 0.45), transparent),
     radial-gradient(1.5px 1.5px at 85% 20%, rgba(134, 255, 176, 0.4), transparent),
     radial-gradient(1px 1px at 40% 80%, rgba(134, 255, 176, 0.45), transparent);
 }
-:root[data-theme="matrix"] .projector-beam {
+:root[data-theme='matrix'] .projector-beam {
   background: radial-gradient(50% 50% at 50% 50%, rgba(74, 222, 128, 0.14), transparent 70%);
 }
-:root[data-theme="matrix"] ::selection {
+:root[data-theme='matrix'] ::selection {
   background: rgba(74, 222, 128, 0.3);
   color: #03150a;
 }

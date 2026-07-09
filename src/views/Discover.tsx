@@ -42,7 +42,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
 
   return (
     <div
-      className={cn('discover-card group relative cursor-pointer', className)}
+      className={cn('discover-card film-frame group relative cursor-pointer', className)}
       style={style}
       onClick={() => onSelect(result)}
       role="button"
@@ -50,16 +50,14 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
       aria-label={`View details for ${result.title}`}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(result) } }}
     >
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden border transition-transform duration-200 group-hover:scale-[1.02] group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
-        style={{ background: 'var(--void)', borderColor: 'var(--line)' }}
-      >
+      <div className="relative aspect-[2/3] overflow-hidden film-frame__window transition-transform duration-200 group-hover:scale-[1.015]">
         {result.posterUrl && !imgError ? (
           <img
             src={result.posterUrl}
             alt={result.title}
             loading="lazy"
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-[1px]"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--inset)' }}>
@@ -71,78 +69,89 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
           </div>
         )}
 
-        {/* Gradient + hover content */}
-        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-        <div className="absolute inset-0 flex flex-col justify-end p-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        {/* Base gradient + frame label — always visible, like a printed frame caption */}
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/55 to-transparent" />
+        {/* Stronger scrim on hover, for contrast under the action row */}
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/85 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute inset-0 flex flex-col justify-end p-2.5">
           <p className="font-serif text-[13px] font-semibold text-paper leading-snug line-clamp-2 mb-0.5">
             {result.title}
           </p>
-          <p className="font-mono text-[10px] text-paper-faint mb-1.5">
+          <p className="font-mono text-[10px] text-paper-faint">
             {result.year > 0 ? result.year : ''}
             {result.type === 'tv' && result.seasonCount ? ` · ${result.seasonCount}S` : ''}
           </p>
           {result.genres.length > 0 && (
-            <p className="font-mono text-[9px] text-amber/70 truncate mb-2">
+            <p className="font-mono text-[9px] text-amber/70 truncate mt-1">
               {result.genres.slice(0, 2).join(' · ')}
             </p>
           )}
-          {isOwned ? (
-            <div className="flex items-center gap-1 text-amber text-[10px] font-mono">
-              <Check className="w-3 h-3" />
-              In your library
-            </div>
-          ) : !isSharedView ? (
-            <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-[1500ms]">
-              <button
-                onClick={(e) => { e.stopPropagation(); onAdd(result) }}
-                aria-label={`Add ${result.title} to library`}
-                className="flex items-center justify-center gap-1 flex-1 py-1.5 rounded text-[11px] font-bold transition-colors btn-amber"
-              >
-                <Plus className="w-3 h-3" />
-                Add to Library
-              </button>
 
-              {/* Details hint — expands after a long hover, with tooltip */}
-              <div
-                className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-[1500ms]"
-              >
-                {/* Tooltip — always visible once the wrapper fades in */}
-                <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
-                  <div
-                    className="relative px-2 py-1 rounded shadow-lg"
-                    style={{ background: 'var(--void)', border: '1px solid rgba(233,178,102,0.35)' }}
+          {/* Actions — reveal on hover only. overflow-hidden clips the row's content
+              while collapsed (grid-rows-[0fr]); switched to visible once hovered so the
+              details tooltip — which pops up *above* the row via `bottom-full` — isn't
+              clipped by this same box once expanded. */}
+          <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-200">
+            <div className="overflow-hidden group-hover:overflow-visible">
+              {isOwned ? (
+                <div className="flex items-center gap-1 text-amber text-[10px] font-mono pt-2">
+                  <Check className="w-3 h-3" />
+                  In your library
+                </div>
+              ) : !isSharedView ? (
+                <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-[1500ms] pt-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAdd(result) }}
+                    aria-label={`Add ${result.title} to library`}
+                    className="flex items-center justify-center gap-1 flex-1 py-1.5 rounded text-[11px] font-bold transition-colors btn-amber"
                   >
-                    <p className="font-mono text-[9px] text-paper-faint whitespace-nowrap">Click for more details</p>
-                    <div
-                      className="absolute top-full right-2.5"
-                      style={{
-                        width: 0, height: 0,
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderTop: '4px solid rgba(233,178,102,0.35)',
+                    <Plus className="w-3 h-3" />
+                    Add to Library
+                  </button>
+
+                  {/* Details hint — expands after a long hover, with tooltip */}
+                  <div
+                    className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-[1500ms]"
+                  >
+                    {/* Tooltip — always visible once the wrapper fades in */}
+                    <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
+                      <div
+                        className="relative px-2 py-1 rounded shadow-lg"
+                        style={{ background: 'var(--void)', border: '1px solid rgba(233,178,102,0.35)' }}
+                      >
+                        <p className="font-mono text-[9px] text-paper-faint whitespace-nowrap">Click for more details</p>
+                        <div
+                          className="absolute top-full right-2.5"
+                          style={{
+                            width: 0, height: 0,
+                            borderLeft: '4px solid transparent',
+                            borderRight: '4px solid transparent',
+                            borderTop: '4px solid rgba(233,178,102,0.35)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelect(result)
+                        pushNotification({
+                          message: 'Next time, click on the poster itself to see more details.',
+                          kind: 'tip',
+                          autoClose: 5000,
+                        })
                       }}
-                    />
+                      aria-label={`See details for ${result.title}`}
+                      className="w-full h-[30px] rounded flex items-center justify-center btn-amber"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelect(result)
-                    pushNotification({
-                      message: 'Next time, click on the poster itself to see more details.',
-                      kind: 'tip',
-                      autoClose: 5000,
-                    })
-                  }}
-                  aria-label={`See details for ${result.title}`}
-                  className="w-full h-[30px] rounded flex items-center justify-center btn-amber"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
 
         {/* Always-visible "in library" badge */}
@@ -157,32 +166,40 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
         )}
       </div>
 
-      {/* Title, year, and add button below card — always visible (Netflix-style caption) */}
-      <div className="mt-1.5 px-0.5">
-        <p className="font-serif text-[12px] text-paper leading-snug truncate">{result.title}</p>
-        <div className="flex items-center justify-between gap-1 mt-0.5">
-          <p className="font-mono text-[10px] text-paper-faint truncate">
-            {result.type === 'tv' ? 'TV' : 'Movie'}
-            {result.year > 0 ? ` · ${result.year}` : ''}
-          </p>
-          {isOwned ? (
-            <Check className="w-3 h-3 text-amber shrink-0" />
-          ) : !isSharedView ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onAdd(result) }}
-              aria-label={`Add ${result.title} to library`}
-              className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors btn-amber sm:hidden"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          ) : null}
-        </div>
+      {/* Format + quick-add — the frame's edge-print; title already lives on the poster above */}
+      <div className="film-frame__caption px-1.5 py-1.5 flex items-center justify-between gap-1">
+        <p className="font-mono text-[10px] text-paper-faint truncate">
+          {result.type === 'tv' ? 'TV' : 'Movie'}
+          {result.year > 0 ? ` · ${result.year}` : ''}
+        </p>
+        {isOwned ? (
+          <Check className="w-3 h-3 text-amber shrink-0" />
+        ) : !isSharedView ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdd(result) }}
+            aria-label={`Add ${result.title} to library`}
+            className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors btn-amber sm:hidden"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        ) : null}
       </div>
     </div>
   )
 }
 
-// ─── DiscoverCarousel — horizontal row with edges that dissolve, not clip ─────
+// ─── DiscoverCarousel — a continuously-scrolling film strip, drag-to-scrub ────
+// The track is duplicated once and driven by transform (not native scroll), so it can
+// loop seamlessly: past the end of the first copy, the visible position wraps back to
+// the same spot in the second copy. Speed is applied via requestAnimationFrame directly
+// to the transform + the --reel-scroll-x custom property (which the sprocket-hole masks
+// read), never through React state, so scrolling never triggers a re-render.
+
+const CAROUSEL_SPEED_PX_S = 26
+
+// Sprocket-hole pitch from the .reel-strip mask in index.css (repeating-linear-gradient
+// period, 8px hole + 30.4px stock). Mirror any change to that value here.
+const SPROCKET_PITCH_PX = 38.4
 
 interface DiscoverCarouselProps {
   results: SearchResult[]
@@ -196,82 +213,200 @@ interface DiscoverCarouselProps {
 function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSelect, delays }: DiscoverCarouselProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
+  const markerRef = useRef<HTMLDivElement>(null)
+  const scrollXRef = useRef(0)
+  const singleSetWidthRef = useRef(0)
+  const draggingRef = useRef(false)
+  const dragMovedRef = useRef(false)
+  const dragStartXRef = useRef(0)
+  const dragStartScrollRef = useRef(0)
+  const pausedRef = useRef(false)
+  const reducedMotionRef = useRef(false)
+  const [isGrabbing, setIsGrabbing] = useState(false)
 
-  const updateScrollState = useCallback(() => {
-    const el = trackRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 4)
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
-    // Drives the sprocket-hole background-position so the top/bottom reel strips
-    // glide past in sync with the posters, like film actually threading through a gate.
-    wrapperRef.current?.style.setProperty('--reel-scroll-x', `${-el.scrollLeft}px`)
+  const applyTransform = useCallback(() => {
+    const width = singleSetWidthRef.current
+    if (!trackRef.current || width <= 0) return
+    const normalized = ((scrollXRef.current % width) + width) % width
+    // Snapped to a whole pixel before it hits the DOM (scrollXRef itself stays full
+    // float precision for smooth accumulation). A fractional translateX on the track
+    // lets the compositor round each frame's edge independently, so adjacent frames'
+    // borders can land a device pixel apart — a hairline seam that flickers open onto
+    // whatever's behind on every other frame, worst in Firefox.
+    trackRef.current.style.transform = `translateX(${-Math.round(normalized)}px)`
+    // Drives the sprocket-hole mask-position so the top/bottom reel strips glide past
+    // in sync with the posters, like film actually threading through a projector gate.
+    // Wrapped on a modulus of the hole pitch — NOT the poster-loop width above — so the
+    // hole pattern never jumps out of phase with itself at the loop seam (the loop width
+    // is almost never an exact multiple of the pitch).
+    const maskWrap = SPROCKET_PITCH_PX * 1000
+    const maskShift = ((scrollXRef.current % maskWrap) + maskWrap) % maskWrap
+    wrapperRef.current?.style.setProperty('--reel-scroll-x', `${-maskShift}px`)
+  }, [])
+
+  // Measure the width of one (non-duplicated) copy of the results via a zero-width
+  // marker placed between the two copies — a translateX on the track shifts marker
+  // and track by the same amount, so their gap stays a stable read of the set width.
+  useEffect(() => {
+    function measure() {
+      const track = trackRef.current
+      const marker = markerRef.current
+      if (!track || !marker) return
+      singleSetWidthRef.current = marker.getBoundingClientRect().left - track.getBoundingClientRect().left
+      applyTransform()
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (trackRef.current) ro.observe(trackRef.current)
+    return () => ro.disconnect()
+  }, [results, applyTransform])
+
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+    reducedMotionRef.current = mql.matches
+    const handleChange = () => { reducedMotionRef.current = mql.matches }
+    mql.addEventListener('change', handleChange)
+    return () => mql.removeEventListener('change', handleChange)
   }, [])
 
   useEffect(() => {
-    updateScrollState()
-  }, [results, updateScrollState])
+    if (results.length === 0) return
+    let raf = 0
+    let lastTs: number | null = null
+    function tick(ts: number) {
+      if (lastTs == null) lastTs = ts
+      const dt = (ts - lastTs) / 1000
+      lastTs = ts
+      if (!draggingRef.current && !pausedRef.current && !reducedMotionRef.current) {
+        scrollXRef.current += CAROUSEL_SPEED_PX_S * dt
+        applyTransform()
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [results.length, applyTransform])
 
-  function scroll(dir: 1 | -1) {
-    const el = trackRef.current
-    if (!el) return
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' })
+  function onPointerDown(e: React.PointerEvent) {
+    draggingRef.current = true
+    dragMovedRef.current = false
+    dragStartXRef.current = e.clientX
+    dragStartScrollRef.current = scrollXRef.current
+    setIsGrabbing(true)
+    e.currentTarget.setPointerCapture(e.pointerId)
   }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!draggingRef.current) return
+    const delta = e.clientX - dragStartXRef.current
+    if (Math.abs(delta) > 5) dragMovedRef.current = true
+    scrollXRef.current = dragStartScrollRef.current - delta
+    applyTransform()
+  }
+
+  function endDrag() {
+    draggingRef.current = false
+    setIsGrabbing(false)
+  }
+
+  // Pause on pointer hover (mouse) and on keyboard focus (Tab-ing through cards),
+  // so the strip doesn't slide away from underneath a focused or hovered card.
+  function pause() { pausedRef.current = true }
+  function resume() { pausedRef.current = false }
+
+  // Chevron override — a manual nudge layered on top of the auto-scroll/drag, for
+  // anyone who'd rather page through than wait for the marquee or grab-drag it.
+  // The auto-scroll keeps drifting from wherever this lands, same as after a drag.
+  function scrollByPage(dir: 1 | -1) {
+    const amount = (trackRef.current?.parentElement?.clientWidth ?? 300) * 0.85 * dir
+    scrollXRef.current += amount
+    const track = trackRef.current
+    if (track) track.style.transition = 'transform 0.4s var(--ease, ease)'
+    applyTransform()
+    window.setTimeout(() => { if (track) track.style.transition = '' }, 400)
+  }
+
+  const handleSelect = useCallback((result: SearchResult) => {
+    if (dragMovedRef.current) { dragMovedRef.current = false; return }
+    onSelect(result)
+  }, [onSelect])
+
+  const loopedResults = results.length > 0 ? [...results, ...results] : []
 
   return (
     <div ref={wrapperRef} className="group/carousel -mx-4 sm:-mx-8 px-4 sm:px-8">
-      <div className="reel-strip reel-strip--top" />
+      <div
+        className="film-strip"
+        style={{ cursor: isGrabbing ? 'grabbing' : 'grab', touchAction: 'pan-y', userSelect: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+        onFocusCapture={pause}
+        onBlurCapture={resume}
+        onDragStart={(e) => e.preventDefault()}
+      >
+        {/* Overlaid on the track's own top/bottom edge (not a separate band above/below
+            it), so the punched sprocket holes are real cutouts down to .film-strip's
+            black background — see the .reel-strip comment in index.css. */}
+        <div className="reel-strip reel-strip--top" />
+        <div className="reel-strip reel-strip--bottom" />
 
-      <div className="relative">
-        <div
-          ref={trackRef}
-          onScroll={updateScrollState}
-          className="discover-grid flex gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none"
-        >
-          {results.map((result, i) => (
-            <DiscoverCard
-              key={`${result.type}-${result.tmdbId}`}
-              result={result}
-              isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
-              isSharedView={isSharedView}
-              onAdd={onAdd}
-              onSelect={onSelect}
-              style={{ ['--poster-delay' as string]: `${delays[i] ?? 0}ms` }}
-              className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] snap-start"
-            />
-          ))}
-        </div>
+        <div className="relative">
+          <div ref={trackRef} className="discover-grid flex" style={{ willChange: 'transform' }}>
+            {results.map((result, i) => (
+              <DiscoverCard
+                key={`${result.type}-${result.tmdbId}-a-${i}`}
+                result={result}
+                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isSharedView={isSharedView}
+                onAdd={onAdd}
+                onSelect={handleSelect}
+                style={{ ['--poster-delay' as string]: `${delays[i] ?? 0}ms` }}
+                className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]"
+              />
+            ))}
+            <div ref={markerRef} aria-hidden style={{ width: 0, flex: '0 0 0' }} />
+            {loopedResults.slice(results.length).map((result, i) => (
+              <DiscoverCard
+                key={`${result.type}-${result.tmdbId}-b-${i}`}
+                result={result}
+                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isSharedView={isSharedView}
+                onAdd={onAdd}
+                onSelect={handleSelect}
+                style={{ ['--poster-delay' as string]: `${delays[i] ?? 0}ms` }}
+                className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]"
+              />
+            ))}
+          </div>
 
-        {/* Reel scrim + sprocket rail — a deliberate "more content" affordance, not a fade-out */}
-        <div className={cn('reel-scrim reel-scrim--left', canScrollLeft && 'is-visible')} />
-        <div className={cn('reel-scrim reel-scrim--right', canScrollRight && 'is-visible')} />
-        <div className={cn('reel-rail reel-rail--left', canScrollLeft && 'is-visible')} />
-        <div className={cn('reel-rail reel-rail--right', canScrollRight && 'is-visible')} />
+          {/* Reel vignette — a constant soft edge, not a "more content" affordance,
+              since the strip loops endlessly and there's no true edge to signal. */}
+          <div className="reel-scrim reel-scrim--left is-visible" />
+          <div className="reel-scrim reel-scrim--right is-visible" />
 
-        {canScrollLeft && (
+          {/* Manual override — visible on hover, since the strip is already paused then */}
           <button
-            onClick={() => scroll(-1)}
+            onClick={() => scrollByPage(-1)}
             aria-label="Scroll left"
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 -mt-3 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
+            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
             style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
           >
             <ChevronLeft className="w-4 h-4 text-paper" />
           </button>
-        )}
-        {canScrollRight && (
           <button
-            onClick={() => scroll(1)}
+            onClick={() => scrollByPage(1)}
             aria-label="Scroll right"
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 -mt-3 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
+            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
             style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
           >
             <ChevronRight className="w-4 h-4 text-paper" />
           </button>
-        )}
+        </div>
       </div>
-
-      <div className="reel-strip reel-strip--bottom" />
     </div>
   )
 }

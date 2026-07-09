@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import {
@@ -30,18 +30,19 @@ interface DiscoverCardProps {
   result: SearchResult
   isOwned: boolean
   style?: React.CSSProperties
+  className?: string
   isSharedView: boolean
   onAdd: (result: SearchResult) => void
   onSelect: (result: SearchResult) => void
 }
 
-function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style }: DiscoverCardProps) {
+function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, className }: DiscoverCardProps) {
   const [imgError, setImgError] = useState(false)
   const pushNotification = useAppStore((s) => s.pushNotification)
 
   return (
     <div
-      className="discover-card group relative cursor-pointer"
+      className={cn('discover-card film-frame group relative cursor-pointer', className)}
       style={style}
       onClick={() => onSelect(result)}
       role="button"
@@ -49,16 +50,14 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style }:
       aria-label={`View details for ${result.title}`}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(result) } }}
     >
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden border transition-transform duration-200 group-hover:scale-[1.02] group-hover:shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
-        style={{ background: 'var(--void)', borderColor: 'var(--line)' }}
-      >
+      <div className="relative aspect-[2/3] overflow-hidden film-frame__window transition-transform duration-200 group-hover:scale-[1.015]">
         {result.posterUrl && !imgError ? (
           <img
             src={result.posterUrl}
             alt={result.title}
             loading="lazy"
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-[1px]"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--inset)' }}>
@@ -70,78 +69,89 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style }:
           </div>
         )}
 
-        {/* Gradient + hover content */}
-        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-        <div className="absolute inset-0 flex flex-col justify-end p-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        {/* Base gradient + frame label — always visible, like a printed frame caption */}
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/55 to-transparent" />
+        {/* Stronger scrim on hover, for contrast under the action row */}
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/85 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute inset-0 flex flex-col justify-end p-2.5">
           <p className="font-serif text-[13px] font-semibold text-paper leading-snug line-clamp-2 mb-0.5">
             {result.title}
           </p>
-          <p className="font-mono text-[10px] text-paper-faint mb-1.5">
+          <p className="font-mono text-[10px] text-paper-faint">
             {result.year > 0 ? result.year : ''}
             {result.type === 'tv' && result.seasonCount ? ` · ${result.seasonCount}S` : ''}
           </p>
           {result.genres.length > 0 && (
-            <p className="font-mono text-[9px] text-amber/70 truncate mb-2">
+            <p className="font-mono text-[9px] text-amber/70 truncate mt-1">
               {result.genres.slice(0, 2).join(' · ')}
             </p>
           )}
-          {isOwned ? (
-            <div className="flex items-center gap-1 text-amber text-[10px] font-mono">
-              <Check className="w-3 h-3" />
-              In your library
-            </div>
-          ) : !isSharedView ? (
-            <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-[1500ms]">
-              <button
-                onClick={(e) => { e.stopPropagation(); onAdd(result) }}
-                aria-label={`Add ${result.title} to library`}
-                className="flex items-center justify-center gap-1 flex-1 py-1.5 rounded text-[11px] font-bold transition-colors btn-amber"
-              >
-                <Plus className="w-3 h-3" />
-                Add to Library
-              </button>
 
-              {/* Details hint — expands after a long hover, with tooltip */}
-              <div
-                className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-[1500ms]"
-              >
-                {/* Tooltip — always visible once the wrapper fades in */}
-                <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
-                  <div
-                    className="relative px-2 py-1 rounded shadow-lg"
-                    style={{ background: 'var(--void)', border: '1px solid rgba(233,178,102,0.35)' }}
+          {/* Actions — reveal on hover only. overflow-hidden clips the row's content
+              while collapsed (grid-rows-[0fr]); switched to visible once hovered so the
+              details tooltip — which pops up *above* the row via `bottom-full` — isn't
+              clipped by this same box once expanded. */}
+          <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-200">
+            <div className="overflow-hidden group-hover:overflow-visible">
+              {isOwned ? (
+                <div className="flex items-center gap-1 text-amber text-[10px] font-mono pt-2">
+                  <Check className="w-3 h-3" />
+                  In your library
+                </div>
+              ) : !isSharedView ? (
+                <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-[1500ms] pt-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAdd(result) }}
+                    aria-label={`Add ${result.title} to library`}
+                    className="flex items-center justify-center gap-1 flex-1 py-1.5 rounded text-[11px] font-bold transition-colors btn-amber"
                   >
-                    <p className="font-mono text-[9px] text-paper-faint whitespace-nowrap">Click for more details</p>
-                    <div
-                      className="absolute top-full right-2.5"
-                      style={{
-                        width: 0, height: 0,
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderTop: '4px solid rgba(233,178,102,0.35)',
+                    <Plus className="w-3 h-3" />
+                    Add to Library
+                  </button>
+
+                  {/* Details hint — expands after a long hover, with tooltip */}
+                  <div
+                    className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-[1500ms]"
+                  >
+                    {/* Tooltip — always visible once the wrapper fades in */}
+                    <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
+                      <div
+                        className="relative px-2 py-1 rounded shadow-lg"
+                        style={{ background: 'var(--void)', border: '1px solid rgba(233,178,102,0.35)' }}
+                      >
+                        <p className="font-mono text-[9px] text-paper-faint whitespace-nowrap">Click for more details</p>
+                        <div
+                          className="absolute top-full right-2.5"
+                          style={{
+                            width: 0, height: 0,
+                            borderLeft: '4px solid transparent',
+                            borderRight: '4px solid transparent',
+                            borderTop: '4px solid rgba(233,178,102,0.35)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelect(result)
+                        pushNotification({
+                          message: 'Next time, click on the poster itself to see more details.',
+                          kind: 'tip',
+                          autoClose: 5000,
+                        })
                       }}
-                    />
+                      aria-label={`See details for ${result.title}`}
+                      className="w-full h-[30px] rounded flex items-center justify-center btn-amber"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelect(result)
-                    pushNotification({
-                      message: 'Next time, click on the poster itself to see more details.',
-                      kind: 'tip',
-                      autoClose: 5000,
-                    })
-                  }}
-                  aria-label={`See details for ${result.title}`}
-                  className="w-full h-[30px] rounded flex items-center justify-center btn-amber"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
 
         {/* Always-visible "in library" badge */}
@@ -156,27 +166,322 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style }:
         )}
       </div>
 
-      {/* Mobile: title, year, and add button below card (hover doesn't work on touch) */}
-      <div className="mt-1.5 sm:hidden px-0.5">
-        <p className="font-serif text-[12px] text-paper leading-snug truncate">{result.title}</p>
-        <div className="flex items-center justify-between gap-1 mt-0.5">
-          <p className="font-mono text-[10px] text-paper-faint">
-            {result.year > 0 ? result.year : ''}
-            {result.type === 'tv' && result.seasonCount ? ` · ${result.seasonCount}S` : ''}
-          </p>
-          {isOwned ? (
-            <Check className="w-3 h-3 text-amber shrink-0" />
-          ) : !isSharedView ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onAdd(result) }}
-              aria-label={`Add ${result.title} to library`}
-              className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors btn-amber"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          ) : null}
+      {/* Format + quick-add — the frame's edge-print; title already lives on the poster above */}
+      <div className="film-frame__caption px-1.5 py-1.5 flex items-center justify-between gap-1">
+        <p className="font-mono text-[10px] text-paper-faint truncate">
+          {result.type === 'tv' ? 'TV' : 'Movie'}
+          {result.year > 0 ? ` · ${result.year}` : ''}
+        </p>
+        {isOwned ? (
+          <Check className="w-3 h-3 text-amber shrink-0" />
+        ) : !isSharedView ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdd(result) }}
+            aria-label={`Add ${result.title} to library`}
+            className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-colors btn-amber sm:hidden"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+// ─── DiscoverCarousel — a continuously-scrolling film strip, drag-to-scrub ────
+// The track is duplicated once and driven by transform (not native scroll), so it can
+// loop seamlessly: past the end of the first copy, the visible position wraps back to
+// the same spot in the second copy. Speed is applied via requestAnimationFrame directly
+// to the transform + the --reel-scroll-x custom property (which the sprocket-hole masks
+// read), never through React state, so scrolling never triggers a re-render.
+
+const CAROUSEL_SPEED_PX_S = 26
+
+// Sprocket-hole pitch from the .reel-strip mask in index.css (repeating-linear-gradient
+// period, 8px hole + 30.4px stock). Mirror any change to that value here.
+const SPROCKET_PITCH_PX = 38.4
+
+interface DiscoverCarouselProps {
+  results: SearchResult[]
+  libraryTmdbIds: Set<number>
+  isSharedView: boolean
+  onAdd: (result: SearchResult) => void
+  onSelect: (result: SearchResult) => void
+  delays: number[]
+}
+
+function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSelect, delays }: DiscoverCarouselProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const markerRef = useRef<HTMLDivElement>(null)
+  const scrollXRef = useRef(0)
+  const singleSetWidthRef = useRef(0)
+  const draggingRef = useRef(false)
+  const dragMovedRef = useRef(false)
+  const dragStartXRef = useRef(0)
+  const dragStartScrollRef = useRef(0)
+  const pausedRef = useRef(false)
+  const reducedMotionRef = useRef(false)
+  const [isGrabbing, setIsGrabbing] = useState(false)
+
+  const applyTransform = useCallback(() => {
+    const width = singleSetWidthRef.current
+    if (!trackRef.current || width <= 0) return
+    const normalized = ((scrollXRef.current % width) + width) % width
+    // Snapped to a whole pixel before it hits the DOM (scrollXRef itself stays full
+    // float precision for smooth accumulation). A fractional translateX on the track
+    // lets the compositor round each frame's edge independently, so adjacent frames'
+    // borders can land a device pixel apart — a hairline seam that flickers open onto
+    // whatever's behind on every other frame, worst in Firefox.
+    trackRef.current.style.transform = `translateX(${-Math.round(normalized)}px)`
+    // Drives the sprocket-hole mask-position so the top/bottom reel strips glide past
+    // in sync with the posters, like film actually threading through a projector gate.
+    // Wrapped on a modulus of the hole pitch — NOT the poster-loop width above — so the
+    // hole pattern never jumps out of phase with itself at the loop seam (the loop width
+    // is almost never an exact multiple of the pitch).
+    const maskWrap = SPROCKET_PITCH_PX * 1000
+    const maskShift = ((scrollXRef.current % maskWrap) + maskWrap) % maskWrap
+    wrapperRef.current?.style.setProperty('--reel-scroll-x', `${-maskShift}px`)
+  }, [])
+
+  // Measure the width of one (non-duplicated) copy of the results via a zero-width
+  // marker placed between the two copies — a translateX on the track shifts marker
+  // and track by the same amount, so their gap stays a stable read of the set width.
+  useEffect(() => {
+    function measure() {
+      const track = trackRef.current
+      const marker = markerRef.current
+      if (!track || !marker) return
+      singleSetWidthRef.current = marker.getBoundingClientRect().left - track.getBoundingClientRect().left
+      applyTransform()
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (trackRef.current) ro.observe(trackRef.current)
+    return () => ro.disconnect()
+  }, [results, applyTransform])
+
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+    reducedMotionRef.current = mql.matches
+    const handleChange = () => { reducedMotionRef.current = mql.matches }
+    mql.addEventListener('change', handleChange)
+    return () => mql.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
+    if (results.length === 0) return
+    let raf = 0
+    let lastTs: number | null = null
+    function tick(ts: number) {
+      if (lastTs == null) lastTs = ts
+      const dt = (ts - lastTs) / 1000
+      lastTs = ts
+      if (!draggingRef.current && !pausedRef.current && !reducedMotionRef.current) {
+        scrollXRef.current += CAROUSEL_SPEED_PX_S * dt
+        applyTransform()
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [results.length, applyTransform])
+
+  function onPointerDown(e: React.PointerEvent) {
+    draggingRef.current = true
+    dragMovedRef.current = false
+    dragStartXRef.current = e.clientX
+    dragStartScrollRef.current = scrollXRef.current
+    setIsGrabbing(true)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!draggingRef.current) return
+    const delta = e.clientX - dragStartXRef.current
+    if (Math.abs(delta) > 5) dragMovedRef.current = true
+    scrollXRef.current = dragStartScrollRef.current - delta
+    applyTransform()
+  }
+
+  function endDrag() {
+    draggingRef.current = false
+    setIsGrabbing(false)
+  }
+
+  // Pause on pointer hover (mouse) and on keyboard focus (Tab-ing through cards),
+  // so the strip doesn't slide away from underneath a focused or hovered card.
+  function pause() { pausedRef.current = true }
+  function resume() { pausedRef.current = false }
+
+  // Chevron override — a manual nudge layered on top of the auto-scroll/drag, for
+  // anyone who'd rather page through than wait for the marquee or grab-drag it.
+  // The auto-scroll keeps drifting from wherever this lands, same as after a drag.
+  function scrollByPage(dir: 1 | -1) {
+    const amount = (trackRef.current?.parentElement?.clientWidth ?? 300) * 0.85 * dir
+    scrollXRef.current += amount
+    const track = trackRef.current
+    if (track) track.style.transition = 'transform 0.4s var(--ease, ease)'
+    applyTransform()
+    window.setTimeout(() => { if (track) track.style.transition = '' }, 400)
+  }
+
+  const handleSelect = useCallback((result: SearchResult) => {
+    if (dragMovedRef.current) { dragMovedRef.current = false; return }
+    onSelect(result)
+  }, [onSelect])
+
+  const loopedResults = results.length > 0 ? [...results, ...results] : []
+
+  return (
+    <div ref={wrapperRef} className="group/carousel -mx-4 sm:-mx-8 px-4 sm:px-8">
+      <div
+        className="film-strip"
+        style={{ cursor: isGrabbing ? 'grabbing' : 'grab', touchAction: 'pan-y', userSelect: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+        onFocusCapture={pause}
+        onBlurCapture={resume}
+        onDragStart={(e) => e.preventDefault()}
+      >
+        {/* Overlaid on the track's own top/bottom edge (not a separate band above/below
+            it), so the punched sprocket holes are real cutouts down to .film-strip's
+            black background — see the .reel-strip comment in index.css. */}
+        <div className="reel-strip reel-strip--top" />
+        <div className="reel-strip reel-strip--bottom" />
+
+        <div className="relative">
+          <div ref={trackRef} className="discover-grid flex" style={{ willChange: 'transform' }}>
+            {results.map((result, i) => (
+              <DiscoverCard
+                key={`${result.type}-${result.tmdbId}-a-${i}`}
+                result={result}
+                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isSharedView={isSharedView}
+                onAdd={onAdd}
+                onSelect={handleSelect}
+                style={{ ['--poster-delay' as string]: `${delays[i] ?? 0}ms` }}
+                className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]"
+              />
+            ))}
+            <div ref={markerRef} aria-hidden style={{ width: 0, flex: '0 0 0' }} />
+            {loopedResults.slice(results.length).map((result, i) => (
+              <DiscoverCard
+                key={`${result.type}-${result.tmdbId}-b-${i}`}
+                result={result}
+                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isSharedView={isSharedView}
+                onAdd={onAdd}
+                onSelect={handleSelect}
+                style={{ ['--poster-delay' as string]: `${delays[i] ?? 0}ms` }}
+                className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]"
+              />
+            ))}
+          </div>
+
+          {/* Reel vignette — a constant soft edge, not a "more content" affordance,
+              since the strip loops endlessly and there's no true edge to signal. */}
+          <div className="reel-scrim reel-scrim--left is-visible" />
+          <div className="reel-scrim reel-scrim--right is-visible" />
+
+          {/* Manual override — visible on hover, since the strip is already paused then */}
+          <button
+            onClick={() => scrollByPage(-1)}
+            aria-label="Scroll left"
+            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
+            style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
+          >
+            <ChevronLeft className="w-4 h-4 text-paper" />
+          </button>
+          <button
+            onClick={() => scrollByPage(1)}
+            aria-label="Scroll right"
+            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
+            style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
+          >
+            <ChevronRight className="w-4 h-4 text-paper" />
+          </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── TasteDropdown — themed picker for the "Because you watched" / "More starring" rows ──
+
+interface TasteDropdownOption {
+  id: string
+  label: string
+}
+
+interface TasteDropdownProps {
+  options: TasteDropdownOption[]
+  value: string | null
+  onChange: (id: string) => void
+  ariaLabel: string
+  placeholder?: string
+}
+
+function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Select…' }: TasteDropdownProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  const selected = options.find((o) => o.id === value)
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        disabled={options.length === 0}
+        className="flex items-center gap-1.5 font-mono text-xs rounded-md border px-2.5 py-1.5 text-amber-bright hover:border-amber/40 transition-colors max-w-[220px] disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: 'var(--inset)', borderColor: open ? 'rgba(233,178,102,0.4)' : 'var(--line)' }}
+      >
+        <span className="truncate">{selected?.label ?? placeholder}</span>
+        <ChevronDown className={cn('w-3.5 h-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          className="absolute left-0 top-[calc(100%+6px)] w-56 max-h-64 overflow-y-auto rounded-lg border shadow-2xl z-30 py-1 bg-card scrollbar-thin"
+          style={{ borderColor: 'var(--line)' }}
+        >
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="option"
+              aria-selected={o.id === value}
+              onClick={() => { onChange(o.id); setOpen(false) }}
+              className={cn(
+                'w-full text-left px-3 py-1.5 text-[13px] font-sans truncate transition-colors',
+                o.id === value
+                  ? 'text-amber-bright bg-amber/15'
+                  : 'text-paper-faint hover:text-paper hover:bg-[color:var(--inset-strong)]'
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -471,7 +776,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
                   >
                     <div
                       className="w-full flex items-center justify-center"
-                      style={{ background: 'var(--card)', aspectRatio: '2/3' }}
+                      style={{ background: 'hsl(var(--card))', aspectRatio: '2/3' }}
                     >
                       <User className="w-10 h-10" style={{ color: 'var(--line)' }} />
                     </div>
@@ -497,7 +802,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
                       {c.profileUrl ? (
                         <img src={c.profileUrl} alt={c.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'hsl(var(--card))' }}>
                           <span className="font-serif text-2xl" style={{ color: 'var(--paper-faint)', opacity: 0.4 }}>
                             {c.name.charAt(0).toUpperCase()}
                           </span>
@@ -587,12 +892,69 @@ export function Discover() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [genresExpanded, setGenresExpanded] = useState(true)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   // Fast owned-title lookup by tmdbId
   const libraryTmdbIds = useMemo(
     () => new Set(titles.map((t) => t.tmdbId).filter((id): id is number => id != null)),
     [titles]
   )
+
+  // ── "Because you watched" — front-end only for now, see TODO near becauseWatchedResults ──
+  const [becauseWatchedId, setBecauseWatchedId] = useState<string | null>(null)
+
+  // ── "More starring" — real TMDB filmography via fetchPersonCredits, keyed off library cast ──
+  const [moreStarringPersonId, setMoreStarringPersonId] = useState<number | null>(null)
+  const [moreStarringResults, setMoreStarringResults] = useState<SearchResult[]>([])
+  const [moreStarringLoading, setMoreStarringLoading] = useState(false)
+
+  // Close the filter popover on outside click
+  useEffect(() => {
+    if (!filtersOpen) return
+    function handleClick(e: MouseEvent) {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [filtersOpen])
+
+  // Default the "because you watched" basis to the first library title once titles load
+  useEffect(() => {
+    if (becauseWatchedId === null && titles.length > 0) setBecauseWatchedId(titles[0].id)
+  }, [titles, becauseWatchedId])
+
+  const castOptions = useMemo(() => {
+    const seen = new Map<number, string>()
+    for (const t of titles) {
+      for (const c of t.cast ?? []) {
+        if (!seen.has(c.tmdbPersonId)) seen.set(c.tmdbPersonId, c.name)
+      }
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [titles])
+
+  // Default the "more starring" basis to the first known cast member once library cast loads
+  useEffect(() => {
+    if (moreStarringPersonId === null && castOptions.length > 0) setMoreStarringPersonId(castOptions[0].id)
+  }, [castOptions, moreStarringPersonId])
+
+  // Real filmography lookup — unlike "because you watched" this is fully wired to TMDB
+  useEffect(() => {
+    if (moreStarringPersonId === null) { setMoreStarringResults([]); return }
+    let cancelled = false
+    setMoreStarringLoading(true)
+    fetchPersonCredits(moreStarringPersonId)
+      .then((credits) => {
+        if (cancelled) return
+        setMoreStarringResults(credits.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+      })
+      .catch((err) => { console.error('more starring credits error:', err); if (!cancelled) setMoreStarringResults([]) })
+      .finally(() => { if (!cancelled) setMoreStarringLoading(false) })
+    return () => { cancelled = true }
+  }, [moreStarringPersonId, libraryTmdbIds])
 
   const genres = filterType === 'tv' ? TV_GENRES : MOVIE_GENRES
 
@@ -825,198 +1187,256 @@ export function Discover() {
     })
   }, [displayResults.length])
 
+  const becauseWatchedTitle = useMemo(
+    () => titles.find((t) => t.id === becauseWatchedId) ?? null,
+    [titles, becauseWatchedId]
+  )
+
+  // TODO(backend): this reuses the trending pool as a stand-in "similar titles" feed so
+  // the UI can be built and reviewed now. Replace with a real recommendation call keyed
+  // off `becauseWatchedTitle` (e.g. a media-proxy endpoint wrapping TMDB's
+  // /movie|tv/{id}/recommendations, or a Supabase-side taste model) once that lands.
+  const becauseWatchedResults = useMemo(() => {
+    if (!becauseWatchedTitle) return []
+    return trending.filter(
+      (r) => r.tmdbId !== becauseWatchedTitle.tmdbId && (r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId))
+    )
+  }, [becauseWatchedTitle, trending, libraryTmdbIds])
+
+  const becauseWatchedDelays = useMemo(() => {
+    const MAX = 24
+    const n = Math.min(becauseWatchedResults.length, MAX)
+    return Array.from({ length: becauseWatchedResults.length }, (_, i) => {
+      if (i >= MAX) return 0
+      const slot = n > 0 ? (i * 7) % n : 0
+      return slot * 15
+    })
+  }, [becauseWatchedResults.length])
+
+  const moreStarringDelays = useMemo(() => {
+    const MAX = 24
+    const n = Math.min(moreStarringResults.length, MAX)
+    return Array.from({ length: moreStarringResults.length }, (_, i) => {
+      if (i >= MAX) return 0
+      const slot = n > 0 ? (i * 7) % n : 0
+      return slot * 15
+    })
+  }, [moreStarringResults.length])
+
   const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
-      {/* Page header — centered */}
-      <div className="flex items-center justify-center gap-3 mb-5">
-        <Compass className="w-5 h-5 text-amber shrink-0" />
-        <div>
-          <h1 className="font-serif text-2xl font-light text-paper leading-none">Discover</h1>
-          <p className="font-mono text-[11px] text-paper-faint mt-1 tracking-wide">
-            Explore movies &amp; shows not in your library
-          </p>
-        </div>
+      {/* Hero heading — centered */}
+      <div className="text-center mb-7">
+        <h1 className="font-serif text-3xl sm:text-4xl font-bold text-paper leading-tight max-w-xl mx-auto">
+          What's missing from your archive?
+        </h1>
       </div>
 
-      {/* Search — centered */}
-      <div className="relative mb-3 max-w-xl mx-auto">
-        {loading && query.trim() ? (
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="w-5 h-5 border-2 border-amber/20 border-t-amber/70 rounded-full animate-spin" />
-          </div>
-        ) : (
-          <Search
-            className={cn(
-              'absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none transition-colors duration-150',
-              isSearchFocused ? 'text-amber/60' : 'text-paper-faint',
-            )}
+      {/* Search — centered, with filter toggle */}
+      <div className="flex items-center gap-2 mb-5 max-w-xl mx-auto">
+        <div className="relative flex-1">
+          {loading && query.trim() ? (
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="w-5 h-5 border-2 border-amber/20 border-t-amber/70 rounded-full animate-spin" />
+            </div>
+          ) : (
+            <Search
+              className={cn(
+                'absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none transition-colors duration-150',
+                isSearchFocused ? 'text-amber/60' : 'text-paper-faint',
+              )}
+            />
+          )}
+          <input
+            ref={inputRef}
+            type="text"
+            aria-label={SEARCH_PLACEHOLDERS[searchMode]}
+            placeholder={SEARCH_PLACEHOLDERS[searchMode]}
+            value={query}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (query) clearSearch()
+                else inputRef.current?.blur()
+              }
+            }}
+            className="w-full h-12 pl-11 pr-10 rounded-xl border text-base font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-2 focus:ring-amber/30 transition-all duration-150"
+            style={{
+              background: 'var(--inset)',
+              borderColor: isSearchFocused ? 'rgba(233,178,102,0.35)' : 'var(--line)',
+            }}
           />
-        )}
-        <input
-          ref={inputRef}
-          type="text"
-          aria-label={SEARCH_PLACEHOLDERS[searchMode]}
-          placeholder={SEARCH_PLACEHOLDERS[searchMode]}
-          value={query}
-          onChange={(e) => handleSearch(e.target.value)}
-          onFocus={() => setIsSearchFocused(true)}
-          onBlur={() => setIsSearchFocused(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              if (query) clearSearch()
-              else inputRef.current?.blur()
-            }
-          }}
-          className="w-full h-12 pl-11 pr-10 rounded-xl border text-base font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-2 focus:ring-amber/30 transition-all duration-150"
-          style={{
-            background: 'var(--inset)',
-            borderColor: isSearchFocused ? 'rgba(233,178,102,0.35)' : 'var(--line)',
-          }}
-        />
-        {query && (
+          {query && (
+            <button
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter icon — toggles the Titles/People/Studios + Genres popover */}
+        <div className="relative shrink-0" ref={filterPanelRef}>
           <button
-            onClick={clearSearch}
-            aria-label="Clear search"
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-label="Filters"
+            aria-expanded={filtersOpen}
+            className={cn(
+              'w-12 h-12 rounded-xl border flex items-center justify-center transition-colors',
+              filtersOpen || searchMode !== 'titles' || selectedGenreId !== null
+                ? 'text-amber border-amber/40 bg-amber/10'
+                : 'text-paper-faint border-[var(--line)] hover:text-paper'
+            )}
+            style={{ background: filtersOpen ? undefined : 'var(--inset)' }}
           >
-            <X className="w-5 h-5" />
+            <SlidersHorizontal className="w-5 h-5" />
           </button>
-        )}
-      </div>
 
-      {/* Sidebar + content */}
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
-        {/* Sidebar filters */}
-        <aside className="w-full lg:w-[220px] shrink-0 lg:sticky lg:top-24 space-y-5">
-          <div>
-            <h3 className="flex items-center gap-1.5 font-serif text-sm font-semibold text-paper mb-2.5">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-amber" />
-              Filters
-            </h3>
-            <div className="flex gap-1.5 flex-wrap">
-              {([
-                { id: 'titles' as SearchMode, label: 'Titles' },
-                { id: 'people' as SearchMode, label: 'People' },
-                { id: 'studios' as SearchMode, label: 'Studios' },
-              ]).map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => handleSearchModeChange(id)}
-                  className={cn(
-                    'flex-1 lg:flex-none px-3 py-1.5 rounded-md text-xs font-mono border transition-colors',
-                    searchMode === id
-                      ? 'bg-amber/15 border-amber/40 text-amber-bright'
-                      : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-paper-faint/30'
-                  )}
-                  style={{ background: searchMode === id ? undefined : 'var(--inset)' }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="font-serif text-sm font-semibold text-paper mb-2.5">Format</h3>
-            <div className="flex gap-1.5 flex-wrap">
-              {([
-                { id: 'all' as FilterType, label: 'All' },
-                { id: 'movie' as FilterType, label: 'Movies' },
-                { id: 'tv' as FilterType, label: 'TV Shows' },
-              ] as const).map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => handleTypeChange(id)}
-                  className={cn(
-                    'flex-1 lg:flex-none px-3 py-1.5 rounded-md text-xs font-mono border transition-colors',
-                    filterType === id
-                      ? 'bg-amber/15 border-amber/40 text-amber-bright'
-                      : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-paper-faint/30'
-                  )}
-                  style={{ background: filterType === id ? undefined : 'var(--inset)' }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Genres — titles mode only, hidden when search is active */}
-          {searchMode === 'titles' && !query.trim() && (
-            <div>
-              <button
-                onClick={() => setGenresExpanded((v) => !v)}
-                className="w-full flex items-center justify-between font-serif text-sm font-semibold text-paper mb-2.5"
-              >
-                Genres
-                <ChevronDown className={cn('w-3.5 h-3.5 text-paper-faint transition-transform', !genresExpanded && '-rotate-90')} />
-              </button>
-              {genresExpanded && (
-                <div className="space-y-0.5 max-h-64 lg:max-h-none overflow-y-auto scrollbar-thin" role="radiogroup" aria-label="Filter by genre">
-                  <button
-                    onClick={() => handleGenreSelect(null)}
-                    role="radio"
-                    aria-checked={selectedGenreId === null}
-                    className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors"
-                  >
-                    <span
-                      className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
-                      style={{ borderColor: selectedGenreId === null ? 'var(--amber)' : 'var(--line)' }}
-                    >
-                      {selectedGenreId === null && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--amber)' }} />}
-                    </span>
-                    All
-                  </button>
-                  {genres.map((genre) => (
+          {filtersOpen && (
+            <div
+              className="absolute right-0 top-[calc(100%+8px)] w-72 rounded-xl border shadow-2xl z-30 p-4 space-y-4 bg-card"
+              style={{ borderColor: 'var(--line)' }}
+            >
+              <div>
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.12em] text-paper-faint mb-2">Search by</h3>
+                <div className="flex gap-1.5">
+                  {([
+                    { id: 'titles' as SearchMode, label: 'Titles' },
+                    { id: 'people' as SearchMode, label: 'People' },
+                    { id: 'studios' as SearchMode, label: 'Studios' },
+                  ]).map(({ id, label }) => (
                     <button
-                      key={genre.id}
-                      onClick={() => handleGenreSelect(genre.id)}
-                      role="radio"
-                      aria-checked={selectedGenreId === genre.id}
-                      className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors"
+                      key={id}
+                      onClick={() => handleSearchModeChange(id)}
+                      className={cn(
+                        'flex-1 px-2.5 py-1.5 rounded-md text-xs font-mono border transition-colors',
+                        searchMode === id
+                          ? 'bg-amber/15 border-amber/40 text-amber-bright'
+                          : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-paper-faint/30'
+                      )}
+                      style={{ background: searchMode === id ? undefined : 'var(--inset)' }}
                     >
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
-                        style={{ borderColor: selectedGenreId === genre.id ? 'var(--amber)' : 'var(--line)' }}
-                      >
-                        {selectedGenreId === genre.id && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--amber)' }} />}
-                      </span>
-                      {genre.name}
+                      {label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {searchMode === 'titles' && !query.trim() && (
+                <div>
+                  <button
+                    onClick={() => setGenresExpanded((v) => !v)}
+                    className="w-full flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-paper-faint mb-2"
+                  >
+                    Genres
+                    <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !genresExpanded && '-rotate-90')} />
+                  </button>
+                  {genresExpanded && (
+                    <div className="space-y-0.5 max-h-56 overflow-y-auto scrollbar-thin" role="radiogroup" aria-label="Filter by genre">
+                      <button
+                        onClick={() => handleGenreSelect(null)}
+                        role="radio"
+                        aria-checked={selectedGenreId === null}
+                        className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors"
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
+                          style={{ borderColor: selectedGenreId === null ? 'var(--amber)' : 'var(--line)' }}
+                        >
+                          {selectedGenreId === null && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--amber)' }} />}
+                        </span>
+                        All
+                      </button>
+                      {genres.map((genre) => (
+                        <button
+                          key={genre.id}
+                          onClick={() => handleGenreSelect(genre.id)}
+                          role="radio"
+                          aria-checked={selectedGenreId === genre.id}
+                          className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors"
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
+                            style={{ borderColor: selectedGenreId === genre.id ? 'var(--amber)' : 'var(--line)' }}
+                          >
+                            {selectedGenreId === genre.id && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--amber)' }} />}
+                          </span>
+                          {genre.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
-        </aside>
+        </div>
+      </div>
 
-        {/* Main content */}
-        <div className="flex-1 min-w-0 w-full">
-          {/* Section label */}
-          <div className="flex items-baseline justify-between mb-4">
-            <div className="flex items-center gap-1.5">
-              {showBack && (
-                <button
-                  onClick={clearSearch}
-                  aria-label="Back to search"
-                  className="text-paper-faint hover:text-paper transition-colors"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <h2 className="font-serif text-base font-semibold text-paper">
-                {sectionLabel}
-              </h2>
-            </div>
-            {!loading && !inPickerMode && displayResults.length > 0 && (
+      {/* Format tabs — All / Movies / TV Shows, text style */}
+      <div className="flex items-center justify-center gap-6 mb-8">
+        {([
+          { id: 'all' as FilterType, label: 'Both' },
+          { id: 'movie' as FilterType, label: 'Movies' },
+          { id: 'tv' as FilterType, label: 'TV Shows' },
+        ] as const).map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => handleTypeChange(id)}
+            className={cn(
+              'pb-1.5 border-b-2 font-serif text-lg transition-colors',
+              filterType === id
+                ? 'text-amber-bright border-amber font-semibold'
+                : 'text-paper-faint border-transparent hover:text-paper'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Main content */}
+      <div className="w-full">
+        {/* Section label */}
+        <div className="flex items-baseline justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            {showBack && (
+              <button
+                onClick={clearSearch}
+                aria-label="Back to search"
+                className="text-paper-faint hover:text-paper transition-colors"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <h2 className="font-serif text-lg font-semibold text-paper">
+              {sectionLabel}
+            </h2>
+          </div>
+          {!loading && !inPickerMode && displayResults.length > 0 && (
+            searchMode === 'titles' && !query.trim() && hasMore ? (
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : 'View more'}
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            ) : (
               <span className="font-mono text-[10px] text-paper-faint/60">
                 {displayResults.length} title{displayResults.length !== 1 ? 's' : ''}
               </span>
-            )}
-          </div>
+            )
+          )}
+        </div>
 
           {inPickerMode ? (
             query.trim() ? (
@@ -1079,43 +1499,80 @@ export function Discover() {
               )}
             </div>
           ) : (
-            <div className="discover-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-              {displayResults.map((result, i) => (
-                <DiscoverCard
-                  key={`${result.type}-${result.tmdbId}`}
-                  result={result}
-                  isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
-                  isSharedView={isSharedView}
-                  onAdd={openAddTitlePreselected}
-                  onSelect={setSelectedResult}
-                  style={{ ['--poster-delay' as string]: `${discoverDelays[i]}ms` }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Load more */}
-          {searchMode === 'titles' && !query.trim() && !loading && displayResults.length > 0 && hasMore && (
-            <div className="flex justify-center mt-8">
-              <button
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="px-6 py-2.5 rounded-lg font-mono text-sm border transition-colors hover:border-paper-faint/40 hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}
-              >
-                {loadingMore ? (
-                  <span className="flex items-center gap-2">
-                    <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    Loading…
-                  </span>
-                ) : (
-                  'Load more'
-                )}
-              </button>
-            </div>
+            <DiscoverCarousel
+              results={displayResults}
+              libraryTmdbIds={libraryTmdbIds}
+              isSharedView={isSharedView}
+              onAdd={openAddTitlePreselected}
+              onSelect={setSelectedResult}
+              delays={discoverDelays}
+            />
           )}
         </div>
-      </div>
+
+        {/* Because you watched — placeholder recommendations, see TODO above becauseWatchedResults */}
+        {searchMode === 'titles' && !query.trim() && selectedGenreId === null && titles.length > 0 && (
+          <div className="mt-10">
+            <div className="flex flex-wrap items-center gap-2.5 mb-3">
+              <h2 className="font-serif text-lg font-semibold text-paper">Because you watched</h2>
+              <TasteDropdown
+                options={titles.map((t) => ({ id: t.id, label: t.title }))}
+                value={becauseWatchedId}
+                onChange={setBecauseWatchedId}
+                ariaLabel="Choose a title to base recommendations on"
+              />
+            </div>
+            {becauseWatchedResults.length > 0 ? (
+              <DiscoverCarousel
+                results={becauseWatchedResults}
+                libraryTmdbIds={libraryTmdbIds}
+                isSharedView={isSharedView}
+                onAdd={openAddTitlePreselected}
+                onSelect={setSelectedResult}
+                delays={becauseWatchedDelays}
+              />
+            ) : (
+              <p className="font-mono text-xs text-paper-faint py-6">
+                No suggestions yet — check back once trending titles load.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* More starring — real TMDB filmography for a cast member from the library */}
+        {searchMode === 'titles' && !query.trim() && selectedGenreId === null && castOptions.length > 0 && (
+          <div className="mt-10">
+            <div className="flex flex-wrap items-center gap-2.5 mb-3">
+              <h2 className="font-serif text-lg font-semibold text-paper">More starring</h2>
+              <TasteDropdown
+                options={castOptions.map((c) => ({ id: String(c.id), label: c.name }))}
+                value={moreStarringPersonId != null ? String(moreStarringPersonId) : null}
+                onChange={(id) => setMoreStarringPersonId(Number(id))}
+                ariaLabel="Choose an actor to see more of their titles"
+              />
+            </div>
+            {moreStarringLoading ? (
+              <div className="flex gap-3 overflow-hidden">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
+                ))}
+              </div>
+            ) : moreStarringResults.length > 0 ? (
+              <DiscoverCarousel
+                results={moreStarringResults}
+                libraryTmdbIds={libraryTmdbIds}
+                isSharedView={isSharedView}
+                onAdd={openAddTitlePreselected}
+                onSelect={setSelectedResult}
+                delays={moreStarringDelays}
+              />
+            ) : (
+              <p className="font-mono text-xs text-paper-faint py-6">
+                Nothing else to show — every title with this cast member is already in your archive.
+              </p>
+            )}
+          </div>
+        )}
 
       {/* Detail modal */}
       <DiscoverDetailModal

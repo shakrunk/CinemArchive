@@ -171,13 +171,22 @@ export function Ledger() {
       <div ref={boardRef}>
         {widgets.length === 0 && (
           <div
-            className="rounded-xl border border-dashed py-16 px-6 text-center"
+            className="rounded-xl border border-dashed py-16 px-6 text-center flex flex-col items-center justify-center gap-3"
             style={{ borderColor: paletteOverId === 'end' ? 'var(--amber)' : 'var(--line-2)' }}
           >
             <p className="text-sm text-paper-faint">
               The board is empty.{' '}
-              {editing ? 'Drag widgets here from the palette.' : canEdit ? 'Use “Edit layout” to add widgets.' : ''}
+              {editing ? 'Drag widgets here from the palette.' : ''}
             </p>
+            {!editing && canEdit && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 mt-2"
+              >
+                Edit layout
+              </button>
+            )}
           </div>
         )}
         <div

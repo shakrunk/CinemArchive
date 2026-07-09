@@ -26,3 +26,7 @@
 ## 2025-02-17 - Resolve N+1 Query in Insertion Loops
 **Learning:** Adding a new TV show triggers an N+1 query problem by running separate `supabase.from('episode_crew').insert()` calls for *every single episode* in a loop.
 **Action:** Replace the nested loops with `flatMap` to generate arrays of all items across the entire structure, and then perform bulk inserts.
+
+## 2025-03-02 - Resolve N+1 Query in Metadata Refreshes
+**Learning:** Calling iterative database upserts (`upsertSeasonCastInDb` and `upsertEpisodeCrewInDb`) in `for...of` loops when refreshing TV show metadata or backfilling details creates severe N+1 query bottlenecks.
+**Action:** Replace `for...of` iteration over Supabase inserts/upserts with bulk functions that map all incoming data to a single flat array and call `.upsert()` exactly once.

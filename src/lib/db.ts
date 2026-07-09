@@ -1109,6 +1109,62 @@ export async function upsertTitleCrewInDb(userId: string, titleId: string, crew:
   if (error) console.error('Error upserting title crew:', error)
 }
 
+
+export async function bulkUpsertSeasonCastInDb(
+  userId: string,
+  titleId: string,
+  seasonCastItems: Array<{ seasonId: string; cast: CastMember[] }>
+): Promise<void> {
+  if (!supabase || seasonCastItems.length === 0) return
+
+  const allRows = seasonCastItems.flatMap(({ seasonId, cast }) =>
+    cast.map(c => ({
+      user_id: userId,
+      title_id: titleId,
+      season_id: seasonId,
+      tmdb_person_id: c.tmdbPersonId,
+      name: c.name,
+      character_name: c.character ?? null,
+      episode_count: c.episodeCount ?? null,
+      profile_url: c.profileUrl ?? null,
+      cast_order: c.order,
+    }))
+  )
+
+  if (allRows.length === 0) return
+
+  const { error } = await supabase.from('season_cast').upsert(allRows, {
+    onConflict: 'season_id,tmdb_person_id'
+  })
+  if (error) console.error('Error in bulkUpsertSeasonCastInDb:', error)
+}
+
+export async function bulkUpsertEpisodeCrewInDb(
+  userId: string,
+  titleId: string,
+  episodeCrewItems: Array<{ episodeId: string; crew: EpisodeCrew[] }>
+): Promise<void> {
+  if (!supabase || episodeCrewItems.length === 0) return
+
+  const allRows = episodeCrewItems.flatMap(({ episodeId, crew }) =>
+    crew.map(c => ({
+      user_id: userId,
+      title_id: titleId,
+      episode_id: episodeId,
+      tmdb_person_id: c.tmdbPersonId,
+      name: c.name,
+      job: c.job,
+    }))
+  )
+
+  if (allRows.length === 0) return
+
+  const { error } = await supabase.from('episode_crew').upsert(allRows, {
+    onConflict: 'episode_id,tmdb_person_id,job'
+  })
+  if (error) console.error('Error in bulkUpsertEpisodeCrewInDb:', error)
+}
+
 export async function upsertSeasonCastInDb(
   userId: string,
   titleId: string,

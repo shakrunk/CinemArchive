@@ -1109,14 +1109,14 @@ export async function upsertTitleCrewInDb(userId: string, titleId: string, crew:
   if (error) console.error('Error upserting title crew:', error)
 }
 
-export async function upsertSeasonCastInDb(
+export async function upsertSeasonCastsInDb(
   userId: string,
   titleId: string,
-  seasonId: string,
-  cast: CastMember[]
+  seasons: Array<{ seasonId: string; cast: CastMember[] }>
 ): Promise<void> {
-  if (!supabase || cast.length === 0) return
-  const { error } = await supabase.from('season_cast').upsert(
+  if (!supabase || seasons.length === 0) return
+
+  const rows = seasons.flatMap(({ seasonId, cast }) =>
     cast.map((c) => ({
       user_id: userId,
       title_id: titleId,
@@ -1127,20 +1127,26 @@ export async function upsertSeasonCastInDb(
       episode_count: c.episodeCount ?? null,
       profile_url: c.profileUrl ?? null,
       cast_order: c.order,
-    })),
+    }))
+  )
+
+  if (rows.length === 0) return
+
+  const { error } = await supabase.from('season_cast').upsert(
+    rows,
     { onConflict: 'season_id,tmdb_person_id' }
   )
-  if (error) console.error('Error upserting season cast:', error)
+  if (error) console.error('Error upserting season casts:', error)
 }
 
-export async function upsertEpisodeCrewInDb(
+export async function upsertEpisodeCrewsInDb(
   userId: string,
   titleId: string,
-  episodeId: string,
-  crew: EpisodeCrew[]
+  episodes: Array<{ episodeId: string; crew: EpisodeCrew[] }>
 ): Promise<void> {
-  if (!supabase || crew.length === 0) return
-  const { error } = await supabase.from('episode_crew').upsert(
+  if (!supabase || episodes.length === 0) return
+
+  const rows = episodes.flatMap(({ episodeId, crew }) =>
     crew.map((c) => ({
       user_id: userId,
       title_id: titleId,
@@ -1148,10 +1154,16 @@ export async function upsertEpisodeCrewInDb(
       tmdb_person_id: c.tmdbPersonId,
       name: c.name,
       job: c.job,
-    })),
+    }))
+  )
+
+  if (rows.length === 0) return
+
+  const { error } = await supabase.from('episode_crew').upsert(
+    rows,
     { onConflict: 'episode_id,tmdb_person_id,job' }
   )
-  if (error) console.error('Error upserting episode crew:', error)
+  if (error) console.error('Error upserting episode crews:', error)
 }
 
 export async function deleteViewingFromDb(userId: string, viewingId: string): Promise<void> {

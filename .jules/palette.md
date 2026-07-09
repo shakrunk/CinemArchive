@@ -57,3 +57,6 @@
 ## 2024-07-07 - Empty State Visual Consistency
 **Learning:** In AddTitleWorkflow.tsx, the initial empty state features a stylized search icon in a circle, but the "no results" state lacked this visual anchor, making it feel less polished and inconsistent.
 **Action:** When designing or updating empty states, ensure visual consistency by reusing established empty-state icons or illustrations (like a muted `<Search />` icon) to anchor the message and make the interface more pleasant to use.
+## 2024-11-20 - [Actionable Empty States in Dashboards]
+**Learning:** Empty states in dashboard components (like those in Ledger.tsx) often just display static text (e.g., 'Use "Edit layout" to add widgets.'), which is a dead end. Providing a clear CTA like 'Edit layout' helps the user take the next step.
+**Action:** When working on dashboard panels or data visualization components, ensure any empty states include an actionable CTA button that guides the user on how to populate the data.

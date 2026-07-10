@@ -1,15 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Search, Film, Tv, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
+import { Search, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
+import { PosterThumb } from 'src/components/ui/poster-thumb'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, Season, CastMember, EpisodeCrew } from 'src/store/mockData'
-import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
+import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
 
 // ─── Search hook ─────────────────────────────────────────────────────────────
 
@@ -40,8 +41,6 @@ function useDebouncedSearch(delay = 400) {
 
   return { results, loading, search }
 }
-
-const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // ─── Season scaffolding ──────────────────────────────────────────────────────
 
@@ -503,19 +502,7 @@ export function AddTitleWorkflow() {
                       onClick={() => selectResult(r)}
                       className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left"
                     >
-                      <div className="w-12 shrink-0">
-                        {r.posterUrl ? (
-                          <img src={r.posterUrl} alt={r.title} className="w-full aspect-[2/3] object-cover rounded" />
-                        ) : (
-                          <div className="w-full aspect-[2/3] bg-secondary rounded flex items-center justify-center">
-                            {r.type === 'movie' ? (
-                              <Film className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <Tv className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <PosterThumb src={r.posterUrl} alt={r.title} type={r.type} />
                       <div className="flex-1 min-w-0">
                         <p className="font-sans text-sm text-foreground truncate">{r.title}</p>
                         <p className="font-mono text-xs text-muted-foreground">

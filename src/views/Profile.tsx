@@ -35,29 +35,9 @@ import type { Theme } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
-
-// ─── Shared bits ──────────────────────────────────────────────────────────────
-
-interface Message {
-  type: 'success' | 'error'
-  text: string
-}
-
-function MessageBanner({ message }: { message: Message | null }) {
-  if (!message) return null
-  return (
-    <div
-      className={cn(
-        'p-3 rounded-lg text-xs font-sans leading-normal border',
-        message.type === 'success'
-          ? 'bg-amber/10 border-amber/30 text-amber'
-          : 'bg-destructive/10 border-destructive/30 text-destructive'
-      )}
-    >
-      {message.text}
-    </div>
-  )
-}
+import { MessageBanner, type Message } from 'src/components/ui/message-banner'
+import { Section } from 'src/components/ui/section'
+import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 
 const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: boolean }[] = [
   { id: 'account', label: 'Account', Icon: UserCircle, authOnly: false },
@@ -69,41 +49,6 @@ const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: b
   { id: 'invites', label: 'Invites', Icon: Ticket, authOnly: true },
   { id: 'data', label: 'Data & Portability', Icon: Download, authOnly: false },
 ]
-
-/** Section shell: anchor target + uniform heading/description/card framing. */
-function Section({
-  id,
-  title,
-  Icon,
-  description,
-  children,
-}: {
-  id: string
-  title: string
-  Icon: typeof Shield
-  description?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section id={`settings-${id}`} className="scroll-mt-24">
-      <h2 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-2">
-        <Icon className="w-3.5 h-3.5 text-amber" />
-        {title}
-      </h2>
-      {description && (
-        <p className="font-sans text-xs text-muted-foreground leading-relaxed mb-3 max-w-[60ch]">
-          {description}
-        </p>
-      )}
-      <div
-        className="rounded-xl border p-4 sm:p-5 space-y-4"
-        style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-      >
-        {children}
-      </div>
-    </section>
-  )
-}
 
 function initialsOf(name: string): string {
   return name
@@ -868,9 +813,9 @@ function SharingSection() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading links...</div>
+          <LoadingRow label="Loading links..." />
         ) : activeKeys.length === 0 ? (
-          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No active sharing keys generated.</div>
+          <EmptyRow label="No active sharing keys generated." />
         ) : (
           activeKeys.map((k) => (
             <div key={k.id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
@@ -1039,9 +984,9 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading invites...</div>
+          <LoadingRow label="Loading invites..." />
         ) : codes.length === 0 ? (
-          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No invite codes generated yet.</div>
+          <EmptyRow label="No invite codes generated yet." />
         ) : (
           codes.map((c) => (
             <div key={c.id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">

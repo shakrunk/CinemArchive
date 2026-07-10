@@ -6,6 +6,7 @@ import { Input } from 'src/components/ui/input'
 import { cn } from 'src/lib/utils'
 import { signInWithEmail, signInWithPasskey } from 'src/lib/auth'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
+import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
 
 interface ProfileModalProps {
   open: boolean
@@ -92,25 +93,15 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
         </h2>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Sign in or sign up">
-            {(['signin', 'signup'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="tab"
-                aria-selected={authMode === m}
-                onClick={() => switchAuthMode(m)}
-                className={cn(
-                  'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors',
-                  authMode === m
-                    ? 'border-amber/50 bg-amber/10 text-amber'
-                    : 'border-border bg-secondary/20 text-muted-foreground hover:border-amber/25'
-                )}
-              >
-                {m === 'signin' ? 'Sign In' : 'Sign Up'}
-              </button>
-            ))}
-          </div>
+          <SegmentedToggle
+            ariaLabel="Sign in or sign up"
+            options={[
+              { value: 'signin', label: 'Sign In' },
+              { value: 'signup', label: 'Sign Up' },
+            ]}
+            value={authMode}
+            onChange={switchAuthMode}
+          />
 
           {authMode === 'signin' ? (
             <>

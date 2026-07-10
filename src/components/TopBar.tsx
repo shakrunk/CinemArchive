@@ -1,9 +1,10 @@
-import { Plus, LayoutGrid, List, BarChart3, User, LogIn, PlayCircle, Search, Sun, Moon, Compass, Users, X, Eye } from 'lucide-react'
+import { Plus, LayoutGrid, List, User, LogIn, Search, Sun, Moon, Users, X, Eye } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
-import { useAppStore } from 'src/store/useAppStore'
+import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { toggleTheme } from 'src/lib/theme'
+import { resolveNavIcon } from 'src/lib/navIcons'
 import type { AppView, NavItemId } from 'src/lib/navigation'
 import { ReelMark } from 'src/components/ui/reel-mark'
 import { NotificationCenter } from 'src/components/NotificationCenter'
@@ -14,11 +15,12 @@ interface TopBarProps {
   onProfileClick: () => void
 }
 
-const NAV_META: Record<NavItemId, { label: string; Icon: typeof BarChart3 }> = {
-  discover: { label: 'Discover', Icon: Compass },
-  library: { label: 'The Library', Icon: LayoutGrid },
-  upnext: { label: 'Up Next', Icon: PlayCircle },
-  ledger: { label: 'The Ledger', Icon: BarChart3 },
+// Longer copy than BottomNav.tsx's — has room for full labels (see navigation.ts).
+const NAV_LABELS: Record<NavItemId, string> = {
+  discover: 'Discover',
+  library: 'The Library',
+  upnext: 'Up Next',
+  ledger: 'The Ledger',
 }
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
@@ -48,7 +50,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
     window.location.href = url.toString()
   }
 
-  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  const visibleNav = useVisibleNavItems()
 
   return (
     <header
@@ -81,8 +83,8 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         {/* Pill nav */}
         <nav className="navpill ml-1 hidden sm:flex" aria-label="Main navigation">
           {visibleNav.map((id) => {
-            const { label, Icon: DefaultIcon } = NAV_META[id]
-            const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
+            const label = NAV_LABELS[id]
+            const Icon = resolveNavIcon(id, viewMode)
             return (
               <button
                 key={id}

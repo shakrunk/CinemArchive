@@ -5,7 +5,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { cn, ratingColorVar } from 'src/lib/utils'
 import { deriveRatingDistribution } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel } from '../PanelShell'
+import { Panel, PanelEmpty } from '../PanelShell'
 import { renderStarLabel } from '../labels'
 
 export function RatingDistribution({
@@ -48,15 +48,7 @@ export function RatingDistribution({
       className={className}
     >
       {total === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <p className="text-center text-sm text-paper-faint">No ratings yet</p>
-          <button
-            onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
-          >
-            Browse Library
-          </button>
-        </div>
+        <PanelEmpty message="No ratings yet" />
       ) : (
         <div
           className={cn(

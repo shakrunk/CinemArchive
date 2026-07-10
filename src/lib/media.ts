@@ -71,6 +71,11 @@ export interface SeasonFetchResult {
 const TMDB_IMG = 'https://image.tmdb.org/t/p'
 const TMDB_IMG_W185 = 'https://image.tmdb.org/t/p/w185'
 
+/** Episode-still base URL, shared by consumers that build `stillUrl` fields
+ *  from raw TMDB episode payloads (AddTitleWorkflow, RefreshMetadataModal,
+ *  TitleDetailDrawer, episode-card.tsx). */
+export const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
+
 // ─── Genre Lists (stable TMDB IDs — hardcoded to avoid an extra round-trip) ─
 
 export interface Genre {
@@ -163,6 +168,33 @@ function extractCertification(data: any, type: MediaType): string | undefined {
   return rating && rating.trim() !== '' ? rating.trim() : undefined
 }
 
+/**
+ * Map a raw TMDB cast array into `CastMember[]`. `aggregate` selects the
+ * TV aggregate_credits shape (`roles[0].character`, `total_episode_count`)
+ * vs. the standard credits shape (`character`, `episode_count`).
+ */
+function mapTmdbCast(list: any[], opts: { aggregate?: boolean } = {}): CastMember[] {
+  return list.map((c: any) => ({
+    tmdbPersonId: c.id,
+    name: c.name,
+    character: opts.aggregate ? (c.roles?.[0]?.character || undefined) : (c.character || undefined),
+    episodeCount: opts.aggregate ? (c.total_episode_count ?? undefined) : (c.episode_count ?? undefined),
+    profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
+    order: c.order ?? 0,
+  }))
+}
+
+/** Alternate-push two lists so the top of each stays visible, capped at `limit`. */
+function interleave<T>(a: T[], b: T[], limit: number): T[] {
+  const combined: T[] = []
+  const maxLength = Math.max(a.length, b.length)
+  for (let i = 0; i < maxLength; i++) {
+    if (i < a.length) combined.push(a[i])
+    if (i < b.length) combined.push(b[i])
+  }
+  return combined.slice(0, limit)
+}
+
 function mapSearchItem(item: any, type: MediaType): SearchResult {
   const date = type === 'movie' ? item.release_date : item.first_air_date
   return {
@@ -198,13 +230,7 @@ export async function searchMedia(query: string): Promise<SearchResult[]> {
     const movies = (movieRes.data?.results || []).map((i: any) => mapSearchItem(i, 'movie'))
     const tv = (tvRes.data?.results || []).map((i: any) => mapSearchItem(i, 'tv'))
 
-    const combined: SearchResult[] = []
-    const maxLength = Math.max(movies.length, tv.length)
-    for (let i = 0; i < maxLength; i++) {
-      if (i < movies.length) combined.push(movies[i])
-      if (i < tv.length) combined.push(tv[i])
-    }
-    return combined.slice(0, 15)
+    return interleave(movies, tv, 15)
   }
 
   const q = query.toLowerCase()
@@ -266,19 +292,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     ? (data.aggregate_credits?.cast ?? data.credits?.cast ?? [])
     : (data.credits?.cast ?? [])
 
-  const cast: CastMember[] = rawCast
-    .map((c: any) => ({
-      tmdbPersonId: c.id,
-      name: c.name,
-      character: base.type === 'tv'
-        ? (c.roles?.[0]?.character || undefined)
-        : (c.character || undefined),
-      episodeCount: base.type === 'tv'
-        ? (c.total_episode_count ?? undefined)
-        : undefined,
-      profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
-      order: c.order ?? 0,
-    }))
+  const cast: CastMember[] = mapTmdbCast(rawCast, { aggregate: base.type === 'tv' })
 
   const seenCrewKey = new Set<string>()
   const crew: CrewMember[] = []

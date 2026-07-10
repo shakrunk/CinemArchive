@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Amber-outlined "secondary action" CTA — compact (panel empty-states) and
+// larger (page-level empty-states) flavors.
+export const SECONDARY_AMBER_BUTTON =
+  'text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors'
+export const SECONDARY_AMBER_BUTTON_LG =
+  'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60'
+
 export function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -76,6 +83,10 @@ export function areaPath(points: ChartPoint[], baselineY: number): string {
   const first = points[0]
   const last = points[points.length - 1]
   return `${line} L ${last.x},${baselineY} L ${first.x},${baselineY} Z`
+}
+
+export function decadeOf(year: number): number {
+  return Math.floor(year / 10) * 10
 }
 
 export function getInitials(name: string): string {

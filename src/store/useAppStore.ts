@@ -18,6 +18,7 @@ import {
   newLedgerWidgetId,
   normalizeLedgerWidgets,
 } from '../lib/ledgerPanels'
+import { decadeOf } from '../lib/utils'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
@@ -333,7 +334,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
   if (filters.decades.length > 0) {
     result = result.filter((t) => {
-      const decade = `${Math.floor(t.year / 10) * 10}s`
+      const decade = `${decadeOf(t.year)}s`
       return filters.decades.includes(decade)
     })
   }
@@ -402,6 +403,16 @@ function syncToDb(get: () => AppStore, logMessage: string, dbCall: () => Promise
     console.error(logMessage, err)
     if (failureMessage) get().pushNotification({ message: failureMessage, retry: async () => { await dbCall() } })
   })
+}
+
+// Swap the element at `idx` with its "up"/"down" neighbor. Returns null (no
+// change) when `idx` wasn't found or the neighbor would fall outside the list.
+function swapAdjacent<T>(list: T[], idx: number, direction: 'up' | 'down'): T[] | null {
+  const swapWith = direction === 'up' ? idx - 1 : idx + 1
+  if (idx === -1 || swapWith < 0 || swapWith >= list.length) return null
+  const next = [...list]
+  ;[next[idx], next[swapWith]] = [next[swapWith], next[idx]]
+  return next
 }
 
 // ─── Store ──────────────────────────────────────────────────────────────────
@@ -743,12 +754,8 @@ export const useAppStore = create<AppStore>()(
 
   moveNavItem: (id, direction) =>
     set((s) => {
-      const order = [...s.navPrefs.order]
-      const idx = order.indexOf(id)
-      const swapWith = direction === 'up' ? idx - 1 : idx + 1
-      if (idx === -1 || swapWith < 0 || swapWith >= order.length) return {}
-      ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
-      return { navPrefs: { ...s.navPrefs, order } }
+      const order = swapAdjacent(s.navPrefs.order, s.navPrefs.order.indexOf(id), direction)
+      return order ? { navPrefs: { ...s.navPrefs, order } } : {}
     }),
 
   reorderNav: (order) => set((s) => ({ navPrefs: { ...s.navPrefs, order } })),
@@ -796,12 +803,8 @@ export const useAppStore = create<AppStore>()(
 
   moveLedgerWidget: (id, direction) => {
     set((s) => {
-      const widgets = [...s.ledgerPrefs.widgets]
-      const idx = widgets.findIndex((w) => w.id === id)
-      const swapWith = direction === 'up' ? idx - 1 : idx + 1
-      if (idx === -1 || swapWith < 0 || swapWith >= widgets.length) return {}
-      ;[widgets[idx], widgets[swapWith]] = [widgets[swapWith], widgets[idx]]
-      return { ledgerPrefs: { widgets } }
+      const widgets = swapAdjacent(s.ledgerPrefs.widgets, s.ledgerPrefs.widgets.findIndex((w) => w.id === id), direction)
+      return widgets ? { ledgerPrefs: { widgets } } : {}
     })
     scheduleLedgerLayoutSave(get)
   },
@@ -1220,7 +1223,15 @@ export const useAllNetworks = () => {
 
 export const useAllDecades = () => {
   const titles = useAppStore((s) => s.titles)
-  return useMemo(() => [...new Set(titles.map((t) => `${Math.floor(t.year / 10) * 10}s`))].sort(), [titles])
+  return useMemo(() => [...new Set(titles.map((t) => `${decadeOf(t.year)}s`))].sort(), [titles])
+}
+
+export const useVisibleNavItems = () => {
+  const navPrefs = useAppStore((s) => s.navPrefs)
+  return useMemo(
+    () => navPrefs.order.filter((id) => !navPrefs.hidden.includes(id)),
+    [navPrefs],
+  )
 }
 
 export const useAllLanguages = () => {

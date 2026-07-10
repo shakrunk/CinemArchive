@@ -6,6 +6,7 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
 import { Chip } from 'src/components/ui/chip'
+import { EmptyState } from 'src/components/ui/empty-state'
 import { cn, languageName, staggerDelays } from 'src/lib/utils'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode } from 'src/store/useAppStore'
@@ -261,38 +262,29 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
-function EmptyState() {
+function LibraryEmptyState() {
   const isLibraryEmpty = useAppStore((s) => s.titles.length === 0)
   const resetFilters = useAppStore((s) => s.resetFilters)
   const openAddTitle = useAppStore((s) => s.openAddTitle)
 
-  return (
-    <div className="text-center py-24 px-5 text-paper-faint">
-      <Film className="w-14 h-14 mx-auto mb-5 text-amber-deep opacity-50" />
-      {isLibraryEmpty ? (
-        <>
-          <p className="font-serif text-2xl text-paper-dim font-light">Your archive is empty.</p>
-          <p className="font-sans text-sm mt-2 opacity-70 mb-6">Add your first title to start your collection.</p>
-          <button
-            onClick={openAddTitle}
-            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
-          >
-            Add a title
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="font-serif text-2xl text-paper-dim font-light">No titles match the bill.</p>
-          <p className="font-sans text-sm mt-2 opacity-70">Try a different search or reset the filters.</p>
-          <button
-            onClick={resetFilters}
-            className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
-          >
-            Clear all filters
-          </button>
-        </>
-      )}
-    </div>
+  return isLibraryEmpty ? (
+    <EmptyState
+      Icon={Film}
+      title="Your archive is empty."
+      subtext="Add your first title to start your collection."
+      subtextClassName="mb-6"
+      ctaLabel="Add a title"
+      onCta={openAddTitle}
+    />
+  ) : (
+    <EmptyState
+      Icon={Film}
+      title="No titles match the bill."
+      subtext="Try a different search or reset the filters."
+      ctaLabel="Clear all filters"
+      onCta={resetFilters}
+      ctaClassName="mt-6"
+    />
   )
 }
 
@@ -303,7 +295,7 @@ function PosterWall({ titles }: { titles: Title[] }) {
 
   const delays = useMemo(() => staggerDelays(titles.length), [titles.length])
 
-  if (titles.length === 0) return <EmptyState />
+  if (titles.length === 0) return <LibraryEmptyState />
 
   return (
     <div className="poster-wall">
@@ -324,7 +316,7 @@ function PosterWall({ titles }: { titles: Title[] }) {
 
 function LedgerList({ titles }: { titles: Title[] }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-  if (titles.length === 0) return <EmptyState />
+  if (titles.length === 0) return <LibraryEmptyState />
 
   return (
     <div
@@ -447,7 +439,7 @@ function buildFranchiseGroups(titles: Title[]): FranchiseGroup[] {
 function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: ViewMode }) {
   const groups = useMemo(() => buildFranchiseGroups(titles), [titles])
 
-  if (titles.length === 0) return <EmptyState />
+  if (titles.length === 0) return <LibraryEmptyState />
 
   // Nothing in the current view belongs to a franchise — render flat.
   if (groups.length === 1 && groups[0].name === null) {

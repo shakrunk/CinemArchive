@@ -1,4 +1,16 @@
 import { useAppStore, type Theme } from 'src/store/useAppStore'
+import { prefersReducedMotion } from './motion'
+
+type ViewTransitionResult = { ready: Promise<void>; finished: Promise<void> }
+
+function getStartViewTransition(): ((cb: () => void) => ViewTransitionResult) | undefined {
+  return (document as Document & { startViewTransition?: (cb: () => void) => ViewTransitionResult })
+    .startViewTransition
+}
+
+function computeEndRadius(x: number, y: number): number {
+  return Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+}
 
 // Keep in sync with the inline FOUC script in index.html and the
 // <meta name="theme-color"> defaults.
@@ -45,11 +57,8 @@ function webPolygon(cx: number, cy: number, r: number, innerRatio = 0.72): strin
  *  is still the OLD value, which would make the starburst reveal an unfiltered
  *  page and then pop to noir once the VT ends. */
 export function transitionSpiderNoir(commit: () => void): void {
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  type VT = { ready: Promise<void>; finished: Promise<void> }
-  const startViewTransition = (
-    document as Document & { startViewTransition?: (cb: () => void) => VT }
-  ).startViewTransition
+  const prefersReduced = prefersReducedMotion()
+  const startViewTransition = getStartViewTransition()
 
   if (!startViewTransition || prefersReduced) {
     commit()
@@ -58,10 +67,7 @@ export function transitionSpiderNoir(commit: () => void): void {
 
   const cx = window.innerWidth / 2
   const cy = window.innerHeight / 2
-  const endRadius = Math.hypot(
-    Math.max(cx, window.innerWidth - cx),
-    Math.max(cy, window.innerHeight - cy),
-  )
+  const endRadius = computeEndRadius(cx, cy)
 
   const collapsed = webPolygon(cx, cy, 0)
   const expanded  = webPolygon(cx, cy, endRadius)
@@ -108,12 +114,8 @@ export function toggleTheme(origin?: { clientX: number; clientY: number }): void
     useAppStore.getState().setTheme(next)
   }
 
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const startViewTransition = (
-    document as Document & {
-      startViewTransition?: (cb: () => void) => { ready: Promise<void> }
-    }
-  ).startViewTransition
+  const prefersReduced = prefersReducedMotion()
+  const startViewTransition = getStartViewTransition()
 
   if (!startViewTransition || prefersReduced || !origin) {
     commit()
@@ -122,10 +124,7 @@ export function toggleTheme(origin?: { clientX: number; clientY: number }): void
 
   const x = origin.clientX
   const y = origin.clientY
-  const endRadius = Math.hypot(
-    Math.max(x, window.innerWidth - x),
-    Math.max(y, window.innerHeight - y)
-  )
+  const endRadius = computeEndRadius(x, y)
 
   const transition = startViewTransition.call(document, commit)
   transition.ready

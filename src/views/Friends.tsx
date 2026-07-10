@@ -4,7 +4,6 @@ import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, 
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { ShareScopeEditor } from 'src/components/ShareScopeEditor'
 import {
@@ -21,62 +20,10 @@ import {
   fetchRecommendations, markRecommendationRead, dismissRecommendation, type Recommendation,
   fetchFriendActivityFeed, type ActivityEvent,
 } from 'src/lib/db'
-
-// ─── Shared bits ──────────────────────────────────────────────────────────────
-
-interface Message {
-  type: 'success' | 'error'
-  text: string
-}
-
-function MessageBanner({ message }: { message: Message | null }) {
-  if (!message) return null
-  return (
-    <div
-      className={cn(
-        'p-3 rounded-lg text-xs font-sans leading-normal border',
-        message.type === 'success'
-          ? 'bg-amber/10 border-amber/30 text-amber'
-          : 'bg-destructive/10 border-destructive/30 text-destructive'
-      )}
-    >
-      {message.text}
-    </div>
-  )
-}
-
-/** Section shell: uniform heading/description/card framing (no anchor-scroll needed here — this is its own page, not a settings scroll list). */
-function Section({
-  title,
-  Icon,
-  description,
-  children,
-}: {
-  title: string
-  Icon: typeof Users
-  description?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-2">
-        <Icon className="w-3.5 h-3.5 text-amber" />
-        {title}
-      </h2>
-      {description && (
-        <p className="font-sans text-xs text-muted-foreground leading-relaxed mb-3 max-w-[60ch]">
-          {description}
-        </p>
-      )}
-      <div
-        className="rounded-xl border p-4 sm:p-5 space-y-4"
-        style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-      >
-        {children}
-      </div>
-    </section>
-  )
-}
+import { MessageBanner, type Message } from 'src/components/ui/message-banner'
+import { Section } from 'src/components/ui/section'
+import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
+import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
@@ -196,9 +143,9 @@ function FriendsSection() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading friends...</div>
+          <LoadingRow label="Loading friends..." />
         ) : friendships.length === 0 ? (
-          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No friends yet.</div>
+          <EmptyRow label="No friends yet." />
         ) : (
           friendships.map((f) => (
             <div key={f.friend_user_id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
@@ -370,13 +317,13 @@ function InboxSection() {
     >
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading recommendations...</div>
+          <LoadingRow label="Loading recommendations..." />
         ) : recommendations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-3">
           <p className="text-center text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</p>
           <button
             onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
           >
             Browse Library
           </button>
@@ -508,13 +455,13 @@ function ActivitySection() {
     <Section title="Friend Activity" Icon={Activity} description="What your friends have been adding, watching, and saying lately.">
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading activity...</div>
+          <LoadingRow label="Loading activity..." />
         ) : feed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-3">
           <p className="text-center text-xs font-sans text-muted-foreground italic">No friend activity yet.</p>
           <button
             onClick={() => requestView('discover')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
           >
             Discover Titles
           </button>

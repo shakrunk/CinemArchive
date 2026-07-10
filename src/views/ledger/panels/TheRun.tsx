@@ -6,7 +6,7 @@ import { deriveMonthlySeries } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
-import { Panel } from '../PanelShell'
+import { Panel, PanelEmpty } from '../PanelShell'
 import { monthLabel } from '../labels'
 
 export function TheRun({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
@@ -38,8 +38,6 @@ export function TheRun({ className, settings }: { className?: string; settings?:
     [recent, maxCount],
   )
 
-  const requestView = useAppStore((s) => s.requestView)
-
   return (
     <Panel
       title={settings?.title || 'The run'}
@@ -47,15 +45,7 @@ export function TheRun({ className, settings }: { className?: string; settings?:
       className={className}
     >
       {total === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <p className="text-center text-sm text-paper-faint">No screenings in the past year</p>
-          <button
-            onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
-          >
-            Browse Library
-          </button>
-        </div>
+        <PanelEmpty message="No screenings in the past year" />
       ) : (
         <div>
           <div className="overflow-x-auto overflow-y-hidden scrollbar-thin">

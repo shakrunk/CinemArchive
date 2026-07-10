@@ -1,8 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { X } from 'lucide-react'
 import { modKey } from 'src/lib/utils'
 import { useVisibleNavItems } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS } from 'src/lib/navigation'
+import { ModalCloseButton } from 'src/components/ui/modal-close-button'
 
 interface ShortcutEntry {
   keys: string[]
@@ -74,11 +74,8 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
             >
               Keyboard Shortcuts
             </h2>
-            <DialogPrimitive.Close
-              className="w-7 h-7 flex items-center justify-center text-paper-faint hover:text-paper rounded transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
+            <DialogPrimitive.Close asChild>
+              <ModalCloseButton ariaLabel="Close" className="static" />
             </DialogPrimitive.Close>
           </div>
 

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Play, Pause, X, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize } from 'lucide-react'
+import { Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize } from 'lucide-react'
 import type { TitleVideo } from 'src/lib/media'
 import { SubsectionLabel } from 'src/components/ui/typography'
+import { ModalCloseButton } from 'src/components/ui/modal-close-button'
 
 // ── Minimal YT IFrame API types ───────────────────────────────────────────────
 interface YTWindow extends Window {
@@ -284,29 +285,12 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
         }}
       />
 
-      {/* × Close */}
-      <button
-        type="button"
-        aria-label="Close trailer"
+      <ModalCloseButton
         onClick={(e) => { e.stopPropagation(); onClose() }}
-        className="absolute top-4 right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
-        style={{
-          background: 'rgba(11,9,7,0.75)',
-          color: 'var(--paper-faint)',
-          border: '1px solid rgba(233,178,102,0.15)',
-          backdropFilter: 'blur(6px)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--amber)'
-          e.currentTarget.style.borderColor = 'rgba(233,178,102,0.45)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--paper-faint)'
-          e.currentTarget.style.borderColor = 'rgba(233,178,102,0.15)'
-        }}
-      >
-        <X className="w-4 h-4" />
-      </button>
+        ariaLabel="Close trailer"
+        variant="scrim"
+        className="z-10"
+      />
 
       {/* Main panel */}
       <div

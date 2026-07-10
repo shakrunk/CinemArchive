@@ -24,7 +24,17 @@ interface Badge {
   label: string
   value: string
   color: string
+  /** Box-shadow color on hover — a translucent variant of `color`. Plain hex
+   *  colors derive this via string suffix (see `withAlpha`); `color` values
+   *  that are CSS var() references (e.g. the themed amber) need their own
+   *  alpha-aware token instead, since you can't string-suffix a var(). */
+  glowColor: string
   name: string
+}
+
+/** Hex color + alpha suffix, e.g. withAlpha('#F5C518', '66') → '#F5C51866'. */
+function withAlpha(hex: string, alphaHex: string): string {
+  return `${hex}${alphaHex}`
 }
 
 export function ReviewBadges({
@@ -38,9 +48,9 @@ export function ReviewBadges({
   bechdelScore?: string
 }) {
   const rawBadges: Array<Badge | false> = [
-    imdb != null && { key: 'imdb', label: REVIEW_BADGE_CONFIG.imdb.label, value: `${imdb}/10`, color: REVIEW_BADGE_CONFIG.imdb.color, name: REVIEW_BADGE_CONFIG.imdb.name },
-    rt != null && { key: 'rt', label: REVIEW_BADGE_CONFIG.rt.label, value: `${rt}%`, color: REVIEW_BADGE_CONFIG.rt.color, name: REVIEW_BADGE_CONFIG.rt.name },
-    meta != null && { key: 'meta', label: REVIEW_BADGE_CONFIG.meta.label, value: `${meta}/100`, color: REVIEW_BADGE_CONFIG.meta.color, name: REVIEW_BADGE_CONFIG.meta.name },
+    imdb != null && { key: 'imdb', label: REVIEW_BADGE_CONFIG.imdb.label, value: `${imdb}/10`, color: REVIEW_BADGE_CONFIG.imdb.color, glowColor: withAlpha(REVIEW_BADGE_CONFIG.imdb.color, '66'), name: REVIEW_BADGE_CONFIG.imdb.name },
+    rt != null && { key: 'rt', label: REVIEW_BADGE_CONFIG.rt.label, value: `${rt}%`, color: REVIEW_BADGE_CONFIG.rt.color, glowColor: withAlpha(REVIEW_BADGE_CONFIG.rt.color, '66'), name: REVIEW_BADGE_CONFIG.rt.name },
+    meta != null && { key: 'meta', label: REVIEW_BADGE_CONFIG.meta.label, value: `${meta}/100`, color: REVIEW_BADGE_CONFIG.meta.color, glowColor: withAlpha(REVIEW_BADGE_CONFIG.meta.color, '66'), name: REVIEW_BADGE_CONFIG.meta.name },
   ]
   const badges: Badge[] = rawBadges.filter((b): b is Badge => Boolean(b))
 
@@ -52,7 +62,8 @@ export function ReviewBadges({
     key: 'awards',
     label: 'AWD',
     value: hasAwards ? String(awardsCount) : '—',
-    color: hasAwards ? '#d4a72c' : NO_DATA_COLOR,
+    color: hasAwards ? 'var(--amber)' : NO_DATA_COLOR,
+    glowColor: hasAwards ? 'rgb(var(--amber-rgb) / 0.4)' : withAlpha(NO_DATA_COLOR, '66'),
     name: hasAwards
       ? `${awardsCount} award${awardsCount === 1 ? '' : 's'} won (Wikidata)`
       : 'Awards data unavailable on Wikidata for this title',
@@ -63,6 +74,7 @@ export function ReviewBadges({
     label: 'BDT',
     value: bechdelOutcome === 'pass' ? 'PASS' : bechdelOutcome === 'fail' ? (bechdelScore ?? 'FAIL') : '—',
     color: bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR,
+    glowColor: withAlpha(bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR, '66'),
     name: bechdelOutcome === 'pass'
       ? 'Bechdel test: passes (Wikidata)'
       : bechdelOutcome === 'fail'
@@ -78,7 +90,7 @@ export function ReviewBadges({
           title={b.name}
           className="flex items-center gap-1.5 bg-secondary/60 border border-transparent rounded px-2.5 py-1.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-secondary hover:shadow-[0_4px_12px_-4px_var(--badge-color)] animate-[scaleIn_0.45s_ease-out_forwards]"
           style={{
-            '--badge-color': `${b.color}66`,
+            '--badge-color': b.glowColor,
             animationDelay: entranceDelay(i, 70),
             transform: 'scale(0)',
             opacity: 0,

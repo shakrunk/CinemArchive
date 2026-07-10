@@ -96,6 +96,7 @@ export function ChoiceCard({
     <button
       aria-label={ariaLabel}
       onClick={onClick}
+      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
       style={{
         flex: 1,
         border: `1px solid ${borderColor}`,

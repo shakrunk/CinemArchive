@@ -1,6 +1,6 @@
-import { X } from 'lucide-react'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from './modal-backdrop'
+import { ModalCloseButton } from './modal-close-button'
 
 interface PosterLightboxProps {
   src: string
@@ -14,17 +14,7 @@ export function PosterLightbox({ src, alt, onClose }: PosterLightboxProps) {
 
   return (
     <ModalBackdrop onClose={onClose} ariaLabel={`${alt} poster`} backdropOpacity={0.92}>
-      <button
-        ref={closeButtonRef}
-        onClick={onClose}
-        className="absolute top-4 right-4 flex items-center justify-center w-8 h-8 rounded-full transition-colors"
-        style={{ background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.7)' }}
-        aria-label="Close poster view"
-        onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,1)')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
-      >
-        <X className="w-4 h-4" />
-      </button>
+      <ModalCloseButton ref={closeButtonRef} onClick={onClose} ariaLabel="Close poster view" variant="scrim" />
       <img
         src={largeSrc}
         alt={alt}

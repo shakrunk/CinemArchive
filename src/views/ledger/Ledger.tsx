@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { Pencil, Check, ChevronUp, PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 import { LEDGER_PANEL_LABELS, LEDGER_PANEL_STANDARD_HEIGHT, defaultLedgerWidgets } from 'src/lib/ledgerPanels'
 import { DashHero, StatRibbon } from './LedgerHero'
 import { LedgerSkeleton } from './LedgerSkeleton'
@@ -137,7 +137,7 @@ export function Ledger() {
             <button
               type="button"
               onClick={() => void loadUserLibrary()}
-              className="mt-5 text-xs font-mono text-amber border border-amber/30 rounded-md px-4 py-2 hover:bg-amber/10 transition-colors"
+              className={cn(SECONDARY_AMBER_BUTTON, 'mt-5 px-4 py-2')}
             >
               Try again
             </button>
@@ -182,7 +182,7 @@ export function Ledger() {
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 mt-2"
+                className={cn(SECONDARY_AMBER_BUTTON, 'mt-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
               >
                 Edit layout
               </button>

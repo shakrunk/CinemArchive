@@ -22,7 +22,7 @@ function ColorModePill({ mode, className }: { mode: 'bw' | 'color'; className?: 
         fontSize: '9px',
         letterSpacing: '0.06em',
         background: mode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
-        color: mode === 'bw' ? '#aaa' : 'var(--amber)',
+        color: mode === 'bw' ? 'var(--paper-dim)' : 'var(--amber)',
         border: `1px solid ${mode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
       }}
     >

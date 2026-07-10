@@ -1,7 +1,8 @@
-import { X, Film, Tv } from 'lucide-react'
+import { Film, Tv } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
+import { ModalCloseButton } from 'src/components/ui/modal-close-button'
 import type { CastMember, CrewMember } from 'src/store/mockData'
 
 export interface PersonDetailTarget {
@@ -41,17 +42,12 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
         style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
+        <ModalCloseButton
           ref={closeButtonRef}
           onClick={onClose}
-          className="absolute top-3 right-3 flex items-center justify-center w-7 h-7 rounded-full transition-colors"
-          style={{ color: 'var(--paper-faint)' }}
-          aria-label={`Close ${person.name} details`}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--paper)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--paper-faint)')}
-        >
-          <X className="w-4 h-4" />
-        </button>
+          ariaLabel={`Close ${person.name} details`}
+          className="top-3 right-3"
+        />
 
         {/* Person identity */}
         <div className="flex gap-4 px-5 pt-5 pb-4">

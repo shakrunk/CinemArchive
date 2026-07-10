@@ -15,3 +15,9 @@ export function monthLabel(month: string): string {
   const [y, m] = month.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' })
 }
+
+/** Month label with a 2-digit year suffix ("Mar '25") — for series that span
+ *  more than one calendar year, where a bare month name is ambiguous. */
+export function monthYearLabel(month: string): string {
+  return `${monthLabel(month)} ’${month.slice(2, 4)}`
+}

@@ -2,9 +2,9 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { getInitials } from 'src/lib/utils'
+import { getInitials, rankBubbleAccent } from 'src/lib/utils'
 import { deriveTopActors } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 export function TheEnsemble({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
@@ -12,7 +12,7 @@ export function TheEnsemble({ className, settings }: { className?: string; setti
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
   const browseByPerson = useAppStore((s) => s.browseByPerson)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const actors = useMemo(
     () => deriveTopActors(titles, settings),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,11 +60,7 @@ export function TheEnsemble({ className, settings }: { className?: string; setti
                       ? 'linear-gradient(155deg, var(--amber-bright), var(--amber-deep))'
                       : 'linear-gradient(155deg, var(--ink-3), var(--ink-1))',
                   color: i === 0 ? 'var(--on-amber)' : 'var(--paper-dim)',
-                  border: i === 0 ? 'none' : '1px solid var(--line-2)',
-                  boxShadow: i === 0 ? '0 8px 22px -8px rgba(233,178,102,0.55)' : 'var(--shadow)',
-                  opacity: 0,
-                  transform: 'scale(0)',
-                  animationDelay: `${i * 70}ms`,
+                  ...rankBubbleAccent(i === 0, 22, i * 70),
                 }}
               >
                 {getInitials(a.actor)}

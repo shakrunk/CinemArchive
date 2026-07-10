@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link2, Pencil, Check, X } from 'lucide-react'
 import type { WatchProviders } from 'src/lib/media'
+import { SubsectionLabel } from 'src/components/ui/typography'
 
 function ProviderRow({ label, providers }: { label: string; providers: WatchProviders['flatrate'] }) {
   if (providers.length === 0) return null
@@ -66,7 +67,7 @@ export function WatchProvidersSection({ providers, customUrl, isSharedView, onSa
     }
     return (
       <div>
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Where to Watch</h4>
+        <SubsectionLabel>Where to Watch</SubsectionLabel>
         <a
           href={customUrl}
           target="_blank"
@@ -87,7 +88,7 @@ export function WatchProvidersSection({ providers, customUrl, isSharedView, onSa
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">Where to Watch</h4>
+        <SubsectionLabel className="mb-0">Where to Watch</SubsectionLabel>
         {!isSharedView && !editing && (
           <button
             onClick={() => { setDraft(customUrl ?? ''); setEditing(true) }}

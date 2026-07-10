@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { cn } from 'src/lib/utils'
+import { cn, fmtRuntime } from 'src/lib/utils'
 import type { Title, WatchStatus } from 'src/store/mockData'
 
 interface DynamicPosterProps {
@@ -120,7 +120,7 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
               {title.runtime ? (
                 <>
                   <span className="opacity-40">·</span>
-                  <span>{title.runtime}m</span>
+                  <span>{fmtRuntime(title.runtime)}</span>
                 </>
               ) : null}
             </div>

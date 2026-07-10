@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { toPercent } from 'src/lib/utils'
 import { deriveTimewarp } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
 
@@ -18,7 +19,7 @@ const BUCKET_COLORS = [
 
 export function TheRevivalHouse({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   const { buckets, median, total } = useMemo(
@@ -58,7 +59,7 @@ export function TheRevivalHouse({ className, settings }: { className?: string; s
                   className="font-mono text-[10px] font-medium"
                   style={{ color: i < 3 ? 'var(--on-amber)' : 'var(--paper)' }}
                 >
-                  {Math.round((b.count / total) * 100)}%
+                  {toPercent(b.count, total)}%
                 </span>
               </div>
             ),

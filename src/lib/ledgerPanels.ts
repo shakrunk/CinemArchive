@@ -252,6 +252,13 @@ export function effectiveLedgerSettings(
   }
 }
 
+/** Stable dependency-array key for a widget's settings — plain JSON identity
+ *  rather than object reference, so a `settings` prop with unchanged content
+ *  but a new identity doesn't force a panel's memoized derivation to recompute. */
+export function settingsDepKey(settings?: LedgerWidgetSettings): string {
+  return JSON.stringify(settings ?? {})
+}
+
 /** Short " · films · this year" suffix appended to a configured panel's hint
  *  so a customized card is self-describing on the board. */
 export function describeLedgerSettings(settings?: LedgerWidgetSettings): string {

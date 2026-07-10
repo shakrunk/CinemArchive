@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, Check } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
-import { cn } from 'src/lib/utils'
 import { useAllGenres } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { LoadingRow } from 'src/components/ui/loading-row'
 import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
+import { Chip } from 'src/components/ui/chip'
 import { getShareScope, setShareScope, type ShareScopeTarget } from 'src/lib/auth'
 import type { WatchStatus } from 'src/store/mockData'
 
@@ -138,15 +138,10 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
                       <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-2">Genres</h4>
                       <div className="flex flex-wrap gap-1.5">
                         {allGenres.map((g) => (
-                          <button
-                            key={g}
-                            type="button"
-                            onClick={() => toggleGenre(g)}
-                            className={cn('chip', genres.includes(g) && 'is-active')}
-                          >
+                          <Chip key={g} active={genres.includes(g)} onClick={() => toggleGenre(g)}>
                             {genres.includes(g) && <Check className="w-3 h-3 mr-1 inline" />}
                             {g}
-                          </button>
+                          </Chip>
                         ))}
                       </div>
                     </div>
@@ -156,15 +151,10 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
                     <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-2">Watch status</h4>
                     <div className="flex flex-wrap gap-1.5">
                       {STATUS_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => toggleStatus(opt.value)}
-                          className={cn('chip', statuses.includes(opt.value) && 'is-active')}
-                        >
+                        <Chip key={opt.value} active={statuses.includes(opt.value)} onClick={() => toggleStatus(opt.value)}>
                           {statuses.includes(opt.value) && <Check className="w-3 h-3 mr-1 inline" />}
                           {opt.label}
-                        </button>
+                        </Chip>
                       ))}
                     </div>
                   </div>

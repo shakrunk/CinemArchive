@@ -2,8 +2,9 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { maxOrOne, rankBarFill } from 'src/lib/utils'
 import type { LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { Panel, PanelEmpty, RowTitle } from '../PanelShell'
 
 const RUNTIME_BUCKETS = [
   { label: 'Short & sweet', range: 'under 90m', min: 0, max: 90 },
@@ -29,7 +30,7 @@ export function RuntimeSpectrum({ className, settings }: { className?: string; s
     return { rows, total: runtimes.length, avg }
   }, [titles])
 
-  const maxCount = Math.max(...rows.map((r) => r.count), 1)
+  const maxCount = maxOrOne(rows.map((r) => r.count))
 
   return (
     <Panel
@@ -44,22 +45,13 @@ export function RuntimeSpectrum({ className, settings }: { className?: string; s
           {rows.map((b, i) => (
             <div key={b.label} className="flex items-center gap-3">
               <div className="w-[128px] shrink-0">
-                <span
-                  className="font-serif text-sm font-medium text-paper block leading-tight"
-                  style={{ fontVariationSettings: '"opsz" 30' }}
-                >
-                  {b.label}
-                </span>
+                <RowTitle className="block leading-tight">{b.label}</RowTitle>
                 <span className="font-mono text-[9px] text-paper-faint">{b.range}</span>
               </div>
               <div className="flex-1 h-[16px] rounded-sm bg-[var(--wash)] overflow-hidden">
                 <div
                   className="h-full rounded-sm bar-fill"
-                  style={{
-                    width: `${(b.count / maxCount) * 100}%`,
-                    background: 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))',
-                    animationDelay: `${i * 80}ms`,
-                  }}
+                  style={rankBarFill(b.count / maxCount, true, i * 80)}
                 />
               </div>
               <span className="font-mono text-[11px] text-paper-dim w-8 text-right shrink-0">{b.count}</span>

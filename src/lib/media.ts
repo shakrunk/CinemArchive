@@ -29,6 +29,9 @@ export interface SearchResult {
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
+  awardsCount?: number  // "award received" (P166) statement count, resolved via Wikidata; sparse outside high-profile titles
+  bechdelOutcome?: 'pass' | 'fail'  // Wikidata P5021/P9259 assessment outcome; absent means no data, not "fails"
+  bechdelScore?: string  // optional "x/3" breakdown (Wikidata P444 qualifier), mainly present on fails
   cast?: CastMember[]
   crew?: CrewMember[]
   studios?: string[]
@@ -262,12 +265,16 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
   let rtScore: number | undefined
   let rtUrl: string | undefined
   let metacriticScore: number | undefined
+  let awardsCount: number | undefined
+  let bechdelOutcome: 'pass' | 'fail' | undefined
+  let bechdelScore: string | undefined
 
   if (imdbId) {
     try {
-      const [{ data: ratingsData }, { data: rtLinkData }] = await Promise.all([
+      const [{ data: ratingsData }, { data: rtLinkData }, { data: accoladesData }] = await Promise.all([
         supabase.functions.invoke(`media-proxy?action=ratings&imdb=${imdbId}`),
         supabase.functions.invoke(`media-proxy?action=rt_link&imdb=${imdbId}`),
+        supabase.functions.invoke(`media-proxy?action=accolades&imdb=${imdbId}`),
       ])
       if (ratingsData) {
         imdbRating =
@@ -280,6 +287,9 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
         metacriticScore = meta && meta !== 'N/A' ? parseInt(meta, 10) : undefined
       }
       rtUrl = rtLinkData?.rtUrl ?? undefined
+      awardsCount = accoladesData?.awardsCount ?? undefined
+      bechdelOutcome = accoladesData?.bechdel?.outcome ?? undefined
+      bechdelScore = accoladesData?.bechdel?.score ?? undefined
     } catch (e) {
       console.error('Error fetching ratings:', e)
     }
@@ -354,6 +364,9 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     imdbRating,
     rtScore,
     metacriticScore,
+    awardsCount,
+    bechdelOutcome,
+    bechdelScore,
     cast,
     crew,
     studios,

@@ -97,35 +97,101 @@ async function getOMDbRatings(imdbId: string) {
 
 const WIKIDATA_SPARQL = 'https://query.wikidata.org/sparql'
 
+// Wikidata: "Bechdel test" item and its "assessment outcome" (P9259) values.
+// See Wikidata:WikiProject_Media_Representation/Model for how assessment (P5021) is modeled.
+const BECHDEL_QID = 'Q4165246'
+const BECHDEL_PASS_QID = 'Q105773168'
+const BECHDEL_FAIL_QID = 'Q105773155'
+
+async function wikidataSparql(sparql: string): Promise<any> {
+  const url = `${WIKIDATA_SPARQL}?query=${encodeURIComponent(sparql)}&format=json`
+  const res = await fetch(url, {
+    headers: {
+      'Accept': 'application/sparql-results+json',
+      // Wikidata's query service requires an identifying User-Agent.
+      'User-Agent': 'CinemArchive/1.0 (https://cinemarchive.kumarfamilynet.work/; media-proxy edge function)',
+    },
+  })
+  return res.json()
+}
+
+// getCached/setCached can't distinguish "no cache row" from "cached value was null",
+// since both come back as `null`. Wrap negative results in a sentinel so lookups
+// that legitimately resolve to "no data" (most titles, for awards/Bechdel) still
+// hit the cache on repeat instead of re-querying Wikidata every time.
+const CACHE_NO_DATA = { __noData: true } as const
+
+async function cachedWikidataLookup<T>(cacheKey: string, resolve: () => Promise<T | null>): Promise<T | null> {
+  const cached = await getCached(cacheKey)
+  if (cached !== null) {
+    return (cached as any)?.__noData ? null : (cached as T)
+  }
+
+  let result: T | null = null
+  try {
+    result = await resolve()
+  } catch {
+    // Best-effort — Wikidata enrichment is a nice-to-have, not a critical path.
+  }
+
+  await setCached(cacheKey, result === null ? CACHE_NO_DATA : result)
+  return result
+}
+
 // Resolves the canonical Rotten Tomatoes page for a title via Wikidata: finds the
 // item with a matching IMDb ID (P345) and reads its Rotten Tomatoes ID (P1258),
 // which already encodes the "m/" or "tv/" path segment (e.g. "m/titanic").
 async function getWikidataRTUrl(imdbId: string): Promise<string | null> {
-  const cacheKey = `wikidata:rt:${imdbId}`
-  const cached = await getCached(cacheKey)
-  if (cached !== null) return cached as string | null
-
-  const sparql = `SELECT ?rt WHERE { ?item wdt:P345 "${imdbId}". ?item wdt:P1258 ?rt. } LIMIT 1`
-  const url = `${WIKIDATA_SPARQL}?query=${encodeURIComponent(sparql)}&format=json`
-
-  let rtUrl: string | null = null
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'Accept': 'application/sparql-results+json',
-        // Wikidata's query service requires an identifying User-Agent.
-        'User-Agent': 'CinemArchive/1.0 (https://cinemarchive.kumarfamilynet.work/; media-proxy edge function)',
-      },
-    })
-    const data = await res.json()
+  return cachedWikidataLookup(`wikidata:rt:${imdbId}`, async () => {
+    const sparql = `SELECT ?rt WHERE { ?item wdt:P345 "${imdbId}". ?item wdt:P1258 ?rt. } LIMIT 1`
+    const data = await wikidataSparql(sparql)
     const rtId = data?.results?.bindings?.[0]?.rt?.value
-    if (rtId) rtUrl = `https://www.rottentomatoes.com/${rtId}`
-  } catch {
-    // Best-effort — an RT link is a nice-to-have, not a critical path.
-  }
+    return rtId ? `https://www.rottentomatoes.com/${rtId}` : null
+  })
+}
 
-  await setCached(cacheKey, rtUrl)
-  return rtUrl
+// Counts "award received" (P166) statements on the matching Wikidata item. Returns
+// null only when no Wikidata item matches the IMDb ID at all — a matched item with
+// zero recorded awards legitimately returns 0 (Wikidata's award coverage is sparse
+// outside high-profile titles, so 0 mostly means "untracked" rather than "none won").
+async function getWikidataAwardsCount(imdbId: string): Promise<number | null> {
+  return cachedWikidataLookup(`wikidata:awards:${imdbId}`, async () => {
+    const sparql = `SELECT ?item (COUNT(?award) as ?c) WHERE {
+      ?item wdt:P345 "${imdbId}".
+      OPTIONAL { ?item wdt:P166 ?award. }
+    } GROUP BY ?item`
+    const data = await wikidataSparql(sparql)
+    const binding = data?.results?.bindings?.[0]
+    return binding ? parseInt(binding.c.value, 10) : null
+  })
+}
+
+export interface BechdelResult {
+  outcome: 'pass' | 'fail'
+  score: string | null
+}
+
+// Reads the Bechdel test assessment (P5021 -> Bechdel test, qualified by assessment
+// outcome P9259) from the Wikidata item matching the IMDb ID. bechdeltest.com's own
+// API — the underlying source for this data — was discontinued, so Wikidata's
+// mirror of it is the only viable route.
+async function getWikidataBechdel(imdbId: string): Promise<BechdelResult | null> {
+  return cachedWikidataLookup(`wikidata:bechdel:${imdbId}`, async () => {
+    const sparql = `SELECT ?outcome ?score WHERE {
+      ?item wdt:P345 "${imdbId}".
+      ?item p:P5021 ?stmt.
+      ?stmt ps:P5021 wd:${BECHDEL_QID}.
+      ?stmt pq:P9259 ?outcome.
+      OPTIONAL { ?stmt pq:P444 ?score. }
+    } LIMIT 1`
+    const data = await wikidataSparql(sparql)
+    const binding = data?.results?.bindings?.[0]
+    if (!binding) return null
+    const outcomeUri: string = binding.outcome.value
+    if (outcomeUri.endsWith(BECHDEL_PASS_QID)) return { outcome: 'pass', score: binding.score?.value ?? null }
+    if (outcomeUri.endsWith(BECHDEL_FAIL_QID)) return { outcome: 'fail', score: binding.score?.value ?? null }
+    return null
+  })
 }
 
 async function getTMDBVideos(tmdbId: number, type: 'movie' | 'tv') {
@@ -215,6 +281,16 @@ Deno.serve(async (req: Request) => {
         const imdbId = url.searchParams.get('imdb') ?? ''
         if (!imdbId) throw new Error('Missing imdb parameter')
         result = { rtUrl: await getWikidataRTUrl(imdbId) }
+        break
+      }
+      case 'accolades': {
+        const imdbId = url.searchParams.get('imdb') ?? ''
+        if (!imdbId) throw new Error('Missing imdb parameter')
+        const [awardsCount, bechdel] = await Promise.all([
+          getWikidataAwardsCount(imdbId),
+          getWikidataBechdel(imdbId),
+        ])
+        result = { awardsCount, bechdel }
         break
       }
       case 'videos': {

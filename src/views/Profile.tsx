@@ -10,7 +10,8 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { ShareScopeEditor } from 'src/components/ShareScopeEditor'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, fmtDateShort } from 'src/lib/utils'
+import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import {
   isSupabaseConfigured,
   signInWithEmail,
@@ -712,7 +713,7 @@ function SharingSection() {
   const [expiryHours, setExpiryHours] = useState<string>('')
   const [generating, setGenerating] = useState(false)
   const [editingScopeFor, setEditingScopeFor] = useState<SharedKey | null>(null)
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null)
+  const { copiedId: copiedKeyId, copy: copyLink } = useCopyFeedback()
   const [showRevoked, setShowRevoked] = useState(false)
 
   useEffect(() => {
@@ -761,9 +762,7 @@ function SharingSection() {
 
   function handleCopyLink(token: string, keyId: string) {
     const link = `${window.location.origin}${window.location.pathname}?share=${token}`
-    navigator.clipboard.writeText(link)
-    setCopiedKeyId(keyId)
-    setTimeout(() => setCopiedKeyId(null), 2000)
+    copyLink(link, keyId)
   }
 
   const activeKeys = sharedKeys.filter((k) => k.is_active)
@@ -822,12 +821,12 @@ function SharingSection() {
               <div className="min-w-0">
                 <p className="font-sans text-xs text-paper font-medium truncate">{k.label || 'Unnamed Link'}</p>
                 <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                  Created: {new Date(k.created_at).toLocaleDateString()}
-                  {k.expires_at && ` · Expires ${new Date(k.expires_at).toLocaleDateString()}`}
+                  Created: {fmtDateShort(k.created_at)}
+                  {k.expires_at && ` · Expires ${fmtDateShort(k.expires_at)}`}
                 </p>
                 {k.last_used_at && (
                   <p className="font-mono text-[9px] text-amber-muted mt-0.5">
-                    Last used: {new Date(k.last_used_at).toLocaleDateString()}
+                    Last used: {fmtDateShort(k.last_used_at)}
                   </p>
                 )}
               </div>
@@ -881,7 +880,7 @@ function SharingSection() {
                   <div className="min-w-0">
                     <p className="font-sans text-xs text-paper font-medium truncate">{k.label || 'Unnamed Link'}</p>
                     <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                      Created: {new Date(k.created_at).toLocaleDateString()} · Revoked
+                      Created: {fmtDateShort(k.created_at)} · Revoked
                     </p>
                   </div>
                 </div>
@@ -909,7 +908,7 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
   const [codes, setCodes] = useState<InviteCode[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { copiedId, copy: copyCode } = useCopyFeedback()
   const [message, setMessage] = useState<Message | null>(null)
 
   useEffect(() => {
@@ -951,9 +950,7 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
   }
 
   function handleCopy(code: string, id: string) {
-    navigator.clipboard.writeText(code)
-    setCopiedId(id)
-    setTimeout(() => setCopiedId(null), 2000)
+    copyCode(code, id)
   }
 
   const unredeemedCount = codes.filter((c) => !c.redeemed_by).length
@@ -994,8 +991,8 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
                 <p className="font-mono text-sm text-paper font-medium tracking-wider">{c.code}</p>
                 <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
                   {c.redeemed_by
-                    ? `Redeemed ${c.redeemed_at ? new Date(c.redeemed_at).toLocaleDateString() : ''}`
-                    : `Created ${new Date(c.created_at).toLocaleDateString()}`}
+                    ? `Redeemed ${c.redeemed_at ? fmtDateShort(c.redeemed_at) : ''}`
+                    : `Created ${fmtDateShort(c.created_at)}`}
                 </p>
               </div>
               <div className="flex gap-1 shrink-0">

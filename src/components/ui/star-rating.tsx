@@ -12,6 +12,11 @@ interface StarRatingProps {
 
 const sizeMap = { sm: 'text-sm', md: 'text-base', lg: 'text-xl' }
 
+// Trailing ".0" reads as noise on a star rating — drop it for whole numbers.
+function fmtRating(value: number): string {
+  return value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)
+}
+
 export function StarRating({
   value = 0,
   max = 5,
@@ -80,7 +85,7 @@ export function StarRating({
       })}
       {value > 0 && (
         <span className="ml-1 text-muted-foreground text-xs font-mono">
-          {value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}
+          {fmtRating(value)}
         </span>
       )}
     </div>
@@ -97,7 +102,7 @@ export function StarBadge({ rating, className }: { rating: number; className?: s
       )}
     >
       <span>★</span>
-      <span>{rating % 1 === 0 ? rating.toFixed(0) : rating.toFixed(1)}</span>
+      <span>{fmtRating(rating)}</span>
     </span>
   )
 }

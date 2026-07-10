@@ -4,12 +4,12 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { deriveStreaks } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
 
 export function TheMarathon({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
 
   const streaks = useMemo(
     () => deriveStreaks(titles, settings),
@@ -74,7 +74,7 @@ export function TheMarathon({ className, settings }: { className?: string; setti
         <p className="mt-2 font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint">last 30 nights</p>
       </div>
 
-      <p className="mt-5 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
+      <p className={cn('mt-5', FOOTER_CAPTION)}>
         {streaks.totalDays} distinct screening night{streaks.totalDays !== 1 ? 's' : ''} on record
       </p>
     </Panel>

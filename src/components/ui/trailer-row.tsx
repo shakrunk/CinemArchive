@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, X, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize } from 'lucide-react'
 import type { TitleVideo } from 'src/lib/media'
+import { SubsectionLabel } from 'src/components/ui/typography'
 
 // ── Minimal YT IFrame API types ───────────────────────────────────────────────
 interface YTWindow extends Window {
@@ -522,9 +523,7 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
   return (
     <>
       <div>
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
-          Trailers
-        </h4>
+        <SubsectionLabel>Trailers</SubsectionLabel>
         <div className="flex gap-4 overflow-x-auto scrollbar-none -mx-6 px-6 pb-1">
           {videos.map((v, i) => (
             <button

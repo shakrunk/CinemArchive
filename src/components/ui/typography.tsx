@@ -59,6 +59,17 @@ export function StatLabel({ className, children, ...props }: TypographyProps) {
   )
 }
 
+export function SubsectionLabel({ className, children, ...props }: TypographyProps) {
+  return (
+    <h4
+      className={cn('font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4', className)}
+      {...props}
+    >
+      {children}
+    </h4>
+  )
+}
+
 export function MetaBadge({ className, children, ...props }: TypographyProps) {
   return (
     <span

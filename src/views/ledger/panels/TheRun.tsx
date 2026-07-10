@@ -2,16 +2,17 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn, maxOrOne } from 'src/lib/utils'
 import { deriveMonthlySeries } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
 import { monthLabel } from '../labels'
 
 export function TheRun({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   // Gap-filled month series: the x-axis represents a true, evenly-spaced
@@ -22,7 +23,7 @@ export function TheRun({ className, settings }: { className?: string; settings?:
     [titles, settingsKey],
   )
 
-  const maxCount = Math.max(...recent.map((d) => d.count), 1)
+  const maxCount = maxOrOne(recent.map((d) => d.count))
   const total = recent.reduce((sum, d) => sum + d.count, 0)
 
   const points: SparklinePoint[] = useMemo(
@@ -69,7 +70,7 @@ export function TheRun({ className, settings }: { className?: string; settings?:
               </div>
             </div>
           </div>
-          <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
+          <p className={cn('mt-4', FOOTER_CAPTION)}>
             {total} screening{total !== 1 ? 's' : ''} across the last {recent.length} months
           </p>
           {tip.node}

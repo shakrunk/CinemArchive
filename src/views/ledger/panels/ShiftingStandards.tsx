@@ -2,15 +2,16 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
 import { deriveTrajectory } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
 
 export function ShiftingStandards({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   const { points: quarters, allTimeAvg } = useMemo(
@@ -80,7 +81,7 @@ export function ShiftingStandards({ className, settings }: { className?: string;
           </div>
         </div>
       </div>
-      <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
+      <p className={cn('mt-4', FOOTER_CAPTION)}>
         dashed line marks your {allTimeAvg.toFixed(1)}★ all-time average
       </p>
       {tip.node}

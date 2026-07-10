@@ -24,7 +24,7 @@ import {
   Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
   ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X, Send,
 } from 'lucide-react'
-import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
+import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, TMDB_STILL_BASE, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
@@ -1315,7 +1315,7 @@ export function TitleDetailDrawer() {
               {title.runtime && title.type === 'movie' && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="w-3 h-3" />
-                  <span className="font-mono">{title.runtime}m</span>
+                  <span className="font-mono">{fmtRuntime(title.runtime)}</span>
                 </div>
               )}
             </div>
@@ -1393,7 +1393,7 @@ export function TitleDetailDrawer() {
                   {title.runtime && title.type === 'movie' && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      <span className="font-mono">{title.runtime}m</span>
+                      <span className="font-mono">{fmtRuntime(title.runtime)}</span>
                     </div>
                   )}
                 </div>
@@ -1499,12 +1499,19 @@ export function TitleDetailDrawer() {
               </div>
 
               {/* Critical Reception */}
-              {(title.imdbRating || title.rtScore || title.metacriticScore) && (
+              {title.imdbId && (
                 <div>
                   <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
                     Critical Reception
                   </h4>
-                  <ReviewBadges imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
+                  <ReviewBadges
+                    imdb={title.imdbRating}
+                    rt={title.rtScore}
+                    meta={title.metacriticScore}
+                    awardsCount={title.awardsCount}
+                    bechdelOutcome={title.bechdelOutcome}
+                    bechdelScore={title.bechdelScore}
+                  />
                 </div>
               )}
 

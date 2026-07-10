@@ -9,7 +9,7 @@ import {
   type SearchResult, type PersonResult, type CompanyResult,
 } from 'src/lib/media'
 import type { MediaType } from 'src/store/mockData'
-import { cn, staggerDelays } from 'src/lib/utils'
+import { cn, fmtRuntime, staggerDelays } from 'src/lib/utils'
 import { usePrefersReducedMotionRef } from 'src/lib/motion'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
@@ -663,7 +663,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
     onAdd(data!)
   }
 
-  const hasScores = data.imdbRating != null || data.rtScore != null || data.metacriticScore != null
+  const hasScores = data.imdbId != null
   const hasBackdrop = !!data.backdropUrl
 
   return (
@@ -733,7 +733,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
                 <span className="font-mono text-xs text-paper-faint">
                   {data.year > 0 ? data.year : ''}
-                  {data.runtime ? ` · ${data.runtime}m` : ''}
+                  {data.runtime ? ` · ${fmtRuntime(data.runtime)}` : ''}
                   {data.type === 'tv' && data.seasonCount
                     ? ` · ${data.seasonCount} season${data.seasonCount !== 1 ? 's' : ''}`
                     : ''}
@@ -799,7 +799,14 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
             </div>
           ) : hasScores ? (
             <div className="mb-4">
-              <ReviewBadges imdb={data.imdbRating} rt={data.rtScore} meta={data.metacriticScore} />
+              <ReviewBadges
+                imdb={data.imdbRating}
+                rt={data.rtScore}
+                meta={data.metacriticScore}
+                awardsCount={data.awardsCount}
+                bechdelOutcome={data.bechdelOutcome}
+                bechdelScore={data.bechdelScore}
+              />
             </div>
           ) : null}
 

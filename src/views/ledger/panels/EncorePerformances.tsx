@@ -3,12 +3,12 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { Panel, PanelEmpty, RowTitle, RankBadge } from '../PanelShell'
 
 export function EncorePerformances({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
 
   const encores = useMemo(() => {
     const { titles: scoped, topN } = scopedTitles('encores', titles, settings)
@@ -35,14 +35,9 @@ export function EncorePerformances({ className, settings }: { className?: string
               className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)]"
               style={{ gridTemplateColumns: '26px 1fr auto' }}
             >
-              <span className="font-mono text-xs text-amber-deep">{String(i + 1).padStart(2, '0')}</span>
+              <RankBadge rank={i + 1} />
               <div className="min-w-0">
-                <span
-                  className="font-serif text-sm font-medium text-paper truncate block"
-                  style={{ fontVariationSettings: '"opsz" 30' }}
-                >
-                  {t.title}
-                </span>
+                <RowTitle className="truncate block">{t.title}</RowTitle>
                 <span className="font-mono text-[10px] text-paper-faint">{t.year}</span>
               </div>
               <span className="flex gap-0.5 shrink-0">

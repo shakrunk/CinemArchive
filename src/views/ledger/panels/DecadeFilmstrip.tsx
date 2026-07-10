@@ -3,8 +3,8 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { decadeOf } from 'src/lib/utils'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { decadeOf, maxOrOne } from 'src/lib/utils'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
 import { Panel, PanelEmpty } from '../PanelShell'
@@ -15,7 +15,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   const decades = useMemo(() => {
@@ -31,7 +31,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [titles, settingsKey])
 
-  const maxCount = Math.max(...decades.map((d) => d.count), 1)
+  const maxCount = maxOrOne(decades.map((d) => d.count))
 
   const points: SparklinePoint[] = useMemo(
     () =>

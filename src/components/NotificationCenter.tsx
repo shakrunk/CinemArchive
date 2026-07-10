@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, fmtDateShort } from 'src/lib/utils'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { useClickOutside } from 'src/lib/useClickOutside'
 import type { AppView } from 'src/lib/navigation'
@@ -143,7 +143,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                           <span className="font-medium">{actorName(n)}</span> {meta.verb(n)}
                         </p>
                         <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                          {new Date(n.createdAt).toLocaleDateString()}
+                          {fmtDateShort(n.createdAt)}
                         </p>
                       </div>
                       {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}

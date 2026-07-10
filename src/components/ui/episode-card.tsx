@@ -5,7 +5,7 @@ import { avgEpisodeRating } from 'src/store/episodeUtils'
 import { StarRating } from 'src/components/ui/star-rating'
 import { Input } from 'src/components/ui/input'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
-import { cn, fmtDate, fmtDateTime } from 'src/lib/utils'
+import { cn, fmtDate, fmtDateTime, fmtRuntime } from 'src/lib/utils'
 import { TMDB_STILL_BASE } from 'src/lib/media'
 import type { Episode, Season } from 'src/store/mockData'
 
@@ -145,7 +145,7 @@ export function EpisodeCard({
           <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
             {episode.airDate ? new Date(episode.airDate).getFullYear() : ''}
             {episode.airDate && episode.runtime ? ' · ' : ''}
-            {episode.runtime ? `${episode.runtime}m` : ''}
+            {episode.runtime ? fmtRuntime(episode.runtime) : ''}
           </div>
         )}
         {episode.synopsis && (

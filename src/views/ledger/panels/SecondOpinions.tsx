@@ -2,16 +2,17 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
 export function SecondOpinions({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   const rows = useMemo(() => {
@@ -47,16 +48,13 @@ export function SecondOpinions({ className, settings }: { className?: string; se
                     setFilter('search', r.title.title)
                     requestView('library')
                   }}
-                  className="w-full grid items-center gap-3 px-1.5 py-2 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
+                  className={cn('w-full grid items-center gap-3', LIST_ROW_HOVER)}
                   style={{ gridTemplateColumns: '1fr minmax(90px, 130px) auto' }}
                 >
                   <div className="min-w-0">
-                    <span
-                      className="font-serif text-sm font-medium text-paper truncate block group-hover:underline decoration-amber/40"
-                      style={{ fontVariationSettings: '"opsz" 30' }}
-                    >
+                    <RowTitle className="truncate block group-hover:underline decoration-amber/40">
                       {r.title.title}
-                    </span>
+                    </RowTitle>
                     <span className="font-mono text-[10px] text-paper-faint">{r.title.year}</span>
                   </div>
                   <div className="flex flex-col gap-1">

@@ -2,17 +2,17 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { languageName } from 'src/lib/utils'
+import { cn, languageName, toPercent, rankBarFill } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
 export function InTranslation({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   const langs = useMemo(() => {
@@ -48,30 +48,21 @@ export function InTranslation({ className, settings }: { className?: string; set
                 setFilter('languages', [l.code])
                 requestView('library')
               }}
-              className="w-full flex items-center gap-3 px-1.5 py-2 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
+              className={cn('w-full flex items-center gap-3', LIST_ROW_HOVER)}
               {...tip.bind({ label: l.name, value: `${l.count} title${l.count !== 1 ? 's' : ''}` })}
             >
               <span className="font-mono text-[10px] uppercase text-amber-deep w-7 shrink-0">{l.code}</span>
-              <span
-                className="font-serif text-sm font-medium text-paper truncate w-[34%] shrink-0 group-hover:underline decoration-amber/40"
-                style={{ fontVariationSettings: '"opsz" 30' }}
-              >
+              <RowTitle className="truncate w-[34%] shrink-0 group-hover:underline decoration-amber/40">
                 {l.name}
-              </span>
+              </RowTitle>
               <span className="flex-1 h-[10px] rounded-sm bg-[var(--wash)] overflow-hidden">
                 <span
                   className="block h-full rounded-sm bar-fill"
-                  style={{
-                    width: `${(l.count / maxCount) * 100}%`,
-                    background: i === 0
-                      ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))'
-                      : 'rgba(128,115,95,0.55)',
-                    animationDelay: `${i * 70}ms`,
-                  }}
+                  style={rankBarFill(l.count / maxCount, i === 0, i * 70)}
                 />
               </span>
               <span className="font-mono text-[10px] text-paper-faint w-12 text-right shrink-0">
-                {Math.round((l.count / total) * 100)}%
+                {toPercent(l.count, total)}%
               </span>
             </button>
           ))}

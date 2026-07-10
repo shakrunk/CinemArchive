@@ -1,28 +1,47 @@
+import type { CSSProperties } from 'react'
 import type { MediaType } from 'src/store/mockData'
 
 // ─── Review Badges ─────────────────────────────────────────────────────────────
 
+const REVIEW_BADGE_CONFIG = {
+  imdb: { label: 'IMDb', color: '#F5C518', name: 'IMDb' },
+  rt: { label: 'RT', color: '#FA320A', name: 'Rotten Tomatoes' },
+  meta: { label: 'MC', color: '#6ebc24', name: 'Metacritic' },
+} as const
+
 export function ReviewBadges({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: number }) {
+  const badges = [
+    imdb != null && { key: 'imdb' as const, value: `${imdb}/10` },
+    rt != null && { key: 'rt' as const, value: `${rt}%` },
+    meta != null && { key: 'meta' as const, value: `${meta}/100` },
+  ].filter((b): b is { key: keyof typeof REVIEW_BADGE_CONFIG; value: string } => Boolean(b))
+
   return (
     <div className="flex flex-wrap gap-2">
-      {imdb && (
-        <div className="flex items-center gap-1.5 bg-secondary/60 rounded px-2.5 py-1.5">
-          <span className="text-[#F5C518] font-mono font-bold text-xs">IMDb</span>
-          <span className="font-mono text-sm text-foreground">{imdb}/10</span>
-        </div>
-      )}
-      {rt && (
-        <div className="flex items-center gap-1.5 bg-secondary/60 rounded px-2.5 py-1.5">
-          <span className="text-[#FA320A] font-mono font-bold text-xs">RT</span>
-          <span className="font-mono text-sm text-foreground">{rt}%</span>
-        </div>
-      )}
-      {meta && (
-        <div className="flex items-center gap-1.5 bg-secondary/60 rounded px-2.5 py-1.5">
-          <span className="text-[#6ebc24] font-mono font-bold text-xs">MC</span>
-          <span className="font-mono text-sm text-foreground">{meta}/100</span>
-        </div>
-      )}
+      {badges.map((b, i) => {
+        const { label, color, name } = REVIEW_BADGE_CONFIG[b.key]
+        return (
+          <div
+            key={b.key}
+            title={name}
+            className="flex items-center gap-1.5 bg-secondary/60 border border-transparent rounded px-2.5 py-1.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-secondary hover:shadow-[0_4px_12px_-4px_var(--badge-color)] animate-[scaleIn_0.45s_ease-out_forwards]"
+            style={{
+              '--badge-color': `${color}66`,
+              animationDelay: `${i * 70}ms`,
+              transform: 'scale(0)',
+              opacity: 0,
+            } as CSSProperties}
+          >
+            <span
+              className="font-mono font-bold text-xs transition-colors"
+              style={{ color }}
+            >
+              {label}
+            </span>
+            <span className="font-mono text-sm text-foreground tabular-nums">{b.value}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }

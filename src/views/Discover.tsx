@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import {
@@ -9,9 +9,11 @@ import {
   type SearchResult, type PersonResult, type CompanyResult,
 } from 'src/lib/media'
 import type { MediaType } from 'src/store/mockData'
-import { cn } from 'src/lib/utils'
+import { cn, staggerDelays } from 'src/lib/utils'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
+import { Chip } from 'src/components/ui/chip'
+import { useClickOutside } from 'src/lib/useClickOutside'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -439,14 +441,7 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
+  useClickOutside(ref, () => setOpen(false), open)
 
   const selected = options.find((o) => o.id === value)
 
@@ -490,6 +485,36 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
             </button>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Empty state — no-results / prompt states across all three search modes ───
+
+function DiscoverEmptyState({
+  icon: Icon,
+  message,
+  onClearSearch,
+  dim = false,
+}: {
+  icon: LucideIcon
+  message: string
+  onClearSearch?: () => void
+  dim?: boolean
+}) {
+  return (
+    <div className="py-16 text-center flex flex-col items-center">
+      <Icon className={cn('w-10 h-10 mx-auto mb-3 text-paper-faint', dim ? 'opacity-20' : 'opacity-30')} />
+      <p className={cn('font-mono text-sm text-paper-faint', onClearSearch && 'mb-4')}>{message}</p>
+      {onClearSearch && (
+        <button
+          onClick={onClearSearch}
+          className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto"
+        >
+          <X className="w-3.5 h-3.5" />
+          Clear search
+        </button>
       )}
     </div>
   )
@@ -932,16 +957,7 @@ export function Discover() {
   const [moreStarringLoading, setMoreStarringLoading] = useState(false)
 
   // Close the filter popover on outside click
-  useEffect(() => {
-    if (!filtersOpen) return
-    function handleClick(e: MouseEvent) {
-      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
-        setFiltersOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [filtersOpen])
+  useClickOutside(filterPanelRef, () => setFiltersOpen(false), filtersOpen)
 
   // Default the "because you watched" basis to the first library title once titles load
   useEffect(() => {
@@ -1199,15 +1215,7 @@ export function Discover() {
     return 'Trending This Week'
   })()
 
-  const discoverDelays = useMemo(() => {
-    const MAX = 24
-    const n = Math.min(displayResults.length, MAX)
-    return Array.from({ length: displayResults.length }, (_, i) => {
-      if (i >= MAX) return 0
-      const slot = n > 0 ? (i * 7) % n : 0
-      return slot * 15
-    })
-  }, [displayResults.length])
+  const discoverDelays = useMemo(() => staggerDelays(displayResults.length), [displayResults.length])
 
   const becauseWatchedTitle = useMemo(
     () => titles.find((t) => t.id === becauseWatchedId) ?? null,
@@ -1225,25 +1233,9 @@ export function Discover() {
     )
   }, [becauseWatchedTitle, trending, libraryTmdbIds])
 
-  const becauseWatchedDelays = useMemo(() => {
-    const MAX = 24
-    const n = Math.min(becauseWatchedResults.length, MAX)
-    return Array.from({ length: becauseWatchedResults.length }, (_, i) => {
-      if (i >= MAX) return 0
-      const slot = n > 0 ? (i * 7) % n : 0
-      return slot * 15
-    })
-  }, [becauseWatchedResults.length])
+  const becauseWatchedDelays = useMemo(() => staggerDelays(becauseWatchedResults.length), [becauseWatchedResults.length])
 
-  const moreStarringDelays = useMemo(() => {
-    const MAX = 24
-    const n = Math.min(moreStarringResults.length, MAX)
-    return Array.from({ length: moreStarringResults.length }, (_, i) => {
-      if (i >= MAX) return 0
-      const slot = n > 0 ? (i * 7) % n : 0
-      return slot * 15
-    })
-  }, [moreStarringResults.length])
+  const moreStarringDelays = useMemo(() => staggerDelays(moreStarringResults.length), [moreStarringResults.length])
 
   const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
@@ -1334,19 +1326,9 @@ export function Discover() {
                     { id: 'people' as SearchMode, label: 'People' },
                     { id: 'studios' as SearchMode, label: 'Studios' },
                   ]).map(({ id, label }) => (
-                    <button
-                      key={id}
-                      onClick={() => handleSearchModeChange(id)}
-                      className={cn(
-                        'flex-1 px-2.5 py-1.5 rounded-md text-xs font-mono border transition-colors',
-                        searchMode === id
-                          ? 'bg-amber/15 border-amber/40 text-amber-bright'
-                          : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-paper-faint/30'
-                      )}
-                      style={{ background: searchMode === id ? undefined : 'var(--inset)' }}
-                    >
+                    <Chip key={id} active={searchMode === id} onClick={() => handleSearchModeChange(id)} className="flex-1 text-center">
                       {label}
-                    </button>
+                    </Chip>
                   ))}
                 </div>
               </div>
@@ -1473,53 +1455,29 @@ export function Discover() {
               ) : searchMode === 'studios' && companyResults.length > 0 ? (
                 <CompanyPicker companies={companyResults} onSelect={handleCompanySelect} />
               ) : (
-                <div className="py-16 text-center flex flex-col items-center">
-                  {searchMode === 'people'
-                    ? <User className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />
-                    : <Building2 className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />}
-                  <p className="font-mono text-sm text-paper-faint mb-4">No results found.</p>
-                  <button
-                    onClick={clearSearch}
-                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Clear search
-                  </button>
-                </div>
+                <DiscoverEmptyState
+                  icon={searchMode === 'people' ? User : Building2}
+                  message="No results found."
+                  onClearSearch={clearSearch}
+                />
               )
             ) : (
-              <div className="py-16 text-center">
-                {searchMode === 'people' ? (
-                  <>
-                    <User className="w-10 h-10 text-paper-faint/20 mx-auto mb-3" />
-                    <p className="font-mono text-sm text-paper-faint">Type a name to browse by actor, director, or crew.</p>
-                  </>
-                ) : (
-                  <>
-                    <Building2 className="w-10 h-10 text-paper-faint/20 mx-auto mb-3" />
-                    <p className="font-mono text-sm text-paper-faint">Type a studio name to browse their catalog.</p>
-                  </>
-                )}
-              </div>
+              <DiscoverEmptyState
+                icon={searchMode === 'people' ? User : Building2}
+                message={searchMode === 'people'
+                  ? 'Type a name to browse by actor, director, or crew.'
+                  : 'Type a studio name to browse their catalog.'}
+                dim
+              />
             )
           ) : loading ? (
             <DiscoverSkeleton />
           ) : displayResults.length === 0 ? (
-            <div className="py-16 text-center flex flex-col items-center">
-              <Compass className="w-10 h-10 text-paper-faint/30 mx-auto mb-3" />
-              <p className="font-mono text-sm text-paper-faint mb-4">
-                {query.trim() ? 'No results found.' : 'Nothing to show yet.'}
-              </p>
-              {query.trim() && (
-                <button
-                  onClick={clearSearch}
-                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Clear search
-                </button>
-              )}
-            </div>
+            <DiscoverEmptyState
+              icon={Compass}
+              message={query.trim() ? 'No results found.' : 'Nothing to show yet.'}
+              onClearSearch={query.trim() ? clearSearch : undefined}
+            />
           ) : (
             <DiscoverCarousel
               results={displayResults}

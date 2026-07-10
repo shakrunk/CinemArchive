@@ -84,3 +84,18 @@ export function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+/**
+ * Per-card entrance delays (ms) for a staggered fade/slide-in grid, capped at `max`
+ * concurrently-animated cards so a long list doesn't queue up a slow cascade — cards
+ * past the cap render with no delay. The (i * 7) % n shuffle spreads the stagger order
+ * across the grid instead of animating strictly left-to-right/row-by-row.
+ */
+export function staggerDelays(count: number, max = 24): number[] {
+  const n = Math.min(count, max)
+  return Array.from({ length: count }, (_, i) => {
+    if (i >= max) return 0
+    const slot = n > 0 ? (i * 7) % n : 0
+    return slot * 15
+  })
+}
+

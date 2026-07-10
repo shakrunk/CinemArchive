@@ -8,9 +8,9 @@ import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import type { Title } from 'src/store/mockData'
 import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
+import { staggerDelays } from 'src/lib/utils'
 
 const UNDO_WINDOW_MS = 6000
-const MAX_ANIMATED = 24
 
 type PendingUndo = { seasonNumber: number; episodeNumber: number; watchEventId: string; label: string }
 type FinishedCard = { snapshot: UpNextEntry; undo: PendingUndo }
@@ -285,14 +285,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0
 
   const totalCards = shows.length + finishedToShow.length + availableWatchlist.length + comingSoon.length
-  const delays = useMemo(() => {
-    const n = Math.min(totalCards, MAX_ANIMATED)
-    return Array.from({ length: totalCards }, (_, i) => {
-      if (i >= MAX_ANIMATED) return 0
-      const slot = n > 0 ? (i * 7) % n : 0
-      return slot * 15
-    })
-  }, [totalCards])
+  const delays = useMemo(() => staggerDelays(totalCards), [totalCards])
   let cardIndex = 0
 
   return (

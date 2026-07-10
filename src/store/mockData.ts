@@ -109,6 +109,9 @@ export interface Title {
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
+  awardsCount?: number  // "award received" (P166) statement count, resolved via Wikidata; sparse outside high-profile titles
+  bechdelOutcome?: 'pass' | 'fail'  // Wikidata P5021/P9259 assessment outcome; absent means no data, not "fails"
+  bechdelScore?: string  // optional "x/3" breakdown (Wikidata P444 qualifier), mainly present on fails
   cast?: CastMember[]
   crew?: CrewMember[]
   studios?: string[]

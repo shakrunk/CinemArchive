@@ -9,39 +9,84 @@ const REVIEW_BADGE_CONFIG = {
   meta: { label: 'MC', color: '#6ebc24', name: 'Metacritic' },
 } as const
 
-export function ReviewBadges({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: number }) {
-  const badges = [
-    imdb != null && { key: 'imdb' as const, value: `${imdb}/10` },
-    rt != null && { key: 'rt' as const, value: `${rt}%` },
-    meta != null && { key: 'meta' as const, value: `${meta}/100` },
-  ].filter((b): b is { key: keyof typeof REVIEW_BADGE_CONFIG; value: string } => Boolean(b))
+// Dim, desaturated tone for "we checked Wikidata and there's nothing" — distinct
+// from the colored badges so it reads as a deliberate "no data" state, not a bug.
+const NO_DATA_COLOR = '#6b6660'
+
+interface Badge {
+  key: string
+  label: string
+  value: string
+  color: string
+  name: string
+}
+
+export function ReviewBadges({
+  imdb, rt, meta, awardsCount, bechdelOutcome, bechdelScore,
+}: {
+  imdb?: number
+  rt?: number
+  meta?: number
+  awardsCount?: number
+  bechdelOutcome?: 'pass' | 'fail'
+  bechdelScore?: string
+}) {
+  const rawBadges: Array<Badge | false> = [
+    imdb != null && { key: 'imdb', label: REVIEW_BADGE_CONFIG.imdb.label, value: `${imdb}/10`, color: REVIEW_BADGE_CONFIG.imdb.color, name: REVIEW_BADGE_CONFIG.imdb.name },
+    rt != null && { key: 'rt', label: REVIEW_BADGE_CONFIG.rt.label, value: `${rt}%`, color: REVIEW_BADGE_CONFIG.rt.color, name: REVIEW_BADGE_CONFIG.rt.name },
+    meta != null && { key: 'meta', label: REVIEW_BADGE_CONFIG.meta.label, value: `${meta}/100`, color: REVIEW_BADGE_CONFIG.meta.color, name: REVIEW_BADGE_CONFIG.meta.name },
+  ]
+  const badges: Badge[] = rawBadges.filter((b): b is Badge => Boolean(b))
+
+  // Awards and Bechdel always render, even with no data — Wikidata's coverage of
+  // both is sparse outside high-profile titles, and silently omitting the badge
+  // would be indistinguishable from "still loading" or "forgot to wire this up."
+  const hasAwards = awardsCount != null && awardsCount > 0
+  badges.push({
+    key: 'awards',
+    label: 'AWD',
+    value: hasAwards ? String(awardsCount) : '—',
+    color: hasAwards ? '#d4a72c' : NO_DATA_COLOR,
+    name: hasAwards
+      ? `${awardsCount} award${awardsCount === 1 ? '' : 's'} won (Wikidata)`
+      : 'Awards data unavailable on Wikidata for this title',
+  })
+
+  badges.push({
+    key: 'bechdel',
+    label: 'BDT',
+    value: bechdelOutcome === 'pass' ? 'PASS' : bechdelOutcome === 'fail' ? (bechdelScore ?? 'FAIL') : '—',
+    color: bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR,
+    name: bechdelOutcome === 'pass'
+      ? 'Bechdel test: passes (Wikidata)'
+      : bechdelOutcome === 'fail'
+        ? `Bechdel test: fails${bechdelScore ? ` (${bechdelScore})` : ''} (Wikidata)`
+        : 'Bechdel test data unavailable on Wikidata for this title',
+  })
 
   return (
     <div className="flex flex-wrap gap-2">
-      {badges.map((b, i) => {
-        const { label, color, name } = REVIEW_BADGE_CONFIG[b.key]
-        return (
-          <div
-            key={b.key}
-            title={name}
-            className="flex items-center gap-1.5 bg-secondary/60 border border-transparent rounded px-2.5 py-1.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-secondary hover:shadow-[0_4px_12px_-4px_var(--badge-color)] animate-[scaleIn_0.45s_ease-out_forwards]"
-            style={{
-              '--badge-color': `${color}66`,
-              animationDelay: `${i * 70}ms`,
-              transform: 'scale(0)',
-              opacity: 0,
-            } as CSSProperties}
+      {badges.map((b, i) => (
+        <div
+          key={b.key}
+          title={b.name}
+          className="flex items-center gap-1.5 bg-secondary/60 border border-transparent rounded px-2.5 py-1.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-secondary hover:shadow-[0_4px_12px_-4px_var(--badge-color)] animate-[scaleIn_0.45s_ease-out_forwards]"
+          style={{
+            '--badge-color': `${b.color}66`,
+            animationDelay: `${i * 70}ms`,
+            transform: 'scale(0)',
+            opacity: 0,
+          } as CSSProperties}
+        >
+          <span
+            className="font-mono font-bold text-xs transition-colors"
+            style={{ color: b.color }}
           >
-            <span
-              className="font-mono font-bold text-xs transition-colors"
-              style={{ color }}
-            >
-              {label}
-            </span>
-            <span className="font-mono text-sm text-foreground tabular-nums">{b.value}</span>
-          </div>
-        )
-      })}
+            {b.label}
+          </span>
+          <span className="font-mono text-sm text-foreground tabular-nums">{b.value}</span>
+        </div>
+      ))}
     </div>
   )
 }

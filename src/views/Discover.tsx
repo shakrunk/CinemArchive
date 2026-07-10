@@ -663,7 +663,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
     onAdd(data!)
   }
 
-  const hasScores = data.imdbRating != null || data.rtScore != null || data.metacriticScore != null
+  const hasScores = data.imdbId != null
   const hasBackdrop = !!data.backdropUrl
 
   return (
@@ -799,7 +799,14 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
             </div>
           ) : hasScores ? (
             <div className="mb-4">
-              <ReviewBadges imdb={data.imdbRating} rt={data.rtScore} meta={data.metacriticScore} />
+              <ReviewBadges
+                imdb={data.imdbRating}
+                rt={data.rtScore}
+                meta={data.metacriticScore}
+                awardsCount={data.awardsCount}
+                bechdelOutcome={data.bechdelOutcome}
+                bechdelScore={data.bechdelScore}
+              />
             </div>
           ) : null}
 

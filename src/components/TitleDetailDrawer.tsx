@@ -1499,12 +1499,19 @@ export function TitleDetailDrawer() {
               </div>
 
               {/* Critical Reception */}
-              {(title.imdbRating || title.rtScore || title.metacriticScore) && (
+              {title.imdbId && (
                 <div>
                   <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
                     Critical Reception
                   </h4>
-                  <ReviewBadges imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
+                  <ReviewBadges
+                    imdb={title.imdbRating}
+                    rt={title.rtScore}
+                    meta={title.metacriticScore}
+                    awardsCount={title.awardsCount}
+                    bechdelOutcome={title.bechdelOutcome}
+                    bechdelScore={title.bechdelScore}
+                  />
                 </div>
               )}
 

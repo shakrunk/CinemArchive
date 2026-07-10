@@ -5,7 +5,8 @@ import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, u
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
-import { cn, languageName } from 'src/lib/utils'
+import { Chip } from 'src/components/ui/chip'
+import { cn, languageName, staggerDelays } from 'src/lib/utils'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode } from 'src/store/useAppStore'
 
@@ -47,22 +48,6 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'rating', label: 'Rating' },
   { value: 'director', label: 'Director' },
 ]
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button onClick={onClick} className={cn('chip', active && 'is-active', 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}>
-      {children}
-    </button>
-  )
-}
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -313,19 +298,10 @@ function EmptyState() {
 
 // ─── Poster Wall ─────────────────────────────────────────────────────────────
 
-const MAX_ANIMATED = 24
-
 function PosterWall({ titles }: { titles: Title[] }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
 
-  const delays = useMemo(() => {
-    const n = Math.min(titles.length, MAX_ANIMATED)
-    return Array.from({ length: titles.length }, (_, i) => {
-      if (i >= MAX_ANIMATED) return 0
-      const slot = n > 0 ? (i * 7) % n : 0
-      return slot * 15
-    })
-  }, [titles.length])
+  const delays = useMemo(() => staggerDelays(titles.length), [titles.length])
 
   if (titles.length === 0) return <EmptyState />
 
@@ -498,16 +474,6 @@ function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: Vi
   )
 }
 
-// ─── Quick Status Filters ─────────────────────────────────────────────────────
-
-const QUICK_STATUS_FILTERS: { value: WatchStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'watched', label: 'Watched' },
-  { value: 'watching', label: 'Watching' },
-  { value: 'watchlist', label: 'Watchlist' },
-  { value: 'dropped', label: 'Dropped' },
-]
-
 // ─── Library View ─────────────────────────────────────────────────────────────
 
 export function Library() {
@@ -565,7 +531,7 @@ export function Library() {
 
         {/* Status segmented control (desktop) */}
         <div className="seg hidden md:flex" role="group" aria-label="Status filter">
-          {QUICK_STATUS_FILTERS.map((opt) => (
+          {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setFilter('status', opt.value)}
@@ -599,14 +565,10 @@ export function Library() {
 
       {/* Status chips (mobile) */}
       <div className="flex md:hidden gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1">
-        {QUICK_STATUS_FILTERS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setFilter('status', opt.value)}
-            className={cn('chip shrink-0', filters.status === opt.value && 'is-active')}
-          >
+        {STATUS_OPTIONS.map((opt) => (
+          <Chip key={opt.value} active={filters.status === opt.value} onClick={() => setFilter('status', opt.value)} className="shrink-0">
             {opt.label}
-          </button>
+          </Chip>
         ))}
       </div>
 

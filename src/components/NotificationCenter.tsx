@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { useClickOutside } from 'src/lib/useClickOutside'
 import type { AppView } from 'src/lib/navigation'
 import type { AppNotificationItem, NotificationType } from 'src/lib/db'
 
@@ -49,21 +50,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
   const [loading, setLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!open) return
-    function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    function onEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    document.addEventListener('keydown', onEscape)
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside)
-      document.removeEventListener('keydown', onEscape)
-    }
-  }, [open])
+  useClickOutside(containerRef, () => setOpen(false), open, { escape: true })
 
   async function handleToggle() {
     const next = !open

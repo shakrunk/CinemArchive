@@ -9,6 +9,28 @@ import { cn, fmtDate, fmtDateTime } from 'src/lib/utils'
 import { TMDB_STILL_BASE } from 'src/lib/media'
 import type { Episode, Season } from 'src/store/mockData'
 
+function stillSrcFor(episode: Episode): string | null {
+  if (!episode.stillUrl) return null
+  return episode.stillUrl.startsWith('http') ? episode.stillUrl : `${TMDB_STILL_BASE}${episode.stillUrl}`
+}
+
+function ColorModePill({ mode, className }: { mode: 'bw' | 'color'; className?: string }) {
+  return (
+    <span
+      className={cn('font-mono px-1 rounded', className)}
+      style={{
+        fontSize: '9px',
+        letterSpacing: '0.06em',
+        background: mode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
+        color: mode === 'bw' ? '#aaa' : 'var(--amber)',
+        border: `1px solid ${mode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}`,
+      }}
+    >
+      {mode === 'bw' ? '◐ B&W' : '◈ Color'}
+    </span>
+  )
+}
+
 // ─── EpisodeCard ─────────────────────────────────────────────────────────────
 
 export interface EpisodeCardProps {
@@ -40,11 +62,7 @@ export function EpisodeCard({
     })
   }
 
-  const stillSrc = episode.stillUrl
-    ? episode.stillUrl.startsWith('http')
-      ? episode.stillUrl
-      : `${TMDB_STILL_BASE}${episode.stillUrl}`
-    : null
+  const stillSrc = stillSrcFor(episode)
 
   return (
     <div
@@ -233,11 +251,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
     setPendingLog(null)
   }
 
-  const stillSrc = episode.stillUrl
-    ? episode.stillUrl.startsWith('http')
-      ? episode.stillUrl
-      : `${TMDB_STILL_BASE}${episode.stillUrl}`
-    : null
+  const stillSrc = stillSrcFor(episode)
 
   return (
     <div className="ep-panel px-3 py-3 space-y-3 rounded-lg" style={{ borderTop: '1px solid var(--line)', background: 'var(--inset)' }}>
@@ -305,11 +319,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                     <div className="flex items-start gap-1">
                       <div className="flex-1 font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
                         {we.watchedAt ? fmtDate(we.watchedAt) : <span className="italic">Before CinemArchive</span>}
-                        {we.colorMode && (
-                          <span className="font-mono ml-1.5 px-1 rounded" style={{ fontSize: '9px', letterSpacing: '0.06em', background: we.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)', color: we.colorMode === 'bw' ? '#aaa' : 'var(--amber)', border: `1px solid ${we.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}` }}>
-                            {we.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
-                          </span>
-                        )}
+                        {we.colorMode && <ColorModePill mode={we.colorMode} className="ml-1.5" />}
                         {we.notes && <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>"{we.notes}"</div>}
                       </div>
                       {!isSharedView && (
@@ -351,11 +361,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                   <div className="mt-0.5" style={{ color: 'var(--paper-faint)' }}>
                     <div className="font-mono flex items-center gap-1.5" style={{ fontSize: '10px' }}>
                       <span>{fmtDateTime(rv.reviewedAt).date}</span>
-                      {rv.colorMode && (
-                        <span className="font-mono px-1 rounded" style={{ fontSize: '9px', letterSpacing: '0.06em', background: rv.colorMode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)', color: rv.colorMode === 'bw' ? '#aaa' : 'var(--amber)', border: `1px solid ${rv.colorMode === 'bw' ? 'rgba(200,200,200,0.2)' : 'rgba(233,178,102,0.3)'}` }}>
-                          {rv.colorMode === 'bw' ? '◐ B&W' : '◈ Color'}
-                        </span>
-                      )}
+                      {rv.colorMode && <ColorModePill mode={rv.colorMode} />}
                     </div>
                     <div className="font-mono" style={{ fontSize: '9px' }}>{fmtDateTime(rv.reviewedAt).time}</div>
                   </div>

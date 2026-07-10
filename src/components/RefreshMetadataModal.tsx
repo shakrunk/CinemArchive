@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from 'react'
-import { Search, Film, Tv, RefreshCw, X } from 'lucide-react'
+import { Search, RefreshCw, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
+import { PosterThumb } from 'src/components/ui/poster-thumb'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
@@ -73,7 +74,6 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
   // Re-matching only makes sense within the same media type (keeps the DB
   // season/episode structure consistent with the title type).
   const typedResults = results.filter((r) => r.type === title.type)
-  const TypeIcon = title.type === 'movie' ? Film : Tv
 
   async function applyFrom(base: SearchResult) {
     // The DB enforces a unique (user, tmdb_id, type) link; block re-pointing this
@@ -264,15 +264,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
 
       {/* Current entry */}
       <div className="flex gap-4 items-center">
-        <div className="w-16 shrink-0">
-          {title.posterUrl ? (
-            <img src={title.posterUrl} alt={title.title} className="w-full aspect-[2/3] object-cover rounded" />
-          ) : (
-            <div className="w-full aspect-[2/3] bg-secondary rounded flex items-center justify-center">
-              <TypeIcon className="w-5 h-5 text-muted-foreground" />
-            </div>
-          )}
-        </div>
+        <PosterThumb src={title.posterUrl} alt={title.title} type={title.type} size="md" />
         <div className="min-w-0">
           <p className="font-serif text-lg text-foreground truncate">{title.title}</p>
           <p className="font-mono text-xs text-muted-foreground">
@@ -360,15 +352,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                         onClick={() => applyFrom(r)}
                         className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left"
                       >
-                        <div className="w-12 shrink-0">
-                          {r.posterUrl ? (
-                            <img src={r.posterUrl} alt={r.title} className="w-full aspect-[2/3] object-cover rounded" />
-                          ) : (
-                            <div className="w-full aspect-[2/3] bg-secondary rounded flex items-center justify-center">
-                              <TypeIcon className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
+                        <PosterThumb src={r.posterUrl} alt={r.title} type={title.type} />
                         <div className="flex-1 min-w-0">
                           <p className="font-sans text-sm text-foreground truncate">{r.title}</p>
                           <p className="font-mono text-xs text-muted-foreground">

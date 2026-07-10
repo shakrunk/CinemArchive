@@ -1,6 +1,16 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from './auth'
 import type { CastMember, CrewMember, EpisodeCrew, Title, WatchStatus, MediaType } from '../store/mockData'
 import { normalizeLedgerWidgets, type LedgerWidget } from './ledgerPanels'
+
+// Throws (after logging) when a Supabase call reports an error — the same
+// three-line shape this file used to repeat at every call site.
+function unwrap(error: PostgrestError | null, message: string): void {
+  if (error) {
+    console.error(message, error)
+    throw error
+  }
+}
 
 // ─── Mapping Helpers ─────────────────────────────────────────────────────────
 
@@ -185,10 +195,7 @@ export async function fetchUserLibrary(userId: string): Promise<Title[]> {
     .select(TITLE_SELECT)
     .eq('user_id', userId)
 
-  if (error) {
-    console.error('Error fetching user library:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching user library:')
 
   return (data || []).map(mapDbTitleToLocal)
 }
@@ -202,10 +209,7 @@ export async function fetchSharedLibrary(
   if (!supabase) return { titles: [], ownerUserId: null }
 
   const { error: rpcError } = await supabase.rpc('set_shared_token', { token })
-  if (rpcError) {
-    console.error('Error setting shared token RPC:', rpcError)
-    throw rpcError
-  }
+  unwrap(rpcError, 'Error setting shared token RPC:')
 
   const [{ data, error }, { data: ownerUserId, error: ownerError }] = await Promise.all([
     supabase
@@ -214,10 +218,7 @@ export async function fetchSharedLibrary(
     supabase.rpc('shared_key_owner', { token_val: token }),
   ])
 
-  if (error) {
-    console.error('Error fetching shared library:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching shared library:')
   if (ownerError) console.error('Error resolving shared link owner:', ownerError)
 
   return {
@@ -237,10 +238,7 @@ export async function fetchFriendLibrary(friendUserId: string): Promise<Title[]>
     .select(TITLE_SELECT)
     .eq('user_id', friendUserId)
 
-  if (error) {
-    console.error('Error fetching friend library:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching friend library:')
 
   return (data || []).map(mapDbTitleToLocal)
 }
@@ -295,10 +293,7 @@ export async function sendRecommendation(recipientUserId: string, title: Title, 
     p_note: note?.trim() || null,
   })
 
-  if (error) {
-    console.error('Error sending recommendation:', error)
-    throw error
-  }
+  unwrap(error, 'Error sending recommendation:')
 }
 
 // Recipient user IDs (and their current status) this user has already sent
@@ -317,10 +312,7 @@ export async function fetchSentRecommendationStatus(
     .eq('tmdb_id', tmdbId)
     .eq('type', type)
 
-  if (error) {
-    console.error('Error fetching sent recommendation status:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching sent recommendation status:')
 
   const result: Record<string, 'unread' | 'read' | 'dismissed'> = {}
   for (const row of data || []) {
@@ -335,10 +327,7 @@ export async function fetchRecommendations(): Promise<Recommendation[]> {
 
   const { data, error } = await supabase.rpc('list_recommendations')
 
-  if (error) {
-    console.error('Error fetching recommendations:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching recommendations:')
 
   return (data || []).map(mapDbRecommendationToLocal)
 }
@@ -346,19 +335,13 @@ export async function fetchRecommendations(): Promise<Recommendation[]> {
 export async function markRecommendationRead(id: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.rpc('mark_recommendation_read', { rec_id: id })
-  if (error) {
-    console.error('Error marking recommendation read:', error)
-    throw error
-  }
+  unwrap(error, 'Error marking recommendation read:')
 }
 
 export async function dismissRecommendation(id: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.rpc('dismiss_recommendation', { rec_id: id })
-  if (error) {
-    console.error('Error dismissing recommendation:', error)
-    throw error
-  }
+  unwrap(error, 'Error dismissing recommendation:')
 }
 
 // ─── Title comments & reactions (friends-only) ───────────────────────────────
@@ -405,20 +388,14 @@ function mapDbTitleReactionToLocal(row: any): TitleReaction {
 export async function fetchTitleComments(titleId: string): Promise<TitleComment[]> {
   if (!supabase) return []
   const { data, error } = await supabase.rpc('list_title_comments', { p_title_id: titleId })
-  if (error) {
-    console.error('Error fetching title comments:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching title comments:')
   return (data || []).map(mapDbTitleCommentToLocal)
 }
 
 export async function addTitleComment(titleId: string, body: string): Promise<TitleComment> {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { data, error } = await supabase.rpc('add_title_comment', { p_title_id: titleId, p_body: body })
-  if (error) {
-    console.error('Error adding title comment:', error)
-    throw error
-  }
+  unwrap(error, 'Error adding title comment:')
   return {
     id: data.id,
     authorId: data.author_id,
@@ -432,19 +409,13 @@ export async function addTitleComment(titleId: string, body: string): Promise<Ti
 export async function deleteTitleComment(commentId: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.rpc('delete_title_comment', { p_comment_id: commentId })
-  if (error) {
-    console.error('Error deleting title comment:', error)
-    throw error
-  }
+  unwrap(error, 'Error deleting title comment:')
 }
 
 export async function fetchTitleReactions(titleId: string): Promise<TitleReaction[]> {
   if (!supabase) return []
   const { data, error } = await supabase.rpc('list_title_reactions', { p_title_id: titleId })
-  if (error) {
-    console.error('Error fetching title reactions:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching title reactions:')
   return (data || []).map(mapDbTitleReactionToLocal)
 }
 
@@ -452,10 +423,7 @@ export async function fetchTitleReactions(titleId: string): Promise<TitleReactio
 export async function setTitleReaction(titleId: string, emoji: ReactionEmoji | null): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.rpc('set_title_reaction', { p_title_id: titleId, p_emoji: emoji })
-  if (error) {
-    console.error('Error setting title reaction:', error)
-    throw error
-  }
+  unwrap(error, 'Error setting title reaction:')
 }
 
 export interface ActivityEvent {
@@ -502,10 +470,7 @@ export async function fetchFriendActivityFeed(before?: string, limit = 30): Prom
     p_limit: limit,
   })
 
-  if (error) {
-    console.error('Error fetching friend activity feed:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching friend activity feed:')
 
   return (data || []).map(mapDbActivityEventToLocal)
 }
@@ -559,48 +524,33 @@ function mapDbNotificationToLocal(row: any): AppNotificationItem {
 export async function fetchNotifications(before?: string, limit = 30): Promise<AppNotificationItem[]> {
   if (!supabase) return []
   const { data, error } = await supabase.rpc('list_notifications', { p_before: before ?? null, p_limit: limit })
-  if (error) {
-    console.error('Error fetching notifications:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching notifications:')
   return (data || []).map(mapDbNotificationToLocal)
 }
 
 export async function fetchUnreadNotificationCount(): Promise<number> {
   if (!supabase) return 0
   const { data, error } = await supabase.rpc('unread_notification_count')
-  if (error) {
-    console.error('Error fetching unread notification count:', error)
-    throw error
-  }
+  unwrap(error, 'Error fetching unread notification count:')
   return data ?? 0
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.rpc('mark_notification_read', { p_id: id })
-  if (error) {
-    console.error('Error marking notification read:', error)
-    throw error
-  }
+  unwrap(error, 'Error marking notification read:')
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.rpc('mark_all_notifications_read')
-  if (error) {
-    console.error('Error marking all notifications read:', error)
-    throw error
-  }
+  unwrap(error, 'Error marking all notifications read:')
 }
 
 export async function deleteNotification(id: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.from('notifications').delete().eq('id', id)
-  if (error) {
-    console.error('Error deleting notification:', error)
-    throw error
-  }
+  unwrap(error, 'Error deleting notification:')
 }
 
 export async function insertTitleToDb(userId: string, title: Title): Promise<void> {
@@ -643,10 +593,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
     collection_name: title.collectionName ?? null,
   })
 
-  if (titleError) {
-    console.error('Error inserting title:', titleError)
-    throw titleError
-  }
+  unwrap(titleError, 'Error inserting title:')
 
   // 2. Insert seasons and episodes together
   if (title.type === 'tv' && title.seasons && title.seasons.length > 0) {
@@ -661,10 +608,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
         air_year: s.airYear,
       }))
     )
-    if (seasonsError) {
-      console.error('Error inserting seasons:', seasonsError)
-      throw seasonsError
-    }
+    unwrap(seasonsError, 'Error inserting seasons:')
 
     // Flatten all episodes across all seasons and insert in one call
     const allEpisodes = title.seasons.flatMap((s) =>
@@ -684,10 +628,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
 
     if (allEpisodes.length > 0) {
       const { error: episodesError } = await supabase.from('episodes').insert(allEpisodes)
-      if (episodesError) {
-        console.error('Error inserting episodes:', episodesError)
-        throw episodesError
-      }
+      unwrap(episodesError, 'Error inserting episodes:')
     }
   }
 
@@ -703,10 +644,7 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
         notes: v.notes,
       }))
     )
-    if (viewingsError) {
-      console.error('Error inserting viewings:', viewingsError)
-      throw viewingsError
-    }
+    unwrap(viewingsError, 'Error inserting viewings:')
   }
 
   // 4. Insert title-level cast and crew (fire-and-forget)
@@ -840,10 +778,7 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
       .eq('id', titleId)
       .eq('user_id', userId)
 
-    if (error) {
-      console.error('Error updating title:', error)
-      throw error
-    }
+    unwrap(error, 'Error updating title:')
   }
 
   if (patch.seasons && patch.seasons.length > 0) {
@@ -861,10 +796,7 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
         { onConflict: 'title_id,season_number' }
       )
 
-    if (error) {
-      console.error('Error bulk updating seasons:', error)
-      throw error
-    }
+    unwrap(error, 'Error bulk updating seasons:')
   }
 
   // Upsert all viewings: client-generated UUIDs insert as new rows, DB UUIDs update in-place
@@ -880,10 +812,7 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
       }))
     )
 
-    if (error) {
-      console.error('Error upserting viewings:', error)
-      throw error
-    }
+    unwrap(error, 'Error upserting viewings:')
   }
 
   // Cast refresh: delete existing rows, re-insert new set (removes stale members)
@@ -949,10 +878,7 @@ export async function logEpisodeToDb(
       notes: opts.watchNotes || undefined,
       color_mode: opts.colorMode ?? null,
     })
-    if (error) {
-      console.error('Error inserting episode watch event:', error)
-      throw error
-    }
+    unwrap(error, 'Error inserting episode watch event:')
   }
 
   if (opts.rating && opts.rating > 0) {
@@ -961,10 +887,7 @@ export async function logEpisodeToDb(
       user_id: userId,
       rating: opts.rating,
     })
-    if (error) {
-      console.error('Error inserting episode rating:', error)
-      throw error
-    }
+    unwrap(error, 'Error inserting episode rating:')
   }
 
   if (opts.reviewText?.trim()) {
@@ -974,10 +897,7 @@ export async function logEpisodeToDb(
       review_text: opts.reviewText.trim(),
       color_mode: opts.colorMode ?? null,
     })
-    if (error) {
-      console.error('Error inserting episode review:', error)
-      throw error
-    }
+    unwrap(error, 'Error inserting episode review:')
   }
 }
 
@@ -998,10 +918,7 @@ export async function insertPrePlatformWatchEventsToDb(
       watched_at: null,
     }))
   )
-  if (error) {
-    console.error('Error inserting pre-platform watch events:', error)
-    throw error
-  }
+  unwrap(error, 'Error inserting pre-platform watch events:')
 }
 
 export async function upsertEpisodeMetadataInDb(
@@ -1037,10 +954,7 @@ export async function upsertEpisodeMetadataInDb(
     .from('episodes')
     .upsert(rows, { onConflict: 'title_id,season_number,episode_number' })
 
-  if (error) {
-    console.error('Error upserting episode metadata:', error)
-    throw error
-  }
+  unwrap(error, 'Error upserting episode metadata:')
 }
 
 export async function deleteTitleFromDb(userId: string, titleId: string): Promise<void> {
@@ -1052,10 +966,7 @@ export async function deleteTitleFromDb(userId: string, titleId: string): Promis
     .eq('id', titleId)
     .eq('user_id', userId)
 
-  if (error) {
-    console.error('Error deleting title:', error)
-    throw error
-  }
+  unwrap(error, 'Error deleting title:')
 }
 
 export async function upsertTitleCastInDb(userId: string, titleId: string, cast: CastMember[]): Promise<void> {
@@ -1201,10 +1112,7 @@ export async function deleteViewingFromDb(userId: string, viewingId: string): Pr
     .delete()
     .eq('id', viewingId)
     .eq('user_id', userId)
-  if (error) {
-    console.error('Error deleting viewing:', error)
-    throw error
-  }
+  unwrap(error, 'Error deleting viewing:')
 }
 
 export async function deleteEpisodeWatchEventFromDb(userId: string, watchEventId: string): Promise<void> {
@@ -1214,10 +1122,7 @@ export async function deleteEpisodeWatchEventFromDb(userId: string, watchEventId
     .delete()
     .eq('id', watchEventId)
     .eq('user_id', userId)
-  if (error) {
-    console.error('Error deleting episode watch event:', error)
-    throw error
-  }
+  unwrap(error, 'Error deleting episode watch event:')
 }
 
 // ─── User Title Pins ──────────────────────────────────────────────────────────
@@ -1287,10 +1192,7 @@ export async function fetchLedgerLayout(ownerUserId: string): Promise<LedgerWidg
     .select('ledger_layout')
     .eq('user_id', ownerUserId)
     .maybeSingle()
-  if (error) {
-    console.error('fetchLedgerLayout:', error)
-    throw error
-  }
+  unwrap(error, 'fetchLedgerLayout:')
   if (!data || data.ledger_layout == null) return null
   return normalizeLedgerWidgets(data.ledger_layout)
 }
@@ -1300,8 +1202,5 @@ export async function saveLedgerLayout(userId: string, widgets: LedgerWidget[]):
   const { error } = await supabase
     .from('user_prefs')
     .upsert({ user_id: userId, ledger_layout: widgets, updated_at: new Date().toISOString() })
-  if (error) {
-    console.error('saveLedgerLayout:', error)
-    throw error
-  }
+  unwrap(error, 'saveLedgerLayout:')
 }

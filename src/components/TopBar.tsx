@@ -1,4 +1,4 @@
-import { Plus, LayoutGrid, List, User, LogIn, Search, Sun, Moon, Users, X, Eye } from 'lucide-react'
+import { Plus, LogIn, Search, Sun, Moon, X, Eye, Users } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
@@ -8,6 +8,7 @@ import { resolveNavIcon } from 'src/lib/navIcons'
 import type { AppView, NavItemId } from 'src/lib/navigation'
 import { ReelMark } from 'src/components/ui/reel-mark'
 import { NotificationCenter } from 'src/components/NotificationCenter'
+import { AccountMenu } from 'src/components/AccountMenu'
 
 interface TopBarProps {
   currentView: AppView
@@ -25,10 +26,9 @@ const NAV_LABELS: Record<NavItemId, string> = {
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, setViewMode, openAddTitle, user, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
+  const { viewMode, openAddTitle, user, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
     useShallow((s) => ({
       viewMode: s.viewMode,
-      setViewMode: s.setViewMode,
       openAddTitle: s.openAddTitle,
       user: s.user,
       isSharedView: s.isSharedView,
@@ -40,6 +40,10 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
     }))
   )
   const friendView = viewerContext.kind === 'friend' ? viewerContext : null
+  // Theme lives in AccountMenu once it's shown, but AccountMenu only renders
+  // for an authenticated owner — everyone else (signed out, shared/friend view)
+  // still needs a standalone toggle.
+  const showAccountMenu = isSupabaseConfigured && !isSharedView && !!user
 
   function handleExitSharedLink() {
     // An anonymous shared-link session never authenticated, so there's no
@@ -102,19 +106,21 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
 
         {/* Actions */}
         <div className="flex items-center gap-2 ml-auto shrink-0">
-          <button
-            onClick={(e) => toggleTheme({ clientX: e.clientX, clientY: e.clientY })}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center"
-            style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-[17px] h-[17px]" />
-            ) : (
-              <Moon className="w-[17px] h-[17px]" />
-            )}
-          </button>
+          {!showAccountMenu && (
+            <button
+              onClick={(e) => toggleTheme({ clientX: e.clientX, clientY: e.clientY })}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center"
+              style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-[17px] h-[17px]" />
+              ) : (
+                <Moon className="w-[17px] h-[17px]" />
+              )}
+            </button>
+          )}
 
           <button
             onClick={openCommandPalette}
@@ -131,31 +137,6 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
               {modKey}K
             </kbd>
           </button>
-
-          {currentView === 'library' && (
-            <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={cn(
-                  'icon-btn w-8 h-8',
-                  viewMode === 'grid' && '!text-amber-bright bg-amber/12'
-                )}
-                aria-label="Poster wall"
-              >
-                <LayoutGrid className="w-[17px] h-[17px]" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  'icon-btn w-8 h-8',
-                  viewMode === 'list' && '!text-amber-bright bg-amber/12'
-                )}
-                aria-label="Ledger list"
-              >
-                <List className="w-[17px] h-[17px]" />
-              </button>
-            </div>
-          )}
 
           {friendView ? (
             <button
@@ -182,34 +163,9 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           ) : (
             isSupabaseConfigured && !isSharedView && (
               <>
-                {user && (
-                  <button
-                    onClick={() => onViewChange('friends')}
-                    aria-current={currentView === 'friends' ? 'page' : undefined}
-                    className={cn(
-                      'icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center',
-                      currentView === 'friends' && '!bg-amber/15 border-amber/50 text-amber'
-                    )}
-                    style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-                    aria-label="Friends"
-                    title="Friends"
-                  >
-                    <Users className="w-[17px] h-[17px]" />
-                  </button>
-                )}
                 {user && <NotificationCenter onNavigate={onViewChange} />}
-                {user ? (
-                  <button
-                    onClick={onProfileClick}
-                    aria-current={currentView === 'profile' ? 'page' : undefined}
-                    className={cn(
-                      'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center',
-                      currentView === 'profile' && '!bg-amber/15 border-amber/50'
-                    )}
-                    aria-label="Profile and Settings"
-                  >
-                    <User className="w-[17px] h-[17px]" />
-                  </button>
+                {showAccountMenu ? (
+                  <AccountMenu currentView={currentView} onNavigate={onViewChange} />
                 ) : (
                   <button
                     onClick={onProfileClick}
@@ -228,7 +184,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             <button
               onClick={openAddTitle}
               aria-label="Add Title"
-              className="btn-amber inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
+              className="btn-amber hidden sm:inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Title</span>

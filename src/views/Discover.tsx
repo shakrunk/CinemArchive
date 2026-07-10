@@ -233,12 +233,18 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
     const width = singleSetWidthRef.current
     if (!trackRef.current || width <= 0) return
     const normalized = ((scrollXRef.current % width) + width) % width
-    // Snapped to a whole pixel before it hits the DOM (scrollXRef itself stays full
-    // float precision for smooth accumulation). A fractional translateX on the track
-    // lets the compositor round each frame's edge independently, so adjacent frames'
-    // borders can land a device pixel apart — a hairline seam that flickers open onto
-    // whatever's behind on every other frame, worst in Firefox.
-    trackRef.current.style.transform = `translateX(${-Math.round(normalized)}px)`
+    // Snapped to a whole *device* pixel (not CSS pixel) before it hits the DOM
+    // (scrollXRef itself stays full float precision for smooth accumulation). A
+    // fractional translateX on the track lets the compositor round each frame's edge
+    // independently, so adjacent frames' borders can land a device pixel apart — a
+    // hairline seam that flickers open onto whatever's behind on every other frame,
+    // worst in Firefox. Snapping to whole CSS pixels prevents that but throttles
+    // motion to 1px steps even on Retina displays, where each CSS px is 2-3 device
+    // px — at this carousel's ~26px/s speed that reads as visible stutter. Snapping
+    // to the device pixel grid instead keeps the same anti-seam guarantee at native
+    // resolution.
+    const dpr = window.devicePixelRatio || 1
+    trackRef.current.style.transform = `translateX(${-Math.round(normalized * dpr) / dpr}px)`
     // Drives the sprocket-hole mask-position so the top/bottom reel strips glide past
     // in sync with the posters, like film actually threading through a projector gate.
     // Wrapped on a modulus of the hole pitch — NOT the poster-loop width above — so the

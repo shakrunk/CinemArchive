@@ -1,7 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { modKey } from 'src/lib/utils'
-import { useAppStore } from 'src/store/useAppStore'
+import { useVisibleNavItems } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS } from 'src/lib/navigation'
 
 interface ShortcutEntry {
@@ -46,8 +46,7 @@ interface KeyboardShortcutsHelpProps {
 }
 
 export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpProps) {
-  const navPrefs = useAppStore((s) => s.navPrefs)
-  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  const visibleNav = useVisibleNavItems()
   const navigateEntries: ShortcutEntry[] = [
     ...visibleNav.map((id, i) => ({ keys: [String(i + 1)], label: NAV_ITEM_LABELS[id] })),
     { keys: [String(visibleNav.length + 1)], label: 'Profile & Settings' },

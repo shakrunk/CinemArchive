@@ -12,7 +12,7 @@ import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
 import { useShallow } from 'zustand/react/shallow'
-import { useAppStore } from 'src/store/useAppStore'
+import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
@@ -50,7 +50,6 @@ export default function App() {
     isAddTitleOpen,
     isDetailDrawerOpen,
     isRefreshMetadataOpen,
-    navPrefs
   } = useAppStore(
     useShallow((s) => ({
       setUser: s.setUser,
@@ -66,7 +65,6 @@ export default function App() {
       isAddTitleOpen: s.isAddTitleOpen,
       isDetailDrawerOpen: s.isDetailDrawerOpen,
       isRefreshMetadataOpen: s.isRefreshMetadataOpen,
-      navPrefs: s.navPrefs
     }))
   )
 
@@ -114,7 +112,7 @@ export default function App() {
   // Number-key shortcuts follow the user's nav order/visibility from Settings
   // → Navigation, so key N always jumps to whatever sits in slot N. Hidden
   // tabs get no number key; Profile always gets the next number after them.
-  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  const visibleNav = useVisibleNavItems()
   const navShortcuts = Object.fromEntries(
     visibleNav.map((id, i) => [String(i + 1), () => setCurrentView(id)])
   )

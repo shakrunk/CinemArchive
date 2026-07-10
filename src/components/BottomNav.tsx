@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
-import { LayoutGrid, List, BarChart3, Plus, PlayCircle, Compass, Users } from 'lucide-react'
-import { useAppStore } from 'src/store/useAppStore'
+import { Plus, Users, type LucideIcon } from 'lucide-react'
+import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { resolveNavIcon } from 'src/lib/navIcons'
 import type { AppView, NavItemId } from 'src/lib/navigation'
 
 interface BottomNavProps {
@@ -9,11 +10,12 @@ interface BottomNavProps {
   onViewChange: (view: AppView) => void
 }
 
-const NAV_META: Record<NavItemId, { label: string; Icon: typeof LayoutGrid }> = {
-  discover: { label: 'Discover', Icon: Compass },
-  library: { label: 'Library', Icon: LayoutGrid },
-  upnext: { label: 'Up Next', Icon: PlayCircle },
-  ledger: { label: 'Ledger', Icon: BarChart3 },
+// Shorter copy than TopBar.tsx's — this nav is space-constrained (see navigation.ts).
+const NAV_LABELS: Record<NavItemId, string> = {
+  discover: 'Discover',
+  library: 'Library',
+  upnext: 'Up Next',
+  ledger: 'Ledger',
 }
 
 function NavTab({
@@ -25,7 +27,7 @@ function NavTab({
   active: boolean
   onClick: () => void
   label: string
-  Icon: typeof LayoutGrid
+  Icon: LucideIcon
 }) {
   return (
     <button
@@ -51,11 +53,10 @@ function NavTab({
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const openAddTitle = useAppStore((s) => s.openAddTitle)
   const isSharedView = useAppStore((s) => s.isSharedView)
-  const navPrefs = useAppStore((s) => s.navPrefs)
   const viewMode = useAppStore((s) => s.viewMode)
   const user = useAppStore((s) => s.user)
 
-  const visibleNav = navPrefs.order.filter((id) => !navPrefs.hidden.includes(id))
+  const visibleNav = useVisibleNavItems()
   // Split around the central Add button, biasing an odd extra item to the left
   // (matches the original fixed Discover/Library · Add · Up Next/Ledger layout).
   const splitAt = Math.ceil(visibleNav.length / 2)
@@ -114,8 +115,8 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {leftNav.map((id) => {
-          const { label, Icon: DefaultIcon } = NAV_META[id]
-          const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
+          const label = NAV_LABELS[id]
+          const Icon = resolveNavIcon(id, viewMode)
           return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
         })}
 
@@ -132,8 +133,8 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         )}
 
         {rightNav.map((id) => {
-          const { label, Icon: DefaultIcon } = NAV_META[id]
-          const Icon = id === 'library' && viewMode === 'list' ? List : DefaultIcon
+          const label = NAV_LABELS[id]
+          const Icon = resolveNavIcon(id, viewMode)
           return <NavTab key={id} active={currentView === id} onClick={() => onViewChange(id)} label={label} Icon={Icon} />
         })}
 

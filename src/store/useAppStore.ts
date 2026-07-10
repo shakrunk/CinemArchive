@@ -1225,6 +1225,14 @@ export const useAllDecades = () => {
   return useMemo(() => [...new Set(titles.map((t) => `${Math.floor(t.year / 10) * 10}s`))].sort(), [titles])
 }
 
+export const useVisibleNavItems = () => {
+  const navPrefs = useAppStore((s) => s.navPrefs)
+  return useMemo(
+    () => navPrefs.order.filter((id) => !navPrefs.hidden.includes(id)),
+    [navPrefs],
+  )
+}
+
 export const useAllLanguages = () => {
   const titles = useAppStore((s) => s.titles)
   return useMemo(

@@ -45,6 +45,7 @@ const TYPE_OPTIONS: { value: MediaType | 'all'; label: string }[] = [
 ]
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'lastInteraction', label: 'Last Interaction' },
   { value: 'addedAt', label: 'Date Added' },
   { value: 'title', label: 'Title' },
   { value: 'year', label: 'Year' },

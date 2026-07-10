@@ -33,7 +33,7 @@ import type { SearchResult } from '../lib/media'
 
 // ─── Filter & Sort Types ────────────────────────────────────────────────────
 
-export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director'
+export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director' | 'lastInteraction'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
 export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
@@ -284,7 +284,7 @@ const defaultFilters: LibraryFilters = {
   person: null,
   studio: null,
   groupByFranchise: false,
-  sortField: 'addedAt',
+  sortField: 'lastInteraction',
   sortDir: 'desc',
 }
 
@@ -303,6 +303,30 @@ export function titleHasPerson(title: Title, personId: number): boolean {
     }
   }
   return false
+}
+
+function timeOf(dateStr: string | undefined): number {
+  return dateStr ? new Date(dateStr).getTime() : -Infinity
+}
+
+/** Most recent user interaction with a title: added, (re)watched, or — for
+ *  TV — any per-episode watch/rating/review event. Deliberately excludes
+ *  `titles.updated_at` (bumped by bulk metadata refresh on every title, which
+ *  would collapse this into "everything touched just now") and sharing
+ *  (no per-title timestamp exists for that in the data model). */
+export function titleLastInteractionAt(title: Title): number {
+  let latest = timeOf(title.addedAt)
+  for (const v of title.viewings) {
+    latest = Math.max(latest, timeOf(v.date))
+  }
+  for (const season of title.seasons ?? []) {
+    for (const ep of season.episodes ?? []) {
+      for (const we of ep.watchEvents) latest = Math.max(latest, timeOf(we.watchedAt))
+      for (const r of ep.ratings) latest = Math.max(latest, timeOf(r.ratedAt))
+      for (const rv of ep.reviews) latest = Math.max(latest, timeOf(rv.reviewedAt))
+    }
+  }
+  return latest
 }
 
 function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[] {
@@ -366,6 +390,14 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
   }
 
   // Sort
+  // Precomputed once per sort pass — titleLastInteractionAt walks every
+  // episode's watch/rating/review events, so calling it per-comparison
+  // would redo that work O(n log n) times instead of O(n).
+  const lastInteractionById =
+    filters.sortField === 'lastInteraction'
+      ? new Map(result.map((t) => [t.id, titleLastInteractionAt(t)]))
+      : null
+
   result.sort((a, b) => {
     let comparison = 0
     switch (filters.sortField) {
@@ -380,6 +412,9 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
         break
       case 'addedAt':
         comparison = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
+        break
+      case 'lastInteraction':
+        comparison = (lastInteractionById!.get(a.id) ?? 0) - (lastInteractionById!.get(b.id) ?? 0)
         break
       case 'director':
         comparison = (a.director ?? '').localeCompare(b.director ?? '')
@@ -429,6 +464,10 @@ type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 2
+
+// Guards the one-time default-sort migration below (separate localStorage key
+// so it fires exactly once, independent of PERSIST_VERSION).
+const SORT_DEFAULT_MIGRATION_KEY = 'cinemarchive-sort-default-migrated'
 
 // ─── Ledger layout write-behind ─────────────────────────────────────────────
 // Layout edits are rapid (drags fire many width/order updates), so the synced
@@ -1181,6 +1220,15 @@ export const useAppStore = create<AppStore>()(
         if (!state) return
         // Older persisted payloads may lack newer filter keys — backfill them.
         state.filters = { ...defaultFilters, ...state.filters }
+        // One-time migration: the default sort used to be 'addedAt'. Flip
+        // still-on-default users over to the new 'lastInteraction' default
+        // without touching anyone who has since picked a different sort.
+        if (typeof localStorage !== 'undefined' && !localStorage.getItem(SORT_DEFAULT_MIGRATION_KEY)) {
+          if (state.filters.sortField === 'addedAt') {
+            state.filters.sortField = 'lastInteraction'
+          }
+          localStorage.setItem(SORT_DEFAULT_MIGRATION_KEY, '1')
+        }
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)
         // Migrate ledger layout prefs. Older payloads used per-panel-type

@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { ChoiceModal, ChoiceCard } from 'src/components/ui/choice-modal'
 
 interface SpiderNoirModeModalProps {
   open: boolean
@@ -8,209 +7,130 @@ interface SpiderNoirModeModalProps {
 }
 
 export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeModalProps) {
-  useEffect(() => {
-    if (!open) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onSkip()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onSkip])
-
-  if (!open) return null
-
-  return createPortal(
-    <>
-      <div
-        aria-hidden="true"
-        onClick={onSkip}
+  return (
+    <ChoiceModal
+      open={open}
+      onDismiss={onSkip}
+      ariaLabel="How did you experience this?"
+      backdropColor="rgba(11, 9, 7, 0.92)"
+    >
+      <h2
         style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 10000,
-          background: 'rgba(11, 9, 7, 0.92)',
-          backdropFilter: 'blur(8px)',
-          animation: 'spider-noir-fade-in 300ms ease',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="How did you experience this?"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 10001,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px',
-          pointerEvents: 'none',
+          fontFamily: 'var(--serif)',
+          fontSize: 'clamp(20px, 5vw, 28px)',
+          color: 'rgb(var(--ivory))',
+          marginBottom: '8px',
+          textAlign: 'center',
+          letterSpacing: '-0.01em',
         }}
       >
-        <div style={{ display: 'contents', pointerEvents: 'auto' }}>
-          <h2
-            style={{
-              fontFamily: 'var(--serif)',
-              fontSize: 'clamp(20px, 5vw, 28px)',
-              color: 'rgb(var(--ivory))',
-              marginBottom: '8px',
-              textAlign: 'center',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            How did you experience this?
-          </h2>
+        How did you experience this?
+      </h2>
 
-          <p
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: '11px',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'rgba(243, 234, 217, 0.5)',
-              marginBottom: '32px',
-              textAlign: 'center',
-            }}
-          >
-            Spider-Man: Noir
-          </p>
+      <p
+        style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '11px',
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: 'rgba(243, 234, 217, 0.5)',
+          marginBottom: '32px',
+          textAlign: 'center',
+        }}
+      >
+        Spider-Man: Noir
+      </p>
 
-          {/* Choice cards */}
-          <div style={{ display: 'flex', gap: '16px', width: '100%', maxWidth: '480px' }}>
-            {/* B&W card */}
-            <button
-              aria-label="Authentic Black & White"
-              onClick={() => onSelect('bw')}
+      <div style={{ display: 'flex', gap: '16px', width: '100%', maxWidth: '480px' }}>
+        <ChoiceCard
+          ariaLabel="Authentic Black & White"
+          onClick={() => onSelect('bw')}
+          borderColor="rgba(255,255,255,0.15)"
+          hoverBorderColor="rgba(255,255,255,0.4)"
+          background="linear-gradient(160deg, rgba(80,80,80,0.3), rgba(20,20,20,0.5))"
+          filter="grayscale(1)"
+        >
+          <span style={{ fontSize: '36px', lineHeight: 1, color: '#ccc' }}>◐</span>
+          <div style={{ textAlign: 'center' }}>
+            <div
               style={{
-                flex: 1,
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '12px',
-                padding: '24px 16px',
-                cursor: 'pointer',
-                transition: 'transform 0.18s, border-color 0.18s',
-                filter: 'grayscale(1)',
-                background: 'linear-gradient(160deg, rgba(80,80,80,0.3), rgba(20,20,20,0.5))',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = ''
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
+                fontFamily: 'var(--serif)',
+                fontSize: '15px',
+                color: '#e0e0e0',
+                marginBottom: '4px',
+                fontVariationSettings: '"opsz" 24',
               }}
             >
-              <span style={{ fontSize: '36px', lineHeight: 1, color: '#ccc' }}>◐</span>
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  style={{
-                    fontFamily: 'var(--serif)',
-                    fontSize: '15px',
-                    color: '#e0e0e0',
-                    marginBottom: '4px',
-                    fontVariationSettings: '"opsz" 24',
-                  }}
-                >
-                  Authentic
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--mono)',
-                    fontSize: '10px',
-                    color: '#999',
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Black &amp; White
-                </div>
-              </div>
-            </button>
-
-            {/* Color card */}
-            <button
-              aria-label="True-Hue Full Color"
-              onClick={() => onSelect('color')}
+              Authentic
+            </div>
+            <div
               style={{
-                flex: 1,
-                border: '1px solid rgba(233, 178, 102, 0.3)',
-                borderRadius: '12px',
-                padding: '24px 16px',
-                cursor: 'pointer',
-                transition: 'transform 0.18s, border-color 0.18s, box-shadow 0.18s',
-                background: 'linear-gradient(160deg, rgba(192, 57, 43, 0.35), rgba(233, 178, 102, 0.2))',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px)'
-                e.currentTarget.style.borderColor = 'rgba(233, 178, 102, 0.7)'
-                e.currentTarget.style.boxShadow = '0 8px 32px -8px rgba(233, 178, 102, 0.4)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = ''
-                e.currentTarget.style.borderColor = 'rgba(233, 178, 102, 0.3)'
-                e.currentTarget.style.boxShadow = ''
+                fontFamily: 'var(--mono)',
+                fontSize: '10px',
+                color: '#999',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
               }}
             >
-              <span style={{ fontSize: '36px', lineHeight: 1, color: 'var(--amber)' }}>◈</span>
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  style={{
-                    fontFamily: 'var(--serif)',
-                    fontSize: '15px',
-                    color: 'var(--amber)',
-                    marginBottom: '4px',
-                    fontVariationSettings: '"opsz" 24',
-                  }}
-                >
-                  True-Hue
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--mono)',
-                    fontSize: '10px',
-                    color: 'var(--amber-deep)',
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Full Color
-                </div>
-              </div>
-            </button>
+              Black &amp; White
+            </div>
           </div>
+        </ChoiceCard>
 
-          {/* Skip */}
-          <button
-            onClick={onSkip}
-            style={{
-              marginTop: '24px',
-              fontFamily: 'var(--mono)',
-              fontSize: '11px',
-              color: 'rgba(243, 234, 217, 0.5)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              letterSpacing: '0.08em',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(243, 234, 217, 0.7)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(243, 234, 217, 0.5)')}
-          >
-            not now
-          </button>
-        </div>
+        <ChoiceCard
+          ariaLabel="True-Hue Full Color"
+          onClick={() => onSelect('color')}
+          borderColor="rgba(233, 178, 102, 0.3)"
+          hoverBorderColor="rgba(233, 178, 102, 0.7)"
+          hoverShadowColor="rgba(233, 178, 102, 0.4)"
+          background="linear-gradient(160deg, rgba(192, 57, 43, 0.35), rgba(233, 178, 102, 0.2))"
+        >
+          <span style={{ fontSize: '36px', lineHeight: 1, color: 'var(--amber)' }}>◈</span>
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontFamily: 'var(--serif)',
+                fontSize: '15px',
+                color: 'var(--amber)',
+                marginBottom: '4px',
+                fontVariationSettings: '"opsz" 24',
+              }}
+            >
+              True-Hue
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: '10px',
+                color: 'var(--amber-deep)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Full Color
+            </div>
+          </div>
+        </ChoiceCard>
       </div>
-    </>,
-    document.body
+
+      <button
+        onClick={onSkip}
+        style={{
+          marginTop: '24px',
+          fontFamily: 'var(--mono)',
+          fontSize: '11px',
+          color: 'rgba(243, 234, 217, 0.5)',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          letterSpacing: '0.08em',
+          transition: 'color 0.15s',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(243, 234, 217, 0.7)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(243, 234, 217, 0.5)')}
+      >
+        not now
+      </button>
+    </ChoiceModal>
   )
 }

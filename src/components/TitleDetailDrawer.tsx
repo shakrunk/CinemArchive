@@ -27,7 +27,7 @@ import {
 import { cn, fmtDate, fmtReleaseDate, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, TMDB_STILL_BASE, type TitleVideo, type WatchProviders } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
+import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
@@ -1164,13 +1164,13 @@ export function TitleDetailDrawer() {
               console.error('Episode metadata backfill DB write failed:', e)
             )
           }
-          for (const { seasonId, cast } of allSeasonCast) {
-            upsertSeasonCastInDb(snapshotUser.id, snapshotTitle.id, seasonId, cast).catch((e) =>
+          if (allSeasonCast.length > 0) {
+            bulkUpsertSeasonCastInDb(snapshotUser.id, snapshotTitle.id, allSeasonCast).catch((e) =>
               console.error('Season cast backfill DB write failed:', e)
             )
           }
-          for (const { episodeId, crew } of allEpisodeCrew) {
-            upsertEpisodeCrewInDb(snapshotUser.id, snapshotTitle.id, episodeId, crew).catch((e) =>
+          if (allEpisodeCrew.length > 0) {
+            bulkUpsertEpisodeCrewInDb(snapshotUser.id, snapshotTitle.id, allEpisodeCrew).catch((e) =>
               console.error('Episode crew backfill DB write failed:', e)
             )
           }

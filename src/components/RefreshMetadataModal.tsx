@@ -6,7 +6,7 @@ import { Input } from 'src/components/ui/input'
 import { PosterThumb } from 'src/components/ui/poster-thumb'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
+import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
 import type { Title, Episode, EpisodeCrew } from 'src/store/mockData'
 
 // Project an existing library Title back into a SearchResult so it can be
@@ -224,13 +224,13 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
               console.error('Episode metadata refresh DB write failed:', e)
             )
           }
-          for (const { seasonId, cast } of allSeasonCast) {
-            upsertSeasonCastInDb(user.id, title.id, seasonId, cast).catch((e) =>
+          if (allSeasonCast.length > 0) {
+            bulkUpsertSeasonCastInDb(user.id, title.id, allSeasonCast).catch((e) =>
               console.error('Season cast refresh DB write failed:', e)
             )
           }
-          for (const { episodeId, crew } of allEpisodeCrew) {
-            upsertEpisodeCrewInDb(user.id, title.id, episodeId, crew).catch((e) =>
+          if (allEpisodeCrew.length > 0) {
+            bulkUpsertEpisodeCrewInDb(user.id, title.id, allEpisodeCrew).catch((e) =>
               console.error('Episode crew refresh DB write failed:', e)
             )
           }

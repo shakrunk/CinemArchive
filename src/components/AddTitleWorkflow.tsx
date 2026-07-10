@@ -478,6 +478,9 @@ export function AddTitleWorkflow() {
 
               {!loading && results.length === 0 && query.length > 1 && (
                 <div className="text-center py-6 text-muted-foreground text-sm flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-secondary/40 flex items-center justify-center mx-auto mb-1">
+                    <Search className="w-6 h-6 text-muted-foreground/40" />
+                  </div>
                   <div>No results for "{query}"</div>
                   <button
                     onClick={() => {

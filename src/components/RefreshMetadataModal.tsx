@@ -108,6 +108,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
         originalLanguage: result.originalLanguage,
         contentRating: result.contentRating,
         imdbId: result.imdbId,
+        rtUrl: result.rtUrl,
         imdbRating: result.imdbRating,
         rtScore: result.rtScore,
         metacriticScore: result.metacriticScore,

@@ -25,6 +25,7 @@ export interface SearchResult {
   originalLanguage?: string  // ISO 639-1 code, e.g. "en"
   contentRating?: string  // age certification, e.g. "PG-13", "TV-MA"
   imdbId?: string  // e.g. "tt1375666"
+  rtUrl?: string  // Rotten Tomatoes page URL, resolved via Wikidata
   imdbRating?: number
   rtScore?: number
   metacriticScore?: number
@@ -259,13 +260,15 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
 
   let imdbRating: number | undefined
   let rtScore: number | undefined
+  let rtUrl: string | undefined
   let metacriticScore: number | undefined
 
   if (imdbId) {
     try {
-      const { data: ratingsData } = await supabase.functions.invoke(
-        `media-proxy?action=ratings&imdb=${imdbId}`
-      )
+      const [{ data: ratingsData }, { data: rtLinkData }] = await Promise.all([
+        supabase.functions.invoke(`media-proxy?action=ratings&imdb=${imdbId}`),
+        supabase.functions.invoke(`media-proxy?action=rt_link&imdb=${imdbId}`),
+      ])
       if (ratingsData) {
         imdbRating =
           ratingsData.imdbRating && ratingsData.imdbRating !== 'N/A'
@@ -276,6 +279,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
         const meta = ratingsData.Metascore
         metacriticScore = meta && meta !== 'N/A' ? parseInt(meta, 10) : undefined
       }
+      rtUrl = rtLinkData?.rtUrl ?? undefined
     } catch (e) {
       console.error('Error fetching ratings:', e)
     }
@@ -338,6 +342,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     originalLanguage: data.original_language || undefined,
     contentRating: extractCertification(data, base.type),
     imdbId,
+    rtUrl,
     posterUrl: data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : base.posterUrl,
     backdropUrl: data.backdrop_path ? `${TMDB_IMG}/w1280${data.backdrop_path}` : base.backdropUrl,
     director,

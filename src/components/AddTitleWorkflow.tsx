@@ -397,6 +397,7 @@ export function AddTitleWorkflow() {
       originalLanguage: selected.originalLanguage,
       contentRating: selected.contentRating,
       imdbId: selected.imdbId,
+      rtUrl: selected.rtUrl,
       director: selected.director,
       genres: selected.genres,
       posterUrl: selected.posterUrl,

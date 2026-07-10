@@ -606,14 +606,6 @@
     border-right: 5px solid rgb(var(--film-stock));
     border-radius: 0;
     overflow: hidden;
-    transition:
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
-  }
-  .film-frame:hover {
-    /* Subtle amber frame focus color for the contiguous frames. */
-    border-color: rgb(var(--amber-rgb) / 0.4);
-    box-shadow: none; /* Removed the hover inner shadow for clarity. */
   }
   /* Thin black mat around the poster art itself, making it look nested. */
   .film-frame__window {

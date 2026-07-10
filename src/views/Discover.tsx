@@ -639,22 +639,31 @@ interface DiscoverDetailModalProps {
 
 function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: DiscoverDetailModalProps) {
   const [details, setDetails] = useState<SearchResult | null>(null)
-  const [hydrating, setHydrating] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [loadedTmdbId, setLoadedTmdbId] = useState<number | null | undefined>(undefined)
+
+  // Reset stale details/logo the moment the result identity changes, rather than in an
+  // effect — this is React's documented "adjusting state when a prop changes" pattern.
+  if ((result?.tmdbId ?? null) !== loadedTmdbId) {
+    setLoadedTmdbId(result?.tmdbId ?? null)
+    setDetails(null)
+    setLogoUrl(null)
+  }
+
+  // Derived rather than tracked separately: we're hydrating exactly while a result is open
+  // and its details haven't landed yet (details is reset to null above on every identity change).
+  const hydrating = !!result && details === null
 
   useEffect(() => {
-    if (!result) { setDetails(null); return }
-    setDetails(null)
-    setHydrating(true)
+    if (!result) return
     fetchMediaDetails(result)
       .then(({ result: r }) => setDetails(r))
       .catch(() => setDetails(result))
-      .finally(() => setHydrating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result?.tmdbId])
 
   useEffect(() => {
-    if (!result?.tmdbId) { setLogoUrl(null); return }
+    if (!result?.tmdbId) return
     let cancelled = false
     fetchTitleImages(result.tmdbId, result.type).then(({ logoUrl: logo }) => {
       if (!cancelled) setLogoUrl(logo)
@@ -957,20 +966,18 @@ export function Discover() {
   )
 
   // ── "Because you watched" — front-end only for now, see TODO near becauseWatchedResults ──
-  const [becauseWatchedId, setBecauseWatchedId] = useState<string | null>(null)
+  const [becauseWatchedOverrideId, setBecauseWatchedOverrideId] = useState<string | null>(null)
 
   // ── "More starring" — real TMDB filmography via fetchPersonCredits, keyed off library cast ──
-  const [moreStarringPersonId, setMoreStarringPersonId] = useState<number | null>(null)
+  const [moreStarringOverridePersonId, setMoreStarringOverridePersonId] = useState<number | null>(null)
   const [moreStarringResults, setMoreStarringResults] = useState<SearchResult[]>([])
-  const [moreStarringLoading, setMoreStarringLoading] = useState(false)
+  const [loadedMoreStarringPersonId, setLoadedMoreStarringPersonId] = useState<number | null>(null)
 
   // Close the filter popover on outside click
   useClickOutside(filterPanelRef, () => setFiltersOpen(false), filtersOpen)
 
-  // Default the "because you watched" basis to the first library title once titles load
-  useEffect(() => {
-    if (becauseWatchedId === null && titles.length > 0) setBecauseWatchedId(titles[0].id)
-  }, [titles, becauseWatchedId])
+  // Basis defaults to the first library title unless the user picked one explicitly
+  const becauseWatchedId = becauseWatchedOverrideId ?? (titles.length > 0 ? titles[0].id : null)
 
   const castOptions = useMemo(() => {
     const seen = new Map<number, string>()
@@ -982,23 +989,29 @@ export function Discover() {
     return Array.from(seen, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
   }, [titles])
 
-  // Default the "more starring" basis to the first known cast member once library cast loads
-  useEffect(() => {
-    if (moreStarringPersonId === null && castOptions.length > 0) setMoreStarringPersonId(castOptions[0].id)
-  }, [castOptions, moreStarringPersonId])
+  // Basis defaults to the first known cast member unless the user picked one explicitly
+  const moreStarringPersonId = moreStarringOverridePersonId ?? (castOptions.length > 0 ? castOptions[0].id : null)
+
+  // Derived rather than tracked separately: loading exactly while we have a basis whose
+  // credits haven't landed yet (mirrors DiscoverDetailModal's `hydrating` derivation above).
+  const moreStarringLoading = moreStarringPersonId !== null && moreStarringPersonId !== loadedMoreStarringPersonId
 
   // Real filmography lookup — unlike "because you watched" this is fully wired to TMDB
   useEffect(() => {
-    if (moreStarringPersonId === null) { setMoreStarringResults([]); return }
+    if (moreStarringPersonId === null) return
     let cancelled = false
-    setMoreStarringLoading(true)
     fetchPersonCredits(moreStarringPersonId)
       .then((credits) => {
         if (cancelled) return
         setMoreStarringResults(credits.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+        setLoadedMoreStarringPersonId(moreStarringPersonId)
       })
-      .catch((err) => { console.error('more starring credits error:', err); if (!cancelled) setMoreStarringResults([]) })
-      .finally(() => { if (!cancelled) setMoreStarringLoading(false) })
+      .catch((err) => {
+        console.error('more starring credits error:', err)
+        if (cancelled) return
+        setMoreStarringResults([])
+        setLoadedMoreStarringPersonId(moreStarringPersonId)
+      })
     return () => { cancelled = true }
   }, [moreStarringPersonId, libraryTmdbIds])
 
@@ -1035,10 +1048,10 @@ export function Discover() {
   }, [filterType, selectedGenreId, query, searchMode])
 
   // Company titles — re-fetch when type filter changes while a company is selected
+  // (the loading flag for this case is set by handleTypeChange, which triggers this effect)
   useEffect(() => {
     if (searchMode !== 'studios' || !selectedCompany) return
     let cancelled = false
-    setLoading(true)
     const type: MediaType = filterType === 'all' ? 'movie' : filterType
     fetchCompanyTitles(selectedCompany.id, type)
       .then((data) => { if (!cancelled) { setCompanyTitles(data); setLoading(false) } })
@@ -1165,8 +1178,10 @@ export function Discover() {
       setLoading(true)
       setSearchResults([])
       setQuery('')
+    } else if (searchMode === 'studios' && selectedCompany) {
+      setLoading(true)
     }
-    // People: re-filters via personCredits memo; Studios: re-fetches via effect
+    // People: re-filters via personCredits memo
   }
 
   async function handleLoadMore() {
@@ -1243,7 +1258,11 @@ export function Discover() {
 
   const becauseWatchedDelays = useMemo(() => staggerDelays(becauseWatchedResults.length), [becauseWatchedResults.length])
 
-  const moreStarringDelays = useMemo(() => staggerDelays(moreStarringResults.length), [moreStarringResults.length])
+  // Hide stale results the moment the basis reverts to no selection (e.g. an empty library)
+  // rather than clearing them from an effect.
+  const visibleMoreStarringResults = moreStarringPersonId === null ? [] : moreStarringResults
+
+  const moreStarringDelays = useMemo(() => staggerDelays(visibleMoreStarringResults.length), [visibleMoreStarringResults.length])
 
   const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
@@ -1506,7 +1525,7 @@ export function Discover() {
               <TasteDropdown
                 options={titles.map((t) => ({ id: t.id, label: t.title }))}
                 value={becauseWatchedId}
-                onChange={setBecauseWatchedId}
+                onChange={setBecauseWatchedOverrideId}
                 ariaLabel="Choose a title to base recommendations on"
               />
             </div>
@@ -1535,7 +1554,7 @@ export function Discover() {
               <TasteDropdown
                 options={castOptions.map((c) => ({ id: String(c.id), label: c.name }))}
                 value={moreStarringPersonId != null ? String(moreStarringPersonId) : null}
-                onChange={(id) => setMoreStarringPersonId(Number(id))}
+                onChange={(id) => setMoreStarringOverridePersonId(Number(id))}
                 ariaLabel="Choose an actor to see more of their titles"
               />
             </div>
@@ -1545,9 +1564,9 @@ export function Discover() {
                   <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
                 ))}
               </div>
-            ) : moreStarringResults.length > 0 ? (
+            ) : visibleMoreStarringResults.length > 0 ? (
               <DiscoverCarousel
-                results={moreStarringResults}
+                results={visibleMoreStarringResults}
                 libraryTmdbIds={libraryTmdbIds}
                 isSharedView={isSharedView}
                 onAdd={openAddTitlePreselected}

@@ -2,7 +2,7 @@
 // Ledger's panels. Split out of Ledger.tsx so each panel lives in its own file.
 
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 
 export function Panel({
   title,
@@ -32,10 +32,7 @@ export function PanelEmpty({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-8 gap-3">
       <p className="text-center text-sm text-paper-faint">{message}</p>
-      <button
-        onClick={() => requestView('library')}
-        className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
-      >
+      <button onClick={() => requestView('library')} className={SECONDARY_AMBER_BUTTON}>
         Browse Library
       </button>
     </div>

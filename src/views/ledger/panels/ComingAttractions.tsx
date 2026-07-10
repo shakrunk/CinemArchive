@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 import { deriveAttractions } from 'src/store/ledgerDerive'
 import type { LedgerPanelWidth, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
@@ -77,10 +77,7 @@ export function ComingAttractions({
               setFilter('status', 'watchlist')
               requestView('library')
             }}
-            className={cn(
-              'self-start text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors',
-              isSplit ? 'mt-5' : 'mt-6',
-            )}
+            className={cn(SECONDARY_AMBER_BUTTON, 'self-start', isSplit ? 'mt-5' : 'mt-6')}
           >
             View the watchlist
           </button>

@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel } from '../PanelShell'
+import { Panel, PanelEmpty } from '../PanelShell'
 
 export function EncorePerformances({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
@@ -19,8 +19,6 @@ export function EncorePerformances({ className, settings }: { className?: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [titles, settingsKey])
 
-  const requestView = useAppStore((s) => s.requestView)
-
   return (
     <Panel
       title={settings?.title || 'Encore performances'}
@@ -28,15 +26,7 @@ export function EncorePerformances({ className, settings }: { className?: string
       className={className}
     >
       {encores.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <p className="text-center text-sm text-paper-faint">No title has screened twice yet</p>
-          <button
-            onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
-          >
-            Browse Library
-          </button>
-        </div>
+        <PanelEmpty message="No title has screened twice yet" />
       ) : (
         <ol className="flex flex-col gap-1">
           {encores.map((t, i) => (

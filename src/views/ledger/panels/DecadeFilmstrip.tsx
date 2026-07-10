@@ -7,7 +7,7 @@ import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledge
 import { decadeOf } from 'src/lib/utils'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
-import { Panel } from '../PanelShell'
+import { Panel, PanelEmpty } from '../PanelShell'
 
 const FILMSTRIP_HOLES = Array.from({ length: 28 })
 
@@ -50,15 +50,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
       className={className}
     >
       {decades.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <p className="text-center text-sm text-paper-faint">No titles yet</p>
-          <button
-            onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
-          >
-            Browse Library
-          </button>
-        </div>
+        <PanelEmpty message="No titles yet" />
       ) : (
         <div
           className="rounded-xl overflow-x-auto overflow-y-hidden scrollbar-thin"

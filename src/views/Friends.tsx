@@ -22,6 +22,7 @@ import {
 } from 'src/lib/db'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { Section } from 'src/components/ui/section'
+import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
@@ -321,7 +322,7 @@ function InboxSection() {
           <p className="text-center text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</p>
           <button
             onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
           >
             Browse Library
           </button>
@@ -459,7 +460,7 @@ function ActivitySection() {
           <p className="text-center text-xs font-sans text-muted-foreground italic">No friend activity yet.</p>
           <button
             onClick={() => requestView('discover')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
           >
             Discover Titles
           </button>

@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { deriveTopGenres } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel } from '../PanelShell'
+import { Panel, PanelEmpty } from '../PanelShell'
 
 export function GenreBars({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
@@ -25,15 +25,7 @@ export function GenreBars({ className, settings }: { className?: string; setting
       className={className}
     >
       {genres.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-3">
-          <p className="text-center text-sm text-paper-faint">No genres yet</p>
-          <button
-            onClick={() => requestView('library')}
-            className="text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors"
-          >
-            Browse Library
-          </button>
-        </div>
+        <PanelEmpty message="No genres yet" />
       ) : (
         <div className="flex flex-wrap items-center justify-center gap-3 py-2">
           {genres.map((g, i) => {

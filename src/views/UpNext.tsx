@@ -9,6 +9,7 @@ import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import type { Title } from 'src/store/mockData'
 import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
 import { staggerDelays } from 'src/lib/utils'
+import { EmptyState } from 'src/components/ui/empty-state'
 
 const UNDO_WINDOW_MS = 6000
 
@@ -56,21 +57,16 @@ function ProgressBar({ watched, total }: { watched: number; total: number }) {
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
-function EmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
+function UpNextEmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   return (
-    <div className="text-center py-24 px-5 text-paper-faint">
-      <PlayCircle className="w-14 h-14 mx-auto mb-5 text-amber-deep opacity-50" />
-      <p className="font-serif text-2xl text-paper-dim font-light">Nothing in progress.</p>
-      <p className="font-sans text-sm mt-2 opacity-70">
-        Start a series and set it to “Watching” to see your next episode here.
-      </p>
-      <button
-        onClick={onBrowseLibrary}
-        className="mt-6 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
-      >
-        Browse the Library
-      </button>
-    </div>
+    <EmptyState
+      Icon={PlayCircle}
+      title="Nothing in progress."
+      subtext="Start a series and set it to “Watching” to see your next episode here."
+      ctaLabel="Browse the Library"
+      onCta={onBrowseLibrary}
+      ctaClassName="mt-6"
+    />
   )
 }
 
@@ -295,7 +291,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
         <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">Up Next</h1>
       </header>
       {isEmpty ? (
-        <EmptyState onBrowseLibrary={onBrowseLibrary} />
+        <UpNextEmptyState onBrowseLibrary={onBrowseLibrary} />
       ) : (
         <div className="upnext-grid grid grid-cols-1 sm:grid-cols-2 gap-3">
           {shows.map((entry) => (

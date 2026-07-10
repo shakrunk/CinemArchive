@@ -457,6 +457,11 @@
       transparent 100%
     );
   }
+  @media (max-width: 640px) {
+    .reel-scrim {
+      width: 28px;
+    }
+  }
 
   /* ── Film strip: the whole DiscoverCarousel dresses up as a continuous
         physical strip of 35mm film stock. Deliberately has NO background of its

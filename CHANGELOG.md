@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-10
+
+### Fixed
+- Ledger — "By the Genre" widget: genre bubbles no longer overflow the card
+  when `topN` is configured toward the high end of its 3–12 range. Bubble size
+  (and the `sm`-preset ranked list's row height) is now derived from an
+  estimated row count so the widget's fixed-height card fits any configured
+  count without forcing an internal scrollbar.
+
 ## [1.0.1] - 2026-07-10
 
 ### Fixed

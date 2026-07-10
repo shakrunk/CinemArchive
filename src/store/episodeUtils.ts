@@ -1,4 +1,4 @@
-import type { Episode, Season, Title } from './mockData'
+import type { Episode, EpisodeWatchEvent, Season, Title } from './mockData'
 
 // ─── Canonical rating helpers — single source of truth for all rollups ───────
 
@@ -68,17 +68,26 @@ export function nextUnwatchedEpisode(
   return null
 }
 
+// ─── Cross-title episode watch-event traversal ───────────────────────────────
+
+/** Every watch event across all of a title's seasons/episodes, in season →
+ *  episode order. Single traversal shared by everything that needs to scan a
+ *  title's full watch history rather than one season/episode at a time. */
+export function* allWatchEvents(title: Title): Generator<EpisodeWatchEvent> {
+  for (const season of title.seasons ?? []) {
+    for (const ep of season.episodes ?? []) {
+      yield* ep.watchEvents
+    }
+  }
+}
+
 // ─── Spider-Noir color mode progression ──────────────────────────────────────
 
 /** Modes with at least one episode watch event recorded in that mode. */
 export function getUnlockedModes(title: Title): Set<'bw' | 'color'> {
   const modes = new Set<'bw' | 'color'>()
-  for (const season of title.seasons ?? []) {
-    for (const ep of season.episodes ?? []) {
-      for (const we of ep.watchEvents) {
-        if (we.colorMode) modes.add(we.colorMode)
-      }
-    }
+  for (const we of allWatchEvents(title)) {
+    if (we.colorMode) modes.add(we.colorMode)
   }
   return modes
 }

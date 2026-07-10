@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
 import { X, Film, Tv } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
+import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
+import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import type { CastMember, CrewMember } from 'src/store/mockData'
 
 export interface PersonDetailTarget {
@@ -19,21 +20,7 @@ interface PersonDetailPanelProps {
 export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
   const titles = useAppStore((s) => s.titles)
   const browseByPerson = useAppStore((s) => s.browseByPerson)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
-
-  const onCloseRef = useRef(onClose)
-  useEffect(() => { onCloseRef.current = onClose })
-
-  useEffect(() => {
-    const returnEl = document.activeElement as HTMLElement
-    closeButtonRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current() }
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      returnEl?.focus()
-    }
-  }, [])
+  const closeButtonRef = useModalFocusAndEscape<HTMLButtonElement>(onClose)
 
   const personTitles = titles.filter((t) => {
     if (t.cast?.some((m: CastMember) => m.tmdbPersonId === person.tmdbPersonId)) return true
@@ -48,14 +35,7 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${person.name} details`}
-      className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.82)', zIndex: 215 }}
-      onClick={onClose}
-    >
+    <ModalBackdrop onClose={onClose} ariaLabel={`${person.name} details`}>
       <div
         className="relative w-full max-w-sm rounded-xl overflow-hidden"
         style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
@@ -156,6 +136,6 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

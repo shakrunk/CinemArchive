@@ -2,10 +2,10 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { areaPath, linePath } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
+import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
 import { Panel } from '../PanelShell'
 
 const FILMSTRIP_HOLES = Array.from({ length: 28 })
@@ -32,11 +32,12 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
 
   const maxCount = Math.max(...decades.map((d) => d.count), 1)
 
-  const points = useMemo(
+  const points: SparklinePoint[] = useMemo(
     () =>
       decades.map((d, i) => ({
         x: decades.length === 1 ? 500 : (i / (decades.length - 1)) * 1000,
         y: 190 - (d.count / maxCount) * 164,
+        tooltip: { label: d.label, value: `${d.count} title${d.count !== 1 ? 's' : ''}` },
       })),
     [decades, maxCount],
   )
@@ -68,49 +69,17 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
                 <span key={i} />
               ))}
             </div>
-            <div className="relative w-full h-[150px]">
-              <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="absolute inset-0 w-full h-full block">
-                <defs>
-                  <linearGradient id="filmstrip-area" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--amber)" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="var(--amber)" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <path d={areaPath(points, 190)} fill="url(#filmstrip-area)" />
-                <path
-                  d={linePath(points)}
-                  fill="none"
-                  stroke="var(--amber-bright)"
-                  strokeWidth={3}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  pathLength={1}
-                  className="chart-path-draw"
-                  style={{ strokeDasharray: 1 }}
-                  vectorEffect="non-scaling-stroke"
-                />
-              </svg>
-              {/* Rendered as HTML dots, not SVG circles — preserveAspectRatio="none"
-                  stretches x/y independently, which would turn <circle> into ellipses. */}
-              {points.map((p, i) => (
-                <span
-                  key={i}
-                  {...tip.bind({
-                    label: decades[i].label,
-                    value: `${decades[i].count} title${decades[i].count !== 1 ? 's' : ''}`,
-                  })}
-                  className="absolute rounded-full -translate-x-1/2 -translate-y-1/2"
-                  style={{
-                    left: `${(p.x / 1000) * 100}%`,
-                    top: `${(p.y / 200) * 100}%`,
-                    width: 14,
-                    height: 14,
-                    background: 'var(--ink-1)',
-                    border: '2.5px solid var(--amber-bright)',
-                  }}
-                />
-              ))}
-            </div>
+            <MiniLineChart
+              points={points}
+              viewBoxHeight={200}
+              areaBaseline={190}
+              heightPx={150}
+              lineColor="var(--amber-bright)"
+              areaColor="var(--amber)"
+              areaOpacity={0.35}
+              dotSize={14}
+              tipBind={tip.bind}
+            />
             <div className="filmstrip-holes pb-3">
               {FILMSTRIP_HOLES.map((_, i) => (
                 <span key={i} />

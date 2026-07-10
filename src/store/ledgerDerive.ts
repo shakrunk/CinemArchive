@@ -4,13 +4,14 @@
 // settingsKey]); `titles` is replaced wholesale by the store on any change,
 // so reference equality is a sound cache key.
 //
-// computeLedgerStats (ledgerStats.ts) still powers the hero/ribbon and stays
-// untouched — these functions cover the panels, which need per-instance
-// parameterization.
+// computeLedgerStats (ledgerStats.ts) calls several of these unscoped (no
+// settings) for the whole-library hero/ribbon — the same rollup, computed
+// once here, feeds both the hero stats and the per-widget panels.
 
 import type { Title } from './mockData'
 import type { LedgerPanelId, LedgerTimeRange, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { effectiveLedgerSettings } from 'src/lib/ledgerPanels'
+import { allWatchEvents } from './episodeUtils'
 
 // ─── Scope & time-range helpers ──────────────────────────────────────────────
 
@@ -54,10 +55,25 @@ export function scopedTitles(
 
 // ─── Per-panel derivations (ported from ledgerStats.ts + inline useMemos) ───
 
-function tally(values: string[]): [string, number][] {
+export function tally(values: string[]): [string, number][] {
   const counts = new Map<string, number>()
   for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
   return [...counts.entries()]
+}
+
+/** Viewing counts bucketed by calendar month (YYYY-MM), optionally restricted
+ *  to an inclusive lower-bound date. Shared core of both the hero ribbon's
+ *  viewingsByMonth (ledgerStats.ts) and The Run's gap-filled monthly series. */
+export function bucketViewingsByMonth(titles: Title[], rangeStart: string | null = null): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const t of titles) {
+    for (const v of t.viewings) {
+      if (!v.date || !dateInRange(v.date, rangeStart)) continue
+      const month = v.date.slice(0, 7)
+      counts.set(month, (counts.get(month) ?? 0) + 1)
+    }
+  }
+  return counts
 }
 
 export function deriveTopGenres(titles: Title[], settings?: LedgerWidgetSettings) {
@@ -138,15 +154,10 @@ export function deriveRatingDistribution(titles: Title[], settings?: LedgerWidge
  *  at 10 years so a stray date can't explode the series). */
 export function deriveMonthlySeries(titles: Title[], settings?: LedgerWidgetSettings) {
   const { titles: scoped, rangeStart } = scopedTitles('run', titles, settings)
-  const counts = new Map<string, number>()
+  const counts = bucketViewingsByMonth(scoped, rangeStart)
   let earliest: string | null = null
-  for (const t of scoped) {
-    for (const v of t.viewings) {
-      if (!v.date || !dateInRange(v.date, rangeStart)) continue
-      const month = v.date.slice(0, 7)
-      counts.set(month, (counts.get(month) ?? 0) + 1)
-      if (!earliest || month < earliest) earliest = month
-    }
+  for (const month of counts.keys()) {
+    if (!earliest || month < earliest) earliest = month
   }
 
   const now = new Date()
@@ -192,11 +203,7 @@ function distinctScreeningDates(titles: Title[]): Set<string> {
   const dates = new Set<string>()
   for (const t of titles) {
     for (const v of t.viewings) if (v.date) dates.add(v.date)
-    for (const season of t.seasons ?? []) {
-      for (const ep of season.episodes ?? []) {
-        for (const we of ep.watchEvents) if (we.watchedAt) dates.add(we.watchedAt)
-      }
-    }
+    for (const we of allWatchEvents(t)) if (we.watchedAt) dates.add(we.watchedAt)
   }
   return dates
 }

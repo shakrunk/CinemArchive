@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Send, Check, Loader2, Search, RefreshCw } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
+import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
+import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { sendRecommendation, fetchSentRecommendationStatus } from 'src/lib/db'
 import type { Title } from 'src/store/mockData'
@@ -20,7 +22,7 @@ function friendName(f: FriendshipView): string {
 
 export function SendRecommendationPanel({ title, onClose }: SendRecommendationPanelProps) {
   const pushNotification = useAppStore((s) => s.pushNotification)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const closeButtonRef = useModalFocusAndEscape<HTMLButtonElement>(onClose)
 
   const [friends, setFriends] = useState<FriendshipView[]>([])
   const [loadingFriends, setLoadingFriends] = useState(true)
@@ -28,20 +30,6 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
   const [search, setSearch] = useState('')
   const [note, setNote] = useState('')
   const [sendState, setSendState] = useState<Record<string, SendState>>({})
-
-  const onCloseRef = useRef(onClose)
-  useEffect(() => { onCloseRef.current = onClose })
-
-  useEffect(() => {
-    const returnEl = document.activeElement as HTMLElement
-    closeButtonRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current() }
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      returnEl?.focus()
-    }
-  }, [])
 
   async function loadFriends() {
     setLoadingFriends(true)
@@ -100,14 +88,7 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
   })
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Send "${title.title}" to a friend`}
-      className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.82)', zIndex: 215 }}
-      onClick={onClose}
-    >
+    <ModalBackdrop onClose={onClose} ariaLabel={`Send "${title.title}" to a friend`}>
       <div
         className="relative w-full max-w-sm rounded-xl overflow-hidden flex flex-col"
         style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)', maxHeight: '85vh' }}
@@ -265,6 +246,6 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
           )}
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

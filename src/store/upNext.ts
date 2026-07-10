@@ -1,5 +1,5 @@
 import type { Title, Season, Episode } from './mockData'
-import { nextUnwatchedEpisode, totalEpisodesWatched, totalEpisodeCount } from './episodeUtils'
+import { nextUnwatchedEpisode, totalEpisodesWatched, totalEpisodeCount, allWatchEvents } from './episodeUtils'
 
 export interface UpNextEntry {
   title: Title
@@ -21,12 +21,8 @@ export interface UpcomingEntry {
  *  Dateless (pre-platform) watch events are skipped — they carry no recency signal. */
 function lastWatchedAtForTitle(title: Title): string | null {
   let max: string | null = null
-  for (const season of title.seasons ?? []) {
-    for (const episode of season.episodes ?? []) {
-      for (const we of episode.watchEvents) {
-        if (we.watchedAt && (max === null || we.watchedAt > max)) max = we.watchedAt
-      }
-    }
+  for (const we of allWatchEvents(title)) {
+    if (we.watchedAt && (max === null || we.watchedAt > max)) max = we.watchedAt
   }
   return max
 }

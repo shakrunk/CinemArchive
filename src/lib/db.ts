@@ -28,6 +28,10 @@ function mapDbTitleToLocal(row: any): Title {
     }
   }
 
+  function sortedCast(rows: any[] | null | undefined): CastMember[] {
+    return (rows || []).sort((a: any, b: any) => a.cast_order - b.cast_order).map(mapCastRow)
+  }
+
   return {
     id: row.id,
     tmdbId: row.tmdb_id,
@@ -59,9 +63,7 @@ function mapDbTitleToLocal(row: any): Title {
     studios: row.studios || [],
     collectionId: row.collection_id ?? undefined,
     collectionName: row.collection_name || undefined,
-    cast: (row.title_cast || [])
-      .sort((a: any, b: any) => a.cast_order - b.cast_order)
-      .map(mapCastRow),
+    cast: sortedCast(row.title_cast),
     crew: (row.title_crew || []).map((c: any): CrewMember => ({
       tmdbPersonId: c.tmdb_person_id,
       name: c.name,
@@ -131,9 +133,7 @@ function mapDbTitleToLocal(row: any): Title {
           episodeCount: s.episode_count,
           episodesWatched: s.episodes_watched,
           airYear: s.air_year || undefined,
-          cast: (s.season_cast || [])
-            .sort((a: any, b: any) => a.cast_order - b.cast_order)
-            .map(mapCastRow),
+          cast: sortedCast(s.season_cast),
           episodes,
         }
       })
@@ -153,28 +153,32 @@ function mapDbTitleToLocal(row: any): Title {
 
 // ─── Database Operations ─────────────────────────────────────────────────────
 
+// Shared by every full-library fetch (own/shared/friend) so a schema/column
+// change only needs to be applied once.
+const TITLE_SELECT = `
+  *,
+  title_cast (*),
+  title_crew (*),
+  seasons (
+    *,
+    season_cast (*)
+  ),
+  viewings (*),
+  episodes (
+    *,
+    episode_crew (*),
+    episode_watch_events (*),
+    episode_ratings (*),
+    episode_reviews (*)
+  )
+`
+
 export async function fetchUserLibrary(userId: string): Promise<Title[]> {
   if (!supabase) return []
 
   const { data, error } = await supabase
     .from('titles')
-    .select(`
-      *,
-      title_cast (*),
-      title_crew (*),
-      seasons (
-        *,
-        season_cast (*)
-      ),
-      viewings (*),
-      episodes (
-        *,
-        episode_crew (*),
-        episode_watch_events (*),
-        episode_ratings (*),
-        episode_reviews (*)
-      )
-    `)
+    .select(TITLE_SELECT)
     .eq('user_id', userId)
 
   if (error) {
@@ -202,23 +206,7 @@ export async function fetchSharedLibrary(
   const [{ data, error }, { data: ownerUserId, error: ownerError }] = await Promise.all([
     supabase
       .from('titles')
-      .select(`
-        *,
-        title_cast (*),
-        title_crew (*),
-        seasons (
-          *,
-          season_cast (*)
-        ),
-        viewings (*),
-        episodes (
-          *,
-          episode_crew (*),
-          episode_watch_events (*),
-          episode_ratings (*),
-          episode_reviews (*)
-        )
-      `),
+      .select(TITLE_SELECT),
     supabase.rpc('shared_key_owner', { token_val: token }),
   ])
 
@@ -242,23 +230,7 @@ export async function fetchFriendLibrary(friendUserId: string): Promise<Title[]>
 
   const { data, error } = await supabase
     .from('titles')
-    .select(`
-      *,
-      title_cast (*),
-      title_crew (*),
-      seasons (
-        *,
-        season_cast (*)
-      ),
-      viewings (*),
-      episodes (
-        *,
-        episode_crew (*),
-        episode_watch_events (*),
-        episode_ratings (*),
-        episode_reviews (*)
-      )
-    `)
+    .select(TITLE_SELECT)
     .eq('user_id', friendUserId)
 
   if (error) {

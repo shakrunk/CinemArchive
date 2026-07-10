@@ -7,17 +7,14 @@
 // Deploy with: supabase functions deploy redeem-invite
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { buildCorsHeaders, handleOptions, errorMessage } from '../_shared/http.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const corsHeaders = buildCorsHeaders('POST, OPTIONS')
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -61,9 +58,8 @@ function fail(message: string): Response {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+  const optionsResponse = handleOptions(req, corsHeaders)
+  if (optionsResponse) return optionsResponse
 
   try {
     const body = await req.json().catch(() => ({}))
@@ -137,7 +133,6 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal error'
-    return fail(message)
+    return fail(errorMessage(err))
   }
 })

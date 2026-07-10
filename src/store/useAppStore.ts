@@ -382,6 +382,28 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
   return result
 }
 
+// Every mutator that replaces `titles` must keep `filteredTitles`/`stats` in
+// sync with it — bundling the recompute here means a new mutator can't forget
+// one half of the pair.
+function withDerivedTitles(titles: Title[], filters: LibraryFilters) {
+  return {
+    titles,
+    filteredTitles: applyFiltersToTitles(titles, filters),
+    stats: computeLedgerStats(titles),
+  }
+}
+
+// Fire-and-forget a DB write: log the failure and, if a user-facing message is
+// given, surface a retry-able notification. `retry` reruns the same call
+// raw (NotificationStack already wraps it in its own try/catch), so it must
+// not recurse back into this wrapper.
+function syncToDb(get: () => AppStore, logMessage: string, dbCall: () => Promise<unknown>, failureMessage?: string) {
+  dbCall().catch((err) => {
+    console.error(logMessage, err)
+    if (failureMessage) get().pushNotification({ message: failureMessage, retry: async () => { await dbCall() } })
+  })
+}
+
 // ─── Store ──────────────────────────────────────────────────────────────────
 
 type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice
@@ -444,30 +466,17 @@ export const useAppStore = create<AppStore>()(
   filteredTitles: applyFiltersToTitles(import.meta.env.DEV ? mockTitles : [], defaultFilters),
 
   setTitles: (titles) =>
-    set((s) => ({
-      titles,
-      filteredTitles: applyFiltersToTitles(titles, s.filters),
-      stats: computeLedgerStats(titles),
-    })),
+    set((s) => withDerivedTitles(titles, s.filters)),
 
   addTitle: (title) =>
     set((s) => {
       const titles = [title, ...s.titles]
       if (s.user) {
         const userId = s.user.id
-        insertTitleToDb(userId, title).catch((err) => {
-          console.error('Failed to sync added title to DB:', err)
-          get().pushNotification({
-            message: `Couldn't save "${title.title}" — check your connection.`,
-            retry: () => insertTitleToDb(userId, title),
-          })
-        })
+        syncToDb(get, 'Failed to sync added title to DB:', () => insertTitleToDb(userId, title),
+          `Couldn't save "${title.title}" — check your connection.`)
       }
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   updateTitle: (id, patch) =>
@@ -475,19 +484,10 @@ export const useAppStore = create<AppStore>()(
       const titles = s.titles.map((t) => (t.id === id ? { ...t, ...patch } : t))
       if (s.user) {
         const userId = s.user.id
-        updateTitleInDb(userId, id, patch).catch((err) => {
-          console.error('Failed to sync updated title to DB:', err)
-          get().pushNotification({
-            message: 'Couldn\'t save changes — check your connection.',
-            retry: () => updateTitleInDb(userId, id, patch),
-          })
-        })
+        syncToDb(get, 'Failed to sync updated title to DB:', () => updateTitleInDb(userId, id, patch),
+          'Couldn\'t save changes — check your connection.')
       }
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   removeTitle: (id) =>
@@ -495,19 +495,10 @@ export const useAppStore = create<AppStore>()(
       const titles = s.titles.filter((t) => t.id !== id)
       if (s.user) {
         const userId = s.user.id
-        deleteTitleFromDb(userId, id).catch((err) => {
-          console.error('Failed to sync deleted title from DB:', err)
-          get().pushNotification({
-            message: 'Couldn\'t remove title — check your connection.',
-            retry: () => deleteTitleFromDb(userId, id),
-          })
-        })
+        syncToDb(get, 'Failed to sync deleted title from DB:', () => deleteTitleFromDb(userId, id),
+          'Couldn\'t remove title — check your connection.')
       }
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   setFilter: (key, value) =>
@@ -542,13 +533,8 @@ export const useAppStore = create<AppStore>()(
           const userId = s.user.id
           const episodeId = targetEpisode.id
           const dbOpts = { ...opts, watchEventId }
-          logEpisodeToDb(userId, episodeId, dbOpts).catch((err) => {
-            console.error('Failed to sync episode log to DB:', err)
-            get().pushNotification({
-              message: 'Couldn\'t save watch event — check your connection.',
-              retry: () => logEpisodeToDb(userId, episodeId, dbOpts),
-            })
-          })
+          syncToDb(get, 'Failed to sync episode log to DB:', () => logEpisodeToDb(userId, episodeId, dbOpts),
+            'Couldn\'t save watch event — check your connection.')
         }
       }
 
@@ -600,11 +586,7 @@ export const useAppStore = create<AppStore>()(
         })
         return { ...t, seasons }
       })
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   logNextEpisodeWatch: (titleId, colorMode) => {
@@ -623,13 +605,8 @@ export const useAppStore = create<AppStore>()(
     if (state.user) {
       const userId = state.user.id
       const dbOpts = { watchedAt, watchEventId, colorMode }
-      logEpisodeToDb(userId, episodeId, dbOpts).catch((err) => {
-        console.error('Failed to sync quick episode log to DB:', err)
-        get().pushNotification({
-          message: 'Couldn\'t save watch event — check your connection.',
-          retry: () => logEpisodeToDb(userId, episodeId, dbOpts),
-        })
-      })
+      syncToDb(get, 'Failed to sync quick episode log to DB:', () => logEpisodeToDb(userId, episodeId, dbOpts),
+        'Couldn\'t save watch event — check your connection.')
     }
 
     set((s) => {
@@ -647,11 +624,7 @@ export const useAppStore = create<AppStore>()(
         })
         return { ...t, seasons }
       })
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     })
 
     return { seasonNumber, episodeNumber, watchEventId }
@@ -683,26 +656,15 @@ export const useAppStore = create<AppStore>()(
 
       if (s.user && newEvents.length > 0) {
         const userId = s.user.id
-        insertPrePlatformWatchEventsToDb(userId, newEvents).catch((err) => {
-          console.error('Failed to sync pre-platform watch events to DB:', err)
-          get().pushNotification({
-            message: 'Couldn\'t save watch events — check your connection.',
-            retry: () => insertPrePlatformWatchEventsToDb(userId, newEvents),
-          })
-        })
+        syncToDb(get, 'Failed to sync pre-platform watch events to DB:', () => insertPrePlatformWatchEventsToDb(userId, newEvents),
+          'Couldn\'t save watch events — check your connection.')
       }
       if (s.user && seasonNumber === undefined) {
         const userId = s.user.id
-        updateTitleInDb(userId, titleId, { status: 'watched' }).catch((err) => {
-          console.error('Failed to sync watched status to DB:', err)
-        })
+        syncToDb(get, 'Failed to sync watched status to DB:', () => updateTitleInDb(userId, titleId, { status: 'watched' }))
       }
 
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   removeViewing: (titleId, viewingId) =>
@@ -713,32 +675,18 @@ export const useAppStore = create<AppStore>()(
       })
       if (s.user) {
         const userId = s.user.id
-        deleteViewingFromDb(userId, viewingId).catch((err) => {
-          console.error('Failed to sync deleted viewing to DB:', err)
-          get().pushNotification({
-            message: 'Couldn\'t remove viewing — check your connection.',
-            retry: () => deleteViewingFromDb(userId, viewingId),
-          })
-        })
+        syncToDb(get, 'Failed to sync deleted viewing to DB:', () => deleteViewingFromDb(userId, viewingId),
+          'Couldn\'t remove viewing — check your connection.')
       }
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   deleteEpisodeWatchEvent: (titleId, seasonNumber, episodeNumber, watchEventId) =>
     set((s) => {
       if (s.user) {
         const userId = s.user.id
-        deleteEpisodeWatchEventFromDb(userId, watchEventId).catch((err) => {
-          console.error('Failed to sync deleted episode watch event to DB:', err)
-          get().pushNotification({
-            message: 'Couldn\'t remove watch event — check your connection.',
-            retry: () => deleteEpisodeWatchEventFromDb(userId, watchEventId),
-          })
-        })
+        syncToDb(get, 'Failed to sync deleted episode watch event to DB:', () => deleteEpisodeWatchEventFromDb(userId, watchEventId),
+          'Couldn\'t remove watch event — check your connection.')
       }
       const titles = s.titles.map((t) => {
         if (t.id !== titleId) return t
@@ -757,11 +705,7 @@ export const useAppStore = create<AppStore>()(
         })
         return { ...t, seasons }
       })
-      return {
-        titles,
-        filteredTitles: applyFiltersToTitles(titles, s.filters),
-        stats: computeLedgerStats(titles),
-      }
+      return withDerivedTitles(titles, s.filters)
     }),
 
   // ── Ledger ─────────────────────────────────────────────────
@@ -1063,12 +1007,7 @@ export const useAppStore = create<AppStore>()(
     } else {
       // Clear on logout — restore mock data only in dev
       const fallback = import.meta.env.DEV ? mockTitles : []
-      set((s) => ({
-        titles: fallback,
-        filteredTitles: applyFiltersToTitles(fallback, s.filters),
-        stats: computeLedgerStats(fallback),
-        pinnedModes: {},
-      }))
+      set((s) => ({ ...withDerivedTitles(fallback, s.filters), pinnedModes: {} }))
     }
   },
 
@@ -1097,11 +1036,7 @@ export const useAppStore = create<AppStore>()(
         console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
         return
       }
-      set((s) => ({
-        titles: dbTitles,
-        filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
-        stats: computeLedgerStats(dbTitles),
-      }))
+      set((s) => withDerivedTitles(dbTitles, s.filters))
     } catch (err) {
       console.error('Failed to load user library from DB:', err)
       set({ libraryLoadError: "Couldn't load your library — check your connection." })
@@ -1118,11 +1053,7 @@ export const useAppStore = create<AppStore>()(
     set({ loadingUser: true, isSharedView: true, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null })
     try {
       const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
-      set((s) => ({
-        titles: dbTitles,
-        filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
-        stats: computeLedgerStats(dbTitles),
-      }))
+      set((s) => withDerivedTitles(dbTitles, s.filters))
       // Show the owner's board arrangement (falls back to the default board
       // when they never synced one). Never written into the viewer's prefs.
       if (ownerUserId) {
@@ -1151,11 +1082,7 @@ export const useAppStore = create<AppStore>()(
     })
     try {
       const dbTitles = await fetchFriendLibrary(friendUserId)
-      set((s) => ({
-        titles: dbTitles,
-        filteredTitles: applyFiltersToTitles(dbTitles, s.filters),
-        stats: computeLedgerStats(dbTitles),
-      }))
+      set((s) => withDerivedTitles(dbTitles, s.filters))
       // Show the friend's board arrangement (read-only RLS policy).
       void fetchLedgerLayout(friendUserId)
         .then((widgets) => set({ viewedLedgerWidgets: widgets }))
@@ -1178,9 +1105,7 @@ export const useAppStore = create<AppStore>()(
       viewerContext: { kind: 'owner' },
       isSharedView: false,
       viewedLedgerWidgets: null,
-      titles: [],
-      filteredTitles: applyFiltersToTitles([], s.filters),
-      stats: computeLedgerStats([]),
+      ...withDerivedTitles([], s.filters),
     }))
     void get().loadUserLibrary()
   },

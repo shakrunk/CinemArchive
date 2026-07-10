@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Loader2, Check } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { cn } from 'src/lib/utils'
 import { useAllGenres } from 'src/store/useAppStore'
+import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
+import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { getShareScope, setShareScope, type ShareScopeTarget } from 'src/lib/auth'
 import type { WatchStatus } from 'src/store/mockData'
 
@@ -21,7 +23,7 @@ interface ShareScopeEditorProps {
 
 export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorProps) {
   const allGenres = useAllGenres()
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const closeButtonRef = useModalFocusAndEscape<HTMLButtonElement>(onClose)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -49,17 +51,6 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    const returnEl = document.activeElement as HTMLElement
-    closeButtonRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      returnEl?.focus()
-    }
-  }, [onClose])
 
   function toggleGenre(g: string) {
     setGenres((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
@@ -91,14 +82,7 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Edit access for ${label}`}
-      className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.82)', zIndex: 215 }}
-      onClick={onClose}
-    >
+    <ModalBackdrop onClose={onClose} ariaLabel={`Edit access for ${label}`}>
       <div
         className="relative w-full max-w-sm rounded-xl overflow-hidden flex flex-col"
         style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)', maxHeight: '85vh' }}
@@ -207,6 +191,6 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
           )}
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   )
 }

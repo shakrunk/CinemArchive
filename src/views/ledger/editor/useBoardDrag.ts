@@ -56,6 +56,21 @@ function capturePointer(el: Element, pointerId: number) {
   }
 }
 
+// Find which item's rect the pointer is currently over, optionally skipping one id.
+function hitTestItem(
+  refs: Map<string, HTMLDivElement>,
+  x: number,
+  y: number,
+  excludeId?: string,
+): string | null {
+  for (const [id, el] of refs) {
+    if (id === excludeId) continue
+    const rect = el.getBoundingClientRect()
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return id
+  }
+  return null
+}
+
 export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | null) => void }) {
   const widgets = useAppStore((s) => s.ledgerPrefs.widgets)
   const reorderLedgerWidgets = useAppStore((s) => s.reorderLedgerWidgets)
@@ -185,15 +200,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     // re-rendered the entire board on every pointermove.
     const el = itemRefs.current.get(drag.id)
     if (el) el.style.transform = `translate(${dx - drag.shiftX}px, ${dy - drag.shiftY}px)`
-    let hit: string | null = null
-    for (const [id, item] of itemRefs.current) {
-      if (id === drag.id) continue
-      const rect = item.getBoundingClientRect()
-      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        hit = id
-        break
-      }
-    }
+    const hit = hitTestItem(itemRefs.current, e.clientX, e.clientY, drag.id)
     if (hit !== overRef.current) {
       overRef.current = hit
       if (hit) {
@@ -311,14 +318,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     }
     setPaletteGhost({ panel: drag.panel, x: e.clientX, y: e.clientY })
     // Hit-test board cards first; anywhere else over the board appends.
-    let hit: string | null = null
-    for (const [id, el] of itemRefs.current) {
-      const rect = el.getBoundingClientRect()
-      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        hit = id
-        break
-      }
-    }
+    let hit = hitTestItem(itemRefs.current, e.clientX, e.clientY)
     if (!hit) {
       const board = boardRef.current?.getBoundingClientRect()
       if (board && e.clientX >= board.left && e.clientX <= board.right && e.clientY >= board.top) {

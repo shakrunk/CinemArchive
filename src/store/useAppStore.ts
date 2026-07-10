@@ -404,6 +404,16 @@ function syncToDb(get: () => AppStore, logMessage: string, dbCall: () => Promise
   })
 }
 
+// Swap the element at `idx` with its "up"/"down" neighbor. Returns null (no
+// change) when `idx` wasn't found or the neighbor would fall outside the list.
+function swapAdjacent<T>(list: T[], idx: number, direction: 'up' | 'down'): T[] | null {
+  const swapWith = direction === 'up' ? idx - 1 : idx + 1
+  if (idx === -1 || swapWith < 0 || swapWith >= list.length) return null
+  const next = [...list]
+  ;[next[idx], next[swapWith]] = [next[swapWith], next[idx]]
+  return next
+}
+
 // ─── Store ──────────────────────────────────────────────────────────────────
 
 type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice
@@ -743,12 +753,8 @@ export const useAppStore = create<AppStore>()(
 
   moveNavItem: (id, direction) =>
     set((s) => {
-      const order = [...s.navPrefs.order]
-      const idx = order.indexOf(id)
-      const swapWith = direction === 'up' ? idx - 1 : idx + 1
-      if (idx === -1 || swapWith < 0 || swapWith >= order.length) return {}
-      ;[order[idx], order[swapWith]] = [order[swapWith], order[idx]]
-      return { navPrefs: { ...s.navPrefs, order } }
+      const order = swapAdjacent(s.navPrefs.order, s.navPrefs.order.indexOf(id), direction)
+      return order ? { navPrefs: { ...s.navPrefs, order } } : {}
     }),
 
   reorderNav: (order) => set((s) => ({ navPrefs: { ...s.navPrefs, order } })),
@@ -796,12 +802,8 @@ export const useAppStore = create<AppStore>()(
 
   moveLedgerWidget: (id, direction) => {
     set((s) => {
-      const widgets = [...s.ledgerPrefs.widgets]
-      const idx = widgets.findIndex((w) => w.id === id)
-      const swapWith = direction === 'up' ? idx - 1 : idx + 1
-      if (idx === -1 || swapWith < 0 || swapWith >= widgets.length) return {}
-      ;[widgets[idx], widgets[swapWith]] = [widgets[swapWith], widgets[idx]]
-      return { ledgerPrefs: { widgets } }
+      const widgets = swapAdjacent(s.ledgerPrefs.widgets, s.ledgerPrefs.widgets.findIndex((w) => w.id === id), direction)
+      return widgets ? { ledgerPrefs: { widgets } } : {}
     })
     scheduleLedgerLayoutSave(get)
   },

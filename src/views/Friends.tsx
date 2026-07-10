@@ -536,10 +536,16 @@ export function Friends() {
       </div>
 
       {authed ? (
-        <div className="max-w-[70ch] space-y-10 pb-16">
-          <FriendsSection />
-          <InboxSection />
-          <ActivitySection />
+        <div className="grid grid-cols-12 gap-8 pb-16">
+          <div className="col-span-12 lg:col-span-5 xl:col-span-4 max-w-[70ch] lg:max-w-none">
+            <div className="lg:sticky lg:top-24">
+              <FriendsSection />
+            </div>
+          </div>
+          <div className="col-span-12 lg:col-span-7 xl:col-span-8 space-y-10 max-w-[70ch] lg:max-w-none">
+            <InboxSection />
+            <ActivitySection />
+          </div>
         </div>
       ) : (
         <p className="font-sans text-xs text-muted-foreground">

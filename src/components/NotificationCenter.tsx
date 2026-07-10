@@ -3,6 +3,7 @@ import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket }
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
+import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { useClickOutside } from 'src/lib/useClickOutside'
 import type { AppView } from 'src/lib/navigation'
 import type { AppNotificationItem, NotificationType } from 'src/lib/db'
@@ -118,9 +119,9 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
 
           <div className="max-h-96 overflow-y-auto scrollbar-thin">
             {loading ? (
-              <div className="text-center py-6 text-xs font-mono text-muted-foreground">Loading...</div>
+              <LoadingRow label="Loading..." className="py-6" />
             ) : notificationInbox.length === 0 ? (
-              <div className="text-center py-6 text-xs font-sans text-muted-foreground italic">Nothing yet.</div>
+              <EmptyRow label="Nothing yet." className="py-6" />
             ) : (
               notificationInbox.map((n) => {
                 const meta = TYPE_META[n.type]

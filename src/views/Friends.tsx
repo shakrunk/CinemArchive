@@ -22,6 +22,7 @@ import {
 } from 'src/lib/db'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { Section } from 'src/components/ui/section'
+import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
@@ -142,9 +143,9 @@ function FriendsSection() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading friends...</div>
+          <LoadingRow label="Loading friends..." />
         ) : friendships.length === 0 ? (
-          <div className="text-center py-4 text-xs font-sans text-muted-foreground italic">No friends yet.</div>
+          <EmptyRow label="No friends yet." />
         ) : (
           friendships.map((f) => (
             <div key={f.friend_user_id} className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3">
@@ -316,7 +317,7 @@ function InboxSection() {
     >
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading recommendations...</div>
+          <LoadingRow label="Loading recommendations..." />
         ) : recommendations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-3">
           <p className="text-center text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</p>
@@ -454,7 +455,7 @@ function ActivitySection() {
     <Section title="Friend Activity" Icon={Activity} description="What your friends have been adding, watching, and saying lately.">
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-4 text-xs font-mono text-muted-foreground">Loading activity...</div>
+          <LoadingRow label="Loading activity..." />
         ) : feed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-3">
           <p className="text-center text-xs font-sans text-muted-foreground italic">No friend activity yet.</p>

@@ -5,6 +5,7 @@ import { cn } from 'src/lib/utils'
 import { useAllGenres } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
+import { LoadingRow } from 'src/components/ui/loading-row'
 import { getShareScope, setShareScope, type ShareScopeTarget } from 'src/lib/auth'
 import type { WatchStatus } from 'src/store/mockData'
 
@@ -112,7 +113,7 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
 
         <div className="overflow-y-auto flex-1 px-5 pb-5 space-y-4">
           {loading ? (
-            <div className="text-center py-6 text-xs font-mono text-muted-foreground">Loading...</div>
+            <LoadingRow label="Loading..." className="py-6" />
           ) : (
             <>
               <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Access level">

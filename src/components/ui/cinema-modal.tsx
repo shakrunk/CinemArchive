@@ -1,6 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X, Maximize2, Minimize2 } from "lucide-react"
+import { Maximize2, Minimize2 } from "lucide-react"
 import { cn } from "src/lib/utils"
+import { ModalCloseButton } from "./modal-close-button"
 import { type ReactNode } from "react"
 
 interface CinemaModalProps {
@@ -57,12 +58,8 @@ export function CinemaModal({
               {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
           )}
-          <DialogPrimitive.Close
-            className="absolute right-4 top-4 z-20 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-amber/50"
-            aria-label="Close"
-            title="Close"
-          >
-            <X className="w-4 h-4" />
+          <DialogPrimitive.Close asChild>
+            <ModalCloseButton ariaLabel="Close" variant="scrim" />
           </DialogPrimitive.Close>
           {children}
         </DialogPrimitive.Content>

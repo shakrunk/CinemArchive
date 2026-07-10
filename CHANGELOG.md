@@ -22,6 +22,18 @@ number is chosen.
   width (capped per breakpoint) and rows recenter automatically; the narrow `sm`
   preset swaps to a compact ranked bar list at the `lg` breakpoint and up, where
   a bubble cloud would otherwise crowd into a ~4-of-12-column card.
+- UI consistency: consolidated the app's five hand-rolled modal close buttons
+  (`cinema-modal`, `poster-lightbox`, `trailer-row`, `PersonDetailPanel` /
+  `SendRecommendationPanel`, `ShareScopeEditor`, `KeyboardShortcutsHelp`) into a
+  single shared `ModalCloseButton`, fixing `ShareScopeEditor`'s close button
+  (previously had no hover state at all) and giving every close button a
+  keyboard focus ring for free. Added a focus-visible ring to the Matrix/Spider-Noir
+  `ChoiceCard` picker, which previously had no visible keyboard focus state.
+  Also: `Ledger.tsx`'s two hand-retyped copies of the shared amber CTA button now
+  import the constant instead of forking it; the awards badge no longer hardcodes
+  a fixed gold hex (now themes correctly under Noir/Matrix); the B&W/Color episode
+  pill's text color now routes through a token instead of a raw `#aaa`; and the
+  unused shadcn `dialog.tsx` scaffold was removed.
 
 ## [1.0.0] - 2026-07-10
 

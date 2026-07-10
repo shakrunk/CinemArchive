@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, Check } from 'lucide-react'
+import { Loader2, Check } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { useAllGenres } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
+import { ModalCloseButton } from 'src/components/ui/modal-close-button'
 import { LoadingRow } from 'src/components/ui/loading-row'
 import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
 import { Chip } from 'src/components/ui/chip'
@@ -90,15 +91,12 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
         style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)', maxHeight: '85vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
+        <ModalCloseButton
           ref={closeButtonRef}
           onClick={onClose}
-          className="absolute top-3 right-3 flex items-center justify-center w-7 h-7 rounded-full transition-colors z-10"
-          style={{ color: 'var(--paper-faint)' }}
-          aria-label="Close edit access"
-        >
-          <X className="w-4 h-4" />
-        </button>
+          ariaLabel="Close edit access"
+          className="top-3 right-3"
+        />
 
         <div className="px-5 pt-5 pb-4 shrink-0">
           <div

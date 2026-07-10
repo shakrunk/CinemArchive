@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { X, Send, Check, Loader2, Search, RefreshCw } from 'lucide-react'
+import { Send, Check, Loader2, Search, RefreshCw } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
+import { ModalCloseButton } from 'src/components/ui/modal-close-button'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { sendRecommendation, fetchSentRecommendationStatus } from 'src/lib/db'
 import type { Title } from 'src/store/mockData'
@@ -94,17 +95,12 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
         style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)', maxHeight: '85vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
+        <ModalCloseButton
           ref={closeButtonRef}
           onClick={onClose}
-          className="absolute top-3 right-3 flex items-center justify-center w-7 h-7 rounded-full transition-colors z-10"
-          style={{ color: 'var(--paper-faint)' }}
-          aria-label="Close send to a friend"
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--paper)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--paper-faint)')}
-        >
-          <X className="w-4 h-4" />
-        </button>
+          ariaLabel="Close send to a friend"
+          className="top-3 right-3"
+        />
 
         {/* Header: title being recommended */}
         <div className="flex gap-3 px-5 pt-5 pb-4 shrink-0">

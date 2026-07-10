@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { decadeOf } from 'src/lib/utils'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
 import { Panel } from '../PanelShell'
@@ -21,7 +22,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
     const { titles: scoped } = scopedTitles('decades', titles, settings)
     const counts = new Map<number, number>()
     for (const t of scoped) {
-      const decade = Math.floor(t.year / 10) * 10
+      const decade = decadeOf(t.year)
       counts.set(decade, (counts.get(decade) ?? 0) + 1)
     }
     return [...counts.entries()]

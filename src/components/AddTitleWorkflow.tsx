@@ -9,7 +9,7 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, Season, CastMember, EpisodeCrew } from 'src/store/mockData'
-import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
+import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
 
 // ─── Search hook ─────────────────────────────────────────────────────────────
 
@@ -40,8 +40,6 @@ function useDebouncedSearch(delay = 400) {
 
   return { results, loading, search }
 }
-
-const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // ─── Season scaffolding ──────────────────────────────────────────────────────
 

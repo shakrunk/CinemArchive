@@ -4,11 +4,9 @@ import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
-import { searchMedia, fetchMediaDetails, fetchSeasonDetails, type SearchResult } from 'src/lib/media'
+import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, upsertSeasonCastInDb, upsertEpisodeCrewInDb } from 'src/lib/db'
 import type { Title, Episode, EpisodeCrew } from 'src/store/mockData'
-
-const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // Project an existing library Title back into a SearchResult so it can be
 // re-hydrated through the same detail-fetch path as a fresh search pick.

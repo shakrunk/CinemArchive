@@ -78,6 +78,10 @@ export function areaPath(points: ChartPoint[], baselineY: number): string {
   return `${line} L ${last.x},${baselineY} L ${first.x},${baselineY} Z`
 }
 
+export function decadeOf(year: number): number {
+  return Math.floor(year / 10) * 10
+}
+
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()

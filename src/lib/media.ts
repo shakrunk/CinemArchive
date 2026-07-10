@@ -71,6 +71,11 @@ export interface SeasonFetchResult {
 const TMDB_IMG = 'https://image.tmdb.org/t/p'
 const TMDB_IMG_W185 = 'https://image.tmdb.org/t/p/w185'
 
+/** Episode-still base URL, shared by consumers that build `stillUrl` fields
+ *  from raw TMDB episode payloads (AddTitleWorkflow, RefreshMetadataModal,
+ *  TitleDetailDrawer, episode-card.tsx). */
+export const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
+
 // ─── Genre Lists (stable TMDB IDs — hardcoded to avoid an extra round-trip) ─
 
 export interface Genre {

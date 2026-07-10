@@ -18,6 +18,7 @@ import {
   newLedgerWidgetId,
   normalizeLedgerWidgets,
 } from '../lib/ledgerPanels'
+import { decadeOf } from '../lib/utils'
 import {
   fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
@@ -333,7 +334,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
   if (filters.decades.length > 0) {
     result = result.filter((t) => {
-      const decade = `${Math.floor(t.year / 10) * 10}s`
+      const decade = `${decadeOf(t.year)}s`
       return filters.decades.includes(decade)
     })
   }
@@ -1222,7 +1223,7 @@ export const useAllNetworks = () => {
 
 export const useAllDecades = () => {
   const titles = useAppStore((s) => s.titles)
-  return useMemo(() => [...new Set(titles.map((t) => `${Math.floor(t.year / 10) * 10}s`))].sort(), [titles])
+  return useMemo(() => [...new Set(titles.map((t) => `${decadeOf(t.year)}s`))].sort(), [titles])
 }
 
 export const useVisibleNavItems = () => {

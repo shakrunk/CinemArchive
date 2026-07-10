@@ -6,9 +6,8 @@ import { StarRating } from 'src/components/ui/star-rating'
 import { Input } from 'src/components/ui/input'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import { cn, fmtDate, fmtDateTime } from 'src/lib/utils'
+import { TMDB_STILL_BASE } from 'src/lib/media'
 import type { Episode, Season } from 'src/store/mockData'
-
-const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // ─── EpisodeCard ─────────────────────────────────────────────────────────────
 

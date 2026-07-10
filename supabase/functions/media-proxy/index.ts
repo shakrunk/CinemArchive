@@ -3,6 +3,7 @@
 // Deploy with: supabase functions deploy media-proxy
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { buildCorsHeaders, handleOptions, errorMessage } from '../_shared/http.ts'
 
 const TMDB_BASE = 'https://api.themoviedb.org/3'
 const OMDB_BASE = 'https://www.omdbapi.com'
@@ -15,15 +16,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-interface CorsHeaders {
-  [key: string]: string
-}
-
-const corsHeaders: CorsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS, POST',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const corsHeaders = buildCorsHeaders('GET, OPTIONS, POST')
 
 async function getCached(key: string): Promise<unknown | null> {
   try {
@@ -54,6 +47,17 @@ async function setCached(key: string, response: unknown): Promise<void> {
   }
 }
 
+async function cachedFetch(cacheKey: string, url: string): Promise<unknown> {
+  const cached = await getCached(cacheKey)
+  if (cached) return cached
+
+  const res = await fetch(url)
+  const data = await res.json()
+
+  await setCached(cacheKey, data)
+  return data
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function parseMediaType(value: string | null): 'movie' | 'tv' {
@@ -67,175 +71,78 @@ function parseMediaType(value: string | null): 'movie' | 'tv' {
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 async function searchTMDB(query: string, type: 'movie' | 'tv') {
-  const cacheKey = `tmdb:search:${type}:${query}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/search/${type}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false&language=en-US&page=1`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:search:${type}:${query}`, url)
 }
 
 async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
-  // Cache key bumped to v3 — v3 adds aggregate_credits for TV (episode counts per cast member).
-  const cacheKey = `tmdb:details:v3:${type}:${tmdbId}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   // TV: aggregate_credits gives total_episode_count per cast member (standard credits doesn't).
   // credits is still needed for crew. Movies don't have aggregate_credits.
   const appendix = type === 'movie' ? 'credits,release_dates' : 'credits,aggregate_credits,seasons,content_ratings,external_ids'
   const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=${appendix}&language=en-US`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  // Cache key bumped to v3 — v3 adds aggregate_credits for TV (episode counts per cast member).
+  return cachedFetch(`tmdb:details:v3:${type}:${tmdbId}`, url)
 }
 
 async function getTMDBSeasonDetails(tmdbId: number, seasonNumber: number) {
-  // Cache key bumped to v3 — ensures episode_count is present in season credits cast
-  const cacheKey = `tmdb:season:v3:${tmdbId}:${seasonNumber}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=credits`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  // Cache key bumped to v3 — ensures episode_count is present in season credits cast
+  return cachedFetch(`tmdb:season:v3:${tmdbId}:${seasonNumber}`, url)
 }
 
 async function getOMDbRatings(imdbId: string) {
-  const cacheKey = `omdb:${imdbId}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${OMDB_BASE}/?apikey=${OMDB_API_KEY}&i=${imdbId}&tomatoes=true`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`omdb:${imdbId}`, url)
 }
 
 async function getTMDBVideos(tmdbId: number, type: 'movie' | 'tv') {
-  const cacheKey = `tmdb:videos:${type}:${tmdbId}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/${type}/${tmdbId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:videos:${type}:${tmdbId}`, url)
 }
 
 async function getTMDBWatchProviders(tmdbId: number, type: 'movie' | 'tv') {
-  const cacheKey = `tmdb:watch:${type}:${tmdbId}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/${type}/${tmdbId}/watch/providers?api_key=${TMDB_API_KEY}`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:watch:${type}:${tmdbId}`, url)
 }
 
 async function getTMDBImages(tmdbId: number, type: 'movie' | 'tv') {
-  const cacheKey = `tmdb:images:${type}:${tmdbId}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   // include_image_language=en,null returns English-text logos plus textless ones.
   const url = `${TMDB_BASE}/${type}/${tmdbId}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:images:${type}:${tmdbId}`, url)
 }
 
 async function getTMDBTrending(type: 'movie' | 'tv', page = 1) {
-  const cacheKey = `tmdb:trending:${type}:week:p${page}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:trending:${type}:week:p${page}`, url)
 }
 
 async function getTMDBDiscover(type: 'movie' | 'tv', genreId?: number, page = 1, companyId?: number) {
-  const cacheKey = `tmdb:discover:${type}:${genreId ?? 'all'}:${companyId ?? 'all'}:${page}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   let url = `${TMDB_BASE}/discover/${type}?api_key=${TMDB_API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}`
   if (genreId) url += `&with_genres=${genreId}`
   if (companyId) url += `&with_companies=${companyId}`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:discover:${type}:${genreId ?? 'all'}:${companyId ?? 'all'}:${page}`, url)
 }
 
 async function searchPersonTMDB(query: string) {
-  const cacheKey = `tmdb:person_search:${query}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false&language=en-US&page=1`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:person_search:${query}`, url)
 }
 
 async function getPersonCredits(personId: number) {
-  const cacheKey = `tmdb:person_credits:${personId}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=en-US`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:person_credits:${personId}`, url)
 }
 
 async function searchCompanyTMDB(query: string) {
-  const cacheKey = `tmdb:company_search:${query}`
-  const cached = await getCached(cacheKey)
-  if (cached) return cached
-
   const url = `${TMDB_BASE}/search/company?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=1`
-  const res = await fetch(url)
-  const data = await res.json()
-
-  await setCached(cacheKey, data)
-  return data
+  return cachedFetch(`tmdb:company_search:${query}`, url)
 }
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+  const optionsResponse = handleOptions(req, corsHeaders)
+  if (optionsResponse) return optionsResponse
 
   try {
     const url = new URL(req.url)
@@ -334,8 +241,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal error'
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(JSON.stringify({ error: errorMessage(err) }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

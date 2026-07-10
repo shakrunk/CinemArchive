@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-10
+
 ### Fixed
 - Ledger — "The Run" widget: the monthly screening trend chart no longer forces
   a horizontal scrollbar (previously a fixed per-month pixel width could balloon

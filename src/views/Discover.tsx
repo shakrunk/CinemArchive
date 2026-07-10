@@ -10,6 +10,7 @@ import {
 } from 'src/lib/media'
 import type { MediaType } from 'src/store/mockData'
 import { cn, staggerDelays } from 'src/lib/utils'
+import { usePrefersReducedMotionRef } from 'src/lib/motion'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 import { Chip } from 'src/components/ui/chip'
@@ -223,7 +224,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   const dragStartXRef = useRef(0)
   const dragStartScrollRef = useRef(0)
   const pausedRef = useRef(false)
-  const reducedMotionRef = useRef(false)
+  const reducedMotionRef = usePrefersReducedMotionRef()
   const [isGrabbing, setIsGrabbing] = useState(false)
 
   const applyTransform = useCallback(() => {
@@ -264,14 +265,6 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   }, [results, applyTransform])
 
   useEffect(() => {
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
-    reducedMotionRef.current = mql.matches
-    const handleChange = () => { reducedMotionRef.current = mql.matches }
-    mql.addEventListener('change', handleChange)
-    return () => mql.removeEventListener('change', handleChange)
-  }, [])
-
-  useEffect(() => {
     if (results.length === 0) return
     let raf = 0
     let lastTs: number | null = null
@@ -287,7 +280,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [results.length, applyTransform])
+  }, [results.length, applyTransform, reducedMotionRef])
 
   function onPointerDown(e: React.PointerEvent) {
     draggingRef.current = true

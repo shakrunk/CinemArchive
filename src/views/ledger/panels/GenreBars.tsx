@@ -1,11 +1,11 @@
 // ─── Genre bars ───────────────────────────────────────────────────────────────
 
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, rankBarFill, rankBubbleAccent, toPercent } from 'src/lib/utils'
 import { deriveTopGenres } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER, FOOTER_CAPTION } from '../PanelShell'
+import { Panel, PanelEmpty, RowTitle, FOOTER_CAPTION } from '../PanelShell'
 
 // Per-bubble flex-basis at the `lg` breakpoint and up, keyed by the widget's
 // board-width preset — panels are always full-width below `lg` (see
@@ -24,10 +24,27 @@ const DESKTOP_BASIS: Record<LedgerPanelWidth, string> = {
   full: 'lg:basis-[calc(16.667%-4px)]',
 }
 
-// Max bubble diameter per breakpoint tier (set as a CSS custom property, since
-// inline styles can't carry responsive variants), so a tight column count
-// doesn't inflate row height past what the panel's fixed 400px body allows.
-const BUBBLE_CAP_CLASS = '[--bubble-cap:72px] sm:[--bubble-cap:82px] lg:[--bubble-cap:96px]'
+// Column counts assumed for each tier, mirroring the basis maps above — used
+// only to *estimate* row count so the bubble cap can shrink for a large topN
+// (configurable 3–12; see LEDGER_TOP_N_MIN/MAX in lib/ledgerPanels.ts). The
+// panel body's fixed height doesn't grow with row count, so an unshrunk cap
+// at topN=12 would overflow the card.
+const MOBILE_COLS = 3
+const DESKTOP_COLS: Record<LedgerPanelWidth, number> = { sm: 3, md: 4, lg: 5, full: 6 }
+const DESKTOP_MAX_CAP = 96
+const MOBILE_MAX_CAP = 72
+// Rough content-height budget left for the bubble/list body once the card's
+// fixed 400px (LEDGER_PANEL_STANDARD_HEIGHT) header, padding, and footer
+// caption are accounted for.
+const CONTENT_BUDGET_PX = 232
+const GAP_PX = 4
+const MIN_BUBBLE_PX = 34
+
+function bubbleCapPx(count: number, cols: number, maxCap: number): number {
+  const rows = Math.max(1, Math.ceil(count / cols))
+  const fit = Math.floor((CONTENT_BUDGET_PX - (rows - 1) * GAP_PX) / rows)
+  return Math.max(MIN_BUBBLE_PX, Math.min(maxCap, fit))
+}
 
 export function GenreBars({
   className,
@@ -49,6 +66,11 @@ export function GenreBars({
   )
   const maxCount = genres[0]?.count ?? 1
   const totalCount = useMemo(() => genres.reduce((sum, g) => sum + g.count, 0), [genres])
+  const rawId = useId().replace(/[^a-zA-Z0-9]/g, '')
+  const scopeClass = `gb-${rawId}`
+
+  const mobileCap = bubbleCapPx(genres.length, MOBILE_COLS, MOBILE_MAX_CAP)
+  const desktopCap = bubbleCapPx(genres.length, DESKTOP_COLS[width], DESKTOP_MAX_CAP)
 
   const onSelect = (genre: string) => {
     setFilter('genres', [genre])
@@ -64,13 +86,16 @@ export function GenreBars({
       {genres.length === 0 ? (
         <PanelEmpty message="No genres yet" />
       ) : (
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div className={cn('flex-1 min-h-0 flex flex-col', scopeClass)}>
+          {/* topN is user-configurable (3–12); the bubble cap shrinks as the
+           *  count rises so a busy widget still fits the fixed card height
+           *  instead of overflowing into a scrollbar. */}
+          <style>{`.${scopeClass}{--bubble-cap:${mobileCap}px}@media (min-width:1024px){.${scopeClass}{--bubble-cap:${desktopCap}px}}`}</style>
           {/* Bubble cloud — the default presentation everywhere, and the only
            *  one below `lg` since every preset renders full-width there. */}
           <div
             className={cn(
               'flex-1 min-h-0 flex flex-wrap content-center justify-center gap-1',
-              BUBBLE_CAP_CLASS,
               width === 'sm' && 'lg:hidden',
             )}
           >
@@ -118,14 +143,16 @@ export function GenreBars({
           </div>
 
           {/* Ranked list — swaps in for the `sm` preset at `lg` and up, where
-           *  a bubble cloud would crowd into a ~4-of-12-column card. */}
+           *  a bubble cloud would crowd into a ~4-of-12-column card. Rows are
+           *  flex-1 (not a fixed row height) so topN=12 compresses to fit the
+           *  same fixed card height that topN=3 stretches to fill. */}
           {width === 'sm' && (
-            <div className="hidden lg:flex flex-1 min-h-0 flex-col justify-around">
+            <div className="hidden lg:flex flex-1 min-h-0 flex-col">
               {genres.map((g, i) => (
                 <button
                   key={g.genre}
                   onClick={() => onSelect(g.genre)}
-                  className={cn('w-full flex items-center gap-3', LIST_ROW_HOVER)}
+                  className="w-full flex-1 min-h-0 flex items-center gap-3 px-1.5 rounded-md transition-colors hover:bg-[var(--wash)] cursor-pointer group"
                 >
                   <span className="font-mono text-[10px] text-amber-deep w-4 shrink-0">{String(i + 1).padStart(2, '0')}</span>
                   <RowTitle className="truncate flex-1 min-w-0 text-left">{g.genre}</RowTitle>

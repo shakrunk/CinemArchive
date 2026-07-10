@@ -11,6 +11,7 @@
 import type { Title } from './mockData'
 import type { LedgerPanelId, LedgerTimeRange, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { effectiveLedgerSettings } from 'src/lib/ledgerPanels'
+import { allWatchEvents } from './episodeUtils'
 
 // ─── Scope & time-range helpers ──────────────────────────────────────────────
 
@@ -192,11 +193,7 @@ function distinctScreeningDates(titles: Title[]): Set<string> {
   const dates = new Set<string>()
   for (const t of titles) {
     for (const v of t.viewings) if (v.date) dates.add(v.date)
-    for (const season of t.seasons ?? []) {
-      for (const ep of season.episodes ?? []) {
-        for (const we of ep.watchEvents) if (we.watchedAt) dates.add(we.watchedAt)
-      }
-    }
+    for (const we of allWatchEvents(t)) if (we.watchedAt) dates.add(we.watchedAt)
   }
   return dates
 }

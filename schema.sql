@@ -38,6 +38,7 @@ create table titles (
   original_language text,              -- ISO 639-1 code, e.g. "en"
   content_rating    text,              -- age certification, e.g. "PG-13", "TV-MA"
   imdb_id           text,              -- e.g. "tt1375666" — enables an exact IMDb link
+  rt_url            text,              -- Rotten Tomatoes page URL, resolved via Wikidata (P1258) from imdb_id
   custom_watch_url  text,              -- owner override for "where to watch", shown preferentially in shared views
   collection_id     integer,           -- TMDB collection id (movies) — franchise grouping
   collection_name   text,              -- TMDB collection name, e.g. "The Lord of the Rings Collection"

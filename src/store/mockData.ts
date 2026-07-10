@@ -101,6 +101,7 @@ export interface Title {
   originalLanguage?: string  // ISO 639-1 code, e.g. "en", "ja"
   contentRating?: string  // age certification, e.g. "PG-13", "TV-MA"
   imdbId?: string  // e.g. "tt1375666" — enables an exact IMDb link
+  rtUrl?: string  // Rotten Tomatoes page URL, resolved via Wikidata (P1258) from imdbId
   customWatchUrl?: string  // owner override for "where to watch", shown preferentially in shared views
   collectionId?: number    // TMDB collection id (movies) — franchise grouping
   collectionName?: string  // TMDB collection name, e.g. "The Lord of the Rings Collection"

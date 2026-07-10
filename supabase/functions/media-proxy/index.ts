@@ -95,6 +95,39 @@ async function getOMDbRatings(imdbId: string) {
   return cachedFetch(`omdb:${imdbId}`, url)
 }
 
+const WIKIDATA_SPARQL = 'https://query.wikidata.org/sparql'
+
+// Resolves the canonical Rotten Tomatoes page for a title via Wikidata: finds the
+// item with a matching IMDb ID (P345) and reads its Rotten Tomatoes ID (P1258),
+// which already encodes the "m/" or "tv/" path segment (e.g. "m/titanic").
+async function getWikidataRTUrl(imdbId: string): Promise<string | null> {
+  const cacheKey = `wikidata:rt:${imdbId}`
+  const cached = await getCached(cacheKey)
+  if (cached !== null) return cached as string | null
+
+  const sparql = `SELECT ?rt WHERE { ?item wdt:P345 "${imdbId}". ?item wdt:P1258 ?rt. } LIMIT 1`
+  const url = `${WIKIDATA_SPARQL}?query=${encodeURIComponent(sparql)}&format=json`
+
+  let rtUrl: string | null = null
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/sparql-results+json',
+        // Wikidata's query service requires an identifying User-Agent.
+        'User-Agent': 'CinemArchive/1.0 (https://cinemarchive.kumarfamilynet.work/; media-proxy edge function)',
+      },
+    })
+    const data = await res.json()
+    const rtId = data?.results?.bindings?.[0]?.rt?.value
+    if (rtId) rtUrl = `https://www.rottentomatoes.com/${rtId}`
+  } catch {
+    // Best-effort — an RT link is a nice-to-have, not a critical path.
+  }
+
+  await setCached(cacheKey, rtUrl)
+  return rtUrl
+}
+
 async function getTMDBVideos(tmdbId: number, type: 'movie' | 'tv') {
   const url = `${TMDB_BASE}/${type}/${tmdbId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
   return cachedFetch(`tmdb:videos:${type}:${tmdbId}`, url)
@@ -176,6 +209,12 @@ Deno.serve(async (req: Request) => {
         const imdbId = url.searchParams.get('imdb') ?? ''
         if (!imdbId) throw new Error('Missing imdb parameter')
         result = await getOMDbRatings(imdbId)
+        break
+      }
+      case 'rt_link': {
+        const imdbId = url.searchParams.get('imdb') ?? ''
+        if (!imdbId) throw new Error('Missing imdb parameter')
+        result = { rtUrl: await getWikidataRTUrl(imdbId) }
         break
       }
       case 'videos': {

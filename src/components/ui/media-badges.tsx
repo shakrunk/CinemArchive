@@ -53,6 +53,7 @@ export interface MediaRef {
   tmdbId: number
   type: MediaType
   imdbId?: string
+  rtUrl?: string
 }
 
 type LinkBrand = 'tmdb' | 'imdb' | 'rt' | 'metacritic'
@@ -71,7 +72,11 @@ function buildExternalLinks(m: MediaRef): Array<{ brand: LinkBrand; name: string
       ? `https://www.imdb.com/title/${m.imdbId}/`
       : `https://www.imdb.com/find/?q=${q}&s=tt`,
   })
-  links.push({ brand: 'rt', name: 'Rotten Tomatoes', href: `https://www.rottentomatoes.com/search?search=${q}` })
+  links.push({
+    brand: 'rt',
+    name: 'Rotten Tomatoes',
+    href: m.rtUrl || `https://www.rottentomatoes.com/search?search=${q}`,
+  })
   links.push({ brand: 'metacritic', name: 'Metacritic', href: `https://www.metacritic.com/search/${q}/` })
 
   return links

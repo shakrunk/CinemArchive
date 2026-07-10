@@ -30,3 +30,6 @@
 ## 2025-03-02 - Resolve N+1 Query in Metadata Refreshes
 **Learning:** Calling iterative database upserts (`upsertSeasonCastInDb` and `upsertEpisodeCrewInDb`) in `for...of` loops when refreshing TV show metadata or backfilling details creates severe N+1 query bottlenecks.
 **Action:** Replace `for...of` iteration over Supabase inserts/upserts with bulk functions that map all incoming data to a single flat array and call `.upsert()` exactly once.
+## 2026-07-10 - Zustand Multiple Subscriptions
+**Learning:** Components subscribing to multiple store properties individually via separate `useAppStore` hooks create multiple independent store subscriptions. This leads to higher memory usage, subscription execution overhead, and potential re-render cascades.
+**Action:** Always batch state extractions into a single object selector using `useShallow` from `zustand/react/shallow` to reduce subscriptions to exactly one per component.

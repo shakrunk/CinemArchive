@@ -38,6 +38,14 @@ export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
 export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
 
+/** Default theme for users with no persisted choice yet — matches the OS
+ *  preference instead of hard-coding dark. Keep in sync with the inline FOUC
+ *  script in index.html. */
+function getSystemTheme(): Theme {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'dark'
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
+
 /** Nav bar layout/visibility preferences — order + hidden apply to both the
  *  TopBar pill nav and BottomNav; compact hides labels on the desktop pill nav. */
 export interface NavPrefs {
@@ -726,7 +734,7 @@ export const useAppStore = create<AppStore>()(
 
   // ── UI ─────────────────────────────────────────────────────
   viewMode: 'grid',
-  theme: 'dark',
+  theme: getSystemTheme(),
   unlockedThemes: ['dark', 'light'],
   navPrefs: defaultNavPrefs,
   ledgerPrefs: defaultLedgerPrefs,

@@ -12,19 +12,27 @@
     <script>
       (function () {
         var COLORS = { dark: '#0b0907', light: '#f4ede0', noir: '#0d0d0f', matrix: '#020403' };
+        function systemTheme() {
+          return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
         try {
           var raw = localStorage.getItem('cinemarchive-library');
           var state = raw && JSON.parse(raw).state;
           var theme = state && state.theme;
           var unlocked = (state && state.unlockedThemes) || ['dark', 'light'];
-          if (!COLORS.hasOwnProperty(theme) || unlocked.indexOf(theme) === -1) theme = 'dark';
+          if (!COLORS.hasOwnProperty(theme) || unlocked.indexOf(theme) === -1) theme = systemTheme();
           document.documentElement.setAttribute('data-theme', theme);
           if (theme !== 'dark') {
             var m = document.querySelector('meta[name="theme-color"]');
             if (m) m.setAttribute('content', COLORS[theme]);
           }
         } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'dark');
+          var fallback = systemTheme();
+          document.documentElement.setAttribute('data-theme', fallback);
+          if (fallback !== 'dark') {
+            var m2 = document.querySelector('meta[name="theme-color"]');
+            if (m2) m2.setAttribute('content', COLORS[fallback]);
+          }
         }
       })();
     </script>

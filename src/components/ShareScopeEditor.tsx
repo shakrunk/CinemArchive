@@ -6,6 +6,7 @@ import { useAllGenres } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { LoadingRow } from 'src/components/ui/loading-row'
+import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
 import { getShareScope, setShareScope, type ShareScopeTarget } from 'src/lib/auth'
 import type { WatchStatus } from 'src/store/mockData'
 
@@ -116,25 +117,15 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
             <LoadingRow label="Loading..." className="py-6" />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Access level">
-                {(['full', 'custom'] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === m}
-                    onClick={() => setMode(m)}
-                    className={cn(
-                      'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors',
-                      mode === m
-                        ? 'border-amber/50 bg-amber/10 text-amber'
-                        : 'border-border bg-secondary/20 text-muted-foreground hover:border-amber/25'
-                    )}
-                  >
-                    {m === 'full' ? 'Full library' : 'Custom'}
-                  </button>
-                ))}
-              </div>
+              <SegmentedToggle
+                ariaLabel="Access level"
+                options={[
+                  { value: 'full', label: 'Full library' },
+                  { value: 'custom', label: 'Custom' },
+                ]}
+                value={mode}
+                onChange={setMode}
+              />
 
               {mode === 'custom' && (
                 <>

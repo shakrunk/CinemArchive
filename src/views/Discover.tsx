@@ -293,20 +293,29 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
     dragStartXRef.current = e.clientX
     dragStartScrollRef.current = scrollXRef.current
     setIsGrabbing(true)
-    e.currentTarget.setPointerCapture(e.pointerId)
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!draggingRef.current) return
     const delta = e.clientX - dragStartXRef.current
-    if (Math.abs(delta) > 5) dragMovedRef.current = true
+    // Pointer capture is deferred until movement crosses the drag threshold — grabbing
+    // it eagerly on pointerdown retargets the *click* compatibility event (per the
+    // Pointer Events spec) to this wrapper for every plain click too, so descendant
+    // onClick handlers (poster, Info button) never see it.
+    if (!dragMovedRef.current && Math.abs(delta) > 5) {
+      dragMovedRef.current = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
     scrollXRef.current = dragStartScrollRef.current - delta
     applyTransform()
   }
 
-  function endDrag() {
+  function endDrag(e: React.PointerEvent) {
     draggingRef.current = false
     setIsGrabbing(false)
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
   }
 
   // Pause on pointer hover (mouse) and on keyboard focus (Tab-ing through cards),
@@ -490,10 +499,23 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
 
 function DiscoverSkeleton() {
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
-      {Array.from({ length: 14 }, (_, i) => (
-        <div key={i} className="aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
-      ))}
+    <div className="-mx-4 sm:-mx-8 px-4 sm:px-8" aria-hidden>
+      <div className="film-strip">
+        <div className="reel-strip reel-strip--top" />
+        <div className="reel-strip reel-strip--bottom" />
+        <div className="discover-grid flex">
+          {Array.from({ length: 10 }, (_, i) => (
+            <div key={i} className="film-frame shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]">
+              <div className="film-frame__window aspect-[2/3]">
+                <div className="w-full h-full rounded-[1px] animate-pulse" style={{ background: 'var(--inset)' }} />
+              </div>
+              <div className="film-frame__caption px-1.5 py-1.5">
+                <div className="h-2.5 w-2/3 rounded animate-pulse" style={{ background: 'var(--inset)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

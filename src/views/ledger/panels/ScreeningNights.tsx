@@ -2,16 +2,16 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, maxOrOne } from 'src/lib/utils'
 import { scopedTitles, dateInRange } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { Panel, PanelEmpty, COL_GROW_ANIMATION } from '../PanelShell'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function ScreeningNights({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
 
   const { counts, total, peak } = useMemo(() => {
     const { titles: scoped, rangeStart } = scopedTitles('weekdays', titles, settings)
@@ -29,7 +29,7 @@ export function ScreeningNights({ className, settings }: { className?: string; s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [titles, settingsKey])
 
-  const maxCount = Math.max(...counts, 1)
+  const maxCount = maxOrOne(counts)
 
   return (
     <Panel
@@ -54,7 +54,7 @@ export function ScreeningNights({ className, settings }: { className?: string; s
                   boxShadow: day === peak ? '0 6px 18px -6px rgba(233,178,102,0.5)' : undefined,
                   transformOrigin: 'bottom',
                   transform: 'scaleY(0)',
-                  animation: 'col-grow 0.7s var(--ease) forwards',
+                  animation: COL_GROW_ANIMATION,
                   animationDelay: `${day * 60}ms`,
                 }}
               />

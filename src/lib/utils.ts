@@ -85,8 +85,40 @@ export function areaPath(points: ChartPoint[], baselineY: number): string {
   return `${line} L ${last.x},${baselineY} L ${first.x},${baselineY} Z`
 }
 
+// Bar-fill style for "highlight rank #1, gray out the rest" horizontal bars.
+export function rankBarFill(ratio: number, isTop: boolean, delayMs: number): React.CSSProperties {
+  return {
+    width: `${ratio * 100}%`,
+    background: isTop ? 'linear-gradient(90deg, var(--amber-deep), var(--amber-bright))' : 'rgba(128,115,95,0.55)',
+    animationDelay: `${delayMs}ms`,
+  }
+}
+
+// Circular rank-bubble accent (lead item gets the amber treatment, the rest
+// share a muted ink treatment) — background gradient and boxShadow spread are
+// caller-supplied since the panels that use this differ there.
+export function rankBubbleAccent(isTop: boolean, boxShadowSpreadPx: number, delayMs: number): React.CSSProperties {
+  return {
+    border: isTop ? 'none' : '1px solid var(--line-2)',
+    boxShadow: isTop ? `0 8px ${boxShadowSpreadPx}px -8px rgba(233,178,102,0.55)` : 'var(--shadow)',
+    opacity: 0,
+    transform: 'scale(0)',
+    animationDelay: `${delayMs}ms`,
+  }
+}
+
 export function decadeOf(year: number): number {
   return Math.floor(year / 10) * 10
+}
+
+/** `Math.max(...values, 1)` — guards a bar/ring chart's scale denominator against an empty or all-zero series. */
+export function maxOrOne(values: number[]): number {
+  return Math.max(...values, 1)
+}
+
+/** Rounded `part/total` as a whole-number percentage, for share-of-total labels. */
+export function toPercent(part: number, total: number): number {
+  return Math.round((part / total) * 100)
 }
 
 export function getInitials(name: string): string {

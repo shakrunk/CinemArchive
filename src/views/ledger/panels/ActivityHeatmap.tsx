@@ -2,11 +2,11 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn, fmtReleaseDate } from 'src/lib/utils'
+import { cn, fmtReleaseDate, maxOrOne } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
-import { Panel } from '../PanelShell'
+import { Panel, FOOTER_CAPTION } from '../PanelShell'
 import { localDateStr } from '../labels'
 
 // Weeks shown and cell size scale down with the card's width so a narrow
@@ -29,7 +29,7 @@ export function ActivityHeatmap({
   width?: LedgerPanelWidth
 }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const { weeksBack, cellPx } = HEATMAP_CONFIG[width]
 
   const viewingCounts = useMemo(() => {
@@ -89,7 +89,7 @@ export function ActivityHeatmap({
   }, [viewingCounts, weeksBack, cellPx])
 
   const maxCellCount = useMemo(
-    () => Math.max(...weeks.flat().map((c) => c.count), 1),
+    () => maxOrOne(weeks.flat().map((c) => c.count)),
     [weeks],
   )
 
@@ -151,7 +151,7 @@ export function ActivityHeatmap({
           ))}
         </div>
       </div>
-      <p className="mt-4 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint">
+      <p className={cn('mt-4', FOOTER_CAPTION)}>
         {totalInYear} screening{totalInYear !== 1 ? 's' : ''} in the past {weeksBack === 52 ? 'year' : `${weeksBack} weeks`}
       </p>
       {tip.node}

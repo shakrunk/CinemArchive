@@ -2,15 +2,16 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn, maxOrOne } from 'src/lib/utils'
 import { deriveRevivals } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { Panel, PanelEmpty, FOOTER_CAPTION, COL_GROW_ANIMATION } from '../PanelShell'
 import { monthLabel } from '../labels'
 
 export function PremieresRevivals({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
 
   const months = useMemo(
@@ -23,7 +24,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
     (acc, m) => ({ premieres: acc.premieres + m.premieres, revivals: acc.revivals + m.revivals }),
     { premieres: 0, revivals: 0 },
   )
-  const maxHalf = Math.max(...months.flatMap((m) => [m.premieres, m.revivals]), 1)
+  const maxHalf = maxOrOne(months.flatMap((m) => [m.premieres, m.revivals]))
 
   const panelTitle = settings?.title || 'Premieres & revivals'
   const hint = `first watches vs. encores${describeLedgerSettings(settings)}`
@@ -59,7 +60,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
                     background: 'linear-gradient(180deg, var(--amber-bright), var(--amber-deep))',
                     transformOrigin: 'bottom',
                     transform: 'scaleY(0)',
-                    animation: 'col-grow 0.7s var(--ease) forwards',
+                    animation: COL_GROW_ANIMATION,
                     animationDelay: `${i * 45}ms`,
                   }}
                 />
@@ -76,7 +77,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
                     background: 'linear-gradient(180deg, rgba(154,163,178,0.75), rgba(154,163,178,0.3))',
                     transformOrigin: 'top',
                     transform: 'scaleY(0)',
-                    animation: 'col-grow 0.7s var(--ease) forwards',
+                    animation: COL_GROW_ANIMATION,
                     animationDelay: `${i * 45 + 60}ms`,
                   }}
                 />
@@ -88,7 +89,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
           ))}
         </div>
       </div>
-      <p className="mt-3 font-mono text-[10px] tracking-[0.16em] uppercase text-paper-faint flex items-center gap-4">
+      <p className={cn('mt-3 flex items-center gap-4', FOOTER_CAPTION)}>
         <span className="flex items-center gap-1.5">
           <i className="w-2 h-2 rounded-sm" style={{ background: 'var(--amber-bright)' }} /> {totals.premieres} premieres
         </span>

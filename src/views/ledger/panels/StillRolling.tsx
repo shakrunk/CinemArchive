@@ -2,15 +2,16 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
 import { RadialRing } from 'src/components/LedgerCharts'
 import { deriveProgress } from 'src/store/ledgerDerive'
-import type { LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
 export function StillRolling({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
 
   const rows = useMemo(
     () => deriveProgress(titles, settings),
@@ -36,7 +37,7 @@ export function StillRolling({ className, settings }: { className?: string; sett
           <li key={r.id}>
             <button
               onClick={() => openDetailDrawer(r.id)}
-              className="w-full flex items-center gap-3 px-1.5 py-2 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
+              className={cn('w-full flex items-center gap-3', LIST_ROW_HOVER)}
             >
               <span className="relative w-10 h-10 shrink-0">
                 <RadialRing
@@ -51,12 +52,9 @@ export function StillRolling({ className, settings }: { className?: string; sett
                 </span>
               </span>
               <span className="min-w-0 flex-1">
-                <span
-                  className="font-serif text-sm font-medium text-paper truncate block group-hover:underline decoration-amber/40"
-                  style={{ fontVariationSettings: '"opsz" 30' }}
-                >
+                <RowTitle className="truncate block group-hover:underline decoration-amber/40">
                   {r.title}
-                </span>
+                </RowTitle>
                 <span className="font-mono text-[10px] text-paper-faint">{r.year}</span>
               </span>
               <span className="font-mono text-[11px] text-paper-dim shrink-0">

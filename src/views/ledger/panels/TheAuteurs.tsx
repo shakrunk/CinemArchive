@@ -2,17 +2,18 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
 import { RadialRing } from 'src/components/LedgerCharts'
 import { deriveTopDirectors } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
-import { Panel, PanelEmpty } from '../PanelShell'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER, RankBadge } from '../PanelShell'
 
 export function TheAuteurs({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
   const browseByPerson = useAppStore((s) => s.browseByPerson)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const directors = useMemo(
     () => deriveTopDirectors(titles, settings),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,15 +48,12 @@ export function TheAuteurs({ className, settings }: { className?: string; settin
                     requestView('library')
                   }
                 }}
-                className="w-full flex items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group"
+                className={cn('w-full flex items-center gap-3', LIST_ROW_HOVER, 'py-2.5')}
               >
-                <span className="font-mono text-xs text-amber-deep w-5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                <span
-                  className="font-serif text-base font-medium text-paper truncate flex-1 min-w-0 group-hover:underline decoration-amber/40"
-                  style={{ fontVariationSettings: '"opsz" 30' }}
-                >
+                <RankBadge rank={i + 1} className="w-5 shrink-0" />
+                <RowTitle className="text-base truncate flex-1 min-w-0 group-hover:underline decoration-amber/40">
                   {d.director}
-                </span>
+                </RowTitle>
                 <span className="relative w-9 h-9 shrink-0">
                   <RadialRing pct={pct} size={36} stroke={4} color={color} delay={i * 60} />
                   <span className="absolute inset-0 flex items-center justify-center font-mono text-[10px] text-paper-dim">

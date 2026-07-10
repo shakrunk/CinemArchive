@@ -2,15 +2,16 @@
 
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
+import { rankBubbleAccent } from 'src/lib/utils'
 import { deriveTopGenres } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 
 export function GenreBars({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
-  const settingsKey = JSON.stringify(settings ?? {})
+  const settingsKey = settingsDepKey(settings)
   const genres = useMemo(
     () => deriveTopGenres(titles, settings),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,11 +47,7 @@ export function GenreBars({ className, settings }: { className?: string; setting
                     i === 0
                       ? 'radial-gradient(circle at 32% 28%, var(--amber-bright), var(--amber-deep))'
                       : 'radial-gradient(circle at 32% 28%, var(--ink-3), var(--ink-1))',
-                  border: i === 0 ? 'none' : '1px solid var(--line-2)',
-                  boxShadow: i === 0 ? '0 8px 24px -8px rgba(233,178,102,0.55)' : 'var(--shadow)',
-                  opacity: 0,
-                  transform: 'scale(0)',
-                  animationDelay: `${i * 55}ms`,
+                  ...rankBubbleAccent(i === 0, 24, i * 55),
                 }}
               >
                 <span

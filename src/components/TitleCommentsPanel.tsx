@@ -6,6 +6,7 @@ import {
   fetchTitleReactions, setTitleReaction,
   REACTION_EMOJIS, type TitleComment, type TitleReaction, type ReactionEmoji,
 } from 'src/lib/db'
+import { fmtDateShort } from 'src/lib/utils'
 
 const BODY_MAX_LEN = 1000
 
@@ -170,7 +171,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
                 {c.body}
               </p>
               <p className="font-mono mt-1" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
-                {new Date(c.createdAt).toLocaleDateString()}
+                {fmtDateShort(c.createdAt)}
               </p>
             </div>
           ))}

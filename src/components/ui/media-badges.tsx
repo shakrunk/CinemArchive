@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { MediaType } from 'src/store/mockData'
+import { SubsectionLabel } from 'src/components/ui/typography'
 
 // ─── Review Badges ─────────────────────────────────────────────────────────────
 
@@ -12,6 +13,11 @@ const REVIEW_BADGE_CONFIG = {
 // Dim, desaturated tone for "we checked Wikidata and there's nothing" — distinct
 // from the colored badges so it reads as a deliberate "no data" state, not a bug.
 const NO_DATA_COLOR = '#6b6660'
+
+// Per-item stagger for a scale-in entrance animation; callers pick their own pace.
+function entranceDelay(i: number, msPerItem: number): string {
+  return `${i * msPerItem}ms`
+}
 
 interface Badge {
   key: string
@@ -73,7 +79,7 @@ export function ReviewBadges({
           className="flex items-center gap-1.5 bg-secondary/60 border border-transparent rounded px-2.5 py-1.5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-secondary hover:shadow-[0_4px_12px_-4px_var(--badge-color)] animate-[scaleIn_0.45s_ease-out_forwards]"
           style={{
             '--badge-color': `${b.color}66`,
-            animationDelay: `${i * 70}ms`,
+            animationDelay: entranceDelay(i, 70),
             transform: 'scale(0)',
             opacity: 0,
           } as CSSProperties}
@@ -190,7 +196,7 @@ export function ExternalLinks({ media }: { media: MediaRef }) {
   if (links.length === 0) return null
   return (
     <div>
-      <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Links</h4>
+      <SubsectionLabel>Links</SubsectionLabel>
       <div className="flex flex-wrap items-center gap-2">
         {links.map((l, i) => {
           const { bg, fg } = BRAND_CONFIG[l.brand]
@@ -203,7 +209,7 @@ export function ExternalLinks({ media }: { media: MediaRef }) {
               aria-label={`Open ${media.title} on ${l.name}`}
               title={`View on ${l.name}`}
               className={`w-8 h-8 rounded-md ${bg} ${fg} flex items-center justify-center transition-transform hover:scale-110 animate-[scaleIn_0.6s_ease-out_forwards]`}
-              style={{ animationDelay: `${i * 60}ms`, transform: 'scale(0)', opacity: 0 }}
+              style={{ animationDelay: entranceDelay(i, 60), transform: 'scale(0)', opacity: 0 }}
             >
               <BrandLogo brand={l.brand} />
             </a>

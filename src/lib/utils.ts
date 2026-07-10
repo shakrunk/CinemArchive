@@ -12,8 +12,10 @@ export const SECONDARY_AMBER_BUTTON =
 export const SECONDARY_AMBER_BUTTON_LG =
   'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60'
 
+const SHORT_DATE_FORMAT: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
+
 export function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', SHORT_DATE_FORMAT)
 }
 
 /** Format a YYYY-MM-DD date as e.g. "Jul 16, 2010", parsing as local-naive to avoid TZ drift. */
@@ -21,7 +23,16 @@ export function fmtReleaseDate(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd)
   if (!m) return ymd
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('en-US', SHORT_DATE_FORMAT)
+}
+
+export function fmtRuntime(minutes: number): string {
+  return `${minutes}m`
+}
+
+/** Browser-locale-default short date (e.g. "7/9/2026") — distinct from fmtDate's fixed "Jul 9, 2026" format. */
+export function fmtDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString()
 }
 
 /** Map an ISO 639-1 language code to its English display name, falling back to the upper-cased code. */
@@ -44,7 +55,7 @@ export const modKey: '⌘' | 'Ctrl' =
 export function fmtDateTime(iso: string): { date: string; time: string } {
   const d = new Date(iso)
   return {
-    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    date: d.toLocaleDateString('en-US', SHORT_DATE_FORMAT),
     time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
   }
 }

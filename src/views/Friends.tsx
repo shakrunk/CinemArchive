@@ -23,7 +23,7 @@ import {
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
-import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
+import { cn, fmtDateShort, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
@@ -491,7 +491,7 @@ function ActivitySection() {
                     )}
                   </p>
                   <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                    {new Date(e.eventAt).toLocaleDateString()}
+                    {fmtDateShort(e.eventAt)}
                   </p>
                 </div>
               </button>

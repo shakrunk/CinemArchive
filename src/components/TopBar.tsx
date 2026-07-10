@@ -62,7 +62,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
       style={{
         borderColor: 'var(--line)',
         background:
-          'linear-gradient(180deg, rgb(var(--void-rgb) / 0.92), rgb(var(--void-rgb) / 0.62) 70%, transparent)',
+          'linear-gradient(180deg, rgb(var(--void-rgb) / 0.97), rgb(var(--void-rgb) / 0.86))',
         backdropFilter: 'blur(14px) saturate(1.1)',
         WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
       }}

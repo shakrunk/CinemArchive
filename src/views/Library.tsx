@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
@@ -8,6 +8,8 @@ import { BottomSheet } from 'src/components/ui/bottom-sheet'
 import { Chip } from 'src/components/ui/chip'
 import { EmptyState } from 'src/components/ui/empty-state'
 import { cn, languageName, staggerDelays } from 'src/lib/utils'
+import { useCopyFeedback } from 'src/lib/useCopyFeedback'
+import { buildRecommendationPrompt } from 'src/lib/recommendationPrompt'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode } from 'src/store/useAppStore'
 
@@ -470,8 +472,9 @@ function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: Vi
 
 export function Library() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { filteredTitles, filters, viewMode, setFilter, setViewMode } = useAppStore(
+  const { titles, filteredTitles, filters, viewMode, setFilter, setViewMode } = useAppStore(
     useShallow((s) => ({
+      titles: s.titles,
       filteredTitles: s.filteredTitles,
       filters: s.filters,
       viewMode: s.viewMode,
@@ -480,6 +483,8 @@ export function Library() {
     }))
   )
   const [filterOpen, setFilterOpen] = useState(false)
+  const { copiedId, copy } = useCopyFeedback()
+  const copied = copiedId === 'rec-prompt'
 
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -555,6 +560,20 @@ export function Library() {
             <List className="w-[17px] h-[17px]" />
           </button>
         </div>
+
+        <button
+          onClick={() => copy(buildRecommendationPrompt(titles), 'rec-prompt')}
+          className={cn(
+            'icon-btn h-11 px-3.5 gap-2 border text-sm',
+            copied ? '!text-amber !border-amber/40' : 'border-[var(--line)] text-paper-dim'
+          )}
+          style={{ background: 'var(--inset)' }}
+          title="Copy a recommendation prompt for an LLM"
+          aria-label="Copy a recommendation prompt for an LLM"
+        >
+          {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Sparkles className="w-4 h-4" aria-hidden="true" />}
+          <span className="hidden sm:inline">{copied ? 'Copied!' : 'Get Recs'}</span>
+        </button>
 
         <button
           onClick={() => setFilterOpen(true)}

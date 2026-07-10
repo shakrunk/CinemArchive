@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Search, SlidersHorizontal, X, Film, User, Building2, Languages } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
@@ -470,12 +470,13 @@ function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: Vi
 
 export function Library() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { filteredTitles, filters, viewMode, setFilter } = useAppStore(
+  const { filteredTitles, filters, viewMode, setFilter, setViewMode } = useAppStore(
     useShallow((s) => ({
       filteredTitles: s.filteredTitles,
       filters: s.filters,
       viewMode: s.viewMode,
       setFilter: s.setFilter,
+      setViewMode: s.setViewMode,
     }))
   )
   const [filterOpen, setFilterOpen] = useState(false)
@@ -535,6 +536,25 @@ export function Library() {
         </div>
 
         <div className="flex-1" />
+
+        <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={cn('icon-btn w-8 h-8', viewMode === 'grid' && '!text-amber-bright bg-amber/12')}
+            aria-label="Poster wall"
+            title="Poster wall"
+          >
+            <LayoutGrid className="w-[17px] h-[17px]" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn('icon-btn w-8 h-8', viewMode === 'list' && '!text-amber-bright bg-amber/12')}
+            aria-label="Ledger list"
+            title="Ledger list"
+          >
+            <List className="w-[17px] h-[17px]" />
+          </button>
+        </div>
 
         <button
           onClick={() => setFilterOpen(true)}

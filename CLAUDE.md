@@ -45,6 +45,22 @@ When targeting a version-bump or release PR, target `main` (not `dev`) if commit
 
 ---
 
+## Versioning
+
+The app follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). `package.json` → `version` is the single source of truth; `CHANGELOG.md` (Keep a Changelog format) records what shipped in each version.
+
+- **Commit messages already follow [Conventional Commits](https://www.conventionalcommits.org/)** (`feat(scope): ...`, `fix(scope): ...`, `refactor: ...`, etc. — see recent `git log`). The bump type is derived from the commit types being shipped:
+  - Any commit with a `!` after the type/scope (e.g. `feat!:`) or a `BREAKING CHANGE:` footer → **MAJOR**
+  - Any `feat` commit (with no breaking change) → **MINOR**
+  - Any `fix` or `perf` commit only (no `feat`, no breaking change) → **PATCH**
+  - Only `docs`/`chore`/`refactor`/`test`/`style`/`ci`/`build` commits → **no bump** — these ship without touching `version`/`CHANGELOG.md`
+- **The bump happens once per release**, when opening the `dev` → `main` PR — not per-commit. The `ship` skill (`.claude/skills/ship/SKILL.md`) checks the commits being shipped and performs the bump as part of that PR when one is warranted; see that skill for the mechanics.
+- **`CHANGELOG.md`** keeps an `[Unreleased]` section at the top that entries accumulate under during normal work. At release time, `[Unreleased]` is retitled to the new `[X.Y.Z] - YYYY-MM-DD` and a fresh empty `[Unreleased]` is added above it.
+- **Git tags:** after a version-bumping PR merges to `main`, `.github/workflows/deploy.yml`'s `release` job tags the commit `vX.Y.Z` (read from `package.json`) and publishes a GitHub Release using the matching `CHANGELOG.md` section — this is automatic, not a manual step.
+- Any agent making changes should add a line under `CHANGELOG.md`'s `[Unreleased]` section when the change is user-facing (matches `feat`/`fix`/`perf`/breaking); purely internal changes (`refactor`/`docs`/`test`/`chore`) don't need an entry.
+
+---
+
 ## Dependencies
 
 Do not revert dependency migrations as suspected supply-chain issues without verifying against the official package registry first.

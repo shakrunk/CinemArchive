@@ -39,6 +39,9 @@ create table titles (
   content_rating    text,              -- age certification, e.g. "PG-13", "TV-MA"
   imdb_id           text,              -- e.g. "tt1375666" — enables an exact IMDb link
   rt_url            text,              -- Rotten Tomatoes page URL, resolved via Wikidata (P1258) from imdb_id
+  awards_count      integer,           -- count of "award received" (P166) statements on Wikidata; sparse outside high-profile titles
+  bechdel_outcome   text check (bechdel_outcome in ('pass', 'fail')),  -- Wikidata P5021/P9259 assessment outcome
+  bechdel_score     text,              -- optional "x/3" breakdown (Wikidata P444 qualifier), mainly present on fails
   custom_watch_url  text,              -- owner override for "where to watch", shown preferentially in shared views
   collection_id     integer,           -- TMDB collection id (movies) — franchise grouping
   collection_name   text,              -- TMDB collection name, e.g. "The Lord of the Rings Collection"

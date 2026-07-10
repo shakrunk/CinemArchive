@@ -72,15 +72,17 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
           </div>
         )}
 
-        {/* Base gradient + frame label — always visible, like a printed frame caption */}
-        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/55 to-transparent" />
+        {/* Base gradient + frame label — always visible, like a printed frame caption.
+            Fixed dark tones (not theme-swapping void/paper), so the scrim stays legible
+            over poster art in light mode too — mirrors .poster.has-img in index.css. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080503] via-[#080503]/55 to-transparent" />
         {/* Stronger scrim on hover, for contrast under the action row */}
-        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/85 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080503] via-[#080503]/85 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         <div className="absolute inset-0 flex flex-col justify-end p-2.5">
-          <p className="font-serif text-[13px] font-semibold text-paper leading-snug line-clamp-2 mb-0.5">
+          <p className="font-serif text-[13px] font-semibold text-[rgb(var(--ivory))] leading-snug line-clamp-2 mb-0.5">
             {result.title}
           </p>
-          <p className="font-mono text-[10px] text-paper-faint">
+          <p className="font-mono text-[10px] text-white/60">
             {result.year > 0 ? result.year : ''}
             {result.type === 'tv' && result.seasonCount ? ` · ${result.seasonCount}S` : ''}
           </p>
@@ -120,9 +122,9 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
                     <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
                       <div
                         className="relative px-2 py-1 rounded shadow-lg"
-                        style={{ background: 'var(--void)', border: '1px solid rgba(233,178,102,0.35)' }}
+                        style={{ background: '#0d0906', border: '1px solid rgba(233,178,102,0.35)' }}
                       >
-                        <p className="font-mono text-[9px] text-paper-faint whitespace-nowrap">Click for more details</p>
+                        <p className="font-mono text-[9px] text-white/60 whitespace-nowrap">Click for more details</p>
                         <div
                           className="absolute top-full right-2.5"
                           style={{
@@ -171,7 +173,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
 
       {/* Format + quick-add — the frame's edge-print; title already lives on the poster above */}
       <div className="film-frame__caption px-1.5 py-1.5 flex items-center justify-between gap-1">
-        <p className="font-mono text-[10px] text-paper-faint truncate">
+        <p className="font-mono text-[10px] text-white/60 truncate">
           {result.type === 'tv' ? 'TV' : 'Movie'}
           {result.year > 0 ? ` · ${result.year}` : ''}
         </p>

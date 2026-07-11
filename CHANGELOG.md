@@ -9,6 +9,52 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Details drawer — "In my home collection" toggle in Where to Watch (KP-002):
+  marks a title as owned locally and surfaces an amber "Home Collection"
+  source row, visible to friends and shared-link viewers too.
+- Details drawer — physical media shelf (KP-003): catalog the physical copies
+  you own per title (DVD, Blu-ray, 4K UHD, VHS, LaserDisc) with an optional
+  edition note; stored on the title and shown read-only in shared views.
+- Details drawer — franchise strip and progress (KP-027, KP-028): movies that
+  belong to a TMDB collection now show every film in the franchise in release
+  order with a "Watched X/Y" progress bar; entries already in the library open
+  in place, the rest can be added directly.
+- Discover — "Because You Watched" now shows real TMDB recommendations for
+  the selected library title via a new media-proxy `recommendations` action,
+  replacing the trending-list stand-in (KP-024).
+- Discover — carousels gained a persistent play/pause toggle (KP-036),
+  mouse-wheel/trackpad horizontal scrolling (KP-001), and momentum gliding
+  after a grab-and-drag release (KP-037).
+- Discover — the "Because You Watched" / "More Starring" pickers now include
+  a filter input once the option list grows past a handful (KP-030).
+- Friends — "Suggested friends" lists people connected to you by invite code
+  (they redeemed yours, or you redeemed theirs) with a one-tap friend request
+  (KP-026).
+- Settings — new About section with the app version, a short description,
+  data-source credits (TMDB/OMDb/Wikidata), and repository links (KP-023);
+  the sign-in modal footer now shows the running version too.
+- Accessibility — a hidden-until-focused "Keyboard shortcuts" button now sits
+  right after the skip-nav link and opens the shortcuts panel (KP-035).
+
+### Changed
+
+- Bechdel badge now uses a Venus (♀) icon instead of the "BDT" initialism
+  (KP-029).
+- The Library view gained its missing display title, and the Discover heading
+  now uses the same Fraunces display-title brand styling as the other views
+  (KP-031); Discover carousel headers use Title Case (KP-034).
+- Top bar — the search button's label/shortcut and the CinemArchive word mark
+  now collapse into icons at wider breakpoints so the nav doesn't crowd on
+  tablets and laptops (KP-032, KP-033).
+
+### Fixed
+
+- Ledger — "Critical Record" legend rows now connect each star label to its
+  count with a dot leader, so wide cards read as one list instead of two
+  disconnected columns (KP-038).
+
 ## [1.0.3] - 2026-07-10
 
 ### Fixed

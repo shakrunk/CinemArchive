@@ -626,6 +626,43 @@ export async function fetchDiscover(type: MediaType, genreId?: number, page = 1)
   return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
 }
 
+/**
+ * Fetch every movie in a TMDB collection (franchise), release order. Backs the
+ * details drawer's franchise strip and watch-progress bar. Empty in local dev.
+ */
+export async function fetchCollectionParts(collectionId: number): Promise<SearchResult[]> {
+  if (!(isSupabaseConfigured && supabase)) return []
+
+  const { data, error } = await supabase.functions.invoke(
+    `media-proxy?action=collection&id=${collectionId}`
+  )
+  if (error) throw error
+  const parts = (data?.parts ?? []).map((i: any) => mapSearchItem(i, 'movie')) as SearchResult[]
+  // TMDB doesn't guarantee part order; sort by release year, unreleased (year 0) last.
+  return parts.sort((a, b) => (a.year || 9999) - (b.year || 9999))
+}
+
+/**
+ * Fetch TMDB's "recommendations" feed for a title — real similar-title picks
+ * (backs the "Because You Watched" carousel). Falls back to mock trending in
+ * local dev.
+ */
+export async function fetchRecommendations(tmdbId: number, type: MediaType, page = 1): Promise<SearchResult[]> {
+  if (!(isSupabaseConfigured && supabase)) {
+    return MOCK_TRENDING.filter((r) => r.tmdbId !== tmdbId).slice(0, 10)
+  }
+
+  const { data, error } = await supabase.functions.invoke(
+    `media-proxy?action=recommendations&id=${tmdbId}&type=${type}&page=${page}`
+  )
+  if (error) throw error
+  // TMDB's recommendations payload carries a media_type per item; trust it over
+  // the source title's type so a movie can still recommend a series spin-off.
+  return (data?.results ?? []).map((i: any) =>
+    mapSearchItem(i, i.media_type === 'tv' ? 'tv' : 'movie')
+  ) as SearchResult[]
+}
+
 // ─── Person / Company types ───────────────────────────────────────────────────
 
 export interface PersonResult {

@@ -356,3 +356,20 @@ export async function listFriendships(): Promise<FriendshipView[]> {
   if (error) throw error
   return data ?? []
 }
+
+// ─── Suggested friends (invite lineage) ──────────────────────────────────────
+
+export interface InviteConnection {
+  user_id: string
+  username: string | null
+  display_name: string | null
+  connection: 'invited_by_you' | 'invited_you'
+}
+
+/** People linked to the current user by an invite code (they redeemed yours,
+ *  or you redeemed theirs) who aren't friends (or pending/blocked) yet. */
+export async function listInviteConnections(): Promise<InviteConnection[]> {
+  const { data, error } = await getClient().rpc('list_invite_connections')
+  if (error) throw error
+  return data ?? []
+}

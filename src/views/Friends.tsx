@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2 } from 'lucide-react'
+import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2, Ticket } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore } from 'src/store/useAppStore'
@@ -14,7 +14,9 @@ import {
   blockFriend,
   unblockFriend,
   listFriendships,
+  listInviteConnections,
   type FriendshipView,
+  type InviteConnection,
 } from 'src/lib/auth'
 import {
   fetchRecommendations, markRecommendationRead, dismissRecommendation, type Recommendation,
@@ -35,11 +37,13 @@ function FriendsSection() {
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const [friendships, setFriendships] = useState<FriendshipView[]>([])
+  const [suggestions, setSuggestions] = useState<InviteConnection[]>([])
   const [loading, setLoading] = useState(false)
   const [editingScopeFor, setEditingScopeFor] = useState<FriendshipView | null>(null)
 
   useEffect(() => {
     void loadFriendships()
+    void loadSuggestions()
   }, [])
 
   async function loadFriendships() {
@@ -51,6 +55,17 @@ function FriendsSection() {
       console.error('Failed to load friendships:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // People linked by invite lineage (they redeemed your code, or theirs got
+  // you here) who aren't connected yet — the server already excludes anyone
+  // with an existing friendship row in any state.
+  async function loadSuggestions() {
+    try {
+      setSuggestions(await listInviteConnections())
+    } catch (err) {
+      console.error('Failed to load suggested friends:', err)
     }
   }
 
@@ -111,6 +126,19 @@ function FriendsSection() {
       await loadFriendships()
     } catch (err) {
       console.error('Failed to unblock user:', err)
+    }
+  }
+
+  async function handleSuggestedRequest(suggestion: InviteConnection) {
+    setMessage(null)
+    try {
+      await sendFriendRequest(suggestion.user_id)
+      setSuggestions((prev) => prev.filter((s) => s.user_id !== suggestion.user_id))
+      setMessage({ type: 'success', text: 'Friend request sent.' })
+      await loadFriendships()
+    } catch (err: any) {
+      console.error(err)
+      setMessage({ type: 'error', text: err.message || 'Failed to send friend request.' })
     }
   }
 
@@ -230,6 +258,44 @@ function FriendsSection() {
           ))
         )}
       </div>
+
+      {/* Suggested friends — invite lineage (KP-026) */}
+      {suggestions.length > 0 && (
+        <div className="pt-1">
+          <p className="font-sans text-[10px] uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Ticket className="w-3 h-3 text-amber/70" />
+            Suggested friends
+          </p>
+          <div className="space-y-2">
+            {suggestions.map((s) => (
+              <div
+                key={s.user_id}
+                className="bg-secondary/20 rounded-lg p-3 border border-border flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-sans text-xs text-paper font-medium truncate">
+                    {s.display_name || s.username || 'Unknown user'}
+                  </p>
+                  <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                    {s.connection === 'invited_by_you'
+                      ? 'Joined with your invite code'
+                      : 'Invited you to CinemArchive'}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => handleSuggestedRequest(s)}
+                  className="bg-secondary hover:bg-amber/20 hover:text-amber text-muted-foreground w-7 h-7 p-0 flex items-center justify-center shrink-0"
+                  title="Send friend request"
+                  aria-label={`Send friend request to ${s.display_name || s.username || 'user'}`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {editingScopeFor && (
         <ShareScopeEditor

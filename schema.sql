@@ -43,6 +43,8 @@ create table titles (
   bechdel_outcome   text check (bechdel_outcome in ('pass', 'fail')),  -- Wikidata P5021/P9259 assessment outcome
   bechdel_score     text,              -- optional "x/3" breakdown (Wikidata P444 qualifier), mainly present on fails
   custom_watch_url  text,              -- owner override for "where to watch", shown preferentially in shared views
+  in_home_collection boolean not null default false,  -- owned locally — surfaces a "Home Collection" source in Where to Watch
+  physical_media    jsonb not null default '[]'::jsonb,  -- cataloged physical copies: [{ id, format, edition?, notes? }]
   collection_id     integer,           -- TMDB collection id (movies) — franchise grouping
   collection_name   text,              -- TMDB collection name, e.g. "The Lord of the Rings Collection"
   added_at      timestamptz not null default now(),

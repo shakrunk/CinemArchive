@@ -78,6 +78,19 @@ export interface Viewing {
   notes?: string
 }
 
+// Physical asset variants a home library can hold (KP-003).
+export const PHYSICAL_MEDIA_FORMATS = ['DVD', 'Blu-ray', '4K UHD', 'VHS', 'LaserDisc', 'Other'] as const
+export type PhysicalMediaFormat = (typeof PHYSICAL_MEDIA_FORMATS)[number]
+
+/** One physical copy of a title on the owner's shelf. Stored as jsonb on the
+ *  titles row (see schema.sql `physical_media`) in exactly this shape. */
+export interface PhysicalMediaItem {
+  id: string
+  format: PhysicalMediaFormat
+  edition?: string  // e.g. "Extended Edition", "Criterion #537", "Steelbook"
+  notes?: string    // packaging, region, condition…
+}
+
 export interface Title {
   id: string
   tmdbId: number
@@ -103,6 +116,8 @@ export interface Title {
   imdbId?: string  // e.g. "tt1375666" — enables an exact IMDb link
   rtUrl?: string  // Rotten Tomatoes page URL, resolved via Wikidata (P1258) from imdbId
   customWatchUrl?: string  // owner override for "where to watch", shown preferentially in shared views
+  inHomeCollection?: boolean  // owned locally (physical shelf / media server) — shows a Home Collection source in Where to Watch
+  physicalMedia?: PhysicalMediaItem[]  // cataloged physical copies (DVD, Blu-ray, …)
   collectionId?: number    // TMDB collection id (movies) — franchise grouping
   collectionName?: string  // TMDB collection name, e.g. "The Lord of the Rings Collection"
   viewings: Viewing[]

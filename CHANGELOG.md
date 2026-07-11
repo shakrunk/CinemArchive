@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-11
+
+### Added
+
+- Details drawer — redesigned title presentation with a persistent primary/sidebar
+  layout, unified hero metadata and review scores, contained content sections,
+  expandable wrapping cast cards, consolidated genres and tags, sidebar viewing
+  statistics, scroll-aware provider and trailer fades, and responsive mobile flow.
+
 ## [1.1.0] - 2026-07-10
 
 ### Added

@@ -7,7 +7,7 @@ import { PosterLightbox } from 'src/components/ui/poster-lightbox'
 import { SeriesGraph } from 'src/components/ui/series-graph'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
-import { CardTitle, BodyText, MetaBadge, StatNumber, StatLabel } from 'src/components/ui/typography'
+import { CardTitle, BodyText, MetaBadge, StatLabel } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
@@ -21,8 +21,8 @@ import {
 } from 'src/store/episodeUtils'
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
-  Calendar, Check, Clock, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X, Send,
+  Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
@@ -39,7 +39,7 @@ import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
 import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
 import { TrailerRow } from 'src/components/ui/trailer-row'
 import { WatchProvidersSection } from 'src/components/ui/watch-providers'
-import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
+import { ReviewBadges, ExternalLinks, HeroScores } from 'src/components/ui/media-badges'
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 
 type SelectorMode = 'normal' | 'bw' | 'color'
@@ -189,7 +189,77 @@ function ViewingTimeline({
   )
 }
 
+// ─── Section container ────────────────────────────────────────────────────────
+// Every drawer section sits in one of these bordered cards so related content
+// reads as a common region (gestalt) instead of floating in open space.
+
+function SectionCard({
+  title,
+  action,
+  className,
+  children,
+}: {
+  title?: React.ReactNode
+  /** Rendered on the right of the heading row (e.g. a "Log a viewing" button). */
+  action?: React.ReactNode
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      className={cn('rounded-xl border p-4 sm:p-5 min-w-0', className)}
+      style={{ borderColor: 'var(--line)', background: 'var(--wash)' }}
+    >
+      {(title || action) && (
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">{title}</h4>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
 // ─── Details sidebar ──────────────────────────────────────────────────────────
+
+function StatusCard({
+  status,
+  isSharedView,
+  onChange,
+}: {
+  status: WatchStatus
+  isSharedView: boolean
+  onChange: (status: WatchStatus) => void
+}) {
+  return (
+    <SectionCard title="Status">
+      <div className="relative inline-block">
+        <select
+          value={status}
+          onChange={isSharedView ? undefined : (e) => onChange(e.target.value as WatchStatus)}
+          disabled={isSharedView}
+          aria-label="Title status"
+          className={cn(
+            'appearance-none font-sans text-sm rounded-lg pl-3 pr-9 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60',
+            isSharedView && 'opacity-60 cursor-default'
+          )}
+          style={{ color: 'var(--amber)' }}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
+          style={{ color: 'var(--amber)' }}
+        />
+      </div>
+    </SectionCard>
+  )
+}
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -210,6 +280,112 @@ const CREW_DISPLAY: Array<{ jobs: string[]; label: string }> = [
   { jobs: ['Director of Photography'],                     label: 'D.O.P.' },
   { jobs: ['Original Music Composer'],                     label: 'Composer' },
 ]
+
+function CastCard({
+  member,
+  onPersonClick,
+}: {
+  member: CastMember
+  onPersonClick: (person: PersonDetailTarget) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+      aria-label={`View details for ${member.name}`}
+      className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
+      style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
+    >
+      <div className="aspect-[2/3] overflow-hidden">
+        {member.profileUrl ? (
+          <img
+            src={member.profileUrl}
+            alt={member.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
+            <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>
+              {member.name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="p-2">
+        <div
+          className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber"
+          style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }}
+          title={member.name}
+        >
+          {member.name}
+        </div>
+        <div
+          className="font-mono line-clamp-1 mt-0.5"
+          style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }}
+          title={member.character}
+        >
+          {member.character || ' '}
+        </div>
+        {member.episodeCount != null && (
+          <div
+            className="font-mono mt-0.5"
+            style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}
+          >
+            {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
+          </div>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// Wrapping cast layout: the first 5 members show, with a "View All" tile in the
+// 6th slot expanding the rest (no single-axis horizontal scroll).
+const CAST_COLLAPSED_COUNT = 5
+
+function CastGrid({
+  cast,
+  onPersonClick,
+}: {
+  cast: CastMember[]
+  onPersonClick: (person: PersonDetailTarget) => void
+}) {
+  const [showAll, setShowAll] = useState(false)
+  // No point hiding a single member behind a button — collapse only above 6.
+  const collapsible = cast.length > CAST_COLLAPSED_COUNT
+  const visible = collapsible && !showAll ? cast.slice(0, CAST_COLLAPSED_COUNT) : cast
+
+  return (
+    <div className="flex flex-wrap gap-2.5">
+      {visible.map((member) => (
+        <CastCard key={member.tmdbPersonId} member={member} onPersonClick={onPersonClick} />
+      ))}
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="shrink-0 w-[110px] rounded-lg flex flex-col items-center justify-center gap-1.5 border border-dashed transition-colors hover:border-amber/40 hover:bg-amber/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+          style={{ borderColor: 'var(--line)', minHeight: '120px' }}
+        >
+          {showAll ? (
+            <ChevronUp className="w-4 h-4" style={{ color: 'var(--paper-faint)' }} />
+          ) : (
+            <Plus className="w-4 h-4" style={{ color: 'var(--paper-faint)' }} />
+          )}
+          <span className="font-mono text-xs" style={{ color: 'var(--paper-dim)' }}>
+            {showAll ? 'Show less' : 'View All'}
+          </span>
+          {!showAll && (
+            <span className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+              +{cast.length - CAST_COLLAPSED_COUNT} more
+            </span>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
 
 interface CastCrewSectionProps {
   cast?: CastMember[]
@@ -251,58 +427,7 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
           >
             Main Cast
           </div>
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
-            {cast.map((member) => (
-              <button
-                key={member.tmdbPersonId}
-                type="button"
-                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
-                aria-label={`View details for ${member.name}`}
-                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
-                style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-              >
-                <div className="aspect-[2/3] overflow-hidden">
-                  {member.profileUrl ? (
-                    <img
-                      src={member.profileUrl}
-                      alt={member.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
-                      <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>
-                        {member.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-2">
-                  <div
-                    className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber"
-                    style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }}
-                    title={member.name}
-                  >
-                    {member.name}
-                  </div>
-                  <div
-                    className="font-mono line-clamp-1 mt-0.5"
-                    style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }}
-                    title={member.character}
-                  >
-                    {member.character || ' '}
-                  </div>
-                  {member.episodeCount != null && (
-                    <div
-                      className="font-mono mt-0.5"
-                      style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}
-                    >
-                      {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+          <CastGrid cast={cast} onPersonClick={onPersonClick} />
         </div>
       )}
 
@@ -778,19 +903,7 @@ function DrawerTagEditor({
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground">Tags</h4>
-        {!editing && (
-          <button
-            onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-            className="text-xs font-mono text-amber/50 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1"
-          >
-            + add
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1.5">
         {tags.map((t) => (
           <span
             key={t}
@@ -820,7 +933,7 @@ function DrawerTagEditor({
             className="px-2 py-0.5 rounded-full bg-secondary border border-amber/30 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber/60 w-28"
           />
         )}
-        {!editing && tags.length === 0 && (
+        {!editing && (
           <button
             onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
             className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -828,7 +941,6 @@ function DrawerTagEditor({
             <Tag className="w-2.5 h-2.5" /> add tag
           </button>
         )}
-      </div>
     </div>
   )
 }
@@ -1447,7 +1559,11 @@ export function TitleDetailDrawer() {
       <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
         {/* Hero: cinematic backdrop (stored or fetched) or blurred-poster fallback */}
         {(title.backdropUrl || heroBackdropUrl) ? (
-          <HeroBackdrop title={title} backdropOverride={heroBackdropUrl ?? undefined} onPosterClick={() => setPosterLightboxOpen(true)}>
+          <HeroBackdrop
+            title={title}
+            backdropOverride={heroBackdropUrl ?? undefined}
+            onPosterClick={() => setPosterLightboxOpen(true)}
+          >
             <div className="flex items-center gap-2">
               {title.type === 'movie' ? (
                 <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -1470,17 +1586,21 @@ export function TitleDetailDrawer() {
             ) : (
               <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
             )}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-sm text-amber">{title.year}</span>
-              {title.director && title.type === 'movie' && (
-                <span className="text-xs text-muted-foreground font-sans">dir. {title.director}</span>
+            <div className="flex flex-wrap items-center gap-2">
+                <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.year}</MetaBadge>
+              {title.director && (
+                <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.director}</MetaBadge>
               )}
               {title.runtime && title.type === 'movie' && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span className="font-mono">{fmtRuntime(title.runtime)}</span>
-                </div>
+                <MetaBadge className="h-7 inline-flex items-center gap-1 whitespace-nowrap border-amber/20 text-amber/80">
+                  <Clock className="w-3 h-3 shrink-0" />
+                  {fmtRuntime(title.runtime)}
+                </MetaBadge>
               )}
+              {title.contentRating && <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.contentRating}</MetaBadge>}
+              {title.genres.slice(0, 2).map((genre) => (
+                <MetaBadge key={genre} className="border-amber/20 text-amber/80">{genre}</MetaBadge>
+              ))}
             </div>
             {isSpiderNoir && (
               <SpiderNoirModeSelector
@@ -1495,11 +1615,16 @@ export function TitleDetailDrawer() {
             {isMatrix && (title.viewings.length > 0 || title.status === 'watched') && (
               <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
             )}
-            <StarRating
-              value={title.rating ?? 0}
-              size="sm"
-              onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-sm border border-white/10">
+                <StarRating
+                  value={title.rating ?? 0}
+                  size="sm"
+                  onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
+                />
+              </div>
+              <HeroScores imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
+            </div>
           </HeroBackdrop>
         ) : (
           <div className="relative overflow-hidden shrink-0">
@@ -1527,10 +1652,10 @@ export function TitleDetailDrawer() {
                     className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
                     title="View full poster"
                   >
-                    <DynamicPoster title={title} />
+                    <DynamicPoster title={title} hideBadges />
                   </button>
                 ) : (
-                  <DynamicPoster title={title} />
+                  <DynamicPoster title={title} hideBadges />
                 )}
               </div>
               <div className="flex-1 min-w-0 space-y-2 pt-6">
@@ -1548,17 +1673,21 @@ export function TitleDetailDrawer() {
                   )}
                 </div>
                 <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="font-mono text-sm text-amber">{title.year}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.year}</MetaBadge>
                   {title.director && (
-                    <span className="text-xs text-muted-foreground font-sans">dir. {title.director}</span>
+                    <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.director}</MetaBadge>
                   )}
                   {title.runtime && title.type === 'movie' && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span className="font-mono">{fmtRuntime(title.runtime)}</span>
-                    </div>
+                    <MetaBadge className="h-7 inline-flex items-center gap-1 whitespace-nowrap border-amber/20 text-amber/80">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      {fmtRuntime(title.runtime)}
+                    </MetaBadge>
                   )}
+                  {title.contentRating && <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.contentRating}</MetaBadge>}
+                  {title.genres.slice(0, 2).map((genre) => (
+                    <MetaBadge key={genre} className="border-amber/20 text-amber/80">{genre}</MetaBadge>
+                  ))}
                 </div>
                 {isSpiderNoir && (
                   <SpiderNoirModeSelector
@@ -1573,164 +1702,82 @@ export function TitleDetailDrawer() {
                 {isMatrix && (title.viewings.length > 0 || title.status === 'watched') && (
                   <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
                 )}
-                <StarRating
-                  value={title.rating ?? 0}
-                  size="sm"
-                  onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
-                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-sm border border-white/10">
+                    <StarRating
+                      value={title.rating ?? 0}
+                      size="sm"
+                      onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
+                    />
+                  </div>
+                  <HeroScores imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {/* Scrollable body */}
-        <div className="px-6 pb-6 space-y-5">
-          {/* Upper info — two columns on desktop so the right side is used */}
-          <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-8 lg:items-start space-y-5 lg:space-y-0">
+        <div className="px-4 sm:px-6 pb-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-8 lg:items-start">
+          {/* Each column owns its vertical flow, so a tall sidebar never creates
+              empty grid rows between primary-content sections. */}
+          <main className="space-y-5 min-w-0">
             {/* Left column — status, synopsis, genres */}
-            <div className="space-y-5 min-w-0">
-              {/* Status */}
-              <div>
-                <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Status</h4>
-                <div className="relative inline-block">
-                  <select
-                    value={title.status}
-                    onChange={isSharedView ? undefined : (e) => updateTitle(title.id, { status: e.target.value as WatchStatus })}
-                    disabled={isSharedView}
-                    aria-label="Title status"
-                    className={cn(
-                      'appearance-none font-sans text-sm rounded-lg pl-3 pr-9 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60',
-                      isSharedView && 'opacity-60 cursor-default'
-                    )}
-                    style={{ color: 'var(--amber)' }}
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                    style={{ color: 'var(--amber)' }}
-                  />
-                </div>
-              </div>
-
+            <div className="space-y-5 min-w-0 lg:col-start-1 lg:row-start-1">
               {/* Synopsis */}
-              {title.synopsis && (
-                <div>
-                  <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Synopsis</h4>
-                  <BodyText className="text-sm leading-relaxed max-w-2xl">{title.synopsis}</BodyText>
-                </div>
-              )}
-
-              {/* Genres */}
-              {title.genres.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {title.genres.map((g) => (
-                    <MetaBadge key={g} className="border-amber/20 text-amber/70">{g}</MetaBadge>
-                  ))}
-                </div>
+              {(title.synopsis || title.genres.length > 0 || !isSharedView || title.tags.length > 0) && (
+                <SectionCard title="Synopsis">
+                  {title.synopsis && <BodyText className="text-sm leading-relaxed max-w-2xl">{title.synopsis}</BodyText>}
+                  {(title.genres.length > 0 || !isSharedView || title.tags.length > 0) && (
+                    <div className={cn('flex flex-wrap items-center gap-1.5', title.synopsis && 'mt-4 pt-4 border-t')} style={{ borderColor: 'var(--line)' }}>
+                      {title.genres.length > 0 && (
+                        <>
+                          {title.genres.map((genre) => (
+                            <MetaBadge key={genre} className="border-amber/20 text-amber/70">{genre}</MetaBadge>
+                          ))}
+                        </>
+                      )}
+                      {(!isSharedView || title.tags.length > 0) && (
+                        <DrawerTagEditor
+                          tags={title.tags}
+                          isSharedView={isSharedView}
+                          onChange={(tags) => updateTitle(title.id, { tags })}
+                        />
+                      )}
+                    </div>
+                  )}
+                </SectionCard>
               )}
             </div>
-
-            {/* Right column — details + critical reception */}
-            <div className="space-y-5">
-              <div>
-                <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">Details</h4>
-                <dl className="space-y-2 rounded-lg bg-secondary/30 p-3">
-                  {title.network && <DetailRow label="Network" value={title.network} />}
-                  {title.type === 'movie' && title.director && <DetailRow label="Director" value={title.director} />}
-                  {title.runtime ? <DetailRow label="Runtime" value={`${title.runtime} min`} /> : null}
-                  {title.contentRating && <DetailRow label="Rated" value={title.contentRating} />}
-                  {title.originalLanguage && <DetailRow label="Language" value={languageName(title.originalLanguage)} />}
-                  {title.releaseDate && (
-                    <DetailRow
-                      label={title.releaseDate > new Date().toISOString().slice(0, 10) ? 'Releases' : 'Released'}
-                      value={fmtReleaseDate(title.releaseDate)}
-                    />
-                  )}
-                  {title.studios && title.studios.length > 0 && (
-                    <DetailRow label="Studio" value={title.studios.join(', ')} />
-                  )}
-                  {title.collectionName && (
-                    <DetailRow label="Franchise" value={title.collectionName.replace(/\s+Collection$/i, '')} />
-                  )}
-                  <DetailRow label="Added" value={fmtDate(title.addedAt)} />
-                </dl>
-              </div>
-
-              {/* Critical Reception */}
-              {title.imdbId && (
-                <div>
-                  <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
-                    Critical Reception
-                  </h4>
-                  <ReviewBadges
-                    imdb={title.imdbRating}
-                    rt={title.rtScore}
-                    meta={title.metacriticScore}
-                    awardsCount={title.awardsCount}
-                    bechdelOutcome={title.bechdelOutcome}
-                    bechdelScore={title.bechdelScore}
-                  />
-                </div>
-              )}
-
-              {/* External links */}
-              <ExternalLinks media={title} />
-
-              {/* Where to watch */}
-              <WatchProvidersSection
-                providers={watchProviders}
-                customUrl={title.customWatchUrl}
-                inHomeCollection={title.inHomeCollection}
-                physicalMedia={title.physicalMedia}
-                isSharedView={isSharedView}
-                onSaveCustomUrl={(url) => updateTitle(title.id, { customWatchUrl: url })}
-                onToggleHomeCollection={(value) => updateTitle(title.id, { inHomeCollection: value })}
-                onChangePhysicalMedia={(items) => updateTitle(title.id, { physicalMedia: items })}
-              />
-            </div>
-          </div>
-
-          {/* Tags — editable when not in shared view */}
-          {(!isSharedView || title.tags.length > 0) && (
-            <DrawerTagEditor
-              tags={title.tags}
-              isSharedView={isSharedView}
-              onChange={(tags) => updateTitle(title.id, { tags })}
-            />
-          )}
 
           {/* Cast & Crew */}
           {(title.cast?.length || title.crew?.length || title.studios?.length) ? (
-            <CastCrewSection
-              cast={title.cast}
-              crew={title.crew}
-              studios={title.studios}
-              onPersonClick={setActivePerson}
-              onStudioClick={browseByStudio}
-            />
+            <SectionCard className="lg:col-start-1">
+              <CastCrewSection
+                cast={title.cast}
+                crew={title.crew}
+                studios={title.studios}
+                onPersonClick={setActivePerson}
+                onStudioClick={browseByStudio}
+              />
+            </SectionCard>
           ) : null}
 
           {/* Franchise — the collection's other movies + watch progress */}
           {title.type === 'movie' && title.collectionId != null && (
-            <FranchiseSection
-              collectionId={title.collectionId}
-              collectionName={title.collectionName}
-              currentTmdbId={title.tmdbId}
-              isSharedView={isSharedView}
-            />
+            <SectionCard className="lg:col-start-1">
+              <FranchiseSection
+                collectionId={title.collectionId}
+                collectionName={title.collectionName}
+                currentTmdbId={title.tmdbId}
+                isSharedView={isSharedView}
+              />
+            </SectionCard>
           )}
 
           {/* ── TV Series section ───────────────────────────────────── */}
           {title.type === 'tv' && title.seasons && title.seasons.length > 0 && (
-            <div>
-              <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim mb-4">
-                Season &amp; Episodes
-              </h4>
+            <SectionCard title="Season & Episodes" className="lg:col-start-1">
               <TVSeriesSection
                 titleId={title.id}
                 seasons={title.seasons}
@@ -1739,42 +1786,17 @@ export function TitleDetailDrawer() {
                 onPersonClick={setActivePerson}
                 onColorModeSelected={handleModeSelect}
               />
-            </div>
+            </SectionCard>
           )}
 
           {/* ── Movie section (and TV without seasons) ─────────────── */}
           {title.type === 'movie' && (
             <>
-              {/* Viewing Stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-secondary/40 rounded-lg px-3 py-1.5 text-center">
-                  <StatNumber className="text-xl">{title.viewings.length}</StatNumber>
-                  <div className="mt-0.5">
-                    <StatLabel>Viewings</StatLabel>
-                  </div>
-                </div>
-                <div className="bg-secondary/40 rounded-lg px-3 py-1.5 text-center">
-                  <div className="flex items-center justify-center gap-1 mb-0.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    <StatNumber className="text-base leading-tight">
-                      {(() => {
-                        if (title.viewings.length === 0) return '—'
-                        const latest = title.viewings.slice().sort((a, b) => viewingTime(b) - viewingTime(a))[0]
-                        return latest.date ? fmtDate(latest.date) : 'Before joining'
-                      })()}
-                    </StatNumber>
-                  </div>
-                  <StatLabel>Last Seen</StatLabel>
-                </div>
-              </div>
-
               {/* Viewing History */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">
-                    Viewing History
-                  </h4>
-                  {!showLogForm && !isSharedView && (
+              <SectionCard
+                title="Viewing History"
+                className="lg:col-start-1"
+                action={!showLogForm && !isSharedView ? (
                     <button
                       onClick={() => setShowLogForm(true)}
                       className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
@@ -1782,8 +1804,8 @@ export function TitleDetailDrawer() {
                       <Plus className="w-3.5 h-3.5" />
                       Log a viewing
                     </button>
-                  )}
-                </div>
+                ) : undefined}
+              >
 
                 {showLogForm && (
                   <div className="border-t pt-3 mb-4 space-y-3" style={{ borderColor: 'var(--line)' }}>
@@ -1864,15 +1886,23 @@ export function TitleDetailDrawer() {
                   onDeleteViewing={(viewingId) => removeViewing(title.id, viewingId)}
                   onLogViewing={() => setShowLogForm(true)}
                 />
-              </div>
+              </SectionCard>
             </>
           )}
 
           {/* Trailers */}
-          <TrailerRow videos={videos} />
+          {videos.length > 0 && (
+            <SectionCard className="lg:col-start-1">
+              <TrailerRow videos={videos} />
+            </SectionCard>
+          )}
 
           {/* Comments & reactions — friends-only, hidden for anonymous share-link visitors */}
-          {viewerContext.kind !== 'shared-link' && <TitleCommentsPanel titleId={title.id} />}
+          {viewerContext.kind !== 'shared-link' && (
+            <SectionCard className="lg:col-start-1">
+              <TitleCommentsPanel titleId={title.id} />
+            </SectionCard>
+          )}
 
           {/* Maintenance actions */}
           {!isSharedView && (
@@ -1933,6 +1963,96 @@ export function TitleDetailDrawer() {
               )}
             </div>
           )}
+          </main>
+
+          {/* Right column — supplementary metadata flows independently. */}
+          <aside className="space-y-5 min-w-0">
+            <StatusCard
+              status={title.status}
+              isSharedView={isSharedView}
+              onChange={(status) => updateTitle(title.id, { status })}
+            />
+            {title.type === 'movie' && (
+              <SectionCard title="Viewing Stats">
+                <div className="space-y-2">
+                  <div className="bg-secondary/40 rounded-lg px-3 py-3 min-w-0 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <Eye className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
+                      <StatLabel>Viewings</StatLabel>
+                    </div>
+                    <span className="font-mono text-base leading-none font-medium text-amber tabular-nums shrink-0">
+                      {title.viewings.length}
+                    </span>
+                  </div>
+                  <div className="bg-secondary/40 rounded-lg px-3 py-3 min-w-0 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
+                      <StatLabel>Last Seen</StatLabel>
+                    </div>
+                    <span className="font-mono text-xs leading-none font-medium text-amber tabular-nums whitespace-nowrap shrink-0 text-right">
+                      {(() => {
+                        if (title.viewings.length === 0) return '—'
+                        const latest = title.viewings.slice().sort((a, b) => viewingTime(b) - viewingTime(a))[0]
+                        return latest.date ? fmtDate(latest.date) : 'Before joining'
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              </SectionCard>
+            )}
+            <SectionCard title="Details">
+              <dl className="space-y-2 rounded-lg bg-secondary/30 p-3">
+                {title.network && <DetailRow label="Network" value={title.network} />}
+                {title.runtime ? <DetailRow label="Runtime" value={`${title.runtime} min`} /> : null}
+                {title.contentRating && <DetailRow label="Rated" value={title.contentRating} />}
+                {title.originalLanguage && <DetailRow label="Language" value={languageName(title.originalLanguage)} />}
+                {title.releaseDate && (
+                  <DetailRow
+                    label={title.releaseDate > new Date().toISOString().slice(0, 10) ? 'Releases' : 'Released'}
+                    value={fmtReleaseDate(title.releaseDate)}
+                  />
+                )}
+                {title.studios && title.studios.length > 0 && (
+                  <DetailRow label="Studio" value={title.studios.join(', ')} />
+                )}
+                {title.collectionName && (
+                  <DetailRow label="Franchise" value={title.collectionName.replace(/\s+Collection$/i, '')} />
+                )}
+                <DetailRow label="Added" value={fmtDate(title.addedAt)} />
+              </dl>
+            </SectionCard>
+
+            {title.imdbId && (
+              <SectionCard title="Critical Reception">
+                <ReviewBadges
+                  imdb={title.imdbRating}
+                  rt={title.rtScore}
+                  meta={title.metacriticScore}
+                  awardsCount={title.awardsCount}
+                  bechdelOutcome={title.bechdelOutcome}
+                  bechdelScore={title.bechdelScore}
+                  showScores={false}
+                />
+              </SectionCard>
+            )}
+
+            <SectionCard>
+              <ExternalLinks media={title} />
+            </SectionCard>
+
+            <SectionCard>
+              <WatchProvidersSection
+                providers={watchProviders}
+                customUrl={title.customWatchUrl}
+                inHomeCollection={title.inHomeCollection}
+                physicalMedia={title.physicalMedia}
+                isSharedView={isSharedView}
+                onSaveCustomUrl={(url) => updateTitle(title.id, { customWatchUrl: url })}
+                onToggleHomeCollection={(value) => updateTitle(title.id, { inHomeCollection: value })}
+                onChangePhysicalMedia={(items) => updateTitle(title.id, { physicalMedia: items })}
+              />
+            </SectionCard>
+          </aside>
         </div>
       </div>
     </CinemaModal>

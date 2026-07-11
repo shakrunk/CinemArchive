@@ -3,10 +3,18 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle, RankBadge } from '../PanelShell'
 
-export function EncorePerformances({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function EncorePerformances({
+  className,
+  settings,
+  width = 'sm',
+}: {
+  className?: string
+  settings?: LedgerWidgetSettings
+  width?: LedgerPanelWidth
+}) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = settingsDepKey(settings)
 
@@ -28,22 +36,25 @@ export function EncorePerformances({ className, settings }: { className?: string
       {encores.length === 0 ? (
         <PanelEmpty message="No title has screened twice yet" />
       ) : (
-        <ol className="flex flex-col gap-1">
+        <ol className={width === 'lg' || width === 'full' ? 'grid grid-cols-2 gap-x-6 gap-y-1' : 'flex flex-col gap-1'}>
           {encores.map((t, i) => (
             <li
               key={t.id}
               className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)]"
-              style={{ gridTemplateColumns: '26px 1fr auto' }}
+              style={{ gridTemplateColumns: width === 'sm' ? '22px minmax(0, 1fr) auto' : '26px minmax(0, 1fr) auto' }}
             >
               <RankBadge rank={i + 1} />
               <div className="min-w-0">
                 <RowTitle className="truncate block">{t.title}</RowTitle>
                 <span className="font-mono text-[10px] text-paper-faint">{t.year}</span>
               </div>
-              <span className="flex gap-0.5 shrink-0">
-                {Array.from({ length: Math.min(t.viewings.length, 6) }, (_, k) => (
+              <span className="flex items-center gap-0.5 shrink-0" aria-label={`${t.viewings.length} screenings`}>
+                {Array.from({ length: Math.min(t.viewings.length, width === 'sm' ? 5 : 8) }, (_, k) => (
                   <i key={k} className="w-[5px] h-[5px] rounded-full bg-amber" />
                 ))}
+                {t.viewings.length > (width === 'sm' ? 5 : 8) && (
+                  <span className="ml-1 font-mono text-[9px] text-paper-faint">{t.viewings.length}×</span>
+                )}
               </span>
             </li>
           ))}

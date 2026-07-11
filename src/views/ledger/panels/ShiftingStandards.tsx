@@ -4,12 +4,12 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { deriveTrajectory } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
 import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
 
-export function ShiftingStandards({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function ShiftingStandards({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
@@ -44,11 +44,13 @@ export function ShiftingStandards({ className, settings }: { className?: string;
   }
 
   const refY = yFor(allTimeAvg)
+  const labelBudget = width === 'sm' ? 4 : width === 'md' ? 6 : width === 'lg' ? 9 : 12
+  const labelStep = Math.max(1, Math.ceil(quarters.length / labelBudget))
 
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
-      <div className="overflow-x-auto overflow-y-hidden scrollbar-thin">
-        <div style={{ minWidth: Math.max(quarters.length * 68, 420) }}>
+      <div className="min-w-0 overflow-hidden">
+        <div className="min-w-0">
           <MiniLineChart
             points={chartPoints}
             viewBoxHeight={190}
@@ -73,9 +75,9 @@ export function ShiftingStandards({ className, settings }: { className?: string;
             }
           />
           <div className="flex justify-between px-1">
-            {quarters.map((q) => (
+            {quarters.map((q, i) => (
               <span key={q.quarter} className="font-mono text-[9px] text-paper-faint whitespace-nowrap">
-                {q.quarter}
+                {(i % labelStep === 0 || i === quarters.length - 1) ? q.quarter : '\u00a0'}
               </span>
             ))}
           </div>

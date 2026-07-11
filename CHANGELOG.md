@@ -9,9 +9,25 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Ledger responsive-widget backlog (KP-004–KP-022): revamped all 15 remaining
+  affected panels one at a time with fluid charts, preset-aware list/grid
+  reflow, adaptive labels and plot sizing, and full-card use at `sm`, `md`,
+  `lg`, and `full` widths. Verified that every ledger card stays within its
+  horizontal and vertical bounds at 1440×900 and 390×844 viewports.
+- Ledger adaptive composition follow-up: widget cards now use one clipped layer
+  with consistent rounded corners, vertically balance their contents, and never
+  create internal scroll surfaces. Mobile always selects the compact visual
+  mode regardless of the saved desktop width. Screening Nights now progresses
+  from a compact radar chart to a synchronized radar-and-bar composition;
+  Critical Record and The Ensemble likewise switch to purpose-built compact
+  legends/lists instead of squeezing their desktop presentations.
+
 ## [1.0.2] - 2026-07-10
 
 ### Fixed
+
 - Ledger — "By the Genre" widget: genre bubbles no longer overflow the card
   when `topN` is configured toward the high end of its 3–12 range. Bubble size
   (and the `sm`-preset ranked list's row height) is now derived from an
@@ -21,6 +37,7 @@ number is chosen.
 ## [1.0.1] - 2026-07-10
 
 ### Fixed
+
 - Ledger — "The Run" widget: the monthly screening trend chart no longer forces
   a horizontal scrollbar (previously a fixed per-month pixel width could balloon
   past 6000px on a 10-year "all time" range). The chart now fills its card at
@@ -52,6 +69,7 @@ Baseline release. Marks the app as built, deployed, and in daily use — all
 history before this point is retained in git log, not itemized here.
 
 ### Fixed
+
 - Discover view: eliminated synchronous `setState` calls inside `useEffect` bodies
   (detail-modal hydration, "because you watched" / "more starring" defaults, studio
   search loading) in favor of derived state, per React's "you might not need an

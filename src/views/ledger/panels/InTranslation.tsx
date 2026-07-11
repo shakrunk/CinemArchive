@@ -4,11 +4,11 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, languageName, toPercent, rankBarFill } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
-export function InTranslation({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function InTranslation({ className, settings, width = 'sm' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -40,7 +40,7 @@ export function InTranslation({ className, settings }: { className?: string; set
       {langs.length === 0 ? (
         <PanelEmpty message="No language data yet" />
       ) : (
-        <div className="flex flex-col gap-1">
+        <div className={width === 'lg' || width === 'full' ? 'grid grid-cols-2 gap-x-7 gap-y-1' : 'flex flex-col gap-1'}>
           {langs.map((l, i) => (
             <button
               key={l.code}
@@ -52,7 +52,7 @@ export function InTranslation({ className, settings }: { className?: string; set
               {...tip.bind({ label: l.name, value: `${l.count} title${l.count !== 1 ? 's' : ''}` })}
             >
               <span className="font-mono text-[10px] uppercase text-amber-deep w-7 shrink-0">{l.code}</span>
-              <RowTitle className="truncate w-[34%] shrink-0 group-hover:underline decoration-amber/40">
+              <RowTitle className={cn('truncate shrink-0 group-hover:underline decoration-amber/40', width === 'sm' ? 'w-[31%]' : 'w-[34%]')}>
                 {l.name}
               </RowTitle>
               <span className="flex-1 h-[10px] rounded-sm bg-[var(--wash)] overflow-hidden">
@@ -61,7 +61,7 @@ export function InTranslation({ className, settings }: { className?: string; set
                   style={rankBarFill(l.count / maxCount, i === 0, i * 70)}
                 />
               </span>
-              <span className="font-mono text-[10px] text-paper-faint w-12 text-right shrink-0">
+              <span className="font-mono text-[10px] text-paper-faint w-9 text-right shrink-0">
                 {toPercent(l.count, total)}%
               </span>
             </button>

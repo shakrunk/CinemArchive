@@ -4,12 +4,12 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, maxOrOne } from 'src/lib/utils'
 import { deriveRevivals } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty, FOOTER_CAPTION, COL_GROW_ANIMATION } from '../PanelShell'
 import { monthLabel } from '../labels'
 
-export function PremieresRevivals({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function PremieresRevivals({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
@@ -25,6 +25,9 @@ export function PremieresRevivals({ className, settings }: { className?: string;
     { premieres: 0, revivals: 0 },
   )
   const maxHalf = maxOrOne(months.flatMap((m) => [m.premieres, m.revivals]))
+  const labelBudget = width === 'sm' ? 4 : width === 'md' ? 6 : width === 'lg' ? 9 : 12
+  const labelStep = Math.max(1, Math.ceil(months.length / labelBudget))
+  const halfHeight = width === 'sm' ? 70 : width === 'md' ? 82 : 92
 
   const panelTitle = settings?.title || 'Premieres & revivals'
   const hint = `first watches vs. encores${describeLedgerSettings(settings)}`
@@ -39,19 +42,19 @@ export function PremieresRevivals({ className, settings }: { className?: string;
 
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
-      <div className="overflow-x-auto overflow-y-hidden scrollbar-thin">
-        <div className="flex items-stretch gap-2" style={{ minWidth: Math.max(months.length * 42, 320) }}>
+      <div className="min-w-0 overflow-hidden">
+        <div className="flex min-w-0 items-stretch gap-[clamp(2px,0.6vw,8px)]">
           {months.map((m, i) => (
             <div
               key={m.month}
-              className="flex-1 min-w-[30px] flex flex-col items-center"
+              className="flex min-w-0 flex-1 flex-col items-center"
               {...tip.bind({
                 label: `${monthLabel(m.month)} ${m.month.slice(0, 4)}`,
                 value: `${m.premieres} premiere${m.premieres !== 1 ? 's' : ''} · ${m.revivals} revival${m.revivals !== 1 ? 's' : ''}`,
               })}
             >
               {/* Premieres grow up from the center axis */}
-              <div className="h-[92px] w-full flex items-end justify-center">
+              <div className="w-full flex items-end justify-center" style={{ height: halfHeight }}>
                 <div
                   className="w-full max-w-[22px] rounded-t-md"
                   style={{
@@ -68,7 +71,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
               {/* Center axis */}
               <div className="w-full h-px shrink-0 bg-[var(--line-2)]" />
               {/* Revivals hang down from the axis */}
-              <div className="h-[92px] w-full flex items-start justify-center">
+              <div className="w-full flex items-start justify-center" style={{ height: halfHeight }}>
                 <div
                   className="w-full max-w-[22px] rounded-b-md"
                   style={{
@@ -83,7 +86,7 @@ export function PremieresRevivals({ className, settings }: { className?: string;
                 />
               </div>
               <span className="font-mono text-[9px] text-paper-faint mt-1 whitespace-nowrap">
-                {monthLabel(m.month)}
+                {(i % labelStep === 0 || i === months.length - 1) ? monthLabel(m.month) : '\u00a0'}
               </span>
             </div>
           ))}

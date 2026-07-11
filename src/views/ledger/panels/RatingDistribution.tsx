@@ -4,7 +4,12 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, ratingColorVar, toPercent } from 'src/lib/utils'
 import { deriveRatingDistribution } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import {
+  describeLedgerSettings,
+  settingsDepKey,
+  type LedgerPanelWidth,
+  type LedgerWidgetSettings,
+} from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 import { renderStarLabel } from '../labels'
 
@@ -24,10 +29,11 @@ export function RatingDistribution({
   const { distribution, avgRating } = useMemo(
     () => deriveRatingDistribution(titles, settings),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [titles, settingsKey],
+    [titles, settingsKey]
   )
   const data = distribution.filter((d) => d.count > 0).sort((a, b) => b.rating - a.rating)
   const total = data.reduce((sum, d) => sum + d.count, 0)
+  const donutSize = width === 'sm' ? 108 : width === 'md' ? 156 : width === 'lg' ? 176 : 192
 
   const gradient = useMemo(() => {
     if (total === 0) return 'var(--wash)'
@@ -52,19 +58,20 @@ export function RatingDistribution({
       ) : (
         <div
           className={cn(
-            'flex items-center gap-8',
+            'flex items-center',
+            width === 'sm' ? 'gap-4' : 'gap-8',
             width === 'sm' ? 'flex-col' : 'flex-row',
-            (width === 'lg' || width === 'full') && 'max-w-[640px] mx-auto',
+            width === 'full' && 'gap-12'
           )}
         >
           <div
             className="donut-ring relative shrink-0 rounded-full"
-            style={{ width: width === 'sm' ? 136 : 168, height: width === 'sm' ? 136 : 168, background: gradient }}
+            style={{ width: donutSize, height: donutSize, background: gradient }}
           >
             <div
               className="donut-hole absolute rounded-full flex flex-col items-center justify-center"
               style={{
-                inset: width === 'sm' ? '20px' : '24px',
+                inset: Math.round(donutSize * 0.145),
                 background: 'linear-gradient(168deg, var(--ink-1), var(--ink-2))',
                 border: '1px solid var(--line)',
               }}
@@ -75,7 +82,12 @@ export function RatingDistribution({
               </span>
             </div>
           </div>
-          <div className="flex-1 w-full min-w-0 flex flex-col gap-0.5">
+          <div
+            className={cn(
+              'flex-1 w-full min-w-0',
+              width === 'full' ? 'grid grid-cols-2 gap-x-8 gap-y-1' : 'flex flex-col gap-1'
+            )}
+          >
             {data.map((d) => (
               <button
                 key={d.rating}
@@ -83,19 +95,24 @@ export function RatingDistribution({
                   setFilter('minRating', d.rating)
                   requestView('library')
                 }}
-                className="w-full flex items-center justify-between gap-3 px-2 py-1.5 rounded-md transition-colors hover:bg-[var(--wash)] cursor-pointer group"
+                className="grid w-full grid-cols-[minmax(76px,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[var(--wash)] cursor-pointer group"
               >
                 <span className="flex items-center gap-2.5">
                   <i
                     className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: ratingColorVar(d.rating), boxShadow: `0 0 8px -1px ${ratingColorVar(d.rating)}` }}
+                    style={{
+                      background: ratingColorVar(d.rating),
+                      boxShadow: `0 0 8px -1px ${ratingColorVar(d.rating)}`,
+                    }}
                   />
                   <span className="font-mono text-[12px] text-amber group-hover:text-amber-bright transition-colors">
                     {renderStarLabel(d.rating)}
                   </span>
                 </span>
-                <span className="font-mono text-[11px] text-paper-faint">
-                  <span className="text-paper-dim">{d.count}</span> · {toPercent(d.count, total)}%
+                <span className="whitespace-nowrap text-right font-mono text-[11px] text-paper-faint">
+                  <span className="text-paper-dim">{d.count}</span>
+                  <span aria-hidden="true"> · </span>
+                  {toPercent(d.count, total)}%
                 </span>
               </button>
             ))}

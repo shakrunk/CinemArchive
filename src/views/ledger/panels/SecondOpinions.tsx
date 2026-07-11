@@ -4,11 +4,11 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
-export function SecondOpinions({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function SecondOpinions({ className, settings, width = 'lg' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -49,7 +49,7 @@ export function SecondOpinions({ className, settings }: { className?: string; se
                     requestView('library')
                   }}
                   className={cn('w-full grid items-center gap-3', LIST_ROW_HOVER)}
-                  style={{ gridTemplateColumns: '1fr minmax(90px, 130px) auto' }}
+                  style={{ gridTemplateColumns: width === 'sm' ? 'minmax(0, 1fr) auto' : 'minmax(0, 1fr) minmax(90px, 1fr) auto' }}
                 >
                   <div className="min-w-0">
                     <RowTitle className="truncate block group-hover:underline decoration-amber/40">
@@ -57,7 +57,7 @@ export function SecondOpinions({ className, settings }: { className?: string; se
                     </RowTitle>
                     <span className="font-mono text-[10px] text-paper-faint">{r.title.year}</span>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className={cn('flex flex-col gap-1', width === 'sm' && 'col-span-2 row-start-2')}>
                     <span className="flex items-center gap-1.5">
                       <span className="font-mono text-[8px] uppercase tracking-widest text-paper-faint w-7 shrink-0">you</span>
                       <span className="flex-1 h-[6px] rounded-full bg-[var(--wash)] overflow-hidden">

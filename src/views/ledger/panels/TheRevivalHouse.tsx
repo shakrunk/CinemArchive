@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { toPercent } from 'src/lib/utils'
 import { deriveTimewarp } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty } from '../PanelShell'
 
@@ -17,7 +17,7 @@ const BUCKET_COLORS = [
   'rgba(128,115,95,0.4)',
 ]
 
-export function TheRevivalHouse({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function TheRevivalHouse({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = settingsDepKey(settings)
   const tip = useChartTip()
@@ -42,7 +42,7 @@ export function TheRevivalHouse({ className, settings }: { className?: string; s
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
       {/* Proportional spectrum strip */}
-      <div className="flex h-[56px] rounded-lg overflow-hidden border border-[var(--line)]">
+      <div className={`flex rounded-lg overflow-hidden border border-[var(--line)] ${width === 'sm' ? 'h-12' : width === 'full' ? 'h-20' : 'h-14'}`}>
         {buckets.map(
           (b, i) =>
             b.count > 0 && (
@@ -67,7 +67,7 @@ export function TheRevivalHouse({ className, settings }: { className?: string; s
       </div>
 
       {/* Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 mt-4">
+      <div className={`grid gap-x-4 gap-y-2 mt-4 ${width === 'sm' ? 'grid-cols-2' : width === 'md' ? 'grid-cols-3' : 'grid-cols-5'}`}>
         {buckets.map((b, i) => (
           <div key={b.key} className="flex items-center gap-2">
             <i className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: BUCKET_COLORS[i] }} />

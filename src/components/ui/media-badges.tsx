@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { Venus, type LucideIcon } from 'lucide-react'
 import type { MediaType } from 'src/store/mockData'
 import { SubsectionLabel } from 'src/components/ui/typography'
 
@@ -22,6 +23,8 @@ function entranceDelay(i: number, msPerItem: number): string {
 interface Badge {
   key: string
   label: string
+  /** Renders in place of the text label; `label` stays as the screen-reader name. */
+  icon?: LucideIcon
   value: string
   color: string
   /** Box-shadow color on hover — a translucent variant of `color`. Plain hex
@@ -71,7 +74,10 @@ export function ReviewBadges({
 
   badges.push({
     key: 'bechdel',
-    label: 'BDT',
+    label: 'Bechdel test',
+    // ♀ — the Bechdel test measures women's representation; the Venus symbol
+    // reads at a glance where the old 'BDT' initialism needed decoding (KP-029).
+    icon: Venus,
     value: bechdelOutcome === 'pass' ? 'PASS' : bechdelOutcome === 'fail' ? (bechdelScore ?? 'FAIL') : '—',
     color: bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR,
     glowColor: withAlpha(bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR, '66'),
@@ -96,12 +102,19 @@ export function ReviewBadges({
             opacity: 0,
           } as CSSProperties}
         >
-          <span
-            className="font-mono font-bold text-xs transition-colors"
-            style={{ color: b.color }}
-          >
-            {b.label}
-          </span>
+          {b.icon ? (
+            <>
+              <b.icon className="w-4 h-4" strokeWidth={2.5} style={{ color: b.color }} aria-hidden />
+              <span className="sr-only">{b.label}</span>
+            </>
+          ) : (
+            <span
+              className="font-mono font-bold text-xs transition-colors"
+              style={{ color: b.color }}
+            >
+              {b.label}
+            </span>
+          )}
           <span className="font-mono text-sm text-foreground tabular-nums">{b.value}</span>
         </div>
       ))}

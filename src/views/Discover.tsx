@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Play, Pause, type LucideIcon } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import {
   searchMedia, fetchTrending, fetchDiscover, fetchMediaDetails, fetchTitleImages,
-  searchPersons, fetchPersonCredits, searchCompanies, fetchCompanyTitles,
+  searchPersons, fetchPersonCredits, searchCompanies, fetchCompanyTitles, fetchRecommendations,
   MOVIE_GENRES, TV_GENRES,
   type SearchResult, type PersonResult, type CompanyResult,
 } from 'src/lib/media'
@@ -202,6 +202,13 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
 
 const CAROUSEL_SPEED_PX_S = 26
 
+// Momentum glide after a drag release: exponential decay rate (s⁻¹) and the speed
+// below which the glide is considered stopped. Velocity is clamped so a wild fling
+// can't launch the strip several loop-widths in a blink.
+const MOMENTUM_FRICTION = 4
+const MOMENTUM_MIN_SPEED_PX_S = 8
+const MOMENTUM_MAX_SPEED_PX_S = 3200
+
 // Sprocket-hole pitch from the .reel-strip mask in index.css (repeating-linear-gradient
 // period, 8px hole + 30.4px stock). Mirror any change to that value here.
 const SPROCKET_PITCH_PX = 38.4
@@ -226,8 +233,12 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   const dragStartXRef = useRef(0)
   const dragStartScrollRef = useRef(0)
   const pausedRef = useRef(false)
+  const velocityRef = useRef(0)
+  const lastMoveRef = useRef<{ x: number; t: number } | null>(null)
+  const userPausedRef = useRef(false)
   const reducedMotionRef = usePrefersReducedMotionRef()
   const [isGrabbing, setIsGrabbing] = useState(false)
+  const [userPaused, setUserPaused] = useState(false)
 
   const applyTransform = useCallback(() => {
     const width = singleSetWidthRef.current
@@ -280,9 +291,22 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
       if (lastTs == null) lastTs = ts
       const dt = (ts - lastTs) / 1000
       lastTs = ts
-      if (!draggingRef.current && !pausedRef.current && !reducedMotionRef.current) {
-        scrollXRef.current += CAROUSEL_SPEED_PX_S * dt
-        applyTransform()
+      if (!draggingRef.current) {
+        let moved = false
+        // Momentum glide from a released drag — decays independently of, and stacks
+        // with, the ambient auto-scroll, so a fling doesn't "kill" the marquee.
+        if (Math.abs(velocityRef.current) >= MOMENTUM_MIN_SPEED_PX_S) {
+          scrollXRef.current += velocityRef.current * dt
+          velocityRef.current *= Math.exp(-MOMENTUM_FRICTION * dt)
+          moved = true
+        } else {
+          velocityRef.current = 0
+        }
+        if (!pausedRef.current && !userPausedRef.current && !reducedMotionRef.current) {
+          scrollXRef.current += CAROUSEL_SPEED_PX_S * dt
+          moved = true
+        }
+        if (moved) applyTransform()
       }
       raf = requestAnimationFrame(tick)
     }
@@ -295,6 +319,8 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
     dragMovedRef.current = false
     dragStartXRef.current = e.clientX
     dragStartScrollRef.current = scrollXRef.current
+    velocityRef.current = 0
+    lastMoveRef.current = { x: e.clientX, t: performance.now() }
     setIsGrabbing(true)
   }
 
@@ -309,6 +335,16 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
       dragMovedRef.current = true
       e.currentTarget.setPointerCapture(e.pointerId)
     }
+    // Instantaneous scroll velocity (px/s), low-pass blended so one jittery pointer
+    // sample can't spike the release fling. Pointer moving right scrolls X negative,
+    // hence the sign flip.
+    const now = performance.now()
+    const last = lastMoveRef.current
+    if (last && now > last.t) {
+      const sample = (-(e.clientX - last.x) / (now - last.t)) * 1000
+      velocityRef.current = 0.8 * sample + 0.2 * velocityRef.current
+    }
+    lastMoveRef.current = { x: e.clientX, t: now }
     scrollXRef.current = dragStartScrollRef.current - delta
     applyTransform()
   }
@@ -316,21 +352,63 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   function endDrag(e: React.PointerEvent) {
     draggingRef.current = false
     setIsGrabbing(false)
+    // Momentum: keep the strip gliding at the release velocity, decayed in the rAF
+    // loop. Suppressed when the pointer stalled before release (a stale velocity
+    // sample would fling a strip the user had deliberately stopped), and under
+    // reduced motion.
+    const last = lastMoveRef.current
+    const stalled = !last || performance.now() - last.t > 100
+    if (!dragMovedRef.current || stalled || reducedMotionRef.current) {
+      velocityRef.current = 0
+    } else {
+      velocityRef.current = Math.max(
+        -MOMENTUM_MAX_SPEED_PX_S,
+        Math.min(MOMENTUM_MAX_SPEED_PX_S, velocityRef.current)
+      )
+    }
+    lastMoveRef.current = null
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId)
     }
   }
+
+  // Mouse-wheel / trackpad horizontal scroll — the strip is transform-driven (no
+  // native scroll surface), so sideways wheel input does nothing without this.
+  // Attached natively with passive: false because React's onWheel can't reliably
+  // preventDefault (browsers register root wheel listeners as passive), and only
+  // horizontal-dominant deltas are consumed so vertical wheel still scrolls the page.
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
+      e.preventDefault()
+      velocityRef.current = 0
+      scrollXRef.current += e.deltaX
+      applyTransform()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [applyTransform])
 
   // Pause on pointer hover (mouse) and on keyboard focus (Tab-ing through cards),
   // so the strip doesn't slide away from underneath a focused or hovered card.
   function pause() { pausedRef.current = true }
   function resume() { pausedRef.current = false }
 
+  // Explicit pause toggle — unlike the hover pause above this one sticks, for anyone
+  // who finds the perpetual marquee distracting or hard to target.
+  function toggleUserPause() {
+    userPausedRef.current = !userPausedRef.current
+    setUserPaused(userPausedRef.current)
+  }
+
   // Chevron override — a manual nudge layered on top of the auto-scroll/drag, for
   // anyone who'd rather page through than wait for the marquee or grab-drag it.
   // The auto-scroll keeps drifting from wherever this lands, same as after a drag.
   function scrollByPage(dir: 1 | -1) {
     const amount = (trackRef.current?.parentElement?.clientWidth ?? 300) * 0.85 * dir
+    velocityRef.current = 0
     scrollXRef.current += amount
     const track = trackRef.current
     if (track) track.style.transition = 'transform 0.4s var(--ease, ease)'
@@ -417,13 +495,30 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
           >
             <ChevronRight className="w-4 h-4 text-paper" />
           </button>
+
+          {/* Auto-scroll pause toggle — stays visible while paused (unlike the
+              hover-only chevrons) so the frozen strip explains itself. */}
+          <button
+            onClick={toggleUserPause}
+            aria-label={userPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+            aria-pressed={userPaused}
+            className={cn(
+              'absolute right-2 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-opacity shadow-lg z-10',
+              userPaused ? 'opacity-100' : 'opacity-0 group-hover/carousel:opacity-100 focus-visible:opacity-100'
+            )}
+            style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
+          >
+            {userPaused
+              ? <Play className="w-3.5 h-3.5 text-amber" />
+              : <Pause className="w-3.5 h-3.5 text-paper" />}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-// ─── TasteDropdown — themed picker for the "Because you watched" / "More starring" rows ──
+// ─── TasteDropdown — themed picker for the "Because You Watched" / "More Starring" rows ──
 
 interface TasteDropdownOption {
   id: string
@@ -438,19 +533,34 @@ interface TasteDropdownProps {
   placeholder?: string
 }
 
+// Options beyond this count get a filter input at the top of the menu — the cast
+// list in particular grows with every library title and quickly outruns scrolling.
+const TASTE_DROPDOWN_SEARCH_THRESHOLD = 8
+
 function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Select…' }: TasteDropdownProps) {
   const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
   useClickOutside(ref, () => setOpen(false), open)
 
   const selected = options.find((o) => o.id === value)
+  const searchable = options.length > TASTE_DROPDOWN_SEARCH_THRESHOLD
+  const needle = filter.trim().toLowerCase()
+  const visibleOptions = searchable && needle
+    ? options.filter((o) => o.label.toLowerCase().includes(needle))
+    : options
+
+  function toggleOpen() {
+    if (!open) setFilter('')
+    setOpen(!open)
+  }
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         aria-label={ariaLabel}
         aria-expanded={open}
         disabled={options.length === 0}
@@ -463,28 +573,54 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
 
       {open && (
         <div
-          role="listbox"
-          aria-label={ariaLabel}
-          className="absolute left-0 top-[calc(100%+6px)] w-56 max-h-64 overflow-y-auto rounded-lg border shadow-2xl z-30 py-1 bg-card scrollbar-thin"
+          className="absolute left-0 top-[calc(100%+6px)] w-56 rounded-lg border shadow-2xl z-30 py-1 bg-card"
           style={{ borderColor: 'var(--line)' }}
         >
-          {options.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              role="option"
-              aria-selected={o.id === value}
-              onClick={() => { onChange(o.id); setOpen(false) }}
-              className={cn(
-                'w-full text-left px-3 py-1.5 text-[13px] font-sans truncate transition-colors',
-                o.id === value
-                  ? 'text-amber-bright bg-amber/15'
-                  : 'text-paper-faint hover:text-paper hover:bg-[color:var(--inset-strong)]'
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
+          {searchable && (
+            <div className="px-1.5 pb-1">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-paper-faint pointer-events-none" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
+                  placeholder="Filter…"
+                  aria-label={`Filter options for ${ariaLabel}`}
+                  className="w-full h-7 pl-7 pr-2 rounded border text-[12px] font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-1 focus:ring-amber/30"
+                  style={{ background: 'var(--inset)', borderColor: 'var(--line)' }}
+                />
+              </div>
+            </div>
+          )}
+          <div
+            role="listbox"
+            aria-label={ariaLabel}
+            className="max-h-56 overflow-y-auto scrollbar-thin"
+          >
+            {visibleOptions.length === 0 ? (
+              <p className="px-3 py-2 text-[12px] font-mono text-paper-faint">No matches.</p>
+            ) : (
+              visibleOptions.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="option"
+                  aria-selected={o.id === value}
+                  onClick={() => { onChange(o.id); setOpen(false) }}
+                  className={cn(
+                    'w-full text-left px-3 py-1.5 text-[13px] font-sans truncate transition-colors',
+                    o.id === value
+                      ? 'text-amber-bright bg-amber/15'
+                      : 'text-paper-faint hover:text-paper hover:bg-[color:var(--inset-strong)]'
+                  )}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -965,8 +1101,10 @@ export function Discover() {
     [titles]
   )
 
-  // ── "Because you watched" — front-end only for now, see TODO near becauseWatchedResults ──
+  // ── "Because You Watched" — real TMDB recommendations keyed off a library title ──
   const [becauseWatchedOverrideId, setBecauseWatchedOverrideId] = useState<string | null>(null)
+  const [becauseWatchedResults, setBecauseWatchedResults] = useState<SearchResult[]>([])
+  const [loadedBecauseWatchedId, setLoadedBecauseWatchedId] = useState<string | null>(null)
 
   // ── "More starring" — real TMDB filmography via fetchPersonCredits, keyed off library cast ──
   const [moreStarringOverridePersonId, setMoreStarringOverridePersonId] = useState<number | null>(null)
@@ -1245,18 +1383,41 @@ export function Discover() {
     [titles, becauseWatchedId]
   )
 
-  // TODO(backend): this reuses the trending pool as a stand-in "similar titles" feed so
-  // the UI can be built and reviewed now. Replace with a real recommendation call keyed
-  // off `becauseWatchedTitle` (e.g. a media-proxy endpoint wrapping TMDB's
-  // /movie|tv/{id}/recommendations, or a Supabase-side taste model) once that lands.
-  const becauseWatchedResults = useMemo(() => {
-    if (!becauseWatchedTitle) return []
-    return trending.filter(
-      (r) => r.tmdbId !== becauseWatchedTitle.tmdbId && (r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId))
-    )
-  }, [becauseWatchedTitle, trending, libraryTmdbIds])
+  // Titles without a TMDB link (tmdbId 0 on manual/migrated adds) have nothing
+  // to seed the feed with — derived here rather than cleared from the effect.
+  const becauseWatchedSeedable = Boolean(becauseWatchedTitle?.tmdbId)
 
-  const becauseWatchedDelays = useMemo(() => staggerDelays(becauseWatchedResults.length), [becauseWatchedResults.length])
+  // Derived rather than tracked separately — mirrors moreStarringLoading above.
+  const becauseWatchedLoading =
+    becauseWatchedId !== null && becauseWatchedSeedable && becauseWatchedId !== loadedBecauseWatchedId
+
+  // Real similar-title picks from TMDB's /movie|tv/{id}/recommendations, via the
+  // media-proxy `recommendations` action.
+  useEffect(() => {
+    if (!becauseWatchedTitle?.tmdbId) return
+    const { id, tmdbId, type } = becauseWatchedTitle
+    let cancelled = false
+    fetchRecommendations(tmdbId, type)
+      .then((recs) => {
+        if (cancelled) return
+        setBecauseWatchedResults(recs.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+        setLoadedBecauseWatchedId(id)
+      })
+      .catch((err) => {
+        console.error('recommendations error:', err)
+        if (cancelled) return
+        setBecauseWatchedResults([])
+        setLoadedBecauseWatchedId(id)
+      })
+    return () => { cancelled = true }
+  }, [becauseWatchedTitle, libraryTmdbIds])
+
+  // Hide stale results whenever the current basis isn't the loaded one (or can't
+  // be seeded at all) — mirrors visibleMoreStarringResults below.
+  const visibleBecauseWatchedResults =
+    becauseWatchedSeedable && becauseWatchedId === loadedBecauseWatchedId ? becauseWatchedResults : []
+
+  const becauseWatchedDelays = useMemo(() => staggerDelays(visibleBecauseWatchedResults.length), [visibleBecauseWatchedResults.length])
 
   // Hide stale results the moment the basis reverts to no selection (e.g. an empty library)
   // rather than clearing them from an effect.
@@ -1269,10 +1430,11 @@ export function Discover() {
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
-      {/* Hero heading — centered */}
+      {/* Hero heading — centered, same display-title brand identity as the other views */}
       <div className="text-center mb-7">
-        <h1 className="font-serif text-3xl sm:text-4xl font-bold text-paper leading-tight max-w-xl mx-auto">
-          What's missing from your archive?
+        <p className="kicker"><span className="dot" /> the acquisitions desk</p>
+        <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3 max-w-xl mx-auto">
+          What's missing from your <em>archive?</em>
         </h1>
       </div>
 
@@ -1517,11 +1679,11 @@ export function Discover() {
           )}
         </div>
 
-        {/* Because you watched — placeholder recommendations, see TODO above becauseWatchedResults */}
+        {/* Because You Watched — real TMDB recommendations for a library title */}
         {searchMode === 'titles' && !query.trim() && selectedGenreId === null && titles.length > 0 && (
           <div className="mt-10">
             <div className="flex flex-wrap items-center gap-2.5 mb-3">
-              <h2 className="font-serif text-lg font-semibold text-paper">Because you watched</h2>
+              <h2 className="font-serif text-lg font-semibold text-paper">Because You Watched</h2>
               <TasteDropdown
                 options={titles.map((t) => ({ id: t.id, label: t.title }))}
                 value={becauseWatchedId}
@@ -1529,9 +1691,15 @@ export function Discover() {
                 ariaLabel="Choose a title to base recommendations on"
               />
             </div>
-            {becauseWatchedResults.length > 0 ? (
+            {becauseWatchedLoading ? (
+              <div className="flex gap-3 overflow-hidden">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
+                ))}
+              </div>
+            ) : visibleBecauseWatchedResults.length > 0 ? (
               <DiscoverCarousel
-                results={becauseWatchedResults}
+                results={visibleBecauseWatchedResults}
                 libraryTmdbIds={libraryTmdbIds}
                 isSharedView={isSharedView}
                 onAdd={openAddTitlePreselected}
@@ -1540,7 +1708,7 @@ export function Discover() {
               />
             ) : (
               <p className="font-mono text-xs text-paper-faint py-6">
-                No suggestions yet — check back once trending titles load.
+                No recommendations found for this title — try picking another.
               </p>
             )}
           </div>
@@ -1550,7 +1718,7 @@ export function Discover() {
         {searchMode === 'titles' && !query.trim() && selectedGenreId === null && castOptions.length > 0 && (
           <div className="mt-10">
             <div className="flex flex-wrap items-center gap-2.5 mb-3">
-              <h2 className="font-serif text-lg font-semibold text-paper">More starring</h2>
+              <h2 className="font-serif text-lg font-semibold text-paper">More Starring</h2>
               <TasteDropdown
                 options={castOptions.map((c) => ({ id: String(c.id), label: c.name }))}
                 value={moreStarringPersonId != null ? String(moreStarringPersonId) : null}

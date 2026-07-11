@@ -192,6 +192,15 @@ export default function App() {
       >
         Skip to content
       </a>
+      {/* Hidden-until-focused, like the skip link above — surfaces the shortcuts
+          panel for keyboard and screen-reader users who can't hover-discover "?". */}
+      <button
+        type="button"
+        onClick={() => setIsKeyboardHelpOpen(true)}
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-3 focus:left-40 focus:px-4 focus:py-2 focus:rounded-md focus:bg-amber focus:text-[color:var(--on-amber)] focus:font-sans focus:text-sm focus:font-medium focus:shadow-lg"
+      >
+        Keyboard shortcuts
+      </button>
 
       {/* ── Atmosphere layers (fixed, full-viewport) ── */}
       <div className="projector-beam" aria-hidden="true" />

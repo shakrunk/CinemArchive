@@ -210,6 +210,16 @@ async function getTMDBImages(tmdbId: number, type: 'movie' | 'tv') {
   return cachedFetch(`tmdb:images:${type}:${tmdbId}`, url)
 }
 
+async function getTMDBCollection(collectionId: number) {
+  const url = `${TMDB_BASE}/collection/${collectionId}?api_key=${TMDB_API_KEY}&language=en-US`
+  return cachedFetch(`tmdb:collection:${collectionId}`, url)
+}
+
+async function getTMDBRecommendations(tmdbId: number, type: 'movie' | 'tv', page = 1) {
+  const url = `${TMDB_BASE}/${type}/${tmdbId}/recommendations?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
+  return cachedFetch(`tmdb:recommendations:${type}:${tmdbId}:p${page}`, url)
+}
+
 async function getTMDBTrending(type: 'movie' | 'tv', page = 1) {
   const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
   return cachedFetch(`tmdb:trending:${type}:week:p${page}`, url)
@@ -312,6 +322,20 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         if (!id) throw new Error('Missing id parameter')
         result = await getTMDBImages(id, type)
+        break
+      }
+      case 'collection': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        if (!id) throw new Error('Missing id parameter')
+        result = await getTMDBCollection(id)
+        break
+      }
+      case 'recommendations': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        const type = parseMediaType(url.searchParams.get('type'))
+        const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+        if (!id) throw new Error('Missing id parameter')
+        result = await getTMDBRecommendations(id, type, page)
         break
       }
       case 'trending': {

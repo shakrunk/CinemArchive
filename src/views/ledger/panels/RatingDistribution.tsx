@@ -95,21 +95,26 @@ export function RatingDistribution({
                   setFilter('minRating', d.rating)
                   requestView('library')
                 }}
-                className="grid w-full grid-cols-[minmax(76px,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[var(--wash)] cursor-pointer group"
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[var(--wash)] cursor-pointer group"
               >
-                <span className="flex items-center gap-2.5">
-                  <i
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{
-                      background: ratingColorVar(d.rating),
-                      boxShadow: `0 0 8px -1px ${ratingColorVar(d.rating)}`,
-                    }}
-                  />
-                  <span className="font-mono text-[12px] text-amber group-hover:text-amber-bright transition-colors">
-                    {renderStarLabel(d.rating)}
-                  </span>
+                <i
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{
+                    background: ratingColorVar(d.rating),
+                    boxShadow: `0 0 8px -1px ${ratingColorVar(d.rating)}`,
+                  }}
+                />
+                <span className="shrink-0 font-mono text-[12px] text-amber group-hover:text-amber-bright transition-colors">
+                  {renderStarLabel(d.rating)}
                 </span>
-                <span className="whitespace-nowrap text-right font-mono text-[11px] text-paper-faint">
+                {/* Dot leader — ties each star label to its count so wide rows still
+                    read as one item, not two lists (KP-038). */}
+                <span
+                  aria-hidden="true"
+                  className="flex-1 min-w-3 self-center border-b border-dotted opacity-50 translate-y-[1px]"
+                  style={{ borderColor: 'var(--paper-faint)' }}
+                />
+                <span className="shrink-0 whitespace-nowrap text-right font-mono text-[11px] text-paper-faint">
                   <span className="text-paper-dim">{d.count}</span>
                   <span aria-hidden="true"> · </span>
                   {toPercent(d.count, total)}%

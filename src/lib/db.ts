@@ -68,6 +68,10 @@ function mapDbTitleToLocal(row: any): Title {
     imdbId: row.imdb_id || undefined,
     rtUrl: row.rt_url || undefined,
     customWatchUrl: row.custom_watch_url || undefined,
+    inHomeCollection: row.in_home_collection || undefined,
+    physicalMedia: Array.isArray(row.physical_media) && row.physical_media.length > 0
+      ? row.physical_media
+      : undefined,
     imdbRating: row.imdb_rating ? parseFloat(row.imdb_rating) : undefined,
     rtScore: row.rt_score || undefined,
     metacriticScore: row.metacritic_score || undefined,
@@ -589,6 +593,8 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
     bechdel_outcome: title.bechdelOutcome ?? null,
     bechdel_score: title.bechdelScore ?? null,
     custom_watch_url: title.customWatchUrl ?? null,
+    in_home_collection: title.inHomeCollection ?? false,
+    physical_media: title.physicalMedia ?? [],
     collection_id: title.collectionId ?? null,
     collection_name: title.collectionName ?? null,
   })
@@ -765,6 +771,10 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
   if (patch.rating !== undefined) mappedPatch.rating = patch.rating
   if (patch.notes !== undefined) mappedPatch.notes = patch.notes
   if (patch.tags !== undefined) mappedPatch.tags = patch.tags
+  if (patch.inHomeCollection !== undefined) mappedPatch.in_home_collection = patch.inHomeCollection
+  // Clearing the shelf passes physicalMedia: undefined — presence of the key
+  // (not its value) is what signals the write, mirroring META_COLUMNS below.
+  if ('physicalMedia' in patch) mappedPatch.physical_media = patch.physicalMedia ?? []
 
   // Metadata refresh: only touch a column when its key is present in the patch.
   for (const [field, column] of META_COLUMNS) {

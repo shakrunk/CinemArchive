@@ -4,38 +4,36 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-| ID     | Issue / Feature Request                                                                                                             | Component / File                                                                            | Severity / Type      |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------- |
-| KP-001 | [Desktop horizontal scroll support for Discovery carousels](#kp-001-desktop-horizontal-scroll-support-for-discovery-carousels)      | [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx)                        | Usability / UI       |
-| KP-002 | [Personal "Home Collection" option in Watch Providers list](#kp-002-personal-home-collection-option-in-watch-providers-list)        | [watch-providers.tsx](file:///V:/repos/CinemArchive/src/components/ui/watch-providers.tsx)  | Feature / UI         |
-| KP-003 | [Physical Media Asset Cataloging System (DVD/Blu-ray/etc.)](#kp-003-physical-media-asset-cataloging-system-dvdblu-rayetc)           | [TitleDetailDrawer.tsx](file:///V:/repos/CinemArchive/src/components/TitleDetailDrawer.tsx) | Feature / Data       |
-| KP-023 | [Missing "About" section on the Settings/Profile page](#kp-023-missing-about-section-on-the-settingsprofile-page)                   | [Profile.tsx](file:///V:/repos/CinemArchive/src/views/Profile.tsx)                          | Feature / Settings   |
-| KP-024 | [TMDB integration for the "Because You Watched" carousel](#kp-024-tmdb-integration-for-the-because-you-watched-carousel)            | [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx)                        | Integration / API    |
-| KP-025 | [Local/Dev Server auto-bypass for Authenticated User Features](#kp-025-localdev-server-auto-bypass-for-authenticated-user-features) | [auth.ts](file:///V:/repos/CinemArchive/src/lib/auth.ts)                                    | Developer Experience |
+_No open items — the backlog was cleared on 2026-07-10 (see below). File new issues here as they surface._
 
 ---
 
-### KP-001: Desktop horizontal scroll support for Discovery carousels
+## Resolved: Backlog Clearance (2026-07-10)
 
-- **Description**: Movie and TV recommendation carousels on the Discovery view do not support horizontal scroll mechanisms via mouse drag or explicit navigation buttons in desktop web environments. They are currently only scrollable via horizontal swipe/trackpad gestures.
-- **Impacted Codebase**: [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx)
-- **Proposed Solution**: Add visible left/right hover controls or support mouse drag-to-scroll on desktop viewports.
+**Resolved 2026-07-10.** Every remaining backlog item (KP-001 through KP-003 and
+KP-023 through KP-038) shipped in one pass. Summary of what landed per item:
 
-### KP-002: Personal "Home Collection" option in Watch Providers list
-
-- **Description**: The watch providers section currently pulls streaming, rental, and purchase platforms via the TMDB API, and allows custom external links. It lacks a native option to indicate that a title is owned locally or is part of a physical "Home Collection" (e.g. Blu-ray, DVD, local media server).
-- **Impacted Codebase**:
-  - [watch-providers.tsx](file:///V:/repos/CinemArchive/src/components/ui/watch-providers.tsx) (UI rendering)
-  - [TitleDetailDrawer.tsx](file:///V:/repos/CinemArchive/src/components/TitleDetailDrawer.tsx) (State management and display)
-- **Proposed Solution**: Introduce a checkbox or dedicated "In My Home Collection" toggle in the watch provider settings. When enabled, display a "Home Collection" badge/source in the "Where to Watch" section of the details panel.
-
-### KP-003: Physical Media Asset Cataloging System (DVD/Blu-ray/etc.)
-
-- **Description**: The application needs a dedicated mechanism to track physical media library ownership details. This should catalog physical asset variants (e.g., DVD, Blu-ray, 4K Ultra HD, VHS, LaserDisc) for titles in the library, independent of streaming or virtual watch providers.
-- **Impacted Codebase**:
-  - [TitleDetailDrawer.tsx](file:///V:/repos/CinemArchive/src/components/TitleDetailDrawer.tsx) (UI for cataloging physical media formats and metadata)
-  - [mockData.ts](file:///V:/repos/CinemArchive/src/store/mockData.ts) (Schema changes to `Title` or a new entity to represent physical assets)
-- **Proposed Solution**: Design an inventory sub-section or schema model allowing users to checklist and specify properties (e.g., edition, format, packaging) of physical copies in their home library.
+| ID     | Issue                                                            | Resolution |
+| ------ | ---------------------------------------------------------------- | ---------- |
+| KP-001 | Desktop horizontal scroll support for Discovery carousels        | Carousels already supported mouse drag and hover chevrons; added mouse-wheel/trackpad horizontal scrolling (native non-passive `wheel` listener consuming horizontal-dominant deltas) to complete desktop coverage. |
+| KP-002 | Personal "Home Collection" option in Watch Providers list        | "In my home collection" toggle in the Where to Watch header ([watch-providers.tsx](file:///V:/repos/CinemArchive/src/components/ui/watch-providers.tsx)); when set, an amber "Home Collection" source row appears, including in shared/friend views. Persisted as `titles.in_home_collection`. |
+| KP-003 | Physical Media Asset Cataloging System (DVD/Blu-ray/etc.)        | Physical media shelf in Where to Watch: catalog copies per title with format (DVD, Blu-ray, 4K UHD, VHS, LaserDisc, Other) and optional edition/notes. Stored as `PhysicalMediaItem[]` in `titles.physical_media` (jsonb); read-only chips in shared views. |
+| KP-023 | Missing "About" section on the Settings/Profile page             | About section on [Profile.tsx](file:///V:/repos/CinemArchive/src/views/Profile.tsx) with app version (from `package.json` via Vite `define` → `__APP_VERSION__`), description, TMDB/OMDb/Wikidata credits, and repo links; version footer added to the sign-in modal. |
+| KP-024 | TMDB integration for the "Because You Watched" carousel          | New `recommendations` media-proxy action wrapping TMDB `/movie|tv/{id}/recommendations`; `fetchRecommendations` in [media.ts](file:///V:/repos/CinemArchive/src/lib/media.ts); Discover now fetches real similar titles for the selected basis title instead of filtering trending. |
+| KP-025 | Local/Dev Server auto-bypass for Authenticated User Features     | Implemented earlier in `b5ba2df`: clicking Sign in on the dev server signs in a mock local session (`src/lib/devAuth.ts`), gated behind `import.meta.env.DEV`. |
+| KP-026 | Suggested friend connections for invite code redeemers/creators  | `list_invite_connections()` SECURITY DEFINER RPC (migration `20260710130000`) surfaces users linked by invite lineage who have no friendship row; Friends tab shows them under "Suggested friends" with a one-tap request. |
+| KP-027 | Display "Other movies in this franchise" in details              | `FranchiseSection` in [TitleDetailDrawer.tsx](file:///V:/repos/CinemArchive/src/components/TitleDetailDrawer.tsx) fetches the TMDB collection (`collection` media-proxy action) and renders every part in release order; library entries open in place, others can be added. |
+| KP-028 | Franchise movie watching progress tracking                       | Same section shows "Watched X/Y" and a progress bar, counting collection parts that exist in the library with `watched` status. |
+| KP-029 | Custom icon for Bechdel test badge                               | The badge now renders a Venus (♀) Lucide icon with an sr-only "Bechdel test" label instead of the "BDT" text. |
+| KP-030 | Search input in "More starring" carousel filter dropdown         | `TasteDropdown` grows a filter input (auto-focused, Escape closes) once the option list exceeds 8 entries. |
+| KP-031 | Uniform page display titles across views                         | Library gained a `kicker` + `display-title` header ("The Library"); Discover's hero was restyled to the same Fraunces display-title identity. |
+| KP-032 | Responsive collapse of Nav bar search bar sooner                 | Search label + `⌘K` hint now `hidden xl:inline` (was `lg:inline`). |
+| KP-033 | Responsive collapse of Nav bar word mark sooner                  | Word mark/tagline now `hidden lg:flex` (was `sm:flex`); only the reel mark shows below `lg`. |
+| KP-034 | Title Case capitalization for Discover carousel titles           | "Because You Watched" and "More Starring" headers now use Title Case. |
+| KP-035 | Keyboard shortcuts button next to skip nav button                | A hidden-until-focused "Keyboard shortcuts" button follows the skip-nav link in [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx) and opens the shortcuts dialog. |
+| KP-036 | Pause button for Discover page carousels                         | Play/pause overlay button per carousel; stays visible while paused, and the paused state holds independently of the hover pause. |
+| KP-037 | Momentum scrolling for grab-and-drag carousel interaction        | Drag velocity is low-pass tracked on pointer move and decays exponentially in the rAF loop after release (clamped, suppressed for stalled pointers and reduced motion). |
+| KP-038 | "Critical Record" widget Gestalt design improvements             | Legend rows switched from a two-column grid to a flex row with a dotted leader connecting each star label to its count/percentage, restoring proximity grouping. |
 
 ---
 
@@ -154,30 +152,3 @@ and uses alternate compact visual forms when a desktop chart would be crowded.
 - **Description**: The watchlist weight widget ("Coming Attractions") needs container-filling fixes.
 - **Impacted Codebase**: [ComingAttractions.tsx](file:///V:/repos/CinemArchive/src/views/ledger/panels/ComingAttractions.tsx)
 - **Proposed Solution**: Prevent clipping and ensure proper margins.
-
----
-
-### KP-023: Missing "About" section on the Settings/Profile page
-
-- **Description**: The Settings/Profile page does not include an "About" or "App Info" section to showcase the app version, details about CinemArchive, and credits/project links.
-- **Impacted Codebase**:
-  - [Profile.tsx](file:///V:/repos/CinemArchive/src/views/Profile.tsx)
-  - [ProfileModal.tsx](file:///V:/repos/CinemArchive/src/components/ProfileModal.tsx)
-- **Proposed Solution**: Append a clean "About" subsection to the Settings view detailing application version info, features, and source repository credits.
-
-### KP-024: TMDB integration for the "Because You Watched" carousel
-
-- **Description**: The "Because You Watched" recommendations row on the Discover page currently falls back to displaying a filtered trending titles list rather than fetching actual similar titles from TMDB based on the source title.
-- **Impacted Codebase**:
-  - [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx) (UI & logic)
-  - Edge Function [supabase/functions/media-proxy/index.ts](file:///V:/repos/CinemArchive/supabase/functions/media-proxy/index.ts) (which handles TMDB queries)
-- **Proposed Solution**: Update the backend media-proxy query to fetch from TMDB's `/movie/{id}/recommendations` or `/tv/{id}/recommendations` endpoints, and retrieve real recommendations.
-
-### KP-025: Local/Dev Server auto-bypass for Authenticated User Features
-
-- **Description**: During local development, logging in or testing authenticated user features (e.g. friends, recommendations, private access) is difficult or requires actual external credentials. Clicking "Sign In" should bypass auth on localhost and automatically enable authenticated-only features.
-- **Impacted Codebase**:
-  - [auth.ts](file:///V:/repos/CinemArchive/src/lib/auth.ts)
-  - [Profile.tsx](file:///V:/repos/CinemArchive/src/views/Profile.tsx)
-  - [ProfileModal.tsx](file:///V:/repos/CinemArchive/src/components/ProfileModal.tsx)
-- **Proposed Solution**: Detect if the app is running in a local development environment (e.g. `localhost` / `127.0.0.1` or `import.meta.env.DEV`), and automatically generate mock session credentials when the user triggers the sign-in action.

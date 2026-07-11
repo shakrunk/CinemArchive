@@ -194,6 +194,10 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
             </>
           )}
         </div>
+
+        <p className="mt-6 font-mono text-[10px] tracking-[0.14em] uppercase text-paper-faint/70 text-center">
+          CinemArchive v{__APP_VERSION__}
+        </p>
       </div>
     </CinemaModal>
   )

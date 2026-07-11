@@ -180,6 +180,7 @@ function SignInCard() {
               variant="outline"
               className="border-border text-muted-foreground hover:text-foreground"
               title="Sign In with Passkey"
+              aria-label="Sign In with Passkey"
             >
               <Fingerprint className="w-4 h-4" />
             </Button>

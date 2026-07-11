@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
+import { DEV_MOCK_USER } from 'src/lib/devAuth'
 import { toggleTheme } from 'src/lib/theme'
 import { resolveNavIcon } from 'src/lib/navIcons'
 import type { AppView, NavItemId } from 'src/lib/navigation'
@@ -26,11 +27,12 @@ const NAV_LABELS: Record<NavItemId, string> = {
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, openAddTitle, user, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
+  const { viewMode, openAddTitle, user, setUser, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
     useShallow((s) => ({
       viewMode: s.viewMode,
       openAddTitle: s.openAddTitle,
       user: s.user,
+      setUser: s.setUser,
       isSharedView: s.isSharedView,
       viewerContext: s.viewerContext,
       exitFriendView: s.exitFriendView,
@@ -168,9 +170,10 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                   <AccountMenu currentView={currentView} onNavigate={onViewChange} />
                 ) : (
                   <button
-                    onClick={onProfileClick}
+                    onClick={import.meta.env.DEV ? () => setUser(DEV_MOCK_USER) : onProfileClick}
                     className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5"
                     aria-label="Sign in"
+                    title={import.meta.env.DEV ? 'Dev mode: sign in instantly with a mock session' : undefined}
                   >
                     <LogIn className="w-[15px] h-[15px]" />
                     <span className="hidden sm:inline font-sans text-[12px]">Sign in</span>

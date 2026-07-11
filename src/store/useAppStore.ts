@@ -6,6 +6,7 @@ import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import type { User } from '@supabase/supabase-js'
+import { isDevMockUser } from '../lib/devAuth'
 import type { AppView, NavItemId } from '../lib/navigation'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
 import type { LedgerPanelId, LedgerPanelWidth, LedgerWidget, LedgerWidgetSettings } from '../lib/ledgerPanels'
@@ -1049,6 +1050,12 @@ export const useAppStore = create<AppStore>()(
     set({ user })
     window.clearInterval(notificationPollTimer)
     notificationPollTimer = undefined
+    if (user && isDevMockUser(user)) {
+      // Dev-only mock session — no real Supabase auth backs this id, so skip
+      // the DB-backed loads below and keep whatever's already on screen
+      // (mockTitles in dev) rather than wiping it with an unauthenticated fetch.
+      return
+    }
     if (user) {
       get().loadUserLibrary()
       get().loadPinnedModes()

@@ -1,37 +1,72 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link2, Pencil, Check, X, Home, Disc3, Plus, Trash2 } from 'lucide-react'
 import type { WatchProviders } from 'src/lib/media'
 import { PHYSICAL_MEDIA_FORMATS, type PhysicalMediaFormat, type PhysicalMediaItem } from 'src/store/mockData'
 import { SubsectionLabel } from 'src/components/ui/typography'
 
 function ProviderRow({ label, providers }: { label: string; providers: WatchProviders['flatrate'] }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ left: false, right: false })
+
+  const updateEdges = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setEdges({
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    })
+  }, [])
+
+  useEffect(() => {
+    updateEdges()
+    window.addEventListener('resize', updateEdges)
+    return () => window.removeEventListener('resize', updateEdges)
+  }, [providers, updateEdges])
+
+  const edgeMask = edges.left && edges.right
+    ? 'linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent)'
+    : edges.left
+      ? 'linear-gradient(to right, transparent, #000 28px)'
+      : edges.right
+        ? 'linear-gradient(to right, #000 calc(100% - 28px), transparent)'
+        : undefined
+
   if (providers.length === 0) return null
   return (
-    <div className="flex items-center gap-2.5 flex-wrap">
+    <div className="flex items-center gap-2.5 min-w-0">
       <span
         className="font-mono shrink-0"
         style={{ width: '40px', color: 'var(--paper-faint)', fontSize: '10px' }}
       >
         {label}
       </span>
-      {providers.map((p) => (
-        <div
-          key={p.providerId}
-          className="w-8 h-8 rounded-md overflow-hidden shrink-0"
-          style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-          title={p.name}
-        >
-          {p.logoUrl ? (
-            <img src={p.logoUrl} alt={p.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="font-mono text-[9px]" style={{ color: 'var(--paper-faint)' }}>
-                {p.name.charAt(0)}
-              </span>
-            </div>
-          )}
-        </div>
-      ))}
+      <div className="relative flex-1 min-w-0 overflow-hidden">
+      <div
+        ref={scrollRef}
+        onScroll={updateEdges}
+        className="flex gap-2 overflow-x-auto scrollbar-thin pb-1"
+        style={{ maskImage: edgeMask, WebkitMaskImage: edgeMask }}
+      >
+        {providers.map((p) => (
+          <div
+            key={p.providerId}
+            className="w-8 h-8 rounded-md overflow-hidden shrink-0"
+            style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
+            title={p.name}
+          >
+            {p.logoUrl ? (
+              <img src={p.logoUrl} alt={p.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="font-mono text-[9px]" style={{ color: 'var(--paper-faint)' }}>
+                  {p.name.charAt(0)}
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      </div>
     </div>
   )
 }
@@ -255,22 +290,6 @@ export function WatchProvidersSection({
             {customUrl ? 'edit link for friends' : 'set link for friends'}
           </button>
         )}
-        {!isSharedView && (
-          <label className="text-xs font-mono transition-colors rounded-sm px-1 flex items-center gap-1.5 cursor-pointer select-none text-amber/50 hover:text-amber has-[:checked]:text-amber">
-            <input
-              type="checkbox"
-              checked={inHomeCollection}
-              onChange={(e) => onToggleHomeCollection(e.target.checked)}
-              className="sr-only"
-            />
-            {inHomeCollection ? (
-              <Check className="w-3 h-3" aria-hidden />
-            ) : (
-              <Home className="w-3 h-3" aria-hidden />
-            )}
-            in my home collection
-          </label>
-        )}
       </div>
 
       {!isSharedView && editing && (
@@ -314,24 +333,40 @@ export function WatchProvidersSection({
             <ProviderRow label="Buy" providers={buy} />
           </>
         )}
-        {inHomeCollection && <HomeCollectionRow />}
+        {hasTmdbData && providers?.link && (
+          <a
+            href={providers.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block font-mono transition-colors hover:text-amber"
+            style={{ fontSize: '9px', color: 'var(--paper-faint)' }}
+          >
+            Streaming data provided by JustWatch
+          </a>
+        )}
+        {!isSharedView && (
+          <button
+            type="button"
+            onClick={() => onToggleHomeCollection(!inHomeCollection)}
+            aria-pressed={inHomeCollection}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 font-mono text-xs transition-colors hover:border-amber/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            style={{
+              background: inHomeCollection ? 'rgba(233,178,102,0.12)' : 'var(--inset)',
+              border: `1px solid ${inHomeCollection ? 'rgba(233,178,102,0.38)' : 'var(--line)'}`,
+              color: inHomeCollection ? 'var(--amber)' : 'var(--paper-faint)',
+            }}
+          >
+            {inHomeCollection ? <Check className="w-3.5 h-3.5" aria-hidden /> : <Home className="w-3.5 h-3.5" aria-hidden />}
+            {inHomeCollection ? 'In my home collection' : 'Add to my home collection'}
+          </button>
+        )}
+        {isSharedView && inHomeCollection && <HomeCollectionRow />}
         {(inHomeCollection || physicalMedia.length > 0) && (
           <PhysicalMediaShelf
             items={physicalMedia}
             isSharedView={isSharedView}
             onChange={(items) => onChangePhysicalMedia(items.length > 0 ? items : undefined)}
           />
-        )}
-        {hasTmdbData && providers?.link && (
-          <a
-            href={providers.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block font-mono mt-1 transition-colors hover:text-amber"
-            style={{ fontSize: '9px', color: 'var(--paper-faint)' }}
-          >
-            Streaming data provided by JustWatch
-          </a>
         )}
       </div>
     </div>

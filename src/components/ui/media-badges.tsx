@@ -41,7 +41,7 @@ function withAlpha(hex: string, alphaHex: string): string {
 }
 
 export function ReviewBadges({
-  imdb, rt, meta, awardsCount, bechdelOutcome, bechdelScore,
+  imdb, rt, meta, awardsCount, bechdelOutcome, bechdelScore, showScores = true,
 }: {
   imdb?: number
   rt?: number
@@ -49,12 +49,15 @@ export function ReviewBadges({
   awardsCount?: number
   bechdelOutcome?: 'pass' | 'fail'
   bechdelScore?: string
+  /** When false, the IMDb/RT/MC score badges are omitted (they're pinned to
+   *  the hero banner instead) and only Awards + Bechdel render. */
+  showScores?: boolean
 }) {
-  const rawBadges: Array<Badge | false> = [
+  const rawBadges: Array<Badge | false> = showScores ? [
     imdb != null && { key: 'imdb', label: REVIEW_BADGE_CONFIG.imdb.label, value: `${imdb}/10`, color: REVIEW_BADGE_CONFIG.imdb.color, glowColor: withAlpha(REVIEW_BADGE_CONFIG.imdb.color, '66'), name: REVIEW_BADGE_CONFIG.imdb.name },
     rt != null && { key: 'rt', label: REVIEW_BADGE_CONFIG.rt.label, value: `${rt}%`, color: REVIEW_BADGE_CONFIG.rt.color, glowColor: withAlpha(REVIEW_BADGE_CONFIG.rt.color, '66'), name: REVIEW_BADGE_CONFIG.rt.name },
     meta != null && { key: 'meta', label: REVIEW_BADGE_CONFIG.meta.label, value: `${meta}/100`, color: REVIEW_BADGE_CONFIG.meta.color, glowColor: withAlpha(REVIEW_BADGE_CONFIG.meta.color, '66'), name: REVIEW_BADGE_CONFIG.meta.name },
-  ]
+  ] : []
   const badges: Badge[] = rawBadges.filter((b): b is Badge => Boolean(b))
 
   // Awards and Bechdel always render, even with no data — Wikidata's coverage of
@@ -116,6 +119,34 @@ export function ReviewBadges({
             </span>
           )}
           <span className="font-mono text-sm text-foreground tabular-nums">{b.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Hero score chips ──────────────────────────────────────────────────────────
+
+/** Compact IMDb/RT/MC chips anchored to the hero banner's top-right corner.
+ *  Scrim background keeps them legible over any backdrop art. */
+export function HeroScores({ imdb, rt, meta }: { imdb?: number; rt?: number; meta?: number }) {
+  const chips = [
+    imdb != null && { key: 'imdb', label: REVIEW_BADGE_CONFIG.imdb.label, color: REVIEW_BADGE_CONFIG.imdb.color, value: String(imdb), name: `${REVIEW_BADGE_CONFIG.imdb.name}: ${imdb}/10` },
+    rt != null && { key: 'rt', label: REVIEW_BADGE_CONFIG.rt.label, color: REVIEW_BADGE_CONFIG.rt.color, value: `${rt}%`, name: `${REVIEW_BADGE_CONFIG.rt.name}: ${rt}%` },
+    meta != null && { key: 'meta', label: REVIEW_BADGE_CONFIG.meta.label, color: REVIEW_BADGE_CONFIG.meta.color, value: String(meta), name: `${REVIEW_BADGE_CONFIG.meta.name}: ${meta}/100` },
+  ].filter((c): c is Exclude<typeof c, false> => Boolean(c))
+  if (chips.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {chips.map((c) => (
+        <div
+          key={c.key}
+          title={c.name}
+          className="h-8 flex items-center gap-1.5 rounded-md px-2.5 bg-black/55 backdrop-blur-sm border border-white/10"
+        >
+          <span className="font-mono font-bold text-[10px]" style={{ color: c.color }}>{c.label}</span>
+          <span className="font-mono text-xs text-white tabular-nums">{c.value}</span>
         </div>
       ))}
     </div>

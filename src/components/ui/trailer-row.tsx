@@ -498,6 +498,31 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
 // ── TrailerRow (thumbnail strip + lightbox host) ───────────────────────────────
 export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [stripEdges, setStripEdges] = useState({ left: false, right: false })
+
+  const updateStripEdges = useCallback(() => {
+    const el = stripRef.current
+    if (!el) return
+    setStripEdges({
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    })
+  }, [])
+
+  useEffect(() => {
+    updateStripEdges()
+    window.addEventListener('resize', updateStripEdges)
+    return () => window.removeEventListener('resize', updateStripEdges)
+  }, [videos, updateStripEdges])
+
+  const stripMask = stripEdges.left && stripEdges.right
+    ? 'linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent)'
+    : stripEdges.left
+      ? 'linear-gradient(to right, transparent, #000 48px)'
+      : stripEdges.right
+        ? 'linear-gradient(to right, #000 calc(100% - 48px), transparent)'
+        : undefined
 
   if (videos.length === 0) return null
 
@@ -508,7 +533,13 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
     <>
       <div>
         <SubsectionLabel>Trailers</SubsectionLabel>
-        <div className="flex gap-4 overflow-x-auto scrollbar-none -mx-6 px-6 pb-1">
+        <div className="relative -mx-4 sm:-mx-5 px-4 sm:px-5 overflow-hidden">
+        <div
+          ref={stripRef}
+          onScroll={updateStripEdges}
+          className="flex gap-4 overflow-x-auto scrollbar-none pb-1"
+          style={{ maskImage: stripMask, WebkitMaskImage: stripMask }}
+        >
           {videos.map((v, i) => (
             <button
               key={v.key}
@@ -524,7 +555,13 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
                 <img
                   src={`https://img.youtube.com/vi/${v.key}/hqdefault.jpg`}
                   alt={v.name}
-                  className="absolute inset-0 w-full h-full object-cover transition-opacity group-hover:opacity-70"
+                  className="absolute inset-0 w-full h-full object-cover saturate-[.68] sepia-[.08] brightness-[.78] transition-[filter,opacity] duration-200 group-hover:saturate-[.9] group-hover:brightness-[.88] group-hover:opacity-80"
+                />
+                {/* Warm thematic wash keeps YouTube artwork inside the archive palette. */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: 'linear-gradient(135deg, rgb(var(--amber-rgb) / 0.1), rgba(7,5,4,0.24))' }}
                 />
                 {/* Vignette */}
                 <div
@@ -566,6 +603,7 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
               </div>
             </button>
           ))}
+        </div>
         </div>
       </div>
 

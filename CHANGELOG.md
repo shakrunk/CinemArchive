@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-10
+
 ### Added
 
 - Details drawer — "In my home collection" toggle in Where to Watch (KP-002):

@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-07-10
+
 ### Fixed
 
 - Ledger responsive-widget backlog (KP-004–KP-022): revamped all 15 remaining

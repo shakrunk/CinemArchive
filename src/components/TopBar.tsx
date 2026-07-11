@@ -73,7 +73,9 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         {/* Brand */}
         <div className="flex items-center gap-3 shrink-0 select-none">
           <ReelMark className="w-[30px] h-[30px] text-amber animate-spin-slow drop-shadow-[0_0_10px_rgb(var(--amber-rgb)/0.5)]" />
-          <div className="hidden sm:flex flex-col leading-[1.05]">
+          {/* lg: — on small tablets the word mark competes with the pill nav for width;
+              below lg only the reel mark shows (KP-033). */}
+          <div className="hidden lg:flex flex-col leading-[1.05]">
             <span
               className="font-serif text-xl font-semibold text-paper tracking-tight"
               style={{ fontVariationSettings: '"opsz" 40' }}
@@ -131,9 +133,11 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
           >
             <Search className="w-[17px] h-[17px]" />
-            <span className="hidden lg:inline font-sans text-[13px] text-paper-faint">Search</span>
+            {/* xl: — the label + shortcut crowd the bar on laptop widths; below xl the
+                icon alone carries it (KP-032). */}
+            <span className="hidden xl:inline font-sans text-[13px] text-paper-faint">Search</span>
             <kbd
-              className="hidden lg:inline font-mono text-[10px] tracking-[0.06em] text-paper-faint border rounded px-1.5 py-0.5"
+              className="hidden xl:inline font-mono text-[10px] tracking-[0.06em] text-paper-faint border rounded px-1.5 py-0.5"
               style={{ borderColor: 'var(--line)' }}
             >
               {modKey}K

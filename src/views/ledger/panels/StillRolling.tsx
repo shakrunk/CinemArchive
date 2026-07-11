@@ -5,10 +5,10 @@ import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { RadialRing } from 'src/components/LedgerCharts'
 import { deriveProgress } from 'src/store/ledgerDerive'
-import { settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
-export function StillRolling({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function StillRolling({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const settingsKey = settingsDepKey(settings)
@@ -32,7 +32,7 @@ export function StillRolling({ className, settings }: { className?: string; sett
 
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
-      <ol className="flex flex-col gap-1">
+      <ol className={width === 'lg' || width === 'full' ? 'grid grid-cols-2 gap-x-7 gap-y-1' : 'flex flex-col gap-1'}>
         {rows.map((r, i) => (
           <li key={r.id}>
             <button

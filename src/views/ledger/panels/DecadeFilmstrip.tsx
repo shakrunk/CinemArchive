@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { decadeOf, maxOrOne } from 'src/lib/utils'
 import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
@@ -11,7 +11,7 @@ import { Panel, PanelEmpty } from '../PanelShell'
 
 const FILMSTRIP_HOLES = Array.from({ length: 28 })
 
-export function DecadeFilmstrip({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function DecadeFilmstrip({ className, settings, width = 'full' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -32,6 +32,8 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
   }, [titles, settingsKey])
 
   const maxCount = maxOrOne(decades.map((d) => d.count))
+  const labelBudget = width === 'sm' ? 4 : width === 'md' ? 6 : width === 'lg' ? 8 : 12
+  const labelStep = Math.max(1, Math.ceil(decades.length / labelBudget))
 
   const points: SparklinePoint[] = useMemo(
     () =>
@@ -53,10 +55,10 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
         <PanelEmpty message="No titles yet" />
       ) : (
         <div
-          className="rounded-xl overflow-x-auto overflow-y-hidden scrollbar-thin"
+          className="min-w-0 rounded-xl overflow-hidden"
           style={{ background: 'linear-gradient(180deg, var(--ink-2), var(--ink-1))', border: '1px solid var(--line)' }}
         >
-          <div style={{ minWidth: Math.max(decades.length * 64, 420) }}>
+          <div className="min-w-0">
             <div className="filmstrip-holes pt-3">
               {FILMSTRIP_HOLES.map((_, i) => (
                 <span key={i} />
@@ -79,7 +81,7 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
               ))}
             </div>
             <div className="flex justify-between px-3.5 pb-3.5 pt-1.5">
-              {decades.map((d) => (
+              {decades.map((d, i) => (
                 <button
                   key={d.label}
                   onClick={() => {
@@ -88,8 +90,8 @@ export function DecadeFilmstrip({ className, settings }: { className?: string; s
                   }}
                   className="flex flex-col items-center gap-0.5 group cursor-pointer"
                 >
-                  <span className="font-mono text-[11px] text-paper-dim group-hover:text-amber-bright transition-colors">
-                    {d.label}
+                  <span className="font-mono text-[clamp(8px,1vw,11px)] text-paper-dim group-hover:text-amber-bright transition-colors">
+                    {(i % labelStep === 0 || i === decades.length - 1) ? d.label : '\u00a0'}
                   </span>
                   <span className="font-mono text-[9px] text-paper-faint">{d.count}</span>
                 </button>

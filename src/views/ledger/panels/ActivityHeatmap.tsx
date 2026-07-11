@@ -12,11 +12,11 @@ import { localDateStr } from '../labels'
 // Weeks shown and cell size scale down with the card's width so a narrow
 // widget reads as a deliberately compact calendar rather than a full-size
 // grid forced through a horizontal scrollbar.
-const HEATMAP_CONFIG: Record<LedgerPanelWidth, { weeksBack: number; cellPx: number }> = {
-  sm: { weeksBack: 38, cellPx: 9 },
-  md: { weeksBack: 52, cellPx: 10 },
-  lg: { weeksBack: 52, cellPx: 13 },
-  full: { weeksBack: 52, cellPx: 14 },
+const HEATMAP_CONFIG: Record<LedgerPanelWidth, { weeksBack: number }> = {
+  sm: { weeksBack: 26 },
+  md: { weeksBack: 39 },
+  lg: { weeksBack: 52 },
+  full: { weeksBack: 52 },
 }
 
 export function ActivityHeatmap({
@@ -30,7 +30,7 @@ export function ActivityHeatmap({
 }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = settingsDepKey(settings)
-  const { weeksBack, cellPx } = HEATMAP_CONFIG[width]
+  const { weeksBack } = HEATMAP_CONFIG[width]
 
   const viewingCounts = useMemo(() => {
     const { titles: scoped } = scopedTitles('activity', titles, settings)
@@ -71,7 +71,7 @@ export function ActivityHeatmap({
     // Collision guard: a month boundary too close to the previous label would
     // overlap it — the min gap scales with column width (smaller cells need
     // fewer columns of clearance, larger cells need more).
-    const minLabelGapWeeks = Math.max(3, Math.ceil(34 / (cellPx + 2)))
+    const minLabelGapWeeks = width === 'sm' ? 5 : width === 'md' ? 4 : 3
     weeks.forEach((week, wi) => {
       const month = Number(week[0].date.slice(5, 7))
       if (month !== lastMonth) {
@@ -85,8 +85,7 @@ export function ActivityHeatmap({
 
     const totalInYear = days.reduce((sum, d) => sum + d.count, 0)
     return { weeks, monthLabels, totalInYear }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingCounts, weeksBack, cellPx])
+  }, [viewingCounts, weeksBack, width])
 
   const maxCellCount = useMemo(
     () => maxOrOne(weeks.flat().map((c) => c.count)),
@@ -100,16 +99,16 @@ export function ActivityHeatmap({
       className={className}
     >
       <div
-        className="overflow-x-auto -mx-1 px-1"
+        className="min-w-0"
         role="img"
         aria-label={`${weeksBack}-week screening heatmap: ${totalInYear} screening${totalInYear !== 1 ? 's' : ''} in the past ${weeksBack === 52 ? 'year' : `${weeksBack} weeks`}`}
       >
         {/* Month labels */}
-        <div className="flex mb-1.5">
+        <div className="grid gap-[clamp(1px,0.2vw,3px)] mb-1.5" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
           {weeks.map((_, wi) => {
             const label = monthLabels.find((m) => m.weekIndex === wi)?.label
             return (
-              <div key={wi} style={{ width: cellPx, marginRight: 2 }} className="overflow-visible shrink-0">
+              <div key={wi} className="min-w-0 overflow-visible">
                 {label && (
                   <span className="font-mono text-[9px] text-paper-faint leading-none whitespace-nowrap">
                     {label}
@@ -120,9 +119,9 @@ export function ActivityHeatmap({
           })}
         </div>
         {/* Heatmap grid */}
-        <div className="flex gap-[2px]">
+        <div className="grid gap-[clamp(1px,0.2vw,3px)]" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
           {weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-[2px]">
+            <div key={wi} className="flex min-w-0 flex-col gap-[clamp(1px,0.2vw,3px)]">
               {week.map((cell) => (
                 <div
                   key={cell.date}
@@ -132,8 +131,8 @@ export function ActivityHeatmap({
                     cell.date === todayStr && 'ring-1 ring-amber-bright/60',
                   )}
                   style={{
-                    width: cellPx,
-                    height: cellPx,
+                    width: '100%',
+                    aspectRatio: '1',
                     ...(cell.count > 0
                       ? {
                           opacity: 0.32 + 0.68 * Math.min(cell.count / maxCellCount, 1),

@@ -5,10 +5,10 @@ import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { RadialRing } from 'src/components/LedgerCharts'
 import { deriveTopDirectors } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER, RankBadge } from '../PanelShell'
 
-export function TheAuteurs({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function TheAuteurs({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -32,7 +32,7 @@ export function TheAuteurs({ className, settings }: { className?: string; settin
 
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
-      <ol className="flex flex-col gap-1">
+      <ol className={width === 'lg' || width === 'full' ? 'grid grid-cols-2 gap-x-7 gap-y-1' : 'flex flex-col gap-1'}>
         {directors.map((d, i) => {
           const pct = d.count / maxCount
           const color = i === 0 ? 'var(--amber-bright)' : 'rgba(128,115,95,0.6)'

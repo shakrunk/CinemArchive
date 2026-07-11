@@ -4,10 +4,10 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { deriveStreaks } from 'src/store/ledgerDerive'
-import { describeLedgerSettings, settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
 
-export function TheMarathon({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function TheMarathon({ className, settings, width = 'sm' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const settingsKey = settingsDepKey(settings)
 
@@ -30,7 +30,7 @@ export function TheMarathon({ className, settings }: { className?: string; setti
 
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
-      <div className="flex items-start gap-8 py-1">
+      <div className={cn('flex items-start py-1', width === 'sm' ? 'justify-between gap-4' : 'justify-center gap-16')}>
         <div className="flex flex-col">
           <span className="stat-num text-[clamp(34px,4vw,52px)]">
             {streaks.longest}
@@ -55,14 +55,14 @@ export function TheMarathon({ className, settings }: { className?: string; setti
       </div>
 
       {/* Trailing 30 days, one dot per night, today last */}
-      <div className="mt-5">
-        <div className="flex flex-wrap gap-[5px]">
+      <div className={cn('mt-5', width !== 'sm' && 'mx-auto max-w-[520px]')}>
+        <div className="grid gap-[clamp(3px,0.5vw,7px)]" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
           {streaks.last30.map((active, i) => {
             const isToday = i === streaks.last30.length - 1
             return (
               <span
                 key={i}
-                className={cn('w-[9px] h-[9px] rounded-full', isToday && 'ring-1 ring-amber-bright/60 ring-offset-1 ring-offset-transparent')}
+                className={cn('w-full max-w-[13px] aspect-square rounded-full justify-self-center', isToday && 'ring-1 ring-amber-bright/60 ring-offset-1 ring-offset-transparent')}
                 style={{
                   background: active ? 'var(--amber)' : 'var(--wash)',
                   boxShadow: active ? '0 0 6px -1px rgba(233,178,102,0.5)' : undefined,

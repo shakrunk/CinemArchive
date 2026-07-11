@@ -4,10 +4,10 @@ import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, rankBarFill } from 'src/lib/utils'
 import { scopedTitles } from 'src/store/ledgerDerive'
-import { settingsDepKey, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import { settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
 
-export function OnTheAir({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function OnTheAir({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -33,7 +33,7 @@ export function OnTheAir({ className, settings }: { className?: string; settings
       {networks.length === 0 ? (
         <PanelEmpty message="No series with a network yet" />
       ) : (
-        <div className="flex flex-col gap-1">
+        <div className={width === 'lg' || width === 'full' ? 'grid grid-cols-2 gap-x-7 gap-y-1' : 'flex flex-col gap-1'}>
           {networks.map((n, i) => (
             <button
               key={n.network}
@@ -43,7 +43,7 @@ export function OnTheAir({ className, settings }: { className?: string; settings
               }}
               className={cn('w-full flex items-center gap-3', LIST_ROW_HOVER)}
             >
-              <RowTitle className="truncate w-[38%] shrink-0 group-hover:underline decoration-amber/40">
+              <RowTitle className={cn('truncate shrink-0 group-hover:underline decoration-amber/40', width === 'sm' ? 'w-[42%]' : 'w-[36%]')}>
                 {n.network}
               </RowTitle>
               <span className="flex-1 h-[12px] rounded-sm bg-[var(--wash)] overflow-hidden">

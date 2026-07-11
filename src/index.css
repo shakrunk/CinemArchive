@@ -549,14 +549,34 @@
 
     -webkit-mask-image:
       repeating-linear-gradient(to right, transparent 0, transparent 8px, black 8px, black 38.4px),
-      linear-gradient(to bottom, black 0, black 3px, transparent 3px, transparent 11px, black 11px, black 14px);
+      linear-gradient(
+        to bottom,
+        black 0,
+        black 3px,
+        transparent 3px,
+        transparent 11px,
+        black 11px,
+        black 14px
+      );
     mask-image:
       repeating-linear-gradient(to right, transparent 0, transparent 8px, black 8px, black 38.4px),
-      linear-gradient(to bottom, black 0, black 3px, transparent 3px, transparent 11px, black 11px, black 14px);
+      linear-gradient(
+        to bottom,
+        black 0,
+        black 3px,
+        transparent 3px,
+        transparent 11px,
+        black 11px,
+        black 14px
+      );
     -webkit-mask-repeat: repeat-x, no-repeat;
     mask-repeat: repeat-x, no-repeat;
-    -webkit-mask-position: var(--reel-scroll-x, 0px) 0, 0 0;
-    mask-position: var(--reel-scroll-x, 0px) 0, 0 0;
+    -webkit-mask-position:
+      var(--reel-scroll-x, 0px) 0,
+      0 0;
+    mask-position:
+      var(--reel-scroll-x, 0px) 0,
+      0 0;
   }
   .reel-strip--top {
     top: 0;
@@ -672,16 +692,40 @@
 
   /* ── Panel: gradient card with editorial header ── */
   .panel {
+    container-type: inline-size;
     background: linear-gradient(168deg, var(--ink-1), rgb(var(--ink-rgb) / 0.6));
     border: 1px solid var(--line);
     border-radius: 18px;
     box-shadow: var(--shadow);
+  }
+  .panel__body > :only-child {
+    min-height: 0;
   }
   .panel__head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
+  }
+  .panel__title {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .panel__hint {
+    max-width: 58%;
+    text-align: right;
+    text-wrap: balance;
+  }
+  @container (max-width: 460px) {
+    .panel__head {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .panel__hint {
+      max-width: 100%;
+      text-align: left;
+    }
   }
   .panel__head h2,
   .panel__title {

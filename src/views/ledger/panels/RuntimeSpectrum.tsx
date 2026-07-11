@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { maxOrOne, rankBarFill } from 'src/lib/utils'
-import type { LedgerWidgetSettings } from 'src/lib/ledgerPanels'
+import type { LedgerPanelWidth, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle } from '../PanelShell'
 
 const RUNTIME_BUCKETS = [
@@ -13,7 +13,7 @@ const RUNTIME_BUCKETS = [
   { label: 'An epic', range: '150m and up', min: 150, max: Infinity },
 ]
 
-export function RuntimeSpectrum({ className, settings }: { className?: string; settings?: LedgerWidgetSettings }) {
+export function RuntimeSpectrum({ className, settings, width = 'md' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
 
   const { rows, total, avg } = useMemo(() => {
@@ -43,18 +43,18 @@ export function RuntimeSpectrum({ className, settings }: { className?: string; s
       ) : (
         <div className="flex flex-col gap-4 py-1">
           {rows.map((b, i) => (
-            <div key={b.label} className="flex items-center gap-3">
-              <div className="w-[128px] shrink-0">
+            <div key={b.label} className={width === 'sm' ? 'grid grid-cols-[1fr_auto] gap-x-3 gap-y-1' : 'flex items-center gap-3'}>
+              <div className={width === 'sm' ? 'min-w-0' : 'w-[clamp(112px,24%,160px)] shrink-0'}>
                 <RowTitle className="block leading-tight">{b.label}</RowTitle>
                 <span className="font-mono text-[9px] text-paper-faint">{b.range}</span>
               </div>
-              <div className="flex-1 h-[16px] rounded-sm bg-[var(--wash)] overflow-hidden">
+              <div className={width === 'sm' ? 'col-span-2 h-[14px] rounded-sm bg-[var(--wash)] overflow-hidden' : 'flex-1 h-[16px] rounded-sm bg-[var(--wash)] overflow-hidden'}>
                 <div
                   className="h-full rounded-sm bar-fill"
                   style={rankBarFill(b.count / maxCount, true, i * 80)}
                 />
               </div>
-              <span className="font-mono text-[11px] text-paper-dim w-8 text-right shrink-0">{b.count}</span>
+              <span className={width === 'sm' ? 'col-start-2 row-start-1 font-mono text-[11px] text-paper-dim text-right' : 'font-mono text-[11px] text-paper-dim w-8 text-right shrink-0'}>{b.count}</span>
             </div>
           ))}
         </div>

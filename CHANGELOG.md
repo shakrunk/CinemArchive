@@ -23,6 +23,13 @@ number is chosen.
   from a compact radar chart to a synchronized radar-and-bar composition;
   Critical Record and The Ensemble likewise switch to purpose-built compact
   legends/lists instead of squeezing their desktop presentations.
+- Library — the mobile filters drawer could no longer be dismissed once
+  opened: it rendered below the sticky top/bottom nav bars (`z-50` vs the
+  nav's `z-[200]`), which visually covered the drawer's close button and
+  reset-filters action. The shared sheet now renders at `z-[210]`, matching
+  the stacking convention used by other above-chrome overlays, and its
+  scrollable content no longer carries the close button off-screen as the
+  filter list is scrolled.
 
 ## [1.0.2] - 2026-07-10
 

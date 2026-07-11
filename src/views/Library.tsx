@@ -505,6 +505,11 @@ export function Library() {
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+      <header className="mb-6">
+        <p className="kicker"><span className="dot" /> the collection</p>
+        <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">The Library</h1>
+      </header>
+
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="search-field flex-1 min-w-[220px] max-w-[460px]">

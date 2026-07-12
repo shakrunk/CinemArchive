@@ -4,12 +4,6 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-### KP-039: Verify invite-code redeemers appear as suggested friend connects
-
-- **Description**: Someone that uses your redeem (invite) code should be suggested as a friend connect. This was implemented as KP-026 (Friends tab → "Suggested friends", backed by the `list_invite_connections()` RPC in migration `20260710130000`), but the request resurfaced — verify the flow works end to end and close this as stale if it does.
-- **Impacted Codebase**: [Friends.tsx](file:///V:/repos/CinemArchive/src/views/Friends.tsx), [auth.ts](file:///V:/repos/CinemArchive/src/lib/auth.ts), migration `20260710130000_invite_connections.sql`
-- **Proposed Solution**: Re-verify the RPC surfaces both `invited_by_you` and `invited_you` lineage and that the Friends tab renders the section; fix anything broken, otherwise document as already resolved.
-
 ### KP-040: Improve the Bechdel test badge icon
 
 - **Description**: The Bechdel badge's Venus (♀) icon (from KP-029) reads as a generic gender symbol rather than the test itself. A more distinctive icon should communicate the test's actual criteria — two women talking to each other.
@@ -45,6 +39,14 @@ This document tracks known issues, technical debt, and usability improvements fo
 - **Description**: Determine how difficult it would be to import watch history and/or ratings from other platforms (Letterboxd, IMDb, Trakt, Netflix, Simkl, …). CinemArchive already has JSON export/import between its own instances, but nothing that ingests third-party data.
 - **Impacted Codebase**: TBD — likely a new import module plus the Add-Title/TMDB matching path
 - **Proposed Solution**: Write a feasibility assessment (per-platform export formats, TMDB matching strategy, effort estimates) under `docs/`, then prototype the lowest-effort importer (likely Letterboxd CSV).
+
+---
+
+## Resolved: Follow-up Polish (2026-07-12)
+
+| ID     | Issue                                                            | Resolution |
+| ------ | ---------------------------------------------------------------- | ---------- |
+| KP-039 | Verify invite-code redeemers appear as suggested friend connects | Stale note — already shipped as KP-026. Verified end to end: migration `20260710130000` is on `main` (applied by `db-migrate.yml`), `list_invite_connections()` covers both `invited_by_you`/`invited_you` lineage and excludes every existing friendship state, `handle_new_user()` guarantees the `profiles` join can't drop a redeemer, and the Friends tab renders "Suggested friends" with a one-tap request. No code change needed. |
 
 ---
 

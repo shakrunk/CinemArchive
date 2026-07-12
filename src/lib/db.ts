@@ -536,6 +536,9 @@ export type NotificationType =
   | 'comment_received'
   | 'reaction_received'
   | 'invite_redeemed'
+  // Cinema Outings (plan §4.7): the DB already accepts these (Phase A's
+  // migration widened notifications_type_check) — inbox rendering/TYPE_META
+  // is added when this type union grows to include them, in a later phase.
 
 export interface AppNotificationItem {
   id: string

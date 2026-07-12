@@ -266,6 +266,11 @@ interface PinsSlice {
 // loaded with the library, never fetched for shared/friend viewers.
 interface OutingsSlice {
   outings: CinemaOuting[]
+  // Pure bulk setter (no DB side effect, mirrors setTitles) — used by import,
+  // which writes new outings to the DB itself before this runs (rule §5.13:
+  // an outing's row must exist before a kept title's viewing back-references
+  // it).
+  setOutings: (outings: CinemaOuting[]) => void
   // "I've got tickets" sheet (plan §4.1) — a single overlay reused by every
   // entry point. titleId preselects a movie (create mode); outingId, when
   // set, switches the sheet into edit mode for that outing (titleId is then
@@ -1280,6 +1285,8 @@ export const useAppStore = create<AppStore>()(
 
   // ── Cinema Outings ("I've got tickets") ─────────────────────
   outings: [],
+
+  setOutings: (outings) => set({ outings }),
 
   isOutingScheduleOpen: false,
   outingScheduleTitleId: null,

@@ -4,12 +4,6 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-### KP-043: Collapse the nav bar word mark into the logo sooner
-
-- **Description**: The TopBar word mark ("CinemArchive / a private film archive") currently collapses below the `lg` breakpoint (KP-033), but it still crowds the pill nav at `lg`–`xl` widths — it needs to collapse a little sooner.
-- **Impacted Codebase**: [TopBar.tsx](file:///V:/repos/CinemArchive/src/components/TopBar.tsx)
-- **Proposed Solution**: Move the word mark's visibility from `hidden lg:flex` to `hidden xl:flex` so only the reel mark shows below `xl`.
-
 ### KP-044: Make the Discover carousel pause buttons more prominent
 
 - **Description**: The per-carousel pause toggle (KP-036) is a small overlay in the film strip's bottom-right corner, only visible on hover — too easy to miss. It should be more prominent and visually distinct, ideally outside the film strip itself, next to the carousel title or the "View more" link.
@@ -32,6 +26,7 @@ This document tracks known issues, technical debt, and usability improvements fo
 | KP-040 | Improve the Bechdel test badge icon                              | Replaced the Venus (♀) glyph with a bespoke `BechdelIcon` in [media-badges.tsx](file:///V:/repos/CinemArchive/src/components/ui/media-badges.tsx) — two figures under a conversation ellipsis, hand-drawn on Lucide's 24px stroke grid so it takes the same size/stroke/color as the stock badge icons. |
 | KP-041 | Reword the Discover hero heading to fit the brand vibe           | The search hero in [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx) now reads "Scout the next reel for the *vault.*" under the existing "the acquisitions desk" kicker — swapping the plain question for the projection-room register used across the app. |
 | KP-042 | Cohesive GUI for the accessibility buttons                       | The skip link and keyboard-shortcuts button in [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx) now live in a single `nav` toolbar (bordered card, shared pill style) that slides in from above when either control gains keyboard focus — replacing two independently positioned pills with a hardcoded `left-40` offset. The focused pill highlights amber to mark the active control. |
+| KP-043 | Collapse the nav bar word mark into the logo sooner              | The [TopBar.tsx](file:///V:/repos/CinemArchive/src/components/TopBar.tsx) word mark moved from `hidden lg:flex` to `hidden xl:flex` — only the spinning reel mark shows below `xl` (1280px), giving the pill nav breathing room at the widths where it was still crowded after KP-033. |
 
 ---
 

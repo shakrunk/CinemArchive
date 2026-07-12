@@ -19,6 +19,8 @@ number is chosen.
 - The keyboard-focus accessibility controls (skip to content, keyboard
   shortcuts) now appear together as one sliding toolbar instead of two
   separately floating pills.
+- The nav bar word mark now collapses into the reel logo below 1280px (was
+  1024px), so it no longer crowds the pill nav on mid-size screens.
 
 ## [1.3.0] - 2026-07-12
 

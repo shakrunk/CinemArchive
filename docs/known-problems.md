@@ -4,12 +4,6 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-### KP-044: Make the Discover carousel pause buttons more prominent
-
-- **Description**: The per-carousel pause toggle (KP-036) is a small overlay in the film strip's bottom-right corner, only visible on hover — too easy to miss. It should be more prominent and visually distinct, ideally outside the film strip itself, next to the carousel title or the "View more" link.
-- **Impacted Codebase**: [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx)
-- **Proposed Solution**: Lift the pause control out of the strip overlay into each carousel's header row (beside the section title / View-more link), always visible, with clear play/pause state.
-
 ### KP-045: Assess importing watch history/ratings from other platforms
 
 - **Description**: Determine how difficult it would be to import watch history and/or ratings from other platforms (Letterboxd, IMDb, Trakt, Netflix, Simkl, …). CinemArchive already has JSON export/import between its own instances, but nothing that ingests third-party data.
@@ -27,6 +21,7 @@ This document tracks known issues, technical debt, and usability improvements fo
 | KP-041 | Reword the Discover hero heading to fit the brand vibe           | The search hero in [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx) now reads "Scout the next reel for the *vault.*" under the existing "the acquisitions desk" kicker — swapping the plain question for the projection-room register used across the app. |
 | KP-042 | Cohesive GUI for the accessibility buttons                       | The skip link and keyboard-shortcuts button in [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx) now live in a single `nav` toolbar (bordered card, shared pill style) that slides in from above when either control gains keyboard focus — replacing two independently positioned pills with a hardcoded `left-40` offset. The focused pill highlights amber to mark the active control. |
 | KP-043 | Collapse the nav bar word mark into the logo sooner              | The [TopBar.tsx](file:///V:/repos/CinemArchive/src/components/TopBar.tsx) word mark moved from `hidden lg:flex` to `hidden xl:flex` — only the spinning reel mark shows below `xl` (1280px), giving the pill nav breathing room at the widths where it was still crowded after KP-033. |
+| KP-044 | Make the Discover carousel pause buttons more prominent          | The KP-036 hover-only overlay in the strip's corner is gone; each carousel header (trending/search, Because You Watched, More Starring) now carries an always-visible labeled Pause/Play chip at its right edge, next to the View-more link / taste dropdowns. `DiscoverCarousel` takes the sticky pause as a controlled `paused` prop; the strip keeps only the transient hover/focus pause. |
 
 ---
 

@@ -21,6 +21,9 @@ number is chosen.
   separately floating pills.
 - The nav bar word mark now collapses into the reel logo below 1280px (was
   1024px), so it no longer crowds the pill nav on mid-size screens.
+- The Discover carousels' pause control moved out of the film strip into each
+  carousel's header as an always-visible labeled Pause/Play chip, replacing
+  the hover-only corner overlay.
 
 ## [1.3.0] - 2026-07-12
 

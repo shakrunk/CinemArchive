@@ -4,7 +4,47 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-_No open items — the backlog was cleared on 2026-07-10 (see below). File new issues here as they surface._
+### KP-039: Verify invite-code redeemers appear as suggested friend connects
+
+- **Description**: Someone that uses your redeem (invite) code should be suggested as a friend connect. This was implemented as KP-026 (Friends tab → "Suggested friends", backed by the `list_invite_connections()` RPC in migration `20260710130000`), but the request resurfaced — verify the flow works end to end and close this as stale if it does.
+- **Impacted Codebase**: [Friends.tsx](file:///V:/repos/CinemArchive/src/views/Friends.tsx), [auth.ts](file:///V:/repos/CinemArchive/src/lib/auth.ts), migration `20260710130000_invite_connections.sql`
+- **Proposed Solution**: Re-verify the RPC surfaces both `invited_by_you` and `invited_you` lineage and that the Friends tab renders the section; fix anything broken, otherwise document as already resolved.
+
+### KP-040: Improve the Bechdel test badge icon
+
+- **Description**: The Bechdel badge's Venus (♀) icon (from KP-029) reads as a generic gender symbol rather than the test itself. A more distinctive icon should communicate the test's actual criteria — two women talking to each other.
+- **Impacted Codebase**: [media-badges.tsx](file:///V:/repos/CinemArchive/src/components/ui/media-badges.tsx)
+- **Proposed Solution**: Replace the Venus glyph with a custom badge-sized icon (e.g. two figures in conversation) consistent with the badge set's visual weight.
+
+### KP-041: Reword the Discover hero heading to fit the brand vibe
+
+- **Description**: The Discover page's search hero heading ("What's missing from your *archive?*") doesn't fully land the cinematic, projection-room brand voice used elsewhere.
+- **Impacted Codebase**: [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx)
+- **Proposed Solution**: Rewrite the heading (and tune the "the acquisitions desk" kicker if needed) to match the app's dark-gold cinema register.
+
+### KP-042: Cohesive GUI for the accessibility buttons
+
+- **Description**: The focus-revealed accessibility controls — the "Skip to content" link and the "Keyboard shortcuts" button in `App.tsx` — are two independently absolute-positioned pills (`focus:left-3` / `focus:left-40`) with duplicated styling; they don't read as one coherent surface when tabbed through.
+- **Impacted Codebase**: [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx)
+- **Proposed Solution**: Group them into a single accessibility toolbar with shared styling/positioning so focusing either reveals a cohesive control cluster.
+
+### KP-043: Collapse the nav bar word mark into the logo sooner
+
+- **Description**: The TopBar word mark ("CinemArchive / a private film archive") currently collapses below the `lg` breakpoint (KP-033), but it still crowds the pill nav at `lg`–`xl` widths — it needs to collapse a little sooner.
+- **Impacted Codebase**: [TopBar.tsx](file:///V:/repos/CinemArchive/src/components/TopBar.tsx)
+- **Proposed Solution**: Move the word mark's visibility from `hidden lg:flex` to `hidden xl:flex` so only the reel mark shows below `xl`.
+
+### KP-044: Make the Discover carousel pause buttons more prominent
+
+- **Description**: The per-carousel pause toggle (KP-036) is a small overlay in the film strip's bottom-right corner, only visible on hover — too easy to miss. It should be more prominent and visually distinct, ideally outside the film strip itself, next to the carousel title or the "View more" link.
+- **Impacted Codebase**: [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx)
+- **Proposed Solution**: Lift the pause control out of the strip overlay into each carousel's header row (beside the section title / View-more link), always visible, with clear play/pause state.
+
+### KP-045: Assess importing watch history/ratings from other platforms
+
+- **Description**: Determine how difficult it would be to import watch history and/or ratings from other platforms (Letterboxd, IMDb, Trakt, Netflix, Simkl, …). CinemArchive already has JSON export/import between its own instances, but nothing that ingests third-party data.
+- **Impacted Codebase**: TBD — likely a new import module plus the Add-Title/TMDB matching path
+- **Proposed Solution**: Write a feasibility assessment (per-platform export formats, TMDB matching strategy, effort estimates) under `docs/`, then prototype the lowest-effort importer (likely Letterboxd CSV).
 
 ---
 

@@ -13,6 +13,9 @@ number is chosen.
 
 - The Bechdel test badge now uses a bespoke "two figures in conversation" icon
   in place of the generic Venus (♀) symbol, matching the test's actual criteria.
+- The Discover page hero now reads "Scout the next reel for the vault." in
+  place of "What's missing from your archive?", matching the app's
+  projection-room voice.
 
 ## [1.3.0] - 2026-07-12
 

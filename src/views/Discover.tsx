@@ -1434,7 +1434,7 @@ export function Discover() {
       <div className="text-center mb-7">
         <p className="kicker"><span className="dot" /> the acquisitions desk</p>
         <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3 max-w-xl mx-auto">
-          What's missing from your <em>archive?</em>
+          Scout the next reel for the <em>vault.</em>
         </h1>
       </div>
 

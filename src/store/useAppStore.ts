@@ -1075,7 +1075,10 @@ export const useAppStore = create<AppStore>()(
     if (!user) return
     set({ loadingUser: true, libraryLoadError: null })
     try {
-      const dbTitles = await fetchUserLibrary(user.id)
+      // Outings ride along with the owner's own library fetch (rule §9 —
+      // owner-private); the returned array isn't consumed yet — a future
+      // phase wires it into an `outings` store slice and the reconciler.
+      const { titles: dbTitles } = await fetchUserLibrary(user.id)
       // The synced board layout rides along with the library fetch. Server
       // wins; a user who has never synced adopts their local board once.
       void fetchLedgerLayout(user.id)

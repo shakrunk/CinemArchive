@@ -34,11 +34,24 @@ export function useOutingReconciler(): void {
 
     let timer: ReturnType<typeof window.setTimeout> | undefined
 
+    // Browsers store the setTimeout delay as a 32-bit signed int — anything
+    // over ~24.8 days overflows and clamps to fire almost immediately. A
+    // scheduled outing can legitimately be further out than that (the
+    // countdown chip's "in {N} days" bucket has no cap), so long waits are
+    // split into re-armed chunks capped just under the overflow ceiling
+    // rather than handed to setTimeout in one shot.
+    const MAX_TIMEOUT_DELAY = 2_147_483_647
+
     function armTimer() {
       window.clearTimeout(timer)
       const next = nextTransitionAt(useAppStore.getState().outings)
       if (!next) return
       const delay = Math.max(0, new Date(next).getTime() - Date.now())
+      if (delay > MAX_TIMEOUT_DELAY) {
+        // Not yet due — just re-check closer to the deadline, no RPC call.
+        timer = window.setTimeout(armTimer, MAX_TIMEOUT_DELAY)
+        return
+      }
       timer = window.setTimeout(() => {
         reconcile()
         armTimer()

@@ -60,3 +60,6 @@
 ## 2024-11-20 - [Actionable Empty States in Dashboards]
 **Learning:** Empty states in dashboard components (like those in Ledger.tsx) often just display static text (e.g., 'Use "Edit layout" to add widgets.'), which is a dead end. Providing a clear CTA like 'Edit layout' helps the user take the next step.
 **Action:** When working on dashboard panels or data visualization components, ensure any empty states include an actionable CTA button that guides the user on how to populate the data.
+## 2024-05-14 - Checkbox Explicit Bindings
+**Learning:** Found instances where custom checkboxes (e.g. `episode-card.tsx` and `TitleDetailDrawer.tsx`) were using implicit `<label>` associations (wrapping the `<input>`) but lacked explicit `id` and `htmlFor` attributes. While implicit association is often sufficient, explicit bindings provide stronger, more reliable support across various screen readers and form interaction paradigms.
+**Action:** Always add explicit `id` bindings to custom form controls and `htmlFor` attributes to their associated labels, especially for toggleable states, ensuring robust accessibility.

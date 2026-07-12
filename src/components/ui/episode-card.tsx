@@ -376,8 +376,8 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
       {!isSharedView && (
         showForm ? (
           <div className="space-y-3 pt-2" style={{ borderTop: episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0 ? '1px solid var(--line)' : 'none' }}>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={log.includeWatch} onChange={(e) => setLog((l) => ({ ...l, includeWatch: e.target.checked }))} className="accent-amber w-3.5 h-3.5" />
+            <label htmlFor={`episode-log-watch-${titleId}-${season.seasonNumber}-${episode.episodeNumber}`} className="flex items-center gap-2 cursor-pointer">
+              <input id={`episode-log-watch-${titleId}-${season.seasonNumber}-${episode.episodeNumber}`} type="checkbox" checked={log.includeWatch} onChange={(e) => setLog((l) => ({ ...l, includeWatch: e.target.checked }))} className="accent-amber w-3.5 h-3.5" />
               <span className="font-sans text-xs" style={{ color: 'var(--paper-dim)' }}>Log a watch event</span>
             </label>
             {log.includeWatch && (
@@ -385,8 +385,8 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                 {!log.prePlatform && (
                   <Input aria-label="Date watched" type="date" value={log.watchedAt} onChange={(e) => setLog((l) => ({ ...l, watchedAt: e.target.value }))} className="h-8 text-xs font-mono bg-secondary/50 border-border" />
                 )}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={log.prePlatform} onChange={(e) => setLog((l) => ({ ...l, prePlatform: e.target.checked }))} className="accent-amber w-3.5 h-3.5" />
+                <label htmlFor={`episode-pre-platform-${titleId}-${season.seasonNumber}-${episode.episodeNumber}`} className="flex items-center gap-2 cursor-pointer">
+                  <input id={`episode-pre-platform-${titleId}-${season.seasonNumber}-${episode.episodeNumber}`} type="checkbox" checked={log.prePlatform} onChange={(e) => setLog((l) => ({ ...l, prePlatform: e.target.checked }))} className="accent-amber w-3.5 h-3.5" />
                   <span className="font-sans text-xs" style={{ color: 'var(--paper-faint)' }}>Watched before joining CinemArchive (no date)</span>
                 </label>
                 <Input aria-label="Watch notes" value={log.watchNotes} onChange={(e) => setLog((l) => ({ ...l, watchNotes: e.target.value }))} placeholder="Watch notes (optional)" className="h-8 text-xs bg-secondary/50 border-border" />

@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-12
+
 ### Added
 
 - Cinema Outings — "I've got tickets" scheduling: a form to log a booked cinema

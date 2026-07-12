@@ -4,12 +4,6 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-### KP-042: Cohesive GUI for the accessibility buttons
-
-- **Description**: The focus-revealed accessibility controls — the "Skip to content" link and the "Keyboard shortcuts" button in `App.tsx` — are two independently absolute-positioned pills (`focus:left-3` / `focus:left-40`) with duplicated styling; they don't read as one coherent surface when tabbed through.
-- **Impacted Codebase**: [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx)
-- **Proposed Solution**: Group them into a single accessibility toolbar with shared styling/positioning so focusing either reveals a cohesive control cluster.
-
 ### KP-043: Collapse the nav bar word mark into the logo sooner
 
 - **Description**: The TopBar word mark ("CinemArchive / a private film archive") currently collapses below the `lg` breakpoint (KP-033), but it still crowds the pill nav at `lg`–`xl` widths — it needs to collapse a little sooner.
@@ -37,6 +31,7 @@ This document tracks known issues, technical debt, and usability improvements fo
 | KP-039 | Verify invite-code redeemers appear as suggested friend connects | Stale note — already shipped as KP-026. Verified end to end: migration `20260710130000` is on `main` (applied by `db-migrate.yml`), `list_invite_connections()` covers both `invited_by_you`/`invited_you` lineage and excludes every existing friendship state, `handle_new_user()` guarantees the `profiles` join can't drop a redeemer, and the Friends tab renders "Suggested friends" with a one-tap request. No code change needed. |
 | KP-040 | Improve the Bechdel test badge icon                              | Replaced the Venus (♀) glyph with a bespoke `BechdelIcon` in [media-badges.tsx](file:///V:/repos/CinemArchive/src/components/ui/media-badges.tsx) — two figures under a conversation ellipsis, hand-drawn on Lucide's 24px stroke grid so it takes the same size/stroke/color as the stock badge icons. |
 | KP-041 | Reword the Discover hero heading to fit the brand vibe           | The search hero in [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx) now reads "Scout the next reel for the *vault.*" under the existing "the acquisitions desk" kicker — swapping the plain question for the projection-room register used across the app. |
+| KP-042 | Cohesive GUI for the accessibility buttons                       | The skip link and keyboard-shortcuts button in [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx) now live in a single `nav` toolbar (bordered card, shared pill style) that slides in from above when either control gains keyboard focus — replacing two independently positioned pills with a hardcoded `left-40` offset. The focused pill highlights amber to mark the active control. |
 
 ---
 

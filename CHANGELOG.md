@@ -16,6 +16,9 @@ number is chosen.
 - The Discover page hero now reads "Scout the next reel for the vault." in
   place of "What's missing from your archive?", matching the app's
   projection-room voice.
+- The keyboard-focus accessibility controls (skip to content, keyboard
+  shortcuts) now appear together as one sliding toolbar instead of two
+  separately floating pills.
 
 ## [1.3.0] - 2026-07-12
 

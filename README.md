@@ -16,6 +16,7 @@ It's a JAMstack app: a static React frontend on GitHub Pages, backed by Supabase
 - **Episode-level TV tracking** — each season expands into episodes; log watch events, ratings, and reviews per episode, all decoupled (re-watch an episode without changing its rating; review without re-watching). Season and series rollups are computed from the episode data.
 - **The Ledger** — a stats dashboard (counts, rating distribution, viewing timeline, top genres, auteurs, media breakdown) rendered with custom CSS visuals.
 - **Re-watch timeline** — every viewing is its own dated entry per title.
+- **Cinema Outings** — log a booked movie trip ("I've got tickets") and it moves itself from watchlist to watched: Up Next leads with a countdown-to-showtime marquee, the show auto-completes into a viewing (theater, companions, format) when it lets out, and a "how was it?" prompt follows with rating, notes, and a friend recommendation. Add-to-calendar `.ics`, plan-sharing with friends, and a "didn't make it" undo round out the flow.
 - **Auth** — passkey / WebAuthn via Supabase Auth.
 - **Shareable read-only links** — time-bound access tokens let others browse your library without editing it.
 - **Offline-first PWA** — installable, with a service worker caching the app shell, posters, and fonts.

@@ -5,7 +5,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { PosterThumb } from 'src/components/ui/poster-thumb'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn } from 'src/lib/utils'
+import { cn, getInitials } from 'src/lib/utils'
 import { companionSuggestions, venueSuggestions, type OutingSchedulePrefill } from 'src/store/outings'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSnippet } from 'src/lib/ics'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
@@ -61,11 +61,16 @@ export function CompanionInput({
             key={c.name}
             className="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-amber/10 border border-amber/20 font-mono text-xs text-amber"
           >
-            {c.friendUserId && (
-              <span className="w-4 h-4 rounded-full bg-amber/20 flex items-center justify-center text-[9px] font-sans shrink-0">
-                {c.name.charAt(0).toUpperCase()}
-              </span>
-            )}
+            {/* Friend avatars when linked; plain initials otherwise (plan §13) —
+               *  every chip gets a bubble, only the styling tells them apart. */}
+            <span
+              className={cn(
+                'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-sans shrink-0',
+                c.friendUserId ? 'bg-amber/20' : 'bg-secondary text-muted-foreground'
+              )}
+            >
+              {getInitials(c.name)}
+            </span>
             {c.name}
             <button
               type="button"
@@ -99,11 +104,14 @@ export function CompanionInput({
               onClick={() => addCompanion(s)}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-secondary/60 transition-colors"
             >
-              {s.friendUserId && (
-                <span className="w-4 h-4 rounded-full bg-amber/20 flex items-center justify-center text-[9px] font-sans shrink-0 text-amber">
-                  {s.name.charAt(0).toUpperCase()}
-                </span>
-              )}
+              <span
+                className={cn(
+                  'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-sans shrink-0',
+                  s.friendUserId ? 'bg-amber/20 text-amber' : 'bg-secondary text-muted-foreground'
+                )}
+              >
+                {getInitials(s.name)}
+              </span>
               {s.name}
             </button>
           ))}

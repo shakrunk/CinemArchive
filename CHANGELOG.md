@@ -45,6 +45,13 @@ number is chosen.
   editor even after its showtime is frozen. Deleting an outing's auto-logged
   viewing from the timeline now leaves the outing completed and closes out
   its pending "how was it?" follow-up.
+- Cinema Outings — "At the Movies" Ledger panel: an opt-in board widget
+  totaling cinema trips (lifetime and this year, with a per-year strip),
+  your favorite theater and venue breakdown, most frequent companion, format
+  chips (IMAX/3D/…), and a "spent at the movies" sum in your locale's
+  currency (hidden until a ticket price is logged). Companion chips
+  throughout the feature now show initials for everyone, not just linked
+  friends.
 
 ## [1.2.0] - 2026-07-11
 

@@ -9,6 +9,7 @@ import {
   formatCompanions,
   parseOutingSharePayload,
   formatOutingShareSnapshotLine,
+  deriveAtTheMovies,
 } from './outings'
 import type { CinemaOuting, Title, Viewing } from './mockData'
 import type { FriendshipView } from '../lib/auth'
@@ -371,5 +372,82 @@ describe('formatOutingShareSnapshotLine', () => {
       ends_at: '2026-07-17T22:36:00.000-06:00',
     })!
     expect(formatOutingShareSnapshotLine(payload)).toBe('Fri 7:30 PM')
+  })
+})
+
+describe('deriveAtTheMovies', () => {
+  function makeViewing(overrides: Partial<Viewing> = {}): Viewing {
+    return { id: nextId('viewing'), titleId: 't1', ...overrides }
+  }
+
+  it('counts only viewings with a venue as trips, ignoring couch rewatches', () => {
+    const titles = [
+      makeTitle({
+        viewings: [
+          makeViewing({ date: '2026-07-17', venue: 'AMC Georgetown' }),
+          makeViewing({ date: '2026-07-01' }), // no venue — a home rewatch
+        ],
+      }),
+    ]
+    const stats = deriveAtTheMovies(titles, [], new Date(2026, 6, 20))
+    expect(stats.tripsTotal).toBe(1)
+    expect(stats.tripsThisYear).toBe(1)
+  })
+
+  it('joins format and ticket price off the outing via outingId, not the viewing', () => {
+    const outing = makeOuting({ id: 'o1', format: 'IMAX', ticketPrice: 18.5 })
+    const titles = [
+      makeTitle({ viewings: [makeViewing({ date: '2026-07-17', venue: 'AMC Georgetown', outingId: 'o1' })] }),
+    ]
+    const stats = deriveAtTheMovies(titles, [outing], new Date(2026, 6, 20))
+    expect(stats.formats).toEqual([{ format: 'IMAX', count: 1 }])
+    expect(stats.totalSpent).toBe(18.5)
+    expect(stats.pricedTripCount).toBe(1)
+  })
+
+  it('ranks venues and companions by visit count, favoring the most frequent', () => {
+    const titles = [
+      makeTitle({
+        viewings: [
+          makeViewing({ date: '2026-01-01', venue: 'AMC Georgetown', companions: [{ name: 'Alex' }] }),
+          makeViewing({ date: '2026-02-01', venue: 'AMC Georgetown', companions: [{ name: 'Alex' }] }),
+          makeViewing({ date: '2026-03-01', venue: 'Alamo Drafthouse', companions: [{ name: 'Sam' }] }),
+        ],
+      }),
+    ]
+    const stats = deriveAtTheMovies(titles, [], new Date(2026, 6, 20))
+    expect(stats.favoriteVenue).toBe('AMC Georgetown')
+    expect(stats.venues).toEqual([
+      { venue: 'AMC Georgetown', count: 2 },
+      { venue: 'Alamo Drafthouse', count: 1 },
+    ])
+    expect(stats.topCompanion).toEqual({ name: 'Alex', count: 2 })
+  })
+
+  it('hides spend when no trip logged a price, and reports no companion/favorite when none exist', () => {
+    const titles = [makeTitle({ viewings: [makeViewing({ date: '2026-07-17', venue: 'AMC Georgetown' })] })]
+    const stats = deriveAtTheMovies(titles, [], new Date(2026, 6, 20))
+    expect(stats.pricedTripCount).toBe(0)
+    expect(stats.totalSpent).toBe(0)
+    expect(stats.topCompanion).toBeNull()
+    expect(stats.formats).toEqual([])
+  })
+
+  it('buckets trips by year in chronological order', () => {
+    const titles = [
+      makeTitle({
+        viewings: [
+          makeViewing({ date: '2024-05-01', venue: 'AMC Georgetown' }),
+          makeViewing({ date: '2026-01-01', venue: 'AMC Georgetown' }),
+          makeViewing({ date: '2026-06-01', venue: 'AMC Georgetown' }),
+        ],
+      }),
+    ]
+    const stats = deriveAtTheMovies(titles, [], new Date(2026, 6, 20))
+    expect(stats.yearCounts).toEqual([
+      { year: 2024, count: 1 },
+      { year: 2026, count: 2 },
+    ])
+    expect(stats.tripsTotal).toBe(3)
   })
 })

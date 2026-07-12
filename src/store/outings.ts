@@ -308,3 +308,102 @@ export function formatOutingShareSnapshotLine(payload: OutingSharePayload): stri
  *  `OutingScheduleSheet` with — seat is deliberately absent (rule §4.10:
  *  "that's the part they go buy"). */
 export type OutingSchedulePrefill = Pick<OutingSharePayload, 'showtime' | 'venue' | 'format'>
+
+// ─── Ledger — "At the Movies" (plan §4.8) ────────────────────────────────────
+
+export interface VenueCount {
+  venue: string
+  count: number
+}
+
+export interface FormatCount {
+  format: CinemaFormat
+  count: number
+}
+
+export interface AtTheMoviesStats {
+  tripsTotal: number
+  tripsThisYear: number
+  /** Chronological, one entry per year that had at least one trip. */
+  yearCounts: { year: number; count: number }[]
+  /** Distinct theaters, most-visited first. */
+  venues: VenueCount[]
+  favoriteVenue: string | null
+  topCompanion: { name: string; count: number } | null
+  /** Formats, most-common first — joined off each trip's outing. */
+  formats: FormatCount[]
+  /** Sum of `ticketPrice` across trips whose outing logged one. */
+  totalSpent: number
+  pricedTripCount: number
+}
+
+/** "At the Movies" Ledger panel data (plan §4.8). Source of truth is
+ *  `viewings`, not `outings` — a "trip" is any viewing with a `venue`,
+ *  whether it came from an auto-completed outing or a manual "log a viewing"
+ *  entry. Each trip joins its outing (via `outingId`, when present) only for
+ *  the fields outings alone carry: `format` and `ticketPrice`. A completed
+ *  outing and its viewing are one trip, counted once. */
+export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now = new Date()): AtTheMoviesStats {
+  const outingById = new Map(outings.map((o) => [o.id, o]))
+  const currentYear = now.getFullYear()
+
+  let tripsTotal = 0
+  let tripsThisYear = 0
+  const yearCounts = new Map<number, number>()
+  const venueCounts = new Map<string, number>()
+  const companionCounts = new Map<string, number>()
+  const formatCounts = new Map<CinemaFormat, number>()
+  let totalSpent = 0
+  let pricedTripCount = 0
+
+  for (const t of titles) {
+    for (const v of t.viewings) {
+      if (!v.venue) continue
+      tripsTotal += 1
+      venueCounts.set(v.venue, (venueCounts.get(v.venue) ?? 0) + 1)
+
+      if (v.date) {
+        const year = Number(v.date.slice(0, 4))
+        if (Number.isFinite(year)) {
+          yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1)
+          if (year === currentYear) tripsThisYear += 1
+        }
+      }
+
+      for (const c of v.companions ?? []) {
+        const name = c.name.trim()
+        if (name) companionCounts.set(name, (companionCounts.get(name) ?? 0) + 1)
+      }
+
+      const outing = v.outingId ? outingById.get(v.outingId) : undefined
+      if (outing?.format) formatCounts.set(outing.format, (formatCounts.get(outing.format) ?? 0) + 1)
+      if (outing?.ticketPrice != null) {
+        totalSpent += outing.ticketPrice
+        pricedTripCount += 1
+      }
+    }
+  }
+
+  const venues = [...venueCounts.entries()]
+    .map(([venue, count]) => ({ venue, count }))
+    .sort((a, b) => b.count - a.count)
+  const topCompanionEntry = [...companionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+  const formats = [...formatCounts.entries()]
+    .map(([format, count]) => ({ format, count }))
+    .sort((a, b) => b.count - a.count)
+  const sortedYearCounts = [...yearCounts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, count]) => ({ year, count }))
+
+  return {
+    tripsTotal,
+    tripsThisYear,
+    yearCounts: sortedYearCounts,
+    venues,
+    favoriteVenue: venues[0]?.venue ?? null,
+    topCompanion: topCompanionEntry ? { name: topCompanionEntry[0], count: topCompanionEntry[1] } : null,
+    formats,
+    totalSpent,
+    pricedTripCount,
+  }
+}

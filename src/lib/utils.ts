@@ -132,6 +132,38 @@ export function toPercent(part: number, total: number): number {
   return Math.round((part / total) * 100)
 }
 
+// Locale → currency code for regions ISO doesn't put in the locale string
+// itself (`Intl.NumberFormat` needs an explicit currency to format one at
+// all). Covers the common cases; anything unlisted falls back to USD rather
+// than throwing — ticket prices are single-currency by design (plan §4.8).
+const REGION_CURRENCY: Record<string, string> = {
+  US: 'USD', GB: 'GBP', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', IN: 'INR',
+  DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR',
+  BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR',
+  CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', MX: 'MXN', BR: 'BRL',
+  ZA: 'ZAR', SG: 'SGD', HK: 'HKD', KR: 'KRW', CN: 'CNY',
+}
+
+/** Format a plain amount as currency using the browser locale's regional
+ *  symbol (e.g. "$18.50", "£12.00", "¥1,800") — no currency code is stored
+ *  alongside `ticket_price`, so this is a best-effort regional guess rather
+ *  than a source-of-truth conversion (plan §4.8: single-currency by design). */
+export function fmtCurrency(amount: number): string {
+  const locale = typeof navigator !== 'undefined' ? navigator.language : 'en-US'
+  let region: string | undefined
+  try {
+    region = new Intl.Locale(locale).maximize().region
+  } catch {
+    region = undefined
+  }
+  const currency = (region && REGION_CURRENCY[region]) || 'USD'
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount)
+  } catch {
+    return `$${amount.toFixed(2)}`
+  }
+}
+
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()

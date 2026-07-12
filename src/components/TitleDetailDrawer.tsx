@@ -1823,8 +1823,9 @@ export function TitleDetailDrawer() {
                           className="bg-secondary/50 border-border font-mono"
                         />
                       )}
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                      <label htmlFor={`drawer-pre-platform-${title.id}`} className="flex items-center gap-2 cursor-pointer mt-2">
                         <input
+                          id={`drawer-pre-platform-${title.id}`}
                           type="checkbox"
                           checked={logPrePlatform}
                           onChange={(e) => setLogPrePlatform(e.target.checked)}

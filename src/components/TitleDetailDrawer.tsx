@@ -22,10 +22,10 @@ import {
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send, Ticket,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send, Ticket, Clapperboard,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
-import { formatCompanions } from 'src/store/outings'
+import { formatCompanions, findPendingFollowUpOuting } from 'src/store/outings'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, fetchCollectionParts, TMDB_STILL_BASE, type TitleVideo, type WatchProviders, type SearchResult } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
@@ -1113,9 +1113,30 @@ function FranchiseSection({
 
 function OutingBanner({ title }: { title: Title }) {
   const outing = useAppStore((s) => s.outings.find((o) => o.titleId === title.id && o.status === 'scheduled'))
+  // Follow-up ("how was it?") banner (plan §4.6) — only surfaced when there's
+  // no scheduled outing to show instead; a rewatch mid-follow-up is a rare
+  // enough overlap that the scheduled banner simply takes priority.
+  const pendingFollowUp = useAppStore((s) =>
+    outing ? null : findPendingFollowUpOuting(s.outings, title.id, new Date())
+  )
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
   const cancelOuting = useAppStore((s) => s.cancelOuting)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
+
+  if (!outing && pendingFollowUp) {
+    return (
+      <div className="px-4 sm:px-6 pt-4">
+        <button
+          onClick={() => openPostShowSheet(pendingFollowUp.id)}
+          className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left"
+        >
+          <Clapperboard className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
+          <span className="font-mono text-xs text-amber">{title.title} just let out — how was it?</span>
+        </button>
+      </div>
+    )
+  }
 
   if (!outing) return null
 

@@ -301,7 +301,11 @@ function OutingForm({
     const nowPast = new Date(endsAtIso).getTime() <= Date.now()
 
     if (editingOuting) {
-      updateOuting(editingOuting.id, common)
+      // Reschedule (plan §4.2): editing a 'missed' outing (from "Didn't make
+      // it") flips it back to 'scheduled' for the next attempt; editing an
+      // already-scheduled outing leaves status untouched.
+      const patch = editingOuting.status === 'scheduled' ? common : { ...common, status: 'scheduled' as const }
+      updateOuting(editingOuting.id, patch)
       if (nowPast) void reconcileOutings()
       onClose()
       return

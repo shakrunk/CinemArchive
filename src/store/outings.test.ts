@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeMarqueeEntries,
+  findPendingFollowUpOuting,
   nextTransitionAt,
   outingPresentation,
   companionSuggestions,
@@ -168,6 +169,31 @@ describe('computeMarqueeEntries', () => {
     const now = new Date('2026-07-17T00:00:00.000Z')
     const entries = computeMarqueeEntries([later, sooner, pending], titles, now)
     expect(entries.map((e) => e.outing.id)).toEqual([sooner.id, later.id, pending.id])
+  })
+
+})
+
+describe('findPendingFollowUpOuting', () => {
+  it('returns the most-recently-ended pending outing for a title', () => {
+    const older = makeOuting({ id: 'o-older', titleId: 't1', status: 'completed', endsAt: '2026-07-01T22:00:00.000Z' })
+    const newer = makeOuting({ id: 'o-newer', titleId: 't1', status: 'completed', endsAt: '2026-07-10T22:00:00.000Z' })
+    const now = new Date('2026-07-11T00:00:00.000Z')
+    expect(findPendingFollowUpOuting([older, newer], 't1', now)?.id).toBe('o-newer')
+  })
+
+  it('returns null once the follow-up has been dismissed', () => {
+    const outing = makeOuting({
+      titleId: 't1',
+      status: 'completed',
+      endsAt: '2026-07-17T22:06:00.000Z',
+      followUpDismissedAt: '2026-07-17T23:00:00.000Z',
+    })
+    const now = new Date('2026-07-18T00:00:00.000Z')
+    expect(findPendingFollowUpOuting([outing], 't1', now)).toBeNull()
+  })
+
+  it('returns null when nothing is pending for that title', () => {
+    expect(findPendingFollowUpOuting([], 't1', new Date('2026-07-17T00:00:00.000Z'))).toBeNull()
   })
 })
 

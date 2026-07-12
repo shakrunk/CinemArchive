@@ -36,13 +36,10 @@ function makeOuting(overrides: Partial<CinemaOuting> = {}): CinemaOuting {
   }
 }
 
-// 'outing_completed' isn't part of the client NotificationType union yet
-// (its inbox rendering lands in a later phase — see revertOutingCompletion's
-// comment) even though the DB already emits rows of this type, hence the cast.
 function makeNotification(overrides: Partial<AppNotificationItem> = {}): AppNotificationItem {
   return {
     id: 'n1',
-    type: 'outing_completed' as unknown as AppNotificationItem['type'],
+    type: 'outing_completed',
     actorId: null,
     actorDisplayName: null,
     actorUsername: null,

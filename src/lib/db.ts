@@ -536,9 +536,10 @@ export type NotificationType =
   | 'comment_received'
   | 'reaction_received'
   | 'invite_redeemed'
-  // Cinema Outings (plan §4.7): the DB already accepts these (Phase A's
-  // migration widened notifications_type_check) — inbox rendering/TYPE_META
-  // is added when this type union grows to include them, in a later phase.
+  | 'outing_completed'
+  // 'outing_plans_shared' (plan §4.7): the DB already accepts it (Phase A's
+  // migration widened notifications_type_check) — its inbox rendering/
+  // TYPE_META lands with Phase D2's in-app plan sharing.
 
 export interface AppNotificationItem {
   id: string

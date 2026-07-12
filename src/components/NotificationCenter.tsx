@@ -1,14 +1,23 @@
 import { useRef, useState } from 'react'
-import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket } from 'lucide-react'
+import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket, Clapperboard } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
+import { findPendingFollowUpOuting } from 'src/store/outings'
 import { cn, fmtDateShort } from 'src/lib/utils'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { useClickOutside } from 'src/lib/useClickOutside'
 import type { AppView } from 'src/lib/navigation'
 import type { AppNotificationItem, NotificationType } from 'src/lib/db'
 
-const TYPE_META: Record<NotificationType, { Icon: typeof Bell; verb: (n: AppNotificationItem) => string }> = {
+interface TypeMeta {
+  Icon: typeof Bell
+  verb: (n: AppNotificationItem) => string
+  // Overrides the default "{actor} {verb}" line — for self-notifications that
+  // carry no actor (plan §4.7's outing_completed: "renders without the actor prefix").
+  render?: (n: AppNotificationItem) => React.ReactNode
+}
+
+const TYPE_META: Record<NotificationType, TypeMeta> = {
   friend_request_received: { Icon: UserPlus, verb: () => 'sent you a friend request' },
   friend_request_accepted: { Icon: UserCheck, verb: () => 'accepted your friend request' },
   share_link_used: { Icon: Eye, verb: (n) => `viewed your shared link${n.payload.label ? ` "${n.payload.label}"` : ''}` },
@@ -16,6 +25,15 @@ const TYPE_META: Record<NotificationType, { Icon: typeof Bell; verb: (n: AppNoti
   comment_received: { Icon: MessageCircle, verb: (n) => `commented on "${n.title ?? 'a title'}"` },
   reaction_received: { Icon: Smile, verb: (n) => `reacted ${n.payload.emoji ?? ''} to "${n.title ?? 'a title'}"` },
   invite_redeemed: { Icon: Ticket, verb: (n) => `redeemed your invite code${typeof n.payload.email === 'string' ? ` (${n.payload.email})` : ''}` },
+  outing_completed: {
+    Icon: Clapperboard,
+    verb: () => 'just let out — how was it?',
+    render: (n) => (
+      <>
+        <span className="font-medium">{n.title ?? 'Your movie'}</span> just let out — how was it?
+      </>
+    ),
+  },
 }
 
 function actorName(n: AppNotificationItem): string {
@@ -35,6 +53,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
     markAllNotificationsSeen,
     deleteNotificationItem,
     openDetailDrawer,
+    openPostShowSheet,
+    outings,
   } = useAppStore(
     useShallow((s) => ({
       notificationInbox: s.notificationInbox,
@@ -44,6 +64,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       markAllNotificationsSeen: s.markAllNotificationsSeen,
       deleteNotificationItem: s.deleteNotificationItem,
       openDetailDrawer: s.openDetailDrawer,
+      openPostShowSheet: s.openPostShowSheet,
+      outings: s.outings,
     }))
   )
 
@@ -68,6 +90,10 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
     setOpen(false)
     if ((n.type === 'comment_received' || n.type === 'reaction_received') && n.titleId) {
       openDetailDrawer(n.titleId)
+    } else if (n.type === 'outing_completed' && n.titleId) {
+      openDetailDrawer(n.titleId)
+      const outing = findPendingFollowUpOuting(outings, n.titleId, new Date())
+      if (outing) openPostShowSheet(outing.id)
     } else if (n.type === 'friend_request_received' || n.type === 'friend_request_accepted' || n.type === 'recommendation_received') {
       onNavigate('friends')
     } else if (n.type === 'invite_redeemed') {
@@ -140,7 +166,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                       <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
                       <div className="min-w-0 flex-1">
                         <p className="font-sans text-xs text-paper leading-snug">
-                          <span className="font-medium">{actorName(n)}</span> {meta.verb(n)}
+                          {meta.render ? meta.render(n) : (<><span className="font-medium">{actorName(n)}</span> {meta.verb(n)}</>)}
                         </p>
                         <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
                           {fmtDateShort(n.createdAt)}

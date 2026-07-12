@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Send, Check, Loader2, Search, RefreshCw } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
+import { cn } from 'src/lib/utils'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { ModalCloseButton } from 'src/components/ui/modal-close-button'
@@ -13,6 +14,10 @@ const NOTE_MAX_LEN = 280
 interface SendRecommendationPanelProps {
   title: Title
   onClose: () => void
+  /** friendUserIds who were companions on the cinema outing this recommendation
+   *  follows up on (plan §8) — annotated "was there with you" and sorted last
+   *  rather than hidden, since they've just seen it too. */
+  companionFriendIds?: Set<string>
 }
 
 type SendState = 'idle' | 'sending' | 'sent' | 'error'
@@ -21,7 +26,7 @@ function friendName(f: FriendshipView): string {
   return f.display_name || f.username || 'Unknown user'
 }
 
-export function SendRecommendationPanel({ title, onClose }: SendRecommendationPanelProps) {
+export function SendRecommendationPanel({ title, onClose, companionFriendIds }: SendRecommendationPanelProps) {
   const pushNotification = useAppStore((s) => s.pushNotification)
   const closeButtonRef = useModalFocusAndEscape<HTMLButtonElement>(onClose)
 
@@ -87,6 +92,17 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
     const q = search.trim().toLowerCase()
     return friendName(f).toLowerCase().includes(q) || (f.username ?? '').toLowerCase().includes(q)
   })
+
+  // Companions on the outing this recommendation follows up on are listed but
+  // de-emphasized ("was there with you") rather than hidden — sorted last
+  // among an otherwise-stable order (Array#sort is stable).
+  const sortedFriends = companionFriendIds && companionFriendIds.size > 0
+    ? [...filteredFriends].sort((a, b) => {
+        const aThere = companionFriendIds.has(a.friend_user_id)
+        const bThere = companionFriendIds.has(b.friend_user_id)
+        return aThere === bThere ? 0 : aThere ? 1 : -1
+      })
+    : filteredFriends
 
   return (
     <ModalBackdrop onClose={onClose} ariaLabel={`Send "${title.title}" to a friend`}>
@@ -195,16 +211,20 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
             </div>
           ) : (
             <div className="py-1.5">
-              {filteredFriends.map((f) => {
+              {sortedFriends.map((f) => {
                 const state = sendState[f.friend_user_id] ?? 'idle'
                 const name = friendName(f)
+                const wasThere = companionFriendIds?.has(f.friend_user_id) ?? false
                 return (
                   <button
                     key={f.friend_user_id}
                     type="button"
                     onClick={() => handleSend(f)}
                     disabled={state === 'sending'}
-                    className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-none focus-visible:bg-[var(--wash)] disabled:cursor-default"
+                    className={cn(
+                      'w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-none focus-visible:bg-[var(--wash)] disabled:cursor-default',
+                      wasThere && 'opacity-60'
+                    )}
                     style={{ background: 'transparent' }}
                     onMouseEnter={(e) => { if (state !== 'sending') e.currentTarget.style.background = 'var(--wash)' }}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -215,8 +235,13 @@ export function SendRecommendationPanel({ title, onClose }: SendRecommendationPa
                     >
                       {name.charAt(0).toUpperCase()}
                     </div>
-                    <span className="flex-1 min-w-0 truncate font-sans text-sm" style={{ color: 'var(--paper)' }}>
-                      {name}
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate font-sans text-sm" style={{ color: 'var(--paper)' }}>{name}</span>
+                      {wasThere && (
+                        <span className="block font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+                          was there with you
+                        </span>
+                      )}
                     </span>
                     {state === 'sending' && (
                       <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--paper-faint)' }} />

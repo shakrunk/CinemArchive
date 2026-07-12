@@ -18,6 +18,14 @@ number is chosen.
   shows a scheduled-outing banner with Edit/Cancel, and saving offers an
   out-of-app share snippet plus a downloadable `.ics` calendar event with a
   2-hour reminder.
+- Cinema Outings — completion & follow-up: Up Next leads with an "On the
+  Marquee" section (countdown chips through a pulsing NOW SHOWING, add-to-
+  calendar, edit/cancel), a toast and bell notification land the moment a
+  showtime's ticket auto-completes, and a "Fresh from the lobby" card offers
+  the post-show sheet — star rating, a quick note, recommending the movie to
+  friends (companions annotated "was there with you"), or "Didn't make it" to
+  revert and reschedule. Movies with a scheduled outing get a 🎟 badge on the
+  library poster wall.
 
 ## [1.2.0] - 2026-07-11
 

@@ -290,6 +290,13 @@ interface OutingsSlice {
   // The single choke point for auto-completion (plan §4.3) — calls
   // complete_due_outings and applies whatever transitions it returns.
   reconcileOutings: () => Promise<void>
+  // Post-show follow-up sheet (plan §4.4) — a single overlay, opened against a
+  // specific completed outing from the bell inbox, the drawer's banner, or the
+  // marquee's "Fresh from the lobby" card.
+  isPostShowSheetOpen: boolean
+  postShowOutingId: string | null
+  openPostShowSheet: (outingId: string) => void
+  closePostShowSheet: () => void
 }
 
 // ─── Default Nav Prefs ──────────────────────────────────────────────────────
@@ -1261,6 +1268,14 @@ export const useAppStore = create<AppStore>()(
   closeOutingSchedule: () =>
     set({ isOutingScheduleOpen: false, outingScheduleTitleId: null, outingScheduleOutingId: null }),
 
+  isPostShowSheetOpen: false,
+  postShowOutingId: null,
+  openPostShowSheet: (outingId) => {
+    if (get().isSharedView) return
+    set({ isPostShowSheetOpen: true, postShowOutingId: outingId })
+  },
+  closePostShowSheet: () => set({ isPostShowSheetOpen: false, postShowOutingId: null }),
+
   addOuting: (outing) =>
     set((s) => {
       const outings = [outing, ...s.outings]
@@ -1375,10 +1390,7 @@ export const useAppStore = create<AppStore>()(
     // locally — a session that never opened the bell has nothing cached here
     // to clean up, and simply leaves the stale item to be read/dismissed later.
     const stale = s0.notificationInbox
-      // 'outing_completed' isn't (yet) part of the client NotificationType
-      // union — that lands with its inbox rendering in a later phase — but
-      // the DB already emits rows of this type (Phase A), hence the cast.
-      .filter((n) => (n.type as string) === 'outing_completed' && n.titleId === outing.titleId)
+      .filter((n) => n.type === 'outing_completed' && n.titleId === outing.titleId)
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0]
     if (stale) void get().deleteNotificationItem(stale.id)
   },

@@ -11,6 +11,7 @@ import { Friends } from 'src/views/Friends'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
 import { OutingScheduleSheet } from 'src/components/OutingScheduleSheet'
+import { PostShowSheet } from 'src/components/PostShowSheet'
 import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
@@ -239,6 +240,7 @@ export default function App() {
           <TitleDetailDrawer />
           <RefreshMetadataModal />
           <OutingScheduleSheet />
+          <PostShowSheet />
         </>
       )}
       <AppCommandPalette onNavigate={setCurrentView} />

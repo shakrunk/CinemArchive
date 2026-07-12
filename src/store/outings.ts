@@ -98,9 +98,9 @@ export function outingPresentation(outing: CinemaOuting, now: Date): OutingPrese
 
 // True while the "how was it?" follow-up (rate/note/recommend/didn't-make-it)
 // is still live for a completed outing: not yet dismissed (explicitly, or by
-// rating — dismissOutingFollowUp is called either way), and within the
-// 14-day window the plan grants (§4.4).
-function isFollowUpPending(outing: CinemaOuting, now: Date): boolean {
+// rating — dismissOutingFollowUp is called either way, plan §4.4/§7.2), and
+// within the 14-day window the plan grants.
+export function isFollowUpPending(outing: CinemaOuting, now: Date): boolean {
   if (outing.status !== 'completed') return false
   if (outing.followUpDismissedAt) return false
   return now.getTime() - new Date(outing.endsAt).getTime() <= FOLLOW_UP_WINDOW_MS
@@ -142,6 +142,17 @@ export function computeMarqueeEntries(outings: CinemaOuting[], titles: Title[], 
   })
 
   return entries
+}
+
+/** The most-recently-ended completed outing for a title that's still
+ *  awaiting follow-up, or null when there's nothing pending — used to route
+ *  a bell notification click or the drawer's banner tap to the right row for
+ *  the post-show sheet (plan §4.4/§4.7), without the caller needing to know
+ *  which outing (a title can have more than one, e.g. a rewatch) is current. */
+export function findPendingFollowUpOuting(outings: CinemaOuting[], titleId: string, now: Date): CinemaOuting | null {
+  const pending = outings.filter((o) => o.titleId === titleId && isFollowUpPending(o, now))
+  pending.sort((a, b) => (a.endsAt < b.endsAt ? 1 : a.endsAt > b.endsAt ? -1 : 0))
+  return pending[0] ?? null
 }
 
 /** The instant the store should re-arm its single completion timer at (plan

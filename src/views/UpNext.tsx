@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { PlayCircle, Check, Undo2, Clock, Bookmark, Ticket } from 'lucide-react'
+import { PlayCircle, Check, Undo2, Clock, Bookmark, Ticket, CalendarPlus, MoreVertical, Clapperboard, Star, X } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
+import { computeMarqueeEntries, formatCompanions, type MarqueeEntry } from 'src/store/outings'
+import { buildOutingIcs, outingIcsFilename, downloadIcsFile } from 'src/lib/ics'
 import type { Title } from 'src/store/mockData'
 import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
-import { staggerDelays } from 'src/lib/utils'
+import { cn, staggerDelays } from 'src/lib/utils'
+import { useClickOutside } from 'src/lib/useClickOutside'
 import { EmptyState } from 'src/components/ui/empty-state'
 
 const UNDO_WINDOW_MS = 6000
@@ -273,12 +276,191 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
   )
 }
 
+// ─── On the Marquee (scheduled/now-showing cinema outings, plan §4.5) ────────
+
+function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number }) {
+  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
+  const { openDetailDrawer, openOutingSchedule, cancelOuting, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      openDetailDrawer: s.openDetailDrawer,
+      openOutingSchedule: s.openOutingSchedule,
+      cancelOuting: s.cancelOuting,
+      isSharedView: s.isSharedView,
+    }))
+  )
+  const { outing, title, presentation } = entry
+
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useClickOutside(menuRef, () => setMenuOpen(false), menuOpen, { escape: true })
+
+  const companionLabel = formatCompanions(outing.companions)
+  const detailLine = [outing.venue, companionLabel && `with ${companionLabel}`].filter(Boolean).join(' · ')
+
+  function handleAddToCalendar() {
+    const ics = buildOutingIcs(outing, title.title)
+    downloadIcsFile(outingIcsFilename(title.title, outing.showtime), ics)
+  }
+
+  return (
+    <div className="relative">
+      <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+        <p
+          className={cn(
+            'font-mono text-xs mt-0.5 inline-flex items-center gap-1.5 text-amber',
+            presentation.kind === 'now-showing' && 'marquee-now-showing'
+          )}
+        >
+          <Ticket className="w-3.5 h-3.5" aria-hidden="true" />
+          <span aria-label={presentation.ariaLabel}>{presentation.label}</span>
+        </p>
+        {detailLine && <p className="font-sans text-sm text-paper-dim truncate">{detailLine}</p>}
+        {!isSharedView && (
+          <div className="mt-auto pt-3 flex items-center justify-between gap-2">
+            {confirmingCancel ? (
+              <span className="flex items-center gap-2">
+                <span className="font-mono text-xs text-paper-faint">Cancel these tickets?</span>
+                <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }}>
+                  Yes
+                </button>
+                <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-paper-faint hover:text-paper transition-colors">
+                  No
+                </button>
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={handleAddToCalendar}
+                  className="flex items-center gap-1.5 font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+                >
+                  <CalendarPlus className="w-3.5 h-3.5" />
+                  Add to calendar
+                </button>
+                <div className="relative" ref={menuRef}>
+                  <button
+                    onClick={() => setMenuOpen((v) => !v)}
+                    aria-label={`More options for ${title.title}'s tickets`}
+                    aria-expanded={menuOpen}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-paper-faint hover:text-amber transition-colors"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  {menuOpen && (
+                    <div
+                      role="menu"
+                      aria-label="Outing options"
+                      className="absolute right-0 bottom-full mb-1 w-44 rounded-lg overflow-hidden z-10 shadow-xl py-1"
+                      style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
+                    >
+                      {/* Share plans: the friend-picker RPC wiring lands in Phase D2 —
+                          the affordance is placed now so that phase only has to wire it in. */}
+                      <button
+                        role="menuitem"
+                        disabled
+                        aria-disabled="true"
+                        title="Coming soon"
+                        className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 font-mono text-xs text-paper-faint/50 cursor-not-allowed"
+                      >
+                        Share plans
+                        <span className="text-[9px] uppercase tracking-wide">Soon</span>
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => { setMenuOpen(false); openOutingSchedule(title.id, outing.id) }}
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors"
+                      >
+                        Edit tickets
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => { setMenuOpen(false); setConfirmingCancel(true) }}
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-ember transition-colors"
+                      >
+                        Cancel outing
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </CardFrame>
+    </div>
+  )
+}
+
+function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number }) {
+  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
+  const { openDetailDrawer, openPostShowSheet, dismissOutingFollowUp, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      openDetailDrawer: s.openDetailDrawer,
+      openPostShowSheet: s.openPostShowSheet,
+      dismissOutingFollowUp: s.dismissOutingFollowUp,
+      isSharedView: s.isSharedView,
+    }))
+  )
+  const { outing, title } = entry
+
+  return (
+    <div className="relative">
+      <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+        <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
+          <Clapperboard className="w-3.5 h-3.5" /> Fresh from the lobby
+        </p>
+        <p className="font-sans text-sm text-paper-dim truncate">Just let out — how was it?</p>
+        {!isSharedView && (
+          <div className="mt-auto pt-3">
+            <button
+              onClick={() => openPostShowSheet(outing.id)}
+              className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full py-2 text-[13px] font-bold"
+            >
+              <Star className="w-4 h-4" /> Rate it
+            </button>
+          </div>
+        )}
+      </CardFrame>
+      {!isSharedView && (
+        <button
+          onClick={() => dismissOutingFollowUp(outing.id)}
+          aria-label={`Dismiss the "how was it" prompt for ${title.title}`}
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-sm text-paper-faint hover:text-paper hover:bg-black/70 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── Up Next view ────────────────────────────────────────────────────────────
 
 export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const shows = useUpNextShows()
   const upcoming = useUpcomingTitles()
   const [finished, setFinished] = useState<FinishedCard[]>([])
+
+  // Owner-only data (plan §4.5: "not rendered in shared/friend views") — the
+  // marquee is skipped entirely in a shared/friend session rather than
+  // trusting `outings` to already be empty there.
+  const { outings, titles, isSharedView } = useAppStore(
+    useShallow((s) => ({ outings: s.outings, titles: s.titles, isSharedView: s.isSharedView }))
+  )
+
+  // A single shared "now" tick for the whole section (not per-card timers) —
+  // countdown labels re-derive once a minute; completion itself is driven by
+  // the reconciler, never by this cosmetic tick (plan §4.5).
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const marqueeEntries = useMemo(
+    () => (isSharedView ? [] : computeMarqueeEntries(outings, titles, now)),
+    [isSharedView, outings, titles, now]
+  )
 
   const dismissFinished = useCallback((titleId: string) => {
     setFinished((f) => f.filter((c) => c.snapshot.title.id !== titleId))
@@ -296,10 +478,14 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const availableWatchlist = upcoming.filter((e) => !e.releaseDate)
   const comingSoon = upcoming.filter((e) => e.releaseDate)
   const hasLiveSection = shows.length > 0 || finishedToShow.length > 0
+  const hasMarquee = marqueeEntries.length > 0
 
-  const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0
+  // Scheduled tickets are content too (plan §4.5: "marquee counts toward the
+  // app's smart-landing check") — Up Next isn't "empty" just because nothing's
+  // mid-episode or on the watchlist yet.
+  const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee
 
-  const totalCards = shows.length + finishedToShow.length + availableWatchlist.length + comingSoon.length
+  const totalCards = shows.length + finishedToShow.length + marqueeEntries.length + availableWatchlist.length + comingSoon.length
   const delays = useMemo(() => staggerDelays(totalCards), [totalCards])
   let cardIndex = 0
 
@@ -319,9 +505,23 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {finishedToShow.map((c) => (
             <CaughtUpCard key={c.snapshot.title.id} snapshot={c.snapshot} undo={c.undo} onDismiss={dismissFinished} delayMs={delays[cardIndex++]} />
           ))}
-          {availableWatchlist.length > 0 && (
+          {hasMarquee && (
             <>
               {hasLiveSection && (
+                <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">On the Marquee</p>
+              )}
+              {marqueeEntries.map((entry) =>
+                entry.outing.status === 'completed' ? (
+                  <FreshFromLobbyCard key={entry.outing.id} entry={entry} delayMs={delays[cardIndex++]} />
+                ) : (
+                  <MarqueeCard key={entry.outing.id} entry={entry} delayMs={delays[cardIndex++]} />
+                )
+              )}
+            </>
+          )}
+          {availableWatchlist.length > 0 && (
+            <>
+              {(hasLiveSection || hasMarquee) && (
                 <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">On your watchlist</p>
               )}
               {availableWatchlist.map((entry) => (
@@ -331,7 +531,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           )}
           {comingSoon.length > 0 && (
             <>
-              {(hasLiveSection || availableWatchlist.length > 0) && (
+              {(hasLiveSection || hasMarquee || availableWatchlist.length > 0) && (
                 <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
               )}
               {comingSoon.map((entry) => (

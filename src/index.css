@@ -1156,6 +1156,22 @@
     background-position: -12px 16px;
   }
 }
+@keyframes now-showing-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+/* "NOW SHOWING" marquee chip (plan §4.5/§13) — the projector-beam amber, not a
+   generic spinner. Neutralized automatically by the global prefers-reduced-
+   motion block above (animation-iteration-count: 1, near-zero duration), so
+   reduced-motion users get a static chip with no extra branching here. */
+.marquee-now-showing {
+  animation: now-showing-pulse 1.8s ease-in-out infinite;
+}
 @keyframes flicker {
   0%,
   100% {

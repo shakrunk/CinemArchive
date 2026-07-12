@@ -4,12 +4,6 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-### KP-040: Improve the Bechdel test badge icon
-
-- **Description**: The Bechdel badge's Venus (♀) icon (from KP-029) reads as a generic gender symbol rather than the test itself. A more distinctive icon should communicate the test's actual criteria — two women talking to each other.
-- **Impacted Codebase**: [media-badges.tsx](file:///V:/repos/CinemArchive/src/components/ui/media-badges.tsx)
-- **Proposed Solution**: Replace the Venus glyph with a custom badge-sized icon (e.g. two figures in conversation) consistent with the badge set's visual weight.
-
 ### KP-041: Reword the Discover hero heading to fit the brand vibe
 
 - **Description**: The Discover page's search hero heading ("What's missing from your *archive?*") doesn't fully land the cinematic, projection-room brand voice used elsewhere.
@@ -47,6 +41,7 @@ This document tracks known issues, technical debt, and usability improvements fo
 | ID     | Issue                                                            | Resolution |
 | ------ | ---------------------------------------------------------------- | ---------- |
 | KP-039 | Verify invite-code redeemers appear as suggested friend connects | Stale note — already shipped as KP-026. Verified end to end: migration `20260710130000` is on `main` (applied by `db-migrate.yml`), `list_invite_connections()` covers both `invited_by_you`/`invited_you` lineage and excludes every existing friendship state, `handle_new_user()` guarantees the `profiles` join can't drop a redeemer, and the Friends tab renders "Suggested friends" with a one-tap request. No code change needed. |
+| KP-040 | Improve the Bechdel test badge icon                              | Replaced the Venus (♀) glyph with a bespoke `BechdelIcon` in [media-badges.tsx](file:///V:/repos/CinemArchive/src/components/ui/media-badges.tsx) — two figures under a conversation ellipsis, hand-drawn on Lucide's 24px stroke grid so it takes the same size/stroke/color as the stock badge icons. |
 
 ---
 

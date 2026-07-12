@@ -1,5 +1,5 @@
-import type { CSSProperties } from 'react'
-import { Venus, type LucideIcon } from 'lucide-react'
+import type { ComponentType, CSSProperties } from 'react'
+import type { LucideProps } from 'lucide-react'
 import type { MediaType } from 'src/store/mockData'
 import { SubsectionLabel } from 'src/components/ui/typography'
 
@@ -20,11 +20,40 @@ function entranceDelay(i: number, msPerItem: number): string {
   return `${i * msPerItem}ms`
 }
 
+// Two figures under a shared conversation ellipsis — the Bechdel test's actual
+// criteria (two women who talk to each other), where the previous Venus symbol
+// read as a generic gender marker (KP-040). Hand-drawn on Lucide's 24px stroke
+// grid so it takes the same className/strokeWidth/color the stock glyphs do.
+function BechdelIcon({ className, strokeWidth = 2, style, ...rest }: LucideProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={style}
+      aria-hidden={rest['aria-hidden']}
+    >
+      <path d="M8.5 4h.01" />
+      <path d="M12 3h.01" />
+      <path d="M15.5 4h.01" />
+      <circle cx="6.5" cy="11" r="3" />
+      <circle cx="17.5" cy="11" r="3" />
+      <path d="M2 21a4.5 4.5 0 0 1 9 0" />
+      <path d="M13 21a4.5 4.5 0 0 1 9 0" />
+    </svg>
+  )
+}
+
 interface Badge {
   key: string
   label: string
   /** Renders in place of the text label; `label` stays as the screen-reader name. */
-  icon?: LucideIcon
+  icon?: ComponentType<LucideProps>
   value: string
   color: string
   /** Box-shadow color on hover — a translucent variant of `color`. Plain hex
@@ -78,9 +107,7 @@ export function ReviewBadges({
   badges.push({
     key: 'bechdel',
     label: 'Bechdel test',
-    // ♀ — the Bechdel test measures women's representation; the Venus symbol
-    // reads at a glance where the old 'BDT' initialism needed decoding (KP-029).
-    icon: Venus,
+    icon: BechdelIcon,
     value: bechdelOutcome === 'pass' ? 'PASS' : bechdelOutcome === 'fail' ? (bechdelScore ?? 'FAIL') : '—',
     color: bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR,
     glowColor: withAlpha(bechdelOutcome === 'pass' ? '#4caf50' : bechdelOutcome === 'fail' ? '#e0524a' : NO_DATA_COLOR, '66'),

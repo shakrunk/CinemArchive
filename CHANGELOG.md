@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- The Bechdel test badge now uses a bespoke "two figures in conversation" icon
+  in place of the generic Venus (♀) symbol, matching the test's actual criteria.
+
 ## [1.3.0] - 2026-07-12
 
 ### Added

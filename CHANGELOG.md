@@ -9,6 +9,52 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-12
+
+### Added
+
+- Cinema Outings — "I've got tickets" scheduling: a form to log a booked cinema
+  trip (showtime, theater, companions, format, previews/runtime buffer, ticket
+  price, seat, booking ref) from the title drawer, Up Next watchlist cards, the
+  command palette, and right after adding a movie to the watchlist. The drawer
+  shows a scheduled-outing banner with Edit/Cancel, and saving offers an
+  out-of-app share snippet plus a downloadable `.ics` calendar event with a
+  2-hour reminder.
+- Cinema Outings — completion & follow-up: Up Next leads with an "On the
+  Marquee" section (countdown chips through a pulsing NOW SHOWING, add-to-
+  calendar, edit/cancel), a toast and bell notification land the moment a
+  showtime's ticket auto-completes, and a "Fresh from the lobby" card offers
+  the post-show sheet — star rating, a quick note, recommending the movie to
+  friends (companions annotated "was there with you"), or "Didn't make it" to
+  revert and reschedule. Movies with a scheduled outing get a 🎟 badge on the
+  library poster wall.
+- Cinema Outings — in-app plan sharing: "Share plans" from the marquee card,
+  drawer banner, or the schedule form's save confirmation opens a friend
+  picker that pushes a one-way snapshot (showtime, venue, format, seat — never
+  the booking ref) to an accepted friend's bell inbox, alongside the existing
+  out-of-app copy/share snippet and `.ics`. The recipient's notification offers
+  "I've got tickets too" (adds the title to their watchlist if needed, then
+  opens their own prefilled ticket form) and "Add to calendar".
+- Cinema Outings — timeline & viewing editor: the drawer's viewing timeline
+  renders a perforated-edge ticket-stub line ("at AMC Georgetown · with Alex &
+  Sam · IMAX") wherever a viewing has a venue or companions, degrading
+  gracefully when only one is present. Every viewing — auto-logged or manually
+  entered — now has an inline editor for its date, rating, notes, theater, and
+  companions (same chip/autocomplete affordances as the ticket form), and the
+  manual "Log a viewing" form gained the same theater/companions fields so
+  home viewings can record company too. A completed outing's receipt fields
+  (format, ticket price, seat, booking ref) stay editable from that same
+  editor even after its showtime is frozen. Deleting an outing's auto-logged
+  viewing from the timeline now leaves the outing completed and closes out
+  its pending "how was it?" follow-up.
+- Cinema Outings — "At the Movies" Ledger panel: an opt-in board widget
+  totaling cinema trips (lifetime and this year, with a per-year strip),
+  your favorite theater and venue breakdown, most frequent companion, format
+  chips (IMAX/3D/…), and a "spent at the movies" sum in your locale's
+  currency (hidden until a ticket price is logged). Companion chips
+  throughout the feature now show initials for everyone, not just linked
+  friends.
+
 ## [1.2.0] - 2026-07-11
 
 ### Added

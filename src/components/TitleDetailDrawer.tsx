@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useId } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
@@ -22,13 +22,18 @@ import {
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send, Ticket, Clapperboard,
+  Pencil, MapPin, Users,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
-import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
+import { formatCompanions, findPendingFollowUpOuting, companionSuggestions, venueSuggestions } from 'src/store/outings'
+import { CINEMA_FORMATS, type Title, type Viewing, type WatchStatus, type Season, type Episode, type CastMember, type CrewMember, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, fetchCollectionParts, TMDB_STILL_BASE, type TitleVideo, type WatchProviders, type SearchResult } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
+import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
+import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
+import { CompanionInput } from 'src/components/OutingScheduleSheet'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
@@ -79,18 +84,300 @@ function viewingTime(v: Viewing): number {
   return v.date ? new Date(v.date).getTime() : -Infinity
 }
 
+// Venue + companions fields — shared by the log-viewing form and the
+// per-viewing editor (plan §4.6/§7.4): the same chip-input/autocomplete
+// affordances as OutingScheduleSheet's ticket form, driven by the same
+// src/store/outings.ts suggestion helpers, so "your usual theater" and
+// "who you usually go with" complete the same way everywhere.
+function VenueCompanionsFields({
+  venue,
+  onVenueChange,
+  companions,
+  onCompanionsChange,
+}: {
+  venue: string
+  onVenueChange: (venue: string) => void
+  companions: Companion[]
+  onCompanionsChange: (companions: Companion[]) => void
+}) {
+  const outings = useAppStore((s) => s.outings)
+  const allViewings = useAppStore((s) => s.titles.flatMap((t) => t.viewings))
+  const [friends, setFriends] = useState<FriendshipView[]>([])
+  const datalistId = useId()
+
+  useEffect(() => {
+    // Deferred to satisfy react-hooks/set-state-in-effect (same pattern as
+    // OutingScheduleSheet's friend fetch).
+    const t = setTimeout(() => {
+      listFriendships()
+        .then((list) => setFriends(list.filter((f) => f.status === 'accepted')))
+        .catch((err) => console.error('Failed to load friends for viewing companions:', err))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  const suggestions = useMemo(
+    () => companionSuggestions(outings, allViewings, friends),
+    [outings, allViewings, friends]
+  )
+  const venues = useMemo(() => venueSuggestions(outings, allViewings), [outings, allViewings])
+
+  return (
+    <>
+      <div>
+        <label className="flex items-center gap-1 font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          <MapPin className="w-3 h-3" />
+          Theater
+        </label>
+        <Input
+          list={datalistId}
+          value={venue}
+          onChange={(e) => onVenueChange(e.target.value)}
+          placeholder="e.g. AMC Georgetown"
+          className="bg-secondary/50 border-border"
+        />
+        <datalist id={datalistId}>
+          {venues.map((v) => <option key={v} value={v} />)}
+        </datalist>
+      </div>
+      <div>
+        <p className="flex items-center gap-1 font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          <Users className="w-3 h-3" />
+          Companions
+        </p>
+        <CompanionInput companions={companions} onChange={onCompanionsChange} suggestions={suggestions} />
+      </div>
+    </>
+  )
+}
+
+// Ticket stub line (plan §4.6/§7.4/§13): "at AMC Georgetown · with Alex &
+// Sam · IMAX" — format comes from the linked outing (viewings don't carry
+// their own format column), so a manually-logged viewing degrades to just
+// venue/companions. Degrades further to nothing when neither is present.
+function TicketStubLine({ viewing, outing }: { viewing: Viewing; outing: CinemaOuting | undefined }) {
+  const companionLabel = formatCompanions(viewing.companions ?? [])
+  const segments = [
+    viewing.venue && `at ${viewing.venue}`,
+    companionLabel && `with ${companionLabel}`,
+    outing?.format,
+  ].filter((s): s is string => Boolean(s))
+  if (segments.length === 0) return null
+
+  return (
+    <div className="flex items-center gap-2 mt-1.5">
+      <span className="ticket-perforation" aria-hidden="true" />
+      <span className="font-mono text-xs text-amber/80">{segments.join(' · ')}</span>
+    </div>
+  )
+}
+
+// Per-viewing editor (plan §4.6/§7.4): venue/companions/rating/notes are
+// editable on ANY viewing, not just outing-completed ones. When the viewing
+// is linked to an outing, a "Ticket details" section also surfaces that
+// outing's receipt fields (format/price/seat/booking ref) — those stay
+// editable after completion even though the outing's timing fields are
+// frozen (rule §5.5); this editor is where that post-completion editing
+// happens, not the schedule sheet.
+function ViewingEditForm({
+  title,
+  viewing,
+  outing,
+  onClose,
+}: {
+  title: Title
+  viewing: Viewing
+  outing: CinemaOuting | undefined
+  onClose: () => void
+}) {
+  const updateTitle = useAppStore((s) => s.updateTitle)
+  const updateOuting = useAppStore((s) => s.updateOuting)
+
+  const [prePlatform, setPrePlatform] = useState(!viewing.date)
+  const [date, setDate] = useState(viewing.date ?? new Date().toISOString().slice(0, 10))
+  const [rating, setRating] = useState(viewing.rating ?? 0)
+  const [notes, setNotes] = useState(viewing.notes ?? '')
+  const [venue, setVenue] = useState(viewing.venue ?? '')
+  const [companions, setCompanions] = useState<Companion[]>(viewing.companions ?? [])
+
+  const [format, setFormat] = useState<CinemaFormat | ''>(outing?.format ?? '')
+  const [ticketPrice, setTicketPrice] = useState(outing?.ticketPrice != null ? String(outing.ticketPrice) : '')
+  const [seat, setSeat] = useState(outing?.seat ?? '')
+  const [bookingRef, setBookingRef] = useState(outing?.bookingRef ?? '')
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    const nextViewings = title.viewings.map((v) =>
+      v.id === viewing.id
+        ? {
+            ...v,
+            date: prePlatform ? undefined : date,
+            rating: rating > 0 ? rating : undefined,
+            notes: notes.trim() || undefined,
+            venue: venue.trim() || undefined,
+            companions: companions.length > 0 ? companions : undefined,
+          }
+        : v
+    )
+    updateTitle(title.id, {
+      viewings: nextViewings,
+      ...(rating > 0 ? { rating } : {}),
+    })
+    if (outing) {
+      updateOuting(outing.id, {
+        format: format || undefined,
+        ticketPrice: ticketPrice.trim() ? Number(ticketPrice) : undefined,
+        seat: seat.trim() || undefined,
+        bookingRef: bookingRef.trim() || undefined,
+      })
+    }
+    onClose()
+  }
+
+  return (
+    <form onSubmit={handleSave} className="mt-3 space-y-3 border-t pt-3" style={{ borderColor: 'var(--line)' }}>
+      <div>
+        {!prePlatform && (
+          <Input
+            type="date"
+            aria-label="Date watched"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="bg-secondary/50 border-border font-mono"
+          />
+        )}
+        <label className="flex items-center gap-2 cursor-pointer mt-2">
+          <input
+            type="checkbox"
+            checked={prePlatform}
+            onChange={(e) => setPrePlatform(e.target.checked)}
+            className="accent-amber w-3.5 h-3.5"
+          />
+          <span className="font-sans text-xs text-muted-foreground">
+            Watched before joining CinemArchive (no date)
+          </span>
+        </label>
+      </div>
+
+      <div>
+        <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Rating</p>
+        <StarRating value={rating} onChange={setRating} size="md" />
+      </div>
+
+      <VenueCompanionsFields
+        venue={venue}
+        onVenueChange={setVenue}
+        companions={companions}
+        onCompanionsChange={setCompanions}
+      />
+
+      <div>
+        <label htmlFor="viewing-edit-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <FileText className="inline w-3 h-3 mr-1" />
+          Notes
+        </label>
+        <textarea
+          id="viewing-edit-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+        />
+      </div>
+
+      {outing && (
+        <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}>
+          <p className="font-mono uppercase tracking-widest" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+            Ticket details
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {CINEMA_FORMATS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFormat(format === f ? '' : f)}
+                className={cn(
+                  'px-2.5 py-1 rounded-md text-xs font-sans border transition-all',
+                  format === f
+                    ? 'bg-amber/20 border-amber/50 text-amber'
+                    : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="viewing-edit-price" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+                Ticket price
+              </label>
+              <Input
+                id="viewing-edit-price"
+                type="number"
+                min={0}
+                step={0.01}
+                value={ticketPrice}
+                onChange={(e) => setTicketPrice(e.target.value)}
+                placeholder="0.00"
+                className="bg-secondary/50 border-border font-mono"
+              />
+            </div>
+            <div>
+              <label htmlFor="viewing-edit-seat" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+                Seat
+              </label>
+              <Input
+                id="viewing-edit-seat"
+                value={seat}
+                onChange={(e) => setSeat(e.target.value)}
+                placeholder="H12"
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="viewing-edit-booking-ref" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+              Booking ref
+            </label>
+            <Input
+              id="viewing-edit-booking-ref"
+              value={bookingRef}
+              onChange={(e) => setBookingRef(e.target.value)}
+              placeholder="AMC-4X9KQ2"
+              className="bg-secondary/50 border-border font-mono"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button type="submit" className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium">
+          Save changes
+        </Button>
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 function ViewingTimeline({
-  viewings,
+  title,
   onDeleteViewing,
   onLogViewing,
   isSharedView,
 }: {
-  viewings: Viewing[]
+  title: Title
   onDeleteViewing?: (viewingId: string) => void
   onLogViewing?: () => void
   isSharedView?: boolean
 }) {
+  const viewings = title.viewings
+  const outings = useAppStore((s) => s.outings)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   if (viewings.length === 0) {
     return (
       <div className="text-center py-6 text-muted-foreground text-sm font-sans flex flex-col items-center gap-3">
@@ -118,6 +405,7 @@ function ViewingTimeline({
           .sort((a, b) => viewingTime(b) - viewingTime(a))
           .map((v) => {
             const formattedDate = v.date ? fmtDate(v.date) : 'Before CinemArchive'
+            const outing = v.outingId ? outings.find((o) => o.id === v.outingId) : undefined
             return (
             <div key={v.id} className="relative">
               <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />
@@ -161,6 +449,18 @@ function ViewingTimeline({
                         {v.rating && (
                           <span className="font-mono text-xs text-amber">★ {v.rating}</span>
                         )}
+                        {!isSharedView && (
+                          <button
+                            onClick={() => setEditingId(editingId === v.id ? null : v.id)}
+                            style={{ color: 'var(--paper-faint)', opacity: 0.45 }}
+                            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.45')}
+                            aria-label={`Edit viewing from ${formattedDate}`}
+                            aria-expanded={editingId === v.id}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
                         {!isSharedView && onDeleteViewing && (
                           <button
                             onClick={() => setPendingDeleteId(v.id)}
@@ -174,10 +474,19 @@ function ViewingTimeline({
                         )}
                       </div>
                     </div>
+                    <TicketStubLine viewing={v} outing={outing} />
                     {v.notes && (
-                      <p className="text-xs text-muted-foreground font-sans italic leading-relaxed">
+                      <p className="text-xs text-muted-foreground font-sans italic leading-relaxed mt-1.5">
                         "{v.notes}"
                       </p>
+                    )}
+                    {editingId === v.id && (
+                      <ViewingEditForm
+                        title={title}
+                        viewing={v}
+                        outing={outing}
+                        onClose={() => setEditingId(null)}
+                      />
                     )}
                   </>
                 )}
@@ -1108,11 +1417,101 @@ function FranchiseSection({
   )
 }
 
+// ─── Cinema Outings — scheduled banner (plan §4.6) ───────────────────────────
+
+function OutingBanner({ title }: { title: Title }) {
+  const outing = useAppStore((s) => s.outings.find((o) => o.titleId === title.id && o.status === 'scheduled'))
+  // Follow-up ("how was it?") banner (plan §4.6) — only surfaced when there's
+  // no scheduled outing to show instead; a rewatch mid-follow-up is a rare
+  // enough overlap that the scheduled banner simply takes priority.
+  const pendingFollowUp = useAppStore((s) =>
+    outing ? null : findPendingFollowUpOuting(s.outings, title.id, new Date())
+  )
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
+  const cancelOuting = useAppStore((s) => s.cancelOuting)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [sharePanelOpen, setSharePanelOpen] = useState(false)
+
+  if (!outing && pendingFollowUp) {
+    return (
+      <div className="px-4 sm:px-6 pt-4">
+        <button
+          onClick={() => openPostShowSheet(pendingFollowUp.id)}
+          className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left"
+        >
+          <Clapperboard className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
+          <span className="font-mono text-xs text-amber">{title.title} just let out — how was it?</span>
+        </button>
+      </div>
+    )
+  }
+
+  if (!outing) return null
+
+  const showtime = new Date(outing.showtime)
+  const now = new Date().getTime()
+  const nowShowing = now >= showtime.getTime() && now < new Date(outing.endsAt).getTime()
+  const dateLabel = showtime.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  const timeLabel = showtime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const companionLabel = formatCompanions(outing.companions)
+  const summary = [nowShowing ? 'NOW SHOWING' : `${dateLabel} · ${timeLabel}`, outing.venue, companionLabel && `with ${companionLabel}`]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <div className="px-4 sm:px-6 pt-4">
+      <div
+        className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06]"
+        aria-label={`Scheduled cinema outing: ${summary}`}
+      >
+        <Ticket className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
+        <span className="font-mono text-xs text-amber">{summary}</span>
+        {confirmingCancel ? (
+          <span className="flex items-center gap-2 ml-auto">
+            <span className="font-mono text-xs text-muted-foreground">Cancel these tickets?</span>
+            <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }}>
+              Yes
+            </button>
+            <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors">
+              No
+            </button>
+          </span>
+        ) : (
+          <span className="flex items-center gap-3 ml-auto">
+            <button
+              onClick={() => setSharePanelOpen(true)}
+              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+            >
+              Share
+            </button>
+            <button
+              onClick={() => openOutingSchedule(title.id, outing.id)}
+              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setConfirmingCancel(true)}
+              className="font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
+            >
+              Cancel
+            </button>
+          </span>
+        )}
+      </div>
+      {sharePanelOpen && (
+        <ShareOutingPanel outing={outing} title={title} onClose={() => setSharePanelOpen(false)} />
+      )}
+    </div>
+  )
+}
+
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, viewerContext } = useAppStore(
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, viewerContext, openOutingSchedule } = useAppStore(
     useShallow((s) => ({
       isDetailDrawerOpen: s.isDetailDrawerOpen,
       closeDetailDrawer: s.closeDetailDrawer,
@@ -1122,6 +1521,7 @@ export function TitleDetailDrawer() {
       openRefreshMetadata: s.openRefreshMetadata,
       isSharedView: s.isSharedView,
       viewerContext: s.viewerContext,
+      openOutingSchedule: s.openOutingSchedule,
     }))
   )
   const browseByStudio = useAppStore((s) => s.browseByStudio)
@@ -1246,6 +1646,10 @@ export function TitleDetailDrawer() {
   const [logPrePlatform, setLogPrePlatform] = useState(false)
   const [logRating, setLogRating] = useState(0)
   const [logNotes, setLogNotes] = useState('')
+  // Home viewings can record company too (plan §4.6) — the generalized
+  // payoff of putting venue/companions on `viewings` rather than only outings.
+  const [logVenue, setLogVenue] = useState('')
+  const [logCompanions, setLogCompanions] = useState<Companion[]>([])
   const [showMovieSaved, setShowMovieSaved] = useState(false)
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
@@ -1466,6 +1870,8 @@ export function TitleDetailDrawer() {
       date: logPrePlatform ? undefined : logDate,
       rating: logRating > 0 ? logRating : undefined,
       notes: logNotes || undefined,
+      venue: logVenue.trim() || undefined,
+      companions: logCompanions.length > 0 ? logCompanions : undefined,
     }
     updateTitle(title.id, {
       viewings: [...title.viewings, viewing],
@@ -1480,6 +1886,8 @@ export function TitleDetailDrawer() {
       setLogPrePlatform(false)
       setLogRating(0)
       setLogNotes('')
+      setLogVenue('')
+      setLogCompanions([])
     }, 1500)
   }
 
@@ -1717,6 +2125,8 @@ export function TitleDetailDrawer() {
           </div>
         )}
 
+        {!isSharedView && title.type === 'movie' && <OutingBanner title={title} />}
+
         {/* Scrollable body */}
         <div className="px-4 sm:px-6 pb-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-8 lg:items-start">
           {/* Each column owns its vertical flow, so a tall sidebar never creates
@@ -1797,13 +2207,24 @@ export function TitleDetailDrawer() {
                 title="Viewing History"
                 className="lg:col-start-1"
                 action={!showLogForm && !isSharedView ? (
-                    <button
-                      onClick={() => setShowLogForm(true)}
-                      className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Log a viewing
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {(title.status === 'watchlist' || title.status === 'watching') && (
+                        <button
+                          onClick={() => openOutingSchedule(title.id)}
+                          className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                        >
+                          <Ticket className="w-3.5 h-3.5" />
+                          I've got tickets
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowLogForm(true)}
+                        className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Log a viewing
+                      </button>
+                    </div>
                 ) : undefined}
               >
 
@@ -1842,6 +2263,12 @@ export function TitleDetailDrawer() {
                       </p>
                       <StarRating value={logRating} onChange={setLogRating} size="md" />
                     </div>
+                    <VenueCompanionsFields
+                      venue={logVenue}
+                      onVenueChange={setLogVenue}
+                      companions={logCompanions}
+                      onCompanionsChange={setLogCompanions}
+                    />
                     <div>
                       <label htmlFor="viewing-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
                         <FileText className="inline w-3 h-3 mr-1" />
@@ -1882,7 +2309,7 @@ export function TitleDetailDrawer() {
                 )}
 
                 <ViewingTimeline
-                  viewings={title.viewings}
+                  title={title}
                   isSharedView={isSharedView}
                   onDeleteViewing={(viewingId) => removeViewing(title.id, viewingId)}
                   onLogViewing={() => setShowLogForm(true)}
@@ -1944,6 +2371,15 @@ export function TitleDetailDrawer() {
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
                   </button>
+                  {title.type === 'movie' && (title.status === 'watched' || title.status === 'dropped') && (
+                    <button
+                      onClick={() => openOutingSchedule(title.id)}
+                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    >
+                      <Ticket className="w-3.5 h-3.5" />
+                      Plan a cinema trip
+                    </button>
+                  )}
                   {user && (
                     <button
                       onClick={() => setSendPanelOpen(true)}

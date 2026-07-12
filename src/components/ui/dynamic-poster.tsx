@@ -11,6 +11,10 @@ interface DynamicPosterProps {
   rich?: boolean
   /** Hide the top-row category (Series/Film) + status badges — for contexts where they're redundant. */
   hideBadges?: boolean
+  /** Amber ticket corner badge for a movie with a scheduled cinema outing
+   *  (plan §4.6) — the library poster wall's "tickets are visible at a
+   *  glance" affordance. Clears the moment the outing completes/cancels. */
+  hasScheduledOuting?: boolean
 }
 
 /* Moody, cinematic tints keyed off the title — never neon. */
@@ -66,7 +70,7 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export function DynamicPoster({ title, className, style, onClick, rich = false, hideBadges = false }: DynamicPosterProps) {
+export function DynamicPoster({ title, className, style, onClick, rich = false, hideBadges = false, hasScheduledOuting = false }: DynamicPosterProps) {
   const hasImage = Boolean(title.posterUrl)
   const tint = useMemo(() => TINTS[hashString(title.title) % TINTS.length], [title.title])
   const badge = STATUS_BADGE[title.status]
@@ -91,6 +95,16 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
     >
       {hasImage && (
         <img className="poster__img" src={title.posterUrl} alt={title.title} loading="lazy" />
+      )}
+
+      {hasScheduledOuting && (
+        <span
+          role="img"
+          aria-label="Tickets booked for this movie"
+          className="absolute top-2 left-2 z-[3] w-6 h-6 rounded-full flex items-center justify-center text-[13px] bg-black/60 backdrop-blur-sm border border-amber/40 shadow-sm"
+        >
+          🎟
+        </span>
       )}
 
       <div className="poster__face">

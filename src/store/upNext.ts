@@ -1,4 +1,4 @@
-import type { Title, Season, Episode } from './mockData'
+import type { CinemaOuting, Title, Season, Episode } from './mockData'
 import { nextUnwatchedEpisode, totalEpisodesWatched, totalEpisodeCount, allWatchEvents } from './episodeUtils'
 
 export interface UpNextEntry {
@@ -29,9 +29,14 @@ function lastWatchedAtForTitle(title: Title): string | null {
 
 /** All watchlist movies/tv — not just unreleased ones. Already-released (or
  *  undated) titles are actionable now, so they lead, sorted most-recently-added
- *  first; titles with a future releaseDate follow, sorted soonest first. */
-export function computeUpcomingTitles(titles: Title[], today: string): UpcomingEntry[] {
-  const watchlist = titles.filter((t) => t.status === 'watchlist')
+ *  first; titles with a future releaseDate follow, sorted soonest first.
+ *  Titles with a scheduled cinema outing are excluded — they render on the
+ *  marquee instead of the watchlist section (plan §7.2). */
+export function computeUpcomingTitles(titles: Title[], today: string, outings: CinemaOuting[] = []): UpcomingEntry[] {
+  const scheduledTitleIds = new Set(
+    outings.filter((o) => o.status === 'scheduled').map((o) => o.titleId)
+  )
+  const watchlist = titles.filter((t) => t.status === 'watchlist' && !scheduledTitleIds.has(t.id))
 
   const available = watchlist
     .filter((t) => !t.releaseDate || t.releaseDate <= today)

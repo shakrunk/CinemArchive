@@ -24,6 +24,7 @@ import { PremieresRevivals } from './panels/PremieresRevivals'
 import { TheRevivalHouse } from './panels/TheRevivalHouse'
 import { StillRolling } from './panels/StillRolling'
 import { ComingAttractions } from './panels/ComingAttractions'
+import { AtTheMovies } from './panels/AtTheMovies'
 
 export interface PanelProps {
   className?: string
@@ -57,6 +58,7 @@ export const PANEL_REGISTRY: Record<LedgerPanelId, { Component: React.ComponentT
   timewarp: { Component: memo(TheRevivalHouse) },
   progress: { Component: memo(StillRolling) },
   attractions: { Component: memo(ComingAttractions) },
+  moviegoing: { Component: memo(AtTheMovies) },
 }
 
 // Grid column span per width preset — panels are always full-width below `lg`.

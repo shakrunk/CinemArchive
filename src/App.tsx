@@ -10,12 +10,15 @@ import { Profile } from 'src/views/Profile'
 import { Friends } from 'src/views/Friends'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
+import { OutingScheduleSheet } from 'src/components/OutingScheduleSheet'
+import { PostShowSheet } from 'src/components/PostShowSheet'
 import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
+import { useOutingReconciler } from 'src/lib/useOutingReconciler'
 import { applyTheme, toggleTheme } from 'src/lib/theme'
 import { AppCommandPalette } from 'src/components/AppCommandPalette'
 import { KeyboardShortcutsHelp } from 'src/components/KeyboardShortcutsHelp'
@@ -30,6 +33,7 @@ export default function App() {
   })
 
   useNavigationSync({ currentView, setCurrentView })
+  useOutingReconciler()
 
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   // Start true when Supabase isn't configured (no auth needed) so we never
@@ -235,6 +239,8 @@ export default function App() {
           <AddTitleWorkflow />
           <TitleDetailDrawer />
           <RefreshMetadataModal />
+          <OutingScheduleSheet />
+          <PostShowSheet />
         </>
       )}
       <AppCommandPalette onNavigate={setCurrentView} />

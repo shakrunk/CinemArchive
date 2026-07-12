@@ -30,7 +30,7 @@ import {
   type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
-import { insertTitleToDb } from 'src/lib/db'
+import { insertTitleToDb, insertOutingToDb } from 'src/lib/db'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
@@ -1034,15 +1034,15 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
 // ─── Data & portability ───────────────────────────────────────────────────────
 
 function DataSection() {
-  const { user, titles, setTitles } = useAppStore(
-    useShallow((s) => ({ user: s.user, titles: s.titles, setTitles: s.setTitles }))
+  const { user, titles, setTitles, outings, setOutings } = useAppStore(
+    useShallow((s) => ({ user: s.user, titles: s.titles, setTitles: s.setTitles, outings: s.outings, setOutings: s.setOutings }))
   )
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleExport() {
-    exportLibrary(titles)
+    exportLibrary(titles, outings)
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1053,14 +1053,24 @@ function DataSection() {
     setImporting(true)
     setMessage(null)
     try {
-      const imported = await parseImportFile(file)
+      const { titles: imported, outings: importedOutings } = await parseImportFile(file)
       const existingKeys = new Set(titles.map((t) => `${t.tmdbId}:${t.type}`))
       const newTitles = imported.filter((t) => !existingKeys.has(`${t.tmdbId}:${t.type}`))
       const skipped = imported.length - newTitles.length
 
       if (newTitles.length > 0) {
         setTitles([...newTitles, ...titles])
+        // Only outings belonging to a title that actually got imported (not
+        // skipped as a duplicate) are kept — matches the newTitles filtering
+        // above and rule §5.13's outing⇄viewing link scope.
+        const newTitleIds = new Set(newTitles.map((t) => t.id))
+        const outingsToInsert = importedOutings.filter((o) => newTitleIds.has(o.titleId))
+        if (outingsToInsert.length > 0) setOutings([...outingsToInsert, ...outings])
         if (user) {
+          // Outings first: a kept title's viewings may carry an outing_id
+          // back-reference, which needs its cinema_outings row to already
+          // exist before insertTitleToDb writes them (rule §5.13).
+          await Promise.all(outingsToInsert.map((o) => insertOutingToDb(user.id, o)))
           await Promise.all(newTitles.map((t) => insertTitleToDb(user.id, t)))
         }
       }

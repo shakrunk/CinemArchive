@@ -1,6 +1,16 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from './auth'
-import type { CastMember, CrewMember, EpisodeCrew, Title, WatchStatus, MediaType } from '../store/mockData'
+import type {
+  CastMember,
+  CinemaOuting,
+  CrewMember,
+  EpisodeCrew,
+  OutingStatus,
+  Title,
+  Viewing,
+  WatchStatus,
+  MediaType,
+} from '../store/mockData'
 import { normalizeLedgerWidgets, type LedgerWidget } from './ledgerPanels'
 
 // Throws (after logging) when a Supabase call reports an error — the same
@@ -18,6 +28,42 @@ function unwrap(error: PostgrestError | null, message: string): void {
 // platform" and orders before any dated watch.
 function watchTime(date: string | null | undefined): number {
   return date ? new Date(date).getTime() : -Infinity
+}
+
+export function mapDbViewingToLocal(row: any): Viewing {
+  return {
+    id: row.id,
+    titleId: row.title_id,
+    date: row.viewed_at || undefined,
+    rating: row.rating ? parseFloat(row.rating) : undefined,
+    notes: row.notes || undefined,
+    venue: row.venue || undefined,
+    companions: Array.isArray(row.companions) && row.companions.length > 0 ? row.companions : undefined,
+    outingId: row.outing_id || undefined,
+  }
+}
+
+export function mapDbOutingToLocal(row: any): CinemaOuting {
+  return {
+    id: row.id,
+    titleId: row.title_id,
+    showtime: row.showtime,
+    previewsMinutes: row.previews_minutes,
+    runtimeMinutes: row.runtime_minutes,
+    endsAt: row.ends_at,
+    venue: row.venue || undefined,
+    companions: Array.isArray(row.companions) ? row.companions : [],
+    format: row.format || undefined,
+    ticketPrice: row.ticket_price != null ? parseFloat(row.ticket_price) : undefined,
+    seat: row.seat || undefined,
+    bookingRef: row.booking_ref || undefined,
+    notes: row.notes || undefined,
+    status: row.status as OutingStatus,
+    previousStatus: row.previous_status || undefined,
+    completedViewingId: row.completed_viewing_id || undefined,
+    followUpDismissedAt: row.follow_up_dismissed_at || undefined,
+    createdAt: row.created_at,
+  }
 }
 
 function mapDbTitleToLocal(row: any): Title {
@@ -157,13 +203,7 @@ function mapDbTitleToLocal(row: any): Title {
       })
       .sort((a: any, b: any) => a.seasonNumber - b.seasonNumber),
     viewings: (row.viewings || [])
-      .map((v: any) => ({
-        id: v.id,
-        titleId: v.title_id,
-        date: v.viewed_at || undefined,
-        rating: v.rating ? parseFloat(v.rating) : undefined,
-        notes: v.notes || undefined,
-      }))
+      .map(mapDbViewingToLocal)
       // undated (pre-platform) viewings sort as oldest → end of the desc list
       .sort((a: any, b: any) => watchTime(b.date) - watchTime(a.date)),
   }
@@ -191,17 +231,23 @@ const TITLE_SELECT = `
   )
 `
 
-export async function fetchUserLibrary(userId: string): Promise<Title[]> {
-  if (!supabase) return []
+// Cinema outings are owner-private (rule §9) — folded into the owner's own
+// library fetch only, never into fetchSharedLibrary/fetchFriendLibrary below.
+export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[] }> {
+  if (!supabase) return { titles: [], outings: [] }
 
-  const { data, error } = await supabase
-    .from('titles')
-    .select(TITLE_SELECT)
-    .eq('user_id', userId)
+  const [{ data, error }, { data: outingRows, error: outingsError }] = await Promise.all([
+    supabase.from('titles').select(TITLE_SELECT).eq('user_id', userId),
+    supabase.from('cinema_outings').select('*').eq('user_id', userId),
+  ])
 
   unwrap(error, 'Error fetching user library:')
+  unwrap(outingsError, 'Error fetching cinema outings:')
 
-  return (data || []).map(mapDbTitleToLocal)
+  return {
+    titles: (data || []).map(mapDbTitleToLocal),
+    outings: (outingRows || []).map(mapDbOutingToLocal),
+  }
 }
 
 /** Shared-token view returns the titles plus the owner's user id (looked up
@@ -490,6 +536,8 @@ export type NotificationType =
   | 'comment_received'
   | 'reaction_received'
   | 'invite_redeemed'
+  | 'outing_completed'
+  | 'outing_plans_shared'
 
 export interface AppNotificationItem {
   id: string
@@ -648,6 +696,9 @@ export async function insertTitleToDb(userId: string, title: Title): Promise<voi
         viewed_at: v.date ?? null,
         rating: v.rating,
         notes: v.notes,
+        venue: v.venue ?? null,
+        companions: v.companions ?? [],
+        outing_id: v.outingId ?? null,
       }))
     )
     unwrap(viewingsError, 'Error inserting viewings:')
@@ -819,6 +870,9 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
         viewed_at: v.date ?? null,
         rating: v.rating,
         notes: v.notes,
+        venue: v.venue ?? null,
+        companions: v.companions ?? [],
+        outing_id: v.outingId ?? null,
       }))
     )
 
@@ -1133,6 +1187,123 @@ export async function deleteEpisodeWatchEventFromDb(userId: string, watchEventId
     .eq('id', watchEventId)
     .eq('user_id', userId)
   unwrap(error, 'Error deleting episode watch event:')
+}
+
+// ─── Cinema Outings ("I've got tickets") ─────────────────────────────────────
+
+export async function insertOutingToDb(userId: string, outing: CinemaOuting): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('cinema_outings').insert({
+    id: outing.id,
+    user_id: userId,
+    title_id: outing.titleId,
+    showtime: outing.showtime,
+    previews_minutes: outing.previewsMinutes,
+    runtime_minutes: outing.runtimeMinutes,
+    ends_at: outing.endsAt,
+    venue: outing.venue ?? null,
+    companions: outing.companions ?? [],
+    format: outing.format ?? null,
+    ticket_price: outing.ticketPrice ?? null,
+    seat: outing.seat ?? null,
+    booking_ref: outing.bookingRef ?? null,
+    notes: outing.notes ?? null,
+    status: outing.status,
+  })
+  unwrap(error, 'Error inserting cinema outing:')
+}
+
+// Columns an outing edit/reschedule/completion may touch. Presence in the
+// patch (even when undefined) writes the column, mirroring META_COLUMNS above.
+const OUTING_COLUMNS: Array<[keyof CinemaOuting, string]> = [
+  ['showtime', 'showtime'],
+  ['previewsMinutes', 'previews_minutes'],
+  ['runtimeMinutes', 'runtime_minutes'],
+  ['endsAt', 'ends_at'],
+  ['venue', 'venue'],
+  ['companions', 'companions'],
+  ['format', 'format'],
+  ['ticketPrice', 'ticket_price'],
+  ['seat', 'seat'],
+  ['bookingRef', 'booking_ref'],
+  ['notes', 'notes'],
+  ['status', 'status'],
+  ['previousStatus', 'previous_status'],
+  ['completedViewingId', 'completed_viewing_id'],
+  ['followUpDismissedAt', 'follow_up_dismissed_at'],
+]
+
+export async function updateOutingInDb(userId: string, outingId: string, patch: Partial<CinemaOuting>): Promise<void> {
+  if (!supabase) return
+
+  const mappedPatch: any = {}
+  for (const [field, column] of OUTING_COLUMNS) {
+    if (field in patch) mappedPatch[column] = patch[field] ?? null
+  }
+  if (Object.keys(mappedPatch).length === 0) return
+
+  const { error } = await supabase
+    .from('cinema_outings')
+    .update(mappedPatch)
+    .eq('id', outingId)
+    .eq('user_id', userId)
+
+  unwrap(error, 'Error updating cinema outing:')
+}
+
+// Hard delete — used when the user removes a cancelled/stale outing row
+// entirely, distinct from the soft "cancelled" status (rule §4.2) reached via
+// updateOutingInDb({ status: 'cancelled' }).
+export async function deleteOutingFromDb(userId: string, outingId: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('cinema_outings')
+    .delete()
+    .eq('id', outingId)
+    .eq('user_id', userId)
+  unwrap(error, 'Error deleting cinema outing:')
+}
+
+export interface OutingCompletionResult {
+  outingId: string
+  titleId: string
+  viewingId: string
+  newTitleStatus: WatchStatus
+  previousStatus: WatchStatus | null
+}
+
+function mapDbOutingCompletionToLocal(row: any): OutingCompletionResult {
+  return {
+    outingId: row.outing_id,
+    titleId: row.title_id,
+    viewingId: row.viewing_id,
+    newTitleStatus: row.new_title_status,
+    previousStatus: row.previous_status ?? null,
+  }
+}
+
+// The single choke point for auto-completion (plan §4.3/§6.4) — called on
+// load/focus/online/timer by the reconciler. p_tz is the client's IANA zone
+// (validated server-side against pg_timezone_names, falling back to UTC);
+// only the viewing's calendar date needs it, since showtime/endsAt are
+// already absolute instants.
+export async function completeDueOutings(tz: string): Promise<OutingCompletionResult[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('complete_due_outings', { p_tz: tz })
+  unwrap(error, 'Error completing due outings:')
+  return (data || []).map(mapDbOutingCompletionToLocal)
+}
+
+// One-way plan-sharing snapshot (plan §4.10) — pushes a copy of the outing's
+// details into each recipient's inbox; never a read grant on the outing
+// itself. Requires accepted friendship, enforced by the RPC, not the client.
+export async function shareOutingPlans(outingId: string, recipientIds: string[]): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.rpc('share_outing_plans', {
+    p_outing_id: outingId,
+    p_recipient_ids: recipientIds,
+  })
+  unwrap(error, 'Error sharing outing plans:')
 }
 
 // ─── User Title Pins ──────────────────────────────────────────────────────────

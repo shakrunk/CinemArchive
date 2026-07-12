@@ -295,6 +295,15 @@ function LibraryEmptyState() {
 
 function PosterWall({ titles }: { titles: Title[] }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const outings = useAppStore((s) => s.outings)
+
+  // Plan §4.6: a small amber 🎟 corner badge on movies with a scheduled cinema
+  // outing, clearing the moment it completes/cancels (those statuses aren't
+  // 'scheduled', so they simply drop out of this set).
+  const scheduledTitleIds = useMemo(
+    () => new Set(outings.filter((o) => o.status === 'scheduled').map((o) => o.titleId)),
+    [outings]
+  )
 
   const delays = useMemo(() => staggerDelays(titles.length), [titles.length])
 
@@ -307,6 +316,7 @@ function PosterWall({ titles }: { titles: Title[] }) {
           key={title.id}
           title={title}
           rich
+          hasScheduledOuting={scheduledTitleIds.has(title.id)}
           onClick={() => openDetailDrawer(title.id)}
           style={{ ['--poster-delay' as string]: `${delays[i]}ms` }}
         />

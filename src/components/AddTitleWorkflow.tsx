@@ -276,7 +276,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
-type Step = 'search' | 'log'
+type Step = 'search' | 'log' | 'success'
 
 interface LogFormState {
   status: WatchStatus
@@ -309,12 +309,13 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 
 export function AddTitleWorkflow() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isAddTitleOpen, closeAddTitle, addTitle, preselectedResult } = useAppStore(
+  const { isAddTitleOpen, closeAddTitle, addTitle, preselectedResult, openOutingSchedule } = useAppStore(
     useShallow((s) => ({
       isAddTitleOpen: s.isAddTitleOpen,
       closeAddTitle: s.closeAddTitle,
       addTitle: s.addTitle,
       preselectedResult: s.preselectedResult,
+      openOutingSchedule: s.openOutingSchedule,
     }))
   )
   const [step, setStep] = useState<Step>('search')
@@ -322,6 +323,7 @@ export function AddTitleWorkflow() {
   const [selected, setSelected] = useState<SearchResult | null>(null)
   const [log, setLog] = useState<LogFormState>(DEFAULT_LOG)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [savedMovieId, setSavedMovieId] = useState<string | null>(null)
   const { results, loading, search } = useDebouncedSearch()
 
   function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -428,6 +430,20 @@ export function AddTitleWorkflow() {
     }
 
     addTitle(newTitle)
+
+    // Polish (plan §4.1): a movie freshly added to the watchlist is exactly
+    // the "a friend invited me to a movie I hadn't tracked yet" moment — offer
+    // the tickets form right here instead of closing immediately.
+    if (selected.type === 'movie' && log.status === 'watchlist') {
+      setSavedMovieId(id)
+      setStep('success')
+    } else {
+      handleClose()
+    }
+  }
+
+  function handleGotTickets() {
+    if (savedMovieId) openOutingSchedule(savedMovieId)
     handleClose()
   }
 
@@ -438,6 +454,7 @@ export function AddTitleWorkflow() {
       setQuery('')
       setSelected(null)
       setLog(DEFAULT_LOG)
+      setSavedMovieId(null)
     }, 300)
   }
 
@@ -451,7 +468,7 @@ export function AddTitleWorkflow() {
     >
       <div className="overflow-y-auto flex-1 scrollbar-thin px-6 py-6">
         <h2 className="font-serif text-xl font-light text-foreground mb-5">Add to Library</h2>
-        <StepIndicator step={step} />
+        {step !== 'success' && <StepIndicator step={step} />}
 
       {/* Step 1: Search */}
       {step === 'search' && (
@@ -704,6 +721,27 @@ export function AddTitleWorkflow() {
             <Star className="w-4 h-4 mr-2" />
             Add to Library
           </Button>
+        </div>
+      )}
+
+      {/* Step 3 (movies only): "Got tickets already?" (plan §4.1) */}
+      {step === 'success' && selected && (
+        <div className="text-center py-10 space-y-4">
+          <div className="w-12 h-12 rounded-full bg-amber/15 flex items-center justify-center mx-auto">
+            <Check className="w-6 h-6 text-amber" />
+          </div>
+          <p className="font-serif text-lg text-foreground">Added "{selected.title}" to your watchlist.</p>
+          <div className="flex flex-col gap-2 items-center pt-2">
+            <button
+              onClick={handleGotTickets}
+              className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors"
+            >
+              🎟 Got tickets already?
+            </button>
+            <Button variant="outline" onClick={handleClose} className="mt-1">
+              Done
+            </Button>
+          </div>
         </div>
       )}
       </div>

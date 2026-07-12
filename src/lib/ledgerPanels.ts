@@ -22,6 +22,7 @@ export type LedgerPanelId =
   | 'timewarp'
   | 'progress'
   | 'attractions'
+  | 'moviegoing'
 
 export const DEFAULT_LEDGER_PANEL_ORDER: LedgerPanelId[] = [
   'activity',
@@ -43,6 +44,7 @@ export const DEFAULT_LEDGER_PANEL_ORDER: LedgerPanelId[] = [
   'timewarp',
   'progress',
   'attractions',
+  'moviegoing',
 ]
 
 export const LEDGER_PANEL_LABELS: Record<LedgerPanelId, string> = {
@@ -65,6 +67,7 @@ export const LEDGER_PANEL_LABELS: Record<LedgerPanelId, string> = {
   timewarp: 'The Revival House',
   progress: 'Still Rolling',
   attractions: 'Coming Attractions',
+  moviegoing: 'At the Movies',
 }
 
 /** Short blurbs shown in the layout editor's widget palette. */
@@ -88,6 +91,7 @@ export const LEDGER_PANEL_DESCRIPTIONS: Record<LedgerPanelId, string> = {
   timewarp: 'How old the films you screen are',
   progress: 'Series in progress, by completion',
   attractions: 'The watchlist, weighed',
+  moviegoing: 'Cinema trips, theaters, and spend',
 }
 
 /** Panel width, expressed as a 12-column grid span (desktop only — panels are
@@ -150,6 +154,7 @@ export const DEFAULT_LEDGER_PANEL_WIDTHS: Record<LedgerPanelId, LedgerPanelWidth
   timewarp: 'md',
   progress: 'md',
   attractions: 'sm',
+  moviegoing: 'lg',
 }
 
 // ─── Per-widget settings ─────────────────────────────────────────────────────
@@ -211,6 +216,7 @@ export const PANEL_SETTING_KEYS: Record<LedgerPanelId, Array<keyof LedgerWidgetS
   timewarp: ['scope', 'title'],
   progress: ['topN', 'title'],
   attractions: ['title'],
+  moviegoing: ['title'],
 }
 
 /** Per-panel defaults for knobs whose neutral value isn't the global one

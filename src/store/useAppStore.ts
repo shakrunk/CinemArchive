@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mockTitles, type Title, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import { mockTitles, type Title, type Viewing, type CinemaOuting, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
+import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
 import type { User } from '@supabase/supabase-js'
 import { isDevMockUser } from '../lib/devAuth'
 import type { AppView, NavItemId } from '../lib/navigation'
@@ -28,7 +29,9 @@ import {
   fetchLedgerLayout, saveLedgerLayout,
   fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
   deleteNotification,
-  type AppNotificationItem,
+  insertOutingToDb, updateOutingInDb, completeDueOutings,
+  shareOutingPlans as shareOutingPlansRpc,
+  type AppNotificationItem, type OutingCompletionResult,
 } from '../lib/db'
 import type { SearchResult } from '../lib/media'
 
@@ -258,6 +261,57 @@ interface PinsSlice {
   loadPinnedModes: () => Promise<void>
 }
 
+// Cinema Outings ("I've got tickets") — see
+// docs/superpowers/plans/2026-07-11-cinema-outings.md §7.2. Owner-only:
+// loaded with the library, never fetched for shared/friend viewers.
+interface OutingsSlice {
+  outings: CinemaOuting[]
+  // Pure bulk setter (no DB side effect, mirrors setTitles) — used by import,
+  // which writes new outings to the DB itself before this runs (rule §5.13:
+  // an outing's row must exist before a kept title's viewing back-references
+  // it).
+  setOutings: (outings: CinemaOuting[]) => void
+  // "I've got tickets" sheet (plan §4.1) — a single overlay reused by every
+  // entry point. titleId preselects a movie (create mode); outingId, when
+  // set, switches the sheet into edit mode for that outing (titleId is then
+  // derived from the outing). Neither set → the sheet's own movie-picker step.
+  // prefill seeds the create-mode form's showtime/venue/format — used by the
+  // "I've got tickets too" CTA on a shared plan (plan §4.10); ignored in edit mode.
+  isOutingScheduleOpen: boolean
+  outingScheduleTitleId: string | null
+  outingScheduleOutingId: string | null
+  outingSchedulePrefill: OutingSchedulePrefill | null
+  openOutingSchedule: (titleId?: string, outingId?: string, prefill?: OutingSchedulePrefill) => void
+  closeOutingSchedule: () => void
+  addOuting: (outing: CinemaOuting) => void
+  // Edit/reschedule — recomputes endsAt from the merged showtime/previews/runtime.
+  updateOuting: (id: string, patch: Partial<CinemaOuting>) => void
+  // Soft-cancel (plan §4.2): kept as a history row, hidden from all surfaces.
+  cancelOuting: (id: string) => void
+  // Stamps follow_up_dismissed_at — called both on an explicit ✕ and after rating.
+  dismissOutingFollowUp: (id: string) => void
+  shareOutingPlans: (outingId: string, recipientIds: string[]) => Promise<void>
+  // "I've got tickets too" resolution (plan §4.10/§5.16) — if the shared
+  // payload's tmdb_id isn't already in the library, adds it to the watchlist
+  // first (same match-by-tmdbId+type resolution the recommendation inbox
+  // uses), then returns the titleId either way for the prefilled sheet.
+  resolveSharedOutingTitle: (payload: OutingSharePayload) => string
+  // "Didn't make it" (plan §5.6): deletes the auto-logged viewing, reverts the
+  // title status iff it's still 'watched', flips the outing to 'missed', and
+  // drops the now-stale outing_completed inbox item.
+  revertOutingCompletion: (outingId: string) => void
+  // The single choke point for auto-completion (plan §4.3) — calls
+  // complete_due_outings and applies whatever transitions it returns.
+  reconcileOutings: () => Promise<void>
+  // Post-show follow-up sheet (plan §4.4) — a single overlay, opened against a
+  // specific completed outing from the bell inbox, the drawer's banner, or the
+  // marquee's "Fresh from the lobby" card.
+  isPostShowSheetOpen: boolean
+  postShowOutingId: string | null
+  openPostShowSheet: (outingId: string) => void
+  closePostShowSheet: () => void
+}
+
 // ─── Default Nav Prefs ──────────────────────────────────────────────────────
 
 const defaultNavPrefs: NavPrefs = {
@@ -461,7 +515,7 @@ function swapAdjacent<T>(list: T[], idx: number, direction: 'up' | 'down'): T[] 
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
-type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice
+type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice & OutingsSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 2
@@ -732,12 +786,30 @@ export const useAppStore = create<AppStore>()(
         if (t.id !== titleId) return t
         return { ...t, viewings: t.viewings.filter((v) => v.id !== viewingId) }
       })
+      // Rule §5.8: deleting the auto-logged viewing directly from the
+      // timeline leaves the outing 'completed' (it's history, not a claim
+      // about the library) but ends any pending follow-up — the post-show
+      // card/sheet requires the viewing to exist. Stamping
+      // followUpDismissedAt (same field the ✕/rating dismissal path uses)
+      // is what isFollowUpPending already keys off, so no other surface
+      // needs to know the viewing is gone.
+      const staleOuting = s.outings.find((o) => o.completedViewingId === viewingId)
+      const followUpDismissedAt = new Date().toISOString()
+      const outings = staleOuting
+        ? s.outings.map((o) =>
+            o.id === staleOuting.id ? { ...o, completedViewingId: undefined, followUpDismissedAt } : o
+          )
+        : s.outings
       if (s.user) {
         const userId = s.user.id
         syncToDb(get, 'Failed to sync deleted viewing to DB:', () => deleteViewingFromDb(userId, viewingId),
           'Couldn\'t remove viewing — check your connection.')
+        if (staleOuting) {
+          syncToDb(get, 'Failed to sync stale outing follow-up to DB:', () =>
+            updateOutingInDb(userId, staleOuting.id, { completedViewingId: undefined, followUpDismissedAt }))
+        }
       }
-      return withDerivedTitles(titles, s.filters)
+      return { ...withDerivedTitles(titles, s.filters), outings }
     }),
 
   deleteEpisodeWatchEvent: (titleId, seasonNumber, episodeNumber, watchEventId) =>
@@ -1064,7 +1136,7 @@ export const useAppStore = create<AppStore>()(
     } else {
       // Clear on logout — restore mock data only in dev
       const fallback = import.meta.env.DEV ? mockTitles : []
-      set((s) => ({ ...withDerivedTitles(fallback, s.filters), pinnedModes: {} }))
+      set((s) => ({ ...withDerivedTitles(fallback, s.filters), pinnedModes: {}, outings: [] }))
     }
   },
 
@@ -1075,7 +1147,9 @@ export const useAppStore = create<AppStore>()(
     if (!user) return
     set({ loadingUser: true, libraryLoadError: null })
     try {
-      const dbTitles = await fetchUserLibrary(user.id)
+      // Outings ride along with the owner's own library fetch (rule §9 —
+      // owner-private; never fetched for shared/friend views).
+      const { titles: dbTitles, outings: dbOutings } = await fetchUserLibrary(user.id)
       // The synced board layout rides along with the library fetch. Server
       // wins; a user who has never synced adopts their local board once.
       void fetchLedgerLayout(user.id)
@@ -1093,7 +1167,10 @@ export const useAppStore = create<AppStore>()(
         console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
         return
       }
-      set((s) => withDerivedTitles(dbTitles, s.filters))
+      set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), outings: dbOutings }))
+      // Reconciliation trigger: app load, right after the library lands
+      // (plan §4.3) — completes anything that finished while the app was closed.
+      void get().reconcileOutings()
     } catch (err) {
       console.error('Failed to load user library from DB:', err)
       set({ libraryLoadError: "Couldn't load your library — check your connection." })
@@ -1205,6 +1282,247 @@ export const useAppStore = create<AppStore>()(
     }
     set({ pinnedModes })
   },
+
+  // ── Cinema Outings ("I've got tickets") ─────────────────────
+  outings: [],
+
+  setOutings: (outings) => set({ outings }),
+
+  isOutingScheduleOpen: false,
+  outingScheduleTitleId: null,
+  outingScheduleOutingId: null,
+  outingSchedulePrefill: null,
+  openOutingSchedule: (titleId, outingId, prefill) => {
+    // Rule (plan ground rules): isSharedView never renders scheduling actions.
+    // Every entry point already gates on it, but guarding here too means a
+    // stray call can't slip an owner-only overlay into a shared/friend session.
+    if (get().isSharedView) return
+    set({
+      isOutingScheduleOpen: true,
+      outingScheduleTitleId: titleId ?? null,
+      outingScheduleOutingId: outingId ?? null,
+      outingSchedulePrefill: prefill ?? null,
+    })
+  },
+  closeOutingSchedule: () =>
+    set({ isOutingScheduleOpen: false, outingScheduleTitleId: null, outingScheduleOutingId: null, outingSchedulePrefill: null }),
+
+  isPostShowSheetOpen: false,
+  postShowOutingId: null,
+  openPostShowSheet: (outingId) => {
+    if (get().isSharedView) return
+    set({ isPostShowSheetOpen: true, postShowOutingId: outingId })
+  },
+  closePostShowSheet: () => set({ isPostShowSheetOpen: false, postShowOutingId: null }),
+
+  addOuting: (outing) =>
+    set((s) => {
+      const outings = [outing, ...s.outings]
+      if (s.user) {
+        const userId = s.user.id
+        syncToDb(get, 'Failed to sync added outing to DB:', () => insertOutingToDb(userId, outing),
+          "Couldn't save your tickets — check your connection.")
+      }
+      return { outings }
+    }),
+
+  updateOuting: (id, patch) =>
+    set((s) => {
+      const outings = s.outings.map((o) => {
+        if (o.id !== id) return o
+        const merged = { ...o, ...patch }
+        // ends_at is a plain column, not generated (timestamptz + interval
+        // isn't immutable) — the client keeps it in sync on every edit,
+        // mirroring what the schema comment on cinema_outings.ends_at says
+        // the RPC/client contract is (plan §6.1).
+        const endsAt = new Date(
+          new Date(merged.showtime).getTime() + (merged.previewsMinutes + merged.runtimeMinutes) * 60_000
+        ).toISOString()
+        return { ...merged, endsAt }
+      })
+      if (s.user) {
+        const userId = s.user.id
+        const updated = outings.find((o) => o.id === id)
+        const dbPatch = updated ? { ...patch, endsAt: updated.endsAt } : patch
+        syncToDb(get, 'Failed to sync updated outing to DB:', () => updateOutingInDb(userId, id, dbPatch),
+          "Couldn't save ticket changes — check your connection.")
+      }
+      return { outings }
+    }),
+
+  cancelOuting: (id) =>
+    set((s) => {
+      const outings = s.outings.map((o) => (o.id === id ? { ...o, status: 'cancelled' as const } : o))
+      if (s.user) {
+        const userId = s.user.id
+        syncToDb(get, 'Failed to sync cancelled outing to DB:', () => updateOutingInDb(userId, id, { status: 'cancelled' }),
+          "Couldn't cancel — check your connection.")
+      }
+      return { outings }
+    }),
+
+  dismissOutingFollowUp: (id) =>
+    set((s) => {
+      const followUpDismissedAt = new Date().toISOString()
+      const outings = s.outings.map((o) => (o.id === id ? { ...o, followUpDismissedAt } : o))
+      if (s.user) {
+        const userId = s.user.id
+        syncToDb(get, 'Failed to sync dismissed outing follow-up to DB:', () =>
+          updateOutingInDb(userId, id, { followUpDismissedAt }))
+      }
+      return { outings }
+    }),
+
+  shareOutingPlans: async (outingId, recipientIds) => {
+    try {
+      await shareOutingPlansRpc(outingId, recipientIds)
+    } catch (err) {
+      console.error('Failed to share outing plans:', err)
+      get().pushNotification({ message: "Couldn't share your plans — check your connection." })
+      throw err
+    }
+  },
+
+  resolveSharedOutingTitle: (payload) => {
+    const s = get()
+    const existing = s.titles.find((t) => t.tmdbId === payload.tmdbId && t.type === payload.type)
+    if (existing) return existing.id
+
+    // Rule §5.16: abandoning the schedule form afterward still leaves the
+    // title on the watchlist — harmless, since tapping this CTA already
+    // means they intend to see it.
+    const id = crypto.randomUUID()
+    s.addTitle({
+      id,
+      tmdbId: payload.tmdbId,
+      type: payload.type,
+      title: payload.title,
+      year: payload.year ?? 0,
+      posterUrl: payload.posterUrl,
+      genres: [],
+      status: 'watchlist',
+      tags: [],
+      addedAt: new Date().toISOString(),
+      viewings: [],
+    })
+    return id
+  },
+
+  revertOutingCompletion: (outingId) => {
+    const s0 = get()
+    const outing = s0.outings.find((o) => o.id === outingId)
+    if (!outing || outing.status !== 'completed') return
+
+    const viewingId = outing.completedViewingId
+    const title = s0.titles.find((t) => t.id === outing.titleId)
+    // Rule §5.6: only revert the title's status if it's still 'watched' — if
+    // the user changed it manually in the meantime, their choice wins.
+    const revertStatus = title?.status === 'watched' ? outing.previousStatus : undefined
+
+    set((s) => {
+      const titles = s.titles.map((t) => {
+        if (t.id !== outing.titleId) return t
+        const next = { ...t }
+        if (viewingId) next.viewings = t.viewings.filter((v) => v.id !== viewingId)
+        if (revertStatus) next.status = revertStatus
+        return next
+      })
+      const outings = s.outings.map((o) =>
+        o.id === outingId ? { ...o, status: 'missed' as const, completedViewingId: undefined } : o
+      )
+      return { ...withDerivedTitles(titles, s.filters), outings }
+    })
+
+    if (s0.user) {
+      const userId = s0.user.id
+      if (viewingId) {
+        syncToDb(get, 'Failed to sync reverted viewing deletion to DB:', () => deleteViewingFromDb(userId, viewingId),
+          "Couldn't undo that viewing — check your connection.")
+      }
+      syncToDb(get, 'Failed to sync reverted outing to DB:', () =>
+        updateOutingInDb(userId, outingId, { status: 'missed', completedViewingId: undefined }))
+      if (revertStatus) {
+        syncToDb(get, 'Failed to sync reverted title status to DB:', () =>
+          updateTitleInDb(userId, outing.titleId, { status: revertStatus }))
+      }
+    }
+
+    // Best-effort: drop the now-stale "how was it?" inbox item (rule §5.6).
+    // The notification carries titleId but not outingId (see the RPC in the
+    // Phase A migration), so this matches the most recent unread
+    // outing_completed item for the title among whatever's already loaded
+    // locally — a session that never opened the bell has nothing cached here
+    // to clean up, and simply leaves the stale item to be read/dismissed later.
+    const stale = s0.notificationInbox
+      .filter((n) => n.type === 'outing_completed' && n.titleId === outing.titleId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0]
+    if (stale) void get().deleteNotificationItem(stale.id)
+  },
+
+  reconcileOutings: async () => {
+    const user = get().user
+    if (!user) return
+
+    let results: OutingCompletionResult[]
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      results = await completeDueOutings(tz)
+    } catch (err) {
+      console.error('Failed to reconcile cinema outings:', err)
+      return
+    }
+    if (results.length === 0) return
+
+    set((s) => {
+      let titles = s.titles
+      let outings = s.outings
+
+      for (const r of results) {
+        const outing = outings.find((o) => o.id === r.outingId)
+        const title = titles.find((t) => t.id === r.titleId)
+        // Multi-device race (§5.11): another session already applied this
+        // transition and our local copy doesn't know about the outing/title —
+        // nothing to reconcile locally; the next full load will catch up.
+        if (!outing || !title) continue
+
+        const viewing: Viewing = {
+          id: r.viewingId,
+          titleId: r.titleId,
+          // Same calendar date the RPC derived server-side from this same
+          // client's IANA zone — see localDateStr's doc comment.
+          date: localDateStr(new Date(outing.showtime)),
+          venue: outing.venue,
+          companions: outing.companions.length > 0 ? outing.companions : undefined,
+          outingId: r.outingId,
+        }
+
+        titles = titles.map((t) =>
+          t.id === r.titleId ? { ...t, status: r.newTitleStatus, viewings: [...t.viewings, viewing] } : t
+        )
+        outings = outings.map((o) =>
+          o.id === r.outingId
+            ? { ...o, status: 'completed' as const, previousStatus: r.previousStatus ?? undefined, completedViewingId: r.viewingId }
+            : o
+        )
+      }
+
+      return { ...withDerivedTitles(titles, s.filters), outings }
+    })
+
+    // One toast per completed outing (plan §4.4).
+    for (const r of results) {
+      const title = get().titles.find((t) => t.id === r.titleId)
+      if (title) {
+        get().pushNotification({
+          kind: 'tip',
+          autoClose: 6000,
+          message: `Marked ${title.title} watched — hope it was worth the popcorn.`,
+        })
+      }
+    }
+
+    void get().refreshUnreadNotificationCount()
+  },
     }),
     {
       name: 'cinemarchive-library',
@@ -1216,6 +1534,7 @@ export const useAppStore = create<AppStore>()(
       // that to the viewer's localStorage.
       partialize: (s) => ({
         titles: s.viewerContext.kind === 'friend' ? [] : s.titles,
+        outings: s.viewerContext.kind === 'friend' ? [] : s.outings,
         filters: s.filters,
         viewMode: s.viewMode,
         theme: s.theme,
@@ -1319,8 +1638,9 @@ export const useUpNextShows = (): UpNextEntry[] => {
 
 export const useUpcomingTitles = (): UpcomingEntry[] => {
   const titles = useAppStore((s) => s.titles)
+  const outings = useAppStore((s) => s.outings)
   return useMemo(() => {
     const today = new Date().toISOString().slice(0, 10)
-    return computeUpcomingTitles(titles, today)
-  }, [titles])
+    return computeUpcomingTitles(titles, today, outings)
+  }, [titles, outings])
 }

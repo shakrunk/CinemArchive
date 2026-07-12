@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // .worktrees holds sibling `git worktree` checkouts (each with its own
+  // tsconfig.json) used for parallel-branch work — linting the main tree
+  // must never descend into them, or typescript-eslint's project service
+  // sees two candidate tsconfigRootDirs and refuses to parse anything.
+  globalIgnores(['dist', '.worktrees']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

@@ -76,6 +76,49 @@ export interface Viewing {
   date?: string  // ISO date (YYYY-MM-DD); absent = watched before joining the platform (indeterminate date)
   rating?: number
   notes?: string
+  venue?: string  // theater, e.g. "AMC Georgetown" — set by outing completion or manual log-viewing
+  companions?: Companion[]  // "watched with" — free-text names, optionally linked to a friend
+  outingId?: string  // back-reference to the cinema_outings row this viewing was auto-logged from
+}
+
+// ─── Cinema Outings — "I've got tickets"
+// (see docs/superpowers/plans/2026-07-11-cinema-outings.md) ────────────────
+
+export type OutingStatus = 'scheduled' | 'completed' | 'missed' | 'cancelled'
+
+export const CINEMA_FORMATS = ['Standard', 'IMAX', '3D', 'Dolby', '70mm', 'Drive-in', 'Other'] as const
+export type CinemaFormat = (typeof CINEMA_FORMATS)[number]
+
+/** Free-text "watched with" entry; friendUserId is set when picked from
+ *  accepted friends rather than typed — deleting that friend later leaves
+ *  the name intact (it's a copy, not a join, per rule §5.14). */
+export interface Companion {
+  name: string
+  friendUserId?: string
+}
+
+/** One planned (or completed/missed/cancelled) cinema trip. Lifecycle:
+ *  scheduled → completed | missed | cancelled (see plan §4.2). Movies only
+ *  in v1. Owner-private — never fetched in shared/friend views. */
+export interface CinemaOuting {
+  id: string
+  titleId: string
+  showtime: string            // ISO datetime (absolute instant)
+  previewsMinutes: number
+  runtimeMinutes: number       // snapshotted at scheduling; a later metadata refresh never silently moves endsAt
+  endsAt: string               // ISO datetime (denormalized; recomputed on edit)
+  venue?: string
+  companions: Companion[]
+  format?: CinemaFormat
+  ticketPrice?: number
+  seat?: string
+  bookingRef?: string          // confirmation code — deliberately excluded from shared plans
+  notes?: string
+  status: OutingStatus
+  previousStatus?: WatchStatus  // title status captured at completion, for a faithful "Didn't make it" revert
+  completedViewingId?: string
+  followUpDismissedAt?: string
+  createdAt: string
 }
 
 // Physical asset variants a home library can hold (KP-003).

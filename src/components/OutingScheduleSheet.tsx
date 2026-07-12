@@ -13,8 +13,10 @@ import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type Title } from 'src/store/mockData'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
+// Exported for reuse by the viewing editor (TitleDetailDrawer, plan §4.6/§7.4)
+// — venue/companions get the same chip-input affordance on any viewing.
 
-function CompanionInput({
+export function CompanionInput({
   companions,
   onChange,
   suggestions,

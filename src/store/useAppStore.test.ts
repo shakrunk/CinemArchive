@@ -188,3 +188,50 @@ describe('updateOuting', () => {
     expect(outing.endsAt).toBe('2026-07-17T22:20:00.000Z')
   })
 })
+
+describe('removeViewing', () => {
+  it('rule §5.8: deleting the auto-logged viewing leaves the outing completed but ends its pending follow-up', () => {
+    const viewing = { id: 'v1', titleId: 't1', date: '2026-07-17', venue: 'AMC Georgetown' }
+    useAppStore.setState({
+      titles: [makeTitle({ status: 'watched', viewings: [viewing] })],
+      outings: [makeOuting({ completedViewingId: 'v1', followUpDismissedAt: undefined })],
+    })
+
+    useAppStore.getState().removeViewing('t1', 'v1')
+
+    const title = useAppStore.getState().titles.find((t) => t.id === 't1')!
+    expect(title.viewings).toEqual([])
+
+    const outing = useAppStore.getState().outings.find((o) => o.id === 'o1')!
+    expect(outing.status).toBe('completed') // history, not a claim about the library
+    expect(outing.completedViewingId).toBeUndefined()
+    expect(outing.followUpDismissedAt).toBeDefined() // pending "how was it?" ends
+  })
+
+  it('leaves unrelated outings untouched when the deleted viewing is not their completedViewingId', () => {
+    const viewing = { id: 'v2', titleId: 't1', date: '2026-07-17' }
+    useAppStore.setState({
+      titles: [makeTitle({ status: 'watched', viewings: [viewing] })],
+      outings: [makeOuting({ completedViewingId: 'v1', followUpDismissedAt: undefined })],
+    })
+
+    useAppStore.getState().removeViewing('t1', 'v2')
+
+    const outing = useAppStore.getState().outings.find((o) => o.id === 'o1')!
+    expect(outing.completedViewingId).toBe('v1')
+    expect(outing.followUpDismissedAt).toBeUndefined()
+  })
+
+  it('is a no-op on outings when the viewing being deleted was never outing-logged', () => {
+    const viewing = { id: 'v3', titleId: 't1', date: '2026-07-10' }
+    useAppStore.setState({
+      titles: [makeTitle({ status: 'watched', viewings: [viewing] })],
+      outings: [],
+    })
+
+    useAppStore.getState().removeViewing('t1', 'v3')
+
+    expect(useAppStore.getState().titles[0].viewings).toEqual([])
+    expect(useAppStore.getState().outings).toEqual([])
+  })
+})

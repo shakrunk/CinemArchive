@@ -33,6 +33,18 @@ number is chosen.
   out-of-app copy/share snippet and `.ics`. The recipient's notification offers
   "I've got tickets too" (adds the title to their watchlist if needed, then
   opens their own prefilled ticket form) and "Add to calendar".
+- Cinema Outings — timeline & viewing editor: the drawer's viewing timeline
+  renders a perforated-edge ticket-stub line ("at AMC Georgetown · with Alex &
+  Sam · IMAX") wherever a viewing has a venue or companions, degrading
+  gracefully when only one is present. Every viewing — auto-logged or manually
+  entered — now has an inline editor for its date, rating, notes, theater, and
+  companions (same chip/autocomplete affordances as the ticket form), and the
+  manual "Log a viewing" form gained the same theater/companions fields so
+  home viewings can record company too. A completed outing's receipt fields
+  (format, ticket price, seat, booking ref) stay editable from that same
+  editor even after its showtime is frozen. Deleting an outing's auto-logged
+  viewing from the timeline now leaves the outing completed and closes out
+  its pending "how was it?" follow-up.
 
 ## [1.2.0] - 2026-07-11
 

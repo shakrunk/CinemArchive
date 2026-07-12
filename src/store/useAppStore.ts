@@ -781,12 +781,30 @@ export const useAppStore = create<AppStore>()(
         if (t.id !== titleId) return t
         return { ...t, viewings: t.viewings.filter((v) => v.id !== viewingId) }
       })
+      // Rule §5.8: deleting the auto-logged viewing directly from the
+      // timeline leaves the outing 'completed' (it's history, not a claim
+      // about the library) but ends any pending follow-up — the post-show
+      // card/sheet requires the viewing to exist. Stamping
+      // followUpDismissedAt (same field the ✕/rating dismissal path uses)
+      // is what isFollowUpPending already keys off, so no other surface
+      // needs to know the viewing is gone.
+      const staleOuting = s.outings.find((o) => o.completedViewingId === viewingId)
+      const followUpDismissedAt = new Date().toISOString()
+      const outings = staleOuting
+        ? s.outings.map((o) =>
+            o.id === staleOuting.id ? { ...o, completedViewingId: undefined, followUpDismissedAt } : o
+          )
+        : s.outings
       if (s.user) {
         const userId = s.user.id
         syncToDb(get, 'Failed to sync deleted viewing to DB:', () => deleteViewingFromDb(userId, viewingId),
           'Couldn\'t remove viewing — check your connection.')
+        if (staleOuting) {
+          syncToDb(get, 'Failed to sync stale outing follow-up to DB:', () =>
+            updateOutingInDb(userId, staleOuting.id, { completedViewingId: undefined, followUpDismissedAt }))
+        }
       }
-      return withDerivedTitles(titles, s.filters)
+      return { ...withDerivedTitles(titles, s.filters), outings }
     }),
 
   deleteEpisodeWatchEvent: (titleId, seasonNumber, episodeNumber, watchEventId) =>

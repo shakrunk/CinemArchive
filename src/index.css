@@ -1172,6 +1172,24 @@
 .marquee-now-showing {
   animation: now-showing-pulse 1.8s ease-in-out infinite;
 }
+/* Ticket-stub perforation (plan §4.6/§7.4/§13) — a dashed amber tear-edge
+   standing in for punched sprocket holes, reused for the viewing-timeline
+   stub line. A gradient rather than real cutouts, so it never needs to match
+   whatever translucent card background sits behind it. Static (no
+   animation), so there's nothing for prefers-reduced-motion to neutralize. */
+.ticket-perforation {
+  display: inline-block;
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(var(--amber-rgb), 0.6) 0,
+    rgba(var(--amber-rgb), 0.6) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+}
 @keyframes flicker {
   0%,
   100% {

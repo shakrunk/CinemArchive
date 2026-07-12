@@ -2370,7 +2370,7 @@ export function TitleDetailDrawer() {
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
                   </button>
-                  {title.type === 'movie' && title.status === 'watched' && (
+                  {title.type === 'movie' && (title.status === 'watched' || title.status === 'dropped') && (
                     <button
                       onClick={() => openOutingSchedule(title.id)}
                       className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"

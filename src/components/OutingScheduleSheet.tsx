@@ -6,9 +6,10 @@ import { Input } from 'src/components/ui/input'
 import { PosterThumb } from 'src/components/ui/poster-thumb'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
-import { companionSuggestions, venueSuggestions } from 'src/store/outings'
-import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSnippet, shareOutingSnippet } from 'src/lib/ics'
+import { companionSuggestions, venueSuggestions, type OutingSchedulePrefill } from 'src/store/outings'
+import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSnippet } from 'src/lib/ics'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
+import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type Title } from 'src/store/mockData'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
@@ -190,13 +191,18 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function defaultForm(runtime?: number): FormState {
+// prefill seeds showtime/venue/format from a shared plan's snapshot (plan
+// §4.10's "I've got tickets too" CTA) — seat is deliberately left out of
+// OutingSchedulePrefill, so it always falls through to the blank default.
+function defaultForm(runtime?: number, prefill?: OutingSchedulePrefill | null): FormState {
+  const showtime = prefill ? new Date(prefill.showtime) : null
+  const pad = (n: number) => String(n).padStart(2, '0')
   return {
-    date: todayStr(),
-    time: '19:00',
-    venue: '',
+    date: showtime ? `${showtime.getFullYear()}-${pad(showtime.getMonth() + 1)}-${pad(showtime.getDate())}` : todayStr(),
+    time: showtime ? `${pad(showtime.getHours())}:${pad(showtime.getMinutes())}` : '19:00',
+    venue: prefill?.venue ?? '',
     companions: [],
-    format: '',
+    format: prefill?.format ?? '',
     previewsMinutes: 20,
     runtimeMinutes: runtime ?? 120,
     ticketPrice: '',
@@ -233,12 +239,14 @@ function OutingForm({
   title,
   editingOuting,
   duplicateOuting,
+  prefill,
   onSaved,
   onClose,
 }: {
   title: Title
   editingOuting: CinemaOuting | null
   duplicateOuting: CinemaOuting | null
+  prefill?: OutingSchedulePrefill | null
   onSaved: (outing: CinemaOuting) => void
   onClose: () => void
 }) {
@@ -264,7 +272,7 @@ function OutingForm({
   }, [])
 
   const [form, setForm] = useState<FormState>(() =>
-    editingOuting ? formFromOuting(editingOuting) : defaultForm(title.runtime)
+    editingOuting ? formFromOuting(editingOuting) : defaultForm(title.runtime, prefill)
   )
 
   const suggestions = useMemo(
@@ -541,27 +549,10 @@ function OutingForm({
   )
 }
 
-// ─── Save confirmation — "Tickets saved — share your plans?" (§4.10 out-of-app) ─
+// ─── Save confirmation — "Tickets saved — share your plans?" (§4.10) ─────────
 
 function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOuting; onClose: () => void }) {
-  const pushNotification = useAppStore((s) => s.pushNotification)
-  const [sharing, setSharing] = useState(false)
-
-  async function handleShare() {
-    setSharing(true)
-    try {
-      const snippet = formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, outing.seat)
-      const outcome = await shareOutingSnippet(snippet)
-      if (outcome === 'copied') {
-        pushNotification({ message: 'Copied — paste it wherever you\'re texting your friends.', kind: 'tip', autoClose: 4000 })
-      }
-    } catch (err) {
-      console.error('Failed to share outing plans:', err)
-      pushNotification({ message: "Couldn't share your plans — check your connection." })
-    } finally {
-      setSharing(false)
-    }
-  }
+  const [sharePanelOpen, setSharePanelOpen] = useState(false)
 
   function handleDownloadIcs() {
     const ics = buildOutingIcs(outing, title.title)
@@ -579,8 +570,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
       </p>
       <div className="flex flex-col gap-2 items-center pt-2">
         <Button
-          onClick={handleShare}
-          disabled={sharing}
+          onClick={() => setSharePanelOpen(true)}
           className="w-full max-w-[220px] bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
         >
           <Share2 className="w-4 h-4 mr-2" />
@@ -597,6 +587,9 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
           Not now
         </button>
       </div>
+      {sharePanelOpen && (
+        <ShareOutingPanel outing={outing} title={title} onClose={() => setSharePanelOpen(false)} />
+      )}
     </div>
   )
 }
@@ -609,6 +602,7 @@ function OutingScheduleBody({ onClose }: { onClose: () => void }) {
   const outings = useAppStore((s) => s.outings)
   const outingScheduleTitleId = useAppStore((s) => s.outingScheduleTitleId)
   const outingScheduleOutingId = useAppStore((s) => s.outingScheduleOutingId)
+  const outingSchedulePrefill = useAppStore((s) => s.outingSchedulePrefill)
 
   const editingOuting = outingScheduleOutingId
     ? outings.find((o) => o.id === outingScheduleOutingId) ?? null
@@ -637,6 +631,7 @@ function OutingScheduleBody({ onClose }: { onClose: () => void }) {
       title={title}
       editingOuting={editingOuting}
       duplicateOuting={duplicateOuting}
+      prefill={editingOuting ? null : outingSchedulePrefill}
       onSaved={setSavedOuting}
       onClose={onClose}
     />

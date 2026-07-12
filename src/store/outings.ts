@@ -1,4 +1,4 @@
-import type { CinemaOuting, Companion, Title, Viewing } from './mockData'
+import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type MediaType, type Title, type Viewing } from './mockData'
 import type { FriendshipView } from '../lib/auth'
 
 // Pure, unit-testable derivations for Cinema Outings ("I've got tickets") —
@@ -231,3 +231,80 @@ export function venueSuggestions(outings: CinemaOuting[], viewings: Viewing[]): 
   }
   return venues
 }
+
+// ─── Plan sharing — "outing_plans_shared" snapshot (plan §4.7/§4.10/§6.5) ────
+
+/** Typed snapshot parsed from an `outing_plans_shared` notification's jsonb
+ *  payload (written by the `share_outing_plans` RPC) — everything the
+ *  recipient's "I've got tickets too" prefill and "Add to calendar" CTA need,
+ *  without any read access to the sender's outing. Booking ref is never
+ *  present (rule §5.15/§6.5 — deliberately excluded at the source). */
+export interface OutingSharePayload {
+  tmdbId: number
+  type: MediaType
+  title: string
+  year?: number
+  posterUrl?: string
+  showtime: string
+  endsAt: string
+  venue?: string
+  format?: CinemaFormat
+  seat?: string
+  companions: string[]
+}
+
+const CINEMA_FORMAT_SET = new Set<string>(CINEMA_FORMATS)
+
+/** Parses the untyped jsonb payload into an `OutingSharePayload`, or null
+ *  when a required field is missing/malformed — the client has no schema
+ *  guarantee on notification payloads, so every field is checked rather than
+ *  cast. */
+export function parseOutingSharePayload(payload: Record<string, unknown>): OutingSharePayload | null {
+  const { tmdb_id: tmdbId, type, title, showtime, ends_at: endsAt } = payload
+  if (
+    typeof tmdbId !== 'number' ||
+    (type !== 'movie' && type !== 'tv') ||
+    typeof title !== 'string' ||
+    typeof showtime !== 'string' ||
+    typeof endsAt !== 'string'
+  ) {
+    return null
+  }
+  const format = typeof payload.format === 'string' && CINEMA_FORMAT_SET.has(payload.format)
+    ? (payload.format as CinemaFormat)
+    : undefined
+  const companions = Array.isArray(payload.companions)
+    ? payload.companions.filter((c): c is string => typeof c === 'string')
+    : []
+
+  return {
+    tmdbId,
+    type,
+    title,
+    year: typeof payload.year === 'number' ? payload.year : undefined,
+    posterUrl: typeof payload.poster_url === 'string' ? payload.poster_url : undefined,
+    showtime,
+    endsAt,
+    venue: typeof payload.venue === 'string' ? payload.venue : undefined,
+    format,
+    seat: typeof payload.seat === 'string' ? payload.seat : undefined,
+    companions,
+  }
+}
+
+/** The inbox snapshot line (plan §4.7): "Fri 7:30 PM · AMC Georgetown · seat
+ *  H12" — fields the sender's outing left blank are simply omitted. */
+export function formatOutingShareSnapshotLine(payload: OutingSharePayload): string {
+  const d = new Date(payload.showtime)
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'short' })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const segments = [`${weekday} ${time}`]
+  if (payload.venue) segments.push(payload.venue)
+  if (payload.seat) segments.push(`seat ${payload.seat}`)
+  return segments.join(' · ')
+}
+
+/** The fields "I've got tickets too" seeds the recipient's own
+ *  `OutingScheduleSheet` with — seat is deliberately absent (rule §4.10:
+ *  "that's the part they go buy"). */
+export type OutingSchedulePrefill = Pick<OutingSharePayload, 'showtime' | 'venue' | 'format'>

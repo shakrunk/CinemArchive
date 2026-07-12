@@ -5,7 +5,7 @@ import { mockTitles, type Title, type Viewing, type CinemaOuting, type LedgerSta
 import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
-import { localDateStr } from './outings'
+import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
 import type { User } from '@supabase/supabase-js'
 import { isDevMockUser } from '../lib/devAuth'
 import type { AppView, NavItemId } from '../lib/navigation'
@@ -270,10 +270,13 @@ interface OutingsSlice {
   // entry point. titleId preselects a movie (create mode); outingId, when
   // set, switches the sheet into edit mode for that outing (titleId is then
   // derived from the outing). Neither set → the sheet's own movie-picker step.
+  // prefill seeds the create-mode form's showtime/venue/format — used by the
+  // "I've got tickets too" CTA on a shared plan (plan §4.10); ignored in edit mode.
   isOutingScheduleOpen: boolean
   outingScheduleTitleId: string | null
   outingScheduleOutingId: string | null
-  openOutingSchedule: (titleId?: string, outingId?: string) => void
+  outingSchedulePrefill: OutingSchedulePrefill | null
+  openOutingSchedule: (titleId?: string, outingId?: string, prefill?: OutingSchedulePrefill) => void
   closeOutingSchedule: () => void
   addOuting: (outing: CinemaOuting) => void
   // Edit/reschedule — recomputes endsAt from the merged showtime/previews/runtime.
@@ -283,6 +286,11 @@ interface OutingsSlice {
   // Stamps follow_up_dismissed_at — called both on an explicit ✕ and after rating.
   dismissOutingFollowUp: (id: string) => void
   shareOutingPlans: (outingId: string, recipientIds: string[]) => Promise<void>
+  // "I've got tickets too" resolution (plan §4.10/§5.16) — if the shared
+  // payload's tmdb_id isn't already in the library, adds it to the watchlist
+  // first (same match-by-tmdbId+type resolution the recommendation inbox
+  // uses), then returns the titleId either way for the prefilled sheet.
+  resolveSharedOutingTitle: (payload: OutingSharePayload) => string
   // "Didn't make it" (plan §5.6): deletes the auto-logged viewing, reverts the
   // title status iff it's still 'watched', flips the outing to 'missed', and
   // drops the now-stale outing_completed inbox item.
@@ -1258,15 +1266,21 @@ export const useAppStore = create<AppStore>()(
   isOutingScheduleOpen: false,
   outingScheduleTitleId: null,
   outingScheduleOutingId: null,
-  openOutingSchedule: (titleId, outingId) => {
+  outingSchedulePrefill: null,
+  openOutingSchedule: (titleId, outingId, prefill) => {
     // Rule (plan ground rules): isSharedView never renders scheduling actions.
     // Every entry point already gates on it, but guarding here too means a
     // stray call can't slip an owner-only overlay into a shared/friend session.
     if (get().isSharedView) return
-    set({ isOutingScheduleOpen: true, outingScheduleTitleId: titleId ?? null, outingScheduleOutingId: outingId ?? null })
+    set({
+      isOutingScheduleOpen: true,
+      outingScheduleTitleId: titleId ?? null,
+      outingScheduleOutingId: outingId ?? null,
+      outingSchedulePrefill: prefill ?? null,
+    })
   },
   closeOutingSchedule: () =>
-    set({ isOutingScheduleOpen: false, outingScheduleTitleId: null, outingScheduleOutingId: null }),
+    set({ isOutingScheduleOpen: false, outingScheduleTitleId: null, outingScheduleOutingId: null, outingSchedulePrefill: null }),
 
   isPostShowSheetOpen: false,
   postShowOutingId: null,
@@ -1342,6 +1356,31 @@ export const useAppStore = create<AppStore>()(
       get().pushNotification({ message: "Couldn't share your plans — check your connection." })
       throw err
     }
+  },
+
+  resolveSharedOutingTitle: (payload) => {
+    const s = get()
+    const existing = s.titles.find((t) => t.tmdbId === payload.tmdbId && t.type === payload.type)
+    if (existing) return existing.id
+
+    // Rule §5.16: abandoning the schedule form afterward still leaves the
+    // title on the watchlist — harmless, since tapping this CTA already
+    // means they intend to see it.
+    const id = crypto.randomUUID()
+    s.addTitle({
+      id,
+      tmdbId: payload.tmdbId,
+      type: payload.type,
+      title: payload.title,
+      year: payload.year ?? 0,
+      posterUrl: payload.posterUrl,
+      genres: [],
+      status: 'watchlist',
+      tags: [],
+      addedAt: new Date().toISOString(),
+      viewings: [],
+    })
+    return id
   },
 
   revertOutingCompletion: (outingId) => {

@@ -26,6 +26,13 @@ number is chosen.
   friends (companions annotated "was there with you"), or "Didn't make it" to
   revert and reschedule. Movies with a scheduled outing get a 🎟 badge on the
   library poster wall.
+- Cinema Outings — in-app plan sharing: "Share plans" from the marquee card,
+  drawer banner, or the schedule form's save confirmation opens a friend
+  picker that pushes a one-way snapshot (showtime, venue, format, seat — never
+  the booking ref) to an accepted friend's bell inbox, alongside the existing
+  out-of-app copy/share snippet and `.ics`. The recipient's notification offers
+  "I've got tickets too" (adds the title to their watchlist if needed, then
+  opens their own prefilled ticket form) and "Add to calendar".
 
 ## [1.2.0] - 2026-07-11
 

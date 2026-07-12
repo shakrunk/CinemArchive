@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { buildOutingIcs, outingIcsFilename, formatOutingShareSnippet, shareOutingSnippet } from './ics'
+import { buildOutingIcs, buildOutingIcsFromSharePayload, outingIcsFilename, formatOutingShareSnippet, shareOutingSnippet } from './ics'
+import type { OutingSharePayload } from 'src/store/outings'
 import type { CinemaOuting } from 'src/store/mockData'
 
 function makeOuting(overrides: Partial<CinemaOuting> = {}): CinemaOuting {
@@ -60,6 +61,36 @@ describe('buildOutingIcs', () => {
     const ics = buildOutingIcs(outing, 'The Long Reel')
     expect(ics).toContain('LOCATION:AMC\\, Georgetown\\; IMAX')
     expect(ics).toContain('Bring snacks\\, arrive early')
+  })
+})
+
+describe('buildOutingIcsFromSharePayload', () => {
+  function makePayload(overrides: Partial<OutingSharePayload> = {}): OutingSharePayload {
+    return {
+      tmdbId: 42,
+      type: 'movie',
+      title: 'Dune Part Three',
+      showtime: '2026-07-17T19:30:00.000-06:00',
+      endsAt: '2026-07-17T22:36:00.000-06:00',
+      companions: [],
+      ...overrides,
+    }
+  }
+
+  it('builds a VEVENT from the snapshot alone, with a tmdbId+showtime UID', () => {
+    const ics = buildOutingIcsFromSharePayload(makePayload({ venue: 'AMC Georgetown', companions: ['Alex', 'Sam'] }))
+    expect(ics).toContain('SUMMARY:🎬 Dune Part Three — AMC Georgetown')
+    expect(ics).toContain('LOCATION:AMC Georgetown')
+    expect(ics).toContain('DESCRIPTION:With Alex & Sam')
+    expect(ics).toContain('UID:share-42-2026-07-17T19:30:00.000-06:00@cinemarchive')
+  })
+
+  it('omits LOCATION/DESCRIPTION when the snapshot has neither venue nor companions', () => {
+    const ics = buildOutingIcsFromSharePayload(makePayload())
+    expect(ics).not.toContain('LOCATION:')
+    // Only the VALARM's own "DESCRIPTION:Reminder" line should remain.
+    expect(ics.match(/DESCRIPTION:/g)).toEqual(['DESCRIPTION:'])
+    expect(ics).toContain('DESCRIPTION:Reminder')
   })
 })
 

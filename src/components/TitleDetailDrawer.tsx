@@ -30,6 +30,7 @@ import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMemb
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, fetchCollectionParts, TMDB_STILL_BASE, type TitleVideo, type WatchProviders, type SearchResult } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
+import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
@@ -1123,6 +1124,7 @@ function OutingBanner({ title }: { title: Title }) {
   const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
   const cancelOuting = useAppStore((s) => s.cancelOuting)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [sharePanelOpen, setSharePanelOpen] = useState(false)
 
   if (!outing && pendingFollowUp) {
     return (
@@ -1171,6 +1173,12 @@ function OutingBanner({ title }: { title: Title }) {
         ) : (
           <span className="flex items-center gap-3 ml-auto">
             <button
+              onClick={() => setSharePanelOpen(true)}
+              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+            >
+              Share
+            </button>
+            <button
               onClick={() => openOutingSchedule(title.id, outing.id)}
               className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
             >
@@ -1185,6 +1193,9 @@ function OutingBanner({ title }: { title: Title }) {
           </span>
         )}
       </div>
+      {sharePanelOpen && (
+        <ShareOutingPanel outing={outing} title={title} onClose={() => setSharePanelOpen(false)} />
+      )}
     </div>
   )
 }

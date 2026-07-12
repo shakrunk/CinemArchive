@@ -537,9 +537,7 @@ export type NotificationType =
   | 'reaction_received'
   | 'invite_redeemed'
   | 'outing_completed'
-  // 'outing_plans_shared' (plan §4.7): the DB already accepts it (Phase A's
-  // migration widened notifications_type_check) — its inbox rendering/
-  // TYPE_META lands with Phase D2's in-app plan sharing.
+  | 'outing_plans_shared'
 
 export interface AppNotificationItem {
   id: string

@@ -8,6 +8,7 @@ import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import { computeMarqueeEntries, formatCompanions, type MarqueeEntry } from 'src/store/outings'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile } from 'src/lib/ics'
+import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import type { Title } from 'src/store/mockData'
 import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
 import { cn, staggerDelays } from 'src/lib/utils'
@@ -292,6 +293,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [sharePanelOpen, setSharePanelOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   useClickOutside(menuRef, () => setMenuOpen(false), menuOpen, { escape: true })
 
@@ -353,17 +355,12 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                       className="absolute right-0 bottom-full mb-1 w-44 rounded-lg overflow-hidden z-10 shadow-xl py-1"
                       style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
                     >
-                      {/* Share plans: the friend-picker RPC wiring lands in Phase D2 —
-                          the affordance is placed now so that phase only has to wire it in. */}
                       <button
                         role="menuitem"
-                        disabled
-                        aria-disabled="true"
-                        title="Coming soon"
-                        className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 font-mono text-xs text-paper-faint/50 cursor-not-allowed"
+                        onClick={() => { setMenuOpen(false); setSharePanelOpen(true) }}
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors"
                       >
                         Share plans
-                        <span className="text-[9px] uppercase tracking-wide">Soon</span>
                       </button>
                       <button
                         role="menuitem"
@@ -387,6 +384,9 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
           </div>
         )}
       </CardFrame>
+      {sharePanelOpen && (
+        <ShareOutingPanel outing={outing} title={title} onClose={() => setSharePanelOpen(false)} />
+      )}
     </div>
   )
 }

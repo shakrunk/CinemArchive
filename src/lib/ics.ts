@@ -1,5 +1,5 @@
 import type { CinemaOuting } from 'src/store/mockData'
-import { formatCompanions } from 'src/store/outings'
+import { formatCompanions, type OutingSharePayload } from 'src/store/outings'
 
 // Hand-rolled cinema-outing calendar/share helpers (plan §4.5/§4.10) — no
 // calendar/share npm dependency anywhere in this feature.
@@ -47,26 +47,36 @@ function buildDescription(outing: CinemaOuting): string {
   return lines.join('\n')
 }
 
+interface VeventFields {
+  uid: string
+  titleName: string
+  venue?: string
+  showtime: string
+  endsAt: string
+  description: string
+}
+
 /** Hand-rolled VEVENT (plan §4.5): DTSTART/DTEND bracket the showtime→ends_at
  *  window, LOCATION carries the venue so phone calendars offer directions,
  *  and a VALARM fires 2 hours before showtime — the only pre-show reminder
- *  v1 can offer (no server push until Phase G). */
-export function buildOutingIcs(outing: CinemaOuting, titleName: string): string {
-  const summary = outing.venue ? `🎬 ${titleName} — ${outing.venue}` : `🎬 ${titleName}`
-  const description = buildDescription(outing)
+ *  v1 can offer (no server push until Phase G). Shared by the owner's outing
+ *  export and the recipient's plan-share export (plan §4.10), which have no
+ *  `CinemaOuting` row to read from. */
+function buildVevent({ uid, titleName, venue, showtime, endsAt, description }: VeventFields): string {
+  const summary = venue ? `🎬 ${titleName} — ${venue}` : `🎬 ${titleName}`
 
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//CinemArchive//Cinema Outings//EN',
     'BEGIN:VEVENT',
-    `UID:${outing.id}@cinemarchive`,
+    `UID:${uid}@cinemarchive`,
     `DTSTAMP:${icsDateTime(new Date().toISOString())}`,
-    `DTSTART:${icsDateTime(outing.showtime)}`,
-    `DTEND:${icsDateTime(outing.endsAt)}`,
+    `DTSTART:${icsDateTime(showtime)}`,
+    `DTEND:${icsDateTime(endsAt)}`,
     `SUMMARY:${icsEscape(summary)}`,
   ]
-  if (outing.venue) lines.push(`LOCATION:${icsEscape(outing.venue)}`)
+  if (venue) lines.push(`LOCATION:${icsEscape(venue)}`)
   if (description) lines.push(`DESCRIPTION:${icsEscape(description)}`)
   lines.push(
     'BEGIN:VALARM',
@@ -79,6 +89,36 @@ export function buildOutingIcs(outing: CinemaOuting, titleName: string): string 
   )
   // CRLF line endings per RFC 5545 §3.1.
   return lines.join('\r\n')
+}
+
+export function buildOutingIcs(outing: CinemaOuting, titleName: string): string {
+  return buildVevent({
+    uid: outing.id,
+    titleName,
+    venue: outing.venue,
+    showtime: outing.showtime,
+    endsAt: outing.endsAt,
+    description: buildDescription(outing),
+  })
+}
+
+/** The recipient's "Add to calendar" CTA on an `outing_plans_shared`
+ *  notification (plan §4.10) — built entirely from the shared snapshot, with
+ *  no access to (or need for) the sender's outing row. */
+export function buildOutingIcsFromSharePayload(payload: OutingSharePayload): string {
+  const companions = formatCompanions(payload.companions.map((name) => ({ name })))
+  const description = companions ? `With ${companions}` : ''
+  return buildVevent({
+    // No outing id to key off of on the recipient's side — tmdbId + showtime
+    // is stable enough to make re-downloads collide (rather than duplicate)
+    // in a calendar app that dedupes by UID.
+    uid: `share-${payload.tmdbId}-${payload.showtime}`,
+    titleName: payload.title,
+    venue: payload.venue,
+    showtime: payload.showtime,
+    endsAt: payload.endsAt,
+    description,
+  })
 }
 
 /** Triggers a browser download of the .ics text — no dependency, just an

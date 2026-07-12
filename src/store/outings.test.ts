@@ -7,6 +7,8 @@ import {
   companionSuggestions,
   venueSuggestions,
   formatCompanions,
+  parseOutingSharePayload,
+  formatOutingShareSnapshotLine,
 } from './outings'
 import type { CinemaOuting, Title, Viewing } from './mockData'
 import type { FriendshipView } from '../lib/auth'
@@ -283,5 +285,91 @@ describe('formatCompanions', () => {
 
   it('joins three or more with commas and a trailing "&"', () => {
     expect(formatCompanions([{ name: 'Alex' }, { name: 'Sam' }, { name: 'Priya' }])).toBe('Alex, Sam & Priya')
+  })
+})
+
+describe('parseOutingSharePayload', () => {
+  function makeRawPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      tmdb_id: 42,
+      type: 'movie',
+      title: 'Dune Part Three',
+      showtime: '2026-07-17T19:30:00.000Z',
+      ends_at: '2026-07-17T22:36:00.000Z',
+      ...overrides,
+    }
+  }
+
+  it('parses a well-formed snapshot, mapping snake_case to camelCase', () => {
+    const payload = parseOutingSharePayload(
+      makeRawPayload({ year: 2026, poster_url: 'https://x/p.jpg', venue: 'AMC Georgetown', format: 'IMAX', seat: 'H12', companions: ['Alex', 'Sam'] })
+    )
+    expect(payload).toEqual({
+      tmdbId: 42,
+      type: 'movie',
+      title: 'Dune Part Three',
+      year: 2026,
+      posterUrl: 'https://x/p.jpg',
+      showtime: '2026-07-17T19:30:00.000Z',
+      endsAt: '2026-07-17T22:36:00.000Z',
+      venue: 'AMC Georgetown',
+      format: 'IMAX',
+      seat: 'H12',
+      companions: ['Alex', 'Sam'],
+    })
+  })
+
+  it('omits optional fields that are missing, and defaults companions to []', () => {
+    const payload = parseOutingSharePayload(makeRawPayload())
+    expect(payload).toEqual({
+      tmdbId: 42,
+      type: 'movie',
+      title: 'Dune Part Three',
+      year: undefined,
+      posterUrl: undefined,
+      showtime: '2026-07-17T19:30:00.000Z',
+      endsAt: '2026-07-17T22:36:00.000Z',
+      venue: undefined,
+      format: undefined,
+      seat: undefined,
+      companions: [],
+    })
+  })
+
+  it('drops an unrecognized format rather than throwing', () => {
+    const payload = parseOutingSharePayload(makeRawPayload({ format: 'Not A Real Format' }))
+    expect(payload?.format).toBeUndefined()
+  })
+
+  it('returns null when a required field is missing or malformed', () => {
+    expect(parseOutingSharePayload(makeRawPayload({ tmdb_id: '42' }))).toBeNull()
+    expect(parseOutingSharePayload(makeRawPayload({ type: 'book' }))).toBeNull()
+    expect(parseOutingSharePayload(makeRawPayload({ title: undefined }))).toBeNull()
+  })
+})
+
+describe('formatOutingShareSnapshotLine', () => {
+  it('joins weekday/time, venue, and seat, omitting whatever is blank', () => {
+    const payload = parseOutingSharePayload({
+      tmdb_id: 42,
+      type: 'movie',
+      title: 'Dune Part Three',
+      showtime: '2026-07-17T19:30:00.000-06:00',
+      ends_at: '2026-07-17T22:36:00.000-06:00',
+      venue: 'AMC Georgetown',
+      seat: 'H12',
+    })!
+    expect(formatOutingShareSnapshotLine(payload)).toBe('Fri 7:30 PM · AMC Georgetown · seat H12')
+  })
+
+  it('omits venue and seat when unset', () => {
+    const payload = parseOutingSharePayload({
+      tmdb_id: 42,
+      type: 'movie',
+      title: 'Dune Part Three',
+      showtime: '2026-07-17T19:30:00.000-06:00',
+      ends_at: '2026-07-17T22:36:00.000-06:00',
+    })!
+    expect(formatOutingShareSnapshotLine(payload)).toBe('Fri 7:30 PM')
   })
 })

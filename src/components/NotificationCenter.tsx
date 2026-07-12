@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket, Clapperboard } from 'lucide-react'
+import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket, Clapperboard, CalendarPlus } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
-import { findPendingFollowUpOuting } from 'src/store/outings'
+import { findPendingFollowUpOuting, parseOutingSharePayload, formatOutingShareSnapshotLine } from 'src/store/outings'
+import { buildOutingIcsFromSharePayload, outingIcsFilename, downloadIcsFile } from 'src/lib/ics'
 import { cn, fmtDateShort } from 'src/lib/utils'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { useClickOutside } from 'src/lib/useClickOutside'
@@ -34,6 +35,20 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
       </>
     ),
   },
+  outing_plans_shared: {
+    Icon: Ticket,
+    verb: (n) => `has tickets to "${n.title ?? 'a movie'}"`,
+    render: (n) => {
+      const payload = parseOutingSharePayload(n.payload)
+      if (!payload) return <><span className="font-medium">{actorName(n)}</span> has tickets to share</>
+      return (
+        <>
+          <span className="font-medium">{actorName(n)}</span> has tickets to{' '}
+          <span className="font-medium">{payload.title}</span> — {formatOutingShareSnapshotLine(payload)}
+        </>
+      )
+    },
+  },
 }
 
 function actorName(n: AppNotificationItem): string {
@@ -54,6 +69,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
     deleteNotificationItem,
     openDetailDrawer,
     openPostShowSheet,
+    openOutingSchedule,
+    resolveSharedOutingTitle,
     outings,
   } = useAppStore(
     useShallow((s) => ({
@@ -65,6 +82,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       deleteNotificationItem: s.deleteNotificationItem,
       openDetailDrawer: s.openDetailDrawer,
       openPostShowSheet: s.openPostShowSheet,
+      openOutingSchedule: s.openOutingSchedule,
+      resolveSharedOutingTitle: s.resolveSharedOutingTitle,
       outings: s.outings,
     }))
   )
@@ -99,6 +118,29 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
     } else if (n.type === 'invite_redeemed') {
       onNavigate('profile')
     }
+  }
+
+  // "I've got tickets too" (plan §4.7/§4.10/rule §5.16): resolves the shared
+  // title into the recipient's own library (adding it to the watchlist first
+  // if it isn't there yet), then opens their own schedule sheet prefilled
+  // with the sender's showtime/venue/format — seat is left for them to fill in.
+  function handleGotTicketsToo(n: AppNotificationItem) {
+    const payload = parseOutingSharePayload(n.payload)
+    if (!payload) return
+    if (!n.readAt) void markOneNotificationRead(n.id)
+    setOpen(false)
+    const titleId = resolveSharedOutingTitle(payload)
+    openOutingSchedule(titleId, undefined, { showtime: payload.showtime, venue: payload.venue, format: payload.format })
+  }
+
+  // "Add to calendar" on a shared plan (plan §4.10) — built entirely from the
+  // notification's snapshot payload, no access to the sender's outing needed.
+  function handleAddSharedToCalendar(n: AppNotificationItem) {
+    const payload = parseOutingSharePayload(n.payload)
+    if (!payload) return
+    if (!n.readAt) void markOneNotificationRead(n.id)
+    const ics = buildOutingIcsFromSharePayload(payload)
+    downloadIcsFile(outingIcsFilename(payload.title, payload.showtime), ics)
   }
 
   return (
@@ -152,38 +194,62 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
               notificationInbox.map((n) => {
                 const meta = TYPE_META[n.type]
                 const Icon = meta.Icon
+                // Inline CTAs (plan §4.7/§4.10) only render once the payload
+                // parses — a malformed/legacy payload just falls back to the
+                // plain notification row.
+                const sharePayload = n.type === 'outing_plans_shared' ? parseOutingSharePayload(n.payload) : null
                 return (
                   <div
                     key={n.id}
-                    className="group relative flex items-start"
+                    className="group relative"
                     style={{ background: n.readAt ? 'transparent' : 'rgb(var(--amber-rgb) / 0.06)' }}
                   >
-                    <button
-                      role="menuitem"
-                      onClick={() => handleItemClick(n)}
-                      className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30"
-                    >
-                      <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-sans text-xs text-paper leading-snug">
-                          {meta.render ? meta.render(n) : (<><span className="font-medium">{actorName(n)}</span> {meta.verb(n)}</>)}
-                        </p>
-                        <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
-                          {fmtDateShort(n.createdAt)}
-                        </p>
+                    <div className="relative flex items-start">
+                      <button
+                        role="menuitem"
+                        onClick={() => handleItemClick(n)}
+                        className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30"
+                      >
+                        <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-sans text-xs text-paper leading-snug">
+                            {meta.render ? meta.render(n) : (<><span className="font-medium">{actorName(n)}</span> {meta.verb(n)}</>)}
+                          </p>
+                          <p className="font-mono text-[9px] text-muted-foreground mt-0.5">
+                            {fmtDateShort(n.createdAt)}
+                          </p>
+                        </div>
+                        {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void deleteNotificationItem(n.id)
+                        }}
+                        aria-label="Dismiss notification"
+                        className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {sharePayload && (
+                      <div className="flex gap-3 pl-[34px] pr-4 pb-2.5 -mt-1">
+                        <button
+                          onClick={() => handleGotTicketsToo(n)}
+                          className="flex items-center gap-1 font-mono text-[10px] text-amber hover:opacity-80 transition-opacity"
+                        >
+                          <Ticket className="w-3 h-3" />
+                          I've got tickets too
+                        </button>
+                        <button
+                          onClick={() => handleAddSharedToCalendar(n)}
+                          className="flex items-center gap-1 font-mono text-[10px] text-paper-faint hover:text-amber transition-colors"
+                        >
+                          <CalendarPlus className="w-3 h-3" />
+                          Add to calendar
+                        </button>
                       </div>
-                      {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void deleteNotificationItem(n.id)
-                      }}
-                      aria-label="Dismiss notification"
-                      className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    )}
                   </div>
                 )
               })

@@ -266,6 +266,15 @@ interface PinsSlice {
 // loaded with the library, never fetched for shared/friend viewers.
 interface OutingsSlice {
   outings: CinemaOuting[]
+  // "I've got tickets" sheet (plan §4.1) — a single overlay reused by every
+  // entry point. titleId preselects a movie (create mode); outingId, when
+  // set, switches the sheet into edit mode for that outing (titleId is then
+  // derived from the outing). Neither set → the sheet's own movie-picker step.
+  isOutingScheduleOpen: boolean
+  outingScheduleTitleId: string | null
+  outingScheduleOutingId: string | null
+  openOutingSchedule: (titleId?: string, outingId?: string) => void
+  closeOutingSchedule: () => void
   addOuting: (outing: CinemaOuting) => void
   // Edit/reschedule — recomputes endsAt from the merged showtime/previews/runtime.
   updateOuting: (id: string, patch: Partial<CinemaOuting>) => void
@@ -1238,6 +1247,19 @@ export const useAppStore = create<AppStore>()(
 
   // ── Cinema Outings ("I've got tickets") ─────────────────────
   outings: [],
+
+  isOutingScheduleOpen: false,
+  outingScheduleTitleId: null,
+  outingScheduleOutingId: null,
+  openOutingSchedule: (titleId, outingId) => {
+    // Rule (plan ground rules): isSharedView never renders scheduling actions.
+    // Every entry point already gates on it, but guarding here too means a
+    // stray call can't slip an owner-only overlay into a shared/friend session.
+    if (get().isSharedView) return
+    set({ isOutingScheduleOpen: true, outingScheduleTitleId: titleId ?? null, outingScheduleOutingId: outingId ?? null })
+  },
+  closeOutingSchedule: () =>
+    set({ isOutingScheduleOpen: false, outingScheduleTitleId: null, outingScheduleOutingId: null }),
 
   addOuting: (outing) =>
     set((s) => {

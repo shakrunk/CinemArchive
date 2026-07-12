@@ -5,6 +5,7 @@ import {
   outingPresentation,
   companionSuggestions,
   venueSuggestions,
+  formatCompanions,
 } from './outings'
 import type { CinemaOuting, Title, Viewing } from './mockData'
 import type { FriendshipView } from '../lib/auth'
@@ -238,5 +239,23 @@ describe('venueSuggestions', () => {
       { id: 'v2', titleId: 't1', date: '2026-01-01', venue: 'AMC Georgetown' },
     ]
     expect(venueSuggestions(outings, viewings)).toEqual(['Alamo Drafthouse', 'AMC Georgetown'])
+  })
+})
+
+describe('formatCompanions', () => {
+  it('returns an empty string for no companions', () => {
+    expect(formatCompanions([])).toBe('')
+  })
+
+  it('returns a bare name for a single companion', () => {
+    expect(formatCompanions([{ name: 'Alex' }])).toBe('Alex')
+  })
+
+  it('joins two companions with "&"', () => {
+    expect(formatCompanions([{ name: 'Alex' }, { name: 'Sam' }])).toBe('Alex & Sam')
+  })
+
+  it('joins three or more with commas and a trailing "&"', () => {
+    expect(formatCompanions([{ name: 'Alex' }, { name: 'Sam' }, { name: 'Priya' }])).toBe('Alex, Sam & Priya')
   })
 })

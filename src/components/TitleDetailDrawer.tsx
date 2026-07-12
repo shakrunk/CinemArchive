@@ -22,9 +22,10 @@ import {
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, RefreshCw, Tag, X, Send, Ticket,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
+import { formatCompanions } from 'src/store/outings'
 import type { Title, Viewing, WatchStatus, Season, Episode, CastMember, CrewMember, EpisodeCrew } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, fetchCollectionParts, TMDB_STILL_BASE, type TitleVideo, type WatchProviders, type SearchResult } from 'src/lib/media'
 import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
@@ -1108,11 +1109,70 @@ function FranchiseSection({
   )
 }
 
+// ─── Cinema Outings — scheduled banner (plan §4.6) ───────────────────────────
+
+function OutingBanner({ title }: { title: Title }) {
+  const outing = useAppStore((s) => s.outings.find((o) => o.titleId === title.id && o.status === 'scheduled'))
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const cancelOuting = useAppStore((s) => s.cancelOuting)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+
+  if (!outing) return null
+
+  const showtime = new Date(outing.showtime)
+  const now = new Date().getTime()
+  const nowShowing = now >= showtime.getTime() && now < new Date(outing.endsAt).getTime()
+  const dateLabel = showtime.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  const timeLabel = showtime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  const companionLabel = formatCompanions(outing.companions)
+  const summary = [nowShowing ? 'NOW SHOWING' : `${dateLabel} · ${timeLabel}`, outing.venue, companionLabel && `with ${companionLabel}`]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <div className="px-4 sm:px-6 pt-4">
+      <div
+        className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06]"
+        aria-label={`Scheduled cinema outing: ${summary}`}
+      >
+        <Ticket className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
+        <span className="font-mono text-xs text-amber">{summary}</span>
+        {confirmingCancel ? (
+          <span className="flex items-center gap-2 ml-auto">
+            <span className="font-mono text-xs text-muted-foreground">Cancel these tickets?</span>
+            <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }}>
+              Yes
+            </button>
+            <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors">
+              No
+            </button>
+          </span>
+        ) : (
+          <span className="flex items-center gap-3 ml-auto">
+            <button
+              onClick={() => openOutingSchedule(title.id, outing.id)}
+              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setConfirmingCancel(true)}
+              className="font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
+            >
+              Cancel
+            </button>
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
   // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, viewerContext } = useAppStore(
+  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, viewerContext, openOutingSchedule } = useAppStore(
     useShallow((s) => ({
       isDetailDrawerOpen: s.isDetailDrawerOpen,
       closeDetailDrawer: s.closeDetailDrawer,
@@ -1122,6 +1182,7 @@ export function TitleDetailDrawer() {
       openRefreshMetadata: s.openRefreshMetadata,
       isSharedView: s.isSharedView,
       viewerContext: s.viewerContext,
+      openOutingSchedule: s.openOutingSchedule,
     }))
   )
   const browseByStudio = useAppStore((s) => s.browseByStudio)
@@ -1717,6 +1778,8 @@ export function TitleDetailDrawer() {
           </div>
         )}
 
+        {!isSharedView && title.type === 'movie' && <OutingBanner title={title} />}
+
         {/* Scrollable body */}
         <div className="px-4 sm:px-6 pb-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-x-8 lg:items-start">
           {/* Each column owns its vertical flow, so a tall sidebar never creates
@@ -1797,13 +1860,24 @@ export function TitleDetailDrawer() {
                 title="Viewing History"
                 className="lg:col-start-1"
                 action={!showLogForm && !isSharedView ? (
-                    <button
-                      onClick={() => setShowLogForm(true)}
-                      className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Log a viewing
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {(title.status === 'watchlist' || title.status === 'watching') && (
+                        <button
+                          onClick={() => openOutingSchedule(title.id)}
+                          className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                        >
+                          <Ticket className="w-3.5 h-3.5" />
+                          I've got tickets
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowLogForm(true)}
+                        className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Log a viewing
+                      </button>
+                    </div>
                 ) : undefined}
               >
 
@@ -1943,6 +2017,15 @@ export function TitleDetailDrawer() {
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
                   </button>
+                  {title.type === 'movie' && title.status === 'watched' && (
+                    <button
+                      onClick={() => openOutingSchedule(title.id)}
+                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    >
+                      <Ticket className="w-3.5 h-3.5" />
+                      Plan a cinema trip
+                    </button>
+                  )}
                   {user && (
                     <button
                       onClick={() => setSendPanelOpen(true)}

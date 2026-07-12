@@ -9,6 +9,16 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Cinema Outings — "I've got tickets" scheduling: a form to log a booked cinema
+  trip (showtime, theater, companions, format, previews/runtime buffer, ticket
+  price, seat, booking ref) from the title drawer, Up Next watchlist cards, the
+  command palette, and right after adding a movie to the watchlist. The drawer
+  shows a scheduled-outing banner with Edit/Cancel, and saving offers an
+  out-of-app share snippet plus a downloadable `.ics` calendar event with a
+  2-hour reminder.
+
 ## [1.2.0] - 2026-07-11
 
 ### Added

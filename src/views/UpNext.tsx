@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { PlayCircle, Check, Undo2, Clock, Bookmark } from 'lucide-react'
+import { PlayCircle, Check, Undo2, Clock, Bookmark, Ticket } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
@@ -234,23 +234,42 @@ function formatReleaseDate(iso: string): string {
 }
 
 function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: number }) {
-  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
+  const { openDetailDrawer, openOutingSchedule, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      openDetailDrawer: s.openDetailDrawer,
+      openOutingSchedule: s.openOutingSchedule,
+      isSharedView: s.isSharedView,
+    }))
+  )
   const { title, releaseDate } = entry
   return (
-    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
-      {releaseDate ? (
-        <>
+    <div className="relative">
+      <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+        {releaseDate ? (
+          <>
+            <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> Upcoming
+            </p>
+            <p className="font-sans text-sm text-paper-dim">Releases {formatReleaseDate(releaseDate)}</p>
+          </>
+        ) : (
           <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" /> Upcoming
+            <Bookmark className="w-3.5 h-3.5" /> On your watchlist
           </p>
-          <p className="font-sans text-sm text-paper-dim">Releases {formatReleaseDate(releaseDate)}</p>
-        </>
-      ) : (
-        <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
-          <Bookmark className="w-3.5 h-3.5" /> On your watchlist
-        </p>
+        )}
+      </CardFrame>
+      {/* Cinema Outings entry point (plan §4.1) — movies only, v1 scope. */}
+      {!isSharedView && title.type === 'movie' && (
+        <button
+          onClick={() => openOutingSchedule(title.id)}
+          aria-label={`I've got tickets for ${title.title}`}
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-sm text-amber/80 hover:text-amber hover:bg-black/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+        >
+          <Ticket className="w-3.5 h-3.5" />
+        </button>
       )}
-    </CardFrame>
+    </div>
   )
 }
 

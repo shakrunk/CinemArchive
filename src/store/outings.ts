@@ -190,6 +190,17 @@ export function companionSuggestions(
   return [...past, ...friendCompanions]
 }
 
+/** Joins companion names the way a sentence would ("Alex", "Alex & Sam",
+ *  "Alex, Sam & Priya") — used by the drawer's scheduled banner, the ticket
+ *  stub, the .ics DESCRIPTION, and the out-of-app share snippet. Empty input
+ *  yields ''. */
+export function formatCompanions(companions: Companion[]): string {
+  const names = companions.map((c) => c.name).filter((n) => n.trim())
+  if (names.length === 0) return ''
+  if (names.length === 1) return names[0]
+  return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`
+}
+
 /** Distinct past venues (most-recent first) across outings + viewings — the
  *  schedule form's theater autocomplete (plan §4.1/§13: "your usual theater
  *  is one tap"). */

@@ -19,6 +19,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     closeCommandPalette,
     openAddTitle,
     openDetailDrawer,
+    openOutingSchedule,
     setViewMode
   } = useAppStore(
     useShallow((s) => ({
@@ -29,6 +30,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
       closeCommandPalette: s.closeCommandPalette,
       openAddTitle: s.openAddTitle,
       openDetailDrawer: s.openDetailDrawer,
+      openOutingSchedule: s.openOutingSchedule,
       setViewMode: s.setViewMode,
     }))
   )
@@ -45,6 +47,12 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     }
     list.push({ id: 'action:view-upnext', kind: 'action', label: 'Go to Up Next', hint: 'view', keywords: 'continue watching' })
     map['action:view-upnext'] = () => onNavigate('upnext')
+    if (!isSharedView) {
+      list.push({ id: 'action:tickets', kind: 'action', label: "I've got tickets…", hint: 'schedule', keywords: 'cinema outing movie showtime theater venue' })
+      map['action:tickets'] = () => openOutingSchedule()
+      list.push({ id: 'action:view-marquee', kind: 'action', label: 'On the Marquee', hint: 'view', keywords: 'cinema outings tickets up next showtime' })
+      map['action:view-marquee'] = () => onNavigate('upnext')
+    }
     list.push({ id: 'action:view-library', kind: 'action', label: 'Go to the Library', hint: 'view', keywords: 'collection posters' })
     map['action:view-library'] = () => onNavigate('library')
     list.push({ id: 'action:view-ledger', kind: 'action', label: 'Go to the Ledger', hint: 'view', keywords: 'stats dashboard' })
@@ -71,7 +79,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
       map[id] = () => openDetailDrawer(t.id)
     }
     return { commands: list, runMap: map }
-  }, [titles, isSharedView, user, openAddTitle, openDetailDrawer, setViewMode, onNavigate])
+  }, [titles, isSharedView, user, openAddTitle, openDetailDrawer, openOutingSchedule, setViewMode, onNavigate])
 
   function runCommand(cmd: Command) {
     closeCommandPalette()

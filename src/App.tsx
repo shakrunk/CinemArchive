@@ -10,6 +10,7 @@ import { Profile } from 'src/views/Profile'
 import { Friends } from 'src/views/Friends'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
 import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
+import { OutingScheduleSheet } from 'src/components/OutingScheduleSheet'
 import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
@@ -237,6 +238,7 @@ export default function App() {
           <AddTitleWorkflow />
           <TitleDetailDrawer />
           <RefreshMetadataModal />
+          <OutingScheduleSheet />
         </>
       )}
       <AppCommandPalette onNavigate={setCurrentView} />

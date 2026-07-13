@@ -18,8 +18,14 @@ android {
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+}
+
 dependencies {
-    implementation(libs.androidx.room.runtime)
+    api(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     kapt(libs.androidx.room.compiler)
 }

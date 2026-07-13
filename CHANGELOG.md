@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-07-12
+
 ### Fixed
 
 - PWA updates now surface a "new version available" toast instead of

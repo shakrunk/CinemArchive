@@ -3,7 +3,9 @@ package work.kumarfamilynet.cinemarchive.feature.library
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,17 +27,24 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.LocalDate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 
-class TitleDetailViewModel(repository: LibraryRepository, titleId: String) : ViewModel() {
+class TitleDetailViewModel(private val repository: LibraryRepository, titleId: String) : ViewModel() {
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Optimistic local write + queued remote push — see LibraryRepository.logEpisodeWatched. */
+    fun onMarkWatched(episodeId: String) {
+        viewModelScope.launch { repository.logEpisodeWatched(episodeId, LocalDate.now().toString()) }
+    }
 }
 
 @Composable
@@ -42,12 +52,12 @@ fun TitleDetailRoute(repository: LibraryRepository, titleId: String, onBack: () 
     val viewModel: TitleDetailViewModel =
         viewModel(factory = TitleDetailViewModelFactory(repository, titleId))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
-    TitleDetailScreen(detail, onBack)
+    TitleDetailScreen(detail, onBack, onMarkWatched = viewModel::onMarkWatched)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TitleDetailScreen(detail: TitleDetail?, onBack: () -> Unit) {
+fun TitleDetailScreen(detail: TitleDetail?, onBack: () -> Unit, onMarkWatched: (String) -> Unit = {}) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -80,7 +90,7 @@ fun TitleDetailScreen(detail: TitleDetail?, onBack: () -> Unit) {
 
             if (detail.seasons.isNotEmpty()) {
                 item { Text("Seasons", style = MaterialTheme.typography.titleMedium) }
-                items(detail.seasons, key = SeasonDetail::id) { season -> SeasonRow(season) }
+                items(detail.seasons, key = SeasonDetail::id) { season -> SeasonRow(season, onMarkWatched) }
             }
 
             if (detail.viewings.isNotEmpty()) {
@@ -105,25 +115,35 @@ private fun TitleHeader(detail: TitleDetail) {
 }
 
 @Composable
-private fun SeasonRow(season: SeasonDetail) {
+private fun SeasonRow(season: SeasonDetail, onMarkWatched: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             "Season ${season.seasonNumber} — ${season.episodesWatched}/${season.episodeCount} watched",
             style = MaterialTheme.typography.titleSmall,
         )
-        season.episodes.forEach { episode -> EpisodeRow(episode) }
+        season.episodes.forEach { episode -> EpisodeRow(episode, onMarkWatched) }
     }
 }
 
 @Composable
-private fun EpisodeRow(episode: EpisodeDetail) {
+private fun EpisodeRow(episode: EpisodeDetail, onMarkWatched: (String) -> Unit) {
     val watched = episode.watchCount > 0
     val label = buildString {
         append("${episode.episodeNumber}. ${episode.episodeName ?: "Untitled"}")
         if (watched) append(" — watched ${episode.watchCount}×")
         episode.latestRating?.let { append(" — ★$it") }
     }
-    Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        if (!watched) {
+            TextButton(onClick = { onMarkWatched(episode.id) }) {
+                Text("Mark watched")
+            }
+        }
+    }
 }
 
 @Composable

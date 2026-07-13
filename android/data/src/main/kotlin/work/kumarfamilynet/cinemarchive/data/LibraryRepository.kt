@@ -1,14 +1,17 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchCount
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
@@ -29,9 +32,9 @@ private data class EpisodeAggregate(
 )
 
 /**
- * The app reads the Library and Title detail through this Room-backed repository. Network
- * sync is added here, rather than being called from UI, once the protected Android contract
- * is available (docs/android-sync-contract.md).
+ * The app reads the Library and Title detail, and queues tracking mutations, through this
+ * Room-backed repository. Writes land in Room immediately (optimistic) and are queued in
+ * [outbox] for a remote push once network sync is wired up (docs/android-sync-contract.md).
  */
 class LibraryRepository(
     private val titleDao: TitleDao,
@@ -40,6 +43,7 @@ class LibraryRepository(
     private val watchEventDao: EpisodeWatchEventDao,
     private val ratingDao: EpisodeRatingDao,
     private val viewingDao: ViewingDao,
+    private val outbox: MutationOutbox,
 ) {
     fun observeLibrary(): Flow<List<LibraryTitle>> = titleDao.observeLibrary().map { rows ->
         rows.map { row ->
@@ -126,5 +130,23 @@ class LibraryRepository(
                 },
             )
         }
+    }
+
+    /** Logs a watch for [episodeId] — optimistic local write + a queued remote push, per
+     *  the idempotency contract in docs/android-sync-contract.md §4.2: the id is generated
+     *  here (not left to the server) so a retried push upserts instead of duplicating. */
+    suspend fun logEpisodeWatched(episodeId: String, watchedAt: String?) {
+        val id = UUID.randomUUID().toString()
+        watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(id = id, episodeId = episodeId, watchedAt = watchedAt)))
+        outbox.enqueue(
+            entityType = "episode_watch_event",
+            entityId = id,
+            operation = "upsert",
+            payload = JSONObject().apply {
+                put("id", id)
+                put("episodeId", episodeId)
+                put("watchedAt", watchedAt ?: JSONObject.NULL)
+            },
+        )
     }
 }

@@ -45,7 +45,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
         aria-label="Account menu"
         aria-expanded={open}
         className={cn(
-          'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center',
+          'icon-btn relative w-9 h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
           (isActive || open) && '!bg-amber/15 border-amber/50'
         )}
       >
@@ -65,7 +65,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
               setOpen(false)
               toggleTheme({ clientX: e.clientX, clientY: e.clientY })
             }}
-            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] text-paper-dim hover:text-amber hover:bg-secondary/30 transition-colors"
+            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] text-paper-dim hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -76,7 +76,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
             aria-current={currentView === 'friends' ? 'page' : undefined}
             onClick={() => go('friends')}
             className={cn(
-              'w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] hover:bg-secondary/30 transition-colors',
+              'w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30',
               currentView === 'friends' ? 'text-amber' : 'text-paper-dim hover:text-amber'
             )}
           >
@@ -89,7 +89,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
             aria-current={currentView === 'profile' ? 'page' : undefined}
             onClick={() => go('profile')}
             className={cn(
-              'w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] hover:bg-secondary/30 transition-colors',
+              'w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30',
               currentView === 'profile' ? 'text-amber' : 'text-paper-dim hover:text-amber'
             )}
           >
@@ -102,7 +102,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
           <button
             role="menuitem"
             onClick={handleSignOut}
-            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] text-paper-dim hover:text-ember hover:bg-secondary/30 transition-colors"
+            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] text-paper-dim hover:text-ember hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
           >
             <LogOut className="w-4 h-4" />
             Sign out

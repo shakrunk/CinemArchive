@@ -272,7 +272,7 @@ function OutingForm({
       titles: s.titles,
     }))
   )
-  const allViewings = titles.flatMap((t) => t.viewings)
+  const allViewings = useMemo(() => titles.flatMap((t) => t.viewings), [titles])
 
   const [friends, setFriends] = useState<FriendshipView[]>([])
 

@@ -220,12 +220,16 @@ interface DiscoverCarouselProps {
   onAdd: (result: SearchResult) => void
   onSelect: (result: SearchResult) => void
   delays: number[]
+  /** Sticky auto-scroll pause, controlled by the header's CarouselPauseButton —
+   *  the strip itself only owns the transient hover/focus pause (KP-044). */
+  paused: boolean
 }
 
-function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSelect, delays }: DiscoverCarouselProps) {
+function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSelect, delays, paused }: DiscoverCarouselProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<HTMLDivElement>(null)
+  const isInViewportRef = useRef(false)
   const scrollXRef = useRef(0)
   const singleSetWidthRef = useRef(0)
   const draggingRef = useRef(false)
@@ -235,10 +239,12 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   const pausedRef = useRef(false)
   const velocityRef = useRef(0)
   const lastMoveRef = useRef<{ x: number; t: number } | null>(null)
-  const userPausedRef = useRef(false)
+  // Mirrors the `paused` prop into a ref so the rAF loop can read it without
+  // re-subscribing on every toggle.
+  const userPausedRef = useRef(paused)
+  useEffect(() => { userPausedRef.current = paused }, [paused])
   const reducedMotionRef = usePrefersReducedMotionRef()
   const [isGrabbing, setIsGrabbing] = useState(false)
-  const [userPaused, setUserPaused] = useState(false)
 
   const applyTransform = useCallback(() => {
     const width = singleSetWidthRef.current
@@ -283,6 +289,23 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
     return () => ro.disconnect()
   }, [results, applyTransform])
 
+  // Keep the ambient marquee from advancing while its carousel is off-screen.
+  // Manual dragging, wheel input, and release momentum remain available whenever
+  // the user is interacting with the strip.
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+    if (!('IntersectionObserver' in window)) {
+      isInViewportRef.current = true
+      return
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      isInViewportRef.current = entry.isIntersecting
+    })
+    observer.observe(wrapper)
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     if (results.length === 0) return
     let raf = 0
@@ -302,7 +325,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
         } else {
           velocityRef.current = 0
         }
-        if (!pausedRef.current && !userPausedRef.current && !reducedMotionRef.current) {
+        if (isInViewportRef.current && !pausedRef.current && !userPausedRef.current && !reducedMotionRef.current) {
           scrollXRef.current += CAROUSEL_SPEED_PX_S * dt
           moved = true
         }
@@ -396,13 +419,6 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   function pause() { pausedRef.current = true }
   function resume() { pausedRef.current = false }
 
-  // Explicit pause toggle — unlike the hover pause above this one sticks, for anyone
-  // who finds the perpetual marquee distracting or hard to target.
-  function toggleUserPause() {
-    userPausedRef.current = !userPausedRef.current
-    setUserPaused(userPausedRef.current)
-  }
-
   // Chevron override — a manual nudge layered on top of the auto-scroll/drag, for
   // anyone who'd rather page through than wait for the marquee or grab-drag it.
   // The auto-scroll keeps drifting from wherever this lands, same as after a drag.
@@ -495,26 +511,35 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
           >
             <ChevronRight className="w-4 h-4 text-paper" />
           </button>
-
-          {/* Auto-scroll pause toggle — stays visible while paused (unlike the
-              hover-only chevrons) so the frozen strip explains itself. */}
-          <button
-            onClick={toggleUserPause}
-            aria-label={userPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
-            aria-pressed={userPaused}
-            className={cn(
-              'absolute right-2 bottom-2 w-8 h-8 rounded-full flex items-center justify-center transition-opacity shadow-lg z-10',
-              userPaused ? 'opacity-100' : 'opacity-0 group-hover/carousel:opacity-100 focus-visible:opacity-100'
-            )}
-            style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
-          >
-            {userPaused
-              ? <Play className="w-3.5 h-3.5 text-amber" />
-              : <Pause className="w-3.5 h-3.5 text-paper" />}
-          </button>
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── CarouselPauseButton — sticky auto-scroll toggle in each carousel's header ──
+// Lives beside the section title / View-more link rather than overlaid on the film
+// strip (KP-044): always visible, labeled, and distinct from the hover-only chevrons,
+// for anyone who finds the perpetual marquee distracting or hard to target.
+
+function CarouselPauseButton({ paused, onToggle }: { paused: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={paused}
+      aria-label={paused ? 'Resume carousel auto-scroll' : 'Pause carousel auto-scroll'}
+      className={cn(
+        'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider rounded-full border px-2.5 py-1 transition-colors',
+        paused
+          ? 'text-amber border-amber/40'
+          : 'text-paper-faint hover:text-paper hover:border-amber/40',
+      )}
+      style={{ background: 'var(--inset)', borderColor: paused ? undefined : 'var(--line)' }}
+    >
+      {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+      {paused ? 'Play' : 'Pause'}
+    </button>
   )
 }
 
@@ -1095,6 +1120,12 @@ export function Discover() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
+  // Sticky pause per carousel, owned here so the toggle can live in each
+  // section's header next to the title / View-more link (KP-044).
+  const [mainPaused, setMainPaused] = useState(false)
+  const [becauseWatchedPaused, setBecauseWatchedPaused] = useState(false)
+  const [moreStarringPaused, setMoreStarringPaused] = useState(false)
+
   // Fast owned-title lookup by tmdbId
   const libraryTmdbIds = useMemo(
     () => new Set(titles.map((t) => t.tmdbId).filter((id): id is number => id != null)),
@@ -1434,7 +1465,7 @@ export function Discover() {
       <div className="text-center mb-7">
         <p className="kicker"><span className="dot" /> the acquisitions desk</p>
         <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3 max-w-xl mx-auto">
-          What's missing from your <em>archive?</em>
+          Discover reels for the <em>vault</em>
         </h1>
       </div>
 
@@ -1612,9 +1643,7 @@ export function Discover() {
             <h2 className="font-serif text-lg font-semibold text-paper">
               {sectionLabel}
             </h2>
-          </div>
-          {!loading && !inPickerMode && displayResults.length > 0 && (
-            searchMode === 'titles' && !query.trim() && hasMore ? (
+            {!loading && !inPickerMode && displayResults.length > 0 && searchMode === 'titles' && !query.trim() && hasMore && (
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
@@ -1623,11 +1652,17 @@ export function Discover() {
                 {loadingMore ? 'Loading…' : 'View more'}
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
-            ) : (
-              <span className="font-mono text-[10px] text-paper-faint/60">
-                {displayResults.length} title{displayResults.length !== 1 ? 's' : ''}
-              </span>
-            )
+            )}
+          </div>
+          {!loading && !inPickerMode && displayResults.length > 0 && (
+            <div className="flex items-center gap-3">
+              {!(searchMode === 'titles' && !query.trim() && hasMore) && (
+                <span className="font-mono text-[10px] text-paper-faint/60">
+                  {displayResults.length} title{displayResults.length !== 1 ? 's' : ''}
+                </span>
+              )}
+              <CarouselPauseButton paused={mainPaused} onToggle={() => setMainPaused((p) => !p)} />
+            </div>
           )}
         </div>
 
@@ -1675,6 +1710,7 @@ export function Discover() {
               onAdd={openAddTitlePreselected}
               onSelect={setSelectedResult}
               delays={discoverDelays}
+              paused={mainPaused}
             />
           )}
         </div>
@@ -1690,6 +1726,11 @@ export function Discover() {
                 onChange={setBecauseWatchedOverrideId}
                 ariaLabel="Choose a title to base recommendations on"
               />
+              {!becauseWatchedLoading && visibleBecauseWatchedResults.length > 0 && (
+                <div className="ml-auto">
+                  <CarouselPauseButton paused={becauseWatchedPaused} onToggle={() => setBecauseWatchedPaused((p) => !p)} />
+                </div>
+              )}
             </div>
             {becauseWatchedLoading ? (
               <div className="flex gap-3 overflow-hidden">
@@ -1705,6 +1746,7 @@ export function Discover() {
                 onAdd={openAddTitlePreselected}
                 onSelect={setSelectedResult}
                 delays={becauseWatchedDelays}
+                paused={becauseWatchedPaused}
               />
             ) : (
               <p className="font-mono text-xs text-paper-faint py-6">
@@ -1725,6 +1767,11 @@ export function Discover() {
                 onChange={(id) => setMoreStarringOverridePersonId(Number(id))}
                 ariaLabel="Choose an actor to see more of their titles"
               />
+              {!moreStarringLoading && visibleMoreStarringResults.length > 0 && (
+                <div className="ml-auto">
+                  <CarouselPauseButton paused={moreStarringPaused} onToggle={() => setMoreStarringPaused((p) => !p)} />
+                </div>
+              )}
             </div>
             {moreStarringLoading ? (
               <div className="flex gap-3 overflow-hidden">
@@ -1740,6 +1787,7 @@ export function Discover() {
                 onAdd={openAddTitlePreselected}
                 onSelect={setSelectedResult}
                 delays={moreStarringDelays}
+                paused={moreStarringPaused}
               />
             ) : (
               <p className="font-mono text-xs text-paper-faint py-6">

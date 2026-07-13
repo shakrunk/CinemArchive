@@ -11,6 +11,7 @@ import {
   sendFriendRequest,
   acceptFriendRequest,
   declineFriendRequest,
+  cancelFriendRequest,
   blockFriend,
   unblockFriend,
   listFriendships,
@@ -107,6 +108,18 @@ function FriendsSection() {
       await loadFriendships()
     } catch (err) {
       console.error('Failed to decline friend request:', err)
+    }
+  }
+
+  async function handleCancelRequest(recipientId: string) {
+    setMessage(null)
+    try {
+      await cancelFriendRequest(recipientId)
+      setMessage({ type: 'success', text: 'Friend request cancelled.' })
+      await Promise.all([loadFriendships(), loadSuggestions()])
+    } catch (err: any) {
+      console.error('Failed to cancel friend request:', err)
+      setMessage({ type: 'error', text: err.message || 'Failed to cancel friend request.' })
     }
   }
 
@@ -210,6 +223,17 @@ function FriendsSection() {
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </>
+                )}
+                {f.status === 'pending' && f.requested_by === user?.id && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleCancelRequest(f.friend_user_id)}
+                    className="bg-secondary hover:bg-destructive hover:text-destructive-foreground text-muted-foreground w-7 h-7 p-0 flex items-center justify-center"
+                    title="Cancel request"
+                    aria-label="Cancel friend request"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
                 )}
                 {f.status === 'accepted' && (
                   <>

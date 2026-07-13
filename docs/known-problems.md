@@ -4,7 +4,21 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-_No open items — the backlog was cleared on 2026-07-10 (see below). File new issues here as they surface._
+_No open items — the 2026-07-12 follow-up batch (KP-039 – KP-045) is resolved below. File new issues here as they surface._
+
+---
+
+## Resolved: Follow-up Polish (2026-07-12)
+
+| ID     | Issue                                                            | Resolution |
+| ------ | ---------------------------------------------------------------- | ---------- |
+| KP-039 | Verify invite-code redeemers appear as suggested friend connects | Stale note — already shipped as KP-026. Verified end to end: migration `20260710130000` is on `main` (applied by `db-migrate.yml`), `list_invite_connections()` covers both `invited_by_you`/`invited_you` lineage and excludes every existing friendship state, `handle_new_user()` guarantees the `profiles` join can't drop a redeemer, and the Friends tab renders "Suggested friends" with a one-tap request. No code change needed. |
+| KP-040 | Improve the Bechdel test badge icon                              | Replaced the Venus (♀) glyph with a bespoke `BechdelIcon` in [media-badges.tsx](file:///V:/repos/CinemArchive/src/components/ui/media-badges.tsx) — two figures under a conversation ellipsis, hand-drawn on Lucide's 24px stroke grid so it takes the same size/stroke/color as the stock badge icons. |
+| KP-041 | Reword the Discover hero heading to fit the brand vibe           | The search hero in [Discover.tsx](file:///V:/repos/CinemArchive/src/views/Discover.tsx) now reads "Scout the next reel for the *vault.*" under the existing "the acquisitions desk" kicker — swapping the plain question for the projection-room register used across the app. |
+| KP-042 | Cohesive GUI for the accessibility buttons                       | The skip link and keyboard-shortcuts button in [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx) now live in a single `nav` toolbar (bordered card, shared pill style) that slides in from above when either control gains keyboard focus — replacing two independently positioned pills with a hardcoded `left-40` offset. The focused pill highlights amber to mark the active control. |
+| KP-043 | Collapse the nav bar word mark into the logo sooner              | The [TopBar.tsx](file:///V:/repos/CinemArchive/src/components/TopBar.tsx) word mark moved from `hidden lg:flex` to `hidden xl:flex` — only the spinning reel mark shows below `xl` (1280px), giving the pill nav breathing room at the widths where it was still crowded after KP-033. |
+| KP-044 | Make the Discover carousel pause buttons more prominent          | The KP-036 hover-only overlay in the strip's corner is gone; each carousel header (trending/search, Because You Watched, More Starring) now carries an always-visible labeled Pause/Play chip at its right edge, next to the View-more link / taste dropdowns. `DiscoverCarousel` takes the sticky pause as a controlled `paused` prop; the strip keeps only the transient hover/focus pause. |
+| KP-045 | Assess importing watch history/ratings from other platforms     | Feasibility assessment written up in [import-feasibility.md](file:///V:/repos/CinemArchive/docs/import-feasibility.md) (verdict: very feasible — Letterboxd/IMDb low effort, Trakt medium with best TV fidelity, Netflix high for quality results). The lowest-effort importer shipped as a prototype: Profile → Data & Portability accepts a Letterboxd CSV (watched/ratings/diary/watchlist), resolves films to TMDB by name+year via [letterboxd-import.ts](file:///V:/repos/CinemArchive/src/lib/letterboxd-import.ts) (unit-tested parser/matcher, progress + cancel, duplicate skipping, unmatched reporting), and imports ratings and per-rewatch viewing dates. |
 
 ---
 

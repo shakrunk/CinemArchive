@@ -1,7 +1,7 @@
 /**
  * Verifies the friendship state-machine transitions. Mirrors the SQL logic
  * in supabase/migrations/20260630010000_friendships.sql (send_friend_request,
- * accept_friend_request, decline_friend_request, block_user) so the rules
+ * accept_friend_request, decline_friend_request, cancel_friend_request, block_user) so the rules
  * stay honest without spinning up a real Postgres instance.
  *
  * Run: node scripts/verify-friendship-state-machine.mjs
@@ -60,6 +60,19 @@ function declineFriendRequest(state, me, requesterId) {
   const matches =
     state && state.user_id_a === a && state.user_id_b === b && state.status === 'pending' && state.requested_by === requesterId
   if (!matches) return state
+  return null // row deleted
+}
+
+/**
+ * @param {object|null} state
+ * @param {string} me
+ * @param {string} recipientId
+ */
+function cancelFriendRequest(state, me, recipientId) {
+  const [a, b] = canonicalPair(me, recipientId)
+  const matches =
+    state && state.user_id_a === a && state.user_id_b === b && state.status === 'pending' && state.requested_by === me
+  if (!matches) throw new Error('No pending friend request to this user')
   return null // row deleted
 }
 
@@ -153,6 +166,19 @@ assert(s5Again.status === 'accepted', 'sending a request to an existing friend i
 let s6 = sendFriendRequest(null, ALICE, BOB)
 s6 = declineFriendRequest(s6, BOB, ALICE)
 assert(s6 === null, 'declining a pending request from the correct sender removes the row')
+
+// Sender can withdraw their own outgoing request.
+let s6b = sendFriendRequest(null, ALICE, BOB)
+s6b = cancelFriendRequest(s6b, ALICE, BOB)
+assert(s6b === null, 'cancelling an outgoing pending request removes the row')
+
+threw = false
+try {
+  cancelFriendRequest(sendFriendRequest(null, ALICE, BOB), BOB, ALICE)
+} catch {
+  threw = true
+}
+assert(threw, 'only the original sender can cancel a pending request')
 
 // Decline is a no-op against the wrong sender id
 let s7 = sendFriendRequest(null, ALICE, BOB)

@@ -9,6 +9,38 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-12
+
+### Added
+
+- Import from Letterboxd: Profile → Data & Portability accepts a CSV from a
+  Letterboxd data export (watched, ratings, diary, or watchlist). Films are
+  matched to TMDB by name and year, ratings copy over on the shared 0.5–5
+  scale, diary rewatches become dated viewings, duplicates are skipped, and
+  unmatched films are reported instead of guessed.
+
+### Changed
+
+- The Bechdel test badge now uses a bespoke "two figures in conversation" icon
+  in place of the generic Venus (♀) symbol, matching the test's actual criteria.
+- The Discover page hero now reads "Scout the next reel for the vault." in
+  place of "What's missing from your archive?", matching the app's
+  projection-room voice.
+- The keyboard-focus accessibility controls (skip to content, keyboard
+  shortcuts) now appear together as one sliding toolbar instead of two
+  separately floating pills.
+- The nav bar word mark now collapses into the reel logo below 1280px (was
+  1024px), so it no longer crowds the pill nav on mid-size screens.
+- The Discover carousels' pause control moved out of the film strip into each
+  carousel's header as an always-visible labeled Pause/Play chip, replacing
+  the hover-only corner overlay.
+
+### Fixed
+
+- Friend requests can now be withdrawn by their sender; discovery carousels
+  only auto-scroll while visible; and the ticket action in Up Next no longer
+  crashes the screen.
+
 ## [1.3.0] - 2026-07-12
 
 ### Added

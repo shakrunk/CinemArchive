@@ -26,6 +26,11 @@ import { NotificationStack } from 'src/components/NotificationStack'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 
+// Shared pill style for the accessibility toolbar's controls — subdued at rest
+// so the amber focus state marks which of the revealed pills is active.
+const A11Y_PILL =
+  'px-4 py-2 rounded-md font-sans text-sm font-medium text-paper bg-secondary/60 transition-colors focus:outline-none focus-visible:bg-amber focus-visible:text-[color:var(--on-amber)]'
+
 export default function App() {
   // Smart landing unless the URL already names a view (deep link / refresh).
   const [currentView, setCurrentView] = useState<AppView>(() => {
@@ -190,21 +195,22 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-3 focus:left-3 focus:px-4 focus:py-2 focus:rounded-md focus:bg-amber focus:text-[color:var(--on-amber)] focus:font-sans focus:text-sm focus:font-medium focus:shadow-lg"
+      {/* Accessibility toolbar — parked above the viewport until either control
+          gains keyboard focus, then the whole cluster slides in so the skip link
+          and the shortcuts button (for keyboard/screen-reader users who can't
+          hover-discover "?") read as one surface, not two stray pills (KP-042).
+          Both stay in the tab order the whole time. */}
+      <nav
+        aria-label="Accessibility shortcuts"
+        className="absolute top-3 left-3 z-[300] flex items-center gap-1.5 p-1.5 rounded-lg border border-amber/30 bg-card shadow-lg -translate-y-[200%] opacity-0 pointer-events-none transition-[transform,opacity] duration-150 focus-within:translate-y-0 focus-within:opacity-100 focus-within:pointer-events-auto"
       >
-        Skip to content
-      </a>
-      {/* Hidden-until-focused, like the skip link above — surfaces the shortcuts
-          panel for keyboard and screen-reader users who can't hover-discover "?". */}
-      <button
-        type="button"
-        onClick={() => setIsKeyboardHelpOpen(true)}
-        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-3 focus:left-40 focus:px-4 focus:py-2 focus:rounded-md focus:bg-amber focus:text-[color:var(--on-amber)] focus:font-sans focus:text-sm focus:font-medium focus:shadow-lg"
-      >
-        Keyboard shortcuts
-      </button>
+        <a href="#main-content" className={A11Y_PILL}>
+          Skip to content
+        </a>
+        <button type="button" onClick={() => setIsKeyboardHelpOpen(true)} className={A11Y_PILL}>
+          Keyboard shortcuts
+        </button>
+      </nav>
 
       {/* ── Atmosphere layers (fixed, full-viewport) ── */}
       <div className="projector-beam" aria-hidden="true" />

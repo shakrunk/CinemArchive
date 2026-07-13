@@ -30,6 +30,7 @@ import {
   type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
+import { parseLetterboxdCsv, resolveLetterboxdRows } from 'src/lib/letterboxd-import'
 import { insertTitleToDb, insertOutingToDb } from 'src/lib/db'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { applyTheme } from 'src/lib/theme'
@@ -1052,6 +1053,10 @@ function DataSection() {
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const lbFileInputRef = useRef<HTMLInputElement>(null)
+  const [lbImporting, setLbImporting] = useState(false)
+  const [lbProgress, setLbProgress] = useState<{ done: number; total: number } | null>(null)
+  const lbCancelRef = useRef(false)
 
   function handleExport() {
     exportLibrary(titles, outings)
@@ -1099,12 +1104,62 @@ function DataSection() {
     }
   }
 
+  // Letterboxd CSV import (KP-045 prototype) — accepts one file from the
+  // Letterboxd data-export zip (watched.csv, ratings.csv, diary.csv,
+  // watchlist.csv). Each film resolves to TMDB by name+year, so large
+  // histories take a while; progress + cancel keep it honest.
+  async function handleLetterboxdFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (lbFileInputRef.current) lbFileInputRef.current.value = ''
+
+    setLbImporting(true)
+    setMessage(null)
+    setLbProgress(null)
+    lbCancelRef.current = false
+    try {
+      const rows = parseLetterboxdCsv(await file.text())
+      if (rows.length === 0) throw new Error('No films found in that CSV.')
+
+      // watchlist.csv rows land on the watchlist; everything else is history.
+      const status = /watchlist/i.test(file.name) ? ('watchlist' as const) : ('watched' as const)
+      const existingMovieIds = new Set(
+        titles.filter((t) => t.type === 'movie' && t.tmdbId != null).map((t) => t.tmdbId)
+      )
+      const { imported, unmatched, duplicates } = await resolveLetterboxdRows(rows, {
+        status,
+        isDuplicate: (tmdbId) => existingMovieIds.has(tmdbId),
+        onProgress: (done, total) => setLbProgress({ done, total }),
+        isCancelled: () => lbCancelRef.current,
+      })
+
+      if (imported.length > 0) {
+        setTitles([...imported, ...titles])
+        if (user) await Promise.all(imported.map((t) => insertTitleToDb(user.id, t)))
+      }
+
+      const parts = [`Imported ${imported.length} film${imported.length !== 1 ? 's' : ''}`]
+      if (duplicates > 0) parts.push(`skipped ${duplicates} already in your library`)
+      if (unmatched.length > 0) {
+        const shown = unmatched.slice(0, 5).join(', ')
+        parts.push(`couldn't match ${unmatched.length}: ${shown}${unmatched.length > 5 ? `, +${unmatched.length - 5} more` : ''}`)
+      }
+      if (lbCancelRef.current) parts.push('(cancelled early)')
+      setMessage({ type: 'success', text: `${parts.join(' · ')}.` })
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Letterboxd import failed.' })
+    } finally {
+      setLbImporting(false)
+      setLbProgress(null)
+    }
+  }
+
   return (
     <Section
       id="data"
       title="Data & Portability"
       Icon={Download}
-      description="Export your entire library as a JSON file, or import a previously exported archive. Duplicates are skipped on import."
+      description="Export your entire library as a JSON file, import a previously exported archive, or bring your watch history and ratings over from a Letterboxd CSV export. Duplicates are skipped on import."
     >
       <MessageBanner message={message} />
       <div className="flex gap-2 max-w-md">
@@ -1131,6 +1186,40 @@ function DataSection() {
           onChange={handleImportFile}
         />
       </div>
+      <div className="flex gap-2 max-w-md">
+        <Button
+          onClick={() => lbFileInputRef.current?.click()}
+          disabled={lbImporting}
+          className="flex-1 bg-secondary/60 hover:bg-amber/20 hover:text-amber text-paper font-sans text-xs border border-border transition-colors gap-2"
+        >
+          {lbImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Film className="w-3.5 h-3.5 text-amber" />}
+          {lbImporting && lbProgress
+            ? `Matching ${lbProgress.done}/${lbProgress.total}…`
+            : lbImporting
+              ? 'Reading CSV…'
+              : 'Import from Letterboxd (CSV)'}
+        </Button>
+        {lbImporting && (
+          <Button
+            onClick={() => { lbCancelRef.current = true }}
+            className="bg-secondary/60 hover:bg-red-500/20 hover:text-red-400 text-paper font-sans text-xs border border-border transition-colors"
+          >
+            Cancel
+          </Button>
+        )}
+        <input
+          ref={lbFileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={handleLetterboxdFile}
+        />
+      </div>
+      <p className="font-mono text-[10px] text-muted-foreground max-w-md">
+        Accepts one file from your Letterboxd data export (watched.csv, ratings.csv,
+        diary.csv, or watchlist.csv). Films are matched to TMDB by name and year;
+        anything that can't be matched confidently is reported, not guessed.
+      </p>
     </Section>
   )
 }

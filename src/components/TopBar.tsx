@@ -73,9 +73,10 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         {/* Brand */}
         <div className="flex items-center gap-3 shrink-0 select-none">
           <ReelMark className="w-[30px] h-[30px] text-amber animate-spin-slow drop-shadow-[0_0_10px_rgb(var(--amber-rgb)/0.5)]" />
-          {/* lg: — on small tablets the word mark competes with the pill nav for width;
-              below lg only the reel mark shows (KP-033). */}
-          <div className="hidden lg:flex flex-col leading-[1.05]">
+          {/* xl: — the word mark competes with the pill nav for width well past the
+              tablet sizes KP-033 first addressed; below xl only the reel mark shows
+              (KP-043). */}
+          <div className="hidden xl:flex flex-col leading-[1.05]">
             <span
               className="font-serif text-xl font-semibold text-paper tracking-tight"
               style={{ fontVariationSettings: '"opsz" 40' }}

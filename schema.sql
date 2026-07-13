@@ -699,7 +699,7 @@ $$;
 --   (none)  -> pending   via send_friend_request
 --   pending -> accepted  via accept_friend_request, or automatically if the
 --              other party also sends a request (mutual request)
---   pending -> (removed) via decline_friend_request
+--   pending -> (removed) via decline_friend_request or cancel_friend_request
 --   any     -> blocked   via block_user (only blocked_by can act on it again)
 --   blocked -> (removed) via unblock_user (blocked_by only); re-friending
 --              requires a fresh send_friend_request afterward
@@ -830,6 +830,32 @@ begin
   where user_id_a = a and user_id_b = b
     and status = 'pending'
     and requested_by = requester_user_id;
+end;
+$$;
+
+create or replace function cancel_friend_request(recipient_user_id uuid)
+returns void
+language plpgsql security definer as $$
+declare
+  me uuid := auth.uid();
+  a uuid := least(me, recipient_user_id);
+  b uuid := greatest(me, recipient_user_id);
+begin
+  if me is null then
+    raise exception 'Not authenticated';
+  end if;
+  if me = recipient_user_id then
+    raise exception 'Cannot cancel a friend request to yourself';
+  end if;
+
+  delete from friendships
+  where user_id_a = a and user_id_b = b
+    and status = 'pending'
+    and requested_by = me;
+
+  if not found then
+    raise exception 'No pending friend request to this user';
+  end if;
 end;
 $$;
 

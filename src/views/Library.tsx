@@ -80,11 +80,11 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
   const allLanguages = useAllLanguages()
 
   return (
-    <BottomSheet open={open} onClose={onClose} side="right" title="Refine Collection">
+    <BottomSheet open={open} onClose={onClose} side="right" title="Filter Library">
       <div className="space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b" style={{ borderColor: 'var(--line)' }}>
           <SlidersHorizontal className="w-4 h-4 text-amber shrink-0" />
-          <span className="font-serif text-xl font-light text-paper">Refine Collection</span>
+          <span className="font-serif text-xl font-light text-paper">Filter Library</span>
           {activeFilterCount > 0 && (
             <span className="ml-auto font-mono text-xs text-amber bg-amber/10 border border-amber/20 px-2 py-0.5 rounded-full shrink-0">
               {activeFilterCount} active

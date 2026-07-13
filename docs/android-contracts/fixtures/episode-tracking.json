@@ -1,0 +1,51 @@
+{
+  "$comment": "Hand-authored fixture for docs/android-contracts/episode-tracking.md. Demonstrates the independence of watch/rating/review logs on a single episode (2 watches, 1 rating, 1 review, all separately timestamped) plus a pre-platform (dateless) watch event on a different episode. Not exported from a live database.",
+  "episodeId": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+  "watchEvents": [
+    {
+      "id": "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
+      "watchedAt": "2026-03-02",
+      "notes": null,
+      "colorMode": null
+    },
+    {
+      "id": "f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f9a0b1c",
+      "watchedAt": "2026-06-10",
+      "notes": "Rewatch before season 2.",
+      "colorMode": "bw"
+    }
+  ],
+  "ratings": [
+    {
+      "id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+      "rating": 4.5,
+      "ratedAt": "2026-03-02T21:00:00.000Z"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "a7b8c9d0-e1f2-3a4b-5c6d-7e8f9a0b1c2d",
+      "reviewText": "Perfect pilot. Sets the tone immediately.",
+      "reviewedAt": "2026-03-03T08:15:00.000Z",
+      "colorMode": null
+    }
+  ],
+  "prePlatformExample": {
+    "episodeId": "12345678-90ab-cdef-1234-567890abcdef",
+    "watchEvents": [
+      {
+        "id": "87654321-ba09-fedc-4321-0987654321ba",
+        "watchedAt": null,
+        "notes": null,
+        "colorMode": null,
+        "$comment": "null watchedAt = watched before joining the platform; sorts as oldest in the timeline"
+      }
+    ]
+  },
+  "seasonRollup": {
+    "$comment": "Denormalized counters on `seasons`, NOT derived automatically from watchEvents by the DB — client must compute and write these explicitly (see episode-tracking.md §3).",
+    "seasonId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    "episodeCount": 7,
+    "episodesWatched": 1
+  }
+}

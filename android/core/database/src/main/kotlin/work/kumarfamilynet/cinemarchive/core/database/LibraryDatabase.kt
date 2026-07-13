@@ -1,33 +1,31 @@
 package work.kumarfamilynet.cinemarchive.core.database
 
 import android.content.Context
-import androidx.room.Dao
 import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import kotlinx.coroutines.flow.Flow
+import androidx.room.TypeConverters
 
-@Entity(tableName = "library_titles")
-data class LibraryTitleEntity(
-    @PrimaryKey val id: String,
-    val name: String,
-    val year: Int?,
-    val posterUrl: String?,
-    val status: String,
+@Database(
+    entities = [
+        TitleEntity::class,
+        SeasonEntity::class,
+        EpisodeEntity::class,
+        EpisodeWatchEventEntity::class,
+        EpisodeRatingEntity::class,
+        ViewingEntity::class,
+    ],
+    version = 1,
+    exportSchema = true,
 )
-
-@Dao
-interface LibraryTitleDao {
-    @Query("SELECT * FROM library_titles ORDER BY name COLLATE NOCASE")
-    fun observeAll(): Flow<List<LibraryTitleEntity>>
-}
-
-@Database(entities = [LibraryTitleEntity::class], version = 1, exportSchema = true)
+@TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
-    abstract fun libraryTitleDao(): LibraryTitleDao
+    abstract fun titleDao(): TitleDao
+    abstract fun seasonDao(): SeasonDao
+    abstract fun episodeDao(): EpisodeDao
+    abstract fun episodeWatchEventDao(): EpisodeWatchEventDao
+    abstract fun episodeRatingDao(): EpisodeRatingDao
+    abstract fun viewingDao(): ViewingDao
 
     companion object {
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(

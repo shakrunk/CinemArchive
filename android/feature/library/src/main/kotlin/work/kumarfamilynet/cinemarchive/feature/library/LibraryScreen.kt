@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,15 +41,15 @@ class LibraryViewModel(repository: LibraryRepository) : ViewModel() {
 }
 
 @Composable
-fun LibraryRoute(repository: LibraryRepository) {
+fun LibraryRoute(repository: LibraryRepository, onTitleClick: (String) -> Unit) {
     val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LibraryScreen(uiState)
+    LibraryScreen(uiState, onTitleClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(uiState: LibraryUiState) {
+fun LibraryScreen(uiState: LibraryUiState, onTitleClick: (String) -> Unit = {}) {
     Scaffold(topBar = { TopAppBar(title = { Text("The Projection Room") }) }) { innerPadding ->
         if (uiState.titles.isEmpty()) {
             EmptyLibrary(modifier = Modifier.padding(innerPadding))
@@ -59,7 +60,11 @@ fun LibraryScreen(uiState: LibraryUiState) {
                 modifier = Modifier.padding(innerPadding),
             ) {
                 items(uiState.titles, key = LibraryTitle::id) { title ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onTitleClick(title.id) },
+                    ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(title.name, style = MaterialTheme.typography.titleLarge)
                             title.year?.let { Text(it.toString(), style = MaterialTheme.typography.bodyMedium) }

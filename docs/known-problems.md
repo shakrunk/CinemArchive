@@ -4,11 +4,7 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-### KP-045: Assess importing watch history/ratings from other platforms
-
-- **Description**: Determine how difficult it would be to import watch history and/or ratings from other platforms (Letterboxd, IMDb, Trakt, Netflix, Simkl, …). CinemArchive already has JSON export/import between its own instances, but nothing that ingests third-party data.
-- **Impacted Codebase**: TBD — likely a new import module plus the Add-Title/TMDB matching path
-- **Proposed Solution**: Write a feasibility assessment (per-platform export formats, TMDB matching strategy, effort estimates) under `docs/`, then prototype the lowest-effort importer (likely Letterboxd CSV).
+_No open items — the 2026-07-12 follow-up batch (KP-039 – KP-045) is resolved below. File new issues here as they surface._
 
 ---
 
@@ -22,6 +18,7 @@ This document tracks known issues, technical debt, and usability improvements fo
 | KP-042 | Cohesive GUI for the accessibility buttons                       | The skip link and keyboard-shortcuts button in [App.tsx](file:///V:/repos/CinemArchive/src/App.tsx) now live in a single `nav` toolbar (bordered card, shared pill style) that slides in from above when either control gains keyboard focus — replacing two independently positioned pills with a hardcoded `left-40` offset. The focused pill highlights amber to mark the active control. |
 | KP-043 | Collapse the nav bar word mark into the logo sooner              | The [TopBar.tsx](file:///V:/repos/CinemArchive/src/components/TopBar.tsx) word mark moved from `hidden lg:flex` to `hidden xl:flex` — only the spinning reel mark shows below `xl` (1280px), giving the pill nav breathing room at the widths where it was still crowded after KP-033. |
 | KP-044 | Make the Discover carousel pause buttons more prominent          | The KP-036 hover-only overlay in the strip's corner is gone; each carousel header (trending/search, Because You Watched, More Starring) now carries an always-visible labeled Pause/Play chip at its right edge, next to the View-more link / taste dropdowns. `DiscoverCarousel` takes the sticky pause as a controlled `paused` prop; the strip keeps only the transient hover/focus pause. |
+| KP-045 | Assess importing watch history/ratings from other platforms     | Feasibility assessment written up in [import-feasibility.md](file:///V:/repos/CinemArchive/docs/import-feasibility.md) (verdict: very feasible — Letterboxd/IMDb low effort, Trakt medium with best TV fidelity, Netflix high for quality results). The lowest-effort importer shipped as a prototype: Profile → Data & Portability accepts a Letterboxd CSV (watched/ratings/diary/watchlist), resolves films to TMDB by name+year via [letterboxd-import.ts](file:///V:/repos/CinemArchive/src/lib/letterboxd-import.ts) (unit-tested parser/matcher, progress + cancel, duplicate skipping, unmatched reporting), and imports ratings and per-rewatch viewing dates. |
 
 ---
 

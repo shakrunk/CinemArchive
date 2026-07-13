@@ -9,6 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Import from Letterboxd: Profile → Data & Portability accepts a CSV from a
+  Letterboxd data export (watched, ratings, diary, or watchlist). Films are
+  matched to TMDB by name and year, ratings copy over on the shared 0.5–5
+  scale, diary rewatches become dated viewings, duplicates are skipped, and
+  unmatched films are reported instead of guessed.
+
 ### Changed
 
 - The Bechdel test badge now uses a bespoke "two figures in conversation" icon

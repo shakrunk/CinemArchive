@@ -97,6 +97,7 @@ object DevFixtureSeed {
         )
 
         val episodeId = "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e"
+        val secondEpisodeId = "a9b8c7d6-e5f4-3a2b-1c0d-9e8f7a6b5c4d"
         database.episodeDao().upsertAll(
             listOf(
                 EpisodeEntity(
@@ -107,6 +108,15 @@ object DevFixtureSeed {
                     episodeName = "Pilot",
                     airDate = "2008-01-20",
                     runtime = 58,
+                ),
+                EpisodeEntity(
+                    id = secondEpisodeId,
+                    titleId = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+                    seasonId = seasonId,
+                    episodeNumber = 2,
+                    episodeName = "Cat's in the Bag...",
+                    airDate = "2008-01-27",
+                    runtime = 48,
                 ),
             )
         )

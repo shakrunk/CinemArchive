@@ -88,6 +88,18 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         episodes.
   - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
         issues, build succeeds.
+  - [x] Verified live on an Android Studio emulator (2026-07-13, `sdk_gphone64_x86_64`,
+        API 36): installed the debug build, launched the app, confirmed the Library and
+        Title detail screens render the seeded fixtures, then tapped "Mark watched" on a
+        real unwatched episode. Pulled the on-device Room database (WAL-mode, so both the
+        `.db` and `.db-wal` files were needed) and confirmed directly: a new
+        `episode_watch_events` row was written with today's date, and a matching
+        `mutation_outbox` row was enqueued (`entityType='episode_watch_event'`,
+        `operation='upsert'`, correct JSON payload, `attemptCount=0`, no error). No crashes
+        in logcat. This is the first confirmation of the outbox pattern working end-to-end
+        on a running app rather than only in a unit test. (`DevFixtureSeed` gained a second,
+        unwatched episode so this path has something to exercise — still temporary/dev-only
+        data, same as the rest of the seed.)
   - [ ] Conflict handling — designed (last-write-wins by `updated_at`, per
         docs/android-sync-contract.md §4.2) but not implementable/testable until a real
         `RemoteMutationWriter` exists to actually produce conflicts against.

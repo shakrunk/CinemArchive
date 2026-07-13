@@ -103,8 +103,31 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [ ] Conflict handling — designed (last-write-wins by `updated_at`, per
         docs/android-sync-contract.md §4.2) but not implementable/testable until a real
         `RemoteMutationWriter` exists to actually produce conflicts against.
-  - [ ] Remaining tracking mutations (rating, review, status change, viewing log) — not yet
-        wired; `logEpisodeWatched` is the one proof-of-pattern for this pass.
+  - [x] Remaining tracking mutations wired end-to-end, each an optimistic Room write plus a
+        queued outbox entry, same pattern as `logEpisodeWatched`:
+        - `logEpisodeRating` / `logEpisodeReview` — append-only logs via the existing
+          `EpisodeRatingDao` and a new `EpisodeReviewEntity`/`EpisodeReviewDao` (no local
+          `episode_reviews` mirror existed before this pass; Room version bumped 1 → 2 with
+          `fallbackToDestructiveMigration` — acceptable pre-distribution, since the only
+          local data is `DevFixtureSeed`'s re-seed-on-empty fixtures).
+        - `logViewing` — append-only re-watch timeline entry via the existing `ViewingDao`.
+        - `updateTitleStatus` — the one in-place update rather than an append; outbox
+          operation is `"update"`, and `updatedAt` is stamped fresh (feeds the last-write-wins
+          conflict handling above, not optional).
+        `TitleDetailScreen` exposes all four as bare text-button/star-tap/inline-textfield
+        affordances (status pills, 5-star tap row, expandable review field, "Log a viewing"),
+        matching the existing "Mark watched" austerity — this pass is the write path, not UI
+        polish.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): cleared app data,
+        confirmed the v1 → v2 destructive migration re-seeds cleanly, then exercised all four
+        new mutations on real UI (rated an episode 4★, submitted an episode review, changed a
+        title's status to WATCHED, logged a new viewing). Pulled the on-device database and
+        confirmed each: `episode_ratings`/`episode_reviews`/`viewings` gained the expected new
+        rows, `titles.status`/`updatedAt` updated in place, and `mutation_outbox` had four
+        matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
+        `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
 - [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

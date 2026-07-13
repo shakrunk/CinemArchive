@@ -116,7 +116,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
               onClick={(e) => toggleTheme({ clientX: e.clientX, clientY: e.clientY })}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center"
+              className="icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
             >
               {theme === 'dark' ? (
@@ -130,7 +130,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           <button
             onClick={openCommandPalette}
             aria-label="Search (open command palette)"
-            className="icon-btn h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center gap-2 px-2.5 sm:px-3"
+            className="icon-btn h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center gap-2 px-2.5 sm:px-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
           >
             <Search className="w-[17px] h-[17px]" />
@@ -148,7 +148,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           {friendView ? (
             <button
               onClick={exitFriendView}
-              className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5"
+              className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               aria-label={`Exit ${friendView.displayName}'s library`}
               title={`Viewing ${friendView.displayName}'s library — click to exit`}
             >
@@ -159,7 +159,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           ) : viewerContext.kind === 'shared-link' ? (
             <button
               onClick={handleExitSharedLink}
-              className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5"
+              className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               aria-label="Exit shared view"
               title="Viewing a shared, read-only link — click to exit"
             >
@@ -176,7 +176,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                 ) : (
                   <button
                     onClick={import.meta.env.DEV ? () => setUser(DEV_MOCK_USER) : onProfileClick}
-                    className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5"
+                    className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                     aria-label="Sign in"
                     title={import.meta.env.DEV ? 'Dev mode: sign in instantly with a mock session' : undefined}
                   >

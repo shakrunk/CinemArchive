@@ -30,6 +30,7 @@ class CinemArchiveApplication : Application() {
             episodeDao = database.episodeDao(),
             watchEventDao = database.episodeWatchEventDao(),
             ratingDao = database.episodeRatingDao(),
+            reviewDao = database.episodeReviewDao(),
             viewingDao = database.viewingDao(),
             outbox = outbox,
         )

@@ -13,10 +13,11 @@ import androidx.room.TypeConverters
         EpisodeEntity::class,
         EpisodeWatchEventEntity::class,
         EpisodeRatingEntity::class,
+        EpisodeReviewEntity::class,
         ViewingEntity::class,
         OutboxEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -26,6 +27,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun episodeDao(): EpisodeDao
     abstract fun episodeWatchEventDao(): EpisodeWatchEventDao
     abstract fun episodeRatingDao(): EpisodeRatingDao
+    abstract fun episodeReviewDao(): EpisodeReviewDao
     abstract fun viewingDao(): ViewingDao
     abstract fun outboxDao(): OutboxDao
 
@@ -34,6 +36,11 @@ abstract class LibraryDatabase : RoomDatabase() {
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
-        ).build()
+        )
+            // Pre-distribution: no real user data exists yet, only DevFixtureSeed's
+            // re-seed-on-empty dev fixtures, so a hand-authored 1->2 migration would
+            // preserve data nobody has. Revisit once the app ships real user data.
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
     }
 }

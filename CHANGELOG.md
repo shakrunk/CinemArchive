@@ -9,6 +9,16 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-13
+
+### Added
+
+- Native Android app (in development, not yet distributed): episode ratings, episode
+  reviews, title status changes, and re-watch logging now write through the same durable
+  mutation outbox as marking an episode watched, so all core tracking actions survive
+  offline use and process death. The remote push is still stubbed pending a physical device
+  for Credential Manager auth.
+
 ## [1.6.0] - 2026-07-13
 
 ### Added

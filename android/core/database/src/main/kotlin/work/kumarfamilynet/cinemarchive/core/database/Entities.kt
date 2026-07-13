@@ -120,6 +120,26 @@ data class EpisodeRatingEntity(
     val ratedAt: String,
 )
 
+/** Independent review log — deliberately not 1:1 with watch events or ratings. */
+@Entity(
+    tableName = "episode_reviews",
+    foreignKeys = [
+        ForeignKey(
+            entity = EpisodeEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["episodeId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("episodeId")],
+)
+data class EpisodeReviewEntity(
+    @PrimaryKey val id: String,
+    val episodeId: String,
+    val reviewText: String,
+    val reviewedAt: String,
+)
+
 /** Re-watch timeline entry — see docs/android-contracts/title-detail.md §1 (Viewings). */
 @Entity(
     tableName = "viewings",

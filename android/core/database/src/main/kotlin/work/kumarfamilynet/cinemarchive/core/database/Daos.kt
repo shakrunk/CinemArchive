@@ -30,6 +30,9 @@ interface TitleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(titles: List<TitleEntity>)
 
+    @Query("UPDATE titles SET status = :status, updatedAt = :updatedAt WHERE id = :titleId")
+    suspend fun updateStatus(titleId: String, status: String, updatedAt: String)
+
     @Query("SELECT COUNT(*) FROM titles")
     suspend fun count(): Int
 }
@@ -82,6 +85,12 @@ interface EpisodeRatingDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(ratings: List<EpisodeRatingEntity>)
+}
+
+@Dao
+interface EpisodeReviewDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(reviews: List<EpisodeReviewEntity>)
 }
 
 @Dao

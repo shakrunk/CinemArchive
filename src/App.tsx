@@ -23,6 +23,7 @@ import { applyTheme, toggleTheme } from 'src/lib/theme'
 import { AppCommandPalette } from 'src/components/AppCommandPalette'
 import { KeyboardShortcutsHelp } from 'src/components/KeyboardShortcutsHelp'
 import { NotificationStack } from 'src/components/NotificationStack'
+import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 
@@ -252,6 +253,7 @@ export default function App() {
       <AppCommandPalette onNavigate={setCurrentView} />
       <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onClose={() => setIsKeyboardHelpOpen(false)} />
       <NotificationStack />
+      <PWAUpdateToast />
     </div>
   )
 }

@@ -9,6 +9,18 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-07-12
+
+### Fixed
+
+- PWA updates now surface a "new version available" toast instead of
+  silently swapping the service worker in the background. Previously a
+  freshly deployed build could sit undetected behind a stale cached shell
+  until the browser's own lazy update check happened to fire, so different
+  devices/tabs could render different versions of the app with no way for
+  the user to force a resync. The toast's Reload button now deterministically
+  activates the new service worker before reloading.
+
 ## [1.4.0] - 2026-07-12
 
 ### Added

@@ -11,6 +11,7 @@ This checklist is the execution record for `docs/native-android-app-plan.md`. It
 - [x] Build a Room-backed, read-only Library prototype with immutable UI state and a screen-scoped ViewModel.
 - [x] Record the provisional package identity and toolchain decision in ADR 0001.
 - [x] Publish the initial Android parity matrix with web sources, backend dependencies, and verification gates.
+- [x] Confirm the local toolchain resolves: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` builds a debug APK and passes lint/unit tests (JDK 17, Android SDK 36 platform, build-tools 35.0.0).
 - [ ] Confirm permanent package name, Play owner, signing owner, privacy owner, and support channel.
 - [ ] Audit the web contracts/RLS/media rules and publish the Android parity matrix and fixtures.
 - [ ] Add protected Supabase test access, session restoration, verified App Links, and physical-device Credential Manager proof.

@@ -59,12 +59,52 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         `schema.sql` kept in sync. Re-validated as a committed file, not just ad-hoc SQL —
         the test project's `public` schema was dropped and all 34 migrations replayed from
         scratch, confirming the file applies cleanly and behaves correctly standalone.
-  - [ ] Applied to production — ships when this branch's `dev` → `main` PR merges and
-        `db-migrate.yml` runs `supabase db push` against the live project.
+  - [x] Applied to production (2026-07-13): [PR #92](https://github.com/shakrunk/CinemArchive/pull/92)
+        merged to `main` (v1.5.0), then the "DB Migrate (manual)" GitHub Actions workflow
+        was dispatched by explicit user confirmation — note this workflow is
+        `workflow_dispatch`-only, *not* automatic on push to `main` despite `CLAUDE.md`
+        describing it that way; worth fixing that doc separately. Verified directly against
+        the live project (`taoyxhbacdvnhevqyrqm`): `sync_tombstones` table exists,
+        `sync_library_changes` RPC exists, all 10 previously-missing `updated_at` columns
+        are present, all alongside real production data (69 titles, etc.) — confirming a
+        clean apply with no data disruption.
   - [ ] Cast/crew, physical media, badge scores (imdb/RT/Metacritic) — deferred from this
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.
-- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling.
+- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Started:**
+  - [x] `mutation_outbox` Room table + `OutboxDao` — a durable queue of pending remote
+        writes (client-generated id, entity type, operation, JSON payload, attempt count),
+        separate from the local read-model write it accompanies so the outbox row only
+        needs to survive process death, not be transactional with it.
+  - [x] `MutationOutbox` (in `data`) — `enqueue()` + `flush()` against a `RemoteMutationWriter`
+        interface. The real implementation isn't wired yet: `UnconfiguredRemoteMutationWriter`
+        always returns `Retry`, so mutations stay durably queued (never dropped, never
+        falsely marked synced) until a real Supabase client + auth session exist — blocked
+        on the same physical-device Credential Manager gap as Phase 0/1's auth work.
+  - [x] One real mutation wired end-to-end: `LibraryRepository.logEpisodeWatched()` writes
+        optimistically to Room (client-generated id, matching the
+        docs/android-sync-contract.md §4.2 idempotency contract) and enqueues the outbox
+        entry. `TitleDetailScreen` exposes it as a "Mark watched" action on unwatched
+        episodes.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on an Android Studio emulator (2026-07-13, `sdk_gphone64_x86_64`,
+        API 36): installed the debug build, launched the app, confirmed the Library and
+        Title detail screens render the seeded fixtures, then tapped "Mark watched" on a
+        real unwatched episode. Pulled the on-device Room database (WAL-mode, so both the
+        `.db` and `.db-wal` files were needed) and confirmed directly: a new
+        `episode_watch_events` row was written with today's date, and a matching
+        `mutation_outbox` row was enqueued (`entityType='episode_watch_event'`,
+        `operation='upsert'`, correct JSON payload, `attemptCount=0`, no error). No crashes
+        in logcat. This is the first confirmation of the outbox pattern working end-to-end
+        on a running app rather than only in a unit test. (`DevFixtureSeed` gained a second,
+        unwatched episode so this path has something to exercise — still temporary/dev-only
+        data, same as the rest of the seed.)
+  - [ ] Conflict handling — designed (last-write-wins by `updated_at`, per
+        docs/android-sync-contract.md §4.2) but not implementable/testable until a real
+        `RemoteMutationWriter` exists to actually produce conflicts against.
+  - [ ] Remaining tracking mutations (rating, review, status change, viewing log) — not yet
+        wired; `logEpisodeWatched` is the one proof-of-pattern for this pass.
 - [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

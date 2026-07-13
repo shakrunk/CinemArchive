@@ -14,6 +14,7 @@ import androidx.room.TypeConverters
         EpisodeWatchEventEntity::class,
         EpisodeRatingEntity::class,
         ViewingEntity::class,
+        OutboxEntity::class,
     ],
     version = 1,
     exportSchema = true,
@@ -26,6 +27,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun episodeWatchEventDao(): EpisodeWatchEventDao
     abstract fun episodeRatingDao(): EpisodeRatingDao
     abstract fun viewingDao(): ViewingDao
+    abstract fun outboxDao(): OutboxDao
 
     companion object {
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(

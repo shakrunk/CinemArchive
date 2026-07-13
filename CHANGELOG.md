@@ -9,6 +9,18 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-13
+
+### Added
+
+- Native Android app (in development, not yet distributed): a durable
+  mutation outbox for tracking changes offline. Marking an episode watched
+  now writes to the local Room database immediately and queues the change
+  for remote sync — the queue survives process death and retries until a
+  push succeeds, so mutations are never silently dropped. The actual remote
+  push is still stubbed pending a physical device for Credential Manager
+  auth; queued mutations stay durably pending until that lands.
+
 ## [1.5.0] - 2026-07-13
 
 ### Added

@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Native Android app (in development, not yet distributed): the selected theme (dark,
+  light, noir, matrix) now persists locally and survives an app restart, via a bare
+  cycle-through button on the Library screen.
+
 ## [1.7.0] - 2026-07-13
 
 ### Added

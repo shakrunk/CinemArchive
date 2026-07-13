@@ -6,8 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-
-enum class ArchiveThemeMode { DARK, LIGHT, NOIR, MATRIX }
+import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 
 private val DarkScheme = darkColorScheme(
     primary = Color(0xFFE9B266),

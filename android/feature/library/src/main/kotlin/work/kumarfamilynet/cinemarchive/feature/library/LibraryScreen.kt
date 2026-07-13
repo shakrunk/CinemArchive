@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
+import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 
@@ -41,16 +43,33 @@ class LibraryViewModel(repository: LibraryRepository) : ViewModel() {
 }
 
 @Composable
-fun LibraryRoute(repository: LibraryRepository, onTitleClick: (String) -> Unit) {
+fun LibraryRoute(
+    repository: LibraryRepository,
+    themeMode: ArchiveThemeMode,
+    onCycleTheme: () -> Unit,
+    onTitleClick: (String) -> Unit,
+) {
     val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LibraryScreen(uiState, onTitleClick)
+    LibraryScreen(uiState, themeMode, onCycleTheme, onTitleClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(uiState: LibraryUiState, onTitleClick: (String) -> Unit = {}) {
-    Scaffold(topBar = { TopAppBar(title = { Text("The Projection Room") }) }) { innerPadding ->
+fun LibraryScreen(
+    uiState: LibraryUiState,
+    themeMode: ArchiveThemeMode = ArchiveThemeMode.DARK,
+    onCycleTheme: () -> Unit = {},
+    onTitleClick: (String) -> Unit = {},
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("The Projection Room") },
+                actions = { TextButton(onClick = onCycleTheme) { Text(themeMode.name) } },
+            )
+        },
+    ) { innerPadding ->
         if (uiState.titles.isEmpty()) {
             EmptyLibrary(modifier = Modifier.padding(innerPadding))
         } else {

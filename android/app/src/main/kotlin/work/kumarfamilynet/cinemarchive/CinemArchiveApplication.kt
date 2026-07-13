@@ -9,6 +9,7 @@ import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.data.DevFixtureSeed
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.MutationOutbox
+import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.data.UnconfiguredRemoteMutationWriter
 
 class CinemArchiveApplication : Application() {
@@ -22,6 +23,8 @@ class CinemArchiveApplication : Application() {
     private val outbox: MutationOutbox by lazy {
         MutationOutbox(database.outboxDao(), UnconfiguredRemoteMutationWriter())
     }
+
+    val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }
 
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepository(

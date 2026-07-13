@@ -42,11 +42,13 @@ kotlin {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:database"))
+    implementation(project(":core:model"))
     implementation(project(":data"))
     implementation(project(":feature:library"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)

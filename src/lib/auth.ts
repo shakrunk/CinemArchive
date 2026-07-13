@@ -338,6 +338,12 @@ export async function declineFriendRequest(requesterUserId: string): Promise<voi
   if (error) throw error
 }
 
+/** Cancel the current user's own pending friend request. */
+export async function cancelFriendRequest(recipientUserId: string): Promise<void> {
+  const { error } = await getClient().rpc('cancel_friend_request', { recipient_user_id: recipientUserId })
+  if (error) throw error
+}
+
 /** Block another user, exiting any existing pending/accepted relationship. */
 export async function blockFriend(targetUserId: string): Promise<void> {
   const { error } = await getClient().rpc('block_user', { target_user_id: targetUserId })

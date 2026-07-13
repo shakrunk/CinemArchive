@@ -266,7 +266,8 @@ function OutingForm({
   const selectTitle = useAppStore((s) => s.selectTitle)
   const openRefreshMetadata = useAppStore((s) => s.openRefreshMetadata)
   const outings = useAppStore((s) => s.outings)
-  const allViewings = useAppStore((s) => s.titles.flatMap((t) => t.viewings))
+  const titles = useAppStore((s) => s.titles)
+  const allViewings = useMemo(() => titles.flatMap((t) => t.viewings), [titles])
 
   const [friends, setFriends] = useState<FriendshipView[]>([])
 

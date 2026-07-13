@@ -229,6 +229,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
   const wrapperRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<HTMLDivElement>(null)
+  const isInViewportRef = useRef(false)
   const scrollXRef = useRef(0)
   const singleSetWidthRef = useRef(0)
   const draggingRef = useRef(false)
@@ -288,6 +289,23 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
     return () => ro.disconnect()
   }, [results, applyTransform])
 
+  // Keep the ambient marquee from advancing while its carousel is off-screen.
+  // Manual dragging, wheel input, and release momentum remain available whenever
+  // the user is interacting with the strip.
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+    if (!('IntersectionObserver' in window)) {
+      isInViewportRef.current = true
+      return
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      isInViewportRef.current = entry.isIntersecting
+    })
+    observer.observe(wrapper)
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     if (results.length === 0) return
     let raf = 0
@@ -307,7 +325,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
         } else {
           velocityRef.current = 0
         }
-        if (!pausedRef.current && !userPausedRef.current && !reducedMotionRef.current) {
+        if (isInViewportRef.current && !pausedRef.current && !userPausedRef.current && !reducedMotionRef.current) {
           scrollXRef.current += CAROUSEL_SPEED_PX_S * dt
           moved = true
         }
@@ -1447,7 +1465,7 @@ export function Discover() {
       <div className="text-center mb-7">
         <p className="kicker"><span className="dot" /> the acquisitions desk</p>
         <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3 max-w-xl mx-auto">
-          Scout the next reel for the <em>vault.</em>
+          Discover reels for the <em>vault</em>
         </h1>
       </div>
 
@@ -1625,19 +1643,20 @@ export function Discover() {
             <h2 className="font-serif text-lg font-semibold text-paper">
               {sectionLabel}
             </h2>
+            {!loading && !inPickerMode && displayResults.length > 0 && searchMode === 'titles' && !query.trim() && hasMore && (
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : 'View more'}
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           {!loading && !inPickerMode && displayResults.length > 0 && (
             <div className="flex items-center gap-3">
-              {searchMode === 'titles' && !query.trim() && hasMore ? (
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50"
-                >
-                  {loadingMore ? 'Loading…' : 'View more'}
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              ) : (
+              {!(searchMode === 'titles' && !query.trim() && hasMore) && (
                 <span className="font-mono text-[10px] text-paper-faint/60">
                   {displayResults.length} title{displayResults.length !== 1 ? 's' : ''}
                 </span>

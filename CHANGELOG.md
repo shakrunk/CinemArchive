@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-12
+
 ### Added
 
 - Import from Letterboxd: Profile → Data & Portability accepts a CSV from a
@@ -32,6 +34,12 @@ number is chosen.
 - The Discover carousels' pause control moved out of the film strip into each
   carousel's header as an always-visible labeled Pause/Play chip, replacing
   the hover-only corner overlay.
+
+### Fixed
+
+- Friend requests can now be withdrawn by their sender; discovery carousels
+  only auto-scroll while visible; and the ticket action in Up Next no longer
+  crashes the screen.
 
 ## [1.3.0] - 2026-07-12
 

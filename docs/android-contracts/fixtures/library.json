@@ -1,0 +1,55 @@
+{
+  "$comment": "Hand-authored fixture for docs/android-contracts/library.md. Shape = the poster-wall projection of a `titles` row, per mapDbTitleToLocal in src/lib/db.ts. Not exported from a live database.",
+  "syncedAt": "2026-07-12T18:00:00.000Z",
+  "titles": [
+    {
+      "id": "3f2b6b1a-8b3e-4a0c-9c1a-1a2b3c4d5e6f",
+      "tmdbId": 27205,
+      "type": "movie",
+      "title": "Inception",
+      "year": 2010,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg",
+      "status": "watched",
+      "rating": 4.5,
+      "genres": ["Action", "Science Fiction", "Thriller"],
+      "tags": ["favorite", "rewatch-worthy"],
+      "addedAt": "2026-01-15",
+      "updatedAt": "2026-01-15T09:12:00.000Z"
+    },
+    {
+      "id": "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+      "tmdbId": 1396,
+      "type": "tv",
+      "title": "Breaking Bad",
+      "year": 2008,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg",
+      "status": "watching",
+      "rating": null,
+      "genres": ["Drama", "Crime"],
+      "tags": [],
+      "addedAt": "2026-03-02",
+      "updatedAt": "2026-06-20T14:30:00.000Z"
+    },
+    {
+      "id": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+      "tmdbId": 550,
+      "type": "movie",
+      "title": "Fight Club",
+      "year": 1999,
+      "posterUrl": null,
+      "status": "watchlist",
+      "rating": null,
+      "genres": ["Drama"],
+      "tags": [],
+      "addedAt": "2026-07-01",
+      "updatedAt": "2026-07-01T20:05:00.000Z"
+    }
+  ],
+  "tombstones_example": [
+    {
+      "entityType": "title",
+      "entityId": "00000000-0000-0000-0000-000000000000",
+      "deletedAt": "2026-06-15T08:00:00.000Z"
+    }
+  ]
+}

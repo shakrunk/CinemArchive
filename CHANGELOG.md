@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-13
+
+### Added
+
+- Native Android app foundation (in development, not yet distributed): a
+  read-only Library and Title detail spine backed by a local Room database.
+  Adds the shared database schema and `sync_library_changes` RPC it will
+  sync against — additive only, no change to existing web app behavior.
+
 ## [1.4.1] - 2026-07-12
 
 ### Fixed

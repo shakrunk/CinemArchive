@@ -191,8 +191,12 @@ function ViewingEditForm({
   outing: CinemaOuting | undefined
   onClose: () => void
 }) {
-  const updateTitle = useAppStore((s) => s.updateTitle)
-  const updateOuting = useAppStore((s) => s.updateOuting)
+  const { updateTitle, updateOuting } = useAppStore(
+    useShallow((s) => ({
+      updateTitle: s.updateTitle,
+      updateOuting: s.updateOuting,
+    }))
+  )
 
   const [prePlatform, setPrePlatform] = useState(!viewing.date)
   const [date, setDate] = useState(viewing.date ?? new Date().toISOString().slice(0, 10))
@@ -1428,9 +1432,13 @@ function OutingBanner({ title }: { title: Title }) {
   const pendingFollowUp = useAppStore((s) =>
     outing ? null : findPendingFollowUpOuting(s.outings, title.id, new Date())
   )
-  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
-  const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
-  const cancelOuting = useAppStore((s) => s.cancelOuting)
+  const { openOutingSchedule, openPostShowSheet, cancelOuting } = useAppStore(
+    useShallow((s) => ({
+      openOutingSchedule: s.openOutingSchedule,
+      openPostShowSheet: s.openPostShowSheet,
+      cancelOuting: s.cancelOuting,
+    }))
+  )
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [sharePanelOpen, setSharePanelOpen] = useState(false)
 
@@ -1537,9 +1545,13 @@ export function TitleDetailDrawer() {
 
   const [sendPanelOpen, setSendPanelOpen] = useState(false)
 
-  const pinnedModes = useAppStore((s) => s.pinnedModes)
-  const setPinnedMode = useAppStore((s) => s.setPinnedMode)
-  const unlockTheme = useAppStore((s) => s.unlockTheme)
+  const { pinnedModes, setPinnedMode, unlockTheme } = useAppStore(
+    useShallow((s) => ({
+      pinnedModes: s.pinnedModes,
+      setPinnedMode: s.setPinnedMode,
+      unlockTheme: s.unlockTheme,
+    }))
+  )
 
   const unlockedModes = useMemo(
     () => (isSpiderNoir && title ? getUnlockedModes(title) : new Set<'bw' | 'color'>()),
@@ -2245,8 +2257,9 @@ export function TitleDetailDrawer() {
                           className="bg-secondary/50 border-border font-mono"
                         />
                       )}
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                      <label htmlFor={`drawer-pre-platform-${title.id}`} className="flex items-center gap-2 cursor-pointer mt-2">
                         <input
+                          id={`drawer-pre-platform-${title.id}`}
                           type="checkbox"
                           checked={logPrePlatform}
                           onChange={(e) => setLogPrePlatform(e.target.checked)}

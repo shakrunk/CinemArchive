@@ -181,6 +181,7 @@ function SignInCard() {
               variant="outline"
               className="border-border text-muted-foreground hover:text-foreground"
               title="Sign In with Passkey"
+              aria-label="Sign In with Passkey"
             >
               <Fingerprint className="w-4 h-4" />
             </Button>
@@ -203,9 +204,13 @@ function SignInCard() {
 }
 
 function AccountSection({ profile }: { profile: MyProfile | null }) {
-  const user = useAppStore((s) => s.user)
-  const setUser = useAppStore((s) => s.setUser)
-  const isSharedView = useAppStore((s) => s.isSharedView)
+  const { user, setUser, isSharedView } = useAppStore(
+    useShallow((s) => ({
+      user: s.user,
+      setUser: s.setUser,
+      isSharedView: s.isSharedView,
+    }))
+  )
 
   async function handleSignOut() {
     try {
@@ -435,10 +440,14 @@ function SecuritySection() {
 // ─── Appearance ───────────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const theme = useAppStore((s) => s.theme)
-  const setTheme = useAppStore((s) => s.setTheme)
-  const unlockedThemes = useAppStore((s) => s.unlockedThemes)
-  const titles = useAppStore((s) => s.titles)
+  const { theme, setTheme, unlockedThemes, titles } = useAppStore(
+    useShallow((s) => ({
+      theme: s.theme,
+      setTheme: s.setTheme,
+      unlockedThemes: s.unlockedThemes,
+      titles: s.titles,
+    }))
+  )
 
   function choose(next: Theme) {
     if (next === theme) return
@@ -533,11 +542,15 @@ interface NavDragMeta {
 }
 
 function NavigationSection() {
-  const navPrefs = useAppStore((s) => s.navPrefs)
-  const moveNavItem = useAppStore((s) => s.moveNavItem)
-  const reorderNav = useAppStore((s) => s.reorderNav)
-  const toggleNavItemHidden = useAppStore((s) => s.toggleNavItemHidden)
-  const setNavCompact = useAppStore((s) => s.setNavCompact)
+  const { navPrefs, moveNavItem, reorderNav, toggleNavItemHidden, setNavCompact } = useAppStore(
+    useShallow((s) => ({
+      navPrefs: s.navPrefs,
+      moveNavItem: s.moveNavItem,
+      reorderNav: s.reorderNav,
+      toggleNavItemHidden: s.toggleNavItemHidden,
+      setNavCompact: s.setNavCompact,
+    }))
+  )
 
   const order = navPrefs.order
   const itemRefs = useRef(new Map<NavItemId, HTMLDivElement>())

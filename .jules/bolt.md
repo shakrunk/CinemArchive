@@ -33,3 +33,6 @@
 ## 2026-07-10 - Zustand Multiple Subscriptions
 **Learning:** Components subscribing to multiple store properties individually via separate `useAppStore` hooks create multiple independent store subscriptions. This leads to higher memory usage, subscription execution overhead, and potential re-render cascades.
 **Action:** Always batch state extractions into a single object selector using `useShallow` from `zustand/react/shallow` to reduce subscriptions to exactly one per component.
+## 2026-07-26 - Zustand Multiple Subscriptions
+**Learning:** Components subscribing to multiple store properties individually via separate `useAppStore` hooks create multiple independent store subscriptions. This leads to higher memory usage, subscription execution overhead, and potential re-render cascades. However, when injecting `useShallow` to fix this, it is easy to forget the import statement.
+**Action:** Always batch state extractions into a single object selector using `useShallow` from `zustand/react/shallow` to reduce subscriptions to exactly one per component, and ALWAYS ensure the `useShallow` import is added.

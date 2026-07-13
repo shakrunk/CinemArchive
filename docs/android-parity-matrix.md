@@ -14,7 +14,7 @@ This is the versioned contract index for the native Android client. The web app 
 | Sharing | Create/revoke/expire scoped, read-only share links and open shared libraries. | `Profile.tsx`, `auth.ts`, `fetchSharedLibrary()` | `shared_access_keys`, `share_scopes`, shared-token RPC, RLS. | Profile / shared library | Anonymous/valid/expired/revoked/scope RLS matrix; App Link routes. | Discovery |
 | Friends and social | Friend states, friend libraries, comments, reactions, activity, recommendations. | `Friends.tsx`, `db.ts`, social components | Friendship state machine; social tables/triggers; scoped friend RLS. | Friends | Owner/friend/blocked/scoped fixtures; pagination and mutation errors. | Discovery |
 | Notifications | In-app inbox and, later, privacy-safe FCM routes. | `NotificationCenter.tsx`, notification store actions | `notifications`; canonical event dispatch; device installation endpoint. | Notification center | Read/dismiss fixture; cold-start route test; lock-screen redaction review. | Discovery |
-| Preferences and themes | Persist four themes plus navigation/Ledger preferences. | `theme.ts`, `Profile.tsx`, `saveLedgerLayout()` | `user_prefs`; local DataStore policy. | Profile/settings | Theme token screenshots; account-switch clearing test. | Foundation complete; persistence pending |
+| Preferences and themes | Persist four themes plus navigation/Ledger preferences. | `theme.ts`, `Profile.tsx`, `saveLedgerLayout()` | `user_prefs`; local DataStore policy. | Profile/settings | Theme token screenshots; account-switch clearing test. | Theme persistence implemented (local DataStore only, no `user_prefs` sync yet); navigation/Ledger preference persistence and account-switch clearing pending |
 
 ## Contract completion rules
 

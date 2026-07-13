@@ -128,6 +128,30 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         rows, `titles.status`/`updatedAt` updated in place, and `mutation_outbox` had four
         matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
         `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
-- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish.
+- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Started:**
+  - [x] Theme persistence: `PreferencesRepository` (`data` module) wraps a Preferences
+        DataStore (`cinemarchive_prefs`) storing the selected `ArchiveThemeMode` — local-only,
+        no Room/sync involvement, distinct from the still-unimplemented `user_prefs`-backed
+        server persistence in `docs/android-parity-matrix.md`. `ArchiveThemeMode` moved from
+        `core:designsystem` to `core:model` so the data layer can reference it without a
+        Compose dependency. `MainActivity` collects the stored mode and applies it via
+        `CinemArchiveTheme`; the Library top bar gained a bare cycle-through-four-themes text
+        button (DARK → LIGHT → NOIR → MATRIX → …) as the only UI needed to exercise it — no
+        dedicated settings screen yet.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): cycled the theme to
+        NOIR, force-stopped the app (full process death, not just backgrounding), relaunched,
+        and confirmed NOIR was still selected and applied. Confirmed
+        `files/datastore/cinemarchive_prefs.preferences_pb` exists on-device. No crashes in
+        logcat.
+  - [ ] Ledger — still at *Discovery* in `docs/android-parity-matrix.md`; per that doc's
+        "Contract completion rules," implementation (even read-only) can't start until a
+        `docs/android-contracts/ledger.md` is written, mirroring the Phase 0 audits for
+        Library/Title-detail/Episode-tracking. Not started — the web Ledger is 15+ widgets
+        (`ledgerDerive.ts`/`ledgerStats.ts`/`ledgerPanels.ts`), so this is multi-session once
+        begun.
+  - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
+        enough UI surface (Ledger, a real settings screen) to apply them to.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

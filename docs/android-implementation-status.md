@@ -59,10 +59,15 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         `schema.sql` kept in sync. Re-validated as a committed file, not just ad-hoc SQL —
         the test project's `public` schema was dropped and all 34 migrations replayed from
         scratch, confirming the file applies cleanly and behaves correctly standalone.
-  - [ ] Applied to production — [PR #92](https://github.com/shakrunk/CinemArchive/pull/92)
-        is open (`dev` → `main`, bumps to 1.5.0); ships when merged and `db-migrate.yml`
-        runs `supabase db push` against the live project. Left for explicit merge rather
-        than merging autonomously, since that's the step that actually touches production.
+  - [x] Applied to production (2026-07-13): [PR #92](https://github.com/shakrunk/CinemArchive/pull/92)
+        merged to `main` (v1.5.0), then the "DB Migrate (manual)" GitHub Actions workflow
+        was dispatched by explicit user confirmation — note this workflow is
+        `workflow_dispatch`-only, *not* automatic on push to `main` despite `CLAUDE.md`
+        describing it that way; worth fixing that doc separately. Verified directly against
+        the live project (`taoyxhbacdvnhevqyrqm`): `sync_tombstones` table exists,
+        `sync_library_changes` RPC exists, all 10 previously-missing `updated_at` columns
+        are present, all alongside real production data (69 titles, etc.) — confirming a
+        clean apply with no data disruption.
   - [ ] Cast/crew, physical media, badge scores (imdb/RT/Metacritic) — deferred from this
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.

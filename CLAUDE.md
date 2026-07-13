@@ -117,7 +117,7 @@ RLS: authenticated user gets full CRUD; valid shared-token holders get read-only
 - **All filtering/sorting is client-side** in the Zustand store (no DB queries for filter changes); the poster wall renders the full filtered set (grid virtualization was planned but is not implemented).
 - **API calls to TMDB/OMDb go through the Edge Function** (never directly from the browser — keeps API keys server-side).
 - **SPA routing on GitHub Pages:** uses a `404.html` redirect fallback; served from a custom domain (`public/CNAME`) at the domain root, so Vite `base` is `/`.
-- **Schema changes go through migrations, not the SQL editor:** add a timestamped file under `supabase/migrations/`, keep `schema.sql` in sync, and push to `main` — `db-migrate.yml` runs `supabase db push`. (`db push`/`migration repair` are Docker-free; only `db pull` needs Docker.)
+- **Schema changes go through migrations, not the SQL editor:** add a timestamped file under `supabase/migrations/`, keep `schema.sql` in sync, and push to `main`. `db-migrate.yml` runs `supabase db push` against production, but it is **`workflow_dispatch`-only — it does not trigger automatically on push to `main`.** After merging a migration-bearing PR, manually run the "DB Migrate (manual)" workflow (Actions tab or `gh workflow run db-migrate.yml --ref main`) to actually apply it; merging alone leaves production on the old schema. (`db push`/`migration repair` are Docker-free; only `db pull` needs Docker.)
 
 ---
 

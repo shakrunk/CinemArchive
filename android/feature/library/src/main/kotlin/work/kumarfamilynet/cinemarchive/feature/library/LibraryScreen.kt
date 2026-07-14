@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,10 +49,11 @@ fun LibraryRoute(
     themeMode: ArchiveThemeMode,
     onCycleTheme: () -> Unit,
     onTitleClick: (String) -> Unit,
+    onOpenLedger: () -> Unit = {},
 ) {
     val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LibraryScreen(uiState, themeMode, onCycleTheme, onTitleClick)
+    LibraryScreen(uiState, themeMode, onCycleTheme, onTitleClick, onOpenLedger)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,12 +63,18 @@ fun LibraryScreen(
     themeMode: ArchiveThemeMode = ArchiveThemeMode.DARK,
     onCycleTheme: () -> Unit = {},
     onTitleClick: (String) -> Unit = {},
+    onOpenLedger: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("The Projection Room") },
-                actions = { TextButton(onClick = onCycleTheme) { Text(themeMode.name) } },
+                actions = {
+                    Row {
+                        TextButton(onClick = onOpenLedger) { Text("Ledger") }
+                        TextButton(onClick = onCycleTheme) { Text(themeMode.name) }
+                    }
+                },
             )
         },
     ) { innerPadding ->

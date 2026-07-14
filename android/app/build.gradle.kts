@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":data"))
     implementation(project(":feature:library"))
+    implementation(project(":feature:ledger"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

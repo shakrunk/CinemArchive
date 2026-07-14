@@ -27,6 +27,12 @@ interface TitleDao {
     @Query("SELECT * FROM titles WHERE id = :titleId")
     fun observeTitle(titleId: String): Flow<TitleEntity?>
 
+    // Ledger hero-stat rollup (docs/android-contracts/ledger.md) reads every title's
+    // type/status/rating/runtime — small enough locally to just select the full row rather
+    // than add a second bespoke projection alongside TitleListRow.
+    @Query("SELECT * FROM titles")
+    fun observeAllTitles(): Flow<List<TitleEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(titles: List<TitleEntity>)
 
@@ -97,6 +103,9 @@ interface EpisodeReviewDao {
 interface ViewingDao {
     @Query("SELECT * FROM viewings WHERE titleId = :titleId ORDER BY date DESC")
     fun observeViewings(titleId: String): Flow<List<ViewingEntity>>
+
+    @Query("SELECT COUNT(*) FROM viewings")
+    fun observeTotalViewingCount(): Flow<Int>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(viewings: List<ViewingEntity>)

@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Native Android app (in development, not yet distributed): a new Ledger screen, reachable
+  from the Library, shows a hero stat ribbon (total movies, total series, viewings logged,
+  average rating, movie minutes watched) computed from your library. This is the stat
+  summary only, not yet the full customizable widget board.
+
 ## [1.8.0] - 2026-07-13
 
 ### Added

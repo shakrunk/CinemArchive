@@ -177,10 +177,30 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         — 148 movie-minutes watched — only Inception is a WATCHED movie, Fight Club is still
         watchlist). Confirmed the back button returns cleanly to Library. No crashes in
         logcat.
-  - [ ] Full 20-widget customizable board — not started; today's slice is the hero ribbon
-        only, ported from `ledgerStats.ts`. The remaining 19 widgets in `ledgerDerive.ts` /
-        `ledgerPanels.ts`, the drag/resize/settings edit mode, and `user_prefs.ledger_layout`
-        sync are all separate, larger follow-on work.
+  - [x] Four more widgets added to the fixed-order board — `LedgerRepository.observeLedgerBoard()`
+        + `LedgerBoard` (`core:model`): Feature Lengths (movie runtime histogram), On the Air
+        (TV network tally), By the Era (release-decade tally), Coming Attractions (the
+        watchlist, with movie-minutes-owed). Chosen specifically because each is a pure
+        bucket/filter over fields the hero ribbon already reads (`type`/`network`/`year`/
+        `runtime`/`status`) — no new Room queries, no schema change. The 6 widgets still
+        skipped this pass (Auteurs, Ensemble, Second Opinions, In Translation, At the Movies,
+        plus every chart-based widget — Activity, The Run, Critical Record, Screening Nights,
+        The Marathon, Shifting Standards, Premieres & Revivals, The Revival House) need either
+        data not mirrored locally yet (cast/crew/imdbRating/originalLanguage/companions/
+        outingId) or a real chart primitive, both bigger lifts than this slice.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): confirmed all four
+        new sections against the on-device data by hand (Feature Lengths: 2 movies both land
+        in the 120–150min bucket; On the Air: AMC ×1; By the Era: one title each in the
+        1990s/2000s/2010s; Coming Attractions: Fight Club, 139 movie-minutes owed). No
+        crashes in logcat. Also incidentally reconfirmed theme persistence survived this
+        session's `installDebug` update (still NOIR from the prior turn), consistent with
+        the earlier theory that the one anomalous LIGHT reading was an out-of-band emulator
+        state discontinuity between turns, not an app defect.
+  - [ ] Remaining 15 widgets, drag/resize/settings edit mode, and `user_prefs.ledger_layout`
+        sync — not started; separate, larger follow-on work, and several are blocked on data
+        (cast/crew/imdbRating/originalLanguage/companions/outingId) not mirrored locally.
   - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
         enough UI surface (the full Ledger board, a real settings screen) to apply them to.
 - [ ] Phase 4 — sharing, social, notifications, and push.

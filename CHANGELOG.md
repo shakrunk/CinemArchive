@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-13
+
 ### Added
 
 - Native Android app (in development, not yet distributed): the Ledger screen gained four

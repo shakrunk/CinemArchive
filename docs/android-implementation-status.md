@@ -160,9 +160,28 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         graphic-only widgets are mouse/touch-tooltip-only today) that Android should not
         port as sufficient. Corrected a matrix typo along the way:
         `user_prefs.ledger_prefs` → the real column, `ledger_layout`.
-  - [ ] Ledger implementation (Android read-only widgets) — not started; the contract above
-        unblocks it, but porting 20 widgets is multi-session work on its own.
+  - [x] Ledger implementation — started: a new `feature:ledger` module and `LedgerRepository`
+        (`data` module) port `computeLedgerStats` from `ledgerStats.ts` (the hero stat ribbon
+        only — total movies, total series, total viewings, average rating, movie minutes
+        watched; TV minutes deferred, see `LedgerStats` kdoc), reachable from a new "Ledger"
+        button on the Library top bar. Deliberately **not** the 20-widget customizable board:
+        that needs `user_prefs.ledger_layout` sync, which needs a real `RemoteMutationWriter`
+        (still stubbed, same physical-device gap as everything else touching real sync).
+        `TitleDao.observeAllTitles()` and `ViewingDao.observeTotalViewingCount()` are new
+        queries backing it; no schema/version change needed (existing tables only).
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): tapped into the new
+        Ledger screen and confirmed every stat matched the on-device Room data by hand (2
+        movies, 1 series, 2 viewings, ★4.5 average — only Inception has a title-level rating
+        — 148 movie-minutes watched — only Inception is a WATCHED movie, Fight Club is still
+        watchlist). Confirmed the back button returns cleanly to Library. No crashes in
+        logcat.
+  - [ ] Full 20-widget customizable board — not started; today's slice is the hero ribbon
+        only, ported from `ledgerStats.ts`. The remaining 19 widgets in `ledgerDerive.ts` /
+        `ledgerPanels.ts`, the drag/resize/settings edit mode, and `user_prefs.ledger_layout`
+        sync are all separate, larger follow-on work.
   - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
-        enough UI surface (Ledger, a real settings screen) to apply them to.
+        enough UI surface (the full Ledger board, a real settings screen) to apply them to.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

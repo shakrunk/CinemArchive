@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Native Android app (in development, not yet distributed): the Ledger screen gained four
+  more stat sections — Feature Lengths (movie runtime breakdown), On the Air (TV network
+  breakdown), By the Era (release-decade breakdown), and Coming Attractions (your
+  watchlist, with total runtime owed).
+
 ## [1.9.0] - 2026-07-13
 
 ### Added

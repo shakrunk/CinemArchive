@@ -11,6 +11,7 @@ error states. Fixture JSON lives alongside each doc in `fixtures/`.
 | Library | [library.md](./library.md) | [fixtures/library.json](./fixtures/library.json) |
 | Title detail | [title-detail.md](./title-detail.md) | [fixtures/title-detail.json](./fixtures/title-detail.json) |
 | Episode tracking | [episode-tracking.md](./episode-tracking.md) | [fixtures/episode-tracking.json](./fixtures/episode-tracking.json) |
+| Ledger | [ledger.md](./ledger.md) | [fixtures/ledger.json](./fixtures/ledger.json) |
 
 These fixtures are hand-authored from the current `schema.sql` and `src/lib/db.ts` shapes,
 not exported from a live database — they are for shape/contract testing, not production

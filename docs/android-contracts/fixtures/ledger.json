@@ -1,0 +1,46 @@
+{
+  "$comment": "Hand-authored fixture for docs/android-contracts/ledger.md. Ledger has no per-widget data table of its own (every widget aggregates the Library/Title-detail/Episode-tracking fixtures already in this directory) — the only new wire shape is the user_prefs row that persists the widget layout. Not exported from a live database.",
+  "userPrefs": {
+    "userId": "5e2c1a3b-7f4d-4e9a-b1c2-3d4e5f6a7b8c",
+    "ledgerLayout": [
+      {
+        "id": "widget-activity-1",
+        "panel": "activity",
+        "width": "lg"
+      },
+      {
+        "id": "widget-genres-1",
+        "panel": "genres",
+        "width": "md",
+        "settings": { "scope": "all", "topN": 8 }
+      },
+      {
+        "id": "widget-run-1",
+        "panel": "run",
+        "width": "full",
+        "settings": { "timeRange": "12mo" }
+      },
+      {
+        "id": "widget-ratings-1",
+        "panel": "ratings",
+        "width": "sm",
+        "settings": { "title": "My Critical Record" }
+      },
+      {
+        "id": "widget-moviegoing-1",
+        "panel": "moviegoing",
+        "width": "md",
+        "settings": { "timeRange": "5y" }
+      }
+    ],
+    "updatedAt": "2026-07-10T19:42:00.000Z"
+  },
+  "malformed_example": {
+    "$comment": "A legacy/corrupt payload normalizeLedgerWidgets() must sanitize on read — Android's parser must degrade identically: drop the unknown panel, backfill the invalid width to a valid default, drop the unrecognized settings key, and clamp topN/title.",
+    "ledgerLayout": [
+      { "id": "widget-unknown-1", "panel": "no-longer-exists", "width": "lg" },
+      { "id": "widget-bad-width-1", "panel": "decades", "width": "huge" },
+      { "id": "widget-bad-settings-1", "panel": "genres", "width": "md", "settings": { "topN": 99, "notAKey": true } }
+    ]
+  }
+}

@@ -145,12 +145,23 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         and confirmed NOIR was still selected and applied. Confirmed
         `files/datastore/cinemarchive_prefs.preferences_pb` exists on-device. No crashes in
         logcat.
-  - [ ] Ledger — still at *Discovery* in `docs/android-parity-matrix.md`; per that doc's
-        "Contract completion rules," implementation (even read-only) can't start until a
-        `docs/android-contracts/ledger.md` is written, mirroring the Phase 0 audits for
-        Library/Title-detail/Episode-tracking. Not started — the web Ledger is 15+ widgets
-        (`ledgerDerive.ts`/`ledgerStats.ts`/`ledgerPanels.ts`), so this is multi-session once
-        begun.
+  - [x] Ledger contract documented: `docs/android-contracts/ledger.md` +
+        `fixtures/ledger.json`, clearing the "Contract completion rules" gate
+        `docs/android-parity-matrix.md` requires before any Ledger implementation (even
+        read-only) can start. Covers the `LedgerWidget`/`user_prefs.ledger_layout` shape and
+        its normalization/clamping rules, all 20 widgets (data inputs + non-obvious
+        calculation rules, e.g. rating widgets read the title-level `Title.rating` only,
+        never per-episode/per-viewing ratings; streak detection is the one date-bucketing
+        panel that also folds in episode watch events), the RLS matrix (`user_prefs` plus the
+        one exception — the "At the Movies" widget's owner-only `cinema_outings` join, which
+        must visibly degrade rather than disappear for friend/shared viewers), the
+        800ms-debounced last-write-wins layout persistence path and its known concurrency
+        gaps, and a flagged accessibility shortfall in the *current web app* (five
+        graphic-only widgets are mouse/touch-tooltip-only today) that Android should not
+        port as sufficient. Corrected a matrix typo along the way:
+        `user_prefs.ledger_prefs` → the real column, `ledger_layout`.
+  - [ ] Ledger implementation (Android read-only widgets) — not started; the contract above
+        unblocks it, but porting 20 widgets is multi-session work on its own.
   - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
         enough UI surface (Ledger, a real settings screen) to apply them to.
 - [ ] Phase 4 — sharing, social, notifications, and push.

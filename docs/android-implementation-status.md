@@ -128,6 +128,80 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         rows, `titles.status`/`updatedAt` updated in place, and `mutation_outbox` had four
         matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
         `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
-- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish.
+- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Started:**
+  - [x] Theme persistence: `PreferencesRepository` (`data` module) wraps a Preferences
+        DataStore (`cinemarchive_prefs`) storing the selected `ArchiveThemeMode` — local-only,
+        no Room/sync involvement, distinct from the still-unimplemented `user_prefs`-backed
+        server persistence in `docs/android-parity-matrix.md`. `ArchiveThemeMode` moved from
+        `core:designsystem` to `core:model` so the data layer can reference it without a
+        Compose dependency. `MainActivity` collects the stored mode and applies it via
+        `CinemArchiveTheme`; the Library top bar gained a bare cycle-through-four-themes text
+        button (DARK → LIGHT → NOIR → MATRIX → …) as the only UI needed to exercise it — no
+        dedicated settings screen yet.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): cycled the theme to
+        NOIR, force-stopped the app (full process death, not just backgrounding), relaunched,
+        and confirmed NOIR was still selected and applied. Confirmed
+        `files/datastore/cinemarchive_prefs.preferences_pb` exists on-device. No crashes in
+        logcat.
+  - [x] Ledger contract documented: `docs/android-contracts/ledger.md` +
+        `fixtures/ledger.json`, clearing the "Contract completion rules" gate
+        `docs/android-parity-matrix.md` requires before any Ledger implementation (even
+        read-only) can start. Covers the `LedgerWidget`/`user_prefs.ledger_layout` shape and
+        its normalization/clamping rules, all 20 widgets (data inputs + non-obvious
+        calculation rules, e.g. rating widgets read the title-level `Title.rating` only,
+        never per-episode/per-viewing ratings; streak detection is the one date-bucketing
+        panel that also folds in episode watch events), the RLS matrix (`user_prefs` plus the
+        one exception — the "At the Movies" widget's owner-only `cinema_outings` join, which
+        must visibly degrade rather than disappear for friend/shared viewers), the
+        800ms-debounced last-write-wins layout persistence path and its known concurrency
+        gaps, and a flagged accessibility shortfall in the *current web app* (five
+        graphic-only widgets are mouse/touch-tooltip-only today) that Android should not
+        port as sufficient. Corrected a matrix typo along the way:
+        `user_prefs.ledger_prefs` → the real column, `ledger_layout`.
+  - [x] Ledger implementation — started: a new `feature:ledger` module and `LedgerRepository`
+        (`data` module) port `computeLedgerStats` from `ledgerStats.ts` (the hero stat ribbon
+        only — total movies, total series, total viewings, average rating, movie minutes
+        watched; TV minutes deferred, see `LedgerStats` kdoc), reachable from a new "Ledger"
+        button on the Library top bar. Deliberately **not** the 20-widget customizable board:
+        that needs `user_prefs.ledger_layout` sync, which needs a real `RemoteMutationWriter`
+        (still stubbed, same physical-device gap as everything else touching real sync).
+        `TitleDao.observeAllTitles()` and `ViewingDao.observeTotalViewingCount()` are new
+        queries backing it; no schema/version change needed (existing tables only).
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): tapped into the new
+        Ledger screen and confirmed every stat matched the on-device Room data by hand (2
+        movies, 1 series, 2 viewings, ★4.5 average — only Inception has a title-level rating
+        — 148 movie-minutes watched — only Inception is a WATCHED movie, Fight Club is still
+        watchlist). Confirmed the back button returns cleanly to Library. No crashes in
+        logcat.
+  - [x] Four more widgets added to the fixed-order board — `LedgerRepository.observeLedgerBoard()`
+        + `LedgerBoard` (`core:model`): Feature Lengths (movie runtime histogram), On the Air
+        (TV network tally), By the Era (release-decade tally), Coming Attractions (the
+        watchlist, with movie-minutes-owed). Chosen specifically because each is a pure
+        bucket/filter over fields the hero ribbon already reads (`type`/`network`/`year`/
+        `runtime`/`status`) — no new Room queries, no schema change. The 6 widgets still
+        skipped this pass (Auteurs, Ensemble, Second Opinions, In Translation, At the Movies,
+        plus every chart-based widget — Activity, The Run, Critical Record, Screening Nights,
+        The Marathon, Shifting Standards, Premieres & Revivals, The Revival House) need either
+        data not mirrored locally yet (cast/crew/imdbRating/originalLanguage/companions/
+        outingId) or a real chart primitive, both bigger lifts than this slice.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-13): confirmed all four
+        new sections against the on-device data by hand (Feature Lengths: 2 movies both land
+        in the 120–150min bucket; On the Air: AMC ×1; By the Era: one title each in the
+        1990s/2000s/2010s; Coming Attractions: Fight Club, 139 movie-minutes owed). No
+        crashes in logcat. Also incidentally reconfirmed theme persistence survived this
+        session's `installDebug` update (still NOIR from the prior turn), consistent with
+        the earlier theory that the one anomalous LIGHT reading was an out-of-band emulator
+        state discontinuity between turns, not an app defect.
+  - [ ] Remaining 15 widgets, drag/resize/settings edit mode, and `user_prefs.ledger_layout`
+        sync — not started; separate, larger follow-on work, and several are blocked on data
+        (cast/crew/imdbRating/originalLanguage/companions/outingId) not mirrored locally.
+  - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
+        enough UI surface (the full Ledger board, a real settings screen) to apply them to.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

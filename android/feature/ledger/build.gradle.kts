@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "work.kumarfamilynet.cinemarchive.core.designsystem"
+    namespace = "work.kumarfamilynet.cinemarchive.feature.ledger"
     compileSdk = 36
     defaultConfig { minSdk = 31 }
     compileOptions {
@@ -19,10 +19,12 @@ android {
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 dependencies {
+    implementation(project(":core:designsystem"))
     implementation(project(":core:model"))
+    implementation(project(":data"))
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 }

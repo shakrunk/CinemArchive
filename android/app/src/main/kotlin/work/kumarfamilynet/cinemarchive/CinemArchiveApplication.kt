@@ -7,8 +7,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.data.DevFixtureSeed
+import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.MutationOutbox
+import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.data.UnconfiguredRemoteMutationWriter
 
 class CinemArchiveApplication : Application() {
@@ -23,6 +25,8 @@ class CinemArchiveApplication : Application() {
         MutationOutbox(database.outboxDao(), UnconfiguredRemoteMutationWriter())
     }
 
+    val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }
+
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepository(
             titleDao = database.titleDao(),
@@ -34,6 +38,10 @@ class CinemArchiveApplication : Application() {
             viewingDao = database.viewingDao(),
             outbox = outbox,
         )
+    }
+
+    val ledgerRepository: LedgerRepository by lazy {
+        LedgerRepository(titleDao = database.titleDao(), viewingDao = database.viewingDao())
     }
 
     override fun onCreate() {

@@ -9,6 +9,27 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-13
+
+### Added
+
+- Native Android app (in development, not yet distributed): the Ledger screen gained four
+  more stat sections — Feature Lengths (movie runtime breakdown), On the Air (TV network
+  breakdown), By the Era (release-decade breakdown), and Coming Attractions (your
+  watchlist, with total runtime owed).
+
+## [1.9.0] - 2026-07-13
+
+### Added
+
+- Native Android app (in development, not yet distributed): the selected theme (dark,
+  light, noir, matrix) now persists locally and survives an app restart, via a bare
+  cycle-through button on the Library screen.
+- Native Android app (in development, not yet distributed): a new Ledger screen, reachable
+  from the Library, shows a hero stat ribbon (total movies, total series, viewings logged,
+  average rating, movie minutes watched) computed from your library. This is the stat
+  summary only, not yet the full customizable widget board.
+
 ## [1.7.0] - 2026-07-13
 
 ### Added

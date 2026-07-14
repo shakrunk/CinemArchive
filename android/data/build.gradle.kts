@@ -21,4 +21,5 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:model"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences)
 }

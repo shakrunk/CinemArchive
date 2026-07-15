@@ -390,7 +390,8 @@ function ViewingTimeline({
         {!isSharedView && onLogViewing && (
           <button
             onClick={onLogViewing}
-            className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+            aria-label="Log first viewing"
+            className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             <Plus className="w-3.5 h-3.5" />
             Log first viewing

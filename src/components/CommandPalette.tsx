@@ -88,7 +88,7 @@ function CommandPaletteBody({
           <button
             type="button"
             onClick={() => { setQuery(''); setActive(0); inputRef.current?.focus() }}
-            className="text-paper-faint hover:text-ember mr-2"
+            className="text-paper-faint hover:text-ember mr-2 rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             aria-label="Clear search"
           >
             <X className="w-[15px] h-[15px]" aria-hidden="true" />
@@ -107,7 +107,7 @@ function CommandPaletteBody({
                   setQuery('')
                   setActive(0)
                 }}
-                className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
+                className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                 aria-label="Clear search"
               >
                 <X className="w-3.5 h-3.5" />

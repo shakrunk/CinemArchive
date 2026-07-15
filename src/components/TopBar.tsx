@@ -1,5 +1,4 @@
 import { Plus, LogIn, Search, Sun, Moon, X, Eye, Users } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
@@ -26,21 +25,17 @@ const NAV_LABELS: Record<NavItemId, string> = {
 }
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {
-  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { viewMode, openAddTitle, user, setUser, isSharedView, viewerContext, exitFriendView, openCommandPalette, theme, navPrefs } = useAppStore(
-    useShallow((s) => ({
-      viewMode: s.viewMode,
-      openAddTitle: s.openAddTitle,
-      user: s.user,
-      setUser: s.setUser,
-      isSharedView: s.isSharedView,
-      viewerContext: s.viewerContext,
-      exitFriendView: s.exitFriendView,
-      openCommandPalette: s.openCommandPalette,
-      theme: s.theme,
-      navPrefs: s.navPrefs,
-    }))
-  )
+  // ⚡ Bolt: Prevent unnecessary object allocation and shallow diffing by using atomic selectors
+  const viewMode = useAppStore((s) => s.viewMode)
+  const openAddTitle = useAppStore((s) => s.openAddTitle)
+  const user = useAppStore((s) => s.user)
+  const setUser = useAppStore((s) => s.setUser)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const viewerContext = useAppStore((s) => s.viewerContext)
+  const exitFriendView = useAppStore((s) => s.exitFriendView)
+  const openCommandPalette = useAppStore((s) => s.openCommandPalette)
+  const theme = useAppStore((s) => s.theme)
+  const navPrefs = useAppStore((s) => s.navPrefs)
   const friendView = viewerContext.kind === 'friend' ? viewerContext : null
   // Theme lives in AccountMenu once it's shown, but AccountMenu only renders
   // for an authenticated owner — everyone else (signed out, shared/friend view)

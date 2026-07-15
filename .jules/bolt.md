@@ -36,3 +36,6 @@
 ## 2026-07-26 - Zustand Multiple Subscriptions
 **Learning:** Components subscribing to multiple store properties individually via separate `useAppStore` hooks create multiple independent store subscriptions. This leads to higher memory usage, subscription execution overhead, and potential re-render cascades. However, when injecting `useShallow` to fix this, it is easy to forget the import statement.
 **Action:** Always batch state extractions into a single object selector using `useShallow` from `zustand/react/shallow` to reduce subscriptions to exactly one per component, and ALWAYS ensure the `useShallow` import is added.
+## 2026-07-13 - Debouncing Search and Re-render pitfalls
+**Learning:** In Zustand, multiple atomic selectors (e.g. `useAppStore(s => s.a)`) are already highly optimized and do not cause extra re-renders. Converting them to a batched `useShallow` is an unnecessary micro-optimization that introduces object allocation overhead. However, synchronously updating a derived store property via string filtering on every keystroke in a large list is a genuine bottleneck.
+**Action:** Focus on debouncing frequent state updates at the local component level (e.g., search inputs) rather than micro-optimizing atomic store subscriptions.

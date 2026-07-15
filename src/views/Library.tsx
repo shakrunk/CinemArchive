@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
@@ -497,6 +497,38 @@ export function Library() {
   const { copiedId, copy } = useCopyFeedback()
   const copied = copiedId === 'rec-prompt'
 
+  // ⚡ Bolt: Debounce search input to prevent re-filtering the entire library on every keystroke
+  const [localSearch, setLocalSearch] = useState(filters.search)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ⚡ Bolt: Sync local search when filters.search changes externally (e.g. clear filters)
+  const [prevSearchFilter, setPrevSearchFilter] = useState(filters.search)
+  if (filters.search !== prevSearchFilter) {
+    setPrevSearchFilter(filters.search)
+    setLocalSearch(filters.search)
+  }
+
+  const handleSearchChange = (val: string) => {
+    setLocalSearch(val)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setFilter('search', val)
+    }, 300)
+  }
+
+  const handleClearSearch = () => {
+    setLocalSearch('')
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    setFilter('search', '')
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
+  }, [])
+
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.type !== 'all') count++
@@ -525,16 +557,16 @@ export function Library() {
         <div className="search-field flex-1 min-w-[220px] max-w-[460px]">
           <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" aria-hidden="true" />
           <input
-            value={filters.search}
-            onChange={(e) => setFilter('search', e.target.value)}
+            value={localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search title, director, genre…"
             aria-label="Search"
             autoComplete="off"
             spellCheck={false}
           />
-          {filters.search && (
+          {localSearch && (
             <button
-              onClick={() => setFilter('search', '')}
+              onClick={handleClearSearch}
               className="text-paper-faint hover:text-ember"
               aria-label="Clear search"
             >

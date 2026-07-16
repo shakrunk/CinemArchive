@@ -71,10 +71,11 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [ ] Cast/crew, physical media, badge scores (imdb/RT/Metacritic) — deferred from this
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.
-- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete except
-      one item (the live multi-device conflict test), blocked on a named authorization
-      decision, not a physical device — see the Phase 3 Ledger section below for the full
-      investigation:**
+- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete —
+      including a real `RemoteMutationWriter` implementation, proven able to authenticate
+      against the test project. Only the final live conflict-test pass is outstanding, blocked
+      on a one-line database `GRANT` on the test project needing its own authorization — see
+      the Phase 3 Ledger section below for the full investigation:**
   - [x] `mutation_outbox` Room table + `OutboxDao` — a durable queue of pending remote
         writes (client-generated id, entity type, operation, JSON payload, attempt count),
         separate from the local read-model write it accompanies so the outbox row only
@@ -300,25 +301,46 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         rotation triggers — pre-existing, unrelated to this work, not fixed here.
   - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
         issues, build succeeds.
-  - [ ] **Still blocked, precisely diagnosed (not a physical-device claim):** syncing this
-        layout to `user_prefs.ledger_layout` needs a real, authenticated `RemoteMutationWriter`
-        — and unlike earlier passes assumed, **that authentication does not require passkeys**.
-        The `RemoteMutationWriter` just needs a Supabase session (a JWT); how that session is
-        obtained is a separate concern from the app's real (passkey) sign-in flow. Investigated
-        live against the non-production `cinemarchive-android-test` project
-        (`rgnthbiigfbfiuehteoe`) with its anon key: anonymous sign-in is disabled
-        (`anonymous_provider_disabled`), and email/password signup requires email confirmation
-        (returns no session until confirmed) and is rate-limited
-        (`over_email_send_rate_limit` after a few attempts) — so a usable session can't be
-        obtained through the public signup endpoint alone. The clean fix is to admin-create one
-        pre-confirmed test user via the Auth Admin API (`POST /auth/v1/admin/users` with
-        `email_confirm: true`) using the project's `service_role` key, out-of-band and once —
-        the *app* then only ever holds the anon key and signs in as that user with a normal
-        password, exactly like the web client's auth shape. That's a full-RLS-bypass credential
-        and a specific live write against even a non-production project, so it needs its own
-        explicit authorization beyond "create test users via signup" (already granted and
-        exhausted by the investigation above) — this is a named decision for the project owner,
-        not a vague "needs a physical device" placeholder.
+  - [x] Real `RemoteMutationWriter` implementation, built and largely proven live —
+        `SupabaseRestClient` (`data` module, `HttpURLConnection`-based — deliberately not the
+        full Supabase Kotlin SDK, to keep this scoped to exactly what the outbox's push
+        semantics need: password sign-in, PATCH-with-filter, GET, upsert), plus
+        `SupabaseRemoteMutationWriter` (implements the real `title`-conflict path via a
+        conditional `PATCH .../titles?id=eq.<id>&updated_at=lt.<incoming>` — an empty result
+        means the server's row is already newer, so it GETs and returns that as the
+        `PushResult.Conflict` payload — and the four append-only upserts) and
+        `SupabaseLedgerLayoutWriter` (`user_prefs.ledger_layout` upsert). `PATCH` isn't in
+        `HttpURLConnection`'s allow-listed methods on the JDK or Android, so the `method` field
+        (a plain protected field on the standard `java.net.HttpURLConnection` class, not an
+        implementation internal) is set via reflection — the standard portable workaround, not
+        a hack tied to one JVM.
+        **This is not the passkey/Credential Manager gap** — a `RemoteMutationWriter` only
+        needs *some* Supabase session; how one is obtained is separate from the app's real
+        sign-in flow. That distinction was verified, not assumed: investigated live against
+        the non-production `cinemarchive-android-test` project. Anonymous sign-in is disabled
+        and email/password signup requires confirmation and hit a rate limit, so — with
+        explicit authorization for this specific action — one pre-confirmed test user was
+        created via the Auth Admin API (`service_role`, used only for that one call, never
+        committed, never in the app) and **signing in with the anon key + that user's password
+        succeeded**, returning a real session. That session is exactly what the app's own
+        future sign-in flow (of any kind) would hand this writer.
+        `SupabaseRemoteMutationWriterLiveTest` (`data/src/test`, network-gated behind four
+        `ANDROID_SUPABASE_TEST_*` env vars, skips via `Assume` when unset so it never affects a
+        normal build/CI run) then exercises two independent sign-ins for that one user (RLS is
+        per-`auth.uid()`, so one user with two sessions correctly simulates two devices) racing
+        a `titles` update, plus a `user_prefs.ledger_layout` upsert+read-back.
+        **What actually blocks the live pass today:** not auth — a database privilege gap on
+        the test project itself. Both writes fail `HTTP 403 42501 permission denied for table
+        titles/user_prefs`, with Postgres's own hint: `GRANT SELECT, INSERT, UPDATE ON
+        public.titles TO authenticated` (and the same for `user_prefs`). The `authenticated`
+        Postgres role on this project is missing table grants the 33 production migrations
+        apparently didn't need to state explicitly (likely auto-configured differently when
+        the *production* project was first provisioned vs. this test project created later via
+        the CLI). Fixing it is a one-line `GRANT` — but it's a schema-level change even on a
+        non-production project, so it needs its own explicit authorization, same as every
+        other escalation in this investigation; not yet requested. Once granted, the two live
+        test methods above should pass unmodified — the writer/session code path is already
+        verified up to exactly that point.
   - [x] Verified live on the same Android Studio emulator (2026-07-15): opened Edit mode,
         removed "The Run" widget, set Critical Record's Top N to 5 via the stepper, tapped
         Done — the board immediately reflected both changes (The Run gone, Critical Record

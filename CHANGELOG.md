@@ -9,6 +9,19 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Native Android app (in development, not yet distributed): the Ledger screen now has all 20
+  widgets from the web app's registry (Time in the Dark, Encore Performances, The Run,
+  Critical Record, By the Genre, The Auteurs, The Ensemble, Second Opinions, In Translation,
+  Screening Nights, The Marathon, Shifting Standards, Premieres & Revivals, The Revival
+  House, Still Rolling, and At the Movies, alongside the previous five), each with a real,
+  focusable accessible list alongside any chart rather than a tooltip-only fallback.
+- Native Android app (in development, not yet distributed): the Ledger board is now
+  customizable — add, remove, reorder, resize, and set a custom title/top-N limit per widget,
+  via a new Edit mode. The layout persists locally and survives an app restart; syncing it
+  across devices isn't wired up yet.
+
 ### Changed
 
 - Native Android app (in development, not yet distributed): tracking-mutation conflict

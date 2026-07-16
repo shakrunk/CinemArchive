@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.ledger
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,13 +9,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,38 +30,124 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.designsystem.BarChartCanvas
+import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
+import work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
+import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerLayoutRules
+import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
+import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
+import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
+import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
+import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWatchlistEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetId
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetSettings
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetWidth
+import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 
+private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
+    LedgerWidgetId.RUNTIMES to "Feature Lengths",
+    LedgerWidgetId.NETWORKS to "On the Air",
+    LedgerWidgetId.DECADES to "By the Era",
+    LedgerWidgetId.ATTRACTIONS to "Coming Attractions",
+    LedgerWidgetId.ACTIVITY to "Time in the Dark",
+    LedgerWidgetId.ENCORES to "Encore Performances",
+    LedgerWidgetId.RUN to "The Run",
+    LedgerWidgetId.RATINGS to "Critical Record",
+    LedgerWidgetId.GENRES to "By the Genre",
+    LedgerWidgetId.AUTEURS to "The Auteurs",
+    LedgerWidgetId.ENSEMBLE to "The Ensemble",
+    LedgerWidgetId.VERDICTS to "Second Opinions",
+    LedgerWidgetId.LANGUAGES to "In Translation",
+    LedgerWidgetId.WEEKDAYS to "Screening Nights",
+    LedgerWidgetId.STREAKS to "The Marathon",
+    LedgerWidgetId.TRAJECTORY to "Shifting Standards",
+    LedgerWidgetId.REVIVALS to "Premieres & Revivals",
+    LedgerWidgetId.TIMEWARP to "The Revival House",
+    LedgerWidgetId.PROGRESS to "Still Rolling",
+    LedgerWidgetId.MOVIEGOING to "At the Movies",
+)
+
 /**
- * The hero stat ribbon ([LedgerStats]) plus the four simplest additional widgets
- * ([LedgerBoard] kdoc explains why those four specifically). The full 20-widget
- * customizable board (docs/android-contracts/ledger.md) is a separate, larger workstream
- * that also needs `user_prefs.ledger_layout` sync, which isn't wired up yet.
+ * All 20 Ledger widgets (docs/android-contracts/ledger.md §2), rendered from a
+ * [LedgerWidgetConfig] list — the fixed default order on first launch, or whatever the user
+ * has locally customized (edit mode: add/remove/move/resize/settings). Every chart primitive
+ * ([BarChartCanvas]/[HeatmapRow]) is decorative and paired with a real, focusable list of the
+ * same data — per ledger.md §5, Android must give every widget a genuine accessible
+ * alternative rather than the web app's tooltip-only fallback on five widgets.
+ *
+ * The layout persists **locally only** (DataStore via [LedgerLayoutRepository]) — syncing it
+ * to `user_prefs.ledger_layout` stays blocked on a real `RemoteMutationWriter`, itself
+ * blocked on a physical device for Credential Manager auth (see
+ * docs/android-implementation-status.md). `width` round-trips through storage but doesn't
+ * yet drive a responsive multi-column grid (Android is phone-first, so every width renders
+ * full-bleed today — see [LedgerWidgetWidth] kdoc). Only `topN`/`title` are applied to a
+ * widget's rendered output (a post-hoc take(n)/header-override); `timeRange`/`scope` persist
+ * and normalize correctly but aren't consumed by any widget's aggregation yet.
  */
 data class LedgerUiState(val stats: LedgerStats, val board: LedgerBoard)
 
-class LedgerViewModel(repository: LedgerRepository) : ViewModel() {
+class LedgerViewModel(
+    repository: LedgerRepository,
+    private val layoutRepository: LedgerLayoutRepository,
+) : ViewModel() {
     val uiState = combine(repository.observeLedgerStats(), repository.observeLedgerBoard(), ::LedgerUiState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val layout = layoutRepository.observeLayout()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val editModeFlow = MutableStateFlow(false)
+    val editMode: StateFlow<Boolean> = editModeFlow
+
+    fun setEditMode(enabled: Boolean) {
+        editModeFlow.value = enabled
+    }
+
+    fun updateLayout(widgets: List<LedgerWidgetConfig>) {
+        viewModelScope.launch { layoutRepository.setLayout(widgets) }
+    }
 }
 
 @Composable
-fun LedgerRoute(repository: LedgerRepository, onBack: () -> Unit) {
-    val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository))
+fun LedgerRoute(repository: LedgerRepository, layoutRepository: LedgerLayoutRepository, onBack: () -> Unit) {
+    val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository, layoutRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LedgerScreen(uiState, onBack)
+    val layout by viewModel.layout.collectAsStateWithLifecycle()
+    val editMode by viewModel.editMode.collectAsStateWithLifecycle()
+    LedgerScreen(
+        uiState = uiState,
+        layout = layout,
+        editMode = editMode,
+        onToggleEditMode = { viewModel.setEditMode(!editMode) },
+        onLayoutChange = viewModel::updateLayout,
+        onBack = onBack,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LedgerScreen(uiState: LedgerUiState?, onBack: () -> Unit = {}) {
+fun LedgerScreen(
+    uiState: LedgerUiState?,
+    layout: List<LedgerWidgetConfig>?,
+    editMode: Boolean = false,
+    onToggleEditMode: () -> Unit = {},
+    onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
+    onBack: () -> Unit = {},
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -67,10 +157,15 @@ fun LedgerScreen(uiState: LedgerUiState?, onBack: () -> Unit = {}) {
                         Text("←", style = MaterialTheme.typography.headlineSmall)
                     }
                 },
+                actions = {
+                    TextButton(onClick = onToggleEditMode) {
+                        Text(if (editMode) "Done" else "Edit")
+                    }
+                },
             )
         },
     ) { innerPadding ->
-        if (uiState == null) {
+        if (uiState == null || layout == null) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(innerPadding),
                 verticalArrangement = Arrangement.Center,
@@ -81,45 +176,250 @@ fun LedgerScreen(uiState: LedgerUiState?, onBack: () -> Unit = {}) {
             return@Scaffold
         }
 
-        val (stats, board) = uiState
+        if (editMode) {
+            LedgerEditModeContent(
+                modifier = Modifier.padding(innerPadding),
+                layout = layout,
+                onLayoutChange = onLayoutChange,
+            )
+        } else {
+            LedgerBoardContent(modifier = Modifier.padding(innerPadding), uiState = uiState, layout = layout)
+        }
+    }
+}
 
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            item { StatRow("Movies", stats.totalMovies.toString()) }
-            item { StatRow("Series", stats.totalSeries.toString()) }
-            item { StatRow("Viewings logged", stats.totalViewings.toString()) }
-            item { StatRow("Average rating", stats.averageRating?.let { "★%.1f".format(it) } ?: "—") }
-            item { StatRow("Movie minutes watched", stats.totalWatchedMovieMinutes.toString()) }
+@Composable
+private fun LedgerBoardContent(modifier: Modifier, uiState: LedgerUiState, layout: List<LedgerWidgetConfig>) {
+    val (stats, board) = uiState
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier,
+    ) {
+        item { StatRow("Movies", stats.totalMovies.toString()) }
+        item { StatRow("Series", stats.totalSeries.toString()) }
+        item { StatRow("Viewings logged", stats.totalViewings.toString()) }
+        item { StatRow("Average rating", stats.averageRating?.let { "★%.1f".format(it) } ?: "—") }
+        item { StatRow("Movie minutes watched", stats.totalWatchedMovieMinutes.toString()) }
 
-            item { SectionHeader("Feature Lengths") }
-            items(board.runtimeBuckets, key = { "runtime-${it.label}" }) { CategoryRow(it) }
+        layout.forEach { config -> renderWidget(config, board) }
+    }
+}
 
-            if (board.networks.isNotEmpty()) {
-                item { SectionHeader("On the Air") }
-                items(board.networks, key = { "network-${it.label}" }) { CategoryRow(it) }
-            }
+private fun <T> List<T>.applyTopN(config: LedgerWidgetConfig): List<T> =
+    config.settings?.topN?.let { take(it) } ?: this
 
-            if (board.decades.isNotEmpty()) {
-                item { SectionHeader("By the Era") }
-                items(board.decades, key = { "decade-${it.label}" }) { CategoryRow(it) }
-            }
+private fun headerFor(config: LedgerWidgetConfig, default: String): String = config.settings?.title ?: default
 
+private fun LazyListScope.renderWidget(config: LedgerWidgetConfig, board: LedgerBoard) {
+    val title = headerFor(config, PANEL_LABELS[config.panel] ?: config.panel.raw)
+    when (config.panel) {
+        LedgerWidgetId.RUNTIMES -> categorySection(title, board.runtimeBuckets.applyTopN(config))
+        LedgerWidgetId.NETWORKS -> categorySection(title, board.networks.applyTopN(config))
+        LedgerWidgetId.DECADES -> categorySection(title, board.decades.applyTopN(config))
+        LedgerWidgetId.ATTRACTIONS -> {
             item {
                 SectionHeader(
-                    if (board.watchlistMovieMinutesOwed > 0) {
-                        "Coming Attractions — ${board.watchlistMovieMinutesOwed} movie minutes owed"
-                    } else {
-                        "Coming Attractions"
-                    },
+                    if (board.watchlistMovieMinutesOwed > 0) "$title — ${board.watchlistMovieMinutesOwed} movie minutes owed" else title,
                 )
             }
-            if (board.watchlist.isEmpty()) {
-                item { Text("Nothing on the watchlist.", style = MaterialTheme.typography.bodyMedium) }
-            } else {
-                items(board.watchlist, key = LedgerWatchlistEntry::titleId) { WatchlistRow(it) }
+            val entries = board.watchlist.applyTopN(config)
+            if (entries.isEmpty()) item { EmptyRow("Nothing on the watchlist.") }
+            else items(entries, key = { "watchlist-${it.titleId}" }) { WatchlistRow(it) }
+        }
+        LedgerWidgetId.ACTIVITY -> {
+            item { SectionHeader(title) }
+            if (board.weeklyActivity.any { it.count > 0 }) {
+                item { HeatmapRow(values = board.weeklyActivity.map { it.count }) }
+                items(board.weeklyActivity.filter { it.count > 0 }.applyTopN(config), key = { "activity-${it.weekLabel}" }) {
+                    CategoryRow(LedgerCategoryCount("Week of ${it.weekLabel}", it.count))
+                }
+            } else item { EmptyRow("No dated viewings logged yet.") }
+        }
+        LedgerWidgetId.ENCORES -> {
+            item { SectionHeader(title) }
+            val entries = board.encores.applyTopN(config)
+            if (entries.isEmpty()) item { EmptyRow("No title has been watched more than once yet.") }
+            else items(entries, key = { "encore-${it.titleId}" }) { EncoreRow(it) }
+        }
+        LedgerWidgetId.RUN -> {
+            item { SectionHeader(title) }
+            if (board.monthlyRun.any { it.count > 0 }) {
+                item { BarChartCanvas(data = board.monthlyRun.map { ChartDatum(it.monthLabel, it.count.toFloat()) }) }
+            }
+            items(board.monthlyRun.applyTopN(config), key = { "run-${it.monthLabel}" }) { CategoryRow(LedgerCategoryCount(it.monthLabel, it.count)) }
+        }
+        LedgerWidgetId.RATINGS -> categorySection(title, board.ratingBuckets.applyTopN(config))
+        LedgerWidgetId.GENRES -> categorySection(title, board.genres.applyTopN(config))
+        LedgerWidgetId.AUTEURS -> categorySection(title, board.auteurs.applyTopN(config))
+        LedgerWidgetId.ENSEMBLE -> categorySection(title, board.ensemble.applyTopN(config))
+        LedgerWidgetId.VERDICTS -> {
+            item { SectionHeader(title) }
+            val entries = board.verdicts.applyTopN(config)
+            if (entries.isEmpty()) item { EmptyRow("No title has both your rating and an IMDb rating yet.") }
+            else items(entries, key = { "verdict-${it.titleId}" }) { VerdictRow(it) }
+        }
+        LedgerWidgetId.LANGUAGES -> categorySection(title, board.languages.applyTopN(config))
+        LedgerWidgetId.WEEKDAYS -> {
+            item { SectionHeader(title) }
+            item { BarChartCanvas(data = board.weekdays.map { ChartDatum(it.weekday, it.count.toFloat()) }) }
+            items(board.weekdays, key = { "weekday-${it.weekday}" }) { CategoryRow(LedgerCategoryCount(it.weekday, it.count)) }
+        }
+        LedgerWidgetId.STREAKS -> {
+            item { SectionHeader(title) }
+            item { StreakSummary(board.streaks) }
+        }
+        LedgerWidgetId.TRAJECTORY -> {
+            item { SectionHeader(title) }
+            val entries = board.trajectory.applyTopN(config)
+            if (entries.isEmpty()) item { EmptyRow("No rated, dated titles yet.") }
+            else {
+                item { BarChartCanvas(data = entries.map { ChartDatum(it.quarterLabel, it.averageRating.toFloat()) }) }
+                items(entries, key = { "quarter-${it.quarterLabel}" }) { QuarterRow(it) }
+            }
+        }
+        LedgerWidgetId.REVIVALS -> {
+            item { SectionHeader(title) }
+            val entries = board.revivals.applyTopN(config)
+            if (entries.isEmpty()) item { EmptyRow("No dated viewings logged yet.") }
+            else items(entries, key = { "revival-${it.monthLabel}" }) { RevivalRow(it) }
+        }
+        LedgerWidgetId.TIMEWARP -> categorySection(title, board.timewarp.applyTopN(config))
+        LedgerWidgetId.PROGRESS -> {
+            item { SectionHeader(title) }
+            val entries = board.stillRolling.applyTopN(config)
+            if (entries.isEmpty()) item { EmptyRow("Nothing in progress.") }
+            else items(entries, key = { "progress-${it.titleId}" }) { ProgressRow(it) }
+        }
+        LedgerWidgetId.MOVIEGOING -> {
+            item { SectionHeader(title) }
+            item { MoviegoingSection(board.moviegoing) }
+        }
+    }
+}
+
+private fun LazyListScope.categorySection(title: String, entries: List<LedgerCategoryCount>) {
+    if (entries.isEmpty()) return
+    item { SectionHeader(title) }
+    items(entries, key = { "$title-${it.label}" }) { CategoryRow(it) }
+}
+
+/**
+ * Add/remove/move/resize/settings for the local layout — every action updates state
+ * synchronously (matching ledger.md §4's "instant UI feedback" rule for the *local* half of
+ * that write path; only the debounced remote upsert is out of reach here).
+ */
+@Composable
+private fun LedgerEditModeContent(
+    modifier: Modifier,
+    layout: List<LedgerWidgetConfig>,
+    onLayoutChange: (List<LedgerWidgetConfig>) -> Unit,
+) {
+    val presentPanels = layout.map { it.panel }.toSet()
+    val availablePanels = LedgerWidgetId.entries.filter { it !in presentPanels }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier,
+    ) {
+        item { SectionHeader("On the board") }
+        items(layout, key = { it.id }) { config ->
+            EditableWidgetRow(
+                config = config,
+                canMoveUp = layout.first() != config,
+                canMoveDown = layout.last() != config,
+                onMoveUp = { onLayoutChange(layout.moved(config, -1)) },
+                onMoveDown = { onLayoutChange(layout.moved(config, 1)) },
+                onRemove = { onLayoutChange(layout.filterNot { it.id == config.id }) },
+                onCycleWidth = { onLayoutChange(layout.map { if (it.id == config.id) it.copy(width = it.width.next()) else it }) },
+                onSettingsChange = { settings ->
+                    onLayoutChange(layout.map { if (it.id == config.id) it.copy(settings = settings) else it })
+                },
+            )
+        }
+
+        if (availablePanels.isNotEmpty()) {
+            item { SectionHeader("Add a widget") }
+            items(availablePanels, key = { "add-${it.raw}" }) { panel ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val newWidget = LedgerLayoutRules.defaultLedgerWidgets().first { it.panel == panel }
+                            .copy(id = "widget-${panel.raw}-${layout.size}")
+                        onLayoutChange(layout + newWidget)
+                    },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(PANEL_LABELS[panel] ?: panel.raw, style = MaterialTheme.typography.bodyMedium)
+                    Text("+ Add", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}
+
+private fun List<LedgerWidgetConfig>.moved(config: LedgerWidgetConfig, delta: Int): List<LedgerWidgetConfig> {
+    val index = indexOf(config)
+    val target = (index + delta).coerceIn(0, size - 1)
+    if (target == index) return this
+    return toMutableList().apply {
+        removeAt(index)
+        add(target, config)
+    }
+}
+
+private fun LedgerWidgetWidth.next(): LedgerWidgetWidth {
+    val values = LedgerWidgetWidth.entries
+    return values[(values.indexOf(this) + 1) % values.size]
+}
+
+@Composable
+private fun EditableWidgetRow(
+    config: LedgerWidgetConfig,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onRemove: () -> Unit,
+    onCycleWidth: () -> Unit,
+    onSettingsChange: (LedgerWidgetSettings?) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(config.settings?.title ?: PANEL_LABELS[config.panel] ?: config.panel.raw, style = MaterialTheme.typography.bodyMedium)
+            Row {
+                TextButton(onClick = onMoveUp, enabled = canMoveUp) { Text("▲") }
+                TextButton(onClick = onMoveDown, enabled = canMoveDown) { Text("▼") }
+                TextButton(onClick = onCycleWidth) { Text(config.width.raw) }
+                TextButton(onClick = onRemove) { Text("✕") }
+            }
+        }
+        OutlinedTextField(
+            value = config.settings?.title ?: "",
+            onValueChange = { newTitle ->
+                val title = newTitle.take(60).ifBlank { null }
+                onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(title = title))
+            },
+            label = { Text("Custom title") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Top N: ", style = MaterialTheme.typography.bodySmall)
+            val topN = config.settings?.topN
+            TextButton(onClick = {
+                val next = ((topN ?: 12) - 1).coerceIn(3, 12)
+                onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
+            }) { Text("-") }
+            Text(topN?.toString() ?: "off", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = {
+                val next = ((topN ?: 2) + 1).coerceIn(3, 12)
+                onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
+            }) { Text("+") }
+            if (topN != null) {
+                TextButton(onClick = { onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = null)) }) {
+                    Text("Clear")
+                }
             }
         }
     }
@@ -139,6 +439,11 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
+private fun EmptyRow(message: String) {
+    Text(message, style = MaterialTheme.typography.bodyMedium)
+}
+
+@Composable
 private fun CategoryRow(category: LedgerCategoryCount) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(category.label, style = MaterialTheme.typography.bodyMedium)
@@ -154,9 +459,96 @@ private fun WatchlistRow(entry: LedgerWatchlistEntry) {
     }
 }
 
+@Composable
+private fun EncoreRow(entry: LedgerEncoreEntry) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text("${entry.title}${entry.year?.let { " ($it)" } ?: ""}", style = MaterialTheme.typography.bodyMedium)
+        Text("${entry.viewingCount}×", style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun VerdictRow(entry: LedgerVerdictEntry) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(entry.title, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Us %.1f vs IMDb %.1f (Δ%.1f)".format(entry.ourRatingOn10, entry.imdbRating, entry.delta),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun QuarterRow(entry: LedgerQuarterRating) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(entry.quarterLabel, style = MaterialTheme.typography.bodyMedium)
+        Text("★%.1f (%d titles)".format(entry.averageRating, entry.titleCount), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun RevivalRow(entry: LedgerPremiereRevivalBucket) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(entry.monthLabel, style = MaterialTheme.typography.bodyMedium)
+        Text("${entry.premieres} premiere(s), ${entry.revivals} revival(s)", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun ProgressRow(entry: LedgerProgressEntry) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(entry.title, style = MaterialTheme.typography.bodyMedium)
+        Text("${entry.episodesWatched} / ${entry.episodeCount} episodes", style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Real text stats, not a data-free dot grid — the accessible replacement for the web app's
+ *  tooltip-only 30-night grid (ledger.md §5). */
+@Composable
+private fun StreakSummary(streaks: LedgerStreaks) {
+    Column {
+        Text("Current streak: ${streaks.currentStreakDays} day(s)", style = MaterialTheme.typography.bodyMedium)
+        Text("Longest streak: ${streaks.longestStreakDays} day(s)", style = MaterialTheme.typography.bodyMedium)
+        if (streaks.recentActiveDates.isNotEmpty()) {
+            Text("Recent screening dates:", style = MaterialTheme.typography.bodySmall)
+            streaks.recentActiveDates.forEach { date ->
+                Text(date, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoviegoingSection(stats: LedgerMoviegoingStats) {
+    Column {
+        Text("Trips: ${stats.tripCount}", style = MaterialTheme.typography.bodyMedium)
+        stats.totalSpend?.let { Text("Total spend: $%.2f".format(it), style = MaterialTheme.typography.bodyMedium) }
+        if (stats.byYear.isNotEmpty()) {
+            Text("By year", style = MaterialTheme.typography.bodySmall)
+            stats.byYear.forEach { CategoryRow(it) }
+        }
+        if (stats.venues.isNotEmpty()) {
+            Text("Venues", style = MaterialTheme.typography.bodySmall)
+            stats.venues.forEach { CategoryRow(it) }
+        }
+        if (stats.companions.isNotEmpty()) {
+            Text("Companions", style = MaterialTheme.typography.bodySmall)
+            stats.companions.forEach { CategoryRow(it) }
+        }
+        if (stats.formats.isNotEmpty()) {
+            Text("Formats", style = MaterialTheme.typography.bodySmall)
+            stats.formats.forEach { CategoryRow(it) }
+        }
+        if (stats.tripCount == 0) {
+            Text("No cinema trips logged yet.", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
 private class LedgerViewModelFactory(
     private val repository: LedgerRepository,
+    private val layoutRepository: LedgerLayoutRepository,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = LedgerViewModel(repository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = LedgerViewModel(repository, layoutRepository) as T
 }

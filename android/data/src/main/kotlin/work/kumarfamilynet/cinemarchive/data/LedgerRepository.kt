@@ -1,25 +1,82 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
+import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
+import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
+import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
+import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerMonthlyCount
+import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
+import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
+import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
+import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
+import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWatchlistEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWeekdayCount
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWeeklyActivity
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 
+private val ISO_LANGUAGE_NAMES = mapOf(
+    "en" to "English", "es" to "Spanish", "fr" to "French", "de" to "German",
+    "it" to "Italian", "ja" to "Japanese", "ko" to "Korean", "zh" to "Chinese",
+    "hi" to "Hindi", "pt" to "Portuguese", "ru" to "Russian", "sv" to "Swedish",
+    "da" to "Danish", "no" to "Norwegian", "fi" to "Finnish", "nl" to "Dutch",
+)
+
+/** All bundle of a title's DAO reads the widgets below need together — kept private since
+ *  it's purely an intermediate combine() shape, not part of the repository's public API. */
+private data class LedgerSources(
+    val titles: List<TitleEntity>,
+    val viewings: List<ViewingEntity>,
+    val cast: List<TitleCastEntity>,
+    val crew: List<TitleCrewEntity>,
+    val outings: List<CinemaOutingEntity>,
+    val watchedAtDates: List<String?>,
+    val seasons: List<SeasonEntity>,
+)
+
+private fun parseLocalDate(date: String?): LocalDate? =
+    date?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+
 /**
- * Read-only Ledger hero-stat rollup — see [LedgerStats] and docs/android-contracts/ledger.md.
- * Pure client-side aggregation over already-synced Room data, same as the web app's
- * ledgerStats.ts; no network call, no write path.
+ * Read-only Ledger rollup — see [LedgerStats]/[LedgerBoard] and
+ * docs/android-contracts/ledger.md. Pure client-side aggregation over already-synced Room
+ * data, same as the web app's ledgerStats.ts/ledgerDerive.ts/ledgerPanels.ts; no network
+ * call, no write path. Covers all 20 widgets as a fixed-order board — the customizable
+ * layout is a separate concern (see [LedgerBoard]'s kdoc).
  */
 class LedgerRepository(
     private val titleDao: TitleDao,
     private val viewingDao: ViewingDao,
+    private val titleCastDao: TitleCastDao,
+    private val titleCrewDao: TitleCrewDao,
+    private val cinemaOutingDao: CinemaOutingDao,
+    private val watchEventDao: EpisodeWatchEventDao,
+    private val seasonDao: SeasonDao,
 ) {
     fun observeLedgerStats(): Flow<LedgerStats> = combine(
         titleDao.observeAllTitles(),
@@ -39,8 +96,53 @@ class LedgerRepository(
         )
     }
 
-    /** Feature Lengths / On the Air / By the Era / Coming Attractions — see [LedgerBoard]. */
-    fun observeLedgerBoard(): Flow<LedgerBoard> = titleDao.observeAllTitles().map { titles ->
+    /** All 20 widgets — see [LedgerBoard] field kdocs for which widget each field backs.
+     *  Split into two combine() groups since kotlinx.coroutines only has typed `combine`
+     *  overloads up to 5 flows. */
+    fun observeLedgerBoard(): Flow<LedgerBoard> {
+        val titleGroup = combine(
+            titleDao.observeAllTitles(),
+            viewingDao.observeAllViewings(),
+            titleCastDao.observeAllCast(),
+            titleCrewDao.observeAllCrew(),
+            ::TitleGroup,
+        )
+        val historyGroup = combine(
+            cinemaOutingDao.observeAllOutings(),
+            watchEventDao.observeAllWatchEvents(),
+            seasonDao.observeAllSeasons(),
+            ::HistoryGroup,
+        )
+        return combine(titleGroup, historyGroup) { titles, history ->
+            LedgerSources(
+                titles.titles,
+                titles.viewings,
+                titles.cast,
+                titles.crew,
+                history.outings,
+                history.watchEvents.map { it.watchedAt },
+                history.seasons,
+            )
+        }.map { s -> buildBoard(s) }
+    }
+
+    private data class TitleGroup(
+        val titles: List<TitleEntity>,
+        val viewings: List<ViewingEntity>,
+        val cast: List<TitleCastEntity>,
+        val crew: List<TitleCrewEntity>,
+    )
+
+    private data class HistoryGroup(
+        val outings: List<CinemaOutingEntity>,
+        val watchEvents: List<EpisodeWatchEventEntity>,
+        val seasons: List<SeasonEntity>,
+    )
+
+    private fun buildBoard(s: LedgerSources): LedgerBoard {
+        val titles = s.titles
+        val viewings = s.viewings
+        val titleById = titles.associateBy { it.id }
         val movies = titles.filter { it.type == MediaType.MOVIE.name }
         val series = titles.filter { it.type == MediaType.TV.name }
 
@@ -51,21 +153,9 @@ class LedgerRepository(
             "150+ min" to movies.count { (it.runtime ?: 0) >= 150 },
         ).map { (label, count) -> LedgerCategoryCount(label, count) }
 
-        val networks = series
-            .mapNotNull { it.network }
-            .groupingBy { it }
-            .eachCount()
-            .entries
-            .sortedByDescending { it.value }
-            .map { LedgerCategoryCount(it.key, it.value) }
-
-        val decades = titles
-            .mapNotNull { it.year }
-            .map { year -> "${(year / 10) * 10}s" }
-            .groupingBy { it }
-            .eachCount()
-            .entries
-            .sortedBy { it.key }
+        val networks = tally(series.mapNotNull { it.network })
+        val decades = titles.mapNotNull { it.year }.map { year -> "${(year / 10) * 10}s" }
+            .groupingBy { it }.eachCount().entries.sortedBy { it.key }
             .map { LedgerCategoryCount(it.key, it.value) }
 
         val watchlisted = titles.filter { it.status == LibraryStatus.WATCHLIST.name }
@@ -76,6 +166,234 @@ class LedgerRepository(
             .filter { it.type == MediaType.MOVIE.name }
             .sumOf { it.runtime ?: 0 }
 
-        LedgerBoard(runtimeBuckets, networks, decades, watchlist, watchlistMovieMinutesOwed)
+        return LedgerBoard(
+            runtimeBuckets = runtimeBuckets,
+            networks = networks,
+            decades = decades,
+            watchlist = watchlist,
+            watchlistMovieMinutesOwed = watchlistMovieMinutesOwed,
+            weeklyActivity = weeklyActivity(viewings),
+            encores = encores(viewings, titleById),
+            monthlyRun = monthlyRun(viewings),
+            ratingBuckets = ratingBuckets(titles),
+            genres = tally(titles.flatMap { it.genres }),
+            auteurs = tally(s.crew.filter { it.job == "Director" }.map { it.name }),
+            ensemble = tally(s.cast.filter { it.castOrder < 5 }.map { it.name }),
+            verdicts = verdicts(titles),
+            languages = tally(titles.mapNotNull { it.originalLanguage?.let { code -> displayLanguage(code) } }),
+            weekdays = weekdays(viewings),
+            streaks = streaks(viewings, s.watchedAtDates),
+            trajectory = trajectory(titles, viewings),
+            revivals = revivals(viewings),
+            timewarp = timewarp(viewings, titleById),
+            stillRolling = stillRolling(titles, s.seasons),
+            moviegoing = moviegoing(viewings, s.outings),
+        )
+    }
+
+    private fun tally(values: List<String>): List<LedgerCategoryCount> =
+        values.groupingBy { it }.eachCount().entries
+            .sortedByDescending { it.value }
+            .map { LedgerCategoryCount(it.key, it.value) }
+
+    /** Time in the Dark: week-granularity heatmap, 52 buckets ending this week (oldest
+     *  first) — see [work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow]'s kdoc
+     *  for why Android buckets by week rather than the web app's per-day grid. */
+    private fun weeklyActivity(viewings: List<ViewingEntity>): List<LedgerWeeklyActivity> {
+        val today = LocalDate.now()
+        val dates = viewings.mapNotNull { parseLocalDate(it.date) }
+        return (51 downTo 0).map { weeksAgo ->
+            val weekStart = today.minusWeeks(weeksAgo.toLong()).with(DayOfWeek.MONDAY)
+            val weekEnd = weekStart.plusDays(6)
+            val count = dates.count { it in weekStart..weekEnd }
+            LedgerWeeklyActivity(weekStart.format(DateTimeFormatter.ofPattern("MMM d")), count)
+        }
+    }
+
+    /** Encore Performances: titles with >=2 viewings (ledger.md §2). */
+    private fun encores(viewings: List<ViewingEntity>, titleById: Map<String, TitleEntity>): List<LedgerEncoreEntry> =
+        viewings.groupingBy { it.titleId }.eachCount().entries
+            .filter { it.value >= 2 }
+            .mapNotNull { (titleId, count) ->
+                titleById[titleId]?.let { LedgerEncoreEntry(titleId, it.title, it.year, count) }
+            }
+            .sortedByDescending { it.viewingCount }
+
+    /** The Run: monthly trend, gap-filled, default window 12mo (ledger.md §2). */
+    private fun monthlyRun(viewings: List<ViewingEntity>): List<LedgerMonthlyCount> {
+        val today = LocalDate.now()
+        val dates = viewings.mapNotNull { parseLocalDate(it.date) }
+        return (11 downTo 0).map { monthsAgo ->
+            val month = today.minusMonths(monthsAgo.toLong())
+            val count = dates.count { it.year == month.year && it.monthValue == month.monthValue }
+            LedgerMonthlyCount(month.format(DateTimeFormatter.ofPattern("MMM yyyy")), count)
+        }
+    }
+
+    /** Critical Record: 0.5-star buckets, 5.0 descending to 0.5 (ledger.md §2). */
+    private fun ratingBuckets(titles: List<TitleEntity>): List<LedgerCategoryCount> {
+        val steps = generateSequence(5.0) { (it - 0.5).takeIf { next -> next >= 0.5 } }.toList()
+        return steps.map { value ->
+            val count = titles.count { title -> title.rating?.let { Math.abs(it - value) < 0.01 } ?: false }
+            LedgerCategoryCount("★%.1f".format(value), count)
+        }
+    }
+
+    /** Second Opinions: our rating (x2, 0-5 -> 0-10) vs IMDb, sorted by |delta| descending,
+     *  only titles with both fields present (ledger.md §2). */
+    private fun verdicts(titles: List<TitleEntity>): List<LedgerVerdictEntry> =
+        titles.mapNotNull { title ->
+            val rating = title.rating ?: return@mapNotNull null
+            val imdbRating = title.imdbRating ?: return@mapNotNull null
+            val ours = rating * 2
+            LedgerVerdictEntry(title.id, title.title, ours, imdbRating, ours - imdbRating)
+        }.sortedByDescending { Math.abs(it.delta) }
+
+    private fun displayLanguage(code: String): String = ISO_LANGUAGE_NAMES[code] ?: code
+
+    /** Screening Nights: local day-of-week from local date components (ledger.md §2). */
+    private fun weekdays(viewings: List<ViewingEntity>): List<LedgerWeekdayCount> {
+        val counts = viewings.mapNotNull { parseLocalDate(it.date) }
+            .groupingBy { it.dayOfWeek }.eachCount()
+        return DayOfWeek.entries.map { day ->
+            LedgerWeekdayCount(day.getDisplayName(TextStyle.SHORT, Locale.getDefault()), counts[day] ?: 0)
+        }
+    }
+
+    /** The Marathon: streak detection folds viewings AND episode watch events together
+     *  (ledger.md §1) — the one date-bucketing panel that does. */
+    private fun streaks(viewings: List<ViewingEntity>, watchedAtDates: List<String?>): LedgerStreaks {
+        val allDates = (viewings.map { it.date } + watchedAtDates)
+            .mapNotNull { parseLocalDate(it) }
+            .toSortedSet()
+        if (allDates.isEmpty()) return LedgerStreaks(0, 0, emptyList())
+
+        var longest = 1
+        var run = 1
+        val ordered = allDates.toList()
+        for (i in 1 until ordered.size) {
+            run = if (ChronoUnit.DAYS.between(ordered[i - 1], ordered[i]) == 1L) run + 1 else 1
+            longest = maxOf(longest, run)
+        }
+
+        val today = LocalDate.now()
+        var current = 0
+        var cursor = if (allDates.contains(today)) today else today.minusDays(1)
+        while (allDates.contains(cursor)) {
+            current++
+            cursor = cursor.minusDays(1)
+        }
+
+        return LedgerStreaks(
+            currentStreakDays = current,
+            longestStreakDays = longest,
+            recentActiveDates = ordered.takeLast(10).map { it.toString() },
+        )
+    }
+
+    /** Shifting Standards: a title lands in the quarter of its first *dated* viewing,
+     *  falling back to addedAt (ledger.md §2). */
+    private fun trajectory(titles: List<TitleEntity>, viewings: List<ViewingEntity>): List<LedgerQuarterRating> {
+        val firstDatedViewingByTitle = viewings
+            .mapNotNull { v -> parseLocalDate(v.date)?.let { v.titleId to it } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, dates) -> dates.min() }
+
+        val quarterByRatedTitle = titles.mapNotNull { title ->
+            val rating = title.rating ?: return@mapNotNull null
+            val landingDate = firstDatedViewingByTitle[title.id] ?: parseLocalDate(title.addedAt)
+            landingDate?.let { Triple(title.id, rating, it) }
+        }
+
+        return quarterByRatedTitle
+            .groupBy { (_, _, date) -> "${date.year} Q${(date.monthValue - 1) / 3 + 1}" }
+            .entries
+            .sortedBy { it.key }
+            .map { (label, entries) ->
+                val ratings = entries.map { (_, rating, _) -> rating }
+                LedgerQuarterRating(label, ratings.average(), ratings.size)
+            }
+    }
+
+    /** Premieres & Revivals: per title, the earliest viewing (undated sorts first, per
+     *  ledger.md §2) is the premiere; every later viewing is a revival. Only dated viewings
+     *  render into a month bucket. */
+    private fun revivals(viewings: List<ViewingEntity>): List<LedgerPremiereRevivalBucket> {
+        val premiereMonths = mutableListOf<String>()
+        val revivalMonths = mutableListOf<String>()
+
+        viewings.groupBy { it.titleId }.forEach { (_, titleViewings) ->
+            val ordered = titleViewings.sortedWith(
+                compareBy(nullsFirst()) { parseLocalDate(it.date) },
+            )
+            ordered.forEachIndexed { index, viewing ->
+                val date = parseLocalDate(viewing.date) ?: return@forEachIndexed
+                val monthLabel = date.format(DateTimeFormatter.ofPattern("MMM yyyy"))
+                if (index == 0) premiereMonths += monthLabel else revivalMonths += monthLabel
+            }
+        }
+
+        val months = (premiereMonths + revivalMonths).distinct().sortedBy {
+            java.time.YearMonth.parse(it, DateTimeFormatter.ofPattern("MMM yyyy"))
+        }
+        return months.map { month ->
+            LedgerPremiereRevivalBucket(
+                monthLabel = month,
+                premieres = premiereMonths.count { it == month },
+                revivals = revivalMonths.count { it == month },
+            )
+        }
+    }
+
+    /** The Revival House: age = viewing year - release year, floored at 0, 5 fixed buckets
+     *  (ledger.md §2). Exact bucket cutoffs aren't pinned by the contract doc — this uses a
+     *  reasonable Android-chosen quintent scheme. */
+    private fun timewarp(viewings: List<ViewingEntity>, titleById: Map<String, TitleEntity>): List<LedgerCategoryCount> {
+        val ages = viewings.mapNotNull { v ->
+            val year = parseLocalDate(v.date)?.year ?: return@mapNotNull null
+            val releaseYear = titleById[v.titleId]?.year ?: return@mapNotNull null
+            (year - releaseYear).coerceAtLeast(0)
+        }
+        val buckets = listOf(
+            "Same year" to (0..0),
+            "1–2 yrs" to (1..2),
+            "3–5 yrs" to (3..5),
+            "6–15 yrs" to (6..15),
+            "16+ yrs" to (16..Int.MAX_VALUE),
+        )
+        return buckets.map { (label, range) -> LedgerCategoryCount(label, ages.count { it in range }) }
+    }
+
+    /** Still Rolling: TV titles that are `WATCHING`, or have partial progress even if
+     *  status says otherwise (ledger.md §2). */
+    private fun stillRolling(titles: List<TitleEntity>, seasons: List<SeasonEntity>): List<LedgerProgressEntry> {
+        val seasonsByTitle = seasons.groupBy { it.titleId }
+        return titles.filter { it.type == MediaType.TV.name }.mapNotNull { title ->
+            val titleSeasons = seasonsByTitle[title.id] ?: emptyList()
+            val watched = titleSeasons.sumOf { it.episodesWatched }
+            val total = titleSeasons.sumOf { it.episodeCount }
+            val isPartial = watched > 0 && watched < total
+            if (title.status != LibraryStatus.WATCHING.name && !isPartial) return@mapNotNull null
+            LedgerProgressEntry(title.id, title.title, watched, total)
+        }
+    }
+
+    /** At the Movies: viewings with a non-null venue are cinema trips (venue is filled for
+     *  a trip whether logged manually or via a completed outing — see schema.sql's
+     *  `viewings.venue`/`companions`/`outing_id` comment). [totalSpend]/formats are the
+     *  owner-private half, joined via `outingId` (ledger.md §3). */
+    private fun moviegoing(viewings: List<ViewingEntity>, outings: List<CinemaOutingEntity>): LedgerMoviegoingStats {
+        val trips = viewings.filter { it.venue != null }
+        val outingById = outings.associateBy { it.id }
+        val joinedOutings = trips.mapNotNull { it.outingId?.let { id -> outingById[id] } }
+
+        return LedgerMoviegoingStats(
+            tripCount = trips.size,
+            byYear = tally(trips.mapNotNull { parseLocalDate(it.date)?.year?.toString() }),
+            venues = tally(trips.mapNotNull { it.venue }),
+            companions = tally(trips.flatMap { it.companions }),
+            formats = tally(joinedOutings.mapNotNull { it.format }),
+            totalSpend = joinedOutings.mapNotNull { it.ticketPrice }.takeIf { it.isNotEmpty() }?.sum(),
+        )
     }
 }

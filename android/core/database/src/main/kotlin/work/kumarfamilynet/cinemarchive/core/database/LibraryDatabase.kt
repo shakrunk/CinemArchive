@@ -16,8 +16,11 @@ import androidx.room.TypeConverters
         EpisodeReviewEntity::class,
         ViewingEntity::class,
         OutboxEntity::class,
+        TitleCastEntity::class,
+        TitleCrewEntity::class,
+        CinemaOutingEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -30,6 +33,9 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun episodeReviewDao(): EpisodeReviewDao
     abstract fun viewingDao(): ViewingDao
     abstract fun outboxDao(): OutboxDao
+    abstract fun titleCastDao(): TitleCastDao
+    abstract fun titleCrewDao(): TitleCrewDao
+    abstract fun cinemaOutingDao(): CinemaOutingDao
 
     companion object {
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
@@ -38,8 +44,8 @@ abstract class LibraryDatabase : RoomDatabase() {
             "cinemarchive.db",
         )
             // Pre-distribution: no real user data exists yet, only DevFixtureSeed's
-            // re-seed-on-empty dev fixtures, so a hand-authored 1->2 migration would
-            // preserve data nobody has. Revisit once the app ships real user data.
+            // re-seed-on-empty dev fixtures, so a hand-authored migration would preserve
+            // data nobody has. Revisit once the app ships real user data.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

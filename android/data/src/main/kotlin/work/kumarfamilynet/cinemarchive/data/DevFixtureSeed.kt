@@ -1,10 +1,13 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 
@@ -40,6 +43,8 @@ object DevFixtureSeed {
                     notes = null,
                     addedAt = "2026-01-15",
                     updatedAt = "2026-01-15T09:12:00.000Z",
+                    imdbRating = 4.4,
+                    originalLanguage = "en",
                 ),
                 TitleEntity(
                     id = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
@@ -59,6 +64,9 @@ object DevFixtureSeed {
                     notes = null,
                     addedAt = "2026-03-02",
                     updatedAt = "2026-06-20T14:30:00.000Z",
+                    // Matches docs/android-contracts/fixtures/title-detail.json verbatim.
+                    imdbRating = 4.65,
+                    originalLanguage = "en",
                 ),
                 TitleEntity(
                     id = "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
@@ -78,6 +86,109 @@ object DevFixtureSeed {
                     notes = null,
                     addedAt = "2026-07-01",
                     updatedAt = "2026-07-01T20:05:00.000Z",
+                    imdbRating = 4.35,
+                    originalLanguage = "en",
+                ),
+            )
+        )
+
+        val inceptionId = "3f2b6b1a-8b3e-4a0c-9c1a-1a2b3c4d5e6f"
+        val breakingBadId = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f"
+        val fightClubId = "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d"
+
+        // Feeds the Ledger Ensemble widget (cast order < 5 counts as "leading",
+        // docs/android-contracts/ledger.md §2). Breaking Bad's rows match
+        // docs/android-contracts/fixtures/title-detail.json verbatim.
+        database.titleCastDao().upsertAll(
+            listOf(
+                TitleCastEntity(
+                    id = "f1a2b3c4-0001-4a0c-9c1a-1a2b3c4d5e01",
+                    titleId = inceptionId,
+                    tmdbPersonId = 6193,
+                    name = "Leonardo DiCaprio",
+                    characterName = "Cobb",
+                    castOrder = 0,
+                ),
+                TitleCastEntity(
+                    id = "f1a2b3c4-0002-4a0c-9c1a-1a2b3c4d5e02",
+                    titleId = inceptionId,
+                    tmdbPersonId = 24045,
+                    name = "Joseph Gordon-Levitt",
+                    characterName = "Arthur",
+                    castOrder = 1,
+                ),
+                TitleCastEntity(
+                    id = "f1a2b3c4-0003-4a0c-9c1a-1a2b3c4d5e03",
+                    titleId = inceptionId,
+                    tmdbPersonId = 2524,
+                    name = "Tom Hardy",
+                    characterName = "Eames",
+                    castOrder = 2,
+                ),
+                TitleCastEntity(
+                    id = "f1a2b3c4-0004-4a0c-9c1a-1a2b3c4d5e04",
+                    titleId = breakingBadId,
+                    tmdbPersonId = 17419,
+                    name = "Bryan Cranston",
+                    characterName = "Walter White",
+                    castOrder = 0,
+                ),
+                TitleCastEntity(
+                    id = "f1a2b3c4-0005-4a0c-9c1a-1a2b3c4d5e05",
+                    titleId = breakingBadId,
+                    tmdbPersonId = 84497,
+                    name = "Aaron Paul",
+                    characterName = "Jesse Pinkman",
+                    castOrder = 1,
+                ),
+                TitleCastEntity(
+                    id = "f1a2b3c4-0006-4a0c-9c1a-1a2b3c4d5e06",
+                    titleId = fightClubId,
+                    tmdbPersonId = 287,
+                    name = "Brad Pitt",
+                    characterName = "Tyler Durden",
+                    castOrder = 0,
+                ),
+                TitleCastEntity(
+                    id = "f1a2b3c4-0007-4a0c-9c1a-1a2b3c4d5e07",
+                    titleId = fightClubId,
+                    tmdbPersonId = 819,
+                    name = "Edward Norton",
+                    characterName = "The Narrator",
+                    castOrder = 1,
+                ),
+            )
+        )
+
+        // Feeds the Ledger Auteurs widget (job == "Director" only, ledger.md §2). Breaking
+        // Bad intentionally has no "Director" crew row here, matching
+        // docs/android-contracts/fixtures/title-detail.json, which only lists Vince
+        // Gilligan as "Creator" — Auteurs should not count it.
+        database.titleCrewDao().upsertAll(
+            listOf(
+                TitleCrewEntity(
+                    id = "e1a2b3c4-0001-4a0c-9c1a-1a2b3c4d5e01",
+                    titleId = inceptionId,
+                    tmdbPersonId = 525,
+                    name = "Christopher Nolan",
+                    job = "Director",
+                    department = "Directing",
+                ),
+                TitleCrewEntity(
+                    id = "e1a2b3c4-0002-4a0c-9c1a-1a2b3c4d5e02",
+                    titleId = breakingBadId,
+                    tmdbPersonId = 66633,
+                    name = "Vince Gilligan",
+                    job = "Creator",
+                    department = "Writing",
+                ),
+                TitleCrewEntity(
+                    id = "e1a2b3c4-0003-4a0c-9c1a-1a2b3c4d5e03",
+                    titleId = fightClubId,
+                    tmdbPersonId = 7467,
+                    name = "David Fincher",
+                    job = "Director",
+                    department = "Directing",
                 ),
             )
         )
@@ -87,7 +198,7 @@ object DevFixtureSeed {
             listOf(
                 SeasonEntity(
                     id = seasonId,
-                    titleId = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+                    titleId = breakingBadId,
                     seasonNumber = 1,
                     episodeCount = 7,
                     episodesWatched = 1,
@@ -102,7 +213,7 @@ object DevFixtureSeed {
             listOf(
                 EpisodeEntity(
                     id = episodeId,
-                    titleId = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+                    titleId = breakingBadId,
                     seasonId = seasonId,
                     episodeNumber = 1,
                     episodeName = "Pilot",
@@ -111,7 +222,7 @@ object DevFixtureSeed {
                 ),
                 EpisodeEntity(
                     id = secondEpisodeId,
-                    titleId = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+                    titleId = breakingBadId,
                     seasonId = seasonId,
                     episodeNumber = 2,
                     episodeName = "Cat's in the Bag...",
@@ -147,15 +258,42 @@ object DevFixtureSeed {
             )
         )
 
+        val cinemaOutingId = "d1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f60"
+        database.cinemaOutingDao().upsertAll(
+            listOf(
+                // Owner-private fields for the Ledger "At the Movies" widget's degraded
+                // (format/spend) half — see CinemaOutingEntity kdoc.
+                CinemaOutingEntity(
+                    id = cinemaOutingId,
+                    titleId = inceptionId,
+                    format = "IMAX",
+                    ticketPrice = 24.50,
+                ),
+            )
+        )
+
         database.viewingDao().upsertAll(
             listOf(
                 ViewingEntity(
                     id = "e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9a0b",
-                    titleId = "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+                    titleId = breakingBadId,
                     date = "2026-03-02",
                     rating = null,
                     notes = "Started the rewatch.",
                     venue = null,
+                ),
+                // Cinema trip, linked to cinemaOutingId — the "At the Movies" widget's
+                // trip-count/venue/companion data (available to any viewer) plus,
+                // owner-only, the outing's format/spend.
+                ViewingEntity(
+                    id = "c1d2e3f4-a5b6-7c8d-9e0f-1a2b3c4d5e60",
+                    titleId = inceptionId,
+                    date = "2026-01-15",
+                    rating = 4.5,
+                    notes = "Opening day.",
+                    venue = "AMC Lincoln Square",
+                    companions = listOf("Sam", "Jordan"),
+                    outingId = cinemaOutingId,
                 ),
             )
         )

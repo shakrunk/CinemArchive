@@ -30,6 +30,12 @@ data class TitleEntity(
     val notes: String?,
     val addedAt: String,
     val updatedAt: String,
+    // Mirrors schema.sql's titles.imdb_rating/original_language — the two remaining
+    // fields the Ledger Second Opinions/In Translation widgets need (see
+    // docs/android-contracts/ledger.md §2). Nullable since most fixture/real titles won't
+    // have every badge score populated (schema.sql's own comment on rt_score/metacritic_score).
+    val imdbRating: Double? = null,
+    val originalLanguage: String? = null,
 )
 
 @Entity(
@@ -160,6 +166,91 @@ data class ViewingEntity(
     val rating: Double?,
     val notes: String?,
     val venue: String?,
+    // Mirrors the `companions`/`outing_id` columns schema.sql adds to `viewings` for cinema
+    // outings — companion display names only (schema.sql's jsonb shape also carries an
+    // optional friendUserId, not needed locally since Android has no friend graph yet).
+    // Feeds the Ledger "At the Movies" widget (docs/android-contracts/ledger.md §2/§3).
+    val companions: List<String> = emptyList(),
+    val outingId: String? = null,
+)
+
+/**
+ * Local mirror of `title_cast` (schema.sql) — top-billed cast per title, used only by the
+ * Ledger Ensemble widget's "leading cast" tally (cast order < 5). Not surfaced on the Title
+ * detail screen yet (title-detail.md's TitleDetail model deliberately deferred cast/crew —
+ * see its kdoc — this table exists for Ledger only, ahead of that).
+ */
+@Entity(
+    tableName = "title_cast",
+    foreignKeys = [
+        ForeignKey(
+            entity = TitleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["titleId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("titleId")],
+)
+data class TitleCastEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val tmdbPersonId: Int,
+    val name: String,
+    val characterName: String?,
+    val castOrder: Int,
+)
+
+/**
+ * Local mirror of `title_crew` (schema.sql) — used by the Ledger Auteurs widget, which
+ * tallies by crew rows where `job == "Director"` (ledger.md §2).
+ */
+@Entity(
+    tableName = "title_crew",
+    foreignKeys = [
+        ForeignKey(
+            entity = TitleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["titleId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("titleId")],
+)
+data class TitleCrewEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val tmdbPersonId: Int,
+    val name: String,
+    val job: String,
+    val department: String?,
+)
+
+/**
+ * Local mirror of the two owner-private `cinema_outings` columns the Ledger "At the Movies"
+ * widget reads (`format`, `ticketPrice`; see ledger.md §3) — everything else that widget
+ * needs (trip counts, venues, companions, year trend) lives on [ViewingEntity]. Android has
+ * no friend/shared-viewer mode yet (unlike the web app), so the "degrades for non-owner
+ * viewers" behavior ledger.md §3 documents isn't reachable here today — this mirrors the
+ * owner's own view only.
+ */
+@Entity(
+    tableName = "cinema_outings",
+    foreignKeys = [
+        ForeignKey(
+            entity = TitleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["titleId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("titleId")],
+)
+data class CinemaOutingEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val format: String?,
+    val ticketPrice: Double?,
 )
 
 class Converters {

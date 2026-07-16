@@ -72,7 +72,9 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.
 - [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete except
-      one physical-device-blocked item (the live multi-device conflict test):**
+      one item (the live multi-device conflict test), blocked on a named authorization
+      decision, not a physical device — see the Phase 3 Ledger section below for the full
+      investigation:**
   - [x] `mutation_outbox` Room table + `OutboxDao` — a durable queue of pending remote
         writes (client-generated id, entity type, operation, JSON payload, attempt count),
         separate from the local read-model write it accompanies so the outbox row only
@@ -80,8 +82,10 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [x] `MutationOutbox` (in `data`) — `enqueue()` + `flush()` against a `RemoteMutationWriter`
         interface. The real implementation isn't wired yet: `UnconfiguredRemoteMutationWriter`
         always returns `Retry`, so mutations stay durably queued (never dropped, never
-        falsely marked synced) until a real Supabase client + auth session exist — blocked
-        on the same physical-device Credential Manager gap as Phase 0/1's auth work.
+        falsely marked synced) until a real Supabase client + auth session exist. **Not a
+        physical-device blocker** — a `RemoteMutationWriter` only needs a Supabase session
+        (a JWT), which is a separate concern from the app's real passkey sign-in flow; see the
+        Phase 3 Ledger section's investigation for the actual (authorization-decision) gap.
   - [x] One real mutation wired end-to-end: `LibraryRepository.logEpisodeWatched()` writes
         optimistically to Room (client-generated id, matching the
         docs/android-sync-contract.md §4.2 idempotency contract) and enqueues the outbox
@@ -116,8 +120,11 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         `kotlinx-coroutines-test` and `org.json:json` (the latter because Android's real
         `org.json` classes aren't on the JVM unit-test classpath, only a throwing stub).
         **What's still blocked:** the *live* multi-device conflict — actually producing one
-        against a real server — needs a real `RemoteMutationWriter`, itself blocked on
-        physical-device Credential Manager auth. This is now the only open Phase 2 item.
+        against a real server — needs a real `RemoteMutationWriter`, which needs an
+        authenticated Supabase session. This is **not** the passkey/Credential Manager gap
+        (that's specific to the app's real sign-in flow); it's a separate, precisely-diagnosed
+        authorization decision — see the Phase 3 Ledger section's investigation. This is now
+        the only open Phase 2 item.
   - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
         issues, 6 new unit tests pass, build succeeds.
   - [x] Remaining tracking mutations wired end-to-end, each an optimistic Room write plus a
@@ -146,9 +153,10 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
         `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
 - [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Ledger board
-      complete (all 20 widgets, local customizable layout, accessibility addressed inline);
-      remaining work is `user_prefs` sync (physical-device-blocked) and a few smaller
-      preferences items (see below):**
+      complete (all 20 widgets, responsive grid, local customizable layout, accessibility
+      addressed inline); remaining work is `user_prefs` sync (blocked on a named
+      authorization decision, not a physical device — see below) and a few smaller
+      preferences items:**
   - [x] Theme persistence: `PreferencesRepository` (`data` module) wraps a Preferences
         DataStore (`cinemarchive_prefs`) storing the selected `ArchiveThemeMode` — local-only,
         no Room/sync involvement, distinct from the still-unimplemented `user_prefs`-backed
@@ -273,15 +281,44 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         applied to a widget's rendered output today (a post-hoc `take(n)`/header-override in
         the UI layer, since no widget's data computation itself takes parameters yet);
         `timeRange`/`scope` persist and normalize correctly but aren't consumed by any
-        widget's aggregation. `width` round-trips through storage but doesn't drive a
-        responsive multi-column grid — Android is phone-first with no lg+ breakpoint, so
-        every width still renders full-bleed; a real responsive grid is a separate,
-        larger lift, not attempted here.
-        **Still blocked:** syncing this layout to `user_prefs.ledger_layout` needs the same
-        `RemoteMutationWriter` as Phase 2's conflict handling — physical-device Credential
-        Manager gap.
+        widget's aggregation.
   - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
         issues, 9 new unit tests pass, build succeeds.
+  - [x] Responsive grid: every widget now renders as a fixed-400dp card with internally
+        scrolling content (ledger.md §1); at a `lg`+ window width (>=840dp, Material's
+        expanded breakpoint) cards pack into a 12-column grid by `width` span
+        (sm/md/lg/full = 4/6/8/12), greedily row-by-row in board order via `BoxWithConstraints`;
+        below that, every card is full-width regardless of stored `width` ("always full below
+        lg"). This had been scoped out as "Android is phone-first, no lg+ grid" in the prior
+        pass — that was a self-imposed simplification, not a real blocker, corrected here.
+        Verified live on the emulator: rotated to landscape (the Medium_Phone AVD is 914dp
+        wide there, above the breakpoint; 411dp in portrait, below it), set two widgets to
+        `sm` in edit mode, confirmed they packed into one row with the correct empty
+        remainder (2 × 4 = 8 of 12 columns used); portrait stayed single-column. Note:
+        navigation state (`MainActivity`'s `Screen` sealed interface) is held in a bare
+        `remember`, not `rememberSaveable`, so it resets to Library on the config change a
+        rotation triggers — pre-existing, unrelated to this work, not fixed here.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [ ] **Still blocked, precisely diagnosed (not a physical-device claim):** syncing this
+        layout to `user_prefs.ledger_layout` needs a real, authenticated `RemoteMutationWriter`
+        — and unlike earlier passes assumed, **that authentication does not require passkeys**.
+        The `RemoteMutationWriter` just needs a Supabase session (a JWT); how that session is
+        obtained is a separate concern from the app's real (passkey) sign-in flow. Investigated
+        live against the non-production `cinemarchive-android-test` project
+        (`rgnthbiigfbfiuehteoe`) with its anon key: anonymous sign-in is disabled
+        (`anonymous_provider_disabled`), and email/password signup requires email confirmation
+        (returns no session until confirmed) and is rate-limited
+        (`over_email_send_rate_limit` after a few attempts) — so a usable session can't be
+        obtained through the public signup endpoint alone. The clean fix is to admin-create one
+        pre-confirmed test user via the Auth Admin API (`POST /auth/v1/admin/users` with
+        `email_confirm: true`) using the project's `service_role` key, out-of-band and once —
+        the *app* then only ever holds the anon key and signs in as that user with a normal
+        password, exactly like the web client's auth shape. That's a full-RLS-bypass credential
+        and a specific live write against even a non-production project, so it needs its own
+        explicit authorization beyond "create test users via signup" (already granted and
+        exhausted by the investigation above) — this is a named decision for the project owner,
+        not a vague "needs a physical device" placeholder.
   - [x] Verified live on the same Android Studio emulator (2026-07-15): opened Edit mode,
         removed "The Run" widget, set Critical Record's Top N to 5 via the stepper, tapped
         Done — the board immediately reflected both changes (The Run gone, Critical Record

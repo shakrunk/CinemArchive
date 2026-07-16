@@ -11,6 +11,7 @@ import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.MutationOutbox
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+import work.kumarfamilynet.cinemarchive.data.TitleConflictHandler
 import work.kumarfamilynet.cinemarchive.data.UnconfiguredRemoteMutationWriter
 
 class CinemArchiveApplication : Application() {
@@ -22,7 +23,11 @@ class CinemArchiveApplication : Application() {
     // (blocked on a physical device — see docs/android-implementation-status.md). Queued
     // mutations stay durable in Room regardless; only the push itself is a no-op for now.
     private val outbox: MutationOutbox by lazy {
-        MutationOutbox(database.outboxDao(), UnconfiguredRemoteMutationWriter())
+        MutationOutbox(
+            database.outboxDao(),
+            UnconfiguredRemoteMutationWriter(),
+            TitleConflictHandler(database.titleDao()),
+        )
     }
 
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }

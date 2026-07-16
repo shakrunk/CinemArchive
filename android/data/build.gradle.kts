@@ -22,4 +22,10 @@ dependencies {
     implementation(project(":core:model"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    // Android's org.json is a compile-only stub that throws at runtime on the JVM unit
+    // test classpath; the real implementation takes priority as an explicit dependency.
+    testImplementation(libs.json)
 }

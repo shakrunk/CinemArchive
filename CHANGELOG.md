@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Native Android app (in development, not yet distributed): tracking-mutation conflict
+  resolution (last-write-wins by `updated_at`) is now implemented and unit-tested; only the
+  live multi-device verification remains blocked on a physical device.
+
 ## [1.10.0] - 2026-07-13
 
 ### Added

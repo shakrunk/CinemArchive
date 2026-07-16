@@ -71,11 +71,13 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [ ] Cast/crew, physical media, badge scores (imdb/RT/Metacritic) — deferred from this
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.
-- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete —
-      including a real `RemoteMutationWriter` implementation, proven able to authenticate
-      against the test project. Only the final live conflict-test pass is outstanding, blocked
-      on a one-line database `GRANT` on the test project needing its own authorization — see
-      the Phase 3 Ledger section below for the full investigation:**
+- [x] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete,
+      including a real `RemoteMutationWriter` (`SupabaseRemoteMutationWriter`) verified live
+      3/3 against the test project — last-write-wins conflict resolution proven end-to-end,
+      not just unit-tested against a fake writer. See the Phase 3 Ledger section below for the
+      full investigation. Not yet wired into the live app, since there's no real sign-in flow
+      to source a session from yet — that's Phase 0's still physical-device-blocked passkey
+      work, a distinct concern from "does the writer work":**
   - [x] `mutation_outbox` Room table + `OutboxDao` — a durable queue of pending remote
         writes (client-generated id, entity type, operation, JSON payload, attempt count),
         separate from the local read-model write it accompanies so the outbox row only
@@ -154,9 +156,10 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
         `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
 - [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Ledger board
-      complete (all 20 widgets, responsive grid, local customizable layout, accessibility
-      addressed inline); remaining work is `user_prefs` sync (blocked on a named
-      authorization decision, not a physical device — see below) and a few smaller
+      complete: all 20 widgets, responsive grid, local customizable layout, accessibility
+      addressed inline, and `user_prefs.ledger_layout` sync verified live end-to-end via
+      `SupabaseLedgerLayoutWriter` (see below) — not yet wired into the live app pending a
+      real sign-in flow (Phase 0, physical-device-blocked). Remaining: a few smaller
       preferences items:**
   - [x] Theme persistence: `PreferencesRepository` (`data` module) wraps a Preferences
         DataStore (`cinemarchive_prefs`) storing the selected `ArchiveThemeMode` — local-only,
@@ -309,11 +312,14 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         conditional `PATCH .../titles?id=eq.<id>&updated_at=lt.<incoming>` — an empty result
         means the server's row is already newer, so it GETs and returns that as the
         `PushResult.Conflict` payload — and the four append-only upserts) and
-        `SupabaseLedgerLayoutWriter` (`user_prefs.ledger_layout` upsert). `PATCH` isn't in
-        `HttpURLConnection`'s allow-listed methods on the JDK or Android, so the `method` field
-        (a plain protected field on the standard `java.net.HttpURLConnection` class, not an
-        implementation internal) is set via reflection — the standard portable workaround, not
-        a hack tied to one JVM.
+        `SupabaseLedgerLayoutWriter` (`user_prefs.ledger_layout` upsert). Built on OkHttp, not
+        `java.net.HttpURLConnection`: PATCH isn't in `HttpURLConnection`'s method allow-list,
+        and the usual reflection workaround (setting the protected `method` field directly)
+        proved unreliable against the real endpoint across several JDK-internals-level fixes
+        (JPMS `--add-opens`, `HttpsURLConnectionImpl`'s delegate indirection) before being
+        abandoned for OkHttp; `java.net.http.HttpClient` (PATCH-native) isn't an option at all
+        — it doesn't exist in Android's SDK (checked directly: 0 `java/net/http` entries in
+        `android-36/android.jar`).
         **This is not the passkey/Credential Manager gap** — a `RemoteMutationWriter` only
         needs *some* Supabase session; how one is obtained is separate from the app's real
         sign-in flow. That distinction was verified, not assumed: investigated live against
@@ -324,23 +330,33 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         committed, never in the app) and **signing in with the anon key + that user's password
         succeeded**, returning a real session. That session is exactly what the app's own
         future sign-in flow (of any kind) would hand this writer.
-        `SupabaseRemoteMutationWriterLiveTest` (`data/src/test`, network-gated behind four
-        `ANDROID_SUPABASE_TEST_*` env vars, skips via `Assume` when unset so it never affects a
-        normal build/CI run) then exercises two independent sign-ins for that one user (RLS is
-        per-`auth.uid()`, so one user with two sessions correctly simulates two devices) racing
-        a `titles` update, plus a `user_prefs.ledger_layout` upsert+read-back.
-        **What actually blocks the live pass today:** not auth — a database privilege gap on
-        the test project itself. Both writes fail `HTTP 403 42501 permission denied for table
-        titles/user_prefs`, with Postgres's own hint: `GRANT SELECT, INSERT, UPDATE ON
-        public.titles TO authenticated` (and the same for `user_prefs`). The `authenticated`
-        Postgres role on this project is missing table grants the 33 production migrations
-        apparently didn't need to state explicitly (likely auto-configured differently when
-        the *production* project was first provisioned vs. this test project created later via
-        the CLI). Fixing it is a one-line `GRANT` — but it's a schema-level change even on a
-        non-production project, so it needs its own explicit authorization, same as every
-        other escalation in this investigation; not yet requested. Once granted, the two live
-        test methods above should pass unmodified — the writer/session code path is already
-        verified up to exactly that point.
+        The `authenticated` Postgres role on the test project also turned out to be missing
+        table grants the production project apparently didn't need stated explicitly (likely
+        auto-configured differently when production was first provisioned vs. this test
+        project created later via the CLI) — `HTTP 403 42501 permission denied for table
+        titles`, with Postgres's own fix in the hint. With separate explicit authorization for
+        this specific, narrow statement, `GRANT SELECT, INSERT, UPDATE ON public.titles,
+        public.user_prefs TO authenticated` was run against the test project only (via a
+        careful temporary-relink-and-back — verified linked back to the production project
+        ref immediately after).
+        **`SupabaseRemoteMutationWriterLiveTest` (`data/src/test`) now passes, live, for
+        real, 3/3** — network-gated behind four `ANDROID_SUPABASE_TEST_*` env vars, skips via
+        `Assume` when unset so it never affects a normal build/CI run. It exercises two
+        independent sign-ins for the one test user (RLS is per-`auth.uid()`, so one user with
+        two sessions correctly simulates two devices) racing a real `titles` update — the
+        earlier-timestamped write is confirmed rejected as `PushResult.Conflict` carrying the
+        winning row, not silently dropped or wrongly applied — plus a real
+        `user_prefs.ledger_layout` upsert, read back and confirmed correct. This is the answer
+        to both Phase 2's and Phase 3's remaining open questions: last-write-wins conflict
+        resolution and Ledger layout sync both work end-to-end against the real backend, not
+        just in unit tests against a fake writer.
+        **What's still not done:** wiring `SupabaseRemoteMutationWriter` into
+        `CinemArchiveApplication` in place of `UnconfiguredRemoteMutationWriter` for real
+        production use — deliberately not done here, since the app has no real sign-in flow
+        yet to obtain a genuine user session from (only the test-user password grant used for
+        verification above); that's Phase 0's passkey/Credential Manager work, still
+        physical-device-blocked, and a distinct concern from "does the writer work" (now
+        answered: yes).
   - [x] Verified live on the same Android Studio emulator (2026-07-15): opened Edit mode,
         removed "The Run" widget, set Critical Record's Top N to 5 via the stepper, tapped
         Done — the board immediately reflected both changes (The Run gone, Critical Record

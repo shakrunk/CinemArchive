@@ -25,8 +25,9 @@ number is chosen.
 ### Changed
 
 - Native Android app (in development, not yet distributed): tracking-mutation conflict
-  resolution (last-write-wins by `updated_at`) is now implemented and unit-tested; only the
-  live multi-device verification remains blocked on a physical device.
+  resolution (last-write-wins by `updated_at`) and Ledger layout sync are now implemented and
+  verified live end-to-end against a real backend; neither is wired into the live app yet,
+  since that needs a real user session from the still-unbuilt passkey sign-in flow.
 
 ## [1.10.0] - 2026-07-13
 

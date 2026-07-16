@@ -323,10 +323,10 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
             {confirmingCancel ? (
               <span className="flex items-center gap-2">
                 <span className="font-mono text-xs text-paper-faint">Cancel these tickets?</span>
-                <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }}>
+                <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
                   Yes
                 </button>
-                <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-paper-faint hover:text-paper transition-colors">
+                <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-paper-faint hover:text-paper transition-colors" aria-label="No, keep these tickets">
                   No
                 </button>
               </span>

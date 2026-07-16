@@ -71,7 +71,8 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [ ] Cast/crew, physical media, badge scores (imdb/RT/Metacritic) — deferred from this
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.
-- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Started:**
+- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete except
+      one physical-device-blocked item (the live multi-device conflict test):**
   - [x] `mutation_outbox` Room table + `OutboxDao` — a durable queue of pending remote
         writes (client-generated id, entity type, operation, JSON payload, attempt count),
         separate from the local read-model write it accompanies so the outbox row only
@@ -100,9 +101,25 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         on a running app rather than only in a unit test. (`DevFixtureSeed` gained a second,
         unwatched episode so this path has something to exercise — still temporary/dev-only
         data, same as the rest of the seed.)
-  - [ ] Conflict handling — designed (last-write-wins by `updated_at`, per
-        docs/android-sync-contract.md §4.2) but not implementable/testable until a real
-        `RemoteMutationWriter` exists to actually produce conflicts against.
+  - [x] Conflict handling — the logic (not just the design) is implemented: `PushResult`
+        gained a `Conflict(serverPayload)` case (`data` module), `MutationOutbox.flush()`
+        resolves it by handing the server's winning payload to a new `ConflictHandler` and
+        clearing the outbox entry rather than retrying — correct by construction, since a
+        server that returns Conflict is signaling its stored `updated_at` is already >= the
+        client's (docs/android-sync-contract.md §4.2's conditional-update rule). Only `title`
+        writes can produce a conflict today (every other outbox entry is an append-only
+        insert with a client-generated id — see `TitleConflictHandler` kdoc), so that's the
+        one `ConflictHandler` implementation, wired in `CinemArchiveApplication`.
+        Unit-tested with a scripted fake `RemoteMutationWriter` covering Success/Retry/
+        Conflict and multi-entry flush (`MutationOutboxTest`, `TitleConflictHandlerTest`) —
+        the first real unit tests in this module; `data/build.gradle.kts` gained
+        `kotlinx-coroutines-test` and `org.json:json` (the latter because Android's real
+        `org.json` classes aren't on the JVM unit-test classpath, only a throwing stub).
+        **What's still blocked:** the *live* multi-device conflict — actually producing one
+        against a real server — needs a real `RemoteMutationWriter`, itself blocked on
+        physical-device Credential Manager auth. This is now the only open Phase 2 item.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, 6 new unit tests pass, build succeeds.
   - [x] Remaining tracking mutations wired end-to-end, each an optimistic Room write plus a
         queued outbox entry, same pattern as `logEpisodeWatched`:
         - `logEpisodeRating` / `logEpisodeReview` — append-only logs via the existing
@@ -128,7 +145,10 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         rows, `titles.status`/`updatedAt` updated in place, and `mutation_outbox` had four
         matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
         `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
-- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Started:**
+- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Ledger board
+      complete (all 20 widgets, local customizable layout, accessibility addressed inline);
+      remaining work is `user_prefs` sync (physical-device-blocked) and a few smaller
+      preferences items (see below):**
   - [x] Theme persistence: `PreferencesRepository` (`data` module) wraps a Preferences
         DataStore (`cinemarchive_prefs`) storing the selected `ArchiveThemeMode` — local-only,
         no Room/sync involvement, distinct from the still-unimplemented `user_prefs`-backed
@@ -198,10 +218,83 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         session's `installDebug` update (still NOIR from the prior turn), consistent with
         the earlier theory that the one anomalous LIGHT reading was an out-of-band emulator
         state discontinuity between turns, not an app defect.
-  - [ ] Remaining 15 widgets, drag/resize/settings edit mode, and `user_prefs.ledger_layout`
-        sync — not started; separate, larger follow-on work, and several are blocked on data
-        (cast/crew/imdbRating/originalLanguage/companions/outingId) not mirrored locally.
-  - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
-        enough UI surface (the full Ledger board, a real settings screen) to apply them to.
+  - [x] The 5 data-blocked widgets unblocked: Room schema bumped to v3 with
+        `TitleCastEntity`/`TitleCrewEntity` (mirroring `title_cast`/`title_crew`) and
+        `imdbRating`/`originalLanguage` columns on `TitleEntity`, plus `companions`/
+        `outingId` on `ViewingEntity` and a new `CinemaOutingEntity` (mirroring the two
+        owner-private `cinema_outings` columns the "At the Movies" widget reads — see its
+        kdoc on why Android's no-friend-mode state means the §3 degrade-for-non-owner
+        behavior isn't reachable yet). `DevFixtureSeed` extended with real cast/crew for all
+        three fixture titles (Breaking Bad's rows copied verbatim from
+        `docs/android-contracts/fixtures/title-detail.json`) and a cinema-outing-linked
+        viewing on Inception, so every new widget has real data to render, not just an empty
+        state.
+  - [x] All remaining 15 widgets implemented: Encore Performances, The Run, Critical Record,
+        By the Genre, The Auteurs, The Ensemble, Second Opinions, In Translation, Screening
+        Nights, The Marathon, Shifting Standards, Premieres & Revivals, The Revival House,
+        Still Rolling, and At the Movies — `LedgerRepository.observeLedgerBoard()` and
+        `LedgerBoard`/new `LedgerWidgets.kt` (`core:model`) now cover the full ledger.md §2
+        registry. New Canvas-based chart primitives (`BarChartCanvas`/`HeatmapRow`/
+        `DeltaScatterCanvas`, `core:designsystem`) back the chart-shaped widgets — simplified
+        vs. the web app on purpose (week-granularity heatmap instead of a 364-cell daily
+        grid, bar charts instead of a radar for Screening Nights, no smoothing) since Android
+        has no charting library and didn't need pixel parity, only data parity. Every chart
+        is paired with a real, focusable accessible list of the same data directly beneath
+        it — closing the ledger.md §5 accessibility gap the *web app itself* has on five
+        widgets (Activity heatmap, Screening Nights, The Marathon, The Run, Shifting
+        Standards/Premieres & Revivals) inline as each was built, rather than deferring it.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-15): cleared app data,
+        confirmed the v2 → v3 destructive migration re-seeds cleanly (`title_cast`:7 rows,
+        `title_crew`:3, `cinema_outings`:1, `viewings`:2 — checked directly against the
+        pulled Room database), then scrolled the full Ledger board and hand-verified every
+        one of the 20 widgets against the seeded fixture data (e.g. Critical Record ★4.5:1;
+        By the Genre Drama:2; The Auteurs Christopher Nolan:1/David Fincher:1; The Ensemble
+        7 cast members each :1; Second Opinions "Us 9.0 vs IMDb 4.4 (Δ4.6)" for Inception;
+        The Marathon showed the 3 correct screening dates and streak counts; Shifting
+        Standards "2026 Q1 ★4.5 (1 titles)"; The Revival House "16+ yrs: 2"; Still Rolling
+        "Breaking Bad 1/7 episodes"; At the Movies "Trips: 1, Total spend: $24.50, AMC
+        Lincoln Square:1, Sam:1, Jordan:1, IMAX:1"). No crashes in logcat.
+  - [x] Customizable board (add/remove/move/resize/settings), local-only: `LedgerLayoutRules`
+        (`core:model`) defines `LedgerWidgetId`/`LedgerWidgetWidth`/`LedgerWidgetSettings`/
+        `LedgerWidgetConfig` plus `defaultLedgerWidgets()` and `normalize()` — a direct port
+        of ledgerPanels.ts's `normalizeLedgerWidgets()` clamps (unknown panel dropped,
+        invalid width backfilled to `full`, unrecognized settings keys dropped, `topN`
+        clamped 3–12, `title` truncated to 60 chars), unit-tested
+        (`LedgerLayoutRulesTest`, 9 cases). `LedgerLayoutRepository` (`data` module) persists
+        the widget list as JSON via a second DataStore (`cinemarchive_ledger_layout`), same
+        pattern as `PreferencesRepository`, normalizing on every read. `LedgerScreen` gained
+        an Edit-mode toggle rendering each widget's controls (move up/down, cycle width,
+        remove, custom-title text field, top-N stepper) plus an "Add a widget" list of
+        missing panels; the non-edit board now renders by iterating the persisted (or
+        default) widget list through a per-panel dispatcher instead of a hardcoded sequence,
+        so edit-mode changes are genuine, not cosmetic. Only `topN`/`title` are actually
+        applied to a widget's rendered output today (a post-hoc `take(n)`/header-override in
+        the UI layer, since no widget's data computation itself takes parameters yet);
+        `timeRange`/`scope` persist and normalize correctly but aren't consumed by any
+        widget's aggregation. `width` round-trips through storage but doesn't drive a
+        responsive multi-column grid — Android is phone-first with no lg+ breakpoint, so
+        every width still renders full-bleed; a real responsive grid is a separate,
+        larger lift, not attempted here.
+        **Still blocked:** syncing this layout to `user_prefs.ledger_layout` needs the same
+        `RemoteMutationWriter` as Phase 2's conflict handling — physical-device Credential
+        Manager gap.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, 9 new unit tests pass, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-15): opened Edit mode,
+        removed "The Run" widget, set Critical Record's Top N to 5 via the stepper, tapped
+        Done — the board immediately reflected both changes (The Run gone, Critical Record
+        showing only its top 5 buckets). Force-stopped the app (full process death) and
+        relaunched: both changes were still applied, confirming the layout persisted to
+        DataStore rather than living only in ViewModel state. No crashes in logcat.
+  - [x] Accessibility: addressed inline per widget as built (see above), not deferred — every
+        chart-based widget has a genuine focusable list alternative, not a tooltip-only
+        fallback. Performance: the board is still small (a few dozen list items across 20
+        sections against 3 fixture titles) and already uses `LazyColumn`'s built-in
+        virtualization; no profiling was warranted at this data scale, and none surfaced an
+        issue during manual testing. Deeper performance work (e.g. `LazyColumn` recomposition
+        tuning at real-library scale) is deferred until there's real user data to profile
+        against, not because it's unactionable.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-16
+
 ### Added
 
 - Native Android app (in development, not yet distributed): the Ledger screen now has all 20
@@ -21,6 +23,9 @@ number is chosen.
   customizable — add, remove, reorder, resize, and set a custom title/top-N limit per widget,
   via a new Edit mode. The layout persists locally and survives an app restart; syncing it
   across devices isn't wired up yet.
+- Native Android app (in development, not yet distributed): the Ledger board now lays out in
+  a responsive multi-column grid on wide screens (tablets, landscape) instead of always
+  stacking widgets in a single column.
 
 ### Changed
 

@@ -71,7 +71,13 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [ ] Cast/crew, physical media, badge scores (imdb/RT/Metacritic) — deferred from this
         pass to keep the local-only slice buildable and reviewable; not a hard blocker,
         just descoped.
-- [ ] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Started:**
+- [x] Phase 2 — durable tracking mutations, outbox, and conflict handling. **Complete,
+      including a real `RemoteMutationWriter` (`SupabaseRemoteMutationWriter`) verified live
+      3/3 against the test project — last-write-wins conflict resolution proven end-to-end,
+      not just unit-tested against a fake writer. See the Phase 3 Ledger section below for the
+      full investigation. Not yet wired into the live app, since there's no real sign-in flow
+      to source a session from yet — that's Phase 0's still physical-device-blocked passkey
+      work, a distinct concern from "does the writer work":**
   - [x] `mutation_outbox` Room table + `OutboxDao` — a durable queue of pending remote
         writes (client-generated id, entity type, operation, JSON payload, attempt count),
         separate from the local read-model write it accompanies so the outbox row only
@@ -79,8 +85,10 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [x] `MutationOutbox` (in `data`) — `enqueue()` + `flush()` against a `RemoteMutationWriter`
         interface. The real implementation isn't wired yet: `UnconfiguredRemoteMutationWriter`
         always returns `Retry`, so mutations stay durably queued (never dropped, never
-        falsely marked synced) until a real Supabase client + auth session exist — blocked
-        on the same physical-device Credential Manager gap as Phase 0/1's auth work.
+        falsely marked synced) until a real Supabase client + auth session exist. **Not a
+        physical-device blocker** — a `RemoteMutationWriter` only needs a Supabase session
+        (a JWT), which is a separate concern from the app's real passkey sign-in flow; see the
+        Phase 3 Ledger section's investigation for the actual (authorization-decision) gap.
   - [x] One real mutation wired end-to-end: `LibraryRepository.logEpisodeWatched()` writes
         optimistically to Room (client-generated id, matching the
         docs/android-sync-contract.md §4.2 idempotency contract) and enqueues the outbox
@@ -100,9 +108,28 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         on a running app rather than only in a unit test. (`DevFixtureSeed` gained a second,
         unwatched episode so this path has something to exercise — still temporary/dev-only
         data, same as the rest of the seed.)
-  - [ ] Conflict handling — designed (last-write-wins by `updated_at`, per
-        docs/android-sync-contract.md §4.2) but not implementable/testable until a real
-        `RemoteMutationWriter` exists to actually produce conflicts against.
+  - [x] Conflict handling — the logic (not just the design) is implemented: `PushResult`
+        gained a `Conflict(serverPayload)` case (`data` module), `MutationOutbox.flush()`
+        resolves it by handing the server's winning payload to a new `ConflictHandler` and
+        clearing the outbox entry rather than retrying — correct by construction, since a
+        server that returns Conflict is signaling its stored `updated_at` is already >= the
+        client's (docs/android-sync-contract.md §4.2's conditional-update rule). Only `title`
+        writes can produce a conflict today (every other outbox entry is an append-only
+        insert with a client-generated id — see `TitleConflictHandler` kdoc), so that's the
+        one `ConflictHandler` implementation, wired in `CinemArchiveApplication`.
+        Unit-tested with a scripted fake `RemoteMutationWriter` covering Success/Retry/
+        Conflict and multi-entry flush (`MutationOutboxTest`, `TitleConflictHandlerTest`) —
+        the first real unit tests in this module; `data/build.gradle.kts` gained
+        `kotlinx-coroutines-test` and `org.json:json` (the latter because Android's real
+        `org.json` classes aren't on the JVM unit-test classpath, only a throwing stub).
+        **What's still blocked:** the *live* multi-device conflict — actually producing one
+        against a real server — needs a real `RemoteMutationWriter`, which needs an
+        authenticated Supabase session. This is **not** the passkey/Credential Manager gap
+        (that's specific to the app's real sign-in flow); it's a separate, precisely-diagnosed
+        authorization decision — see the Phase 3 Ledger section's investigation. This is now
+        the only open Phase 2 item.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, 6 new unit tests pass, build succeeds.
   - [x] Remaining tracking mutations wired end-to-end, each an optimistic Room write plus a
         queued outbox entry, same pattern as `logEpisodeWatched`:
         - `logEpisodeRating` / `logEpisodeReview` — append-only logs via the existing
@@ -128,7 +155,12 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         rows, `titles.status`/`updatedAt` updated in place, and `mutation_outbox` had four
         matching entries (`episode_rating`, `episode_review`, `title` (`operation='update'`),
         `viewing`), all `attemptCount=0` with no error. No crashes in logcat.
-- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Started:**
+- [ ] Phase 3 — Ledger, preferences, accessibility, and performance polish. **Ledger board
+      complete: all 20 widgets, responsive grid, local customizable layout, accessibility
+      addressed inline, and `user_prefs.ledger_layout` sync verified live end-to-end via
+      `SupabaseLedgerLayoutWriter` (see below) — not yet wired into the live app pending a
+      real sign-in flow (Phase 0, physical-device-blocked). Remaining: a few smaller
+      preferences items:**
   - [x] Theme persistence: `PreferencesRepository` (`data` module) wraps a Preferences
         DataStore (`cinemarchive_prefs`) storing the selected `ArchiveThemeMode` — local-only,
         no Room/sync involvement, distinct from the still-unimplemented `user_prefs`-backed
@@ -198,10 +230,146 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         session's `installDebug` update (still NOIR from the prior turn), consistent with
         the earlier theory that the one anomalous LIGHT reading was an out-of-band emulator
         state discontinuity between turns, not an app defect.
-  - [ ] Remaining 15 widgets, drag/resize/settings edit mode, and `user_prefs.ledger_layout`
-        sync — not started; separate, larger follow-on work, and several are blocked on data
-        (cast/crew/imdbRating/originalLanguage/companions/outingId) not mirrored locally.
-  - [ ] Accessibility and performance polish — not actionable yet; deferred until there's
-        enough UI surface (the full Ledger board, a real settings screen) to apply them to.
+  - [x] The 5 data-blocked widgets unblocked: Room schema bumped to v3 with
+        `TitleCastEntity`/`TitleCrewEntity` (mirroring `title_cast`/`title_crew`) and
+        `imdbRating`/`originalLanguage` columns on `TitleEntity`, plus `companions`/
+        `outingId` on `ViewingEntity` and a new `CinemaOutingEntity` (mirroring the two
+        owner-private `cinema_outings` columns the "At the Movies" widget reads — see its
+        kdoc on why Android's no-friend-mode state means the §3 degrade-for-non-owner
+        behavior isn't reachable yet). `DevFixtureSeed` extended with real cast/crew for all
+        three fixture titles (Breaking Bad's rows copied verbatim from
+        `docs/android-contracts/fixtures/title-detail.json`) and a cinema-outing-linked
+        viewing on Inception, so every new widget has real data to render, not just an empty
+        state.
+  - [x] All remaining 15 widgets implemented: Encore Performances, The Run, Critical Record,
+        By the Genre, The Auteurs, The Ensemble, Second Opinions, In Translation, Screening
+        Nights, The Marathon, Shifting Standards, Premieres & Revivals, The Revival House,
+        Still Rolling, and At the Movies — `LedgerRepository.observeLedgerBoard()` and
+        `LedgerBoard`/new `LedgerWidgets.kt` (`core:model`) now cover the full ledger.md §2
+        registry. New Canvas-based chart primitives (`BarChartCanvas`/`HeatmapRow`/
+        `DeltaScatterCanvas`, `core:designsystem`) back the chart-shaped widgets — simplified
+        vs. the web app on purpose (week-granularity heatmap instead of a 364-cell daily
+        grid, bar charts instead of a radar for Screening Nights, no smoothing) since Android
+        has no charting library and didn't need pixel parity, only data parity. Every chart
+        is paired with a real, focusable accessible list of the same data directly beneath
+        it — closing the ledger.md §5 accessibility gap the *web app itself* has on five
+        widgets (Activity heatmap, Screening Nights, The Marathon, The Run, Shifting
+        Standards/Premieres & Revivals) inline as each was built, rather than deferring it.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Verified live on the same Android Studio emulator (2026-07-15): cleared app data,
+        confirmed the v2 → v3 destructive migration re-seeds cleanly (`title_cast`:7 rows,
+        `title_crew`:3, `cinema_outings`:1, `viewings`:2 — checked directly against the
+        pulled Room database), then scrolled the full Ledger board and hand-verified every
+        one of the 20 widgets against the seeded fixture data (e.g. Critical Record ★4.5:1;
+        By the Genre Drama:2; The Auteurs Christopher Nolan:1/David Fincher:1; The Ensemble
+        7 cast members each :1; Second Opinions "Us 9.0 vs IMDb 4.4 (Δ4.6)" for Inception;
+        The Marathon showed the 3 correct screening dates and streak counts; Shifting
+        Standards "2026 Q1 ★4.5 (1 titles)"; The Revival House "16+ yrs: 2"; Still Rolling
+        "Breaking Bad 1/7 episodes"; At the Movies "Trips: 1, Total spend: $24.50, AMC
+        Lincoln Square:1, Sam:1, Jordan:1, IMAX:1"). No crashes in logcat.
+  - [x] Customizable board (add/remove/move/resize/settings), local-only: `LedgerLayoutRules`
+        (`core:model`) defines `LedgerWidgetId`/`LedgerWidgetWidth`/`LedgerWidgetSettings`/
+        `LedgerWidgetConfig` plus `defaultLedgerWidgets()` and `normalize()` — a direct port
+        of ledgerPanels.ts's `normalizeLedgerWidgets()` clamps (unknown panel dropped,
+        invalid width backfilled to `full`, unrecognized settings keys dropped, `topN`
+        clamped 3–12, `title` truncated to 60 chars), unit-tested
+        (`LedgerLayoutRulesTest`, 9 cases). `LedgerLayoutRepository` (`data` module) persists
+        the widget list as JSON via a second DataStore (`cinemarchive_ledger_layout`), same
+        pattern as `PreferencesRepository`, normalizing on every read. `LedgerScreen` gained
+        an Edit-mode toggle rendering each widget's controls (move up/down, cycle width,
+        remove, custom-title text field, top-N stepper) plus an "Add a widget" list of
+        missing panels; the non-edit board now renders by iterating the persisted (or
+        default) widget list through a per-panel dispatcher instead of a hardcoded sequence,
+        so edit-mode changes are genuine, not cosmetic. Only `topN`/`title` are actually
+        applied to a widget's rendered output today (a post-hoc `take(n)`/header-override in
+        the UI layer, since no widget's data computation itself takes parameters yet);
+        `timeRange`/`scope` persist and normalize correctly but aren't consumed by any
+        widget's aggregation.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, 9 new unit tests pass, build succeeds.
+  - [x] Responsive grid: every widget now renders as a fixed-400dp card with internally
+        scrolling content (ledger.md §1); at a `lg`+ window width (>=840dp, Material's
+        expanded breakpoint) cards pack into a 12-column grid by `width` span
+        (sm/md/lg/full = 4/6/8/12), greedily row-by-row in board order via `BoxWithConstraints`;
+        below that, every card is full-width regardless of stored `width` ("always full below
+        lg"). This had been scoped out as "Android is phone-first, no lg+ grid" in the prior
+        pass — that was a self-imposed simplification, not a real blocker, corrected here.
+        Verified live on the emulator: rotated to landscape (the Medium_Phone AVD is 914dp
+        wide there, above the breakpoint; 411dp in portrait, below it), set two widgets to
+        `sm` in edit mode, confirmed they packed into one row with the correct empty
+        remainder (2 × 4 = 8 of 12 columns used); portrait stayed single-column. Note:
+        navigation state (`MainActivity`'s `Screen` sealed interface) is held in a bare
+        `remember`, not `rememberSaveable`, so it resets to Library on the config change a
+        rotation triggers — pre-existing, unrelated to this work, not fixed here.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, build succeeds.
+  - [x] Real `RemoteMutationWriter` implementation, built and largely proven live —
+        `SupabaseRestClient` (`data` module, `HttpURLConnection`-based — deliberately not the
+        full Supabase Kotlin SDK, to keep this scoped to exactly what the outbox's push
+        semantics need: password sign-in, PATCH-with-filter, GET, upsert), plus
+        `SupabaseRemoteMutationWriter` (implements the real `title`-conflict path via a
+        conditional `PATCH .../titles?id=eq.<id>&updated_at=lt.<incoming>` — an empty result
+        means the server's row is already newer, so it GETs and returns that as the
+        `PushResult.Conflict` payload — and the four append-only upserts) and
+        `SupabaseLedgerLayoutWriter` (`user_prefs.ledger_layout` upsert). Built on OkHttp, not
+        `java.net.HttpURLConnection`: PATCH isn't in `HttpURLConnection`'s method allow-list,
+        and the usual reflection workaround (setting the protected `method` field directly)
+        proved unreliable against the real endpoint across several JDK-internals-level fixes
+        (JPMS `--add-opens`, `HttpsURLConnectionImpl`'s delegate indirection) before being
+        abandoned for OkHttp; `java.net.http.HttpClient` (PATCH-native) isn't an option at all
+        — it doesn't exist in Android's SDK (checked directly: 0 `java/net/http` entries in
+        `android-36/android.jar`).
+        **This is not the passkey/Credential Manager gap** — a `RemoteMutationWriter` only
+        needs *some* Supabase session; how one is obtained is separate from the app's real
+        sign-in flow. That distinction was verified, not assumed: investigated live against
+        the non-production `cinemarchive-android-test` project. Anonymous sign-in is disabled
+        and email/password signup requires confirmation and hit a rate limit, so — with
+        explicit authorization for this specific action — one pre-confirmed test user was
+        created via the Auth Admin API (`service_role`, used only for that one call, never
+        committed, never in the app) and **signing in with the anon key + that user's password
+        succeeded**, returning a real session. That session is exactly what the app's own
+        future sign-in flow (of any kind) would hand this writer.
+        The `authenticated` Postgres role on the test project also turned out to be missing
+        table grants the production project apparently didn't need stated explicitly (likely
+        auto-configured differently when production was first provisioned vs. this test
+        project created later via the CLI) — `HTTP 403 42501 permission denied for table
+        titles`, with Postgres's own fix in the hint. With separate explicit authorization for
+        this specific, narrow statement, `GRANT SELECT, INSERT, UPDATE ON public.titles,
+        public.user_prefs TO authenticated` was run against the test project only (via a
+        careful temporary-relink-and-back — verified linked back to the production project
+        ref immediately after).
+        **`SupabaseRemoteMutationWriterLiveTest` (`data/src/test`) now passes, live, for
+        real, 3/3** — network-gated behind four `ANDROID_SUPABASE_TEST_*` env vars, skips via
+        `Assume` when unset so it never affects a normal build/CI run. It exercises two
+        independent sign-ins for the one test user (RLS is per-`auth.uid()`, so one user with
+        two sessions correctly simulates two devices) racing a real `titles` update — the
+        earlier-timestamped write is confirmed rejected as `PushResult.Conflict` carrying the
+        winning row, not silently dropped or wrongly applied — plus a real
+        `user_prefs.ledger_layout` upsert, read back and confirmed correct. This is the answer
+        to both Phase 2's and Phase 3's remaining open questions: last-write-wins conflict
+        resolution and Ledger layout sync both work end-to-end against the real backend, not
+        just in unit tests against a fake writer.
+        **What's still not done:** wiring `SupabaseRemoteMutationWriter` into
+        `CinemArchiveApplication` in place of `UnconfiguredRemoteMutationWriter` for real
+        production use — deliberately not done here, since the app has no real sign-in flow
+        yet to obtain a genuine user session from (only the test-user password grant used for
+        verification above); that's Phase 0's passkey/Credential Manager work, still
+        physical-device-blocked, and a distinct concern from "does the writer work" (now
+        answered: yes).
+  - [x] Verified live on the same Android Studio emulator (2026-07-15): opened Edit mode,
+        removed "The Run" widget, set Critical Record's Top N to 5 via the stepper, tapped
+        Done — the board immediately reflected both changes (The Run gone, Critical Record
+        showing only its top 5 buckets). Force-stopped the app (full process death) and
+        relaunched: both changes were still applied, confirming the layout persisted to
+        DataStore rather than living only in ViewModel state. No crashes in logcat.
+  - [x] Accessibility: addressed inline per widget as built (see above), not deferred — every
+        chart-based widget has a genuine focusable list alternative, not a tooltip-only
+        fallback. Performance: the board is still small (a few dozen list items across 20
+        sections against 3 fixture titles) and already uses `LazyColumn`'s built-in
+        virtualization; no profiling was warranted at this data scale, and none surfaced an
+        issue during manual testing. Deeper performance work (e.g. `LazyColumn` recomposition
+        tuning at real-library scale) is deferred until there's real user data to profile
+        against, not because it's unactionable.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.

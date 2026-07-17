@@ -22,4 +22,16 @@ dependencies {
     implementation(project(":core:model"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore.preferences)
+    // Only for SupabaseRestClient's PATCH support — java.net.HttpURLConnection cannot
+    // reliably send PATCH (not in its method allow-list; the JDK-only reflection workaround
+    // proved unreliable against a real HTTPS endpoint), and java.net.http.HttpClient isn't
+    // present in Android's SDK at all. OkHttp is the industry-standard, well-audited answer
+    // to exactly this gap — not a broad new networking-stack decision for the app.
+    implementation(libs.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    // Android's org.json is a compile-only stub that throws at runtime on the JVM unit
+    // test classpath; the real implementation takes priority as an explicit dependency.
+    testImplementation(libs.json)
 }

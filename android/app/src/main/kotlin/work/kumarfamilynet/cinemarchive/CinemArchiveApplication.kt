@@ -7,10 +7,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.data.DevFixtureSeed
+import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.MutationOutbox
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+import work.kumarfamilynet.cinemarchive.data.TitleConflictHandler
 import work.kumarfamilynet.cinemarchive.data.UnconfiguredRemoteMutationWriter
 
 class CinemArchiveApplication : Application() {
@@ -22,10 +24,15 @@ class CinemArchiveApplication : Application() {
     // (blocked on a physical device — see docs/android-implementation-status.md). Queued
     // mutations stay durable in Room regardless; only the push itself is a no-op for now.
     private val outbox: MutationOutbox by lazy {
-        MutationOutbox(database.outboxDao(), UnconfiguredRemoteMutationWriter())
+        MutationOutbox(
+            database.outboxDao(),
+            UnconfiguredRemoteMutationWriter(),
+            TitleConflictHandler(database.titleDao()),
+        )
     }
 
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }
+    val ledgerLayoutRepository: LedgerLayoutRepository by lazy { LedgerLayoutRepository(this) }
 
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepository(
@@ -41,7 +48,15 @@ class CinemArchiveApplication : Application() {
     }
 
     val ledgerRepository: LedgerRepository by lazy {
-        LedgerRepository(titleDao = database.titleDao(), viewingDao = database.viewingDao())
+        LedgerRepository(
+            titleDao = database.titleDao(),
+            viewingDao = database.viewingDao(),
+            titleCastDao = database.titleCastDao(),
+            titleCrewDao = database.titleCrewDao(),
+            cinemaOutingDao = database.cinemaOutingDao(),
+            watchEventDao = database.episodeWatchEventDao(),
+            seasonDao = database.seasonDao(),
+        )
     }
 
     override fun onCreate() {

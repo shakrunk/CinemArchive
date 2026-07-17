@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
+import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val repository = (application as CinemArchiveApplication).libraryRepository
         val ledgerRepository = (application as CinemArchiveApplication).ledgerRepository
+        val ledgerLayoutRepository = (application as CinemArchiveApplication).ledgerLayoutRepository
         val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
         setContent {
             val themeMode by preferencesRepository.observeThemeMode()
@@ -36,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     CinemArchiveApp(
                         repository,
                         ledgerRepository,
+                        ledgerLayoutRepository,
                         themeMode = themeMode,
                         onCycleTheme = { scope.launch { preferencesRepository.setThemeMode(themeMode.next()) } },
                     )
@@ -60,6 +63,7 @@ private sealed interface Screen {
 private fun CinemArchiveApp(
     repository: LibraryRepository,
     ledgerRepository: LedgerRepository,
+    ledgerLayoutRepository: LedgerLayoutRepository,
     themeMode: ArchiveThemeMode,
     onCycleTheme: () -> Unit,
 ) {
@@ -74,6 +78,6 @@ private fun CinemArchiveApp(
             onOpenLedger = { screen = Screen.Ledger },
         )
         is Screen.TitleDetail -> TitleDetailRoute(repository, current.titleId, onBack = { screen = Screen.Library })
-        is Screen.Ledger -> LedgerRoute(ledgerRepository, onBack = { screen = Screen.Library })
+        is Screen.Ledger -> LedgerRoute(ledgerRepository, ledgerLayoutRepository, onBack = { screen = Screen.Library })
     }
 }

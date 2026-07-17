@@ -48,6 +48,11 @@ interface SeasonDao {
     @Query("SELECT * FROM seasons WHERE titleId = :titleId ORDER BY seasonNumber")
     fun observeSeasons(titleId: String): Flow<List<SeasonEntity>>
 
+    // Ledger's "Still Rolling" widget needs every TV title's episode-progress rollup, not
+    // just one title's — same whole-library rationale as TitleDao.observeAllTitles().
+    @Query("SELECT * FROM seasons")
+    fun observeAllSeasons(): Flow<List<SeasonEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(seasons: List<SeasonEntity>)
 }
@@ -71,6 +76,11 @@ interface EpisodeWatchEventDao {
         """
     )
     fun observeWatchCounts(titleId: String): Flow<List<EpisodeWatchCount>>
+
+    // Ledger's "The Marathon" streak widget folds episode watch events into its date
+    // bucketing across the whole library (ledger.md §1), not scoped to one title.
+    @Query("SELECT * FROM episode_watch_events")
+    fun observeAllWatchEvents(): Flow<List<EpisodeWatchEventEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(events: List<EpisodeWatchEventEntity>)
@@ -107,6 +117,40 @@ interface ViewingDao {
     @Query("SELECT COUNT(*) FROM viewings")
     fun observeTotalViewingCount(): Flow<Int>
 
+    // Ledger's date-bucketed widgets (Activity, The Run, Screening Nights, Premieres &
+    // Revivals, The Revival House, The Marathon, Shifting Standards, Encores, At the
+    // Movies) all fold over every viewing in the library, same rationale as
+    // TitleDao.observeAllTitles().
+    @Query("SELECT * FROM viewings")
+    fun observeAllViewings(): Flow<List<ViewingEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(viewings: List<ViewingEntity>)
+}
+
+@Dao
+interface TitleCastDao {
+    @Query("SELECT * FROM title_cast")
+    fun observeAllCast(): Flow<List<TitleCastEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(rows: List<TitleCastEntity>)
+}
+
+@Dao
+interface TitleCrewDao {
+    @Query("SELECT * FROM title_crew")
+    fun observeAllCrew(): Flow<List<TitleCrewEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(rows: List<TitleCrewEntity>)
+}
+
+@Dao
+interface CinemaOutingDao {
+    @Query("SELECT * FROM cinema_outings")
+    fun observeAllOutings(): Flow<List<CinemaOutingEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(rows: List<CinemaOutingEntity>)
 }

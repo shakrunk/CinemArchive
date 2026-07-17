@@ -1,10 +1,20 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 
 sealed interface PushResult {
     data object Success : PushResult
     data class Retry(val reason: String) : PushResult
+
+    /**
+     * The server rejected this write because its current row is at least as new — see
+     * docs/android-sync-contract.md §4.2 rule 4 (last-write-wins by `updated_at`): a
+     * conditional `update ... where updated_at < incoming` that matched zero rows. By
+     * construction the server's version is the winner, so [serverPayload] is the row to
+     * apply locally, not a value to merge or retry against.
+     */
+    data class Conflict(val serverPayload: JSONObject) : PushResult
 }
 
 /** Pushes one queued mutation to the backend. Implemented once a real Supabase network
@@ -12,6 +22,12 @@ sealed interface PushResult {
  *  each entity type's push must satisfy (client-generated id, upsert-not-insert). */
 interface RemoteMutationWriter {
     suspend fun push(entry: OutboxEntity): PushResult
+}
+
+/** Applies a [PushResult.Conflict]'s server-authoritative payload back into the local
+ *  read model, so a losing local write converges to what the server actually holds. */
+fun interface ConflictHandler {
+    suspend fun applyRemote(entityType: String, entityId: String, serverPayload: JSONObject)
 }
 
 /**

@@ -67,3 +67,11 @@
 ## 2024-07-14 - Redundant ARIA Labels
 **Learning:** Adding `aria-label` to buttons that already have the exact same visible text is slightly redundant for screen readers and goes against WCAG 2.5.3 if it's strictly a duplicate.
 **Action:** When adding focus styles to text-only buttons, I'll avoid adding redundant `aria-label` attributes unless they add missing context.
+
+## 2026-07-20 - Keyboard Focus on Transient Notifications
+**Learning:** Notification toast/stack buttons (like Retry or Dismiss) are often skipped when adding focus styles, because they appear and disappear quickly. However, keyboard users still need to tab to them when they exist, and without explicit focus-visible rings, they become effectively invisible during navigation.
+**Action:** Ensure all interactive elements within transient or animated components (like ) have explicit  styling (e.g., ) to support keyboard discovery.
+
+## 2026-07-20 - Keyboard Focus on Transient Notifications
+**Learning:** Notification toast/stack buttons (like Retry or Dismiss) are often skipped when adding focus styles, because they appear and disappear quickly. However, keyboard users still need to tab to them when they exist, and without explicit focus-visible rings, they become effectively invisible during navigation.
+**Action:** Ensure all interactive elements within transient or animated components have explicit focus-visible styling to support keyboard discovery.

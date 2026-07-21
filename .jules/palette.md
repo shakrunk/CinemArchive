@@ -75,3 +75,7 @@
 ## 2026-07-20 - Keyboard Focus on Transient Notifications
 **Learning:** Notification toast/stack buttons (like Retry or Dismiss) are often skipped when adding focus styles, because they appear and disappear quickly. However, keyboard users still need to tab to them when they exist, and without explicit focus-visible rings, they become effectively invisible during navigation.
 **Action:** Ensure all interactive elements within transient or animated components have explicit focus-visible styling to support keyboard discovery.
+
+## 2024-05-18 - Tooltips on Disabled Buttons
+**Learning:** Adding a `title` or custom cursor (`cursor-not-allowed`) directly to a natively `disabled` button often fails to trigger pointer events in many browsers, preventing the tooltip from appearing.
+**Action:** Always apply the `title` attribute and custom cursor CSS classes to a wrapper element (like a `span` or `div`) surrounding the disabled button to guarantee the helpful explanation is accessible to users via hover.

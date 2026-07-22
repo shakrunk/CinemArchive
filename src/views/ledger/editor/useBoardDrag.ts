@@ -4,7 +4,6 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import { useShallow } from 'zustand/react/shallow'
 import type { LedgerPanelId } from 'src/lib/ledgerPanels'
 import { LEDGER_PANEL_WIDTH_SPANS, nearestPanelWidth } from 'src/lib/ledgerPanels'
 
@@ -73,20 +72,11 @@ function hitTestItem(
 }
 
 export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | null) => void }) {
-  // ⚡ Bolt: Reduce store subscriptions and memory overhead by using useShallow
-  const {
-    widgets,
-    reorderLedgerWidgets,
-    addLedgerWidget,
-    setLedgerWidgetWidth,
-  } = useAppStore(
-    useShallow((s) => ({
-      widgets: s.ledgerPrefs.widgets,
-      reorderLedgerWidgets: s.reorderLedgerWidgets,
-      addLedgerWidget: s.addLedgerWidget,
-      setLedgerWidgetWidth: s.setLedgerWidgetWidth,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const widgets = useAppStore((s) => s.ledgerPrefs.widgets)
+  const reorderLedgerWidgets = useAppStore((s) => s.reorderLedgerWidgets)
+  const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
+  const setLedgerWidgetWidth = useAppStore((s) => s.setLedgerWidgetWidth)
 
   const itemRefs = useRef(new Map<string, HTMLDivElement>())
   const gridRef = useRef<HTMLDivElement>(null)

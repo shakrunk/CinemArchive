@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Film-reel mark, scaled from public/favicon.svg. Kept within the 66dp adaptive-icon
+     safe zone (max reach ~28.7dp from center) so it survives circle/squircle/rounded-square
+     launcher masks. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="54"
+        android:translateY="54">
+        <!-- Outer ring -->
+        <path
+            android:pathData="M -26.66,0 A 26.66,26.66 0 1,0 26.66,0 A 26.66,26.66 0 1,0 -26.66,0"
+            android:strokeColor="#E9B266"
+            android:strokeWidth="4"
+            android:fillColor="#00000000" />
+        <!-- Inner hub ring -->
+        <path
+            android:pathData="M -12,0 A 12,12 0 1,0 12,0 A 12,12 0 1,0 -12,0"
+            android:strokeColor="#E9B266"
+            android:strokeWidth="3.6"
+            android:fillColor="#00000000" />
+        <!-- 3 spokes: top, lower-right, lower-left -->
+        <path
+            android:pathData="M 0,-12 L 0,-26.66"
+            android:strokeColor="#E9B266"
+            android:strokeWidth="4"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M 10.4,6 L 23.1,13.34"
+            android:strokeColor="#E9B266"
+            android:strokeWidth="4"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M -10.4,6 L -23.1,13.34"
+            android:strokeColor="#E9B266"
+            android:strokeWidth="4"
+            android:strokeLineCap="round" />
+        <!-- Center axle -->
+        <path
+            android:pathData="M -4,0 A 4,4 0 1,0 4,0 A 4,4 0 1,0 -4,0"
+            android:fillColor="#E9B266" />
+        <!-- 3 sprocket holes -->
+        <path
+            android:pathData="M 13.52,-10 A 3.8,3.8 0 1,0 21.12,-10 A 3.8,3.8 0 1,0 13.52,-10"
+            android:fillColor="#E9B266" />
+        <path
+            android:pathData="M -3.8,20 A 3.8,3.8 0 1,0 3.8,20 A 3.8,3.8 0 1,0 -3.8,20"
+            android:fillColor="#E9B266" />
+        <path
+            android:pathData="M -21.12,-10 A 3.8,3.8 0 1,0 -13.52,-10 A 3.8,3.8 0 1,0 -21.12,-10"
+            android:fillColor="#E9B266" />
+    </group>
+</vector>

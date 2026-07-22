@@ -4,4 +4,14 @@
         <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+
+    <!-- System cold-start splash: void background + the static film-reel mark (same
+         drawable as the adaptive icon foreground). Kept deliberately simple since the
+         OS only shows this for a moment — the richer spinning/beam treatment lives in
+         MainActivity's Compose splash, which takes over once the window is drawn. -->
+    <style name="Theme.CinemArchive.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CinemArchive</item>
+    </style>
 </resources>

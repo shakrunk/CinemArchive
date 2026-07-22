@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useId } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -191,12 +190,8 @@ function ViewingEditForm({
   outing: CinemaOuting | undefined
   onClose: () => void
 }) {
-  const { updateTitle, updateOuting } = useAppStore(
-    useShallow((s) => ({
-      updateTitle: s.updateTitle,
-      updateOuting: s.updateOuting,
-    }))
-  )
+  const updateTitle = useAppStore((s) => s.updateTitle)
+  const updateOuting = useAppStore((s) => s.updateOuting)
 
   const [prePlatform, setPrePlatform] = useState(!viewing.date)
   const [date, setDate] = useState(viewing.date ?? new Date().toISOString().slice(0, 10))
@@ -1278,13 +1273,9 @@ function FranchiseSection({
   currentTmdbId: number
   isSharedView: boolean
 }) {
-  const { titles, openDetailDrawer, openAddTitlePreselected } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      openDetailDrawer: s.openDetailDrawer,
-      openAddTitlePreselected: s.openAddTitlePreselected,
-    }))
-  )
+  const titles = useAppStore((s) => s.titles)
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openAddTitlePreselected = useAppStore((s) => s.openAddTitlePreselected)
   const [parts, setParts] = useState<SearchResult[]>([])
   const [loadedCollectionId, setLoadedCollectionId] = useState<number | null>(null)
 
@@ -1435,13 +1426,9 @@ function OutingBanner({ title }: { title: Title }) {
   const pendingFollowUp = useAppStore((s) =>
     outing ? null : findPendingFollowUpOuting(s.outings, title.id, new Date())
   )
-  const { openOutingSchedule, openPostShowSheet, cancelOuting } = useAppStore(
-    useShallow((s) => ({
-      openOutingSchedule: s.openOutingSchedule,
-      openPostShowSheet: s.openPostShowSheet,
-      cancelOuting: s.cancelOuting,
-    }))
-  )
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
+  const cancelOuting = useAppStore((s) => s.cancelOuting)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [sharePanelOpen, setSharePanelOpen] = useState(false)
 
@@ -1522,20 +1509,16 @@ function OutingBanner({ title }: { title: Title }) {
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
 export function TitleDetailDrawer() {
-  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isDetailDrawerOpen, closeDetailDrawer, updateTitle, removeTitle, removeViewing, openRefreshMetadata, isSharedView, viewerContext, openOutingSchedule } = useAppStore(
-    useShallow((s) => ({
-      isDetailDrawerOpen: s.isDetailDrawerOpen,
-      closeDetailDrawer: s.closeDetailDrawer,
-      updateTitle: s.updateTitle,
-      removeTitle: s.removeTitle,
-      removeViewing: s.removeViewing,
-      openRefreshMetadata: s.openRefreshMetadata,
-      isSharedView: s.isSharedView,
-      viewerContext: s.viewerContext,
-      openOutingSchedule: s.openOutingSchedule,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
+  const closeDetailDrawer = useAppStore((s) => s.closeDetailDrawer)
+  const updateTitle = useAppStore((s) => s.updateTitle)
+  const removeTitle = useAppStore((s) => s.removeTitle)
+  const removeViewing = useAppStore((s) => s.removeViewing)
+  const openRefreshMetadata = useAppStore((s) => s.openRefreshMetadata)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const viewerContext = useAppStore((s) => s.viewerContext)
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
   const browseByStudio = useAppStore((s) => s.browseByStudio)
   const title = useSelectedTitle()
   const user = useAppStore((s) => s.user)
@@ -1548,13 +1531,9 @@ export function TitleDetailDrawer() {
 
   const [sendPanelOpen, setSendPanelOpen] = useState(false)
 
-  const { pinnedModes, setPinnedMode, unlockTheme } = useAppStore(
-    useShallow((s) => ({
-      pinnedModes: s.pinnedModes,
-      setPinnedMode: s.setPinnedMode,
-      unlockTheme: s.unlockTheme,
-    }))
-  )
+  const pinnedModes = useAppStore((s) => s.pinnedModes)
+  const setPinnedMode = useAppStore((s) => s.setPinnedMode)
+  const unlockTheme = useAppStore((s) => s.unlockTheme)
 
   const unlockedModes = useMemo(
     () => (isSpiderNoir && title ? getUnlockedModes(title) : new Set<'bw' | 'color'>()),

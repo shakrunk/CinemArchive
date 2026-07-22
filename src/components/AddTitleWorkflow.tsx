@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import { Search, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
@@ -308,16 +307,12 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 // ─── AddTitleWorkflow Component ───────────────────────────────────────────────
 
 export function AddTitleWorkflow() {
-  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { isAddTitleOpen, closeAddTitle, addTitle, preselectedResult, openOutingSchedule } = useAppStore(
-    useShallow((s) => ({
-      isAddTitleOpen: s.isAddTitleOpen,
-      closeAddTitle: s.closeAddTitle,
-      addTitle: s.addTitle,
-      preselectedResult: s.preselectedResult,
-      openOutingSchedule: s.openOutingSchedule,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const closeAddTitle = useAppStore((s) => s.closeAddTitle)
+  const addTitle = useAppStore((s) => s.addTitle)
+  const preselectedResult = useAppStore((s) => s.preselectedResult)
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
   const [step, setStep] = useState<Step>('search')
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<SearchResult | null>(null)

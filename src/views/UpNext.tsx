@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { PlayCircle, Check, Undo2, Clock, Bookmark, Ticket, CalendarPlus, MoreVertical, Clapperboard, Star, X } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -77,15 +76,11 @@ function UpNextEmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) 
 // ─── Live (in-progress) card ─────────────────────────────────────────────────
 
 function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: (snapshot: UpNextEntry, undo: PendingUndo) => void; delayMs?: number }) {
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const { openDetailDrawer, logNextEpisodeWatch, deleteEpisodeWatchEvent, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      openDetailDrawer: s.openDetailDrawer,
-      logNextEpisodeWatch: s.logNextEpisodeWatch,
-      deleteEpisodeWatchEvent: s.deleteEpisodeWatchEvent,
-      isSharedView: s.isSharedView
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const logNextEpisodeWatch = useAppStore((s) => s.logNextEpisodeWatch)
+  const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
+  const isSharedView = useAppStore((s) => s.isSharedView)
 
   const { title, season, episode, watchedCount, totalCount } = entry
   const epName = episode.episodeName ?? `Episode ${episode.episodeNumber}`
@@ -175,15 +170,11 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
 // ─── Caught-up (just-finished) card ──────────────────────────────────────────
 
 function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNextEntry; undo: PendingUndo; onDismiss: (titleId: string) => void; delayMs?: number }) {
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const { openDetailDrawer, deleteEpisodeWatchEvent, updateTitle, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      openDetailDrawer: s.openDetailDrawer,
-      deleteEpisodeWatchEvent: s.deleteEpisodeWatchEvent,
-      updateTitle: s.updateTitle,
-      isSharedView: s.isSharedView
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
+  const updateTitle = useAppStore((s) => s.updateTitle)
+  const isSharedView = useAppStore((s) => s.isSharedView)
   const title = snapshot?.title
 
   // Keep the latest onDismiss without resetting the dismissal timer each render.
@@ -238,14 +229,10 @@ function formatReleaseDate(iso: string): string {
 }
 
 function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: number }) {
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const { openDetailDrawer, openOutingSchedule, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      openDetailDrawer: s.openDetailDrawer,
-      openOutingSchedule: s.openOutingSchedule,
-      isSharedView: s.isSharedView,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const isSharedView = useAppStore((s) => s.isSharedView)
   const { title, releaseDate } = entry
   return (
     <div className="relative">
@@ -280,15 +267,11 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
 // ─── On the Marquee (scheduled/now-showing cinema outings, plan §4.5) ────────
 
 function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number }) {
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const { openDetailDrawer, openOutingSchedule, cancelOuting, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      openDetailDrawer: s.openDetailDrawer,
-      openOutingSchedule: s.openOutingSchedule,
-      cancelOuting: s.cancelOuting,
-      isSharedView: s.isSharedView,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const cancelOuting = useAppStore((s) => s.cancelOuting)
+  const isSharedView = useAppStore((s) => s.isSharedView)
   const { outing, title, presentation } = entry
 
   const [menuOpen, setMenuOpen] = useState(false)
@@ -392,15 +375,11 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
 }
 
 function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number }) {
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const { openDetailDrawer, openPostShowSheet, dismissOutingFollowUp, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      openDetailDrawer: s.openDetailDrawer,
-      openPostShowSheet: s.openPostShowSheet,
-      dismissOutingFollowUp: s.dismissOutingFollowUp,
-      isSharedView: s.isSharedView,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
+  const dismissOutingFollowUp = useAppStore((s) => s.dismissOutingFollowUp)
+  const isSharedView = useAppStore((s) => s.isSharedView)
   const { outing, title } = entry
 
   return (

@@ -124,8 +124,23 @@ interface ViewingDao {
     @Query("SELECT * FROM viewings")
     fun observeAllViewings(): Flow<List<ViewingEntity>>
 
+    @Query("SELECT * FROM viewings WHERE id = :id")
+    suspend fun getById(id: String): ViewingEntity?
+
+    // Completion-engine idempotency check (OutingsRepository.completeDueOutings): a re-run
+    // after a process death between the viewing insert and the outing's status flip must not
+    // insert a second viewing for the same trip.
+    @Query("SELECT * FROM viewings WHERE outingId = :outingId LIMIT 1")
+    suspend fun getByOutingId(outingId: String): ViewingEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(viewings: List<ViewingEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(viewing: ViewingEntity)
+
+    @Query("DELETE FROM viewings WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -151,6 +166,24 @@ interface CinemaOutingDao {
     @Query("SELECT * FROM cinema_outings")
     fun observeAllOutings(): Flow<List<CinemaOutingEntity>>
 
+    @Query("SELECT * FROM cinema_outings WHERE titleId = :titleId")
+    fun observeOutingsForTitle(titleId: String): Flow<List<CinemaOutingEntity>>
+
+    @Query("SELECT * FROM cinema_outings WHERE id = :id")
+    suspend fun getById(id: String): CinemaOutingEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(rows: List<CinemaOutingEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: CinemaOutingEntity)
+
+    // Deliberately not filtered by endsAt <= :now in SQL: Instant#toString()'s fractional-
+    // second width varies (no decimal point at all when nanos == 0, else 3/6/9 digits), which
+    // breaks lexicographic string comparison at exactly the boundary this query cares about.
+    // The scheduled list is small (one user's own trips), so comparing via Instant.parse() in
+    // Kotlin (OutingsRepository.completeDueOutings) is simpler than guaranteeing a fixed-width
+    // timestamp format everywhere just to make `<=` safe in SQLite.
+    @Query("SELECT * FROM cinema_outings WHERE status = 'SCHEDULED'")
+    suspend fun getScheduledOutings(): List<CinemaOutingEntity>
 }

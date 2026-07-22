@@ -227,12 +227,14 @@ data class TitleCrewEntity(
 )
 
 /**
- * Local mirror of the two owner-private `cinema_outings` columns the Ledger "At the Movies"
- * widget reads (`format`, `ticketPrice`; see ledger.md §3) — everything else that widget
- * needs (trip counts, venues, companions, year trend) lives on [ViewingEntity]. Android has
- * no friend/shared-viewer mode yet (unlike the web app), so the "degrades for non-owner
- * viewers" behavior ledger.md §3 documents isn't reachable here today — this mirrors the
- * owner's own view only.
+ * Local mirror of `cinema_outings` (schema.sql) — a booked cinema trip. Originally just the
+ * two owner-private columns the Ledger "At the Movies" widget reads (`format`, `ticketPrice`);
+ * expanded to the full row (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §4.2)
+ * once scheduling/completion shipped on Android. Timestamps are ISO-8601 strings, matching
+ * every other timestamp column in this file (e.g. [TitleEntity.updatedAt]) rather than adding
+ * a new `Instant` type converter. Android has no friend/shared-viewer mode yet (unlike the web
+ * app), so `companions` is a plain name list with no `friendUserId` — see [ViewingEntity]'s
+ * own `companions` column, which this mirrors.
  */
 @Entity(
     tableName = "cinema_outings",
@@ -249,8 +251,23 @@ data class TitleCrewEntity(
 data class CinemaOutingEntity(
     @PrimaryKey val id: String,
     val titleId: String,
+    val showtime: String,
+    val previewsMinutes: Int = 20,
+    val runtimeMinutes: Int,
+    val endsAt: String,
+    val venue: String?,
+    val companions: List<String> = emptyList(),
     val format: String?,
     val ticketPrice: Double?,
+    val seat: String? = null,
+    val bookingRef: String? = null,
+    val notes: String? = null,
+    val status: String = "SCHEDULED", // OutingStatus.name
+    val previousStatus: String? = null, // LibraryStatus.name, captured at completion
+    val completedViewingId: String? = null,
+    val followUpDismissedAt: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
 )
 
 class Converters {

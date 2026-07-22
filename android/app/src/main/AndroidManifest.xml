@@ -1,10 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- QR sign-in pane's live camera preview/scanner (feature/auth's LoginScreen). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- "How was it?" notification at the moment a cinema outing ends (Phase 5,
+         docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6) — degrades to
+         foreground-only reconciliation if the user denies either. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".CinemArchiveApplication"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="CinemArchive"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CinemArchive">
+        android:theme="@style/Theme.CinemArchive.Splash">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -12,6 +26,29 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Magic-link sign-in callback (AuthRepository.completeMagicLinkCallback) — must
+                 match the redirect_to this app sends GoTrue, and that URL must be present in
+                 the Supabase project's Auth > URL Configuration redirect allowlist. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cinemarchive" android:host="auth-callback" />
+            </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".OutingCompletionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".BootCompletedReceiver"
+            android:exported="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

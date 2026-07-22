@@ -1,0 +1,6 @@
+# Copy the two lines below into your real android/local.properties (already gitignored,
+# alongside sdk.dir) and fill in your Supabase project's public values. Find these in the
+# Supabase dashboard: Settings > API — same values as the web app's VITE_SUPABASE_URL /
+# VITE_SUPABASE_ANON_KEY (see .env.example at the repo root).
+SUPABASE_URL=https://<your-ref>.supabase.co
+SUPABASE_ANON_KEY=<your-anon-key>

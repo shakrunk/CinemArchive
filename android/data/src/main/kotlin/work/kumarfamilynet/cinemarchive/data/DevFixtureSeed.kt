@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import java.time.Instant
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
@@ -259,15 +260,52 @@ object DevFixtureSeed {
         )
 
         val cinemaOutingId = "d1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f60"
+        val scheduledOutingId = "a4b5c6d7-e8f9-0a1b-2c3d-4e5f60718293"
+        // Anchored to "now" (not a fixed date) so a freshly-installed app always shows an
+        // active marquee entry — plain string literals elsewhere in this file are fine since
+        // they're historical, but a scheduled outing needs to still be in the future whenever
+        // this seed actually runs.
+        val scheduledShowtime = Instant.now().plusSeconds(3 * 24 * 60 * 60) // 3 days out
+        val scheduledEndsAt = scheduledShowtime.plusSeconds((20 + 139) * 60L) // +20min previews, Fight Club's 139min runtime
+        val nowIso = Instant.now().toString()
         database.cinemaOutingDao().upsertAll(
             listOf(
-                // Owner-private fields for the Ledger "At the Movies" widget's degraded
-                // (format/spend) half — see CinemaOutingEntity kdoc.
+                // Completed trip — owner-private fields for the Ledger "At the Movies"
+                // widget's degraded (format/spend) half; see CinemaOutingEntity kdoc.
                 CinemaOutingEntity(
                     id = cinemaOutingId,
                     titleId = inceptionId,
+                    showtime = "2026-01-15T19:00:00Z",
+                    runtimeMinutes = 148,
+                    endsAt = "2026-01-15T22:08:00Z",
+                    venue = "AMC Lincoln Square",
+                    companions = listOf("Sam", "Jordan"),
                     format = "IMAX",
                     ticketPrice = 24.50,
+                    status = "COMPLETED",
+                    previousStatus = "WATCHLIST",
+                    completedViewingId = "c1d2e3f4-a5b6-7c8d-9e0f-1a2b3c4d5e60",
+                    createdAt = "2026-01-14T10:00:00Z",
+                    updatedAt = "2026-01-15T22:08:00Z",
+                ),
+                // Scheduled trip on the watchlisted Fight Club — populates "On the Marquee"
+                // on first launch and gives phase testing something already in place, on
+                // top of whatever's scheduled by hand through the UI.
+                CinemaOutingEntity(
+                    id = scheduledOutingId,
+                    titleId = fightClubId,
+                    showtime = scheduledShowtime.toString(),
+                    previewsMinutes = 20,
+                    runtimeMinutes = 139,
+                    endsAt = scheduledEndsAt.toString(),
+                    venue = "Alamo Drafthouse",
+                    companions = listOf("Alex"),
+                    format = "SEVENTY_MM",
+                    ticketPrice = 18.00,
+                    seat = "H12",
+                    status = "SCHEDULED",
+                    createdAt = nowIso,
+                    updatedAt = nowIso,
                 ),
             )
         )

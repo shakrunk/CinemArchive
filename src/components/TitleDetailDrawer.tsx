@@ -300,6 +300,7 @@ function ViewingEditForm({
               <button
                 key={f}
                 type="button"
+                aria-label={`Cinema format: ${f}`}
                 onClick={() => setFormat(format === f ? '' : f)}
                 className={cn(
                   'px-2.5 py-1 rounded-md text-xs font-sans border transition-all',
@@ -1250,6 +1251,7 @@ function DrawerTagEditor({
         )}
         {!editing && (
           <button
+            aria-label="Add tag"
             onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
             className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
           >

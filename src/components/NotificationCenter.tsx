@@ -150,7 +150,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
         aria-label={unreadNotificationCount > 0 ? `Notifications — ${unreadNotificationCount} unread` : 'Notifications'}
         aria-expanded={open}
         className={cn(
-          'icon-btn relative w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center',
+          'icon-btn relative w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
           open && '!bg-amber/15 border-amber/50 text-amber'
         )}
         style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
@@ -178,7 +178,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
             {unreadNotificationCount > 0 && (
               <button
                 onClick={() => markAllNotificationsSeen()}
-                className="font-mono text-[10px] text-amber hover:opacity-80 transition-opacity"
+                className="font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 Mark all read
               </button>
@@ -208,7 +208,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                       <button
                         role="menuitem"
                         onClick={() => handleItemClick(n)}
-                        className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30"
+                        className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30 focus-visible:outline-none focus-visible:bg-secondary/50"
                       >
                         <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
                         <div className="min-w-0 flex-1">
@@ -227,7 +227,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                           void deleteNotificationItem(n.id)
                         }}
                         aria-label="Dismiss notification"
-                        className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity"
+                        className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -236,14 +236,14 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                       <div className="flex gap-3 pl-[34px] pr-4 pb-2.5 -mt-1">
                         <button
                           onClick={() => handleGotTicketsToo(n)}
-                          className="flex items-center gap-1 font-mono text-[10px] text-amber hover:opacity-80 transition-opacity"
+                          className="flex items-center gap-1 font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <Ticket className="w-3 h-3" />
                           I've got tickets too
                         </button>
                         <button
                           onClick={() => handleAddSharedToCalendar(n)}
-                          className="flex items-center gap-1 font-mono text-[10px] text-paper-faint hover:text-amber transition-colors"
+                          className="flex items-center gap-1 font-mono text-[10px] text-paper-faint hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <CalendarPlus className="w-3 h-3" />
                           Add to calendar

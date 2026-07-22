@@ -1480,10 +1480,10 @@ function OutingBanner({ title }: { title: Title }) {
         {confirmingCancel ? (
           <span className="flex items-center gap-2 ml-auto">
             <span className="font-mono text-xs text-muted-foreground">Cancel these tickets?</span>
-            <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
+            <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
               Yes
             </button>
-            <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
+            <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1" aria-label="No, keep these tickets">
               No
             </button>
           </span>
@@ -1491,19 +1491,22 @@ function OutingBanner({ title }: { title: Title }) {
           <span className="flex items-center gap-3 ml-auto">
             <button
               onClick={() => setSharePanelOpen(true)}
-              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1"
+              aria-label="Share these tickets"
             >
               Share
             </button>
             <button
               onClick={() => openOutingSchedule(title.id, outing.id)}
-              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1"
+              aria-label="Edit these tickets"
             >
               Edit
             </button>
             <button
               onClick={() => setConfirmingCancel(true)}
-              className="font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
+              className="font-mono text-xs text-muted-foreground hover:text-ember transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1"
+              aria-label="Cancel these tickets"
             >
               Cancel
             </button>

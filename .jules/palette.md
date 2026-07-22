@@ -75,3 +75,6 @@
 ## 2026-07-20 - Keyboard Focus on Transient Notifications
 **Learning:** Notification toast/stack buttons (like Retry or Dismiss) are often skipped when adding focus styles, because they appear and disappear quickly. However, keyboard users still need to tab to them when they exist, and without explicit focus-visible rings, they become effectively invisible during navigation.
 **Action:** Ensure all interactive elements within transient or animated components have explicit focus-visible styling to support keyboard discovery.
+## 2026-07-23 - Contextual ARIA labels and Focus on Inline Confirmation Buttons
+**Learning:** Confirmation buttons rendered inline (e.g., "Yes", "No", "Cancel") inside small banner elements like the Outing Schedule Card lack both context for screen readers and focus rings for keyboard navigation. While they might visually make sense, they are inaccessible.
+**Action:** Always ensure that inline confirmation and action buttons ("Yes", "No", "Share", "Edit", "Cancel") have descriptive `aria-label`s (e.g. "Yes, cancel these tickets") and explicit `focus-visible` styling (`focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60`) to support both screen readers and keyboard users.

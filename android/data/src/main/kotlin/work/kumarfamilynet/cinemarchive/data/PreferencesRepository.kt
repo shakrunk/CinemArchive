@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
+import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
+import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 
 private val Context.preferencesDataStore by preferencesDataStore(name = "cinemarchive_prefs")
@@ -19,6 +22,9 @@ private val Context.preferencesDataStore by preferencesDataStore(name = "cinemar
 class PreferencesRepository(context: Context) {
     private val dataStore = context.preferencesDataStore
     private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val paletteKey = stringPreferencesKey("palette")
+    private val fontFamilyKey = stringPreferencesKey("font_family")
+    private val fontScaleKey = stringPreferencesKey("font_scale")
 
     fun observeThemeMode(): Flow<ArchiveThemeMode> = dataStore.data.map { preferences ->
         preferences[themeModeKey]?.let { stored ->
@@ -28,5 +34,35 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setThemeMode(mode: ArchiveThemeMode) {
         dataStore.edit { it[themeModeKey] = mode.name }
+    }
+
+    fun observePalette(): Flow<ArchivePalette> = dataStore.data.map { preferences ->
+        preferences[paletteKey]?.let { stored ->
+            runCatching { ArchivePalette.valueOf(stored) }.getOrNull()
+        } ?: ArchivePalette.BRAND
+    }
+
+    suspend fun setPalette(palette: ArchivePalette) {
+        dataStore.edit { it[paletteKey] = palette.name }
+    }
+
+    fun observeFontFamily(): Flow<ArchiveFontFamily> = dataStore.data.map { preferences ->
+        preferences[fontFamilyKey]?.let { stored ->
+            runCatching { ArchiveFontFamily.valueOf(stored) }.getOrNull()
+        } ?: ArchiveFontFamily.DEFAULT
+    }
+
+    suspend fun setFontFamily(fontFamily: ArchiveFontFamily) {
+        dataStore.edit { it[fontFamilyKey] = fontFamily.name }
+    }
+
+    fun observeFontScale(): Flow<ArchiveFontScale> = dataStore.data.map { preferences ->
+        preferences[fontScaleKey]?.let { stored ->
+            runCatching { ArchiveFontScale.valueOf(stored) }.getOrNull()
+        } ?: ArchiveFontScale.DEFAULT
+    }
+
+    suspend fun setFontScale(fontScale: ArchiveFontScale) {
+        dataStore.edit { it[fontScaleKey] = fontScale.name }
     }
 }

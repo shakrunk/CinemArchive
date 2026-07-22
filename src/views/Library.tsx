@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -65,14 +64,10 @@ function FilterGroup({ label, children }: { label: string; children: React.React
 }
 
 function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
-  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { filters, setFilter, resetFilters } = useAppStore(
-    useShallow((s) => ({
-      filters: s.filters,
-      setFilter: s.setFilter,
-      resetFilters: s.resetFilters,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const filters = useAppStore((s) => s.filters)
+  const setFilter = useAppStore((s) => s.setFilter)
+  const resetFilters = useAppStore((s) => s.resetFilters)
   const allGenres = useAllGenres()
   const allNetworks = useAllNetworks()
   const allDecades = useAllDecades()
@@ -482,17 +477,13 @@ function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: Vi
 // ─── Library View ─────────────────────────────────────────────────────────────
 
 export function Library() {
-  // ⚡ Bolt: Prevent unnecessary re-renders by using useShallow
-  const { titles, filteredTitles, filters, viewMode, setFilter, setViewMode } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      filteredTitles: s.filteredTitles,
-      filters: s.filters,
-      viewMode: s.viewMode,
-      setFilter: s.setFilter,
-      setViewMode: s.setViewMode,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const titles = useAppStore((s) => s.titles)
+  const filteredTitles = useAppStore((s) => s.filteredTitles)
+  const filters = useAppStore((s) => s.filters)
+  const viewMode = useAppStore((s) => s.viewMode)
+  const setFilter = useAppStore((s) => s.setFilter)
+  const setViewMode = useAppStore((s) => s.setViewMode)
   const [filterOpen, setFilterOpen] = useState(false)
   const { copiedId, copy } = useCopyFeedback()
   const copied = copiedId === 'rec-prompt'

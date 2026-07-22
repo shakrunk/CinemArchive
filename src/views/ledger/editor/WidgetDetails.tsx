@@ -3,7 +3,6 @@
 
 import { X, Copy, ChevronUp, ChevronDown, Minus, Plus, PanelRightClose } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
-import { useShallow } from 'zustand/react/shallow'
 import { cn } from 'src/lib/utils'
 import {
   LEDGER_PANEL_LABELS,
@@ -40,24 +39,13 @@ export function WidgetDetails({
   onHide: () => void
   className?: string
 }) {
-  // ⚡ Bolt: Reduce store subscriptions and memory overhead by using useShallow
-  const {
-    widgets,
-    duplicateLedgerWidget,
-    removeLedgerWidget,
-    moveLedgerWidget,
-    setLedgerWidgetWidth,
-    setLedgerWidgetSettings,
-  } = useAppStore(
-    useShallow((s) => ({
-      widgets: s.ledgerPrefs.widgets,
-      duplicateLedgerWidget: s.duplicateLedgerWidget,
-      removeLedgerWidget: s.removeLedgerWidget,
-      moveLedgerWidget: s.moveLedgerWidget,
-      setLedgerWidgetWidth: s.setLedgerWidgetWidth,
-      setLedgerWidgetSettings: s.setLedgerWidgetSettings,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const widgets = useAppStore((s) => s.ledgerPrefs.widgets)
+  const duplicateLedgerWidget = useAppStore((s) => s.duplicateLedgerWidget)
+  const removeLedgerWidget = useAppStore((s) => s.removeLedgerWidget)
+  const moveLedgerWidget = useAppStore((s) => s.moveLedgerWidget)
+  const setLedgerWidgetWidth = useAppStore((s) => s.setLedgerWidgetWidth)
+  const setLedgerWidgetSettings = useAppStore((s) => s.setLedgerWidgetSettings)
 
   const selected = widgets.find((w) => w.id === selectedId)
   const selectedIndex = selected ? widgets.findIndex((w) => w.id === selected.id) : -1

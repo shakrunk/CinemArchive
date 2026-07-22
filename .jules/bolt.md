@@ -40,3 +40,7 @@
 ## 2024-11-21 - Zustand Atomic Selectors Optimization
 **Learning:** Batching multiple atomic selectors into a single `useShallow` call (e.g., `useAppStore(useShallow(s => ({ a: s.a, b: s.b })))`) introduces unnecessary object allocation and shallow diffing overhead on every render, without providing any performance benefit over individual atomic selector hooks (e.g., `useAppStore(s => s.a); useAppStore(s => s.b)`).
 **Action:** When extracting multiple primitive or atomic values from a Zustand store, use multiple individual `useAppStore` hooks rather than batching them inside a `useShallow` object.
+
+## 2024-11-21 - Zustand Atomic Selectors Optimization (Addendum)
+**Learning:** Batching multiple atomic selectors into a single `useShallow` call introduces object allocation and shallow diffing overhead on every render, overriding the rapid referential equality check built natively into Zustand atomic selectors.
+**Action:** When extracting multiple primitive or atomic values from a Zustand store, strictly map them to multiple individual `useAppStore` hooks rather than batching them inside a `useShallow` object.

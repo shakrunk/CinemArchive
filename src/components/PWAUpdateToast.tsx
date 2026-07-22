@@ -26,13 +26,13 @@ export function PWAUpdateToast() {
         </p>
         <button
           onClick={() => updateServiceWorker(true)}
-          className="font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 transition-opacity shrink-0"
+          className="font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 transition-opacity shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >
           Reload
         </button>
         <button
           onClick={() => setNeedRefresh(false)}
-          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           aria-label="Dismiss"
         >
           <X className="w-3.5 h-3.5" />

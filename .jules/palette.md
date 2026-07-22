@@ -75,3 +75,7 @@
 ## 2026-07-20 - Keyboard Focus on Transient Notifications
 **Learning:** Notification toast/stack buttons (like Retry or Dismiss) are often skipped when adding focus styles, because they appear and disappear quickly. However, keyboard users still need to tab to them when they exist, and without explicit focus-visible rings, they become effectively invisible during navigation.
 **Action:** Ensure all interactive elements within transient or animated components have explicit focus-visible styling to support keyboard discovery.
+
+## 2024-05-18 - Keyboard Accessibility in Transient Popovers
+**Learning:** Interactive elements within transient components (such as toast notifications or popovers like NotificationCenter) frequently miss `focus-visible` styling, making them undiscoverable via keyboard navigation once the popover is active.
+**Action:** Always ensure buttons and interactive rows inside dynamic popovers have explicit `focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60` classes for a11y compliance.

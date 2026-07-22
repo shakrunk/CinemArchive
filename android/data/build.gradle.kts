@@ -28,6 +28,10 @@ dependencies {
     // present in Android's SDK at all. OkHttp is the industry-standard, well-audited answer
     // to exactly this gap — not a broad new networking-stack decision for the app.
     implementation(libs.okhttp)
+    // AuthRepository's session storage — a refresh token is a long-lived full-account
+    // credential, so it gets EncryptedSharedPreferences rather than plaintext DataStore
+    // (which PreferencesRepository correctly uses for non-sensitive UI prefs).
+    implementation(libs.androidx.security.crypto)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

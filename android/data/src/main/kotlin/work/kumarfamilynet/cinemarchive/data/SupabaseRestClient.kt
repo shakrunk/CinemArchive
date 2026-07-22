@@ -6,7 +6,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-data class SupabaseSession(val accessToken: String, val userId: String)
+data class SupabaseSession(
+    val accessToken: String,
+    val userId: String,
+    val refreshToken: String? = null,
+    val expiresAt: Long? = null,
+    val email: String? = null,
+)
 
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
@@ -48,6 +54,53 @@ class SupabaseRestClient(
         return SupabaseSession(
             accessToken = json.getString("access_token"),
             userId = json.getJSONObject("user").getString("id"),
+        )
+    }
+
+    /** Sends a magic-link email (GoTrue's OTP grant). `create_user = false` — this app is
+     *  invite-only, matching src/lib/auth.ts's `shouldCreateUser: false`: an unknown email
+     *  must never silently become a new account here. [redirectTo] must be present in the
+     *  Supabase project's Auth > URL Configuration redirect allowlist, or GoTrue silently
+     *  falls back to the web app's Site URL instead. */
+    fun signInWithOtp(email: String, redirectTo: String) {
+        val body = JSONObject().put("email", email).put("create_user", false).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/auth/v1/otp?redirect_to=$redirectTo")
+            .header("apikey", anonKey)
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        execute(request)
+    }
+
+    /** Resolves the user id/email behind an access token — the magic-link deep link's
+     *  fragment only carries the token itself, not the user it belongs to. */
+    fun getUser(accessToken: String): Pair<String, String> {
+        val request = Request.Builder()
+            .url("$baseUrl/auth/v1/user")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        val json = JSONObject(execute(request))
+        return json.getString("id") to json.getString("email")
+    }
+
+    /** Exchanges a refresh token for a new access/refresh pair — GoTrue access tokens
+     *  expire (~1hr), so a session needs this to survive past the first hour. */
+    fun refreshSession(refreshToken: String): SupabaseSession {
+        val body = JSONObject().put("refresh_token", refreshToken).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/auth/v1/token?grant_type=refresh_token")
+            .header("apikey", anonKey)
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        val json = JSONObject(execute(request))
+        return SupabaseSession(
+            accessToken = json.getString("access_token"),
+            userId = json.getJSONObject("user").getString("id"),
+            refreshToken = json.getString("refresh_token"),
+            expiresAt = System.currentTimeMillis() / 1000 + json.getLong("expires_in"),
+            email = json.getJSONObject("user").optString("email").takeIf { it.isNotEmpty() },
         )
     }
 

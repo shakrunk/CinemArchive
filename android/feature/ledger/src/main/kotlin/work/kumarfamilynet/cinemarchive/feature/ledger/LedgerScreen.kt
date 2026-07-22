@@ -11,21 +11,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -44,6 +55,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.BarChartCanvas
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
+import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
 import work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
@@ -130,7 +142,7 @@ class LedgerViewModel(
 }
 
 @Composable
-fun LedgerRoute(repository: LedgerRepository, layoutRepository: LedgerLayoutRepository, onBack: () -> Unit) {
+fun LedgerRoute(repository: LedgerRepository, layoutRepository: LedgerLayoutRepository, onOpenProfile: () -> Unit) {
     val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository, layoutRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val layout by viewModel.layout.collectAsStateWithLifecycle()
@@ -141,7 +153,7 @@ fun LedgerRoute(repository: LedgerRepository, layoutRepository: LedgerLayoutRepo
         editMode = editMode,
         onToggleEditMode = { viewModel.setEditMode(!editMode) },
         onLayoutChange = viewModel::updateLayout,
-        onBack = onBack,
+        onOpenProfile = onOpenProfile,
     )
 }
 
@@ -153,44 +165,62 @@ fun LedgerScreen(
     editMode: Boolean = false,
     onToggleEditMode: () -> Unit = {},
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
-    onBack: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("The Ledger") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Text("←", style = MaterialTheme.typography.headlineSmall)
-                    }
-                },
-                actions = {
-                    TextButton(onClick = onToggleEditMode) {
-                        Text(if (editMode) "Done" else "Edit")
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 0.dp),
+        ) {
+            Text("THE NUMBERS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Surface(
+                onClick = onOpenProfile,
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize()) {
+                    Text("C", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        ) {
+            Text("The Ledger", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(vertical = 2.dp))
+            TextButton(onClick = onToggleEditMode) {
+                Icon(
+                    if (editMode) Icons.Filled.Check else Icons.Filled.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+                Text(if (editMode) "Done" else "Edit")
+            }
+        }
+
         if (uiState == null || layout == null) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 CircularProgressIndicator()
             }
-            return@Scaffold
+            return@Column
         }
 
         if (editMode) {
             LedgerEditModeContent(
-                modifier = Modifier.padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 layout = layout,
                 onLayoutChange = onLayoutChange,
             )
         } else {
-            LedgerBoardContent(modifier = Modifier.padding(innerPadding), uiState = uiState, layout = layout)
+            LedgerBoardContent(modifier = Modifier.fillMaxSize(), uiState = uiState, layout = layout)
         }
     }
 }
@@ -238,11 +268,21 @@ private fun LedgerBoardContent(modifier: Modifier, uiState: LedgerUiState, layou
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            item { StatRow("Movies", stats.totalMovies.toString()) }
-            item { StatRow("Series", stats.totalSeries.toString()) }
-            item { StatRow("Viewings logged", stats.totalViewings.toString()) }
-            item { StatRow("Average rating", stats.averageRating?.let { "★%.1f".format(it) } ?: "—") }
-            item { StatRow("Movie minutes watched", stats.totalWatchedMovieMinutes.toString()) }
+            item {
+                val tiles = listOf(
+                    StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
+                    StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
+                    StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                    StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    tiles.chunked(2).forEach { rowTiles ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            rowTiles.forEach { tile -> StatTile(tile, modifier = Modifier.weight(1f)) }
+                        }
+                    }
+                }
+            }
 
             if (isGrid) {
                 items(packRows(layout), key = { row -> row.joinToString("-") { it.id } }) { row ->
@@ -270,7 +310,11 @@ private fun headerFor(config: LedgerWidgetConfig, default: String): String = con
  *  `weight()` (grid column span) from the caller. */
 @Composable
 private fun WidgetCard(config: LedgerWidgetConfig, board: LedgerBoard, modifier: Modifier) {
-    Card(modifier = modifier.height(CARD_HEIGHT_DP.dp), colors = CardDefaults.cardColors()) {
+    Card(
+        modifier = modifier.height(CARD_HEIGHT_DP.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -460,10 +504,16 @@ private fun EditableWidgetRow(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(config.settings?.title ?: PANEL_LABELS[config.panel] ?: config.panel.raw, style = MaterialTheme.typography.bodyMedium)
             Row {
-                TextButton(onClick = onMoveUp, enabled = canMoveUp) { Text("▲") }
-                TextButton(onClick = onMoveDown, enabled = canMoveDown) { Text("▼") }
+                IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                }
+                IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                }
                 TextButton(onClick = onCycleWidth) { Text(config.width.raw) }
-                TextButton(onClick = onRemove) { Text("✕") }
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Filled.Close, contentDescription = "Remove widget")
+                }
             }
         }
         OutlinedTextField(
@@ -479,15 +529,15 @@ private fun EditableWidgetRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Top N: ", style = MaterialTheme.typography.bodySmall)
             val topN = config.settings?.topN
-            TextButton(onClick = {
+            IconButton(onClick = {
                 val next = ((topN ?: 12) - 1).coerceIn(3, 12)
                 onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
-            }) { Text("-") }
+            }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease top N") }
             Text(topN?.toString() ?: "off", style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = {
+            IconButton(onClick = {
                 val next = ((topN ?: 2) + 1).coerceIn(3, 12)
                 onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
-            }) { Text("+") }
+            }) { Icon(Icons.Filled.Add, contentDescription = "Increase top N") }
             if (topN != null) {
                 TextButton(onClick = { onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = null)) }) {
                     Text("Clear")
@@ -497,11 +547,27 @@ private fun EditableWidgetRow(
     }
 }
 
+private data class StatTileData(val label: String, val value: String, val bg: androidx.compose.ui.graphics.Color, val fg: androidx.compose.ui.graphics.Color)
+
 @Composable
-private fun StatRow(label: String, value: String) {
-    Column {
-        Text(value, style = MaterialTheme.typography.headlineMedium)
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+private fun StatTile(tile: StatTileData, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = tile.bg),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                tile.value,
+                style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DmMonoFamily),
+                color = tile.fg,
+            )
+            Text(
+                tile.label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
     }
 }
 

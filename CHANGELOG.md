@@ -9,6 +9,77 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Native Android app (in development, not yet distributed): Cinema Outings — "I've got
+  tickets" scheduling on any watchlisted/watching movie, an "On the Marquee" section leading
+  Up Next with a live countdown (`TONIGHT · 7:30 PM` → `NOW SHOWING`), and a local completion
+  engine that auto-marks the title watched and logs the venue/companions as a viewing once
+  `showtime + previews + runtime` passes — reconciled on app launch/resume and, uniquely on
+  Android, by a real exact alarm that fires even if the app is closed, prompting a system
+  notification — with the title's poster as the notification's hero image — to rate the
+  outing. "Add to calendar" uses the native Calendar Provider intent.
+  Ships local-first (no backend/auth dependency yet, unlike the web app's version): completion,
+  in-app "Fresh from the lobby" follow-up, and "Didn't make it" revert all run entirely on
+  Room. Notifications inbox sync and in-app plan sharing are intentionally deferred pending
+  passkey auth and the friends stack (see
+  `docs/superpowers/plans/2026-07-21-android-cinema-outings.md`).
+- Native Android app (in development, not yet distributed): a Material 3 Expressive redesign
+  of the whole app shell — a four-tab bottom nav (Discover/Library/Up Next/Ledger) with a
+  morphing pill selection indicator, a tertiary "New Title" FAB, and a full-screen overlay
+  stack (title detail, add-title, profile, appearance, about) replacing the old pushed-screen
+  navigation. New reusable components in `core:designsystem` power it throughout: a
+  single-select segmented control that morphs into a pill on selection, a connected
+  multi-select toggle group, and a draggable half-star rating control with pop animation.
+- Native Android app (in development, not yet distributed): Appearance is now reached from a
+  Profile overlay (avatar, library stats, sign-out placeholder) rather than a gear-icon
+  Settings screen, and splits theme mode (System/Light/Dark) from color palette (Brand,
+  Material You dynamic color, and the unlockable Spider-Noir/Matrix palettes) as two
+  independent choices instead of one four-way mode. About & Legal moved into its own overlay
+  off Profile, with legal entries opening as their own sub-page instead of expanding in place.
+- Native Android app (in development, not yet distributed): Appearance now has a Text section
+  with font accessibility controls — a Lexend-based dyslexia-friendly typeface swapped in
+  app-wide, and a text-size slider (Small through Extra Large) that stacks on top of the
+  device's own system font scale rather than overriding it. Font family and size changes are
+  staged against a live preview card and only take effect app-wide once Apply is tapped.
+- Native Android app (in development, not yet distributed): the Library screen now has a
+  search field, a grid/list view toggle, and multi-select status filter chips, with poster
+  art loaded from each title's real TMDB image (falling back to a tint) instead of a bare
+  text list.
+- Native Android app (in development, not yet distributed): Up Next, a new top-level tab
+  showing "continue watching" progress per title (aggregated from local episode data) with a
+  one-tap "mark episode watched" action, and a watchlist section below it.
+- Native Android app (in development, not yet distributed): Discover, a new top-level tab,
+  and the FAB's "New Title" add flow — both browse a local sample catalog rather than live
+  TMDB search, since the Android app has no media-proxy client yet; clearly scoped as a GUI
+  demo pending that backend work.
+- Native Android app (in development, not yet distributed): a real launcher icon — the same
+  film-reel mark as `public/favicon.svg` in void/amber, as an adaptive icon with a themed
+  monochrome layer for Android 13+ Material You icon theming. Previously the app shipped with
+  no `android:icon` at all and fell back to the OS placeholder.
+- Native Android app (in development, not yet distributed): a branded cold-start splash —
+  the system splash now shows the film-reel mark on the void background instead of a plain
+  flash, then hands off into a Compose splash where the reel keeps spinning over a pulsing
+  amber "projector beam" glow before crossfading into the app.
+
+### Changed
+
+- Native Android app (in development, not yet distributed): visual parity pass toward the
+  web app's cinematic dark-gold aesthetic — all four theme modes now carry a full Material 3
+  color scheme (surface container layers, outline, containers) instead of a handful of
+  overridden roles; typography now uses the same downloadable Fraunces/Hanken Grotesk/DM
+  Mono faces as the web app instead of the system default; card, chip, and icon usage across
+  the Library, Title detail, and Ledger screens was brought in line with Material 3
+  conventions (proper back-arrow and star icons, filter chips for watch status, bordered
+  surface-container cards).
+- Native Android app (in development, not yet distributed): the star rating field now
+  collapses to a plain read-only star row + numeric value (pencil icon signals it's
+  editable) and opens a modal picker to actually set it — mirrors the M3 TimePicker's
+  dialog-collapses-to-text pattern. The picker itself now has an unmistakable slider: a
+  gradient track that fills in as you drag and a raised, ringed handle sitting on top of
+  it, after user testing showed the previous inline drag row wasn't discoverable as a
+  slider on its own.
+
 ## [1.11.0] - 2026-07-16
 
 ### Added

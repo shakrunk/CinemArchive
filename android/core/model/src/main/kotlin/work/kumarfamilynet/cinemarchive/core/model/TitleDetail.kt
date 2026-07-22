@@ -23,6 +23,9 @@ data class TitleDetail(
     val genres: List<String>,
     val seasons: List<SeasonDetail>,
     val viewings: List<Viewing>,
+    /** The soonest active (scheduled, not yet ended) outing for this title, if any — drives
+     *  the drawer's scheduled banner. Null once completed/cancelled/missed. */
+    val scheduledOuting: CinemaOuting? = null,
 )
 
 data class SeasonDetail(
@@ -50,4 +53,6 @@ data class Viewing(
     val rating: Double?,
     val notes: String?,
     val venue: String?,
+    val companions: List<String> = emptyList(),
+    val outingId: String? = null,
 )

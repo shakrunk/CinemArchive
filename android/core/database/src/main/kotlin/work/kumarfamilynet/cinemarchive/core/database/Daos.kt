@@ -15,13 +15,20 @@ data class TitleListRow(
     val year: Int?,
     val posterUrl: String?,
     val status: String,
+    val type: String,
+    val director: String?,
+    val network: String?,
+    val rating: Double?,
 )
 
 data class EpisodeWatchCount(val episodeId: String, val watchCount: Int)
 
 @Dao
 interface TitleDao {
-    @Query("SELECT id, title, year, posterUrl, status FROM titles ORDER BY title COLLATE NOCASE")
+    @Query(
+        "SELECT id, title, year, posterUrl, status, type, director, network, rating " +
+            "FROM titles ORDER BY title COLLATE NOCASE",
+    )
     fun observeLibrary(): Flow<List<TitleListRow>>
 
     @Query("SELECT * FROM titles WHERE id = :titleId")
@@ -38,6 +45,9 @@ interface TitleDao {
 
     @Query("UPDATE titles SET status = :status, updatedAt = :updatedAt WHERE id = :titleId")
     suspend fun updateStatus(titleId: String, status: String, updatedAt: String)
+
+    @Query("UPDATE titles SET rating = :rating, updatedAt = :updatedAt WHERE id = :titleId")
+    suspend fun updateRating(titleId: String, rating: Double, updatedAt: String)
 
     @Query("SELECT COUNT(*) FROM titles")
     suspend fun count(): Int

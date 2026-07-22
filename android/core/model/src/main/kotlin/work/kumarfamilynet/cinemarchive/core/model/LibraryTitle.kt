@@ -7,6 +7,13 @@ data class LibraryTitle(
     val year: Int?,
     val posterUrl: String?,
     val status: LibraryStatus,
+    val type: MediaType,
+    val director: String?,
+    val network: String?,
+    val rating: Double?,
+    /** True while a cinema outing is scheduled for this title — drives the poster wall's
+     *  amber 🎟 corner badge (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §7). */
+    val hasScheduledOuting: Boolean = false,
 )
 
 enum class LibraryStatus {

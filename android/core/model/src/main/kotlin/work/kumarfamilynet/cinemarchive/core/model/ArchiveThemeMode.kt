@@ -1,12 +1,19 @@
 package work.kumarfamilynet.cinemarchive.core.model
 
-/** The four themes CinemArchiveTheme supports — lives in core:model (not core:designsystem)
- *  so the data layer can persist a user's choice without depending on Compose theming. */
+/** Light/dark resolution, independent of [ArchivePalette]. [SYSTEM] follows the device
+ *  setting; [LIGHT]/[DARK] pin it. Doesn't apply to [ArchivePalette.NOIR]/[ArchivePalette.MATRIX],
+ *  which are single fixed-dark palettes regardless of this setting. */
 enum class ArchiveThemeMode {
-    DARK,
+    SYSTEM,
     LIGHT,
-    NOIR,
-    MATRIX;
+    DARK,
+}
 
-    fun next(): ArchiveThemeMode = entries[(ordinal + 1) % entries.size]
+/** Color palette. [BRAND] and [MATERIAL_YOU] resolve light/dark via [ArchiveThemeMode];
+ *  [NOIR] and [MATRIX] are unlockable easter-egg palettes with one fixed appearance each. */
+enum class ArchivePalette {
+    BRAND,
+    MATERIAL_YOU,
+    NOIR,
+    MATRIX,
 }

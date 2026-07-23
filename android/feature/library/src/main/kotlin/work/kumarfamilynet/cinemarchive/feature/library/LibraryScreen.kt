@@ -1,5 +1,10 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,9 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,11 +31,13 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,39 +54,67 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 
 data class LibraryUiState(val titles: List<LibraryTitle> = emptyList())
 
-class LibraryViewModel(repository: LibraryRepository) : ViewModel() {
+class LibraryViewModel(
+    repository: LibraryRepository,
+    private val librarySyncRepository: LibrarySyncRepository,
+) : ViewModel() {
     val uiState = repository.observeLibrary()
         .map(::LibraryUiState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+
+    /** Pull-to-refresh: [LibraryUiState.titles] already updates live off Room, so this only
+     *  needs to pull remote changes down — the observing flow picks them up on its own once
+     *  they land locally. */
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                librarySyncRepository.syncNow()
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
 }
 
 @Composable
 fun LibraryRoute(
     repository: LibraryRepository,
+    librarySyncRepository: LibrarySyncRepository,
     viewMode: LibraryViewMode,
     onToggleViewMode: () -> Unit,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
+    onFabExpandedChange: (Boolean) -> Unit = {},
 ) {
-    val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository))
+    val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository, librarySyncRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
     var search by rememberSaveable { mutableStateOf("") }
     var statusFilters by rememberSaveable { mutableStateOf(setOf<LibraryStatus>()) }
@@ -97,9 +134,13 @@ fun LibraryRoute(
         onToggleViewMode = onToggleViewMode,
         onOpenProfile = onOpenProfile,
         onTitleClick = onTitleClick,
+        onFabExpandedChange = onFabExpandedChange,
+        isRefreshing = isRefreshing,
+        onRefresh = viewModel::refresh,
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreen(
     titles: List<LibraryTitle>,
@@ -111,7 +152,19 @@ private fun LibraryScreen(
     onToggleViewMode: () -> Unit,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
+    onFabExpandedChange: (Boolean) -> Unit = {},
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
+    val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
+    val collapsed = if (viewMode == LibraryViewMode.GRID) {
+        rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
+    } else {
+        rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+    }
+    androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
+
     Column(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -141,81 +194,98 @@ private fun LibraryScreen(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
         )
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 16.dp),
+        AnimatedVisibility(
+            visible = !collapsed,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
         ) {
-            Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            androidx.compose.foundation.text.BasicTextField(
-                value = search,
-                onValueChange = onSearchChange,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier.padding(start = 10.dp).weight(1f),
-                decorationBox = { inner ->
-                    if (search.isEmpty()) {
-                        Text(
-                            "Search your library…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = search,
+                        onValueChange = onSearchChange,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                        modifier = Modifier.padding(start = 10.dp).weight(1f),
+                        decorationBox = { inner ->
+                            if (search.isEmpty()) {
+                                Text(
+                                    "Search your library…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            inner()
+                        },
+                    )
+                    IconButton(onClick = onToggleViewMode, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            // Shows the icon for the mode a tap will switch TO, not the current mode —
+                            // the current mode is already visible in the list/grid below it.
+                            if (viewMode == LibraryViewMode.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                            contentDescription = if (viewMode == LibraryViewMode.GRID) "Switch to list view" else "Switch to grid view",
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    inner()
-                },
-            )
-            IconButton(onClick = onToggleViewMode, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    // Shows the icon for the mode a tap will switch TO, not the current mode —
-                    // the current mode is already visible in the list/grid below it.
-                    if (viewMode == LibraryViewMode.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
-                    contentDescription = if (viewMode == LibraryViewMode.GRID) "Switch to list view" else "Switch to grid view",
-                    tint = MaterialTheme.colorScheme.onSurface,
+                }
+
+                ConnectedToggleGroup(
+                    options = listOf(
+                        ChoiceOption(LibraryStatus.WATCHED, "Watched"),
+                        ChoiceOption(LibraryStatus.WATCHING, "Watching"),
+                        ChoiceOption(LibraryStatus.WATCHLIST, "Watchlist"),
+                        ChoiceOption(LibraryStatus.DROPPED, "Dropped"),
+                    ),
+                    selected = statusFilters,
+                    onToggle = onToggleStatus,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
                 )
             }
         }
 
-        ConnectedToggleGroup(
-            options = listOf(
-                ChoiceOption(LibraryStatus.WATCHED, "Watched"),
-                ChoiceOption(LibraryStatus.WATCHING, "Watching"),
-                ChoiceOption(LibraryStatus.WATCHLIST, "Watchlist"),
-                ChoiceOption(LibraryStatus.DROPPED, "Dropped"),
-            ),
-            selected = statusFilters,
-            onToggle = onToggleStatus,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-        )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    "${titles.size} title${if (titles.size == 1) "" else "s"} on the bill",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                )
 
-        Text(
-            "${titles.size} title${if (titles.size == 1) "" else "s"} on the bill",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-        )
-
-        if (titles.isEmpty()) {
-            EmptyLibrary(modifier = Modifier.fillMaxSize())
-        } else if (viewMode == LibraryViewMode.GRID) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                items(titles, key = LibraryTitle::id) { title ->
-                    LibraryGridCard(title, onClick = { onTitleClick(title.id) })
-                }
-            }
-        } else {
-            LazyColumn(contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp)) {
-                items(titles, key = LibraryTitle::id) { title ->
-                    LibraryListRow(title, onClick = { onTitleClick(title.id) })
+                if (titles.isEmpty()) {
+                    EmptyLibrary(modifier = Modifier.fillMaxSize())
+                } else if (viewMode == LibraryViewMode.GRID) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        state = gridState,
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        items(titles, key = LibraryTitle::id) { title ->
+                            LibraryGridCard(title, onClick = { onTitleClick(title.id) })
+                        }
+                    }
+                } else {
+                    LazyColumn(state = listState, contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp)) {
+                        items(titles, key = LibraryTitle::id) { title ->
+                            LibraryListRow(title, onClick = { onTitleClick(title.id) })
+                        }
+                    }
                 }
             }
         }
@@ -331,7 +401,8 @@ private fun EmptyLibrary(modifier: Modifier = Modifier) {
 
 private class LibraryViewModelFactory(
     private val repository: LibraryRepository,
+    private val librarySyncRepository: LibrarySyncRepository,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = LibraryViewModel(repository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = LibraryViewModel(repository, librarySyncRepository) as T
 }

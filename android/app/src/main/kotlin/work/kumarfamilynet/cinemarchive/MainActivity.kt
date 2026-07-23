@@ -28,10 +28,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.outlined.ViewList
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -68,6 +73,7 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
+import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
@@ -111,6 +117,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         val repository = (application as CinemArchiveApplication).libraryRepository
+        val discoverRepository = (application as CinemArchiveApplication).discoverRepository
         val ledgerRepository = (application as CinemArchiveApplication).ledgerRepository
         val ledgerLayoutRepository = (application as CinemArchiveApplication).ledgerLayoutRepository
         val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
@@ -146,6 +153,7 @@ class MainActivity : ComponentActivity() {
                         } else {
                             CinemArchiveApp(
                                 repository,
+                                discoverRepository,
                                 ledgerRepository,
                                 ledgerLayoutRepository,
                                 preferencesRepository,
@@ -243,6 +251,7 @@ private sealed interface Overlay {
 @Composable
 private fun CinemArchiveApp(
     repository: LibraryRepository,
+    discoverRepository: DiscoverRepository,
     ledgerRepository: LedgerRepository,
     ledgerLayoutRepository: LedgerLayoutRepository,
     preferencesRepository: PreferencesRepository,
@@ -291,6 +300,13 @@ private fun CinemArchiveApp(
         val next = if (libraryViewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
         coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
     }
+
+    // The FAB is a single instance shared across tabs, but only Discover/Library/Up Next report
+    // scroll-collapse (they're the ones with a header/list worth tucking it away from) —
+    // reset to expanded on every tab switch so a collapse from the tab just left doesn't
+    // leak into a tab that never reports back in.
+    var fabExpanded by remember { mutableStateOf(true) }
+    LaunchedEffect(tab) { fabExpanded = true }
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -329,14 +345,15 @@ private fun CinemArchiveApp(
             bottomBar = {
                 MorphingBottomNav(
                     destinations = listOf(
-                        NavDestination(Tab.DISCOVER, "Discover", Icons.Filled.Search),
+                        NavDestination(Tab.DISCOVER, "Discover", Icons.Outlined.Explore, Icons.Filled.Explore),
                         NavDestination(
                             Tab.LIBRARY,
                             "Library",
-                            if (libraryViewMode == LibraryViewMode.GRID) Icons.Filled.GridView else Icons.AutoMirrored.Filled.ViewList,
+                            icon = if (libraryViewMode == LibraryViewMode.GRID) Icons.Outlined.Apps else Icons.AutoMirrored.Outlined.ViewList,
+                            selectedIcon = if (libraryViewMode == LibraryViewMode.GRID) Icons.Filled.Apps else Icons.AutoMirrored.Filled.ViewList,
                         ),
-                        NavDestination(Tab.UP_NEXT, "Up Next", Icons.Filled.PlayArrow),
-                        NavDestination(Tab.LEDGER, "Ledger", Icons.Filled.BarChart),
+                        NavDestination(Tab.UP_NEXT, "Up Next", Icons.Outlined.PlayArrow, Icons.Filled.PlayArrow),
+                        NavDestination(Tab.LEDGER, "Ledger", Icons.Outlined.Insights, Icons.Filled.Insights),
                     ),
                     selected = tab,
                     onSelect = { tab = it },
@@ -346,21 +363,30 @@ private fun CinemArchiveApp(
             Box(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.padding(innerPadding)) {
                     when (tab) {
-                        Tab.DISCOVER -> DiscoverRoute()
+                        Tab.DISCOVER -> DiscoverRoute(discoverRepository, onFabExpandedChange = { fabExpanded = it })
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
+                            librarySyncRepository,
                             viewMode = libraryViewMode,
                             onToggleViewMode = onToggleLibraryViewMode,
                             onOpenProfile = openProfile,
                             onTitleClick = { overlay = Overlay.Detail(it) },
+                            onFabExpandedChange = { fabExpanded = it },
                         )
-                        Tab.UP_NEXT -> UpNextRoute(repository, outingsRepository, onTitleClick = { overlay = Overlay.Detail(it) })
+                        Tab.UP_NEXT -> UpNextRoute(
+                            repository,
+                            outingsRepository,
+                            librarySyncRepository,
+                            onTitleClick = { overlay = Overlay.Detail(it) },
+                            onFabExpandedChange = { fabExpanded = it },
+                        )
                         Tab.LEDGER -> LedgerRoute(ledgerRepository, ledgerLayoutRepository, onOpenProfile = openProfile)
                     }
                 }
 
                 ExpressivePillFab(
                     label = "New Title",
+                    expanded = fabExpanded,
                     onClick = { overlay = Overlay.Add },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

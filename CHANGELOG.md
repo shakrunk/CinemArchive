@@ -11,6 +11,11 @@ number is chosen.
 
 ### Added
 
+- Native Android app (in development, not yet distributed): pull-to-refresh on the Discover,
+  Library, and Up Next tabs. Discover re-fetches trending titles from TMDB; Library and Up
+  Next pull remote changes down via the existing `sync_library_changes` sync (Up Next also
+  re-runs cinema-outing completion afterward), the same reconciliation already run on launch
+  and app resume.
 - Native Android app (in development, not yet distributed): a real sign-in flow — magic-link
   email sign-in, with interactive (not yet backed) UI for passkey and desktop QR-pairing
   sign-in on the same login screen. Once signed in, the app pulls your real library down from
@@ -101,6 +106,10 @@ number is chosen.
   indicator (the biggest offender), the segmented control's selection grow, and the star
   rating's pop-on-set animation all settle faster with a visible bounce instead of the
   previous slow, understated spring.
+- Native Android app (in development, not yet distributed): the "New Title" FAB now collapses
+  to just its "+" glyph while scrolling down the Discover, Library, or Up Next tab, and the
+  search bar/filter row directly beneath each tab's title scroll out of the way with it — both
+  return once you scroll back up.
 
 ### Fixed
 

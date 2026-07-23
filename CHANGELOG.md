@@ -11,6 +11,12 @@ number is chosen.
 
 ### Added
 
+- Native Android app (in development, not yet distributed): a real sign-in flow — magic-link
+  email sign-in, with interactive (not yet backed) UI for passkey and desktop QR-pairing
+  sign-in on the same login screen. Once signed in, the app pulls your real library down from
+  Supabase via `sync_library_changes` (bootstrap + incremental, on launch/sign-in/resume)
+  instead of showing local dev fixtures, and local mutations — title status, ratings,
+  reviews, viewings, cinema outings, Ledger layout — now push to the real backend.
 - Native Android app (in development, not yet distributed): Cinema Outings — "I've got
   tickets" scheduling on any watchlisted/watching movie, an "On the Marquee" section leading
   Up Next with a live countdown (`TONIGHT · 7:30 PM` → `NOW SHOWING`), and a local completion

@@ -46,8 +46,14 @@ private const val PAGE_SIZE = 500
  *
  * 3: the title arm's releaseDate field (supabase/migrations/20260723000000_sync_release_date.sql)
  * — same "already past the watermark" problem as version 2.
+ *
+ * 4: `companions` parsing fix — a prior version stringified each `{name, friendUserId?}`
+ * element wholesale via `JSONArray.getString()` instead of extracting `name` (raw JSON showing
+ * up on the Up Next marquee card). Rows already pulled under the old parser have the bad
+ * string baked into Room and, per this constant's own kdoc, are otherwise stuck there forever
+ * since their `updated_at` never changes.
  */
-private const val SYNC_SCHEMA_VERSION = 3
+private const val SYNC_SCHEMA_VERSION = 4
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -149,6 +155,16 @@ class LibrarySyncRepository(
     private fun JSONObject.optIntOrNull(key: String): Int? = if (has(key) && !isNull(key)) getInt(key) else null
     private fun JSONObject.optDoubleOrNull(key: String): Double? = if (has(key) && !isNull(key)) getDouble(key) else null
 
+    // Remote `companions` is `[{name, friendUserId?}]` (schema.sql) to match the web app's
+    // Companion[] type; Android keeps display names only and drops friendUserId (no friend
+    // graph locally — see CinemaOutingEntity's kdoc). A plain JSONArray.getString() here would
+    // stringify each companion object wholesale instead of extracting its name, which is what
+    // showed raw JSON blobs on the Up Next marquee card. Falls back to the element itself for
+    // any legacy row that already got written as a bare string.
+    private fun JSONArray?.toCompanionNames(): List<String> =
+        this?.let { arr -> (0 until arr.length()).map { i -> (arr.opt(i) as? JSONObject)?.optString("name") ?: arr.getString(i) } }
+            ?: emptyList()
+
     private fun JSONObject.toTitleEntity() = TitleEntity(
         id = getString("id"),
         tmdbId = getInt("tmdbId"),
@@ -200,7 +216,7 @@ class LibrarySyncRepository(
         rating = optDoubleOrNull("rating"),
         notes = optStringOrNull("notes"),
         venue = optStringOrNull("venue"),
-        companions = optJSONArray("companions")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+        companions = optJSONArray("companions").toCompanionNames(),
         outingId = optStringOrNull("outingId"),
     )
 
@@ -216,7 +232,7 @@ class LibrarySyncRepository(
         runtimeMinutes = getInt("runtimeMinutes"),
         endsAt = getString("endsAt"),
         venue = optStringOrNull("venue"),
-        companions = optJSONArray("companions")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+        companions = optJSONArray("companions").toCompanionNames(),
         format = optStringOrNull("format"),
         ticketPrice = optDoubleOrNull("ticketPrice"),
         seat = optStringOrNull("seat"),

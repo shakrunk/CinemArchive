@@ -132,6 +132,13 @@ number is chosen.
   the same `ViewModelStoreOwner`; `viewModel()` without an explicit key caches its instance by
   call site, so the factory — and the `titleId` baked into it — only ever ran once. The lookup
   is now keyed on `titleId`, so each title gets its own ViewModel instance.
+- Native Android app (in development, not yet distributed): the Up Next "On the Marquee" card
+  (and any other companions display) could render a companion as a raw JSON blob, e.g. `with
+  {"name":"...","friendUserId":"..."}`, instead of a plain name. `companions` is `[{name,
+  friendUserId?}]` in Postgres (matching the web app's `Companion[]` type), but the sync pull
+  parsed it with `JSONArray.getString()`, which stringifies non-string elements wholesale
+  rather than extracting `name`. Rows already pulled under the old parser had the bad string
+  baked into Room, so this also bumps the sync schema version to force a one-time full resync.
 
 ## [1.11.0] - 2026-07-16
 

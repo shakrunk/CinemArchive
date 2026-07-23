@@ -205,6 +205,9 @@ interface CinemaOutingDao {
     @Query("SELECT * FROM cinema_outings WHERE id = :id")
     suspend fun getById(id: String): CinemaOutingEntity?
 
+    @Query("DELETE FROM cinema_outings WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(rows: List<CinemaOutingEntity>)
 

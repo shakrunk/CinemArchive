@@ -1883,6 +1883,7 @@ create trigger viewings_tombstone             before delete on viewings         
 create trigger episode_watch_events_tombstone before delete on episode_watch_events for each row execute function record_tombstone('episode_watch_event');
 create trigger episode_ratings_tombstone      before delete on episode_ratings      for each row execute function record_tombstone('episode_rating');
 create trigger episode_reviews_tombstone      before delete on episode_reviews      for each row execute function record_tombstone('episode_review');
+create trigger cinema_outings_tombstone       before delete on cinema_outings       for each row execute function record_tombstone('cinema_outing');
 
 create or replace function sync_library_changes(p_since timestamptz, p_limit integer default 500)
 returns table (
@@ -1928,7 +1929,7 @@ language sql security definer stable as $$
     select 'viewing'::text, v.id, v.title_id, v.updated_at,
       jsonb_build_object(
         'id', v.id, 'titleId', v.title_id, 'date', v.viewed_at, 'rating', v.rating,
-        'notes', v.notes, 'venue', v.venue
+        'notes', v.notes, 'venue', v.venue, 'companions', v.companions, 'outingId', v.outing_id
       )
     from viewings v where v.user_id = auth.uid() and v.updated_at > p_since
 
@@ -1949,6 +1950,21 @@ language sql security definer stable as $$
     select 'episode_review'::text, rv.id, rv.episode_id, rv.updated_at,
       jsonb_build_object('id', rv.id, 'episodeId', rv.episode_id, 'reviewText', rv.review_text, 'reviewedAt', rv.reviewed_at)
     from episode_reviews rv where rv.user_id = auth.uid() and rv.updated_at > p_since
+
+    union all
+
+    select 'cinema_outing'::text, co.id, co.title_id, co.updated_at,
+      jsonb_build_object(
+        'id', co.id, 'titleId', co.title_id, 'showtime', co.showtime,
+        'previewsMinutes', co.previews_minutes, 'runtimeMinutes', co.runtime_minutes,
+        'endsAt', co.ends_at, 'venue', co.venue, 'companions', co.companions,
+        'format', co.format, 'ticketPrice', co.ticket_price, 'seat', co.seat,
+        'bookingRef', co.booking_ref, 'notes', co.notes, 'status', co.status,
+        'previousStatus', co.previous_status, 'completedViewingId', co.completed_viewing_id,
+        'followUpDismissedAt', co.follow_up_dismissed_at, 'createdAt', co.created_at,
+        'updatedAt', co.updated_at
+      )
+    from cinema_outings co where co.user_id = auth.uid() and co.updated_at > p_since
 
     union all
 

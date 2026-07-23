@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
+import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
@@ -36,9 +38,12 @@ private const val PAGE_SIZE = 500
  * RPC serves both bootstrap (`p_since` = epoch) and incremental sync — no separate bootstrap
  * endpoint was ever built server-side, only this RPC.
  *
- * Cast/crew and `cinema_outings` are deliberately not handled here: the migration gave them
- * `updated_at`/tombstone triggers but the RPC itself has no `union all` arm for either, so
- * they aren't in its output at all yet — a server-side gap, not an omission here.
+ * Cast/crew are still deliberately not handled here: the migration gave them `updated_at`/
+ * tombstone triggers but the RPC itself has no `union all` arm for either — a server-side
+ * gap, not an omission here. `cinema_outings` got its arm in
+ * supabase/migrations/20260722000000_cinema_outings_sync.sql once passkey auth and the real
+ * outbox writer landed, closing the read half to match [SupabaseRemoteMutationWriter]'s
+ * `cinema_outing` push case.
  */
 class LibrarySyncRepository(
     context: Context,
@@ -51,6 +56,7 @@ class LibrarySyncRepository(
     private val ratingDao: EpisodeRatingDao,
     private val reviewDao: EpisodeReviewDao,
     private val viewingDao: ViewingDao,
+    private val cinemaOutingDao: CinemaOutingDao,
 ) {
     private val dataStore = context.librarySyncDataStore
     private val cursorKey = stringPreferencesKey("last_synced_at")
@@ -93,6 +99,7 @@ class LibrarySyncRepository(
         byType["episode_watch_event"]?.forEach { watchEventDao.upsertAll(listOf(it.payload().toWatchEventEntity())) }
         byType["episode_rating"]?.forEach { ratingDao.upsertAll(listOf(it.payload().toRatingEntity())) }
         byType["episode_review"]?.forEach { reviewDao.upsertAll(listOf(it.payload().toReviewEntity())) }
+        byType["cinema_outing"]?.forEach { cinemaOutingDao.upsert(it.payload().toCinemaOutingEntity()) }
 
         byType["tombstone"]?.forEach { row ->
             val entityId = row.getString("entity_id")
@@ -104,6 +111,7 @@ class LibrarySyncRepository(
                 "episode_watch_event" -> watchEventDao.deleteById(entityId)
                 "episode_rating" -> ratingDao.deleteById(entityId)
                 "episode_review" -> reviewDao.deleteById(entityId)
+                "cinema_outing" -> cinemaOutingDao.deleteById(entityId)
             }
         }
     }
@@ -163,6 +171,34 @@ class LibrarySyncRepository(
         rating = optDoubleOrNull("rating"),
         notes = optStringOrNull("notes"),
         venue = optStringOrNull("venue"),
+        companions = optJSONArray("companions")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+        outingId = optStringOrNull("outingId"),
+    )
+
+    // Postgres's status/previous_status enums are lowercase ('scheduled', 'watched', ...);
+    // Room stores OutingStatus.name/LibraryStatus.name (uppercase) — same conversion every
+    // other title/cinema_outing boundary crossing already applies (see toTitleEntity's kdoc
+    // and SupabaseRemoteMutationWriter's upsertOuting).
+    private fun JSONObject.toCinemaOutingEntity() = CinemaOutingEntity(
+        id = getString("id"),
+        titleId = getString("titleId"),
+        showtime = getString("showtime"),
+        previewsMinutes = getInt("previewsMinutes"),
+        runtimeMinutes = getInt("runtimeMinutes"),
+        endsAt = getString("endsAt"),
+        venue = optStringOrNull("venue"),
+        companions = optJSONArray("companions")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+        format = optStringOrNull("format"),
+        ticketPrice = optDoubleOrNull("ticketPrice"),
+        seat = optStringOrNull("seat"),
+        bookingRef = optStringOrNull("bookingRef"),
+        notes = optStringOrNull("notes"),
+        status = getString("status").uppercase(),
+        previousStatus = optStringOrNull("previousStatus")?.uppercase(),
+        completedViewingId = optStringOrNull("completedViewingId"),
+        followUpDismissedAt = optStringOrNull("followUpDismissedAt"),
+        createdAt = getString("createdAt"),
+        updatedAt = getString("updatedAt"),
     )
 
     private fun JSONObject.toWatchEventEntity() = EpisodeWatchEventEntity(

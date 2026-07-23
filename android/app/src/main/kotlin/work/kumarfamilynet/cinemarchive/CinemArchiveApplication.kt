@@ -61,6 +61,7 @@ class CinemArchiveApplication : Application() {
             ratingDao = database.episodeRatingDao(),
             reviewDao = database.episodeReviewDao(),
             viewingDao = database.viewingDao(),
+            cinemaOutingDao = database.cinemaOutingDao(),
         )
     }
 

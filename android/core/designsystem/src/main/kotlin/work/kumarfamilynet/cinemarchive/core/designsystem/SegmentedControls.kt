@@ -40,24 +40,33 @@ fun <T> SegmentedGroup(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
             SegmentedGroupItem(
                 label = option.label,
                 isSelected = option.value == selected,
+                isFirst = index == 0,
+                isLast = index == options.lastIndex,
                 onClick = { onSelect(option.value) },
             )
         }
     }
 }
 
+private val SegmentBigCorner = 23.dp
+private val SegmentSmallCorner = 12.dp
+
 @Composable
-private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, onClick: () -> Unit) {
+private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, isFirst: Boolean, isLast: Boolean, onClick: () -> Unit) {
     val weight by animateFloatAsState(
         targetValue = if (isSelected) 1.5f else 1f,
         animationSpec = expressiveSpring(),
         label = "segWeight",
     )
-    val radius by animateDpAsState(if (isSelected) 23.dp else 12.dp, label = "segRadius")
+    // Outer corners of the first/last item stay large even unselected, same cohesive-group
+    // trick as ConnectedToggleItem — the selected item still pops into a full stadium on all
+    // four corners regardless of position, unselected neighbors just shrink toward each other.
+    val leading by animateDpAsState(if (isSelected || isFirst) SegmentBigCorner else SegmentSmallCorner, label = "segLeading")
+    val trailing by animateDpAsState(if (isSelected || isLast) SegmentBigCorner else SegmentSmallCorner, label = "segTrailing")
     val bg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
     val fg = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
 
@@ -66,7 +75,7 @@ private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, onCl
         modifier = Modifier
             .weight(weight.coerceAtLeast(0.01f))
             .height(46.dp),
-        shape = RoundedCornerShape(radius),
+        shape = RoundedCornerShape(topStart = leading, bottomStart = leading, topEnd = trailing, bottomEnd = trailing),
         color = bg,
         contentColor = fg,
     ) {

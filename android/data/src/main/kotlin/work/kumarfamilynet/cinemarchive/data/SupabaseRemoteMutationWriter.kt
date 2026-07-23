@@ -46,7 +46,9 @@ class SupabaseRemoteMutationWriter(
         val session = sessionProvider()
         val id = payload.getString("id")
         val updatedAt = payload.getString("updatedAt")
-        val body = JSONObject().put("status", payload.getString("status")).put("updated_at", updatedAt)
+        // payload.status is LibraryStatus.name (uppercase); titles.status is the lowercase
+        // watch_status enum — same conversion the cinema_outing upsert below already does.
+        val body = JSONObject().put("status", payload.getString("status").lowercase()).put("updated_at", updatedAt)
         val filter = "id=eq.$id&updated_at=lt.$updatedAt"
         val updated = JSONArray(client.patchWithFilter("titles", filter, session.accessToken, body.toString()))
         if (updated.length() > 0) return PushResult.Success

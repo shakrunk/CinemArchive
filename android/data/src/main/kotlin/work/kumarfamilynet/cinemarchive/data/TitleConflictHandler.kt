@@ -15,9 +15,11 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 class TitleConflictHandler(private val titleDao: TitleDao) : ConflictHandler {
     override suspend fun applyRemote(entityType: String, entityId: String, serverPayload: JSONObject) {
         if (entityType != "title") return
+        // serverPayload.status comes straight from Postgres's lowercase watch_status enum
+        // (SupabaseRemoteMutationWriter's conflict read) — Room stores LibraryStatus.name.
         titleDao.updateStatus(
             titleId = entityId,
-            status = serverPayload.getString("status"),
+            status = serverPayload.getString("status").uppercase(),
             updatedAt = serverPayload.getString("updatedAt"),
         )
     }

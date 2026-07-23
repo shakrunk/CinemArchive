@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +50,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
@@ -56,12 +58,12 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
+import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
 data class LibraryUiState(val titles: List<LibraryTitle> = emptyList())
-
-private enum class LibraryViewMode { GRID, LIST }
 
 class LibraryViewModel(repository: LibraryRepository) : ViewModel() {
     val uiState = repository.observeLibrary()
@@ -72,15 +74,18 @@ class LibraryViewModel(repository: LibraryRepository) : ViewModel() {
 @Composable
 fun LibraryRoute(
     repository: LibraryRepository,
+    preferencesRepository: PreferencesRepository,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
 ) {
     val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
 
     var search by rememberSaveable { mutableStateOf("") }
     var statusFilters by rememberSaveable { mutableStateOf(setOf<LibraryStatus>()) }
-    var viewMode by rememberSaveable { mutableStateOf(LibraryViewMode.GRID) }
+    val viewMode by preferencesRepository.observeLibraryViewMode()
+        .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
 
     val filtered = uiState.titles.filter { title ->
         (statusFilters.isEmpty() || title.status in statusFilters) &&
@@ -94,7 +99,10 @@ fun LibraryRoute(
         statusFilters = statusFilters,
         onToggleStatus = { s -> statusFilters = if (s in statusFilters) statusFilters - s else statusFilters + s },
         viewMode = viewMode,
-        onToggleViewMode = { viewMode = if (viewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID },
+        onToggleViewMode = {
+            val next = if (viewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
+            coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
+        },
         onOpenProfile = onOpenProfile,
         onTitleClick = onTitleClick,
     )
@@ -170,8 +178,10 @@ private fun LibraryScreen(
             )
             IconButton(onClick = onToggleViewMode, modifier = Modifier.size(32.dp)) {
                 Icon(
-                    if (viewMode == LibraryViewMode.GRID) Icons.Filled.GridView else Icons.AutoMirrored.Filled.ViewList,
-                    contentDescription = "Toggle view",
+                    // Shows the icon for the mode a tap will switch TO, not the current mode —
+                    // the current mode is already visible in the list/grid below it.
+                    if (viewMode == LibraryViewMode.GRID) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                    contentDescription = if (viewMode == LibraryViewMode.GRID) "Switch to list view" else "Switch to grid view",
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }

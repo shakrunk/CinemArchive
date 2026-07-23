@@ -10,6 +10,7 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
+import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 
 private val Context.preferencesDataStore by preferencesDataStore(name = "cinemarchive_prefs")
 
@@ -25,6 +26,7 @@ class PreferencesRepository(context: Context) {
     private val paletteKey = stringPreferencesKey("palette")
     private val fontFamilyKey = stringPreferencesKey("font_family")
     private val fontScaleKey = stringPreferencesKey("font_scale")
+    private val libraryViewModeKey = stringPreferencesKey("library_view_mode")
 
     fun observeThemeMode(): Flow<ArchiveThemeMode> = dataStore.data.map { preferences ->
         preferences[themeModeKey]?.let { stored ->
@@ -64,5 +66,15 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setFontScale(fontScale: ArchiveFontScale) {
         dataStore.edit { it[fontScaleKey] = fontScale.name }
+    }
+
+    fun observeLibraryViewMode(): Flow<LibraryViewMode> = dataStore.data.map { preferences ->
+        preferences[libraryViewModeKey]?.let { stored ->
+            runCatching { LibraryViewMode.valueOf(stored) }.getOrNull()
+        } ?: LibraryViewMode.GRID
+    }
+
+    suspend fun setLibraryViewMode(mode: LibraryViewMode) {
+        dataStore.edit { it[libraryViewModeKey] = mode.name }
     }
 }

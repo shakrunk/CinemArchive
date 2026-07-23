@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
@@ -65,6 +66,7 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
+import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
@@ -252,6 +254,8 @@ private fun CinemArchiveApp(
 ) {
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    val libraryViewMode by preferencesRepository.observeLibraryViewMode()
+        .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
 
     val openProfile = { overlay = Overlay.Profile }
     val closeOverlay = { overlay = null }
@@ -316,7 +320,11 @@ private fun CinemArchiveApp(
                 MorphingBottomNav(
                     destinations = listOf(
                         NavDestination(Tab.DISCOVER, "Discover", Icons.Filled.Search),
-                        NavDestination(Tab.LIBRARY, "Library", Icons.Filled.GridView),
+                        NavDestination(
+                            Tab.LIBRARY,
+                            "Library",
+                            if (libraryViewMode == LibraryViewMode.GRID) Icons.Filled.GridView else Icons.AutoMirrored.Filled.ViewList,
+                        ),
                         NavDestination(Tab.UP_NEXT, "Up Next", Icons.Filled.PlayArrow),
                         NavDestination(Tab.LEDGER, "Ledger", Icons.Filled.BarChart),
                     ),
@@ -331,6 +339,7 @@ private fun CinemArchiveApp(
                         Tab.DISCOVER -> DiscoverRoute()
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
+                            preferencesRepository,
                             onOpenProfile = openProfile,
                             onTitleClick = { overlay = Overlay.Detail(it) },
                         )

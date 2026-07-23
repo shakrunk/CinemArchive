@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +48,7 @@ fun ProfileRoute(
     onClose: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenPermissions: () -> Unit,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -62,6 +64,7 @@ fun ProfileRoute(
         onClose = onClose,
         onOpenAppearance = onOpenAppearance,
         onOpenAbout = onOpenAbout,
+        onOpenPermissions = onOpenPermissions,
         onSignOut = authRepository::signOut,
     )
 }
@@ -89,6 +92,7 @@ private fun ProfileScreen(
     onClose: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenPermissions: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -136,6 +140,17 @@ private fun ProfileScreen(
                     title = "Appearance",
                     subtitle = appearanceSummary,
                     onClick = onOpenAppearance,
+                )
+            }
+            item {
+                ProfileRow(
+                    icon = Icons.Filled.Lock,
+                    iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    title = "Permissions",
+                    subtitle = "Camera, notifications & alarms",
+                    onClick = onOpenPermissions,
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
             item {

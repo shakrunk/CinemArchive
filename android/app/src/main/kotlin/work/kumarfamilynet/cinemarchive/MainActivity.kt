@@ -80,6 +80,7 @@ import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
 import work.kumarfamilynet.cinemarchive.feature.library.TitleDetailRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
 import work.kumarfamilynet.cinemarchive.feature.upnext.UpNextRoute
 
@@ -227,6 +228,7 @@ private sealed interface Overlay {
     data object Profile : Overlay
     data object Appearance : Overlay
     data object About : Overlay
+    data object Permissions : Overlay
 }
 
 /**
@@ -296,7 +298,7 @@ private fun CinemArchiveApp(
     // Profile (matching their own in-overlay back arrows); everything else closes outright.
     BackHandler(enabled = overlay != null) {
         overlay = when (overlay) {
-            Overlay.Appearance, Overlay.About -> Overlay.Profile
+            Overlay.Appearance, Overlay.About, Overlay.Permissions -> Overlay.Profile
             else -> null
         }
     }
@@ -365,9 +367,11 @@ private fun CinemArchiveApp(
                 onClose = closeOverlay,
                 onOpenAppearance = { overlay = Overlay.Appearance },
                 onOpenAbout = { overlay = Overlay.About },
+                onOpenPermissions = { overlay = Overlay.Permissions },
             )
             Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
             Overlay.About -> AboutRoute(appVersionName, onBack = openProfile)
+            Overlay.Permissions -> PermissionsRoute(onBack = openProfile)
         }
     }
 }

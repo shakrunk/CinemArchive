@@ -45,6 +45,11 @@ number is chosen.
   Material You dynamic color, and the unlockable Spider-Noir/Matrix palettes) as two
   independent choices instead of one four-way mode. About & Legal moved into its own overlay
   off Profile, with legal entries opening as their own sub-page instead of expanding in place.
+- Native Android app (in development, not yet distributed): Profile now has a Permissions
+  overlay showing live status for the three permissions the app asks for contextually
+  (camera for QR sign-in, notifications and exact alarms for the outing "how was it?" prompt),
+  each with a one-tap fix — an in-app request dialog where the OS allows one, otherwise a
+  deep link straight to the relevant system Settings screen.
 - Native Android app (in development, not yet distributed): Appearance now has a Text section
   with font accessibility controls — a Lexend-based dyslexia-friendly typeface swapped in
   app-wide, and a text-size slider (Small through Extra Large) that stacks on top of the

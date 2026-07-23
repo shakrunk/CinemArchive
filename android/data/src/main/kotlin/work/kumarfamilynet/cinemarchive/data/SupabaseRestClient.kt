@@ -132,6 +132,21 @@ class SupabaseRestClient(
         return execute(request)
     }
 
+    /** Calls a Supabase Edge Function (`GET /functions/v1/<name>?<query>`) — used by
+     *  [DiscoverRepository]'s trending fetch. Edge functions deploy with JWT verification on
+     *  by default, so this always sends a bearer token: the signed-in user's access token when
+     *  available, the anon key otherwise — same fallback `supabase-js`'s `functions.invoke`
+     *  uses, and it's what lets Discover work before sign-in. */
+    fun invokeFunction(name: String, query: String, accessToken: String?): String {
+        val request = Request.Builder()
+            .url("$baseUrl/functions/v1/$name?$query")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer ${accessToken ?: anonKey}")
+            .get()
+            .build()
+        return execute(request)
+    }
+
     fun get(table: String, filter: String, accessToken: String): String {
         val request = Request.Builder()
             .url("$baseUrl/rest/v1/$table?$filter")

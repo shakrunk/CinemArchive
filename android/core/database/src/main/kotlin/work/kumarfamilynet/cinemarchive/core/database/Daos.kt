@@ -19,6 +19,7 @@ data class TitleListRow(
     val director: String?,
     val network: String?,
     val rating: Double?,
+    val releaseDate: String?,
 )
 
 data class EpisodeWatchCount(val episodeId: String, val watchCount: Int)
@@ -26,7 +27,7 @@ data class EpisodeWatchCount(val episodeId: String, val watchCount: Int)
 @Dao
 interface TitleDao {
     @Query(
-        "SELECT id, title, year, posterUrl, status, type, director, network, rating " +
+        "SELECT id, title, year, posterUrl, status, type, director, network, rating, releaseDate " +
             "FROM titles ORDER BY title COLLATE NOCASE",
     )
     fun observeLibrary(): Flow<List<TitleListRow>>

@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
+import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
@@ -20,6 +21,7 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
@@ -40,6 +42,18 @@ private data class EpisodeAggregate(
     val episodes: List<EpisodeEntity>,
     val watchCounts: List<EpisodeWatchCount>,
     val ratings: List<EpisodeRatingEntity>,
+)
+
+private data class UpNextCoreSources(
+    val titles: List<TitleListRow>,
+    val seasons: List<SeasonEntity>,
+    val outingRows: List<CinemaOutingEntity>,
+    val viewingRows: List<ViewingEntity>,
+)
+
+private data class UpNextEpisodeSources(
+    val episodes: List<EpisodeEntity>,
+    val watchEvents: List<EpisodeWatchEventEntity>,
 )
 
 /**
@@ -75,6 +89,7 @@ class LibraryRepository(
                 network = row.network,
                 rating = row.rating,
                 hasScheduledOuting = row.id in scheduledTitleIds,
+                releaseDate = row.releaseDate,
             )
         }
     }
@@ -83,29 +98,64 @@ class LibraryRepository(
      *  come from [SeasonDao.observeAllSeasons]'s already-aggregated per-season counts (same
      *  rollup the Ledger board uses) rather than a new query — a WATCHING title with zero
      *  season rows (i.e. a movie) simply can't produce a progress card and is skipped.
-     *  Watchlist titles with a scheduled outing move to the marquee instead of the plain
-     *  watchlist list (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §7). */
+     *  *Watched* counts, though, are rolled from [EpisodeDao.observeAllEpisodes] +
+     *  [EpisodeWatchEventDao.observeAllWatchEvents] rather than trusting
+     *  `seasons.episodesWatched` itself: that column is only ever set when a season row is
+     *  first synced down (schema.sql's default/bulk-add value) and nothing server-side updates
+     *  it when an episode gets watched afterward (episode_watch_events is the only write the
+     *  web app makes) — so it goes stale at 0 (or whatever it started at) for any title tracked
+     *  episode-by-episode. Falls back to the season column only for a title with no locally
+     *  synced episode rows at all. Watchlist titles with a scheduled outing move to the
+     *  marquee instead of the plain watchlist list
+     *  (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §7). */
     fun observeUpNext(): Flow<UpNextBoard> = combine(
-        titleDao.observeLibrary(),
-        seasonDao.observeAllSeasons(),
-        cinemaOutingDao.observeAllOutings(),
-        viewingDao.observeAllViewings(),
-    ) { titles, seasons, outingRows, viewingRows ->
+        combine(
+            titleDao.observeLibrary(),
+            seasonDao.observeAllSeasons(),
+            cinemaOutingDao.observeAllOutings(),
+            viewingDao.observeAllViewings(),
+            ::UpNextCoreSources,
+        ),
+        combine(episodeDao.observeAllEpisodes(), watchEventDao.observeAllWatchEvents(), ::UpNextEpisodeSources),
+    ) { core, episodeSources ->
+        val (titles, seasons, outingRows, viewingRows) = core
+        val (episodes, watchEvents) = episodeSources
         val now = Instant.now()
         val outings = outingRows.map { it.toDomain() }
         val titlesById = titles.associateBy { it.id }
         val viewingsById = viewingRows.associate { it.id to Viewing(it.id, it.date, it.rating, it.notes, it.venue, it.companions, it.outingId) }
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings)
 
+        val seasonById = seasons.associateBy { it.id }
+        val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
+        val episodesByTitle = episodes.groupBy { it.titleId }
         val totalsByTitle = seasons.groupBy { it.titleId }.mapValues { (_, rows) ->
             rows.sumOf { it.episodeCount } to rows.sumOf { it.episodesWatched }
         }
         val watching = titles
             .filter { LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHING }
             .mapNotNull { row ->
-                val (total, watched) = totalsByTitle[row.id] ?: return@mapNotNull null
+                val (total, watchedFallback) = totalsByTitle[row.id] ?: return@mapNotNull null
                 if (total <= 0) return@mapNotNull null
-                UpNextWatching(row.id, row.title, row.posterUrl, watched, total)
+                val titleEpisodes = episodesByTitle[row.id].orEmpty()
+                val watched = if (titleEpisodes.isNotEmpty()) {
+                    titleEpisodes.count { it.id in watchedEpisodeIds }
+                } else {
+                    watchedFallback
+                }
+                val next = titleEpisodes
+                    .sortedWith(compareBy({ seasonById[it.seasonId]?.seasonNumber ?: 0 }, { it.episodeNumber }))
+                    .firstOrNull { it.id !in watchedEpisodeIds }
+                UpNextWatching(
+                    id = row.id,
+                    name = row.title,
+                    posterUrl = row.posterUrl,
+                    episodesWatched = watched,
+                    episodesTotal = total,
+                    nextSeasonNumber = next?.let { seasonById[it.seasonId]?.seasonNumber },
+                    nextEpisodeNumber = next?.episodeNumber,
+                    nextEpisodeName = next?.episodeName,
+                )
             }
         val watchlist = titles
             .filter { LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHLIST && it.id !in scheduledTitleIds }
@@ -120,6 +170,7 @@ class LibraryRepository(
                     director = row.director,
                     network = row.network,
                     rating = row.rating,
+                    releaseDate = row.releaseDate,
                 )
             }
         val onTheMarquee = CinemaOutingRules.marqueeEntries(outings, now).mapNotNull { outing ->
@@ -190,13 +241,22 @@ class LibraryRepository(
                 notes = title.notes,
                 genres = title.genres,
                 seasons = aggregate.seasons.map { season ->
+                    val seasonEpisodes = episodesBySeason[season.id].orEmpty()
+                    // season.episodesWatched (the synced column) is never updated after a
+                    // season's initial sync — see observeUpNext's kdoc — so it's only trusted
+                    // as a fallback for a season with no locally synced episode rows.
+                    val episodesWatched = if (seasonEpisodes.isNotEmpty()) {
+                        seasonEpisodes.count { (watchCountByEpisode[it.id] ?: 0) > 0 }
+                    } else {
+                        season.episodesWatched
+                    }
                     SeasonDetail(
                         id = season.id,
                         seasonNumber = season.seasonNumber,
                         episodeCount = season.episodeCount,
-                        episodesWatched = season.episodesWatched,
+                        episodesWatched = episodesWatched,
                         airYear = season.airYear,
-                        episodes = (episodesBySeason[season.id] ?: emptyList()).map { episode ->
+                        episodes = seasonEpisodes.map { episode ->
                             EpisodeDetail(
                                 id = episode.id,
                                 episodeNumber = episode.episodeNumber,

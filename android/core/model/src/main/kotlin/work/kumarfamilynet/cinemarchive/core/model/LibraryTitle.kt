@@ -14,6 +14,9 @@ data class LibraryTitle(
     /** True while a cinema outing is scheduled for this title — drives the poster wall's
      *  amber 🎟 corner badge (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §7). */
     val hasScheduledOuting: Boolean = false,
+    /** YYYY-MM-DD if known — drives the Up Next watchlist card's "releases <date>" label for
+     *  a title that hasn't come out yet (see UpNextBoard.kt). */
+    val releaseDate: String? = null,
 )
 
 enum class LibraryStatus {

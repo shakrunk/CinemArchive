@@ -43,8 +43,11 @@ private const val PAGE_SIZE = 500
  * (supabase/migrations/20260722000000_cinema_outings_sync.sql) — anything synced before this
  * client version existed is stuck without them otherwise. Found via a real device stuck with
  * a cursor past an already-synced-to-Supabase ticket's updated_at.
+ *
+ * 3: the title arm's releaseDate field (supabase/migrations/20260723000000_sync_release_date.sql)
+ * — same "already past the watermark" problem as version 2.
  */
-private const val SYNC_SCHEMA_VERSION = 2
+private const val SYNC_SCHEMA_VERSION = 3
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -168,6 +171,7 @@ class LibrarySyncRepository(
         notes = optStringOrNull("notes"),
         addedAt = getString("addedAt"),
         updatedAt = getString("updatedAt"),
+        releaseDate = optStringOrNull("releaseDate"),
     )
 
     private fun JSONObject.toSeasonEntity() = SeasonEntity(

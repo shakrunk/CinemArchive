@@ -1901,7 +1901,7 @@ language sql security definer stable as $$
         'director', t.director, 'genres', t.genres, 'posterUrl', t.poster_url,
         'backdropUrl', t.backdrop_url, 'synopsis', t.synopsis, 'runtime', t.runtime,
         'network', t.network, 'status', t.status, 'rating', t.rating, 'notes', t.notes,
-        'addedAt', t.added_at, 'updatedAt', t.updated_at
+        'addedAt', t.added_at, 'updatedAt', t.updated_at, 'releaseDate', t.release_date
       ) as payload
     from titles t where t.user_id = auth.uid() and t.updated_at > p_since
 

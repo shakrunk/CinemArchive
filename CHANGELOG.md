@@ -111,6 +111,12 @@ number is chosen.
   `episode_watch_events` rows are written when you mark an episode watched). It now rolls the
   count from actual per-episode watch events instead, falling back to the season column only
   when no episode-level data has synced yet.
+- Native Android app (in development, not yet distributed): Continue Watching (and a title's
+  own detail screen) showed the wrong episode-watched count for shows tracked episode-by-episode
+  — sometimes 0 even with real progress — for the same reason as the Ledger "Still Rolling"
+  fix above: both trusted the synced `seasons.episodesWatched` column instead of rolling the
+  count from actual per-episode watch events. Continue Watching now also computes which episode
+  is next per title from that same accurate watch data, feeding its "S{n} E{n}" label.
 - Native Android app (in development, not yet distributed): cinema outings (and, more subtly,
   the venue/companions on already-synced viewings) scheduled before this device's own sync
   cursor could never be pulled down, even after the server gained cinema-outing support —

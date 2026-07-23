@@ -36,6 +36,9 @@ data class TitleEntity(
     // have every badge score populated (schema.sql's own comment on rt_score/metacritic_score).
     val imdbRating: Double? = null,
     val originalLanguage: String? = null,
+    // Mirrors schema.sql's titles.release_date — drives the Up Next watchlist card's
+    // "releases <date>" label for a title that hasn't come out yet.
+    val releaseDate: String? = null,
 )
 
 @Entity(

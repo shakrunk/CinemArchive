@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
@@ -57,6 +59,8 @@ private data class LedgerSources(
     val outings: List<CinemaOutingEntity>,
     val watchedAtDates: List<String?>,
     val seasons: List<SeasonEntity>,
+    val episodes: List<EpisodeEntity>,
+    val watchEvents: List<EpisodeWatchEventEntity>,
 )
 
 private fun parseLocalDate(date: String?): LocalDate? =
@@ -77,6 +81,7 @@ class LedgerRepository(
     private val cinemaOutingDao: CinemaOutingDao,
     private val watchEventDao: EpisodeWatchEventDao,
     private val seasonDao: SeasonDao,
+    private val episodeDao: EpisodeDao,
 ) {
     fun observeLedgerStats(): Flow<LedgerStats> = combine(
         titleDao.observeAllTitles(),
@@ -111,6 +116,7 @@ class LedgerRepository(
             cinemaOutingDao.observeAllOutings(),
             watchEventDao.observeAllWatchEvents(),
             seasonDao.observeAllSeasons(),
+            episodeDao.observeAllEpisodes(),
             ::HistoryGroup,
         )
         return combine(titleGroup, historyGroup) { titles, history ->
@@ -122,6 +128,8 @@ class LedgerRepository(
                 history.outings,
                 history.watchEvents.map { it.watchedAt },
                 history.seasons,
+                history.episodes,
+                history.watchEvents,
             )
         }.map { s -> buildBoard(s) }
     }
@@ -137,6 +145,7 @@ class LedgerRepository(
         val outings: List<CinemaOutingEntity>,
         val watchEvents: List<EpisodeWatchEventEntity>,
         val seasons: List<SeasonEntity>,
+        val episodes: List<EpisodeEntity>,
     )
 
     private fun buildBoard(s: LedgerSources): LedgerBoard {
@@ -186,7 +195,7 @@ class LedgerRepository(
             trajectory = trajectory(titles, viewings),
             revivals = revivals(viewings),
             timewarp = timewarp(viewings, titleById),
-            stillRolling = stillRolling(titles, s.seasons),
+            stillRolling = stillRolling(titles, s.seasons, s.episodes, s.watchEvents),
             moviegoing = moviegoing(viewings, s.outings),
         )
     }
@@ -365,12 +374,26 @@ class LedgerRepository(
     }
 
     /** Still Rolling: TV titles that are `WATCHING`, or have partial progress even if
-     *  status says otherwise (ledger.md §2). */
-    private fun stillRolling(titles: List<TitleEntity>, seasons: List<SeasonEntity>): List<LedgerProgressEntry> {
+     *  status says otherwise (ledger.md §2). Watched counts come from real per-episode watch
+     *  events, not `seasons.episodesWatched` — see LibraryRepository.observeUpNext's kdoc for
+     *  why that synced column can't be trusted once a title is tracked episode-by-episode. */
+    private fun stillRolling(
+        titles: List<TitleEntity>,
+        seasons: List<SeasonEntity>,
+        episodes: List<EpisodeEntity>,
+        watchEvents: List<EpisodeWatchEventEntity>,
+    ): List<LedgerProgressEntry> {
         val seasonsByTitle = seasons.groupBy { it.titleId }
+        val episodesByTitle = episodes.groupBy { it.titleId }
+        val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
         return titles.filter { it.type == MediaType.TV.name }.mapNotNull { title ->
             val titleSeasons = seasonsByTitle[title.id] ?: emptyList()
-            val watched = titleSeasons.sumOf { it.episodesWatched }
+            val titleEpisodes = episodesByTitle[title.id].orEmpty()
+            val watched = if (titleEpisodes.isNotEmpty()) {
+                titleEpisodes.count { it.id in watchedEpisodeIds }
+            } else {
+                titleSeasons.sumOf { it.episodesWatched }
+            }
             val total = titleSeasons.sumOf { it.episodeCount }
             val isPartial = watched > 0 && watched < total
             if (title.status != LibraryStatus.WATCHING.name && !isPartial) return@mapNotNull null

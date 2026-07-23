@@ -98,6 +98,7 @@ class CinemArchiveApplication : Application() {
             cinemaOutingDao = database.cinemaOutingDao(),
             watchEventDao = database.episodeWatchEventDao(),
             seasonDao = database.seasonDao(),
+            episodeDao = database.episodeDao(),
         )
     }
 

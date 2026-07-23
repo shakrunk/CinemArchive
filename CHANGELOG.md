@@ -100,6 +100,13 @@ number is chosen.
 
 ### Fixed
 
+- Native Android app (in development, not yet distributed): the Ledger "Still Rolling" widget
+  showed the wrong episode-watched count for shows tracked episode-by-episode — sometimes 0
+  even with real progress — because it trusted the synced `seasons.episodesWatched` column,
+  which is only set once when a season first syncs down and is never updated afterward (only
+  `episode_watch_events` rows are written when you mark an episode watched). It now rolls the
+  count from actual per-episode watch events instead, falling back to the season column only
+  when no episode-level data has synced yet.
 - Native Android app (in development, not yet distributed): cinema outings (and, more subtly,
   the venue/companions on already-synced viewings) scheduled before this device's own sync
   cursor could never be pulled down, even after the server gained cinema-outing support —

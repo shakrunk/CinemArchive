@@ -83,6 +83,13 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE titleId = :titleId ORDER BY seasonId, episodeNumber")
     fun observeEpisodes(titleId: String): Flow<List<EpisodeEntity>>
 
+    // Up Next's continue-watching progress and Ledger's Still Rolling widget both need the
+    // real per-episode watch state across the whole library (seasons.episodesWatched is never
+    // updated after a season's initial sync — see LibraryRepository.observeUpNext's kdoc — so
+    // both roll their own count from this plus EpisodeWatchEventDao.observeAllWatchEvents()).
+    @Query("SELECT * FROM episodes")
+    fun observeAllEpisodes(): Flow<List<EpisodeEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(episodes: List<EpisodeEntity>)
 

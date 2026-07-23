@@ -79,3 +79,7 @@
 ## 2024-05-18 - Keyboard Accessibility in Transient Popovers
 **Learning:** Interactive elements within transient components (such as toast notifications or popovers like NotificationCenter) frequently miss `focus-visible` styling, making them undiscoverable via keyboard navigation once the popover is active.
 **Action:** Always ensure buttons and interactive rows inside dynamic popovers have explicit `focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60` classes for a11y compliance.
+
+## 2024-05-18 - Scope Control
+**Learning:** Even if you see code that violates known performance or state-management rules (like unnecessary `useShallow` batching), fixing it while operating under a strictly UX-focused persona leads to code review rejections because it expands the scope of the PR and introduces unrelated risks (like missing imports breaking CI).
+**Action:** When acting as Palette, only fix UX and accessibility issues. Completely ignore backend logic, state management refactors, and performance optimizations, regardless of how obvious or "wrong" the existing code is.

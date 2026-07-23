@@ -115,6 +115,13 @@ number is chosen.
   unreachable on every future incremental sync, no error or gap indicator. `syncNow()` now
   detects it's running with an older sync schema than the client understands and forces one
   full resync from epoch to catch up, rather than trusting the existing cursor.
+- Native Android app (in development, not yet distributed): opening a title's detail screen
+  from Up Next's Continue Watching (or anywhere else that opens the overlay in place, without
+  navigating) always showed whichever title was opened *first*, no matter which one you
+  actually tapped. The detail overlay isn't a distinct nav destination, so every open shared
+  the same `ViewModelStoreOwner`; `viewModel()` without an explicit key caches its instance by
+  call site, so the factory — and the `titleId` baked into it — only ever ran once. The lookup
+  is now keyed on `titleId`, so each title gets its own ViewModel instance.
 
 ## [1.11.0] - 2026-07-16
 

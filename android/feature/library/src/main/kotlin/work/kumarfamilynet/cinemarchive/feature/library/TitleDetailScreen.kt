@@ -163,7 +163,7 @@ fun TitleDetailRoute(
     onRequestNotificationPermission: () -> Unit = {},
 ) {
     val viewModel: TitleDetailViewModel =
-        viewModel(factory = TitleDetailViewModelFactory(repository, outingsRepository, titleId))
+        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, titleId))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
     TitleDetailScreen(
         detail,

@@ -33,7 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,7 +49,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
@@ -61,7 +59,6 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
-import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
 data class LibraryUiState(val titles: List<LibraryTitle> = emptyList())
 
@@ -74,18 +71,16 @@ class LibraryViewModel(repository: LibraryRepository) : ViewModel() {
 @Composable
 fun LibraryRoute(
     repository: LibraryRepository,
-    preferencesRepository: PreferencesRepository,
+    viewMode: LibraryViewMode,
+    onToggleViewMode: () -> Unit,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
 ) {
     val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val coroutineScope = rememberCoroutineScope()
 
     var search by rememberSaveable { mutableStateOf("") }
     var statusFilters by rememberSaveable { mutableStateOf(setOf<LibraryStatus>()) }
-    val viewMode by preferencesRepository.observeLibraryViewMode()
-        .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
 
     val filtered = uiState.titles.filter { title ->
         (statusFilters.isEmpty() || title.status in statusFilters) &&
@@ -99,10 +94,7 @@ fun LibraryRoute(
         statusFilters = statusFilters,
         onToggleStatus = { s -> statusFilters = if (s in statusFilters) statusFilters - s else statusFilters + s },
         viewMode = viewMode,
-        onToggleViewMode = {
-            val next = if (viewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
-            coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
-        },
+        onToggleViewMode = onToggleViewMode,
         onOpenProfile = onOpenProfile,
         onTitleClick = onTitleClick,
     )

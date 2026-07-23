@@ -254,6 +254,12 @@ private fun CinemArchiveApp(
 ) {
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    // Hoisted above LibraryRoute (rather than let it own this DataStore subscription itself)
+    // because LibraryRoute is torn down and recreated every time `tab` switches away from and
+    // back to LIBRARY — re-subscribing there would reset to collectAsStateWithLifecycle's
+    // hardcoded initialValue on every visit, flashing grid before the real persisted value
+    // loads. This composable lives for the whole signed-in session, so it only pays that
+    // flash once, on cold start.
     val libraryViewMode by preferencesRepository.observeLibraryViewMode()
         .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
 
@@ -281,6 +287,10 @@ private fun CinemArchiveApp(
     // lifecycle, not the ViewModel layer, since it's app-shell-wide rather than one screen's.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val onToggleLibraryViewMode: () -> Unit = {
+        val next = if (libraryViewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
+        coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
+    }
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -339,7 +349,8 @@ private fun CinemArchiveApp(
                         Tab.DISCOVER -> DiscoverRoute()
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
-                            preferencesRepository,
+                            viewMode = libraryViewMode,
+                            onToggleViewMode = onToggleLibraryViewMode,
                             onOpenProfile = openProfile,
                             onTitleClick = { overlay = Overlay.Detail(it) },
                         )

@@ -98,6 +98,17 @@ number is chosen.
   rating's pop-on-set animation all settle faster with a visible bounce instead of the
   previous slow, understated spring.
 
+### Fixed
+
+- Native Android app (in development, not yet distributed): cinema outings (and, more subtly,
+  the venue/companions on already-synced viewings) scheduled before this device's own sync
+  cursor could never be pulled down, even after the server gained cinema-outing support —
+  `sync_library_changes`'s cursor is one global watermark across every entity type, so
+  anything of a newly-supported kind whose `updated_at` predates that watermark was silently
+  unreachable on every future incremental sync, no error or gap indicator. `syncNow()` now
+  detects it's running with an older sync schema than the client understands and forces one
+  full resync from epoch to catch up, rather than trusting the existing cursor.
+
 ## [1.11.0] - 2026-07-16
 
 ### Added

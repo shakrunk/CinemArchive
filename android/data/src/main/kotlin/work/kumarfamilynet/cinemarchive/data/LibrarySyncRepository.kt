@@ -2,6 +2,7 @@ package work.kumarfamilynet.cinemarchive.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,21 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 private val Context.librarySyncDataStore by preferencesDataStore(name = "cinemarchive_sync")
 private const val EPOCH = "1970-01-01T00:00:00Z"
 private const val PAGE_SIZE = 500
+
+/**
+ * Bump whenever `sync_library_changes` starts returning an entity type/field this client
+ * didn't previously understand. The cursor is a single global watermark across every entity
+ * type, so anything of the new kind whose `updated_at` predates the watermark is otherwise
+ * unreachable forever — the RPC's `updated_at > p_since` filter excludes it on every future
+ * incremental page, with no error or gap indication. Bumping this forces exactly one full
+ * resync from epoch after upgrading, at which point the watermark no longer matters.
+ *
+ * 2: cinema_outing rows, and the viewing arm's companions/outingId fields
+ * (supabase/migrations/20260722000000_cinema_outings_sync.sql) — anything synced before this
+ * client version existed is stuck without them otherwise. Found via a real device stuck with
+ * a cursor past an already-synced-to-Supabase ticket's updated_at.
+ */
+private const val SYNC_SCHEMA_VERSION = 2
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -60,6 +76,7 @@ class LibrarySyncRepository(
 ) {
     private val dataStore = context.librarySyncDataStore
     private val cursorKey = stringPreferencesKey("last_synced_at")
+    private val schemaVersionKey = intPreferencesKey("sync_schema_version")
 
     /** No-ops when signed out. Safe to call repeatedly (launch, sign-in, resume) — same
      *  "call it whenever, entries/cursor just don't move if there's nothing new" contract
@@ -69,7 +86,11 @@ class LibrarySyncRepository(
      *  `NetworkOnMainThreadException`. */
     suspend fun syncNow() = withContext(Dispatchers.IO) {
         val session = authRepository.currentSession() ?: return@withContext
-        var cursor = dataStore.data.first()[cursorKey] ?: EPOCH
+        val prefs = dataStore.data.first()
+        // An install that predates SYNC_SCHEMA_VERSION has no stored version at all — treat
+        // that as version 1, so every pre-existing install also gets the one-time reset.
+        val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
+        var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
@@ -79,6 +100,10 @@ class LibrarySyncRepository(
             dataStore.edit { it[cursorKey] = cursor }
             if (rows.length() < PAGE_SIZE) break
         }
+        // Only recorded once the resync above actually ran to completion — if the app is
+        // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
+        // idempotently) does the full resync again rather than settling for a partial one.
+        if (storedSchemaVersion < SYNC_SCHEMA_VERSION) dataStore.edit { it[schemaVersionKey] = SYNC_SCHEMA_VERSION }
     }
 
     /** Applies one page grouped by entity_type in a fixed order — title/season before

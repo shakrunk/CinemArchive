@@ -5,6 +5,7 @@ import android.provider.CalendarContract
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,16 +15,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,8 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -43,12 +49,17 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Instant
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
@@ -57,11 +68,33 @@ import work.kumarfamilynet.cinemarchive.core.model.UpNextBoard
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 
-class UpNextViewModel(private val repository: LibraryRepository, private val outingsRepository: OutingsRepository) : ViewModel() {
+class UpNextViewModel(
+    private val repository: LibraryRepository,
+    private val outingsRepository: OutingsRepository,
+    private val librarySyncRepository: LibrarySyncRepository,
+) : ViewModel() {
     val board = repository.observeUpNext()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UpNextBoard(emptyList(), emptyList()))
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+
+    /** Pull-to-refresh: same pull-then-reconcile ordering as the app-resume trigger in
+     *  MainActivity — pull remote changes down before deciding which outings are due. */
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                librarySyncRepository.syncNow()
+                outingsRepository.completeDueOutings()
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
 
     fun onMarkEpisodeWatched(titleId: String) {
         viewModelScope.launch {
@@ -93,15 +126,26 @@ class UpNextViewModel(private val repository: LibraryRepository, private val out
 private class UpNextViewModelFactory(
     private val repository: LibraryRepository,
     private val outingsRepository: OutingsRepository,
+    private val librarySyncRepository: LibrarySyncRepository,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = UpNextViewModel(repository, outingsRepository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T =
+        UpNextViewModel(repository, outingsRepository, librarySyncRepository) as T
 }
 
 @Composable
-fun UpNextRoute(repository: LibraryRepository, outingsRepository: OutingsRepository, onTitleClick: (String) -> Unit) {
-    val viewModel: UpNextViewModel = viewModel(factory = UpNextViewModelFactory(repository, outingsRepository))
+fun UpNextRoute(
+    repository: LibraryRepository,
+    outingsRepository: OutingsRepository,
+    librarySyncRepository: LibrarySyncRepository,
+    onTitleClick: (String) -> Unit,
+    onFabExpandedChange: (Boolean) -> Unit = {},
+) {
+    val viewModel: UpNextViewModel = viewModel(
+        factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
+    )
     val board by viewModel.board.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     UpNextScreen(
         board,
         onTitleClick,
@@ -111,6 +155,9 @@ fun UpNextRoute(repository: LibraryRepository, outingsRepository: OutingsReposit
         onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
         onDismissFollowUp = viewModel::onDismissFollowUp,
         onDidntMakeIt = viewModel::onDidntMakeIt,
+        onFabExpandedChange = onFabExpandedChange,
+        isRefreshing = isRefreshing,
+        onRefresh = viewModel::refresh,
     )
 }
 
@@ -125,6 +172,9 @@ private fun UpNextScreen(
     onSaveFollowUpNotes: (String, String) -> Unit,
     onDismissFollowUp: (String) -> Unit,
     onDidntMakeIt: (String) -> Unit,
+    onFabExpandedChange: (Boolean) -> Unit = {},
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -138,67 +188,94 @@ private fun UpNextScreen(
     }
     var postShowEntry by remember { mutableStateOf<UpNextOuting?>(null) }
 
-    LazyColumn(
-        contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp),
+    val listState = rememberLazyListState()
+    val collapsed = rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+    LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
     ) {
-        item {
-            Text(
-                "ON THE MARQUEE",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                "Up Next",
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(top = 2.dp, bottom = 20.dp),
-            )
-        }
-
-        items(board.freshFromTheLobby, key = { "lobby-${it.outing.id}" }) { entry ->
-            FreshFromTheLobbyCard(entry, onOpen = { postShowEntry = entry })
-        }
-
-        items(board.onTheMarquee, key = { "marquee-${it.outing.id}" }) { entry ->
-            MarqueeCard(entry, now, onOpen = { onTitleClick(entry.outing.titleId) }, onCancel = { onCancelOuting(entry.outing.id) })
-        }
-
-        if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
             item {
                 Text(
-                    "Nothing queued up yet — start something from your Library.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        if (board.watching.isNotEmpty()) {
-            item {
-                Text(
-                    "CONTINUE WATCHING",
+                    "ON THE MARQUEE",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                    color = MaterialTheme.colorScheme.primary,
                 )
-            }
-        }
-        items(board.watching, key = UpNextWatching::id) { title ->
-            ContinueWatchingCard(title, onOpen = { onTitleClick(title.id) }, onMarkWatched = { onMarkWatched(title.id) })
-        }
-
-        if (board.watchlist.isNotEmpty()) {
-            item {
                 Text(
-                    "ON YOUR WATCHLIST",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                    "Up Next",
+                    style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 20.dp),
                 )
             }
-        }
-        items(board.watchlist, key = LibraryTitle::id) { title ->
-            WatchlistCard(title, onOpen = { onTitleClick(title.id) })
+
+            itemsIndexed(board.freshFromTheLobby, key = { _, it -> "lobby-${it.outing.id}" }) { index, entry ->
+                FreshFromTheLobbyCard(
+                    entry,
+                    shape = groupShape(index, board.freshFromTheLobby.size),
+                    onOpen = { postShowEntry = entry },
+                )
+            }
+
+            itemsIndexed(board.onTheMarquee, key = { _, it -> "marquee-${it.outing.id}" }) { index, entry ->
+                MarqueeCard(
+                    entry,
+                    now,
+                    shape = groupShape(index, board.onTheMarquee.size),
+                    onOpen = { onTitleClick(entry.outing.titleId) },
+                    onCancel = { onCancelOuting(entry.outing.id) },
+                )
+            }
+
+            if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty()) {
+                item {
+                    Text(
+                        "Nothing queued up yet — start something from your Library.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (board.watching.isNotEmpty()) {
+                item {
+                    Text(
+                        "NEXT EPISODE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                    )
+                }
+            }
+            itemsIndexed(board.watching, key = { _, it -> it.id }) { index, title ->
+                ContinueWatchingCard(
+                    title,
+                    shape = groupShape(index, board.watching.size),
+                    onOpen = { onTitleClick(title.id) },
+                    onMarkWatched = { onMarkWatched(title.id) },
+                )
+            }
+
+            if (board.watchlist.isNotEmpty()) {
+                item {
+                    Text(
+                        "ON YOUR WATCHLIST",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                    )
+                }
+            }
+            itemsIndexed(board.watchlist, key = { _, it -> it.id }) { index, title ->
+                WatchlistCard(title, shape = groupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
+            }
         }
     }
 
@@ -226,13 +303,27 @@ private fun UpNextScreen(
     }
 }
 
+private val GroupOuterCorner = 24.dp
+private val GroupInnerCorner = 6.dp
+
+/** Rows of the same card type stacked back-to-back (no header between them) read as one
+ *  group rather than a stack of independent cards: only the group's outermost corners get
+ *  the full radius, the touching edges in between get a small one, and [Arrangement.spacedBy]
+ *  above still leaves a thin seam between rows so they don't fuse into a single hitbox. */
+private fun groupShape(index: Int, count: Int): RoundedCornerShape {
+    if (count <= 1) return RoundedCornerShape(GroupOuterCorner)
+    val top = if (index == 0) GroupOuterCorner else GroupInnerCorner
+    val bottom = if (index == count - 1) GroupOuterCorner else GroupInnerCorner
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
+}
+
 @Composable
-private fun FreshFromTheLobbyCard(entry: UpNextOuting, onOpen: () -> Unit) {
+private fun FreshFromTheLobbyCard(entry: UpNextOuting, shape: Shape, onOpen: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.tertiaryContainer)
             .clickable(onClick = onOpen)
             .padding(16.dp),
@@ -254,7 +345,7 @@ private fun FreshFromTheLobbyCard(entry: UpNextOuting, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun MarqueeCard(entry: UpNextOuting, now: Instant, onOpen: () -> Unit, onCancel: () -> Unit) {
+private fun MarqueeCard(entry: UpNextOuting, now: Instant, shape: Shape, onOpen: () -> Unit, onCancel: () -> Unit) {
     val context = LocalContext.current
     val outing = entry.outing
     val countdown = CinemaOutingRules.countdownLabel(outing, now)
@@ -263,7 +354,7 @@ private fun MarqueeCard(entry: UpNextOuting, now: Instant, onOpen: () -> Unit, o
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onOpen)
             .padding(16.dp),
@@ -331,12 +422,13 @@ private fun addOutingToCalendar(context: android.content.Context, entry: UpNextO
 }
 
 @Composable
-private fun ContinueWatchingCard(title: UpNextWatching, onOpen: () -> Unit, onMarkWatched: () -> Unit) {
+private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: () -> Unit, onMarkWatched: () -> Unit) {
     val pct = if (title.episodesTotal > 0) (title.episodesWatched.toFloat() / title.episodesTotal) else 0f
     Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onOpen)
             .padding(16.dp),
@@ -350,13 +442,36 @@ private fun ContinueWatchingCard(title: UpNextWatching, onOpen: () -> Unit, onMa
             cornerRadius = 14.dp,
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text(title.name, style = MaterialTheme.typography.titleMedium)
+            val hasNext = title.nextSeasonNumber != null && title.nextEpisodeNumber != null
             Text(
-                "${title.episodesWatched} / ${title.episodesTotal} episodes",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp),
+                if (hasNext) title.nextEpisodeName ?: "Episode ${title.nextEpisodeNumber}" else title.name,
+                style = MaterialTheme.typography.titleMedium,
             )
+            if (hasNext) {
+                Text(
+                    title.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    if (hasNext) "S${title.nextSeasonNumber} E${title.nextEpisodeNumber}" else "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    "${title.episodesWatched} / ${title.episodesTotal} episodes",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -372,31 +487,36 @@ private fun ContinueWatchingCard(title: UpNextWatching, onOpen: () -> Unit, onMa
                         .background(MaterialTheme.colorScheme.primary),
                 ) {}
             }
-            Surface(
-                onClick = onMarkWatched,
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            ) {
-                Text(
-                    "Mark episode watched",
-                    style = MaterialTheme.typography.labelMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                )
+        }
+        Surface(
+            onClick = onMarkWatched,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(44.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Check, contentDescription = "Mark episode watched", modifier = Modifier.size(20.dp))
             }
         }
     }
 }
 
+/** Mirrors src/views/UpNext.tsx's formatReleaseDate: parses the plain YYYY-MM-DD as a local
+ *  date (not an instant) so no timezone shift can push it a day off. */
+private fun formatReleaseDate(iso: String): String =
+    runCatching { LocalDate.parse(iso).format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US)) }
+        .getOrDefault(iso)
+
 @Composable
-private fun WatchlistCard(title: LibraryTitle, onOpen: () -> Unit) {
+private fun WatchlistCard(title: LibraryTitle, shape: Shape, onOpen: () -> Unit) {
+    val releaseDate = title.releaseDate
+    val isUpcoming = releaseDate != null && runCatching { LocalDate.parse(releaseDate) > LocalDate.now() }.getOrDefault(false)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onOpen)
             .padding(16.dp),
@@ -412,7 +532,7 @@ private fun WatchlistCard(title: LibraryTitle, onOpen: () -> Unit) {
         Column {
             Text(title.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Ready whenever you are",
+                if (isUpcoming) "Releases ${formatReleaseDate(releaseDate!!)}" else "On your watchlist",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

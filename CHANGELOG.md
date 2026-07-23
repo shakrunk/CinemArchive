@@ -139,6 +139,16 @@ number is chosen.
   parsed it with `JSONArray.getString()`, which stringifies non-string elements wholesale
   rather than extracting `name`. Rows already pulled under the old parser had the bad string
   baked into Room, so this also bumps the sync schema version to force a one-time full resync.
+- Native Android app (in development, not yet distributed): Up Next's "Continue Watching"
+  section was renamed to "Next Episode" — CinemArchive isn't a streaming service, so "continue
+  watching" implied playback that doesn't exist. Its cards now lead with the next unwatched
+  episode's title (falling back to "Episode N" when unnamed) with the series as a smaller
+  subtitle below, and show the season/episode number and watched-count on the same row,
+  left- and right-aligned respectively. The watchlist section's "Ready whenever you are" label
+  — shown even for titles that haven't released yet — now reads "Releases <date>" for an
+  unreleased title, matching the website. Rows of the same card type stacked back-to-back also
+  now read as one grouped list (only the outermost corners get the full radius) instead of a
+  stack of independently rounded cards.
 
 ## [1.11.0] - 2026-07-16
 

@@ -258,11 +258,18 @@ where user-facing.
       correct title, and the `POST_NOTIFICATIONS`-denied path degrades without crashing. Note:
       the tap deep-links into title detail, not directly into an open `PostShowSheet` as
       originally scoped here — the user still taps "Rate" on the viewing row once there.
-- [ ] **Phase 6 *(gated)* — Backend wiring.** Flip `SupabaseCinemaOutingWriter` live once
-      passkey auth lands; add `outing_completed` push handling if/when a general Android
-      notifications-inbox feature exists; in-app plan sharing once the friends stack lands.
-      Update `docs/android-parity-matrix.md` with a new "Cinema outings" row at that point —
-      it isn't tracked there yet and should be added alongside Phase 1, not deferred to here.
+- [x] **Phase 6 — Backend wiring.** Passkey auth and the real outbox writer landed
+      (`ec05214`, `7a89d5a`), which already flipped `SupabaseRemoteMutationWriter`'s
+      `cinema_outing` push case live (it shares the one outbox/writer every other domain
+      uses — no separate `SupabaseCinemaOutingWriter` class was needed). The remaining gap
+      was the read half: `sync_library_changes` had no `union all` arm for `cinema_outings`,
+      and the `viewing` arm never carried `companions`/`outing_id`. Closed in
+      `supabase/migrations/20260722000000_cinema_outings_sync.sql` (new arm + tombstone
+      trigger + the `viewing` fix) and `LibrarySyncRepository`'s new `cinema_outing` upsert/
+      tombstone case, so outings created on one device (or on web) now sync down correctly.
+      `outing_completed` push handling and in-app plan sharing remain deferred — gated on a
+      general Android notifications-inbox feature and the friends stack respectively, neither
+      of which exist yet.
 
 ---
 

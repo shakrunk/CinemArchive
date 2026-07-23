@@ -25,10 +25,12 @@ number is chosen.
   Android, by a real exact alarm that fires even if the app is closed, prompting a system
   notification — with the title's poster as the notification's hero image — to rate the
   outing. "Add to calendar" uses the native Calendar Provider intent.
-  Ships local-first (no backend/auth dependency yet, unlike the web app's version): completion,
-  in-app "Fresh from the lobby" follow-up, and "Didn't make it" revert all run entirely on
-  Room. Notifications inbox sync and in-app plan sharing are intentionally deferred pending
-  passkey auth and the friends stack (see
+  Completion, in-app "Fresh from the lobby" follow-up, and "Didn't make it" revert all run
+  entirely on Room, so they work offline; outings now also sync both ways with the real
+  backend (`sync_library_changes` gained the `cinema_outings` arm it was missing, and the
+  `viewings` arm now carries `companions`/`outing_id`), so an outing scheduled on web or
+  another device pulls down correctly instead of only ever pushing up. Notifications inbox
+  sync and in-app plan sharing are intentionally deferred pending the friends stack (see
   `docs/superpowers/plans/2026-07-21-android-cinema-outings.md`).
 - Native Android app (in development, not yet distributed): a Material 3 Expressive redesign
   of the whole app shell — a four-tab bottom nav (Discover/Library/Up Next/Ledger) with a

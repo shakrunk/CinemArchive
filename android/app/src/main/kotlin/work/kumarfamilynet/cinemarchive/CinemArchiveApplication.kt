@@ -24,7 +24,7 @@ class CinemArchiveApplication : Application() {
     private val database: LibraryDatabase by lazy { LibraryDatabase.create(this) }
 
     private val supabaseClient: SupabaseRestClient by lazy {
-        SupabaseRestClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY)
+        SupabaseRestClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY)
     }
 
     val authRepository: AuthRepository by lazy { AuthRepository(this, supabaseClient) }

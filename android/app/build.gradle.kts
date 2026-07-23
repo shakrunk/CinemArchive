@@ -10,9 +10,14 @@ plugins {
 // Mirrors the web app's .env.local pattern (see .env.example) — android/local.properties
 // is already gitignored (it holds sdk.dir), so SUPABASE_URL/SUPABASE_ANON_KEY live there
 // too rather than in a second secrets file. See android/local.properties.example.
+//
+// Read via providers.fileContents rather than a plain File.inputStream() — this project has
+// the configuration cache enabled (gradle.properties), which only invalidates on file reads
+// it can track; a raw java.io read isn't one, so editing local.properties wouldn't bust a
+// stale cached config and BuildConfig would silently keep serving old values.
 val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use(::load)
+    providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orNull
+        ?.let { load(it.reader()) }
 }
 
 android {
@@ -29,7 +34,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
     }
 
     buildTypes {

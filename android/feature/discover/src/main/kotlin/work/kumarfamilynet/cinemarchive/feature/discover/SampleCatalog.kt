@@ -7,10 +7,12 @@ import kotlinx.coroutines.flow.update
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 
 /**
- * Fixture data for Discover and the "New Title" Add overlay. There is no TMDB/media-proxy
- * client in the Android app yet (docs/android-parity-matrix.md's Discover/add row is still
- * at "Discovery" stage) — this pass is a GUI-only overhaul, so these two screens are wired
- * to a small local sample catalog rather than real search, kept deliberately separate from
+ * Fixture data for the FAB-triggered "New Title" Add overlay ([AddTitleOverlayRoute]). The
+ * Discover tab itself now shows real trending titles via
+ * [work.kumarfamilynet.cinemarchive.data.DiscoverRepository] (see [DiscoverScreen.kt]'s
+ * [work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute]); the Add overlay's search
+ * is still this local sample catalog, since real TMDB search/add is a separate, larger scope
+ * (docs/android-parity-matrix.md's Discover/add row) — deliberately kept apart from
  * [work.kumarfamilynet.cinemarchive.data.LibraryRepository]'s real, Room-backed library.
  * Swap this module out once real search lands; nothing downstream should need to change.
  */
@@ -38,8 +40,9 @@ val SAMPLE_CATALOG: List<SampleTitle> = listOf(
     SampleTitle("smp12", "Perfect Days", 2023, MediaType.MOVIE, Color(0xFF6B7480), "A Tokyo toilet cleaner finds quiet contentment in routine, music, and small daily rituals."),
 )
 
-/** Process-lifetime "added to library" state for the sample catalog — deliberately not
- *  persisted (see [SampleTitle] kdoc): this is a demo of the interaction, not real data. */
+/** Process-lifetime "added to library" state, shared by the sample catalog's Add overlay and
+ *  Discover's real trending grid (keyed by tmdbId there) — deliberately not persisted (see
+ *  [SampleTitle] kdoc): this is a demo of the add *interaction*, not a real library write. */
 object DiscoverSampleStore {
     private val _addedIds = MutableStateFlow<Set<String>>(emptySet())
     val addedIds: StateFlow<Set<String>> = _addedIds

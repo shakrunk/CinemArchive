@@ -66,6 +66,10 @@ number is chosen.
   and the FAB's "New Title" add flow — both browse a local sample catalog rather than live
   TMDB search, since the Android app has no media-proxy client yet; clearly scoped as a GUI
   demo pending that backend work.
+- Native Android app (in development, not yet distributed): the Discover tab now shows this
+  week's real trending movies and TV shows, fetched live from the `media-proxy` Edge
+  Function's `trending` action, with poster art, search, type filtering, and loading/error/
+  retry states. The FAB's "New Title" add flow still browses the local sample catalog.
 - Native Android app (in development, not yet distributed): a real launcher icon — the same
   film-reel mark as `public/favicon.svg` in void/amber, as an adaptive icon with a themed
   monochrome layer for Android 13+ Material You icon theming. Previously the app shipped with

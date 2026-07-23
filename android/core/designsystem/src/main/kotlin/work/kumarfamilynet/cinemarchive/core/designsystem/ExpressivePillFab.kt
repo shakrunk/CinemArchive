@@ -1,7 +1,12 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -24,17 +29,22 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 /** The design handoff's "New Title" FAB: a pill that shrinks and rounds further into a full
- *  stadium while pressed, rather than the default M3 FAB's static shape. */
+ *  stadium while pressed, rather than the default M3 FAB's static shape. Collapses down to
+ *  just the "+" glyph in a circle when [expanded] is false, for screens that tuck the FAB's
+ *  label away while the user is scrolling through a list. */
 @Composable
 fun ExpressivePillFab(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    expanded: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val radius by animateDpAsState(if (isPressed) 28.dp else 20.dp, label = "fabRadius")
+    val pressRadius by animateDpAsState(if (isPressed) 28.dp else 20.dp, label = "fabRadius")
+    val radius by animateDpAsState(if (expanded) pressRadius else 28.dp, label = "fabCollapseRadius")
     val scale by animateFloatAsState(if (isPressed) 0.92f else 1f, label = "fabScale")
+    val horizontalPadding by animateDpAsState(if (expanded) 22.dp else 16.dp, label = "fabPadding")
 
     Surface(
         onClick = onClick,
@@ -48,12 +58,18 @@ fun ExpressivePillFab(
         interactionSource = interactionSource,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 22.dp),
+            modifier = Modifier.padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null)
-            Text(label, style = MaterialTheme.typography.labelLarge)
+            Icon(Icons.Filled.Add, contentDescription = if (expanded) null else label)
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally(),
+            ) {
+                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            }
         }
     }
 }

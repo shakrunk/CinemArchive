@@ -69,6 +69,7 @@ import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.feature.auth.LoginRoute
@@ -112,6 +113,7 @@ class MainActivity : ComponentActivity() {
         val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
         val outingsRepository = (application as CinemArchiveApplication).outingsRepository
         val authRepository = (application as CinemArchiveApplication).authRepository
+        val librarySyncRepository = (application as CinemArchiveApplication).librarySyncRepository
         val initialTitleId = intent.getStringExtra(EXTRA_OPEN_TITLE_ID)
 
         // Magic-link tap: standard launchMode means this is a fresh onCreate (same pattern
@@ -146,6 +148,7 @@ class MainActivity : ComponentActivity() {
                                 preferencesRepository,
                                 outingsRepository,
                                 authRepository,
+                                librarySyncRepository,
                                 initialTitleId = initialTitleId,
                                 appVersionName = BuildConfig.VERSION_NAME,
                             )
@@ -241,6 +244,7 @@ private fun CinemArchiveApp(
     preferencesRepository: PreferencesRepository,
     outingsRepository: OutingsRepository,
     authRepository: AuthRepository,
+    librarySyncRepository: LibrarySyncRepository,
     initialTitleId: String? = null,
     appVersionName: String,
 ) {
@@ -259,6 +263,12 @@ private fun CinemArchiveApp(
         if (Build.VERSION.SDK_INT >= 33) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    // This composable only enters composition once signed in (MainActivity's session gate),
+    // so firing once here covers "just completed the magic-link sign-in" — a case cold-launch
+    // sync (CinemArchiveApplication.onCreate) can't, since that runs before any session exists
+    // yet. Harmless if it races/duplicates that launch-time sync — syncNow() is idempotent.
+    LaunchedEffect(Unit) { librarySyncRepository.syncNow() }
+
     // onResume reconciliation trigger (docs/superpowers/plans/2026-07-21-android-cinema-
     // outings.md §5) — a superset of the web's foreground triggers (app load is already
     // covered by CinemArchiveApplication.onCreate). Coroutine scope tied to this composable's
@@ -268,7 +278,12 @@ private fun CinemArchiveApp(
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                coroutineScope.launch { outingsRepository.completeDueOutings() }
+                // Pull remote changes (e.g. made on the web app while backgrounded) before
+                // deciding which outings are due, same ordering rationale as the launch path.
+                coroutineScope.launch {
+                    librarySyncRepository.syncNow()
+                    outingsRepository.completeDueOutings()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

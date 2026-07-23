@@ -7,13 +7,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
-import work.kumarfamilynet.cinemarchive.data.DevFixtureSeed
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.MutationOutbox
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+import work.kumarfamilynet.cinemarchive.data.SupabaseLedgerLayoutWriter
 import work.kumarfamilynet.cinemarchive.data.SupabaseRemoteMutationWriter
 import work.kumarfamilynet.cinemarchive.data.SupabaseRestClient
 import work.kumarfamilynet.cinemarchive.data.TitleConflictHandler
@@ -41,7 +42,27 @@ class CinemArchiveApplication : Application() {
     }
 
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }
-    val ledgerLayoutRepository: LedgerLayoutRepository by lazy { LedgerLayoutRepository(this) }
+    val ledgerLayoutRepository: LedgerLayoutRepository by lazy {
+        LedgerLayoutRepository(this, authRepository, SupabaseLedgerLayoutWriter(supabaseClient))
+    }
+
+    // The read half of sync — sync_library_changes RPC pull, replacing DevFixtureSeed now
+    // that a real session/writer exist. See this class's plan doc for why one RPC serves
+    // both bootstrap and incremental sync.
+    val librarySyncRepository: LibrarySyncRepository by lazy {
+        LibrarySyncRepository(
+            context = this,
+            client = supabaseClient,
+            authRepository = authRepository,
+            titleDao = database.titleDao(),
+            seasonDao = database.seasonDao(),
+            episodeDao = database.episodeDao(),
+            watchEventDao = database.episodeWatchEventDao(),
+            ratingDao = database.episodeRatingDao(),
+            reviewDao = database.episodeReviewDao(),
+            viewingDao = database.viewingDao(),
+        )
+    }
 
     val libraryRepository: LibraryRepository by lazy {
         LibraryRepository(
@@ -81,13 +102,11 @@ class CinemArchiveApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Temporary — see DevFixtureSeed kdoc. Replaced by real sync once
-        // docs/android-sync-contract.md's sync_library_changes RPC exists.
         applicationScope.launch {
-            DevFixtureSeed.seedIfEmpty(database)
+            librarySyncRepository.syncNow()
             // App-launch reconciliation trigger (docs/superpowers/plans/2026-07-21-android-
-            // cinema-outings.md §5) — must run after seeding so a freshly-seeded scheduled
-            // fixture isn't immediately completed if it happens to already be due.
+            // cinema-outings.md §5) — must run after sync so a trip completed on another
+            // device already reflects locally before this pass decides what's due.
             outingsRepository.completeDueOutings()
         }
         applicationScope.launch { outbox.flush() }

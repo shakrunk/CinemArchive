@@ -26,6 +26,7 @@ private class RecordingTitleDao : TitleDao {
     }
 
     override suspend fun updateRating(titleId: String, rating: Double, updatedAt: String) = Unit
+    override suspend fun deleteById(id: String) = Unit
 }
 
 class TitleConflictHandlerTest {

@@ -51,6 +51,9 @@ interface TitleDao {
 
     @Query("SELECT COUNT(*) FROM titles")
     suspend fun count(): Int
+
+    @Query("DELETE FROM titles WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -65,6 +68,14 @@ interface SeasonDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(seasons: List<SeasonEntity>)
+
+    // LibrarySyncRepository's episode->season resolution: sync_library_changes' episode
+    // payloads carry seasonNumber, not seasonId, so this looks up the local FK target.
+    @Query("SELECT id FROM seasons WHERE titleId = :titleId AND seasonNumber = :seasonNumber LIMIT 1")
+    suspend fun findSeasonId(titleId: String, seasonNumber: Int): String?
+
+    @Query("DELETE FROM seasons WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -74,6 +85,9 @@ interface EpisodeDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(episodes: List<EpisodeEntity>)
+
+    @Query("DELETE FROM episodes WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -94,6 +108,9 @@ interface EpisodeWatchEventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(events: List<EpisodeWatchEventEntity>)
+
+    @Query("DELETE FROM episode_watch_events WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -111,12 +128,18 @@ interface EpisodeRatingDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(ratings: List<EpisodeRatingEntity>)
+
+    @Query("DELETE FROM episode_ratings WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
 interface EpisodeReviewDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(reviews: List<EpisodeReviewEntity>)
+
+    @Query("DELETE FROM episode_reviews WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao

@@ -104,6 +104,18 @@ class SupabaseRestClient(
         )
     }
 
+    /** Calls a PostgREST RPC (`POST /rest/v1/rpc/<name>`) — used for `sync_library_changes`.
+     *  Returns the raw JSON array/object response body. */
+    fun rpc(name: String, paramsJson: String, accessToken: String): String {
+        val request = Request.Builder()
+            .url("$baseUrl/rest/v1/rpc/$name")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .post(paramsJson.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        return execute(request)
+    }
+
     /** PATCH with a PostgREST filter query string (e.g. `"id=eq.<id>&updated_at=lt.<iso>"`) —
      *  the conditional-update mechanism the last-write-wins contract needs. Returns the
      *  updated rows as a raw JSON array string; an empty array means the filter matched

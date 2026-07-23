@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.model.LedgerLayoutRules
@@ -18,14 +20,19 @@ private val Context.ledgerLayoutDataStore by preferencesDataStore(name = "cinema
 
 /**
  * The Ledger board's customizable widget layout — add/remove/move/resize/settings — persisted
- * **locally only** via DataStore, same pattern as [PreferencesRepository]. Syncing this to
- * `user_prefs.ledger_layout` (docs/android-contracts/ledger.md §4) stays blocked on a real
- * `RemoteMutationWriter`, itself blocked on a physical device for Credential Manager auth —
- * see docs/android-implementation-status.md. Every read runs [LedgerLayoutRules.normalize],
- * so a layout written by a future/older app version degrades the same way a server-synced
- * payload would rather than crashing.
+ * locally via DataStore (source of truth for reads: [observeLayout] never hits the network).
+ * [setLayout] additionally fire-and-forgets a push to `user_prefs.ledger_layout`
+ * (docs/android-contracts/ledger.md §4) via [SupabaseLedgerLayoutWriter] when signed in —
+ * same "optimistic local write, best-effort remote push" stance as the web app's db.ts. No
+ * pull-on-sign-in yet (a deliberate, smaller scope cut — see this repository's plan doc).
+ * Every read runs [LedgerLayoutRules.normalize], so a layout written by a future/older app
+ * version degrades the same way a server-synced payload would rather than crashing.
  */
-class LedgerLayoutRepository(context: Context) {
+class LedgerLayoutRepository(
+    context: Context,
+    private val authRepository: AuthRepository,
+    private val remoteWriter: SupabaseLedgerLayoutWriter,
+) {
     private val dataStore = context.ledgerLayoutDataStore
     private val layoutKey = stringPreferencesKey("ledger_layout")
 
@@ -37,6 +44,13 @@ class LedgerLayoutRepository(context: Context) {
 
     suspend fun setLayout(widgets: List<LedgerWidgetConfig>) {
         dataStore.edit { it[layoutKey] = serialize(widgets) }
+        // Dispatchers.IO: this callback is a blocking OkHttp call, and callers (e.g.
+        // LedgerScreen's viewModelScope) run on Main by default — see
+        // LibrarySyncRepository.syncNow()'s kdoc for the same NetworkOnMainThreadException risk.
+        withContext(Dispatchers.IO) {
+            val session = authRepository.currentSession() ?: return@withContext
+            runCatching { remoteWriter.upsertLayout(session, widgets) }
+        }
     }
 
     private fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null

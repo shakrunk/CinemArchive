@@ -87,6 +87,11 @@ number is chosen.
   gradient track that fills in as you drag and a raised, ringed handle sitting on top of
   it, after user testing showed the previous inline drag row wasn't discoverable as a
   slider on its own.
+- Native Android app (in development, not yet distributed): motion across the app shell now
+  matches Material 3 Expressive's punchier, springier feel — the bottom nav's morphing pill
+  indicator (the biggest offender), the segmented control's selection grow, and the star
+  rating's pop-on-set animation all settle faster with a visible bounce instead of the
+  previous slow, understated spring.
 
 ## [1.11.0] - 2026-07-16
 

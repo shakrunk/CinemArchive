@@ -1,9 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -327,10 +325,7 @@ private fun StarGlyph(state: StarState, popKey: Int, boxSize: Dp = 40.dp, iconSi
     LaunchedEffect(popKey) {
         if (popKey > 0) {
             pop.snapTo(0.55f)
-            pop.animateTo(
-                1f,
-                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-            )
+            pop.animateTo(1f, expressiveSpring())
         }
     }
     val bgFraction = if (boxSize.value > 0f) boxSize.value / 40f else 1f

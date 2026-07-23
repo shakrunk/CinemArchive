@@ -1,8 +1,6 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,7 +60,7 @@ fun <T> MorphingBottomNav(
             val selectedIndex = destinations.indexOfFirst { it.value == selected }.coerceAtLeast(0)
             val indicatorOffset by animateDpAsState(
                 targetValue = itemWidth * selectedIndex,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+                animationSpec = expressiveSpring(),
                 label = "navIndicatorOffset",
             )
 

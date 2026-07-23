@@ -1,9 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -56,7 +54,7 @@ fun <T> SegmentedGroup(
 private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, onClick: () -> Unit) {
     val weight by animateFloatAsState(
         targetValue = if (isSelected) 1.5f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = expressiveSpring(),
         label = "segWeight",
     )
     val radius by animateDpAsState(if (isSelected) 23.dp else 12.dp, label = "segRadius")

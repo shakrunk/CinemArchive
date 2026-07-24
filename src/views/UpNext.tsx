@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { PlayCircle, Check, Undo2, Clock, Bookmark, Ticket, CalendarPlus, MoreVertical, Clapperboard, Star, X } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'

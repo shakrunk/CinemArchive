@@ -146,6 +146,10 @@ number is chosen.
 
 ### Fixed
 
+- The web app failed to build (`tsc -b` errored on `src/views/UpNext.tsx`) — a prior refactor
+  that removed most `useShallow` selector usage dropped the import entirely, but one selector
+  in `UpNext` (owner-only `outings`/`titles`/`isSharedView`) still genuinely needed it to avoid
+  re-rendering on every store change. Restored the missing import.
 - Native Android app (in development, not yet distributed): the Ledger "Still Rolling" widget
   showed the wrong episode-watched count for shows tracked episode-by-episode — sometimes 0
   even with real progress — because it trusted the synced `seasons.episodesWatched` column,

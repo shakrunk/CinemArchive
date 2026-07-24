@@ -4,7 +4,28 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 ## Current Backlog
 
-_No open items — the 2026-07-12 follow-up batch (KP-039 – KP-045) is resolved below. File new issues here as they surface._
+### Web app
+
+| ID     | Issue                                                                                                                        | Impacted Codebase |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------| ------------------ |
+| KP-058 | The "eyebrow" kicker label (e.g. *Cast*, *Genres*, *Status*) is hand-rolled at ~38 call sites instead of routing through the existing `SubsectionLabel`/`StatLabel` components in `typography.tsx`, so font family (mono vs. sans), size (8px–12px), tracking (0.06em–0.42em), and color token (`text-paper-dim` / `text-paper-faint` / `text-muted-foreground`) all drift independently per file. | [typography.tsx](file:///V:/repos/CinemArchive/src/components/ui/typography.tsx) and call sites across `src/views/` and `src/components/` |
+
+### Android app (2026-07-23)
+
+| ID     | Issue                                                                                                                        | Impacted Codebase |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------| ------------------ |
+| KP-046 | No predictive back gesture support                                                                                          | [MainActivity.kt](file:///V:/repos/CinemArchive/android/app/src/main/kotlin/work/kumarfamilynet/cinemarchive/MainActivity.kt) |
+| KP-047 | Pull-to-refresh indicator doesn't follow Material 3 Expressive shapes                                                       | [LibraryScreen.kt](file:///V:/repos/CinemArchive/android/feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/LibraryScreen.kt), [DiscoverScreen.kt](file:///V:/repos/CinemArchive/android/feature/discover/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/discover/DiscoverScreen.kt), [UpNextScreen.kt](file:///V:/repos/CinemArchive/android/feature/upnext/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/upnext/UpNextScreen.kt) |
+| KP-048 | Discover tab items already in the library still show the add button instead of an in-library state                        | [DiscoverScreen.kt](file:///V:/repos/CinemArchive/android/feature/discover/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/discover/DiscoverScreen.kt), [AddTitleOverlay.kt](file:///V:/repos/CinemArchive/android/feature/discover/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/discover/AddTitleOverlay.kt) |
+| KP-049 | Discover tab's title modal should be a title drawer with parity to the Library tab's title drawer                          | [DiscoverScreen.kt](file:///V:/repos/CinemArchive/android/feature/discover/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/discover/DiscoverScreen.kt), [TitleDetailScreen.kt](file:///V:/repos/CinemArchive/android/feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/TitleDetailScreen.kt) |
+| KP-050 | Library filters should be hidden behind a filter button (not shown by default), and should expand beyond title status alone — sorting, grouping, genre, tag, stars, etc. | [LibraryScreen.kt](file:///V:/repos/CinemArchive/android/feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/LibraryScreen.kt) |
+| KP-051 | Single-select button groups don't bold the selected option's label/checkmark                                               | `android/core/designsystem` button-group components |
+| KP-052 | "Source on GitHub" and "Release notes" links in Settings → About & Legal should be icon buttons, not plain links            | [ProfileScreen.kt](file:///V:/repos/CinemArchive/android/feature/settings/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/settings/ProfileScreen.kt) |
+| KP-053 | Settings page displays "Cinephile" where it should show "CinemArchive" or the user's name                                  | [ProfileScreen.kt](file:///V:/repos/CinemArchive/android/feature/settings/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/settings/ProfileScreen.kt) |
+| KP-054 | Bottom nav bar icons sit too low in their container, breaking vertical alignment                                           | [MorphingBottomNav.kt](file:///V:/repos/CinemArchive/android/core/designsystem/src/main/kotlin/work/kumarfamilynet/cinemarchive/core/designsystem/MorphingBottomNav.kt) |
+| KP-055 | Library list view needs a per-item container; the topmost item's top corners and bottommost item's bottom corners should use larger outer-corner radii per Material 3 Expressive | [LibraryScreen.kt](file:///V:/repos/CinemArchive/android/feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/LibraryScreen.kt) |
+| KP-056 | Library and Discover grids should support pinch-to-resize (2↔1 columns, or 3–4 columns), with poster card content adapting to card size | [LibraryScreen.kt](file:///V:/repos/CinemArchive/android/feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/LibraryScreen.kt), [DiscoverScreen.kt](file:///V:/repos/CinemArchive/android/feature/discover/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/discover/DiscoverScreen.kt) |
+| KP-057 | Title drawer for TV show episodes needs a design upgrade                                                                    | [TitleDetailScreen.kt](file:///V:/repos/CinemArchive/android/feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/TitleDetailScreen.kt) |
 
 ---
 

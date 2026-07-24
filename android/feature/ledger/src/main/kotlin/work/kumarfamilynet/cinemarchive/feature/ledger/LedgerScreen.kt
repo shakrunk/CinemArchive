@@ -61,9 +61,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -894,30 +895,48 @@ private fun PaletteRow(
 }
 
 /** A small, non-interactive, non-scrolling render of a widget's actual content (C4) — the
- *  real [WidgetContent] composable scaled down via [graphicsLayer], not a bare text row, so
- *  the palette shows what a panel actually looks like before it's added. Uses whatever board
- *  data is on hand (the caller passes any already-computed board — precision isn't the point
- *  here, a representative preview is). */
+ *  real [WidgetContent] composable scaled down via a placement-time [graphicsLayer], not a
+ *  bare text row, so the palette shows what a panel actually looks like before it's added.
+ *  Uses whatever board data is on hand (the caller passes any already-computed board —
+ *  precision isn't the point here, a representative preview is).
+ *
+ *  Deliberately a custom [Layout], not a `Box { Column(Modifier.width(...).graphicsLayer{}) }`
+ *  — [graphicsLayer] is a *draw-time* transform, it doesn't change layout, so the content
+ *  still has to be *measured* at its full intended size first. Nesting it inside a Box fixed
+ *  to the thumbnail's tiny final size clamps that measurement down to the tiny size too
+ *  (Compose's constraint propagation, not the graphicsLayer scale, was doing the shrinking),
+ *  which is what produced cramped, wrapped, barely-legible thumbnail text before this fix.
+ *  Measuring with loose constraints sized to the *full* card here, then scaling only at
+ *  [Placeable.PlacementScope.placeWithLayer] time, keeps the two steps properly separate. */
 @Composable
 private fun WidgetPreviewThumbnail(config: LedgerWidgetConfig, board: LedgerBoard, modifier: Modifier = Modifier) {
     val scale = 0.28f
     val thumbWidth = 84.dp
-    Box(
+    val thumbHeight = (CARD_HEIGHT_DP * scale).dp
+    val fullWidth = thumbWidth / scale
+    Layout(
+        content = {
+            Column(
+                modifier = Modifier.width(fullWidth).height(CARD_HEIGHT_DP.dp).padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                WidgetContent(config, board)
+            }
+        },
         modifier = modifier
             .width(thumbWidth)
-            .height((CARD_HEIGHT_DP * scale).dp)
+            .height(thumbHeight)
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-    ) {
-        Column(
-            modifier = Modifier
-                .width(thumbWidth / scale)
-                .height(CARD_HEIGHT_DP.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f) }
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            WidgetContent(config, board)
+    ) { measurables, _ ->
+        val fullConstraints = Constraints(maxWidth = fullWidth.roundToPx(), maxHeight = CARD_HEIGHT_DP.dp.roundToPx())
+        val placeable = measurables.first().measure(fullConstraints)
+        layout(thumbWidth.roundToPx(), thumbHeight.roundToPx()) {
+            placeable.placeWithLayer(0, 0) {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
         }
     }
 }

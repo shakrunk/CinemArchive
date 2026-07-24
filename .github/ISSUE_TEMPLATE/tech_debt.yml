@@ -1,0 +1,57 @@
+name: Tech debt / polish
+description: Known issue, inconsistency, or usability improvement that isn't a user-facing bug report (mirrors docs/known-problems.md).
+title: "[Tech debt]: "
+labels: ["tech-debt"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For smaller items you may prefer to add a row directly to [docs/known-problems.md](../../docs/known-problems.md) instead of opening an issue. Use this template when the item needs its own discussion or tracking.
+
+  - type: dropdown
+    id: clients
+    attributes:
+      label: Affected client(s)
+      multiple: true
+      options:
+        - Web app
+        - Android app
+        - Shared backend (Supabase schema / Edge Functions)
+        - Repo tooling / CI
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: Issue
+      description: What's inconsistent, hand-rolled, duplicated, or otherwise not following existing conventions?
+    validations:
+      required: true
+
+  - type: input
+    id: impacted
+    attributes:
+      label: Impacted codebase
+      description: File(s) or component(s) involved, e.g. apps/web/src/components/ui/typography.tsx
+    validations:
+      required: false
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Suggested approach
+      description: How would you fix or clean this up? Leave blank if you just want it triaged.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - "Low — cosmetic / nice-to-have"
+        - "Medium — noticeable drift or friction"
+        - "High — actively causing bugs or blocking other work"
+    validations:
+      required: true

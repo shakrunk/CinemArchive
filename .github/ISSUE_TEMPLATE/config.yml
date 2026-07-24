@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Known problems backlog
+    url: https://github.com/shakrunk/CinemArchive/blob/main/docs/known-problems.md
+    about: Browse or add a smaller item directly to the tracked backlog instead of opening an issue.
+  - name: Android parity matrix
+    url: https://github.com/shakrunk/CinemArchive/blob/main/docs/android-parity-matrix.md
+    about: Check whether an Android/web difference is already a tracked parity gap.

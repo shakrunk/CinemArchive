@@ -1,6 +1,6 @@
 # ADR 0002: Multi-platform repo layout (`apps/*`)
 
-- **Status:** Proposed
+- **Status:** Accepted — executed 2026-07-24
 - **Date:** 2026-07-23
 
 ## Decision

@@ -1,6 +1,8 @@
 # Repo Restructure Plan: Multi-Platform Monorepo Layout
 
-**Status:** Proposed — not yet executed.
+**Status:** Executed (2026-07-24). Both `web` and `android` moved to `apps/web/` and
+`apps/android/` in a single branch, per [Decision 1](#decision-1-move-android-too-or-only-move-the-web-app).
+The phased checklist below is retained as the historical record of how the migration was run.
 **Owner:** unassigned.
 **Companion decision record:** [docs/adr/0002-multi-platform-repo-layout.md](adr/0002-multi-platform-repo-layout.md)
 

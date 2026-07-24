@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-authored fixture for docs/android-contracts/library.md. Shape = the poster-wall projection of a `titles` row, per mapDbTitleToLocal in src/lib/db.ts. Not exported from a live database.",
+  "$comment": "Hand-authored fixture for docs/android-contracts/library.md. Shape = the poster-wall projection of a `titles` row, per mapDbTitleToLocal in apps/web/src/lib/db.ts. Not exported from a live database.",
   "syncedAt": "2026-07-12T18:00:00.000Z",
   "titles": [
     {

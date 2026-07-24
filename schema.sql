@@ -1529,7 +1529,7 @@ $$;
 -- An account is only created when a valid, unredeemed invite code is
 -- presented to the redeem-invite Edge Function. Regular sign-in
 -- (supabase.auth.signInWithOtp with shouldCreateUser: false, see
--- src/lib/auth.ts) fails for any email that isn't already a known user.
+-- apps/web/src/lib/auth.ts) fails for any email that isn't already a known user.
 --
 -- Each account may generate at most 2 invite codes, ever — except the owner
 -- account (profiles.is_owner), which is uncapped.

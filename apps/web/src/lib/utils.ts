@@ -164,6 +164,11 @@ export function fmtCurrency(amount: number): string {
   }
 }
 
+/** Extract a human-readable message from a caught value, which TypeScript types as `unknown`. */
+export function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback
+}
+
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()

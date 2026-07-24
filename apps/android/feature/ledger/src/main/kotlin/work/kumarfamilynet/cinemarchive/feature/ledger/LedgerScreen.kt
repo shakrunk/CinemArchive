@@ -399,9 +399,9 @@ private fun WidgetCard(config: LedgerWidgetConfig, board: LedgerBoard?, modifier
 private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
     val title = headerFor(config, PANEL_LABELS[config.panel] ?: config.panel.raw)
     when (config.panel) {
-        LedgerWidgetId.RUNTIMES -> CategorySection(title, board.runtimeBuckets.applyTopN(config))
-        LedgerWidgetId.NETWORKS -> CategorySection(title, board.networks.applyTopN(config))
-        LedgerWidgetId.DECADES -> CategorySection(title, board.decades.applyTopN(config))
+        LedgerWidgetId.RUNTIMES -> CategorySection(title, board.runtimeBuckets.applyTopN(config), "No movies logged yet.")
+        LedgerWidgetId.NETWORKS -> CategorySection(title, board.networks.applyTopN(config), "No TV series logged yet.")
+        LedgerWidgetId.DECADES -> CategorySection(title, board.decades.applyTopN(config), "No dated titles logged yet.")
         LedgerWidgetId.ATTRACTIONS -> {
             SectionHeader(
                 if (board.watchlistMovieMinutesOwed > 0) "$title — ${board.watchlistMovieMinutesOwed} movie minutes owed" else title,
@@ -432,17 +432,17 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
             }
             board.monthlyRun.applyTopN(config).forEach { CategoryRow(LedgerCategoryCount(it.monthLabel, it.count)) }
         }
-        LedgerWidgetId.RATINGS -> CategorySection(title, board.ratingBuckets.applyTopN(config))
-        LedgerWidgetId.GENRES -> CategorySection(title, board.genres.applyTopN(config))
-        LedgerWidgetId.AUTEURS -> CategorySection(title, board.auteurs.applyTopN(config))
-        LedgerWidgetId.ENSEMBLE -> CategorySection(title, board.ensemble.applyTopN(config))
+        LedgerWidgetId.RATINGS -> CategorySection(title, board.ratingBuckets.applyTopN(config), "No ratings logged yet.")
+        LedgerWidgetId.GENRES -> CategorySection(title, board.genres.applyTopN(config), "No genres logged yet.")
+        LedgerWidgetId.AUTEURS -> CategorySection(title, board.auteurs.applyTopN(config), "No director data logged yet.")
+        LedgerWidgetId.ENSEMBLE -> CategorySection(title, board.ensemble.applyTopN(config), "No cast data logged yet.")
         LedgerWidgetId.VERDICTS -> {
             SectionHeader(title)
             val entries = board.verdicts.applyTopN(config)
             if (entries.isEmpty()) EmptyRow("No title has both your rating and an IMDb rating yet.")
             else entries.forEach { VerdictRow(it) }
         }
-        LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config))
+        LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config), "No non-English titles logged yet.")
         LedgerWidgetId.WEEKDAYS -> {
             SectionHeader(title)
             BarChartCanvas(data = board.weekdays.map { ChartDatum(it.weekday, it.count.toFloat()) })
@@ -473,7 +473,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
                 entries.forEach { RevivalRow(it) }
             }
         }
-        LedgerWidgetId.TIMEWARP -> CategorySection(title, board.timewarp.applyTopN(config))
+        LedgerWidgetId.TIMEWARP -> CategorySection(title, board.timewarp.applyTopN(config), "No dated titles logged yet.")
         LedgerWidgetId.PROGRESS -> {
             SectionHeader(title)
             val entries = board.stillRolling.applyTopN(config)
@@ -488,10 +488,9 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
 }
 
 @Composable
-private fun CategorySection(title: String, entries: List<LedgerCategoryCount>) {
-    if (entries.isEmpty()) return
+private fun CategorySection(title: String, entries: List<LedgerCategoryCount>, emptyMessage: String) {
     SectionHeader(title)
-    entries.forEach { CategoryRow(it) }
+    if (entries.isEmpty()) EmptyRow(emptyMessage) else entries.forEach { CategoryRow(it) }
 }
 
 /** Fallback row height (dp) used to convert a reorder drag's accumulated pixel offset into

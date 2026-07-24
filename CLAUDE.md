@@ -1,24 +1,32 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+repository. It covers repo-wide conventions that apply to every client. Client-specific
+guidance lives in nested `CLAUDE.md` files, auto-discovered by directory:
+
+- [apps/web/CLAUDE.md](apps/web/CLAUDE.md) — the web app (Vite + React + TypeScript)
+- [apps/android/CLAUDE.md](apps/android/CLAUDE.md) — the Android app (Kotlin + Jetpack Compose)
 
 ## Project Overview
 
-**CinemArchive (The Projection Room v2)** is a personal movie and TV series tracking app with a cinematic dark-gold aesthetic. It is a JAMstack app: static React frontend deployed to GitHub Pages, backed by Supabase for database and auth, and TMDB/OMDb for media metadata.
+**CinemArchive (The Projection Room v2)** is a personal movie and TV series tracking app with
+a cinematic dark-gold aesthetic, backed by a shared Supabase project (Postgres + Auth + Edge
+Functions) and TMDB/OMDb for media metadata. It ships two clients today, each a sibling under
+`apps/<platform>/` with equal structural standing: a web app (static React, deployed to GitHub
+Pages) and a native Android app — see `README.md` for the full feature list and architecture
+docs, and [docs/repo-restructure-plan.md](docs/repo-restructure-plan.md) /
+[docs/adr/0002-multi-platform-repo-layout.md](docs/adr/0002-multi-platform-repo-layout.md) for
+why this layout was adopted and the checklist for onboarding a future platform (iOS, etc.).
 
-> **Status:** Built and deployed. All phases from `plan.md` are implemented and the app is live on GitHub Pages (https://cinemarchive.kumarfamilynet.work/, a custom domain), backed by a connected Supabase project. The phase table at the bottom is retained as historical context. See `README.md` for full setup/architecture docs.
+## Repository layout
 
----
-
-## Commands
-
-Standard Vite commands:
-
-```bash
-npm run dev        # Start dev server
-npm run build      # Production build → dist/
-npm run preview    # Preview production build locally
-npm run lint       # ESLint
+```
+apps/web/          # Web app (Vite + React + TypeScript) — see apps/web/CLAUDE.md
+apps/android/      # Android app (Kotlin + Jetpack Compose) — see apps/android/CLAUDE.md
+supabase/          # Shared backend: migrations/, functions/ (consumed by every client)
+schema.sql         # Canonical, human-readable copy of the shared DB schema + RLS policies
+docs/              # Repo-wide docs: ADRs, Android↔web contract docs, known problems, etc.
+.github/workflows/ # CI: deploy.yml (web + release + Android APK), android.yml, db-migrate.yml, deploy-functions.yml
 ```
 
 ---
@@ -47,7 +55,7 @@ When targeting a version-bump or release PR, target `main` (not `dev`) if commit
 
 ## Versioning
 
-The app follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). `package.json` → `version` is the single source of truth; `CHANGELOG.md` (Keep a Changelog format) records what shipped in each version.
+The app follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). The repo-root `package.json` → `version` is the single canonical source of truth across every client (it governs the web app's `__APP_VERSION__` and the Android APK's `versionCode`/`versionName` — see `.github/workflows/deploy.yml`). `CHANGELOG.md` (Keep a Changelog format) records what shipped in each version.
 
 - **Commit messages already follow [Conventional Commits](https://www.conventionalcommits.org/)** (`feat(scope): ...`, `fix(scope): ...`, `refactor: ...`, etc. — see recent `git log`). The bump type is derived from the commit types being shipped:
   - Any commit with a `!` after the type/scope (e.g. `feat!:`) or a `BREAKING CHANGE:` footer → **MAJOR**
@@ -56,7 +64,7 @@ The app follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
   - Only `docs`/`chore`/`refactor`/`test`/`style`/`ci`/`build` commits → **no bump** — these ship without touching `version`/`CHANGELOG.md`
 - **The bump happens once per release**, when opening the `dev` → `main` PR — not per-commit. The `ship` skill (`.claude/skills/ship/SKILL.md`) checks the commits being shipped and performs the bump as part of that PR when one is warranted; see that skill for the mechanics.
 - **`CHANGELOG.md`** keeps an `[Unreleased]` section at the top that entries accumulate under during normal work. At release time, `[Unreleased]` is retitled to the new `[X.Y.Z] - YYYY-MM-DD` and a fresh empty `[Unreleased]` is added above it.
-- **Git tags:** after a version-bumping PR merges to `main`, `.github/workflows/deploy.yml`'s `release` job tags the commit `vX.Y.Z` (read from `package.json`) and publishes a GitHub Release using the matching `CHANGELOG.md` section — this is automatic, not a manual step.
+- **Git tags:** after a version-bumping PR merges to `main`, `.github/workflows/deploy.yml`'s `release` job tags the commit `vX.Y.Z` (read from the root `package.json`) and publishes a GitHub Release using the matching `CHANGELOG.md` section — this is automatic, not a manual step.
 - Any agent making changes should add a line under `CHANGELOG.md`'s `[Unreleased]` section when the change is user-facing (matches `feat`/`fix`/`perf`/breaking); purely internal changes (`refactor`/`docs`/`test`/`chore`) don't need an entry.
 
 ---
@@ -66,81 +74,6 @@ The app follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
 Do not revert dependency migrations as suspected supply-chain issues without verifying against the official package registry first.
 
 ---
-
-## Architecture
-
-### Stack
-- **Frontend:** Vite + React + TypeScript + Tailwind CSS
-- **UI Components:** shadcn-ui (pre-configured in Phase 0)
-- **State:** Zustand (`src/store/useAppStore.ts`) — slices for `library`, `ledger`, `ui`
-- **Backend:** Supabase (Postgres + RLS + Auth + Edge Functions)
-- **APIs:** TMDB (metadata/posters) + OMDb (IMDb/RT/Metacritic badges) — both proxied through a Supabase Edge Function with a caching layer
-- **Auth:** Passkey/WebAuthn via Supabase Auth (`src/lib/auth.ts`)
-- **Ledger visuals:** custom CSS visualizations (Recharts was evaluated and dropped — no charting lib bundled)
-- **PWA:** vite-plugin-pwa
-- **Deploy:** GitHub Actions → GitHub Pages (`.github/workflows/deploy.yml`)
-- **DB migrations:** Supabase CLI migrations applied by `.github/workflows/db-migrate.yml`
-- **Edge Function deploy:** `media-proxy` deployed by `.github/workflows/deploy-functions.yml` (triggers on `supabase/functions/**` changes). Functions deploy independently of migrations — editing `index.ts` without deploying leaves the live function stale.
-
-### Source Layout (planned)
-```
-src/
-  components/
-    ui/              # Atomic components (Phase 1, Track B)
-    AddTitleWorkflow.tsx
-  views/
-    Library.tsx      # Poster wall + sortable ledger list (Track D)
-    Ledger.tsx       # Stats dashboards (Track E)
-  store/
-    useAppStore.ts   # Zustand store
-    mockData.ts      # Dummy data used until Phase 3 wires real API
-  lib/
-    auth.ts          # Passkey/WebAuthn helpers
-schema.sql           # Supabase DB schema + RLS policies (Track A)
-```
-
-### Data Model (schema.sql)
-Relational tables replace V1's JSON schema:
-- `titles` — movies and TV series (enum: `movie` | `tv`)
-- `seasons` — TV season relations
-- `episodes` — individual episodes (unique per `title + season + episode number`)
-- `episode_watch_events` / `episode_ratings` / `episode_reviews` — independent, timestamped per-episode logs (decoupled: watch ≠ rate ≠ review)
-- `viewings` — re-watch timeline entries per title (`venue`/`companions`/`outing_id` columns carry a cinema trip's theater and company, whether logged manually or via a completed outing)
-- `cinema_outings` — a booked movie trip (showtime, venue, companions, format, ticket price, seat); `complete_due_outings()` auto-transitions it `scheduled → completed` (logging a `viewings` row and flipping the title to `watched`) once `showtime + previews + runtime` passes; owner-only, never shared
-- `shared_access_keys` — time-bound read-only access tokens
-- `api_cache` — used by the `media-proxy` Edge Function
-
-RLS: authenticated user gets full CRUD; valid shared-token holders get read-only. `db.ts` maps DB rows ⇄ the client `Title` type (episodes are grouped onto their seasons).
-
-### Key Patterns
-- **Optimistic UI:** Zustand store is updated immediately on user action; backend write follows asynchronously (fire-and-forget with error logging in `db.ts`).
-- **All filtering/sorting is client-side** in the Zustand store (no DB queries for filter changes); the poster wall renders the full filtered set (grid virtualization was planned but is not implemented).
-- **API calls to TMDB/OMDb go through the Edge Function** (never directly from the browser — keeps API keys server-side).
-- **SPA routing on GitHub Pages:** uses a `404.html` redirect fallback; served from a custom domain (`public/CNAME`) at the domain root, so Vite `base` is `/`.
-- **Schema changes go through migrations, not the SQL editor:** add a timestamped file under `supabase/migrations/`, keep `schema.sql` in sync, and push to `main`. `db-migrate.yml` runs `supabase db push` against production, but it is **`workflow_dispatch`-only — it does not trigger automatically on push to `main`.** After merging a migration-bearing PR, manually run the "DB Migrate (manual)" workflow (Actions tab or `gh workflow run db-migrate.yml --ref main`) to actually apply it; merging alone leaves production on the old schema. (`db push`/`migration repair` are Docker-free; only `db pull` needs Docker.)
-
----
-
-## Design System
-
-- **Colors:** Void `#0b0907` (background), Amber `#e9b266` (highlights/accents)
-- **Fonts:** `Fraunces` (serif titles), `Hanken Grotesk` (UI sans), `DM Mono` (stats/numbers)
-- **Atmospheric CSS** in `index.css`, rendered once in `App.tsx` as fixed full-viewport siblings: `.grain` noise overlay, `.vignette`, `.dust`, `.projector-beam` glow animation
-- **Mobile-first:** bottom-sheet modals for mobile, `TopBar` + `BottomNav` shell
-
----
-
-## Development Phases (from plan.md)
-
-| Phase | Parallelism | Key Outputs |
-|-------|-------------|-------------|
-| 0 | Sequential | Git init, Vite scaffold, shadcn, Tailwind theme, mockData, ESLint/Prettier |
-| 1 (A/B/C) | Parallel | DB schema+RLS, UI component library, Zustand store |
-| 2 (D/E/F) | Parallel | Library view, Ledger view, AddTitle workflow |
-| 3 | Sequential | Replace mock data with real Supabase calls, auth wiring, PWA |
-| 4 | Sequential | GitHub Actions deploy pipeline |
-
-Phases 1 and 2 are designed for parallel sub-agent execution. Phases 0, 3, and 4 must be sequential to avoid merge conflicts.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

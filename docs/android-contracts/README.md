@@ -13,6 +13,6 @@ error states. Fixture JSON lives alongside each doc in `fixtures/`.
 | Episode tracking | [episode-tracking.md](./episode-tracking.md) | [fixtures/episode-tracking.json](./fixtures/episode-tracking.json) |
 | Ledger | [ledger.md](./ledger.md) | [fixtures/ledger.json](./fixtures/ledger.json) |
 
-These fixtures are hand-authored from the current `schema.sql` and `src/lib/db.ts` shapes,
+These fixtures are hand-authored from the current `schema.sql` and `apps/web/src/lib/db.ts` shapes,
 not exported from a live database — they are for shape/contract testing, not production
-data. Regenerate them if `TITLE_SELECT` in `src/lib/db.ts` or the underlying tables change.
+data. Regenerate them if `TITLE_SELECT` in `apps/web/src/lib/db.ts` or the underlying tables change.

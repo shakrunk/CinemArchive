@@ -39,6 +39,9 @@ jobs:
     name: Build
     needs: migrate
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +51,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -61,7 +65,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: apps/web/dist
 
   deploy:
     name: Deploy
@@ -128,7 +132,7 @@ jobs:
       contents: write
     defaults:
       run:
-        working-directory: android
+        working-directory: apps/android
     steps:
       - name: Checkout
         uses: actions/checkout@v4

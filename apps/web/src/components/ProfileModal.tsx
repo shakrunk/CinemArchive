@@ -3,7 +3,7 @@ import { Mail, Fingerprint, Loader2 } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
-import { cn } from 'src/lib/utils'
+import { cn, getErrorMessage } from 'src/lib/utils'
 import { signInWithEmail, signInWithPasskey } from 'src/lib/auth'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
@@ -38,11 +38,11 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
         type: 'success',
         text: 'Magic link sent! Check your inbox to complete sign-in.',
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
       setAuthMessage({
         type: 'error',
-        text: err.message || 'Failed to send magic link.',
+        text: getErrorMessage(err, 'Failed to send magic link.'),
       })
     } finally {
       setLoadingAuth(false)
@@ -64,11 +64,11 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
         type: 'success',
         text: 'Passkey verification initiated. Check your browser prompt.',
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
       setAuthMessage({
         type: 'error',
-        text: err.message || 'Failed to sign in with passkey.',
+        text: getErrorMessage(err, 'Failed to sign in with passkey.'),
       })
     } finally {
       setLoadingAuth(false)

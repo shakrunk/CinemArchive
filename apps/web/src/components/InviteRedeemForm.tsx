@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { redeemInvite, signInWithEmail } from 'src/lib/auth'
+import { getErrorMessage } from 'src/lib/utils'
 
 interface InviteRedeemFormProps {
   onRedeemed: (message: string) => void
@@ -28,9 +29,9 @@ export function InviteRedeemForm({ onRedeemed, onError }: InviteRedeemFormProps)
       await signInWithEmail(email.trim())
       onRedeemed('Account created — check your inbox for a magic link to finish signing in.')
       setCode('')
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to redeem invite:', err)
-      onError(err.message || 'Failed to redeem invite code.')
+      onError(getErrorMessage(err, 'Failed to redeem invite code.'))
     } finally {
       setLoading(false)
     }

@@ -10,7 +10,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { ShareScopeEditor } from 'src/components/ShareScopeEditor'
 import { useAppStore } from 'src/store/useAppStore'
-import { cn, fmtDateShort } from 'src/lib/utils'
+import { cn, fmtDateShort, getErrorMessage } from 'src/lib/utils'
 import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import {
   isSupabaseConfigured,
@@ -109,9 +109,9 @@ function SignInCard() {
     try {
       await signInWithEmail(email)
       setMessage({ type: 'success', text: 'Magic link sent! Check your inbox to complete sign-in.' })
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage({ type: 'error', text: err.message || 'Failed to send magic link.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send magic link.') })
     } finally {
       setLoading(false)
     }
@@ -127,9 +127,9 @@ function SignInCard() {
     try {
       await signInWithPasskey(email)
       setMessage({ type: 'success', text: 'Passkey verification initiated. Check your browser prompt.' })
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage({ type: 'error', text: err.message || 'Failed to sign in with passkey.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to sign in with passkey.') })
     } finally {
       setLoading(false)
     }
@@ -330,9 +330,9 @@ function IdentitySection({
       setDisplayName(updated.display_name ?? '')
       setUsername(updated.username ?? '')
       setMessage({ type: 'success', text: 'Profile saved.' })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to save profile:', err)
-      setMessage({ type: 'error', text: err.message || 'Failed to save profile.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to save profile.') })
     } finally {
       setSaving(false)
     }
@@ -405,9 +405,9 @@ function SecuritySection() {
     try {
       await registerPasskey()
       setMessage({ type: 'success', text: 'Passkey registered successfully! You can now use it to sign in.' })
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage({ type: 'error', text: err.message || 'Failed to register passkey.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to register passkey.') })
     } finally {
       setLoading(false)
     }
@@ -949,9 +949,9 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
     try {
       await createInviteCode()
       await loadCodes()
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to generate invite code:', err)
-      setMessage({ type: 'error', text: err.message || 'Failed to generate invite code.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to generate invite code.') })
     } finally {
       setGenerating(false)
     }
@@ -1097,8 +1097,8 @@ function DataSection() {
         type: 'success',
         text: `Imported ${added} title${added !== 1 ? 's' : ''}${skipped > 0 ? `, skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}` : ''}.`,
       })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Import failed.' })
+    } catch (err) {
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Import failed.') })
     } finally {
       setImporting(false)
     }
@@ -1146,8 +1146,8 @@ function DataSection() {
       }
       if (lbCancelRef.current) parts.push('(cancelled early)')
       setMessage({ type: 'success', text: `${parts.join(' · ')}.` })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Letterboxd import failed.' })
+    } catch (err) {
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Letterboxd import failed.') })
     } finally {
       setLbImporting(false)
       setLbProgress(null)

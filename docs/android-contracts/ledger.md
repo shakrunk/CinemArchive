@@ -1,10 +1,10 @@
 # Ledger contract
 
-Web sources: `src/store/ledgerDerive.ts` (per-panel derivation), `src/store/ledgerStats.ts`
-(whole-library hero rollup), `src/lib/ledgerPanels.ts` (widget registry, `LedgerWidget`
-shape, settings sanitizer), `src/views/ledger/Ledger.tsx` / `LedgerHero.tsx` /
-`LedgerSkeleton.tsx` (route, edit mode, persistence), `src/components/LedgerCharts.tsx`
-(chart primitives), `src/store/outings.ts` (`deriveAtTheMovies`, the one widget that reaches
+Web sources: `apps/web/src/store/ledgerDerive.ts` (per-panel derivation), `apps/web/src/store/ledgerStats.ts`
+(whole-library hero rollup), `apps/web/src/lib/ledgerPanels.ts` (widget registry, `LedgerWidget`
+shape, settings sanitizer), `apps/web/src/views/ledger/Ledger.tsx` / `LedgerHero.tsx` /
+`LedgerSkeleton.tsx` (route, edit mode, persistence), `apps/web/src/components/LedgerCharts.tsx`
+(chart primitives), `apps/web/src/store/outings.ts` (`deriveAtTheMovies`, the one widget that reaches
 outside the core domain tables). Backend: `user_prefs` table (layout persistence only —
 every widget's *data* is a client-side aggregation over tables `library.md`/
 `title-detail.md`/`episode-tracking.md` already cover, plus `cinema_outings` for one widget;

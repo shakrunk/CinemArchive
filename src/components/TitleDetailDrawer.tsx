@@ -1481,18 +1481,21 @@ function OutingBanner({ title }: { title: Title }) {
             <button
               onClick={() => setSharePanelOpen(true)}
               className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              aria-label="Share these tickets"
             >
               Share
             </button>
             <button
               onClick={() => openOutingSchedule(title.id, outing.id)}
               className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              aria-label="Edit these tickets"
             >
               Edit
             </button>
             <button
               onClick={() => setConfirmingCancel(true)}
               className="font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
+              aria-label="Cancel these tickets"
             >
               Cancel
             </button>

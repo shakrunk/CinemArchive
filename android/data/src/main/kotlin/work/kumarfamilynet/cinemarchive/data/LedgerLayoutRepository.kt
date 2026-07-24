@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -27,6 +28,9 @@ private val Context.ledgerLayoutDataStore by preferencesDataStore(name = "cinema
  * pull-on-sign-in yet (a deliberate, smaller scope cut — see this repository's plan doc).
  * Every read runs [LedgerLayoutRules.normalize], so a layout written by a future/older app
  * version degrades the same way a server-synced payload would rather than crashing.
+ *
+ * [reconcile] is the pull half of the pull-on-sign-in/launch contract (ledger.md §4) —
+ * see [resolveLayoutReconciliation] for the actual merge rule.
  */
 class LedgerLayoutRepository(
     context: Context,
@@ -37,7 +41,7 @@ class LedgerLayoutRepository(
     private val layoutKey = stringPreferencesKey("ledger_layout")
 
     fun observeLayout(): Flow<List<LedgerWidgetConfig>> = dataStore.data.map { preferences ->
-        val stored = preferences[layoutKey]?.let { runCatching { parse(it) }.getOrNull() }
+        val stored = preferences[layoutKey]?.let { runCatching { parseLedgerLayoutJson(it) }.getOrNull() }
         val normalized = stored?.let { LedgerLayoutRules.normalize(it) }
         normalized?.takeIf { it.isNotEmpty() } ?: LedgerLayoutRules.defaultLedgerWidgets()
     }
@@ -53,26 +57,21 @@ class LedgerLayoutRepository(
         }
     }
 
-    private fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
-
-    private fun parse(json: String): List<RawLedgerWidget> {
-        val array = JSONArray(json)
-        return (0 until array.length()).map { i ->
-            val obj = array.getJSONObject(i)
-            val settingsObj = obj.optJSONObject("settings")
-            RawLedgerWidget(
-                id = obj.getString("id"),
-                panel = obj.getString("panel"),
-                width = obj.stringOrNull("width"),
-                settings = settingsObj?.let {
-                    RawLedgerWidgetSettings(
-                        timeRange = it.stringOrNull("timeRange"),
-                        scope = it.stringOrNull("scope"),
-                        topN = if (it.has("topN") && !it.isNull("topN")) it.getInt("topN") else null,
-                        title = it.stringOrNull("title"),
-                    )
-                },
-            )
+    /** Pull half of ledger.md §4's contract. Call on sign-in and on each app-launch
+     *  reconciliation pass — never mid-edit (edit mode is a bounded local interaction that
+     *  only starts once the app is already running and past this point). Silently returns
+     *  without touching local or remote state on a fetch failure (offline, transient error):
+     *  an unknown server state must never be treated as "confirmed empty" and blindly pushed
+     *  over, nor as "confirmed present" and used to overwrite local. */
+    suspend fun reconcile() {
+        val session = authRepository.currentSession() ?: return
+        val fetchResult = withContext(Dispatchers.IO) { runCatching { remoteWriter.fetchLayoutJson(session) } }
+        if (fetchResult.isFailure) return
+        val localWidgets = observeLayout().first()
+        when (val decision = resolveLayoutReconciliation(fetchResult.getOrNull(), localWidgets)) {
+            is LayoutReconciliation.OverwriteLocal -> dataStore.edit { it[layoutKey] = serialize(decision.widgets) }
+            is LayoutReconciliation.PushLocal ->
+                withContext(Dispatchers.IO) { runCatching { remoteWriter.upsertLayout(session, decision.widgets) } }
         }
     }
 
@@ -94,5 +93,54 @@ class LedgerLayoutRepository(
         scope?.let { put("scope", it) }
         topN?.let { put("topN", it) }
         title?.let { put("title", it) }
+    }
+}
+
+private fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
+
+private fun parseLedgerLayoutJson(json: String): List<RawLedgerWidget> {
+    val array = JSONArray(json)
+    return (0 until array.length()).map { i ->
+        val obj = array.getJSONObject(i)
+        val settingsObj = obj.optJSONObject("settings")
+        RawLedgerWidget(
+            id = obj.getString("id"),
+            panel = obj.getString("panel"),
+            width = obj.stringOrNull("width"),
+            settings = settingsObj?.let {
+                RawLedgerWidgetSettings(
+                    timeRange = it.stringOrNull("timeRange"),
+                    scope = it.stringOrNull("scope"),
+                    topN = if (it.has("topN") && !it.isNull("topN")) it.getInt("topN") else null,
+                    title = it.stringOrNull("title"),
+                )
+            },
+        )
+    }
+}
+
+/** [LedgerLayoutRepository.reconcile]'s pure merge decision, split out for unit testing
+ *  without a [Context]/DataStore. A server layout is only trusted when its JSON is present,
+ *  parseable, and normalizes to at least one widget — anything else (no row, null column,
+ *  corrupt JSON, or a payload that normalizes to nothing because every panel was unknown)
+ *  is treated the same as "no server layout yet," matching [LedgerLayoutRepository.observeLayout]'s
+ *  own empty-after-normalize fallback posture for corrupt *local* storage. No merge, no
+ *  per-field reconciliation — same blind last-write-wins stance as [SupabaseLedgerLayoutWriter.upsertLayout]. */
+internal sealed interface LayoutReconciliation {
+    data class OverwriteLocal(val widgets: List<LedgerWidgetConfig>) : LayoutReconciliation
+    data class PushLocal(val widgets: List<LedgerWidgetConfig>) : LayoutReconciliation
+}
+
+internal fun resolveLayoutReconciliation(
+    serverLayoutJson: String?,
+    localWidgets: List<LedgerWidgetConfig>,
+): LayoutReconciliation {
+    val serverWidgets = serverLayoutJson
+        ?.let { json -> runCatching { LedgerLayoutRules.normalize(parseLedgerLayoutJson(json)) }.getOrNull() }
+        ?.takeIf { it.isNotEmpty() }
+    return if (serverWidgets != null) {
+        LayoutReconciliation.OverwriteLocal(serverWidgets)
+    } else {
+        LayoutReconciliation.PushLocal(localWidgets)
     }
 }

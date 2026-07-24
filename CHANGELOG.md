@@ -83,6 +83,10 @@ number is chosen.
   the system splash now shows the film-reel mark on the void background instead of a plain
   flash, then hands off into a Compose splash where the reel keeps spinning over a pulsing
   amber "projector beam" glow before crossfading into the app.
+- Native Android app (in development, not yet distributed): the Ledger board's custom layout
+  now pulls from `user_prefs.ledger_layout` on sign-in and app launch, not just push — a
+  layout customized on web (or another device) now shows up on Android without first making a
+  local edit, matching the documented "server wins on load" contract.
 
 ### Changed
 

@@ -125,8 +125,9 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
               type="button"
               disabled={reacting}
               onClick={() => handleToggleReaction(emoji)}
+              aria-label={`${mine ? 'Remove' : 'Add'} ${emoji} reaction`}
               title={reactionCounts.find((r) => r.emoji === emoji)?.names.join(', ')}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-sm border transition-colors disabled:opacity-60"
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-sm border transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               style={{
                 borderColor: mine ? 'var(--amber)' : 'var(--line)',
                 background: mine ? 'rgb(var(--amber-rgb) / 0.12)' : 'var(--inset)',
@@ -159,9 +160,9 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
                 {c.authorId === user?.id && (
                   <button
                     onClick={() => handleDelete(c.id)}
-                    aria-label="Delete comment"
+                    aria-label={`Delete comment: "${c.body.slice(0, 20)}${c.body.length > 20 ? '...' : ''}"`}
                     title="Delete comment"
-                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    className="text-muted-foreground hover:text-destructive transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -195,7 +196,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
             type="submit"
             disabled={posting || !body.trim()}
             aria-label="Post comment"
-            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md disabled:opacity-50"
+            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ background: 'var(--amber)', color: 'var(--on-amber)' }}
           >
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

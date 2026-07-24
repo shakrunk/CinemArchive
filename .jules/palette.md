@@ -83,3 +83,7 @@
 ## 2024-05-18 - Scope Control
 **Learning:** Even if you see code that violates known performance or state-management rules (like unnecessary `useShallow` batching), fixing it while operating under a strictly UX-focused persona leads to code review rejections because it expands the scope of the PR and introduces unrelated risks (like missing imports breaking CI).
 **Action:** When acting as Palette, only fix UX and accessibility issues. Completely ignore backend logic, state management refactors, and performance optimizations, regardless of how obvious or "wrong" the existing code is.
+
+## 2024-07-24 - Dynamic ARIA Labels & Focus States in TitleCommentsPanel
+**Learning:** Found multiple icon-only buttons (reaction, delete comment, submit post) in `TitleCommentsPanel` lacking explicit focus rings and context-rich ARIA labels. Using static `aria-label`s for toggle states (like reactions) can confuse screen reader users who can't see the visual color change indicating selection.
+**Action:** Added explicit focus-visible Tailwind utilities (`focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60`), made the reaction button's `aria-label` dynamic (`Add` vs `Remove`), and included comment text snippets in the delete button's `aria-label` to provide unique context.

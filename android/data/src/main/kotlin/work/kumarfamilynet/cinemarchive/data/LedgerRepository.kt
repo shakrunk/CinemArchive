@@ -33,14 +33,18 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
 import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
+import work.kumarfamilynet.cinemarchive.core.model.LedgerSettingKey
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
 import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWatchlistEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWeekdayCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWeeklyActivity
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
+import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
 
 private val ISO_LANGUAGE_NAMES = mapOf(
     "en" to "English", "es" to "Spanish", "fr" to "French", "de" to "German",
@@ -101,10 +105,9 @@ class LedgerRepository(
         )
     }
 
-    /** All 20 widgets — see [LedgerBoard] field kdocs for which widget each field backs.
-     *  Split into two combine() groups since kotlinx.coroutines only has typed `combine`
+    /** Split into two combine() groups since kotlinx.coroutines only has typed `combine`
      *  overloads up to 5 flows. */
-    fun observeLedgerBoard(): Flow<LedgerBoard> {
+    private fun observeLedgerSources(): Flow<LedgerSources> {
         val titleGroup = combine(
             titleDao.observeAllTitles(),
             viewingDao.observeAllViewings(),
@@ -131,7 +134,85 @@ class LedgerRepository(
                 history.episodes,
                 history.watchEvents,
             )
-        }.map { s -> buildBoard(s) }
+        }
+    }
+
+    /** All 20 widgets, unfiltered (every field's default `scope`/`timeRange` — i.e. "all") —
+     *  see [LedgerBoard] field kdocs for which widget each field backs. [observeLedgerBoards]
+     *  is the settings-aware counterpart a real board render should use. */
+    fun observeLedgerBoard(): Flow<LedgerBoard> = observeLedgerSources().map { s -> buildBoard(s) }
+
+    /** One [LedgerBoard] per widget instance in [layoutFlow], keyed by [LedgerWidgetConfig.id]
+     *  — each built from [LedgerSources] filtered by that *specific* widget's own effective
+     *  `scope`/`timeRange` (docs/superpowers/plans/2026-07-23-android-ledger-parity.md Phase D,
+     *  mirroring ledgerPanels.ts's `scopedTitles` filter-then-aggregate pattern). A panel that
+     *  doesn't honor `scope`/`timeRange` per [PANEL_SETTING_KEYS] always resolves to
+     *  "all"/unfiltered regardless of what a widget instance's stored settings say, matching
+     *  ledger.md §1's "silently ignore an inapplicable key" rule. Widgets that resolve to the
+     *  same effective (scope, timeRange) pair — the common case, since most widgets carry no
+     *  override — share one [buildBoard] call rather than recomputing per widget. */
+    fun observeLedgerBoards(layoutFlow: Flow<List<LedgerWidgetConfig>>): Flow<Map<String, LedgerBoard>> =
+        combine(observeLedgerSources(), layoutFlow) { sources, layout -> buildBoardsForLayout(sources, layout) }
+
+    private fun buildBoardsForLayout(sources: LedgerSources, layout: List<LedgerWidgetConfig>): Map<String, LedgerBoard> {
+        val cache = mutableMapOf<Pair<String, LocalDate?>, LedgerBoard>()
+        return layout.associate { widget ->
+            val effective = effectiveLedgerSettings(widget.panel, widget.settings)
+            val scope = if (widget.panel.honorsLedgerSetting(LedgerSettingKey.SCOPE)) effective.scope else "all"
+            val rangeStart = if (widget.panel.honorsLedgerSetting(LedgerSettingKey.TIME_RANGE)) {
+                timeRangeStart(effective.timeRange)
+            } else {
+                null
+            }
+            val board = cache.getOrPut(scope to rangeStart) { buildBoard(sources.scopedTo(scope, rangeStart)) }
+            widget.id to board
+        }
+    }
+
+    /** Inclusive lower bound for a time range, or null for "all"/unrestricted — mirrors
+     *  `timeRangeStart()` in ledgerDerive.ts. */
+    private fun timeRangeStart(timeRange: String): LocalDate? = when (timeRange) {
+        "ytd" -> LocalDate.now().withDayOfYear(1)
+        "12mo" -> LocalDate.now().minusYears(1)
+        "5y" -> LocalDate.now().minusYears(5)
+        else -> null // "all"
+    }
+
+    /** Filters to titles of the given [scope] (cascading to every joined collection by
+     *  `titleId`/`episodeId` membership) and, independently, to date-bearing events
+     *  ([ViewingEntity.date]/[EpisodeWatchEventEntity.watchedAt]) on/after [rangeStart] — an
+     *  undated event only passes when [rangeStart] is null, mirroring `dateInRange()`'s "an
+     *  event with no true date can't be shown to be in range" rule. Scope never excludes a
+     *  title by date (only by type); time range never excludes a title (only its dated
+     *  events) — the two axes are independent, matching `scopeTitles`/`dateInRange` staying
+     *  separate helpers on the web side. */
+    private fun LedgerSources.scopedTo(scope: String, rangeStart: LocalDate?): LedgerSources {
+        if (scope == "all" && rangeStart == null) return this
+        val scopedTitleList = when (scope) {
+            "movies" -> titles.filter { it.type == MediaType.MOVIE.name }
+            "tv" -> titles.filter { it.type == MediaType.TV.name }
+            else -> titles
+        }
+        val scopedIds = scopedTitleList.map { it.id }.toSet()
+        fun inRange(date: String?): Boolean {
+            if (rangeStart == null) return true
+            val parsed = parseLocalDate(date) ?: return false
+            return !parsed.isBefore(rangeStart)
+        }
+        val scopedEpisodes = episodes.filter { it.titleId in scopedIds }
+        val scopedEpisodeIds = scopedEpisodes.map { it.id }.toSet()
+        val scopedWatchEvents = watchEvents.filter { it.episodeId in scopedEpisodeIds && inRange(it.watchedAt) }
+        return LedgerSources(
+            titles = scopedTitleList,
+            viewings = viewings.filter { it.titleId in scopedIds && inRange(it.date) },
+            cast = cast.filter { it.titleId in scopedIds },
+            crew = crew.filter { it.titleId in scopedIds },
+            outings = outings.filter { it.titleId in scopedIds },
+            watchedAtDates = scopedWatchEvents.map { it.watchedAt },
+            seasons = seasons.filter { it.titleId in scopedIds },
+            episodes = scopedEpisodes,
+            watchEvents = scopedWatchEvents,
+        )
     }
 
     private data class TitleGroup(
@@ -182,6 +263,7 @@ class LedgerRepository(
             watchlist = watchlist,
             watchlistMovieMinutesOwed = watchlistMovieMinutesOwed,
             weeklyActivity = weeklyActivity(viewings),
+            dailyActivity = dailyActivity(viewings),
             encores = encores(viewings, titleById),
             monthlyRun = monthlyRun(viewings),
             ratingBuckets = ratingBuckets(titles),
@@ -206,8 +288,8 @@ class LedgerRepository(
             .map { LedgerCategoryCount(it.key, it.value) }
 
     /** Time in the Dark: week-granularity heatmap, 52 buckets ending this week (oldest
-     *  first) — see [work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow]'s kdoc
-     *  for why Android buckets by week rather than the web app's per-day grid. */
+     *  first) — backs the accessible list; see [dailyActivity] for the decorative primitive's
+     *  own (higher-resolution) data. */
     private fun weeklyActivity(viewings: List<ViewingEntity>): List<LedgerWeeklyActivity> {
         val today = LocalDate.now()
         val dates = viewings.mapNotNull { parseLocalDate(it.date) }
@@ -217,6 +299,16 @@ class LedgerRepository(
             val count = dates.count { it in weekStart..weekEnd }
             LedgerWeeklyActivity(weekStart.format(DateTimeFormatter.ofPattern("MMM d")), count)
         }
+    }
+
+    /** Time in the Dark: true daily granularity for the trailing 52 weeks (364 days, oldest
+     *  first, Monday-aligned to match [weeklyActivity]'s week boundaries) — backs only
+     *  [work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid]'s 7×52 grid. */
+    private fun dailyActivity(viewings: List<ViewingEntity>): List<Int> {
+        val today = LocalDate.now()
+        val counts = viewings.mapNotNull { parseLocalDate(it.date) }.groupingBy { it }.eachCount()
+        val start = today.minusWeeks(51).with(DayOfWeek.MONDAY)
+        return (0 until 364).map { daysFromStart -> counts[start.plusDays(daysFromStart.toLong())] ?: 0 }
     }
 
     /** Encore Performances: titles with >=2 viewings (ledger.md §2). */
@@ -275,7 +367,9 @@ class LedgerRepository(
         val allDates = (viewings.map { it.date } + watchedAtDates)
             .mapNotNull { parseLocalDate(it) }
             .toSortedSet()
-        if (allDates.isEmpty()) return LedgerStreaks(0, 0, emptyList())
+        val today = LocalDate.now()
+        val last30Nights = (29 downTo 0).map { daysAgo -> allDates.contains(today.minusDays(daysAgo.toLong())) }
+        if (allDates.isEmpty()) return LedgerStreaks(0, 0, emptyList(), last30Nights)
 
         var longest = 1
         var run = 1
@@ -285,7 +379,6 @@ class LedgerRepository(
             longest = maxOf(longest, run)
         }
 
-        val today = LocalDate.now()
         var current = 0
         var cursor = if (allDates.contains(today)) today else today.minusDays(1)
         while (allDates.contains(cursor)) {
@@ -297,6 +390,7 @@ class LedgerRepository(
             currentStreakDays = current,
             longestStreakDays = longest,
             recentActiveDates = ordered.takeLast(10).map { it.toString() },
+            last30Nights = last30Nights,
         )
     }
 

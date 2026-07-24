@@ -26,8 +26,13 @@ data class LedgerBoard(
     val watchlist: List<LedgerWatchlistEntry>,
     /** Coming Attractions: total runtime owed across watchlisted movies only (TV excluded). */
     val watchlistMovieMinutesOwed: Int,
-    /** Time in the Dark: weekly viewing counts, oldest to newest (see [LedgerWeeklyActivity]). */
+    /** Time in the Dark: weekly viewing counts, oldest to newest (see [LedgerWeeklyActivity]) —
+     *  backs the accessible list beneath the heatmap. */
     val weeklyActivity: List<LedgerWeeklyActivity>,
+    /** Time in the Dark: daily viewing counts for the trailing 52 weeks (364 entries, oldest
+     *  to newest) — backs only the [work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid]
+     *  decorative primitive; the accessible list still reads [weeklyActivity]. */
+    val dailyActivity: List<Int>,
     /** Encore Performances: titles with >=2 viewings. */
     val encores: List<LedgerEncoreEntry>,
     /** The Run: monthly viewing counts, gap-filled, default 12mo window. */

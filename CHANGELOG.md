@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-07-23
+
 ### Added
 
 - Native Android app (in development, not yet distributed): pull-to-refresh on the Discover,
@@ -83,6 +85,39 @@ number is chosen.
   the system splash now shows the film-reel mark on the void background instead of a plain
   flash, then hands off into a Compose splash where the reel keeps spinning over a pulsing
   amber "projector beam" glow before crossfading into the app.
+- Native Android app (in development, not yet distributed): the Ledger board's custom layout
+  now pulls from `user_prefs.ledger_layout` on sign-in and app launch, not just push — a
+  layout customized on web (or another device) now shows up on Android without first making a
+  local edit, matching the documented "server wins on load" contract.
+- Native Android app (in development, not yet distributed): Ledger widgets now actually apply
+  their `timeRange`/`scope` settings (previously persisted and normalized but silently
+  ignored by every widget's computation) — e.g. a Genre widget scoped to "Films" now excludes
+  TV titles from its tally instead of only hiding the setting. Widgets whose panel exposes a
+  "top N" knob (By the Genre, The Auteurs, The Ensemble, Encore Performances, On the Air,
+  Second Opinions, In Translation, Still Rolling) also now cap at that panel's default (5 or
+  6) when uncustomized, matching the web app's own defaults instead of showing every item.
+- Native Android app (in development, not yet distributed): the Ledger board's hero section
+  gained a "now showing · {date}" kicker and a narrative sentence (title/screening/hour
+  counts) above the stat tiles, and the stat set grew from 4 tiles to 6 — Screenings and Days
+  in the dark join Movies, Series, Hours logged, and Avg rating.
+- Native Android app (in development, not yet distributed): three Ledger chart upgrades —
+  Time in the Dark's heatmap is now a true daily 7×52 grid instead of one week-granularity
+  row; Shifting Standards and Premieres & Revivals now render as connected line charts
+  instead of bars; The Marathon gained an additive "last 30 nights" activity grid alongside
+  its existing streak-count text. Every widget's existing accessible list is unchanged — these
+  are decorative-primitive upgrades only.
+- Native Android app (in development, not yet distributed): Ledger edit-mode capability
+  parity — long-press-and-drag reorder and drag-to-resize (the existing up/down buttons and
+  tap-to-cycle-width control stay as keyboard/switch-access-friendly fallbacks), a duplicate
+  action per widget, a "Reset to default layout" action with a confirmation dialog, and an
+  "Add a widget" palette that now shows a live scaled preview of each panel's actual content,
+  a "×N already on board" usage badge, and stays addable even for panels already on the board
+  (so a panel can appear multiple times) plus supports long-press-drag to place a new widget
+  at a specific position instead of only appending.
+- Native Android app (in development, not yet distributed): a per-widget settings sheet in
+  Ledger edit mode with segmented Scope (All/Films/Series) and Time range (All time/5 yr/This
+  year/12 mo) controls, shown only for panels that actually honor those settings — the last
+  piece of `timeRange`/`scope` parity, now that widgets consume them.
 
 ### Changed
 
@@ -113,6 +148,10 @@ number is chosen.
 
 ### Fixed
 
+- The web app failed to build (`tsc -b` errored on `src/views/UpNext.tsx`) — a prior refactor
+  that removed most `useShallow` selector usage dropped the import entirely, but one selector
+  in `UpNext` (owner-only `outings`/`titles`/`isSharedView`) still genuinely needed it to avoid
+  re-rendering on every store change. Restored the missing import.
 - Native Android app (in development, not yet distributed): the Ledger "Still Rolling" widget
   showed the wrong episode-watched count for shows tracked episode-by-episode — sometimes 0
   even with real progress — because it trusted the synced `seasons.episodesWatched` column,

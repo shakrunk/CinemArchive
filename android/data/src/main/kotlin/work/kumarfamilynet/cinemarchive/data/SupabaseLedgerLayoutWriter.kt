@@ -19,6 +19,19 @@ class SupabaseLedgerLayoutWriter(private val client: SupabaseRestClient) {
         client.upsert("user_prefs", session.accessToken, body.toString(), onConflict = "user_id")
     }
 
+    /** Reads `user_prefs.ledger_layout` back — the pull half of ledger.md §4's contract.
+     *  Returns null when no row exists yet or the column itself is null (server has never
+     *  synced a layout for this user), which [resolveLayoutReconciliation] treats the same
+     *  as "push the client's current layout up." */
+    fun fetchLayoutJson(session: SupabaseSession): String? {
+        val rows = JSONArray(
+            client.get("user_prefs", "user_id=eq.${session.userId}&select=ledger_layout", session.accessToken),
+        )
+        if (rows.length() == 0) return null
+        val row = rows.getJSONObject(0)
+        return if (row.isNull("ledger_layout")) null else row.getJSONArray("ledger_layout").toString()
+    }
+
     private fun LedgerWidgetConfig.toJson(): JSONObject {
         val obj = JSONObject().put("id", id).put("panel", panel.raw).put("width", width.raw)
         settings?.let { s ->

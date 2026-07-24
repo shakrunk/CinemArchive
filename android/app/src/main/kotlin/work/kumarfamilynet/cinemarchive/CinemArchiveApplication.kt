@@ -4,6 +4,9 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
@@ -115,5 +118,18 @@ class CinemArchiveApplication : Application() {
             outingsRepository.completeDueOutings()
         }
         applicationScope.launch { outbox.flush() }
+        // Ledger layout pull-on-sign-in/launch (docs/superpowers/plans/2026-07-23-android-
+        // ledger-parity.md Phase A, ledger.md §4). observeSession() is a StateFlow, so
+        // collecting it immediately replays whatever session is already stored — that single
+        // subscription covers both "already signed in at cold start" and "just signed in
+        // during this process's lifetime" without a second call site. distinctUntilChanged on
+        // userId (not the whole session) skips token-refresh emissions, which share a userId.
+        applicationScope.launch {
+            authRepository.observeSession()
+                .map { it?.userId }
+                .distinctUntilChanged()
+                .filterNotNull()
+                .collect { ledgerLayoutRepository.reconcile() }
+        }
     }
 }

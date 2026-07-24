@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-authored fixture for docs/android-contracts/title-detail.md. Full TITLE_SELECT-shaped payload for a single TV title, per mapDbTitleToLocal in src/lib/db.ts. Not exported from a live database.",
+  "$comment": "Hand-authored fixture for docs/android-contracts/title-detail.md. Full TITLE_SELECT-shaped payload for a single TV title, per mapDbTitleToLocal in apps/web/src/lib/db.ts. Not exported from a live database.",
   "id": "7c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
   "tmdbId": 1396,
   "type": "tv",

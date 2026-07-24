@@ -2,7 +2,7 @@
 // Real server-side gate for invite-only signup: creates an auth.users row
 // only when a valid, unredeemed invite code is presented. Uses the service
 // role key (admin API) — this is the only place account creation happens;
-// src/lib/auth.ts calls signInWithOtp with shouldCreateUser: false, so the
+// apps/web/src/lib/auth.ts calls signInWithOtp with shouldCreateUser: false, so the
 // normal sign-in flow can never create an account on its own.
 // Deploy with: supabase functions deploy redeem-invite
 
@@ -48,7 +48,7 @@ async function checkRateLimit(ipHash: string, email: string): Promise<boolean> {
 // Always responds 200 — supabase-js's functions.invoke() surfaces non-2xx
 // responses as a generic FunctionsHttpError and discards the JSON body, so a
 // friendly { error } message only reaches the client on a 2xx response.
-// src/lib/auth.ts's redeemInvite() checks data?.error to distinguish this
+// apps/web/src/lib/auth.ts's redeemInvite() checks data?.error to distinguish this
 // from the { success: true } happy path.
 function fail(message: string): Response {
   return new Response(JSON.stringify({ error: message }), {

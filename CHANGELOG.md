@@ -104,6 +104,14 @@ number is chosen.
   instead of bars; The Marathon gained an additive "last 30 nights" activity grid alongside
   its existing streak-count text. Every widget's existing accessible list is unchanged — these
   are decorative-primitive upgrades only.
+- Native Android app (in development, not yet distributed): Ledger edit-mode capability
+  parity — long-press-and-drag reorder and drag-to-resize (the existing up/down buttons and
+  tap-to-cycle-width control stay as keyboard/switch-access-friendly fallbacks), a duplicate
+  action per widget, a "Reset to default layout" action with a confirmation dialog, and an
+  "Add a widget" palette that now shows a live scaled preview of each panel's actual content,
+  a "×N already on board" usage badge, and stays addable even for panels already on the board
+  (so a panel can appear multiple times) plus supports long-press-drag to place a new widget
+  at a specific position instead of only appending.
 
 ### Changed
 

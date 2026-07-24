@@ -3,8 +3,12 @@ package work.kumarfamilynet.cinemarchive.feature.ledger
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.BorderStroke
@@ -25,10 +30,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,9 +51,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -237,6 +254,7 @@ fun LedgerScreen(
             LedgerEditModeContent(
                 modifier = Modifier.fillMaxSize(),
                 layout = layout,
+                boards = uiState.boards,
                 onLayoutChange = onLayoutChange,
             )
         } else {
@@ -471,62 +489,173 @@ private fun CategorySection(title: String, entries: List<LedgerCategoryCount>) {
     entries.forEach { CategoryRow(it) }
 }
 
+/** Fallback row height (dp) used to convert a reorder drag's accumulated pixel offset into
+ *  "how many rows has this crossed" — an approximation (real [EditableWidgetRow]s vary a bit
+ *  with content), not a measured value, since a drag-swap decision only needs "roughly one row
+ *  of travel," not pixel precision. */
+private const val EDIT_ROW_HEIGHT_DP = 140
+private const val RESIZE_STEP_DP = 56f
+
 /**
  * Add/remove/move/resize/settings for the local layout — every action updates state
  * synchronously (matching ledger.md §4's "instant UI feedback" rule for the *local* half of
  * that write path; only the debounced remote upsert is out of reach here).
+ *
+ * Reordering (drag or the up/down buttons — the buttons stay as a keyboard/switch-access-
+ * friendly fallback, not replaced by the gesture) and inserting a widget dragged from the
+ * palette both go through the same local, optimistic [draggedList] state while a drag is in
+ * flight: [onLayoutChange] only fires once, on release, with the final order — never
+ * mid-drag — so a burst of swap decisions within one gesture can't race the async
+ * DataStore round-trip [layout] itself flows through.
  */
 @Composable
 private fun LedgerEditModeContent(
     modifier: Modifier,
     layout: List<LedgerWidgetConfig>,
+    boards: Map<String, LedgerBoard>,
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit,
 ) {
-    val presentPanels = layout.map { it.panel }.toSet()
-    val availablePanels = LedgerWidgetId.entries.filter { it !in presentPanels }
+    var draggedList by remember { mutableStateOf<List<LedgerWidgetConfig>?>(null) }
+    var draggedWidgetId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var showResetConfirm by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val rowHeightPx = remember(density) { with(density) { EDIT_ROW_HEIGHT_DP.dp.toPx() } }
+
+    val displayedLayout = draggedList ?: layout
+    val presentCounts = displayedLayout.groupingBy { it.panel }.eachCount()
+    val previewBoard = boards.values.firstOrNull()
+
+    fun beginDrag(startingList: List<LedgerWidgetConfig>, widgetId: String) {
+        draggedList = startingList
+        draggedWidgetId = widgetId
+        dragOffsetPx = 0f
+    }
+
+    fun applyDragDelta(deltaY: Float) {
+        val id = draggedWidgetId ?: return
+        val current = draggedList ?: return
+        val config = current.find { it.id == id } ?: return
+        dragOffsetPx += deltaY
+        var working = current
+        while (dragOffsetPx > rowHeightPx / 2 && working.last().id != id) {
+            working = working.moved(config, +1)
+            dragOffsetPx -= rowHeightPx
+        }
+        while (dragOffsetPx < -rowHeightPx / 2 && working.first().id != id) {
+            working = working.moved(config, -1)
+            dragOffsetPx += rowHeightPx
+        }
+        draggedList = working
+    }
+
+    fun endDrag() {
+        draggedList?.let(onLayoutChange)
+        draggedList = null
+        draggedWidgetId = null
+        dragOffsetPx = 0f
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
     ) {
-        item { SectionHeader("On the board") }
-        items(layout, key = { it.id }) { config ->
-            EditableWidgetRow(
-                config = config,
-                canMoveUp = layout.first() != config,
-                canMoveDown = layout.last() != config,
-                onMoveUp = { onLayoutChange(layout.moved(config, -1)) },
-                onMoveDown = { onLayoutChange(layout.moved(config, 1)) },
-                onRemove = { onLayoutChange(layout.filterNot { it.id == config.id }) },
-                onCycleWidth = { onLayoutChange(layout.map { if (it.id == config.id) it.copy(width = it.width.next()) else it }) },
-                onSettingsChange = { settings ->
-                    onLayoutChange(layout.map { if (it.id == config.id) it.copy(settings = settings) else it })
-                },
-            )
-        }
-
-        if (availablePanels.isNotEmpty()) {
-            item { SectionHeader("Add a widget") }
-            items(availablePanels, key = { "add-${it.raw}" }) { panel ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        val newWidget = LedgerLayoutRules.defaultLedgerWidgets().first { it.panel == panel }
-                            .copy(id = "widget-${panel.raw}-${layout.size}")
-                        onLayoutChange(layout + newWidget)
-                    },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(PANEL_LABELS[panel] ?: panel.raw, style = MaterialTheme.typography.bodyMedium)
-                    Text("+ Add", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionHeader("On the board")
+                TextButton(onClick = { showResetConfirm = true }) {
+                    Icon(Icons.Filled.RestartAlt, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("Reset")
                 }
             }
         }
+        items(displayedLayout, key = { it.id }) { config ->
+            val index = displayedLayout.indexOf(config)
+            EditableWidgetRow(
+                config = config,
+                canMoveUp = index > 0,
+                canMoveDown = index < displayedLayout.lastIndex,
+                isBeingDragged = config.id == draggedWidgetId,
+                onMoveUp = { onLayoutChange(layout.moved(config, -1)) },
+                onMoveDown = { onLayoutChange(layout.moved(config, 1)) },
+                onRemove = { onLayoutChange(layout.filterNot { it.id == config.id }) },
+                onDuplicate = {
+                    val sourceIndex = layout.indexOfFirst { it.id == config.id }
+                    val duplicate = config.copy(id = "widget-${config.panel.raw}-${UUID.randomUUID()}")
+                    onLayoutChange(layout.toMutableList().apply { add(sourceIndex + 1, duplicate) })
+                },
+                onCycleWidth = { onLayoutChange(layout.map { if (it.id == config.id) it.copy(width = it.width.next()) else it }) },
+                onResizeCommit = { newWidth ->
+                    onLayoutChange(layout.map { if (it.id == config.id) it.copy(width = newWidth) else it })
+                },
+                onSettingsChange = { settings ->
+                    onLayoutChange(layout.map { if (it.id == config.id) it.copy(settings = settings) else it })
+                },
+                onReorderDragStart = { beginDrag(layout, config.id) },
+                onReorderDrag = ::applyDragDelta,
+                onReorderDragEnd = ::endDrag,
+            )
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SectionHeader("Add a widget")
+                Text(
+                    "Long-press and drag to place",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        items(LedgerWidgetId.entries, key = { "add-${it.raw}" }) { panel ->
+            val defaultConfig = remember(panel) { LedgerLayoutRules.defaultLedgerWidgets().first { it.panel == panel } }
+            PaletteRow(
+                panel = panel,
+                usageCount = presentCounts[panel] ?: 0,
+                previewConfig = defaultConfig,
+                previewBoard = previewBoard,
+                onAdd = {
+                    val newWidget = defaultConfig.copy(id = "widget-${panel.raw}-${UUID.randomUUID()}")
+                    onLayoutChange(layout + newWidget)
+                },
+                onDragStart = {
+                    val newWidget = defaultConfig.copy(id = "widget-${panel.raw}-${UUID.randomUUID()}")
+                    beginDrag(layout + newWidget, newWidget.id)
+                },
+                onDrag = ::applyDragDelta,
+                onDragEnd = ::endDrag,
+            )
+        }
+    }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Reset to default layout?") },
+            text = { Text("Replaces your current board with the default widget order and removes every customization. This can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onLayoutChange(LedgerLayoutRules.defaultLedgerWidgets())
+                    showResetConfirm = false
+                }) { Text("Reset") }
+            },
+            dismissButton = { TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") } },
+        )
     }
 }
 
 private fun List<LedgerWidgetConfig>.moved(config: LedgerWidgetConfig, delta: Int): List<LedgerWidgetConfig> {
-    val index = indexOf(config)
+    val index = indexOfFirst { it.id == config.id }
+    if (index < 0) return this
     val target = (index + delta).coerceIn(0, size - 1)
     if (target == index) return this
     return toMutableList().apply {
@@ -540,60 +669,225 @@ private fun LedgerWidgetWidth.next(): LedgerWidgetWidth {
     return values[(values.indexOf(this) + 1) % values.size]
 }
 
+private fun LedgerWidgetWidth.steppedBy(steps: Int): LedgerWidgetWidth {
+    val values = LedgerWidgetWidth.entries
+    return values[(values.indexOf(this) + steps).coerceIn(0, values.lastIndex)]
+}
+
 @Composable
 private fun EditableWidgetRow(
     config: LedgerWidgetConfig,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
+    isBeingDragged: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
+    onDuplicate: () -> Unit,
     onCycleWidth: () -> Unit,
+    onResizeCommit: (LedgerWidgetWidth) -> Unit,
     onSettingsChange: (LedgerWidgetSettings?) -> Unit,
+    onReorderDragStart: () -> Unit,
+    onReorderDrag: (Float) -> Unit,
+    onReorderDragEnd: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(config.settings?.title ?: PANEL_LABELS[config.panel] ?: config.panel.raw, style = MaterialTheme.typography.bodyMedium)
-            Row {
-                IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+    // Local-only while a resize drag is in flight (C2): committed via onResizeCommit on
+    // release, same "no mid-drag onLayoutChange" posture as the reorder drag above.
+    var resizeDragWidth by remember(config.id) { mutableStateOf<LedgerWidgetWidth?>(null) }
+    var resizeAccumDp by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+
+    Surface(
+        tonalElevation = if (isBeingDragged) 8.dp else 0.dp,
+        shadowElevation = if (isBeingDragged) 8.dp else 0.dp,
+        color = if (isBeingDragged) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(if (isBeingDragged) 8.dp else 0.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        Icons.Filled.DragHandle,
+                        contentDescription = "Drag to reorder",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .pointerInput(config.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { onReorderDragStart() },
+                                    onDrag = { change, dragAmount -> change.consume(); onReorderDrag(dragAmount.y) },
+                                    onDragEnd = { onReorderDragEnd() },
+                                    onDragCancel = { onReorderDragEnd() },
+                                )
+                            },
+                    )
+                    Text(
+                        config.settings?.title ?: PANEL_LABELS[config.panel] ?: config.panel.raw,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
-                IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                Row {
+                    IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                    }
+                    IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                    }
+                    IconButton(onClick = onDuplicate) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = "Duplicate widget")
+                    }
+                    IconButton(onClick = onRemove) {
+                        Icon(Icons.Filled.Close, contentDescription = "Remove widget")
+                    }
                 }
-                TextButton(onClick = onCycleWidth) { Text(config.width.raw) }
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove widget")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Text("Width: ", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onCycleWidth) { Text((resizeDragWidth ?: config.width).raw) }
+                // C2's drag handle: horizontal drag cycles through the same 4 width presets as
+                // the tap-to-cycle button above, snapping on release -- clamped at the ends
+                // (not wrapping, unlike the tap button) since a drag past FULL/SM shouldn't
+                // wrap back around.
+                Icon(
+                    Icons.Filled.DragHandle,
+                    contentDescription = "Drag to resize",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .pointerInput(config.id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { resizeDragWidth = config.width; resizeAccumDp = 0f },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    with(density) { resizeAccumDp += dragAmount.x.toDp().value }
+                                    val steps = (resizeAccumDp / RESIZE_STEP_DP).toInt()
+                                    if (steps != 0) {
+                                        resizeDragWidth = (resizeDragWidth ?: config.width).steppedBy(steps)
+                                        resizeAccumDp -= steps * RESIZE_STEP_DP
+                                    }
+                                },
+                                onDragEnd = {
+                                    resizeDragWidth?.let(onResizeCommit)
+                                    resizeDragWidth = null
+                                    resizeAccumDp = 0f
+                                },
+                                onDragCancel = { resizeDragWidth = null; resizeAccumDp = 0f },
+                            )
+                        },
+                )
+            }
+            OutlinedTextField(
+                value = config.settings?.title ?: "",
+                onValueChange = { newTitle ->
+                    val title = newTitle.take(60).ifBlank { null }
+                    onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(title = title))
+                },
+                label = { Text("Custom title") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (config.panel.honorsLedgerSetting(LedgerSettingKey.TOP_N)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Top N: ", style = MaterialTheme.typography.bodySmall)
+                    val topN = config.settings?.topN
+                    IconButton(onClick = {
+                        val next = ((topN ?: 12) - 1).coerceIn(3, 12)
+                        onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
+                    }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease top N") }
+                    Text(topN?.toString() ?: "off", style = MaterialTheme.typography.bodySmall)
+                    IconButton(onClick = {
+                        val next = ((topN ?: 2) + 1).coerceIn(3, 12)
+                        onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
+                    }) { Icon(Icons.Filled.Add, contentDescription = "Increase top N") }
+                    if (topN != null) {
+                        TextButton(onClick = { onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = null)) }) {
+                            Text("Clear")
+                        }
+                    }
                 }
             }
         }
-        OutlinedTextField(
-            value = config.settings?.title ?: "",
-            onValueChange = { newTitle ->
-                val title = newTitle.take(60).ifBlank { null }
-                onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(title = title))
-            },
-            label = { Text("Custom title") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Top N: ", style = MaterialTheme.typography.bodySmall)
-            val topN = config.settings?.topN
-            IconButton(onClick = {
-                val next = ((topN ?: 12) - 1).coerceIn(3, 12)
-                onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
-            }) { Icon(Icons.Filled.Remove, contentDescription = "Decrease top N") }
-            Text(topN?.toString() ?: "off", style = MaterialTheme.typography.bodySmall)
-            IconButton(onClick = {
-                val next = ((topN ?: 2) + 1).coerceIn(3, 12)
-                onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = next))
-            }) { Icon(Icons.Filled.Add, contentDescription = "Increase top N") }
-            if (topN != null) {
-                TextButton(onClick = { onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(topN = null)) }) {
-                    Text("Clear")
-                }
+    }
+}
+
+/** One row in the "Add a widget" palette (C3/C4/C7): a live scaled preview of the panel's
+ *  actual rendered content (not a bare text row), a "×N already on board" usage badge when
+ *  [usageCount] > 0, a tap-to-append "+ Add" action, and a long-press-drag affordance that
+ *  inserts a fresh instance into [LedgerEditModeContent]'s shared drag/reorder state
+ *  immediately on drag start, so dropping it anywhere in "On the board" places it at that
+ *  position (see [LedgerEditModeContent]'s kdoc). Every panel stays addable regardless of
+ *  [usageCount] — C5's duplicate-from-row is the alternative path for cloning an already-
+ *  configured instance; this path always starts from that panel's defaults. */
+@Composable
+private fun PaletteRow(
+    panel: LedgerWidgetId,
+    usageCount: Int,
+    previewConfig: LedgerWidgetConfig,
+    previewBoard: LedgerBoard?,
+    onAdd: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onAdd)
+            .pointerInput(panel) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { onDragStart() },
+                    onDrag = { change, dragAmount -> change.consume(); onDrag(dragAmount.y) },
+                    onDragEnd = { onDragEnd() },
+                    onDragCancel = { onDragEnd() },
+                )
             }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (previewBoard != null) {
+            WidgetPreviewThumbnail(config = previewConfig, board = previewBoard, modifier = Modifier.padding(end = 12.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(PANEL_LABELS[panel] ?: panel.raw, style = MaterialTheme.typography.bodyMedium)
+            if (usageCount > 0) {
+                Text(
+                    "×$usageCount already on board",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Icon(Icons.Filled.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 8.dp))
+        Text("+ Add", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** A small, non-interactive, non-scrolling render of a widget's actual content (C4) — the
+ *  real [WidgetContent] composable scaled down via [graphicsLayer], not a bare text row, so
+ *  the palette shows what a panel actually looks like before it's added. Uses whatever board
+ *  data is on hand (the caller passes any already-computed board — precision isn't the point
+ *  here, a representative preview is). */
+@Composable
+private fun WidgetPreviewThumbnail(config: LedgerWidgetConfig, board: LedgerBoard, modifier: Modifier = Modifier) {
+    val scale = 0.28f
+    val thumbWidth = 84.dp
+    Box(
+        modifier = modifier
+            .width(thumbWidth)
+            .height((CARD_HEIGHT_DP * scale).dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+    ) {
+        Column(
+            modifier = Modifier
+                .width(thumbWidth / scale)
+                .height(CARD_HEIGHT_DP.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f) }
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            WidgetContent(config, board)
         }
     }
 }

@@ -13,7 +13,7 @@ It's a JAMstack app: a static React frontend on GitHub Pages, backed by a shared
 | Client | Location | Notes |
 |--------|----------|-------|
 | Web | [`apps/web/`](apps/web/README.md) | Vite + React + TypeScript, deployed to GitHub Pages. See [apps/web/README.md](apps/web/README.md) for its stack, project structure, and local dev setup. |
-| Android | `android/` | Kotlin + Jetpack Compose (module layout: `app`, `core:model`, `core:designsystem`, `core:database`, `data`, `feature:{auth,library,discover,upnext,ledger,settings}`). Room-backed local database with an outbox-based incremental sync layer (`sync_tombstones`, see `docs/android-sync-contract.md`). Pre-distribution (not yet published to Play). Tracks feature parity with the web app domain by domain — see `docs/android-parity-matrix.md` and `docs/android-implementation-status.md`, and `docs/android-contracts/` for the per-domain field/RLS/fixture contracts. **Not yet moved** to `apps/android/`; see [docs/repo-restructure-plan.md](docs/repo-restructure-plan.md). |
+| Android | `apps/android/` | Kotlin + Jetpack Compose (module layout: `app`, `core:model`, `core:designsystem`, `core:database`, `data`, `feature:{auth,library,discover,upnext,ledger,settings}`). Room-backed local database with an outbox-based incremental sync layer (`sync_tombstones`, see `docs/android-sync-contract.md`). Pre-distribution (not yet published to Play). Tracks feature parity with the web app domain by domain — see `docs/android-parity-matrix.md` and `docs/android-implementation-status.md`, and `docs/android-contracts/` for the per-domain field/RLS/fixture contracts. |
 
 Each client has its own nested `CLAUDE.md` with client-specific guidance for Claude Code, layered on top of the repo-root [CLAUDE.md](CLAUDE.md).
 

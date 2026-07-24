@@ -5,28 +5,24 @@ repository. It covers repo-wide conventions that apply to every client. Client-s
 guidance lives in nested `CLAUDE.md` files, auto-discovered by directory:
 
 - [apps/web/CLAUDE.md](apps/web/CLAUDE.md) — the web app (Vite + React + TypeScript)
-- `android/CLAUDE.md` (not yet added) — the Android app (Kotlin + Jetpack Compose)
+- [apps/android/CLAUDE.md](apps/android/CLAUDE.md) — the Android app (Kotlin + Jetpack Compose)
 
 ## Project Overview
 
 **CinemArchive (The Projection Room v2)** is a personal movie and TV series tracking app with
 a cinematic dark-gold aesthetic, backed by a shared Supabase project (Postgres + Auth + Edge
-Functions) and TMDB/OMDb for media metadata. It ships two clients today: a web app (static
-React, deployed to GitHub Pages) and a native Android app — see `README.md` for the full
-feature list and architecture docs, and [docs/repo-restructure-plan.md](docs/repo-restructure-plan.md)
-for how this multi-client layout is organized.
-
-> **Repo layout note:** this repo is mid-migration to the `apps/<platform>/` layout described
-> in [docs/adr/0002-multi-platform-repo-layout.md](docs/adr/0002-multi-platform-repo-layout.md).
-> The web app has moved to `apps/web/`. `android/` has **not** moved yet — it stays at the repo
-> root, unchanged, until its own migration lands as a separate, coordinated step (see that ADR's
-> companion plan for why the two moves aren't bundled together).
+Functions) and TMDB/OMDb for media metadata. It ships two clients today, each a sibling under
+`apps/<platform>/` with equal structural standing: a web app (static React, deployed to GitHub
+Pages) and a native Android app — see `README.md` for the full feature list and architecture
+docs, and [docs/repo-restructure-plan.md](docs/repo-restructure-plan.md) /
+[docs/adr/0002-multi-platform-repo-layout.md](docs/adr/0002-multi-platform-repo-layout.md) for
+why this layout was adopted and the checklist for onboarding a future platform (iOS, etc.).
 
 ## Repository layout
 
 ```
 apps/web/          # Web app (Vite + React + TypeScript) — see apps/web/CLAUDE.md
-android/           # Android app (Kotlin + Jetpack Compose) — pending move to apps/android/
+apps/android/      # Android app (Kotlin + Jetpack Compose) — see apps/android/CLAUDE.md
 supabase/          # Shared backend: migrations/, functions/ (consumed by every client)
 schema.sql         # Canonical, human-readable copy of the shared DB schema + RLS policies
 docs/              # Repo-wide docs: ADRs, Android↔web contract docs, known problems, etc.

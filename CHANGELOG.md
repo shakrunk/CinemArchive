@@ -112,6 +112,10 @@ number is chosen.
   a "×N already on board" usage badge, and stays addable even for panels already on the board
   (so a panel can appear multiple times) plus supports long-press-drag to place a new widget
   at a specific position instead of only appending.
+- Native Android app (in development, not yet distributed): a per-widget settings sheet in
+  Ledger edit mode with segmented Scope (All/Films/Series) and Time range (All time/5 yr/This
+  year/12 mo) controls, shown only for panels that actually honor those settings — the last
+  piece of `timeRange`/`scope` parity, now that widgets consume them.
 
 ### Changed
 

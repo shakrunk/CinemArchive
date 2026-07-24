@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,6 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,10 +78,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.BarChartCanvas
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
+import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
 import work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow
 import work.kumarfamilynet.cinemarchive.core.designsystem.LineChartCanvas
+import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
@@ -519,6 +523,7 @@ private fun LedgerEditModeContent(
     var draggedWidgetId by remember { mutableStateOf<String?>(null) }
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
     var showResetConfirm by remember { mutableStateOf(false) }
+    var settingsSheetWidgetId by remember { mutableStateOf<String?>(null) }
     val density = LocalDensity.current
     val rowHeightPx = remember(density) { with(density) { EDIT_ROW_HEIGHT_DP.dp.toPx() } }
 
@@ -596,6 +601,9 @@ private fun LedgerEditModeContent(
                 onSettingsChange = { settings ->
                     onLayoutChange(layout.map { if (it.id == config.id) it.copy(settings = settings) else it })
                 },
+                onOpenSettings = { settingsSheetWidgetId = config.id }.takeIf {
+                    config.panel.honorsLedgerSetting(LedgerSettingKey.TIME_RANGE) || config.panel.honorsLedgerSetting(LedgerSettingKey.SCOPE)
+                },
                 onReorderDragStart = { beginDrag(layout, config.id) },
                 onReorderDrag = ::applyDragDelta,
                 onReorderDragEnd = ::endDrag,
@@ -651,6 +659,20 @@ private fun LedgerEditModeContent(
             dismissButton = { TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") } },
         )
     }
+
+    // Looked up by id (not carried as a captured config) so the sheet always reflects the
+    // widget's current settings, including edits made through the sheet itself, and closes
+    // gracefully (no match) if the row is removed while the sheet is open.
+    val settingsSheetWidget = layout.find { it.id == settingsSheetWidgetId }
+    if (settingsSheetWidget != null) {
+        LedgerWidgetSettingsSheet(
+            config = settingsSheetWidget,
+            onSettingsChange = { settings ->
+                onLayoutChange(layout.map { if (it.id == settingsSheetWidget.id) it.copy(settings = settings) else it })
+            },
+            onDismiss = { settingsSheetWidgetId = null },
+        )
+    }
 }
 
 private fun List<LedgerWidgetConfig>.moved(config: LedgerWidgetConfig, delta: Int): List<LedgerWidgetConfig> {
@@ -687,6 +709,9 @@ private fun EditableWidgetRow(
     onCycleWidth: () -> Unit,
     onResizeCommit: (LedgerWidgetWidth) -> Unit,
     onSettingsChange: (LedgerWidgetSettings?) -> Unit,
+    // Null when this panel honors neither `timeRange` nor `scope` per PANEL_SETTING_KEYS --
+    // C8's settings sheet has nothing to show such a panel, so its entry point doesn't render.
+    onOpenSettings: (() -> Unit)?,
     onReorderDragStart: () -> Unit,
     onReorderDrag: (Float) -> Unit,
     onReorderDragEnd: () -> Unit,
@@ -736,6 +761,11 @@ private fun EditableWidgetRow(
                     }
                     IconButton(onClick = onDuplicate) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = "Duplicate widget")
+                    }
+                    if (onOpenSettings != null) {
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Filled.Tune, contentDescription = "Widget settings")
+                        }
                     }
                     IconButton(onClick = onRemove) {
                         Icon(Icons.Filled.Close, contentDescription = "Remove widget")
@@ -888,6 +918,63 @@ private fun WidgetPreviewThumbnail(config: LedgerWidgetConfig, board: LedgerBoar
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             WidgetContent(config, board)
+        }
+    }
+}
+
+private val SCOPE_OPTIONS = listOf(
+    ChoiceOption("all", "All"),
+    ChoiceOption("movies", "Films"),
+    ChoiceOption("tv", "Series"),
+)
+
+private val TIME_RANGE_OPTIONS = listOf(
+    ChoiceOption("all", "All time"),
+    ChoiceOption("5y", "5 yr"),
+    ChoiceOption("ytd", "This year"),
+    ChoiceOption("12mo", "12 mo"),
+)
+
+/**
+ * C8: `timeRange`/`scope` controls for one widget, gated to only the knobs its panel actually
+ * honors (per [PANEL_SETTING_KEYS] — [LedgerEditModeContent] only offers the entry point to
+ * this sheet for a panel honoring at least one of them). Selected values reflect
+ * [effectiveLedgerSettings] (the panel default when unset), not a raw null, so the sheet never
+ * shows a knob as unset when a default is quietly already in effect; picking a segment always
+ * writes it explicitly rather than leaving it implicit.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LedgerWidgetSettingsSheet(
+    config: LedgerWidgetConfig,
+    onSettingsChange: (LedgerWidgetSettings?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val effective = effectiveLedgerSettings(config.panel, config.settings)
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp, 0.dp, 20.dp, 28.dp)) {
+            Text(
+                "${PANEL_LABELS[config.panel] ?: config.panel.raw} settings",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            if (config.panel.honorsLedgerSetting(LedgerSettingKey.SCOPE)) {
+                Text("Scope", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 8.dp))
+                SegmentedGroup(
+                    options = SCOPE_OPTIONS,
+                    selected = effective.scope,
+                    onSelect = { scope -> onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(scope = scope)) },
+                    modifier = Modifier.padding(bottom = 20.dp),
+                )
+            }
+            if (config.panel.honorsLedgerSetting(LedgerSettingKey.TIME_RANGE)) {
+                Text("Time range", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 8.dp))
+                SegmentedGroup(
+                    options = TIME_RANGE_OPTIONS,
+                    selected = effective.timeRange,
+                    onSelect = { timeRange -> onSettingsChange((config.settings ?: LedgerWidgetSettings()).copy(timeRange = timeRange)) },
+                )
+            }
         }
     }
 }

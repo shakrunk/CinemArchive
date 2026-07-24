@@ -26,7 +26,7 @@ import {
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
-import { cn, fmtDateShort, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
+import { cn, fmtDateShort, getErrorMessage, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
@@ -85,9 +85,9 @@ function FriendsSection() {
       setFriendEmail('')
       setMessage({ type: 'success', text: 'Friend request sent.' })
       await loadFriendships()
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage({ type: 'error', text: err.message || 'Failed to send friend request.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send friend request.') })
     } finally {
       setSending(false)
     }
@@ -117,9 +117,9 @@ function FriendsSection() {
       await cancelFriendRequest(recipientId)
       setMessage({ type: 'success', text: 'Friend request cancelled.' })
       await Promise.all([loadFriendships(), loadSuggestions()])
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to cancel friend request:', err)
-      setMessage({ type: 'error', text: err.message || 'Failed to cancel friend request.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to cancel friend request.') })
     }
   }
 
@@ -149,9 +149,9 @@ function FriendsSection() {
       setSuggestions((prev) => prev.filter((s) => s.user_id !== suggestion.user_id))
       setMessage({ type: 'success', text: 'Friend request sent.' })
       await loadFriendships()
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setMessage({ type: 'error', text: err.message || 'Failed to send friend request.' })
+      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to send friend request.') })
     }
   }
 

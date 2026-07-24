@@ -187,6 +187,7 @@ function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNext
     if (!title) return
     const id = setTimeout(() => onDismissRef.current(title.id), UNDO_WINDOW_MS)
     return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on title?.id only, see comment above
   }, [title?.id])
 
   function handleUndo() {

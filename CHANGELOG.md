@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-07-24
+
 ### Fixed
 
 - Native Android app (in development, not yet distributed): Ledger widgets backed by category

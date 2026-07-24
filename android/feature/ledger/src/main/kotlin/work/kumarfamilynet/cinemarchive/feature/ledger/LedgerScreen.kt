@@ -59,8 +59,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.BarChartCanvas
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
+import work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
 import work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow
+import work.kumarfamilynet.cinemarchive.core.designsystem.LineChartCanvas
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
@@ -388,7 +390,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
         LedgerWidgetId.ACTIVITY -> {
             SectionHeader(title)
             if (board.weeklyActivity.any { it.count > 0 }) {
-                HeatmapRow(values = board.weeklyActivity.map { it.count })
+                DailyHeatmapGrid(values = board.dailyActivity)
                 board.weeklyActivity.filter { it.count > 0 }.applyTopN(config).forEach {
                     CategoryRow(LedgerCategoryCount("Week of ${it.weekLabel}", it.count))
                 }
@@ -425,6 +427,9 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
         }
         LedgerWidgetId.STREAKS -> {
             SectionHeader(title)
+            if (board.streaks.last30Nights.any { it }) {
+                HeatmapRow(values = board.streaks.last30Nights.map { if (it) 1 else 0 })
+            }
             StreakSummary(board.streaks)
         }
         LedgerWidgetId.TRAJECTORY -> {
@@ -432,7 +437,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
             val entries = board.trajectory.applyTopN(config)
             if (entries.isEmpty()) EmptyRow("No rated, dated titles yet.")
             else {
-                BarChartCanvas(data = entries.map { ChartDatum(it.quarterLabel, it.averageRating.toFloat()) })
+                LineChartCanvas(data = entries.map { ChartDatum(it.quarterLabel, it.averageRating.toFloat()) })
                 entries.forEach { QuarterRow(it) }
             }
         }
@@ -440,7 +445,10 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
             SectionHeader(title)
             val entries = board.revivals.applyTopN(config)
             if (entries.isEmpty()) EmptyRow("No dated viewings logged yet.")
-            else entries.forEach { RevivalRow(it) }
+            else {
+                LineChartCanvas(data = entries.map { ChartDatum(it.monthLabel, (it.premieres + it.revivals).toFloat()) })
+                entries.forEach { RevivalRow(it) }
+            }
         }
         LedgerWidgetId.TIMEWARP -> CategorySection(title, board.timewarp.applyTopN(config))
         LedgerWidgetId.PROGRESS -> {

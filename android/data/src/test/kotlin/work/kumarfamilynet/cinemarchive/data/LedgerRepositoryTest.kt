@@ -411,6 +411,51 @@ class LedgerRepositoryTest {
     }
 
     @Test
+    fun `dailyActivity has exactly 364 entries and counts a viewing from 3 weeks ago`() = runTest {
+        val recentDate = LocalDate.now().minusWeeks(3)
+        val repository = LedgerRepository(
+            titleDao = FakeTitleDao(LedgerFixture.titles),
+            viewingDao = FakeViewingDao(
+                listOf(ViewingEntity(id = "recent", titleId = LedgerFixture.INCEPTION_ID, date = recentDate.toString(), rating = null, notes = null, venue = null)),
+            ),
+            titleCastDao = FakeTitleCastDao(emptyList()),
+            titleCrewDao = FakeTitleCrewDao(emptyList()),
+            cinemaOutingDao = FakeCinemaOutingDao(emptyList()),
+            watchEventDao = FakeEpisodeWatchEventDao(emptyList()),
+            seasonDao = FakeSeasonDao(emptyList()),
+            episodeDao = FakeEpisodeDao(emptyList()),
+        )
+
+        val board = repository.observeLedgerBoard().first()
+
+        assertEquals(364, board.dailyActivity.size)
+        assertEquals(1, board.dailyActivity.sum())
+    }
+
+    @Test
+    fun `The Marathon's last30Nights has exactly 30 entries and marks a viewing from yesterday`() = runTest {
+        val yesterday = LocalDate.now().minusDays(1)
+        val repository = LedgerRepository(
+            titleDao = FakeTitleDao(LedgerFixture.titles),
+            viewingDao = FakeViewingDao(
+                listOf(ViewingEntity(id = "yesterday", titleId = LedgerFixture.INCEPTION_ID, date = yesterday.toString(), rating = null, notes = null, venue = null)),
+            ),
+            titleCastDao = FakeTitleCastDao(emptyList()),
+            titleCrewDao = FakeTitleCrewDao(emptyList()),
+            cinemaOutingDao = FakeCinemaOutingDao(emptyList()),
+            watchEventDao = FakeEpisodeWatchEventDao(emptyList()),
+            seasonDao = FakeSeasonDao(emptyList()),
+            episodeDao = FakeEpisodeDao(emptyList()),
+        )
+
+        val board = repository.observeLedgerBoard().first()
+
+        assertEquals(30, board.streaks.last30Nights.size)
+        assertEquals(1, board.streaks.last30Nights.count { it })
+        assertTrue("the second-to-last entry (yesterday) must be true", board.streaks.last30Nights[28])
+    }
+
+    @Test
     fun `The Run counts a viewing from 2 months ago in the 12-month window`() = runTest {
         val recentDate = LocalDate.now().minusMonths(2)
         val repository = LedgerRepository(

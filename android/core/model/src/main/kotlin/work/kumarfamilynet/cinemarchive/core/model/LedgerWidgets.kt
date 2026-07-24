@@ -28,6 +28,9 @@ data class LedgerStreaks(
     val currentStreakDays: Int,
     val longestStreakDays: Int,
     val recentActiveDates: List<String>,
+    /** Screening activity for the trailing 30 days, oldest first — backs the additive
+     *  "last 30 nights" grid alongside the existing streak-count text. */
+    val last30Nights: List<Boolean> = emptyList(),
 )
 
 data class LedgerQuarterRating(val quarterLabel: String, val averageRating: Double, val titleCount: Int)

@@ -263,6 +263,7 @@ class LedgerRepository(
             watchlist = watchlist,
             watchlistMovieMinutesOwed = watchlistMovieMinutesOwed,
             weeklyActivity = weeklyActivity(viewings),
+            dailyActivity = dailyActivity(viewings),
             encores = encores(viewings, titleById),
             monthlyRun = monthlyRun(viewings),
             ratingBuckets = ratingBuckets(titles),
@@ -287,8 +288,8 @@ class LedgerRepository(
             .map { LedgerCategoryCount(it.key, it.value) }
 
     /** Time in the Dark: week-granularity heatmap, 52 buckets ending this week (oldest
-     *  first) — see [work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow]'s kdoc
-     *  for why Android buckets by week rather than the web app's per-day grid. */
+     *  first) — backs the accessible list; see [dailyActivity] for the decorative primitive's
+     *  own (higher-resolution) data. */
     private fun weeklyActivity(viewings: List<ViewingEntity>): List<LedgerWeeklyActivity> {
         val today = LocalDate.now()
         val dates = viewings.mapNotNull { parseLocalDate(it.date) }
@@ -298,6 +299,16 @@ class LedgerRepository(
             val count = dates.count { it in weekStart..weekEnd }
             LedgerWeeklyActivity(weekStart.format(DateTimeFormatter.ofPattern("MMM d")), count)
         }
+    }
+
+    /** Time in the Dark: true daily granularity for the trailing 52 weeks (364 days, oldest
+     *  first, Monday-aligned to match [weeklyActivity]'s week boundaries) — backs only
+     *  [work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid]'s 7×52 grid. */
+    private fun dailyActivity(viewings: List<ViewingEntity>): List<Int> {
+        val today = LocalDate.now()
+        val counts = viewings.mapNotNull { parseLocalDate(it.date) }.groupingBy { it }.eachCount()
+        val start = today.minusWeeks(51).with(DayOfWeek.MONDAY)
+        return (0 until 364).map { daysFromStart -> counts[start.plusDays(daysFromStart.toLong())] ?: 0 }
     }
 
     /** Encore Performances: titles with >=2 viewings (ledger.md §2). */
@@ -356,7 +367,9 @@ class LedgerRepository(
         val allDates = (viewings.map { it.date } + watchedAtDates)
             .mapNotNull { parseLocalDate(it) }
             .toSortedSet()
-        if (allDates.isEmpty()) return LedgerStreaks(0, 0, emptyList())
+        val today = LocalDate.now()
+        val last30Nights = (29 downTo 0).map { daysAgo -> allDates.contains(today.minusDays(daysAgo.toLong())) }
+        if (allDates.isEmpty()) return LedgerStreaks(0, 0, emptyList(), last30Nights)
 
         var longest = 1
         var run = 1
@@ -366,7 +379,6 @@ class LedgerRepository(
             longest = maxOf(longest, run)
         }
 
-        val today = LocalDate.now()
         var current = 0
         var cursor = if (allDates.contains(today)) today else today.minusDays(1)
         while (allDates.contains(cursor)) {
@@ -378,6 +390,7 @@ class LedgerRepository(
             currentStreakDays = current,
             longestStreakDays = longest,
             recentActiveDates = ordered.takeLast(10).map { it.toString() },
+            last30Nights = last30Nights,
         )
     }
 

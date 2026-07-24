@@ -98,6 +98,12 @@ number is chosen.
   gained a "now showing · {date}" kicker and a narrative sentence (title/screening/hour
   counts) above the stat tiles, and the stat set grew from 4 tiles to 6 — Screenings and Days
   in the dark join Movies, Series, Hours logged, and Avg rating.
+- Native Android app (in development, not yet distributed): three Ledger chart upgrades —
+  Time in the Dark's heatmap is now a true daily 7×52 grid instead of one week-granularity
+  row; Shifting Standards and Premieres & Revivals now render as connected line charts
+  instead of bars; The Marathon gained an additive "last 30 nights" activity grid alongside
+  its existing streak-count text. Every widget's existing accessible list is unchanged — these
+  are decorative-primitive upgrades only.
 
 ### Changed
 

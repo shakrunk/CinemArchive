@@ -132,7 +132,7 @@ jobs:
       contents: write
     defaults:
       run:
-        working-directory: android
+        working-directory: apps/android
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -5,8 +5,10 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
@@ -29,6 +31,10 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetId
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetSettings
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetWidth
 
 // --- Minimal in-memory fakes, one per DAO LedgerRepository depends on. Only the observeAllX()
 // methods LedgerRepository actually calls are backed by real state; everything else throws,
@@ -426,5 +432,92 @@ class LedgerRepositoryTest {
         val expectedLabel = recentDate.format(DateTimeFormatter.ofPattern("MMM yyyy"))
         assertEquals(1, board.monthlyRun.single { it.monthLabel == expectedLabel }.count)
         assertEquals(1, board.monthlyRun.sumOf { it.count })
+    }
+
+    // --- Phase D: observeLedgerBoards' per-widget scope/timeRange consumption
+    // (docs/superpowers/plans/2026-07-23-android-ledger-parity.md).
+
+    @Test
+    fun `a movies-scoped Genre widget excludes Breaking Bad's Drama and Crime contribution`() = runTest {
+        val layout = listOf(
+            LedgerWidgetConfig(id = "w-genres", panel = LedgerWidgetId.GENRES, width = LedgerWidgetWidth.FULL, settings = LedgerWidgetSettings(scope = "movies")),
+        )
+
+        val boards = LedgerFixture.repository().observeLedgerBoards(flowOf(layout)).first()
+
+        // Unscoped, Drama is 2 (Breaking Bad + Fight Club) per the earlier full-board test;
+        // scoped to movies only, Breaking Bad (TV) drops out and Drama falls to Fight Club's 1.
+        assertEquals(1, boards.getValue("w-genres").genres.single { it.label == "Drama" }.count)
+    }
+
+    @Test
+    fun `a movies-scoped Ensemble widget excludes Breaking Bad's cast`() = runTest {
+        val layout = listOf(
+            LedgerWidgetConfig(id = "w-ensemble", panel = LedgerWidgetId.ENSEMBLE, width = LedgerWidgetWidth.FULL, settings = LedgerWidgetSettings(scope = "movies")),
+        )
+
+        val boards = LedgerFixture.repository().observeLedgerBoards(flowOf(layout)).first()
+
+        val names = boards.getValue("w-ensemble").ensemble.map { it.label }.toSet()
+        assertEquals(5, names.size) // 3 Inception + 2 Fight Club, not Breaking Bad's 2
+        assertFalse("Bryan Cranston" in names)
+        assertFalse("Aaron Paul" in names)
+    }
+
+    @Test
+    fun `Feature Lengths ignores an unsupported scope setting entirely`() = runTest {
+        // runtimes only honors 'title' per PANEL_SETTING_KEYS -- a stray scope value (e.g.
+        // from a layout synced down from a future web version) must be silently ignored, not
+        // applied, matching ledger.md §1.
+        val layout = listOf(
+            LedgerWidgetConfig(id = "w-runtimes", panel = LedgerWidgetId.RUNTIMES, width = LedgerWidgetWidth.FULL, settings = LedgerWidgetSettings(scope = "tv")),
+        )
+
+        val boards = LedgerFixture.repository().observeLedgerBoards(flowOf(layout)).first()
+
+        assertEquals(2, boards.getValue("w-runtimes").runtimeBuckets.single { it.label == "120–150 min" }.count)
+    }
+
+    @Test
+    fun `widgets sharing the same effective scope and time range share one computed board`() = runTest {
+        // Both panels honor scope and neither has an explicit setting, so both resolve to the
+        // same "all" scope, "all" time range pair -- and, being reference-equal LedgerBoard
+        // instances from the same buildBoard() call, prove the per-pair memoization ran once.
+        val layout = listOf(
+            LedgerWidgetConfig(id = "w-genres", panel = LedgerWidgetId.GENRES, width = LedgerWidgetWidth.FULL),
+            LedgerWidgetConfig(id = "w-decades", panel = LedgerWidgetId.DECADES, width = LedgerWidgetWidth.FULL),
+        )
+
+        val boards = LedgerFixture.repository().observeLedgerBoards(flowOf(layout)).first()
+
+        assertTrue(boards.getValue("w-genres") === boards.getValue("w-decades"))
+    }
+
+    @Test
+    fun `a this-year-scoped Screening Nights widget excludes a viewing from over a year ago`() = runTest {
+        val thisYear = LocalDate.now().withDayOfYear(1).plusDays(10)
+        val lastYear = LocalDate.now().minusYears(2)
+        val repository = LedgerRepository(
+            titleDao = FakeTitleDao(LedgerFixture.titles),
+            viewingDao = FakeViewingDao(
+                listOf(
+                    ViewingEntity(id = "this-year", titleId = LedgerFixture.INCEPTION_ID, date = thisYear.toString(), rating = null, notes = null, venue = null),
+                    ViewingEntity(id = "last-year", titleId = LedgerFixture.BREAKING_BAD_ID, date = lastYear.toString(), rating = null, notes = null, venue = null),
+                ),
+            ),
+            titleCastDao = FakeTitleCastDao(emptyList()),
+            titleCrewDao = FakeTitleCrewDao(emptyList()),
+            cinemaOutingDao = FakeCinemaOutingDao(emptyList()),
+            watchEventDao = FakeEpisodeWatchEventDao(emptyList()),
+            seasonDao = FakeSeasonDao(emptyList()),
+            episodeDao = FakeEpisodeDao(emptyList()),
+        )
+        val layout = listOf(
+            LedgerWidgetConfig(id = "w-weekdays", panel = LedgerWidgetId.WEEKDAYS, width = LedgerWidgetWidth.FULL, settings = LedgerWidgetSettings(timeRange = "ytd")),
+        )
+
+        val boards = repository.observeLedgerBoards(flowOf(layout)).first()
+
+        assertEquals(1, boards.getValue("w-weekdays").weekdays.sumOf { it.count })
     }
 }

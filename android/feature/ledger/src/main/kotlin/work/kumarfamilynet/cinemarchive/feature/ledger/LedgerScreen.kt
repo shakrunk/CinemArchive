@@ -65,6 +65,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
 import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
+import work.kumarfamilynet.cinemarchive.core.model.LedgerSettingKey
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
 import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
@@ -73,6 +74,8 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetId
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetSettings
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetWidth
+import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
+import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 
@@ -113,20 +116,26 @@ private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
  * fixed-400dp card (ledger.md §1) with internally scrolling content; at a `lg`+ window width
  * (>= 840dp, [LG_BREAKPOINT]) cards pack into a 12-column grid by `width` span
  * (sm/md/lg/full = 4/6/8/12, see [spanOf12]); below that, every card is full-width regardless
- * of its stored width, per ledger.md §1's "always full below lg". Only `topN`/`title` are
- * applied to a widget's rendered output (a post-hoc take(n)/header-override); `timeRange`/
- * `scope` persist and normalize correctly but aren't consumed by any widget's aggregation yet.
+ * of its stored width, per ledger.md §1's "always full below lg". `topN`/`title` are applied
+ * to a widget's rendered output as a post-hoc take(n)/header-override; `timeRange`/`scope` are
+ * consumed further upstream, in [LedgerRepository.observeLedgerBoards]'s per-widget-instance
+ * aggregation — each widget in [LedgerUiState.boards] is keyed by its own
+ * [LedgerWidgetConfig.id] and already reflects that widget's own effective scope/time-range
+ * filter (a panel that doesn't honor one of those knobs, per `PANEL_SETTING_KEYS`, always gets
+ * the unfiltered "all" board regardless of what a synced widget's stored settings say).
  */
-data class LedgerUiState(val stats: LedgerStats, val board: LedgerBoard)
+data class LedgerUiState(val stats: LedgerStats, val boards: Map<String, LedgerBoard>)
 
 class LedgerViewModel(
     repository: LedgerRepository,
     private val layoutRepository: LedgerLayoutRepository,
 ) : ViewModel() {
-    val uiState = combine(repository.observeLedgerStats(), repository.observeLedgerBoard(), ::LedgerUiState)
+    private val layoutFlow = layoutRepository.observeLayout()
+
+    val uiState = combine(repository.observeLedgerStats(), repository.observeLedgerBoards(layoutFlow), ::LedgerUiState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val layout = layoutRepository.observeLayout()
+    val layout = layoutFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val editModeFlow = MutableStateFlow(false)
@@ -260,7 +269,7 @@ private fun packRows(layout: List<LedgerWidgetConfig>): List<List<LedgerWidgetCo
 
 @Composable
 private fun LedgerBoardContent(modifier: Modifier, uiState: LedgerUiState, layout: List<LedgerWidgetConfig>) {
-    val (stats, board) = uiState
+    val (stats, boards) = uiState
     BoxWithConstraints(modifier = modifier) {
         val isGrid = maxWidth >= LG_BREAKPOINT
         LazyColumn(
@@ -287,29 +296,40 @@ private fun LedgerBoardContent(modifier: Modifier, uiState: LedgerUiState, layou
             if (isGrid) {
                 items(packRows(layout), key = { row -> row.joinToString("-") { it.id } }) { row ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        row.forEach { config -> WidgetCard(config, board, Modifier.weight(config.width.spanOf12().toFloat())) }
+                        row.forEach { config -> WidgetCard(config, boards[config.id], Modifier.weight(config.width.spanOf12().toFloat())) }
                         val usedSpan = row.sumOf { it.width.spanOf12() }
                         if (usedSpan < 12) Spacer(Modifier.weight((12 - usedSpan).toFloat()))
                     }
                 }
             } else {
-                items(layout, key = { it.id }) { config -> WidgetCard(config, board, Modifier.fillMaxWidth()) }
+                items(layout, key = { it.id }) { config -> WidgetCard(config, boards[config.id], Modifier.fillMaxWidth()) }
             }
         }
     }
 }
 
-private fun <T> List<T>.applyTopN(config: LedgerWidgetConfig): List<T> =
-    config.settings?.topN?.let { take(it) } ?: this
+/** Caps at the panel's effective `topN` (its own override, else `PANEL_SETTING_KEYS`'s
+ *  per-panel default) — but only for panels that actually honor `topN`; every other panel's
+ *  list (fixed-size buckets like rating/weekday buckets, or ones with no natural "top" cut)
+ *  renders in full regardless of what a stored widget's settings say, matching ledger.md §1's
+ *  "silently ignore an inapplicable key" rule. */
+private fun <T> List<T>.applyTopN(config: LedgerWidgetConfig): List<T> {
+    if (!config.panel.honorsLedgerSetting(LedgerSettingKey.TOP_N)) return this
+    return take(effectiveLedgerSettings(config.panel, config.settings).topN)
+}
 
 private fun headerFor(config: LedgerWidgetConfig, default: String): String = config.settings?.title ?: default
 
 /** One widget, as a fixed [CARD_HEIGHT_DP]dp card with internally scrolling content
  *  (ledger.md §1: "Every widget renders at a fixed 400px card height... content scrolls/
  *  compresses internally"). [modifier] carries either `fillMaxWidth()` (single column) or a
- *  `weight()` (grid column span) from the caller. */
+ *  `weight()` (grid column span) from the caller. [board] is null for exactly one
+ *  recomposition frame right after a widget is added in edit mode — [LedgerUiState.boards] is
+ *  keyed off the same layout list but recomputed one flow step behind it; render nothing that
+ *  frame rather than crash, it self-heals on the next emission. */
 @Composable
-private fun WidgetCard(config: LedgerWidgetConfig, board: LedgerBoard, modifier: Modifier) {
+private fun WidgetCard(config: LedgerWidgetConfig, board: LedgerBoard?, modifier: Modifier) {
+    if (board == null) return
     Card(
         modifier = modifier.height(CARD_HEIGHT_DP.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),

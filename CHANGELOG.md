@@ -87,6 +87,13 @@ number is chosen.
   now pulls from `user_prefs.ledger_layout` on sign-in and app launch, not just push — a
   layout customized on web (or another device) now shows up on Android without first making a
   local edit, matching the documented "server wins on load" contract.
+- Native Android app (in development, not yet distributed): Ledger widgets now actually apply
+  their `timeRange`/`scope` settings (previously persisted and normalized but silently
+  ignored by every widget's computation) — e.g. a Genre widget scoped to "Films" now excludes
+  TV titles from its tally instead of only hiding the setting. Widgets whose panel exposes a
+  "top N" knob (By the Genre, The Auteurs, The Ensemble, Encore Performances, On the Air,
+  Second Opinions, In Translation, Still Rolling) also now cap at that panel's default (5 or
+  6) when uncustomized, matching the web app's own defaults instead of showing every item.
 
 ### Changed
 

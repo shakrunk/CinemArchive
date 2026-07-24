@@ -9,6 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Native Android app (in development, not yet distributed): Ledger widgets backed by category
+  data (Feature Lengths, On the Air, By the Era, Critical Record, By the Genre, The Auteurs,
+  The Ensemble, In Translation, The Revival House) no longer render as a blank, titleless card
+  when they have no data — they now show their title plus an explanatory message, matching
+  every other widget's empty state.
+
 ## [1.12.0] - 2026-07-23
 
 ### Added

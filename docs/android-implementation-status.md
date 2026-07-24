@@ -425,11 +425,52 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         `LedgerLayoutRepositoryTest`; 8 new in `LedgerPanelSettingsTest`), build succeeds —
         checked after every phase (layout sync, fixture harness, timeRange/scope, editor UX,
         chart uplift, hero/stat parity, settings UI), not just once at the end.
-  - [ ] **Not verified live on a device/emulator** — no Android runtime was available in the
-        environment this plan was implemented in, only compile/lint/unit-test. The drag-
-        reorder/drag-resize gestures, the new chart primitives' actual rendering, and the
-        settings sheet's on-screen behavior should all get a real on-device pass (matching the
-        verification style every other bullet in this section used) before this ships.
+  - [x] **Verified live on a physical device** (2026-07-24, Samsung SM-A256E, Android 16/API 36,
+        connected via adb — not an emulator): installed the debug build over the app's existing
+        real signed-in install (same debug-keystore signature, so app data — including a real
+        production session and 68 synced titles — was preserved, no fresh sign-in needed).
+        - Editor UX: long-press-drag reorder (`input draganddrop`, moved "The Run" two rows and
+          back), long-press-drag resize (cycled a widget lg→full and back), the tap-to-cycle
+          width button, duplicate (added and removed a second "Critical Record"), remove,
+          add-from-palette via tap (added "Premieres & Revivals", confirmed its "×1 already on
+          board" usage badge appeared, then removed it), and the "Reset to default layout"
+          confirmation dialog (opened, read, cancelled — did not actually reset, to avoid
+          wiping the real account's existing customization). All confirmed working; board
+          restored to its exact original order/widths afterward.
+        - Settings sheet: opened The Run's sheet, confirmed it showed the effective
+          panel-default values (Scope=All, Time range=12 mo) rather than a blank/unset state,
+          then switched Scope to Films and to Series in turn and confirmed the widget's actual
+          rendered monthly counts changed each time (Series-only dropped every month to 0 except
+          one recent bar) — `timeRange`/`scope` genuinely filter live data, not just persist
+          inertly. Reset to All afterward.
+        - Chart primitives: `DailyHeatmapGrid` (Time in the Dark, real 7-row weekly grid),
+          `LineChartCanvas` (Shifting Standards and Premieres & Revivals palette previews, real
+          jagged rating/premiere-count lines), and the 30-night grid (The Marathon palette
+          preview) all rendered correctly against real production data.
+        - Layout persistence: changed a widget's width, force-stopped the app via
+          `adb shell am force-stop` (full process death, not just backgrounding), relaunched,
+          and confirmed the change survived — reverted after confirming.
+        - **Found and fixed a real bug via this pass**: `CategorySection` (the shared renderer
+          for 8 widgets — Feature Lengths, On the Air, By the Era, Critical Record, By the Genre,
+          The Auteurs, The Ensemble, In Translation, The Revival House) rendered *nothing at
+          all* — not even its title — when its entries list was empty, unlike every other
+          widget's empty-state branch (Encore Performances, Second Opinions, Still Rolling, etc.),
+          which all show a header plus an explanatory message. On this real account, "The
+          Auteurs" and "The Ensemble" (both driven by `title_cast`/`title_crew` data that isn't
+          populated for any of this account's titles) rendered as two blank beige cards with no
+          title and nothing for TalkBack to announce — confusing for a sighted user and a real
+          accessibility gap. Fixed in `LedgerScreen.kt`: `CategorySection` now always renders
+          the header, plus a tailored `EmptyRow` message per panel (e.g. "No director data
+          logged yet.", "No cast data logged yet.") when there's no data, matching the
+          established pattern. Verified fixed live: rebuilt, reinstalled, confirmed both widgets
+          now show their title and message instead of a blank card.
+        - No crashes in logcat from this session's testing. (A stale, unrelated
+          `SQLiteConstraintException` FOREIGN KEY crash from the prior day's session, 2026-07-23,
+          was still in the logcat ring buffer — flagged separately for investigation, since it's
+          in the library sync path, not Ledger-specific, and didn't reproduce during this pass.)
+        - Full verification gate re-run after the fix:
+          `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — build successful,
+          lint clean, all unit tests pass.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.
   - [x] CI now builds a signed release APK and attaches it to the GitHub Release whenever a

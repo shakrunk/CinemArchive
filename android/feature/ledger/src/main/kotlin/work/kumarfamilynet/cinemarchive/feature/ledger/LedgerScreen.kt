@@ -1,5 +1,8 @@
 package work.kumarfamilynet.cinemarchive.feature.ledger
 
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -175,6 +179,11 @@ fun LedgerScreen(
     onToggleEditMode: () -> Unit = {},
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    // Android has no friend/shared viewer mode yet (see LedgerWidgets.kt's kdoc on the same
+    // gap), so this is always null today — threaded through now so the eventual Friends/
+    // Sharing work only needs to supply a real value, not rewire this call chain. See
+    // docs/superpowers/plans/2026-07-23-android-ledger-parity.md §8.
+    viewedDisplayName: String? = null,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -229,7 +238,12 @@ fun LedgerScreen(
                 onLayoutChange = onLayoutChange,
             )
         } else {
-            LedgerBoardContent(modifier = Modifier.fillMaxSize(), uiState = uiState, layout = layout)
+            LedgerBoardContent(
+                modifier = Modifier.fillMaxSize(),
+                uiState = uiState,
+                layout = layout,
+                viewedDisplayName = viewedDisplayName,
+            )
         }
     }
 }
@@ -268,7 +282,12 @@ private fun packRows(layout: List<LedgerWidgetConfig>): List<List<LedgerWidgetCo
 }
 
 @Composable
-private fun LedgerBoardContent(modifier: Modifier, uiState: LedgerUiState, layout: List<LedgerWidgetConfig>) {
+private fun LedgerBoardContent(
+    modifier: Modifier,
+    uiState: LedgerUiState,
+    layout: List<LedgerWidgetConfig>,
+    viewedDisplayName: String? = null,
+) {
     val (stats, boards) = uiState
     BoxWithConstraints(modifier = modifier) {
         val isGrid = maxWidth >= LG_BREAKPOINT
@@ -278,13 +297,17 @@ private fun LedgerBoardContent(modifier: Modifier, uiState: LedgerUiState, layou
             modifier = Modifier.fillMaxSize(),
         ) {
             item {
-                val tiles = listOf(
-                    StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
-                    StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
-                    StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
-                    StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
-                )
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeroCopy(stats, viewedDisplayName)
+                    val totalScreeningDays = stats.totalWatchedMovieMinutes / 60.0 / 24.0
+                    val tiles = listOf(
+                        StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
+                        StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
+                        StatTileData("Screenings", stats.totalViewings.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
+                        StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                        StatTileData("Days in the dark", "%.1fd".format(totalScreeningDays), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                        StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
+                    )
                     tiles.chunked(2).forEach { rowTiles ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             rowTiles.forEach { tile -> StatTile(tile, modifier = Modifier.weight(1f)) }
@@ -564,6 +587,35 @@ private fun EditableWidgetRow(
                 }
             }
         }
+    }
+}
+
+/** The "now showing · {date}" kicker + narrative sentence above the stat tiles, matching
+ *  `DashHero`'s copy *structure* (date kicker, title/screening/hour counts) — not its literal
+ *  text, since Android's own voice ("THE NUMBERS" label in [LedgerScreen]'s top bar) is kept
+ *  rather than overwritten with the web's copy verbatim, per this repository's Ledger parity
+ *  plan. [viewedDisplayName] is always null today (no friend/shared viewer mode exists yet);
+ *  intentionally not branched on here — see [LedgerScreen]'s kdoc on that parameter. */
+@Composable
+private fun HeroCopy(stats: LedgerStats, viewedDisplayName: String?) {
+    val today = remember {
+        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
+    }
+    val totalTitles = stats.totalMovies + stats.totalSeries
+    val hours = stats.totalWatchedMovieMinutes / 60
+    Column {
+        Text(
+            "now showing · $today",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "A private record of $totalTitles titles, ${stats.totalViewings} screenings, and roughly " +
+                "$hours hours spent in the dark.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

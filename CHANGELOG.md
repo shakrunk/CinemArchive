@@ -94,6 +94,10 @@ number is chosen.
   "top N" knob (By the Genre, The Auteurs, The Ensemble, Encore Performances, On the Air,
   Second Opinions, In Translation, Still Rolling) also now cap at that panel's default (5 or
   6) when uncustomized, matching the web app's own defaults instead of showing every item.
+- Native Android app (in development, not yet distributed): the Ledger board's hero section
+  gained a "now showing · {date}" kicker and a narrative sentence (title/screening/hour
+  counts) above the stat tiles, and the stat set grew from 4 tiles to 6 — Screenings and Days
+  in the dark join Movies, Series, Hours logged, and Avg rating.
 
 ### Changed
 

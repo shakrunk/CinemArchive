@@ -373,3 +373,10 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         against, not because it's unactionable.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.
+  - [x] CI now builds a signed release APK and attaches it to the GitHub Release whenever a
+        version-bump PR merges to `main` (`.github/workflows/deploy.yml`'s new `android` job,
+        piggybacking on the existing web release tag/version — `versionName` tracks
+        `package.json`'s version, `versionCode` is derived from it). Signed with a real upload
+        keystore (`ANDROID_RELEASE_KEYSTORE_BASE64` + password/alias secrets on the repo); this
+        is sideloading-only for now, not a Play Store submission — the permanent application ID
+        / Play owner decision above is still open and unrelated to this.

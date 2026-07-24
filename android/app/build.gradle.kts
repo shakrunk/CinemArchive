@@ -20,6 +20,11 @@ val localProperties = Properties().apply {
         ?.let { load(it.reader()) }
 }
 
+// Release builds are signed with a real upload keystore only in CI, where the release workflow
+// decodes the RELEASE_KEYSTORE secret to a file and exports these env vars. Outside CI (a local
+// `assembleRelease`) storeFile is left null, which Gradle treats as "unsigned" rather than erroring.
+val releaseStorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+
 android {
     namespace = "work.kumarfamilynet.cinemarchive"
     compileSdk = 36
@@ -28,8 +33,10 @@ android {
         applicationId = "work.kumarfamilynet.cinemarchive"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI overrides these via -Pandroid.versionCode/-Pandroid.versionName so the APK tracks
+        // the release tag; the literals below are the local-build fallback.
+        versionCode = (findProperty("android.versionCode") as String?)?.toInt() ?: 1
+        versionName = findProperty("android.versionName") as String? ?: "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -37,10 +44,24 @@ android {
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
     }
 
+    signingConfigs {
+        if (releaseStorePath != null) {
+            create("release") {
+                storeFile = file(releaseStorePath)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseStorePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

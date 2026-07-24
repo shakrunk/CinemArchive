@@ -1,8 +1,8 @@
 # Title detail contract
 
-Web sources: `src/components/TitleDetailDrawer.tsx` (not re-read line-by-line for this pass;
-the data shape is fully defined by `mapDbTitleToLocal` in `src/lib/db.ts`, which is the
-single mapping both the drawer and the library list consume), `src/lib/db.ts`
+Web sources: `apps/web/src/components/TitleDetailDrawer.tsx` (not re-read line-by-line for this pass;
+the data shape is fully defined by `mapDbTitleToLocal` in `apps/web/src/lib/db.ts`, which is the
+single mapping both the drawer and the library list consume), `apps/web/src/lib/db.ts`
 (`TITLE_SELECT`, `mapDbTitleToLocal`, `updateTitleInDb`, `deleteTitleFromDb`,
 `upsertTitleCastInDb`/`upsertTitleCrewInDb`).
 

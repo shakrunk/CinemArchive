@@ -1,8 +1,8 @@
 # Episode tracking contract
 
-Web sources: `src/lib/episodeUtils.ts` (not re-read line-by-line — the persisted shape is
+Web sources: `apps/web/src/lib/episodeUtils.ts` (not re-read line-by-line — the persisted shape is
 fully defined by `logEpisodeToDb` and the nested `episodes` nodes `mapDbTitleToLocal`
-produces), `src/lib/db.ts` (`logEpisodeToDb`, `insertPrePlatformWatchEventsToDb`,
+produces), `apps/web/src/lib/db.ts` (`logEpisodeToDb`, `insertPrePlatformWatchEventsToDb`,
 `upsertEpisodeMetadataInDb`, `deleteEpisodeWatchEventFromDb`).
 
 The core invariant this domain exists to preserve: **watch, rating, and review are three

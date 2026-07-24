@@ -25,7 +25,7 @@ it — applies cleanly and behaves correctly.
 
 ## 1. Current state (as verified against source, 2026-07-12)
 
-- The web client has no incremental sync today. `fetchUserLibrary()` (`src/lib/db.ts:236`)
+- The web client has no incremental sync today. `fetchUserLibrary()` (`apps/web/src/lib/db.ts:236`)
   does a full `select *` over `titles` (with nested `seasons`/`episodes`/cast/crew/viewings)
   filtered by `user_id`, every time. There is no cursor, no pagination, no `since` parameter.
 - Only three tables carry `updated_at` with a trigger: `titles`, `share_scopes`,
@@ -33,7 +33,7 @@ it — applies cleanly and behaves correctly.
   `episodes`, `episode_watch_events`, `episode_ratings`, `episode_reviews`, `title_cast`,
   `title_crew`, `season_cast`, `episode_crew` have **no** `updated_at` column at all.
 - Deletes are hard deletes with `on delete cascade` (e.g. `deleteTitleFromDb`,
-  `deleteViewingFromDb`, `deleteEpisodeWatchEventFromDb` in `src/lib/db.ts`). There is no
+  `deleteViewingFromDb`, `deleteEpisodeWatchEventFromDb` in `apps/web/src/lib/db.ts`). There is no
   tombstone table anywhere in `schema.sql`. A client that cached rows locally has no way to
   learn a row was removed except by re-fetching the full parent set and diffing.
 - Client-generated UUIDs are already the norm for inserts (`title.id`, `v.id`, `ep.id`,

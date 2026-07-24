@@ -1,14 +1,14 @@
 # Importing Watch History & Ratings from Other Platforms — Feasibility Assessment
 
 _Written 2026-07-12 for KP-045. Companion prototype: the Letterboxd CSV importer
-in `src/lib/letterboxd-import.ts` (Profile → Data & Portability)._
+in `apps/web/src/lib/letterboxd-import.ts` (Profile → Data & Portability)._
 
 ## Summary
 
 Importing from third-party platforms is **very feasible**. CinemArchive already
 has every hard piece of the pipeline: TMDB search + full-metadata hydration
 through the `media-proxy` Edge Function (`searchMedia` / `fetchMediaDetails` in
-`src/lib/media.ts`), a client `Title` model with per-viewing dates and a 0–5
+`apps/web/src/lib/media.ts`), a client `Title` model with per-viewing dates and a 0–5
 rating scale, duplicate-skipping insert logic (Profile's JSON import), and
 Supabase persistence (`insertTitleToDb`). A third-party import is therefore just:
 

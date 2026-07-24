@@ -1,7 +1,7 @@
 # Library contract
 
-Web sources: `src/lib/db.ts` (`fetchUserLibrary`, `mapDbTitleToLocal`), `src/views/Library.tsx`,
-`src/store/useAppStore.ts`. Backend: `titles` table + `sync_library_changes` RPC (proposed,
+Web sources: `apps/web/src/lib/db.ts` (`fetchUserLibrary`, `mapDbTitleToLocal`), `apps/web/src/views/Library.tsx`,
+`apps/web/src/store/useAppStore.ts`. Backend: `titles` table + `sync_library_changes` RPC (proposed,
 see `docs/android-sync-contract.md`).
 
 ## 1. Fields, enums, timestamps

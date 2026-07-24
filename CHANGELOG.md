@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-07-23
+
 ### Added
 
 - Native Android app (in development, not yet distributed): pull-to-refresh on the Discover,

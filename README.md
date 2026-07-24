@@ -2,9 +2,20 @@
 
 A personal movie and TV series tracking app with a cinematic dark-gold aesthetic. Search TMDB, log what you watch (down to the individual episode), rate and review, and browse your library as a poster wall or pore over your viewing stats in **The Ledger**.
 
-**Live:** https://cinemarchive.kumarfamilynet.work/
+**Live (web):** https://cinemarchive.kumarfamilynet.work/
 
-It's a JAMstack app: a static React frontend on GitHub Pages, backed by Supabase (Postgres + Auth + Edge Functions), with TMDB and OMDb for metadata and rating badges. A native Android client (Kotlin + Jetpack Compose) shares the same Supabase backend — see [Android app](#android-app) below.
+It's a JAMstack app: a static React frontend on GitHub Pages, backed by a shared Supabase project (Postgres + Auth + Edge Functions), with TMDB and OMDb for metadata and rating badges. A native Android client shares the same backend.
+
+---
+
+## Clients
+
+| Client | Location | Notes |
+|--------|----------|-------|
+| Web | [`apps/web/`](apps/web/README.md) | Vite + React + TypeScript, deployed to GitHub Pages. See [apps/web/README.md](apps/web/README.md) for its stack, project structure, and local dev setup. |
+| Android | `android/` | Kotlin + Jetpack Compose (module layout: `app`, `core:model`, `core:designsystem`, `core:database`, `data`, `feature:{auth,library,discover,upnext,ledger,settings}`). Room-backed local database with an outbox-based incremental sync layer (`sync_tombstones`, see `docs/android-sync-contract.md`). Pre-distribution (not yet published to Play). Tracks feature parity with the web app domain by domain — see `docs/android-parity-matrix.md` and `docs/android-implementation-status.md`, and `docs/android-contracts/` for the per-domain field/RLS/fixture contracts. **Not yet moved** to `apps/android/`; see [docs/repo-restructure-plan.md](docs/repo-restructure-plan.md). |
+
+Each client has its own nested `CLAUDE.md` with client-specific guidance for Claude Code, layered on top of the repo-root [CLAUDE.md](CLAUDE.md).
 
 ---
 
@@ -28,100 +39,13 @@ It's a JAMstack app: a static React frontend on GitHub Pages, backed by Supabase
 
 ---
 
-## Tech stack
+## Shared backend
 
-| Layer | Choice |
-|-------|--------|
-| Build / framework | Vite + React 19 + TypeScript |
-| Styling | Tailwind CSS v3 + shadcn-ui (Radix primitives) |
-| State | Zustand (`library` / `ledger` / `ui` slices) with `persist` to localStorage |
-| Backend | Supabase — Postgres + Row Level Security + Auth |
-| Metadata APIs | TMDB (posters/details) + OMDb (IMDb/RT/Metacritic) via a Supabase Edge Function proxy |
-| Icons | lucide-react |
-| Deploy | GitHub Actions → GitHub Pages |
-| Native client | Android — Kotlin + Jetpack Compose (`android/`, see [Android app](#android-app)) |
+The Supabase project, schema, and Edge Functions are genuinely shared infrastructure — inputs to every client, not owned by one:
 
----
-
-## Project structure
-
-```
-src/
-  components/
-    ui/                  # Atomic shadcn components (button, dialog, star-rating, dynamic-poster, …)
-    AddTitleWorkflow.tsx # Search → log form → optimistic add
-    TitleDetailDrawer.tsx# Title detail + per-episode logging + viewing log + cast/franchise
-    OutingScheduleSheet.tsx / ShareOutingPanel.tsx  # Cinema Outings scheduling + plan sharing
-    NotificationCenter.tsx / SendRecommendationPanel.tsx / TitleCommentsPanel.tsx  # Social layer
-    TopBar.tsx / BottomNav.tsx / ProfileModal.tsx
-  views/
-    Library.tsx          # Poster wall + ledger list
-    Discover.tsx         # TMDB search + trending + recommendation carousels
-    UpNext.tsx           # Watchlist + upcoming Cinema Outings
-    Friends.tsx          # Friend requests, activity feed, invites
-    Profile.tsx          # Auth, account, data import/export, about
-    Ledger.tsx / ledger/ # Editable stats dashboard shell + ~19 widget panels (ledger/panels/)
-  store/
-    useAppStore.ts       # Zustand store (filters, CRUD, logEpisode, auth/library loading)
-    mockData.ts          # Type definitions + seed data (drives logged-out view)
-    episodeUtils.ts      # Rating/watch rollups (episode → season → series)
-    ledgerStats.ts       # Ledger stat computation
-  lib/
-    auth.ts              # Supabase client + passkey/WebAuthn helpers
-    db.ts                # All Supabase reads/writes (titles, seasons, episodes, viewings, social)
-    media.ts             # TMDB/OMDb/Wikidata fetch helpers (via the media-proxy Edge Function)
-    export-import.ts     # JSON backup/restore
-    letterboxd-import.ts # Letterboxd CSV import (parser + TMDB matcher)
-schema.sql               # Canonical DB schema + RLS policies (human-readable copy)
-supabase/
-  migrations/            # Versioned migrations applied by CI (see "Database" below)
-  functions/media-proxy/ # Edge Function: TMDB/OMDb proxy + cache (keeps API keys server-side)
-android/                 # Native Kotlin/Compose client — see "Android app" below
-scripts/
-  migrate-from-v1.mjs    # One-off importer from "The Projection Room" v1 JSON
-  verify-episode-logic.mjs
-.github/workflows/
-  deploy.yml             # Build + deploy to GitHub Pages
-  db-migrate.yml         # supabase db push on migration changes
-  deploy-functions.yml   # Deploy the media-proxy Edge Function on change
-  android.yml            # Android build/lint/test
-```
-
----
-
-## Local development
-
-### Prerequisites
-- Node.js (project uses Node 22.x locally)
-- A Supabase project (for auth + persistence; the app also runs read-only on seed data without one)
-
-### Setup
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Create `.env.local` with your Supabase project's public values:
-   ```
-   VITE_SUPABASE_URL=https://<your-ref>.supabase.co
-   VITE_SUPABASE_ANON_KEY=<your-anon-key>
-   ```
-   > TMDB/OMDb API keys are **not** here — they live server-side as secrets on the `media-proxy` Edge Function, so they never reach the browser.
-3. Run the dev server:
-   ```bash
-   npm run dev        # http://localhost:5173
-   ```
-
-### Commands
-```bash
-npm run dev        # Start dev server (HMR)
-npm run build      # Type-check (tsc -b) + production build → dist/
-npm run preview    # Preview the production build locally
-npm run lint       # ESLint
-```
-
----
-
-## Database
+- **`schema.sql`** — the canonical, human-readable copy of the full DB schema and RLS policies.
+- **`supabase/migrations/`** — versioned migrations applied by CI. The baseline migration (`20260620084847_initial_schema.sql`) captures the schema as of the multi-client split and is already marked **applied** on the remote.
+- **`supabase/functions/media-proxy/`** — Edge Function proxying TMDB/OMDb (keeps API keys server-side).
 
 The schema covers core library/episode tracking, cast & crew, sharing, and a social layer:
 
@@ -140,16 +64,13 @@ The schema covers core library/episode tracking, cast & crew, sharing, and a soc
 
 **Row Level Security:** the authenticated owner gets full CRUD on their rows; holders of a valid shared token get read-only access (scoped by `share_scopes`) via the `app.shared_token` session setting.
 
-`schema.sql` is the canonical, human-readable copy of the full schema and RLS policies — the table list above is its shape, not a substitute for it. `db.ts` reads/writes through the Supabase client and maps DB rows ⇄ the client `Title` type (episodes are grouped onto their seasons on the way in).
+`schema.sql` is the canonical, human-readable copy of the full schema and RLS policies — the table list above is its shape, not a substitute for it.
 
-### Migrations (automated — no manual SQL)
+### Changing the schema (automated — no manual SQL)
 
-Schema changes are versioned under `supabase/migrations/` and applied by CI. The baseline migration (`20260620084847_initial_schema.sql`) captures the current schema and is already marked **applied** on the remote.
-
-**To change the schema:**
 1. Add a new file under `supabase/migrations/`, named with a UTC timestamp prefix, e.g. `20260701120000_add_favorite_flag.sql`, containing just the `ALTER`/`CREATE`/etc. for the change.
 2. Keep `schema.sql` in sync as the readable canonical copy.
-3. Commit and push to `main`. The **DB Migrate** workflow runs `supabase db push` and applies any pending migrations to the live database.
+3. Commit and push to `main`, then manually run the **DB Migrate (manual)** workflow (`gh workflow run db-migrate.yml --ref main`) — it does **not** trigger automatically on push.
 
 The workflow needs these set in **GitHub → Settings → Secrets and variables → Actions (Repository scope)**:
 
@@ -163,26 +84,9 @@ The workflow needs these set in **GitHub → Settings → Secrets and variables 
 
 ---
 
-## Deployment
+## Deployment & release
 
-Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the app (injecting `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` from repository secrets) and publishes `dist/` to GitHub Pages.
-
-The site is served from a custom domain (`public/CNAME`) at the domain root, so Vite's `base` is `/`. SPA deep links are handled by a `404.html` redirect fallback.
-
----
-
-## Android app
-
-`android/` is a native Kotlin + Jetpack Compose client (module layout: `app`, `core:model`, `core:designsystem`, `core:database`, `data`, `feature:{auth,library,discover,upnext,ledger,settings}`) sharing the same Supabase project as the web app, with a Room-backed local database and an outbox-based incremental sync layer (`sync_tombstones`, see `docs/android-sync-contract.md`). It is pre-distribution — not yet published to Play — and tracks feature parity with the web app domain by domain; see `docs/android-parity-matrix.md` and `docs/android-implementation-status.md` for current status, and `docs/android-contracts/` for the per-domain field/RLS/fixture contracts it's built against. `.github/workflows/android.yml` builds, lints, and unit-tests it in CI.
-
----
-
-## Design system
-
-- **Colors:** Void `#0b0907` (background), Amber `#e9b266` (highlights/accents), with ink surfaces, a cool "moon" blue, and ember/paper tones.
-- **Fonts:** `Fraunces` (serif titles), `Hanken Grotesk` (UI sans), `DM Mono` (stats/numbers).
-- **Atmosphere:** `.projector-beam` (flickering amber glow), `.dust`, `.vignette`, and a `.grain` overlay rendered once as fixed full-viewport siblings.
-- **Mobile-first:** bottom-sheet modals on mobile, `TopBar` + `BottomNav` shell.
+`.github/workflows/deploy.yml` runs on push to `main`: applies pending Supabase migrations, builds and publishes the web app (`apps/web/`) to GitHub Pages, tags a `vX.Y.Z` GitHub Release from the root `package.json` version and `CHANGELOG.md`, and — for a genuinely new release — builds and attaches a signed Android release APK. `.github/workflows/deploy-functions.yml` deploys `supabase/functions/**` independently on change. See [CLAUDE.md](CLAUDE.md#versioning) for the versioning/release policy.
 
 ---
 

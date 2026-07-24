@@ -371,6 +371,65 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         issue during manual testing. Deeper performance work (e.g. `LazyColumn` recomposition
         tuning at real-library scale) is deferred until there's real user data to profile
         against, not because it's unactionable.
+  - [x] Ledger web-parity plan executed in full
+        ([`docs/superpowers/plans/2026-07-23-android-ledger-parity.md`](../superpowers/plans/2026-07-23-android-ledger-parity.md)):
+        - **Layout sync correctness:** `LedgerLayoutRepository.reconcile()` pulls
+          `user_prefs.ledger_layout` on sign-in and app launch and applies ledger.md §4's rule
+          (non-null server layout always wins; null pushes the current local layout up) —
+          closes the push-only gap flagged above. Merge decision split into a pure
+          `resolveLayoutReconciliation()`, unit-tested (`LedgerLayoutRepositoryTest`, 5 cases)
+          without needing a `Context`/DataStore.
+        - **Fixture test harness:** `LedgerRepositoryTest` (`data` module, 27 cases) ports the
+          exact fixture the now-retired `DevFixtureSeed` used (recovered from git history) into
+          plain in-memory DAO fakes and asserts all 20 widgets' computed output against it —
+          the same numbers this section hand-verified on-device above (e.g. Second Opinions'
+          "Us 9.0 vs IMDb 4.4 (Δ4.6)" for Inception, Still Rolling "Breaking Bad 1/7"), now a
+          regression suite instead of a one-off manual check. `LedgerPanelSettingsTest`
+          (`core:model`, 8 cases) covers the settings-resolution logic below.
+        - **`timeRange`/`scope` consumption:** `LedgerPanelSettings.kt` (`core:model`) ports
+          `PANEL_SETTING_KEYS`/`effectiveLedgerSettings()` from `ledgerPanels.ts`.
+          `LedgerRepository.observeLedgerBoards(layoutFlow)` computes one `LedgerBoard` per
+          widget instance from `LedgerSources` filtered to that widget's own effective
+          `(scope, timeRange)` — memoized per distinct pair, so widgets sharing settings (the
+          common case) share one `buildBoard()` call. A panel that doesn't honor a knob per
+          `PANEL_SETTING_KEYS` always resolves to unfiltered, regardless of what a
+          server-synced widget's stored settings say. `applyTopN` now applies each panel's
+          effective default (5 or 6) instead of showing every item when uncustomized.
+        - **Editor UX capabilities:** long-press-drag reorder and drag-resize (existing
+          up/down buttons and tap-to-cycle width kept as accessibility fallbacks, not
+          replaced), duplicate, "Reset to default layout" with a confirmation dialog, and an
+          "Add a widget" palette with live scaled `WidgetContent` previews, a "×N already on
+          board" usage badge, and long-press-drag-to-place at a specific board position — all
+          sharing one local, optimistic drag-state so `onLayoutChange` only fires once per
+          gesture, on release, never mid-drag. A new per-widget settings `ModalBottomSheet`
+          (`Scope`/`Time range` `SegmentedGroup` controls, gated per-panel) closes the
+          `timeRange`/`scope` UI gap now that Phase D's consumption exists to back it.
+        - **Chart primitive uplift:** `DailyHeatmapGrid` (true daily 7×52 grid, replacing Time
+          in the Dark's week-granularity row) and `LineChartCanvas` (stroke + gradient fill,
+          used by Shifting Standards and the previously chart-less Premieres & Revivals) added
+          to `core:designsystem`; The Marathon gained an additive 30-night grid (reusing
+          `HeatmapRow`). Screening Nights intentionally stays a bar chart, not a radar — no
+          accessible-parity benefit over the existing bar chart + list pairing.
+        - **Hero/stat-row parity:** a "now showing · {date}" kicker and narrative sentence
+          above the stat tiles (Android's "THE NUMBERS" label kept, not overwritten), and the
+          stat set grew from 4 tiles to 6 (Movies/Series/Screenings/Hours logged/Days in the
+          dark/Avg rating). `LedgerScreen`/`LedgerBoardContent` gained an unused
+          `viewedDisplayName: String?` parameter (always null — no friend/shared viewer mode
+          exists) so that work only needs to supply a value later, not rewire this call chain.
+        - **Explicitly not done:** friend/shared Ledger viewing (blocked on the app-wide
+          Friends/Sharing initiative; the plan's §8 pre-plans the hook) and pixel-identical
+          chart rendering (radar geometry, animated draw-in) — both out of scope per the plan.
+  - [x] Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — 0 lint
+        issues, all unit tests pass (25 in `LedgerRepositoryTest` grew to 27 across the
+        timeRange/scope and daily-activity/last-30-nights additions; 5 new in
+        `LedgerLayoutRepositoryTest`; 8 new in `LedgerPanelSettingsTest`), build succeeds —
+        checked after every phase (layout sync, fixture harness, timeRange/scope, editor UX,
+        chart uplift, hero/stat parity, settings UI), not just once at the end.
+  - [ ] **Not verified live on a device/emulator** — no Android runtime was available in the
+        environment this plan was implemented in, only compile/lint/unit-test. The drag-
+        reorder/drag-resize gestures, the new chart primitives' actual rendering, and the
+        settings sheet's on-screen behavior should all get a real on-device pass (matching the
+        verification style every other bullet in this section used) before this ships.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.
   - [x] CI now builds a signed release APK and attaches it to the GitHub Release whenever a

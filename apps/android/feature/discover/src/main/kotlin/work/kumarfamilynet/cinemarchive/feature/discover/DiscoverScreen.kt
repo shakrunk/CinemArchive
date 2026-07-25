@@ -27,15 +27,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,6 +61,7 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
+import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
@@ -121,7 +123,10 @@ fun DiscoverRoute(
     libraryRepository: LibraryRepository,
     gridColumns: Int,
     onGridColumnsChange: (Int) -> Unit,
+    onOpenProfile: () -> Unit = {},
+    profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
+    onTitleClick: (String) -> Unit = {},
 ) {
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -135,6 +140,12 @@ fun DiscoverRoute(
     val addedIds = remember(libraryTmdbIds, tappedIds) {
         tappedIds + libraryTmdbIds.map(Int::toString)
     }
+    // Resolves a trending result already in the real library to its Room row id, so tapping
+    // it opens the same title-detail screen Library uses instead of the bare preview sheet
+    // below — real parity for anything actually owned (#119/KP-049). A result only tapped
+    // locally via DiscoverSampleStore has no such row and still falls back to the preview.
+    val idsByTmdbKey by libraryRepository.observeLibraryTitleIdsByTmdbKey()
+        .collectAsStateWithLifecycle(initialValue = emptyMap())
     var search by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableStateOf(TypeFilter.ALL) }
     var preview by remember { mutableStateOf<TrendingTitle?>(null) }
@@ -156,15 +167,20 @@ fun DiscoverRoute(
         onRetry = viewModel::retry,
         onRefresh = viewModel::refresh,
         addedIds = addedIds,
-        onOpenPreview = { preview = it },
+        onOpenTitle = { title ->
+            val realId = idsByTmdbKey[title.tmdbId to title.type]
+            if (realId != null) onTitleClick(realId) else preview = title
+        },
         onAdd = DiscoverSampleStore::add,
         gridColumns = gridColumns,
         onGridColumnsChange = onGridColumnsChange,
+        onOpenProfile = onOpenProfile,
+        profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
     )
 
     preview?.let { title ->
-        TrendingTitleDialog(
+        TrendingTitlePreviewSheet(
             title = title,
             isAdded = title.tmdbId.toString() in addedIds,
             onAdd = { DiscoverSampleStore.add(title.tmdbId.toString()) },
@@ -187,10 +203,12 @@ private fun DiscoverScreen(
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
     addedIds: Set<String>,
-    onOpenPreview: (TrendingTitle) -> Unit,
+    onOpenTitle: (TrendingTitle) -> Unit,
     onAdd: (String) -> Unit,
     gridColumns: Int,
     onGridColumnsChange: (Int) -> Unit,
+    onOpenProfile: () -> Unit = {},
+    profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
 ) {
     val gridState = rememberLazyGridState()
@@ -198,17 +216,21 @@ private fun DiscoverScreen(
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
     Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        Text(
-            "EXPLORE THE REEL",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        Text(
-            "Discover",
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "EXPLORE THE REEL",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text("Discover", style = MaterialTheme.typography.headlineLarge)
+            }
+            ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
+        }
 
         AnimatedVisibility(
             visible = !collapsed,
@@ -308,7 +330,7 @@ private fun DiscoverScreen(
                                 title = title,
                                 isAdded = title.tmdbId.toString() in addedIds,
                                 columns = gridColumns,
-                                onOpen = { onOpenPreview(title) },
+                                onOpen = { onOpenTitle(title) },
                                 onAdd = { onAdd(title.tmdbId.toString()) },
                             )
                         }
@@ -406,32 +428,51 @@ private fun DiscoverCard(
     }
 }
 
+/**
+ * Preview sheet for a trending result *not yet* in the real library (#119/KP-049) — styled
+ * after the Library title-detail screen's header (poster tint, title, meta line, synopsis)
+ * for visual parity, but it can't be the same component: there's no [TitleDetail] to show
+ * (no status, rating, or viewing history) until the title is actually added. A result already
+ * in the real library skips this sheet entirely and opens the real detail screen instead
+ * (see [DiscoverRoute]).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrendingTitleDialog(title: TrendingTitle, isAdded: Boolean, onAdd: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title.title, style = MaterialTheme.typography.titleLarge) },
-        text = {
-            Column {
-                Text(
-                    "${title.year ?: "—"}" + if (title.type == MediaType.TV) " · TV Series" else " · Movie",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun TrendingTitlePreviewSheet(title: TrendingTitle, isAdded: Boolean, onAdd: () -> Unit, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 28.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp)) {
+                PosterSurface(
+                    tint = tintForKey(title.tmdbId.toString()),
+                    imageUrl = title.posterUrl,
+                    modifier = Modifier.size(width = 72.dp, height = 100.dp),
+                    aspectRatio = 72f / 100f,
+                    cornerRadius = 12.dp,
                 )
-                Text(
-                    title.synopsis ?: "No synopsis available.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+                Column(modifier = Modifier.padding(start = 14.dp).align(Alignment.CenterVertically)) {
+                    Text(title.title, style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "${title.year ?: "—"}" + if (title.type == MediaType.TV) " · TV Series" else " · Movie",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
-        },
-        confirmButton = {
+
+            Text("Synopsis", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+            Text(
+                title.synopsis ?: "No synopsis available.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 22.dp),
+            )
+
             if (isAdded) {
-                TextButton(onClick = onDismiss, enabled = false) { Text("Added") }
+                TextButton(onClick = onDismiss, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Added") }
             } else {
-                Button(onClick = { onAdd(); onDismiss() }) { Text("Add to library") }
+                Button(onClick = { onAdd(); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Add to library") }
             }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
+        }
+    }
 }

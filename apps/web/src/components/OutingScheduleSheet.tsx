@@ -12,6 +12,7 @@ import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSn
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type Title } from 'src/store/mockData'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
 // Exported for reuse by the viewing editor (TitleDetailDrawer, plan §4.6/§7.4)
@@ -158,9 +159,9 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
       ) : (
         <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-thin">
           {!query && (
-            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground pb-1">
+            <Eyebrow as="p" size="lg" tone="muted" className="pb-1">
               On your watchlist
-            </p>
+            </Eyebrow>
           )}
           {results.map((t) => (
             <button
@@ -370,10 +371,10 @@ function OutingForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="outing-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <Eyebrow as="label" htmlFor="outing-date" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
             <Calendar className="inline w-3 h-3 mr-1" />
             Date
-          </label>
+          </Eyebrow>
           <Input
             id="outing-date"
             type="date"
@@ -384,10 +385,10 @@ function OutingForm({
           />
         </div>
         <div>
-          <label htmlFor="outing-time" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <Eyebrow as="label" htmlFor="outing-time" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
             <Clock className="inline w-3 h-3 mr-1" />
             Showtime
-          </label>
+          </Eyebrow>
           <Input
             id="outing-time"
             type="time"
@@ -400,10 +401,10 @@ function OutingForm({
       </div>
 
       <div>
-        <label htmlFor="outing-venue" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+        <Eyebrow as="label" htmlFor="outing-venue" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           <MapPin className="inline w-3 h-3 mr-1" />
           Theater
-        </label>
+        </Eyebrow>
         <Input
           id="outing-venue"
           list="outing-venue-suggestions"
@@ -418,10 +419,10 @@ function OutingForm({
       </div>
 
       <div>
-        <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
           <Users className="inline w-3 h-3 mr-1" />
           Companions
-        </p>
+        </Eyebrow>
         <CompanionInput
           companions={form.companions}
           onChange={(companions) => patch({ companions })}
@@ -430,10 +431,10 @@ function OutingForm({
       </div>
 
       <div>
-        <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
           <Film className="inline w-3 h-3 mr-1" />
           Format
-        </p>
+        </Eyebrow>
         <div className="flex flex-wrap gap-2">
           {CINEMA_FORMATS.map((f) => (
             <button
@@ -455,9 +456,9 @@ function OutingForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="outing-previews" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <Eyebrow as="label" htmlFor="outing-previews" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
             Previews (min)
-          </label>
+          </Eyebrow>
           <Input
             id="outing-previews"
             type="number"
@@ -471,9 +472,9 @@ function OutingForm({
           />
         </div>
         <div>
-          <label htmlFor="outing-runtime" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <Eyebrow as="label" htmlFor="outing-runtime" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
             Runtime (min)
-          </label>
+          </Eyebrow>
           <Input
             id="outing-runtime"
             type="number"
@@ -502,9 +503,9 @@ function OutingForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="outing-price" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <Eyebrow as="label" htmlFor="outing-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
             Ticket price
-          </label>
+          </Eyebrow>
           <Input
             id="outing-price"
             type="number"
@@ -517,9 +518,9 @@ function OutingForm({
           />
         </div>
         <div>
-          <label htmlFor="outing-seat" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+          <Eyebrow as="label" htmlFor="outing-seat" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
             Seat
-          </label>
+          </Eyebrow>
           <Input
             id="outing-seat"
             value={form.seat}
@@ -531,9 +532,9 @@ function OutingForm({
       </div>
 
       <div>
-        <label htmlFor="outing-booking-ref" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+        <Eyebrow as="label" htmlFor="outing-booking-ref" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           Booking ref
-        </label>
+        </Eyebrow>
         <Input
           id="outing-booking-ref"
           value={form.bookingRef}
@@ -544,9 +545,9 @@ function OutingForm({
       </div>
 
       <div>
-        <label htmlFor="outing-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+        <Eyebrow as="label" htmlFor="outing-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           Notes
-        </label>
+        </Eyebrow>
         <textarea
           id="outing-notes"
           value={form.notes}

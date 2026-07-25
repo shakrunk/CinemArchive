@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { cn } from 'src/lib/utils'
+import { Eyebrow } from 'src/components/ui/typography'
 
 /**
  * Section shell: uniform heading/description/card framing. Pass `id` when the
@@ -21,10 +22,10 @@ export function Section({
 }) {
   return (
     <section id={id ? `settings-${id}` : undefined} className={cn(id && 'scroll-mt-24')}>
-      <h2 className="font-sans text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-2">
+      <Eyebrow as="h2" size="xl" tone="muted" font="sans" className="flex items-center gap-1.5 mb-2">
         <Icon className="w-3.5 h-3.5 text-amber" />
         {title}
-      </h2>
+      </Eyebrow>
       {description && (
         <p className="font-sans text-xs text-muted-foreground leading-relaxed mb-3 max-w-[60ch]">
           {description}

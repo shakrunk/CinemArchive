@@ -11,6 +11,7 @@ import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import { buildRecommendationPrompt } from 'src/lib/recommendationPrompt'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode, GridSize } from 'src/store/useAppStore'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Poster wall density ─────────────────────────────────────────────────────
 
@@ -68,9 +69,9 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-3">
+      <Eyebrow as="h4" size="md" className="mb-3">
         {label}
-      </h4>
+      </Eyebrow>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   )
@@ -142,10 +143,10 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
         </div>
 
         <div>
-          <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-3">
+          <Eyebrow as="h4" size="md" className="mb-3">
             Min Rating:{' '}
             <span className="text-amber">{filters.minRating > 0 ? `★ ${filters.minRating}` : 'Any'}</span>
-          </h4>
+          </Eyebrow>
           <Slider
             value={[filters.minRating]}
             onValueChange={([v]) => setFilter('minRating', v)}
@@ -403,10 +404,10 @@ function LedgerList({ titles }: { titles: Title[] }) {
               </td>
               <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-paper-dim">{title.year}</td>
               <td className="px-4 py-3">
-                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] uppercase text-paper-dim">
+                <Eyebrow as="span" size="md" tone="dim" className="inline-flex items-center gap-1.5">
                   <span aria-hidden="true" className={cn('w-[7px] h-[7px] rounded-full', STATUS_DOT[title.status])} />
                   {title.status}
-                </span>
+                </Eyebrow>
               </td>
               <td className="px-4 py-3 font-mono text-sm text-amber whitespace-nowrap">
                 {title.rating ? `★ ${title.rating}` : '—'}

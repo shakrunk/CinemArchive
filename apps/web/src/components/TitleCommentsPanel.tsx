@@ -7,6 +7,7 @@ import {
   REACTION_EMOJIS, type TitleComment, type TitleReaction, type ReactionEmoji,
 } from 'src/lib/db'
 import { fmtDateShort } from 'src/lib/utils'
+import { Eyebrow } from 'src/components/ui/typography'
 
 const BODY_MAX_LEN = 1000
 
@@ -112,7 +113,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
 
   return (
     <div className="pt-2 border-t space-y-3" style={{ borderColor: 'var(--line)' }}>
-      <h4 className="font-sans text-xs uppercase tracking-widest text-muted-foreground">Comments &amp; Reactions</h4>
+      <Eyebrow as="h4" size="xl" tone="muted" font="sans">Comments &amp; Reactions</Eyebrow>
 
       {/* Reactions */}
       <div className="flex flex-wrap gap-1.5">

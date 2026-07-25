@@ -3,6 +3,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { ModalCloseButton } from 'src/components/ui/modal-close-button'
+import { Eyebrow } from 'src/components/ui/typography'
 import type { CastMember, CrewMember } from 'src/store/mockData'
 
 export interface PersonDetailTarget {
@@ -83,12 +84,9 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
         {/* Library titles */}
         {personTitles.length > 0 && (
           <div style={{ borderTop: '1px solid var(--line)' }}>
-            <div
-              className="px-5 pt-3 pb-1 font-mono"
-              style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-            >
+            <Eyebrow as="div" className="px-5 pt-3 pb-1">
               In your library ({personTitles.length})
-            </div>
+            </Eyebrow>
             <div className="px-4 pb-3 max-h-48 overflow-y-auto scrollbar-thin">
               {personTitles.map((t) => (
                 <div key={t.id} className="flex items-center gap-2 px-1 py-1.5">

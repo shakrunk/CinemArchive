@@ -20,6 +20,7 @@ import { WidgetPalette } from './editor/WidgetPalette'
 import { WidgetDetails } from './editor/WidgetDetails'
 import { useBoardDrag } from './editor/useBoardDrag'
 import { floatingPanelStyle } from './editor/chrome'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export function Ledger() {
   const [compactViewport, setCompactViewport] = useState(
@@ -304,10 +305,10 @@ export function Ledger() {
           })}
         </div>
         {editing && widgets.length > 0 && (
-          <p className="mt-4 font-mono text-[10px] tracking-[0.14em] uppercase text-paper-faint">
+          <Eyebrow as="p" size="md" className="mt-4">
             click a widget to select · drag to reorder · drag side edges to resize · drag from the
             palette to add
-          </p>
+          </Eyebrow>
         )}
       </div>
 

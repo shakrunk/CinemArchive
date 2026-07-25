@@ -41,6 +41,7 @@ import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
+import { Eyebrow } from 'src/components/ui/typography'
 
 const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: boolean }[] = [
   { id: 'account', label: 'Account', Icon: UserCircle, authOnly: false },
@@ -145,9 +146,9 @@ function SignInCard() {
             Enter your email to sign in. You will receive a passwordless magic link to log in securely.
           </p>
           <div>
-            <label htmlFor="settings-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <Eyebrow as="label" htmlFor="settings-email-input" size="xl" tone="muted" font="sans" className="block mb-2">
               Email Address
-            </label>
+            </Eyebrow>
             <div className="relative max-w-sm">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -347,9 +348,9 @@ function IdentitySection({
     >
       <form onSubmit={handleSave} className="space-y-4 max-w-sm">
         <div>
-          <label htmlFor="settings-display-name" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          <Eyebrow as="label" htmlFor="settings-display-name" size="xl" tone="muted" font="sans" className="block mb-2">
             Display Name
-          </label>
+          </Eyebrow>
           <Input
             id="settings-display-name"
             aria-label="Display name"
@@ -361,9 +362,9 @@ function IdentitySection({
           />
         </div>
         <div>
-          <label htmlFor="settings-username" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          <Eyebrow as="label" htmlFor="settings-username" size="xl" tone="muted" font="sans" className="block mb-2">
             Username
-          </label>
+          </Eyebrow>
           <Input
             id="settings-username"
             aria-label="Username"
@@ -886,9 +887,11 @@ function SharingSection() {
           <button
             type="button"
             onClick={() => setShowRevoked((v) => !v)}
-            className="font-sans text-[11px] uppercase tracking-widest text-muted-foreground hover:text-paper transition-colors"
+            className="text-muted-foreground hover:text-paper transition-colors"
           >
-            {showRevoked ? 'Hide' : 'Show'} revoked links ({revokedKeys.length})
+            <Eyebrow size="lg" tone="inherit" font="sans">
+              {showRevoked ? 'Hide' : 'Show'} revoked links ({revokedKeys.length})
+            </Eyebrow>
           </button>
           {showRevoked && (
             <div className="space-y-2 mt-2">
@@ -1337,9 +1340,9 @@ function AboutSection() {
       <div className="flex items-baseline gap-2.5 flex-wrap">
         <span className="font-serif text-lg font-semibold text-paper">CinemArchive</span>
         <span className="font-mono text-xs text-amber">v{__APP_VERSION__}</span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper-faint">
+        <Eyebrow as="span" size="md">
           The Projection Room
-        </span>
+        </Eyebrow>
       </div>
       <p className="font-sans text-xs text-muted-foreground leading-relaxed max-w-[60ch]">
         A private film archive — track the movies and series you watch, rate and
@@ -1394,9 +1397,9 @@ function ArchiveGlance() {
           {i > 0 && <div className="w-px bg-[var(--line-2)] mx-6 sm:mx-8 self-stretch" />}
           <div className="flex flex-col">
             <div className="stat-num text-[clamp(22px,2.6vw,34px)]">{item.value}</div>
-            <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-paper-faint mt-1.5 whitespace-nowrap">
+            <Eyebrow as="div" size="md" className="mt-1.5 whitespace-nowrap">
               {item.sub}
-            </div>
+            </Eyebrow>
           </div>
         </div>
       ))}

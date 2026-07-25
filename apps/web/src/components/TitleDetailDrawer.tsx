@@ -6,7 +6,7 @@ import { PosterLightbox } from 'src/components/ui/poster-lightbox'
 import { SeriesGraph } from 'src/components/ui/series-graph'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
-import { CardTitle, BodyText, MetaBadge, StatLabel } from 'src/components/ui/typography'
+import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
@@ -125,10 +125,10 @@ function VenueCompanionsFields({
   return (
     <>
       <div>
-        <label className="flex items-center gap-1 font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="label" size="xl" tone="muted" font="sans" className="flex items-center gap-1 mb-2">
           <MapPin className="w-3 h-3" />
           Theater
-        </label>
+        </Eyebrow>
         <Input
           list={datalistId}
           value={venue}
@@ -141,10 +141,10 @@ function VenueCompanionsFields({
         </datalist>
       </div>
       <div>
-        <p className="flex items-center gap-1 font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="flex items-center gap-1 mb-2">
           <Users className="w-3 h-3" />
           Companions
-        </p>
+        </Eyebrow>
         <CompanionInput companions={companions} onChange={onCompanionsChange} suggestions={suggestions} />
       </div>
     </>
@@ -260,7 +260,7 @@ function ViewingEditForm({
       </div>
 
       <div>
-        <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Rating</p>
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="mb-2">Rating</Eyebrow>
         <StarRating value={rating} onChange={setRating} size="md" />
       </div>
 
@@ -272,10 +272,10 @@ function ViewingEditForm({
       />
 
       <div>
-        <label htmlFor="viewing-edit-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+        <Eyebrow as="label" htmlFor="viewing-edit-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           <FileText className="inline w-3 h-3 mr-1" />
           Notes
-        </label>
+        </Eyebrow>
         <textarea
           id="viewing-edit-notes"
           value={notes}
@@ -287,9 +287,9 @@ function ViewingEditForm({
 
       {outing && (
         <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}>
-          <p className="font-mono uppercase tracking-widest" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+          <Eyebrow as="p" size="md">
             Ticket details
-          </p>
+          </Eyebrow>
           <div className="flex flex-wrap gap-2">
             {CINEMA_FORMATS.map((f) => (
               <button
@@ -310,9 +310,9 @@ function ViewingEditForm({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="viewing-edit-price" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+              <Eyebrow as="label" htmlFor="viewing-edit-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                 Ticket price
-              </label>
+              </Eyebrow>
               <Input
                 id="viewing-edit-price"
                 type="number"
@@ -325,9 +325,9 @@ function ViewingEditForm({
               />
             </div>
             <div>
-              <label htmlFor="viewing-edit-seat" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+              <Eyebrow as="label" htmlFor="viewing-edit-seat" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                 Seat
-              </label>
+              </Eyebrow>
               <Input
                 id="viewing-edit-seat"
                 value={seat}
@@ -338,9 +338,9 @@ function ViewingEditForm({
             </div>
           </div>
           <div>
-            <label htmlFor="viewing-edit-booking-ref" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+            <Eyebrow as="label" htmlFor="viewing-edit-booking-ref" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
               Booking ref
-            </label>
+            </Eyebrow>
             <Input
               id="viewing-edit-booking-ref"
               value={bookingRef}
@@ -523,7 +523,7 @@ function SectionCard({
     >
       {(title || action) && (
         <div className="flex items-center justify-between gap-3 mb-4">
-          <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">{title}</h4>
+          <SubsectionLabel className="mb-0">{title}</SubsectionLabel>
           {action}
         </div>
       )}
@@ -575,7 +575,7 @@ function StatusCard({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
-      <dt className="font-mono text-xs uppercase tracking-wider text-muted-foreground shrink-0">{label}</dt>
+      <Eyebrow as="dt" size="xl" tone="muted" className="shrink-0">{label}</Eyebrow>
       <dd className="font-sans text-sm text-foreground text-right min-w-0 break-words">{value}</dd>
     </div>
   )
@@ -753,9 +753,9 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
         aria-expanded={expanded}
         className="flex items-center gap-2 mb-4 group focus:outline-none"
       >
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim group-hover:text-amber transition-colors">
+        <Eyebrow as="h4" size="xl" tone="dim" font="sans" className="font-semibold group-hover:text-amber transition-colors">
           Cast &amp; Crew
-        </h4>
+        </Eyebrow>
         <ChevronDown
           className={cn('w-3.5 h-3.5 text-paper-faint transition-transform group-hover:text-amber', expanded ? 'rotate-180' : '')}
         />
@@ -764,12 +764,9 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
       <div className="space-y-4">
       {hasCast && (
         <div>
-          <div
-            className="font-mono mb-2"
-            style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-          >
+          <Eyebrow as="div" className="mb-2">
             Main Cast
-          </div>
+          </Eyebrow>
           <CastGrid cast={cast} onPersonClick={onPersonClick} />
         </div>
       )}
@@ -965,17 +962,17 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
             {totalWatched}<span className="text-sm font-mono ml-0.5" style={{ color: 'var(--paper-faint)' }}>/{totalCount}</span>
           </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Episodes</div>
+          <Eyebrow as="div" className="mt-0.5">Episodes</Eyebrow>
         </div>
         <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--amber)', fontVariationSettings: '"opsz" 30' }}>
             {seriesAvg !== null ? `★ ${seriesAvg.toFixed(1)}` : '—'}
           </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Avg Rating</div>
+          <Eyebrow as="div" className="mt-0.5">Avg Rating</Eyebrow>
         </div>
         <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>{seasons.length}</div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Seasons</div>
+          <Eyebrow as="div" className="mt-0.5">Seasons</Eyebrow>
         </div>
       </div>
 
@@ -985,9 +982,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
       {/* Series Graph heatmap */}
       {seasons.some(hasEpisodes) && (
         <div>
-          <h4 className="font-mono mb-3" style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--paper-faint)' }}>
+          <Eyebrow as="h4" size="md" className="mb-3">
             Series Graph
-          </h4>
+          </Eyebrow>
           <SeriesGraph
             seasons={seasons}
             onCellClick={(seasonNumber, episodeNumber) => {
@@ -1124,9 +1121,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
       {/* Season cast */}
       {season?.cast && season.cast.length > 0 && (
         <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
-          <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+          <Eyebrow as="div" className="mb-2">
             Season {season.seasonNumber} Cast
-          </div>
+          </Eyebrow>
           <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
             {season.cast.map((member) => (
               <button
@@ -1332,9 +1329,9 @@ function FranchiseSection({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">
+        <SubsectionLabel className="mb-0">
           {franchiseLabel} <span className="normal-case tracking-normal text-muted-foreground font-normal">· franchise</span>
-        </h4>
+        </SubsectionLabel>
         {!loading && (
           <span className="font-mono text-[11px] text-paper-faint">
             Watched <span className="text-amber">{watchedCount}</span>/{parts.length}
@@ -1995,9 +1992,9 @@ export function TitleDetailDrawer() {
               ) : (
                 <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               )}
-              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+              <StatLabel>
                 {title.type === 'tv' ? 'Series' : 'Film'}
-              </span>
+              </StatLabel>
               {title.network && (
                 <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
               )}
@@ -2091,9 +2088,9 @@ export function TitleDetailDrawer() {
                   ) : (
                     <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                   )}
-                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+                  <StatLabel>
                     {title.type === 'tv' ? 'Series' : 'Film'}
-                  </span>
+                  </StatLabel>
                   {title.network && (
                     <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
                   )}
@@ -2250,10 +2247,10 @@ export function TitleDetailDrawer() {
                 {showLogForm && (
                   <div className="border-t pt-3 mb-4 space-y-3" style={{ borderColor: 'var(--line)' }}>
                     <div>
-                      <label htmlFor="viewing-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+                      <Eyebrow as="label" htmlFor="viewing-date" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                         <Calendar className="inline w-3 h-3 mr-1" />
                         Date Watched
-                      </label>
+                      </Eyebrow>
                       {!logPrePlatform && (
                         <Input
                           id="viewing-date"
@@ -2277,9 +2274,9 @@ export function TitleDetailDrawer() {
                       </label>
                     </div>
                     <div>
-                      <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
                         Rating
-                      </p>
+                      </Eyebrow>
                       <StarRating value={logRating} onChange={setLogRating} size="md" />
                     </div>
                     <VenueCompanionsFields
@@ -2289,10 +2286,10 @@ export function TitleDetailDrawer() {
                       onCompanionsChange={setLogCompanions}
                     />
                     <div>
-                      <label htmlFor="viewing-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+                      <Eyebrow as="label" htmlFor="viewing-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                         <FileText className="inline w-3 h-3 mr-1" />
                         Notes
-                      </label>
+                      </Eyebrow>
                       <textarea
                         id="viewing-notes"
                         value={logNotes}

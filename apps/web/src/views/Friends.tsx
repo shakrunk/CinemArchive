@@ -27,6 +27,7 @@ import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { cn, fmtDateShort, getErrorMessage, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
@@ -286,10 +287,10 @@ function FriendsSection() {
       {/* Suggested friends — invite lineage (KP-026) */}
       {suggestions.length > 0 && (
         <div className="pt-1">
-          <p className="font-sans text-[10px] uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+          <Eyebrow as="p" size="md" tone="muted" font="sans" className="mb-2 flex items-center gap-1.5">
             <Ticket className="w-3 h-3 text-amber/70" />
             Suggested friends
-          </p>
+          </Eyebrow>
           <div className="space-y-2">
             {suggestions.map((s) => (
               <div
@@ -591,9 +592,11 @@ function ActivitySection() {
                 <button
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="font-sans text-[11px] uppercase tracking-widest text-muted-foreground hover:text-paper transition-colors disabled:opacity-60"
+                  className="text-muted-foreground hover:text-paper transition-colors disabled:opacity-60"
                 >
-                  {loadingMore ? 'Loading...' : 'Load more'}
+                  <Eyebrow size="lg" tone="inherit" font="sans">
+                    {loadingMore ? 'Loading...' : 'Load more'}
+                  </Eyebrow>
                 </button>
               </div>
             )}

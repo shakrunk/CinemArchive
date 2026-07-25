@@ -14,6 +14,7 @@ import { SPIDER_NOIR_TMDB_ID } from 'src/lib/easterEggThemes'
 import { cn, staggerDelays } from 'src/lib/utils'
 import { useClickOutside } from 'src/lib/useClickOutside'
 import { EmptyState } from 'src/components/ui/empty-state'
+import { Eyebrow } from 'src/components/ui/typography'
 
 const UNDO_WINDOW_MS = 6000
 
@@ -489,7 +490,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {hasMarquee && (
             <>
               {hasLiveSection && (
-                <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">On the Marquee</p>
+                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">On the Marquee</Eyebrow>
               )}
               {marqueeEntries.map((entry) =>
                 entry.outing.status === 'completed' ? (
@@ -503,7 +504,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {availableWatchlist.length > 0 && (
             <>
               {(hasLiveSection || hasMarquee) && (
-                <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">On your watchlist</p>
+                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">On your watchlist</Eyebrow>
               )}
               {availableWatchlist.map((entry) => (
                 <UpcomingCard key={entry.title.id} entry={entry} delayMs={delays[cardIndex++]} />
@@ -513,7 +514,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {comingSoon.length > 0 && (
             <>
               {(hasLiveSection || hasMarquee || availableWatchlist.length > 0) && (
-                <p className="col-span-full font-mono text-[11px] text-paper-faint uppercase tracking-widest pt-2 pb-1">Coming soon</p>
+                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">Coming soon</Eyebrow>
               )}
               {comingSoon.map((entry) => (
                 <UpcomingCard key={entry.title.id} entry={entry} delayMs={delays[cardIndex++]} />

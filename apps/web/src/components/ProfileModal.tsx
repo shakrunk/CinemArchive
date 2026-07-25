@@ -7,6 +7,7 @@ import { cn, getErrorMessage } from 'src/lib/utils'
 import { signInWithEmail, signInWithPasskey } from 'src/lib/auth'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
+import { Eyebrow } from 'src/components/ui/typography'
 
 interface ProfileModalProps {
   open: boolean
@@ -111,9 +112,9 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
 
               <form onSubmit={handleEmailSignIn} className="space-y-4">
                 <div>
-                  <label htmlFor="email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                  <Eyebrow as="label" htmlFor="email-input" size="xl" tone="muted" font="sans" className="block mb-2">
                     Email Address
-                  </label>
+                  </Eyebrow>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                     <Input

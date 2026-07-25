@@ -15,6 +15,7 @@ import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 import { Chip } from 'src/components/ui/chip'
 import { useClickOutside } from 'src/lib/useClickOutside'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -991,7 +992,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
           {/* Cast */}
           {hydrating && !data.cast ? (
             <div className="mb-5">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-paper-faint mb-2">Cast</h3>
+              <Eyebrow as="h3" size="md" className="mb-2">Cast</Eyebrow>
               <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-5 px-5">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div
@@ -1015,7 +1016,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
             </div>
           ) : data.cast && data.cast.length > 0 ? (
             <div className="mb-5">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.1em] text-paper-faint mb-2">Cast</h3>
+              <Eyebrow as="h3" size="md" className="mb-2">Cast</Eyebrow>
               <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none -mx-5 px-5">
                 {data.cast.slice(0, 10).map((c) => (
                   <div
@@ -1539,7 +1540,7 @@ export function Discover() {
               style={{ borderColor: 'var(--line)' }}
             >
               <div>
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.12em] text-paper-faint mb-2">Search by</h3>
+                <Eyebrow as="h3" size="md" className="mb-2">Search by</Eyebrow>
                 <div className="flex gap-1.5">
                   {([
                     { id: 'titles' as SearchMode, label: 'Titles' },
@@ -1557,9 +1558,9 @@ export function Discover() {
                 <div>
                   <button
                     onClick={() => setGenresExpanded((v) => !v)}
-                    className="w-full flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-paper-faint mb-2"
+                    className="w-full flex items-center justify-between text-paper-faint mb-2"
                   >
-                    Genres
+                    <Eyebrow size="md" tone="inherit">Genres</Eyebrow>
                     <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !genresExpanded && '-rotate-90')} />
                   </button>
                   {genresExpanded && (

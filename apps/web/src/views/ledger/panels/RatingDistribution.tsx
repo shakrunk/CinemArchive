@@ -12,6 +12,7 @@ import {
 } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
 import { renderStarLabel } from '../labels'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export function RatingDistribution({
   className,
@@ -77,9 +78,9 @@ export function RatingDistribution({
               }}
             >
               <span className="stat-num text-[28px]">{avgRating.toFixed(1)}</span>
-              <span className="font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint mt-1">
+              <Eyebrow as="span" className="mt-1">
                 avg · {total} rated
-              </span>
+              </Eyebrow>
             </div>
           </div>
           <div

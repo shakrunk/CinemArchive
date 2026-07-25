@@ -10,6 +10,7 @@ import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
 import { Chip } from 'src/components/ui/chip'
 import { getShareScope, setShareScope, type ShareScopeTarget } from 'src/lib/auth'
 import type { WatchStatus } from 'src/store/mockData'
+import { Eyebrow } from 'src/components/ui/typography'
 
 const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
   { value: 'watched', label: 'Watched' },
@@ -133,7 +134,7 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
 
                   {allGenres.length > 0 && (
                     <div>
-                      <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-2">Genres</h4>
+                      <Eyebrow as="h4" size="md" className="mb-2">Genres</Eyebrow>
                       <div className="flex flex-wrap gap-1.5">
                         {allGenres.map((g) => (
                           <Chip key={g} active={genres.includes(g)} onClick={() => toggleGenre(g)}>
@@ -146,7 +147,7 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
                   )}
 
                   <div>
-                    <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-2">Watch status</h4>
+                    <Eyebrow as="h4" size="md" className="mb-2">Watch status</Eyebrow>
                     <div className="flex flex-wrap gap-1.5">
                       {STATUS_OPTIONS.map((opt) => (
                         <Chip key={opt.value} active={statuses.includes(opt.value)} onClick={() => toggleStatus(opt.value)}>

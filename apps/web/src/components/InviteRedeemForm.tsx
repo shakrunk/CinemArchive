@@ -4,6 +4,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { redeemInvite, signInWithEmail } from 'src/lib/auth'
 import { getErrorMessage } from 'src/lib/utils'
+import { Eyebrow } from 'src/components/ui/typography'
 
 interface InviteRedeemFormProps {
   onRedeemed: (message: string) => void
@@ -40,9 +41,9 @@ export function InviteRedeemForm({ onRedeemed, onError }: InviteRedeemFormProps)
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="invite-email-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="label" htmlFor="invite-email-input" size="xl" tone="muted" font="sans" className="block mb-2">
           Email Address
-        </label>
+        </Eyebrow>
         <Input
           id="invite-email-input"
           aria-label="Email address for invite redemption"
@@ -55,9 +56,9 @@ export function InviteRedeemForm({ onRedeemed, onError }: InviteRedeemFormProps)
         />
       </div>
       <div>
-        <label htmlFor="invite-code-input" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="label" htmlFor="invite-code-input" size="xl" tone="muted" font="sans" className="block mb-2">
           Invite Code
-        </label>
+        </Eyebrow>
         <Input
           id="invite-code-input"
           aria-label="Invite code"

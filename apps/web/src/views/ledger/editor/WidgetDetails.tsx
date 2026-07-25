@@ -19,6 +19,7 @@ import {
   clampTopN,
 } from 'src/lib/ledgerPanels'
 import { editorBtnClass, floatingPanelStyle } from './chrome'
+import { Eyebrow } from 'src/components/ui/typography'
 
 const segmentBtnClass = (active: boolean) =>
   cn(
@@ -65,9 +66,9 @@ export function WidgetDetails({
           <h3 className="font-serif text-[15px] font-medium text-paper leading-tight">
             {LEDGER_PANEL_LABELS[selected.panel]}
           </h3>
-          <p className="font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint mt-1">
+          <Eyebrow as="p" className="mt-1">
             widget {selectedIndex + 1} of {widgets.length}
-          </p>
+          </Eyebrow>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
@@ -90,7 +91,7 @@ export function WidgetDetails({
       </div>
 
       <div>
-        <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mb-1.5">Size</p>
+        <Eyebrow as="p" className="mb-1.5">Size</Eyebrow>
         <div className="grid grid-cols-4 gap-1">
           {LEDGER_PANEL_WIDTH_ORDER.map((w) => (
             <button
@@ -112,7 +113,7 @@ export function WidgetDetails({
       </div>
 
       <div>
-        <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mb-1.5">Position</p>
+        <Eyebrow as="p" className="mb-1.5">Position</Eyebrow>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -145,7 +146,7 @@ export function WidgetDetails({
 
       {settingKeys.includes('timeRange') && (
         <div>
-          <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mb-1.5">Range</p>
+          <Eyebrow as="p" className="mb-1.5">Range</Eyebrow>
           <div className="grid grid-cols-4 gap-1">
             {LEDGER_TIME_RANGE_ORDER.map((r) => (
               <button
@@ -164,7 +165,7 @@ export function WidgetDetails({
 
       {settingKeys.includes('scope') && (
         <div>
-          <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mb-1.5">Scope</p>
+          <Eyebrow as="p" className="mb-1.5">Scope</Eyebrow>
           <div className="grid grid-cols-3 gap-1">
             {LEDGER_SCOPE_ORDER.map((sc) => (
               <button
@@ -183,7 +184,7 @@ export function WidgetDetails({
 
       {settingKeys.includes('topN') && (
         <div>
-          <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mb-1.5">Show top</p>
+          <Eyebrow as="p" className="mb-1.5">Show top</Eyebrow>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -204,14 +205,14 @@ export function WidgetDetails({
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
-            <span className="font-mono text-[9px] tracking-[0.12em] uppercase text-paper-faint ml-1">entries</span>
+            <Eyebrow as="span" className="ml-1">entries</Eyebrow>
           </div>
         </div>
       )}
 
       {settingKeys.includes('title') && (
         <div>
-          <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mb-1.5">Custom title</p>
+          <Eyebrow as="p" className="mb-1.5">Custom title</Eyebrow>
           <input
             type="text"
             value={selected.settings?.title ?? ''}

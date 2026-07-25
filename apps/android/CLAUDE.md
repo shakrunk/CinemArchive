@@ -57,3 +57,10 @@ This client tracks the web app domain by domain — always check these before la
 - [docs/android-implementation-status.md](../../docs/android-implementation-status.md) — phased progress log, including on-device verification notes
 - [docs/android-contracts/](../../docs/android-contracts/) — per-domain field/RLS/fixture contracts against the web app's `apps/web/src/lib/db.ts` and `schema.sql`
 - [docs/android-sync-contract.md](../../docs/android-sync-contract.md) — incremental sync design (tombstones, cursors)
+
+## Further reading
+
+The wiki's [Android App](https://github.com/shakrunk/CinemArchive/wiki/Android-App) page walks
+through the Room/outbox data flow, the sync design, theming, and where this client deliberately
+exceeds the web app (outing auto-completion via `AlarmManager`). The four contract documents above
+remain authoritative.

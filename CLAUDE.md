@@ -29,6 +29,19 @@ docs/              # Repo-wide docs: ADRs, Android↔web contract docs, known pr
 .github/workflows/ # CI: deploy.yml (web + release + Android APK), android.yml, db-migrate.yml, deploy-functions.yml
 ```
 
+## Documentation
+
+**This file is authoritative for conventions** — the sections below are enforced, and they win over
+any other description of how work is done here.
+
+For background rather than rules, the [wiki](https://github.com/shakrunk/CinemArchive/wiki) covers
+architecture and its rationale, per-client internals, the security model, the release pipeline,
+troubleshooting, and a glossary. Its
+[Documentation Map](https://github.com/shakrunk/CinemArchive/wiki/Documentation-Map) defines which
+of the four documentation homes (this repo, `openwiki/`, the wiki, GitHub issues) owns which kind of
+fact, and the precedence order when they disagree: **code > `schema.sql`/migrations > `docs/` >
+`openwiki/` > wiki.**
+
 ---
 
 ## Verification

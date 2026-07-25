@@ -98,14 +98,10 @@ RLS: authenticated user gets full CRUD; valid shared-token holders get read-only
 
 ---
 
-## Development Phases (historical, from plan.md)
+## Further reading
 
-| Phase | Parallelism | Key Outputs |
-|-------|-------------|-------------|
-| 0 | Sequential | Git init, Vite scaffold, shadcn, Tailwind theme, mockData, ESLint/Prettier |
-| 1 (A/B/C) | Parallel | DB schema+RLS, UI component library, Zustand store |
-| 2 (D/E/F) | Parallel | Library view, Ledger view, AddTitle workflow |
-| 3 | Sequential | Replace mock data with real Supabase calls, auth wiring, PWA |
-| 4 | Sequential | GitHub Actions deploy pipeline |
-
-All phases are implemented; this table is retained as historical context.
+The wiki's [Web App](https://github.com/shakrunk/CinemArchive/wiki/Web-App) page expands on the
+above — store slices, the Ledger panel catalogue, testing, and the gotchas — and
+[Design System](https://github.com/shakrunk/CinemArchive/wiki/Design-System) holds the full token
+reference. The original phased build plan is recorded under
+[Web App § Project history](https://github.com/shakrunk/CinemArchive/wiki/Web-App#project-history).

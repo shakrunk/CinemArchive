@@ -15,11 +15,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -129,19 +132,17 @@ private fun AboutListScreen(
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
-                    Text(
-                        "Source on GitHub",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onOpenSource),
-                    )
-                    Text(
-                        "Release notes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onOpenReleaseNotes),
-                    )
+                // Buttons rather than bare tappable text: these leave the app, and
+                // plain labels gave no affordance that they were actionable at all.
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
+                    OutlinedButton(onClick = onOpenSource, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Code, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Source", modifier = Modifier.padding(start = 8.dp))
+                    }
+                    OutlinedButton(onClick = onOpenReleaseNotes, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Releases", modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
             }
 

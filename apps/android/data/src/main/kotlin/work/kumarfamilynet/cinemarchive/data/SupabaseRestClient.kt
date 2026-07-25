@@ -40,6 +40,13 @@ class SupabaseRestClient(
     private val anonKey: String,
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
+    init {
+        require(baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
+            "SupabaseRestClient baseUrl must be an absolute http(s) URL, got \"$baseUrl\" — " +
+                "SUPABASE_URL is missing (local.properties for local builds, CI secrets for release builds)."
+        }
+    }
+
     /** Signs in with email/password (GoTrue's password grant). No refresh-token handling or
      *  persistence — this client is scoped to the outbox's push path, not a general session
      *  manager (see docs/android-implementation-status.md's Phase 3 Ledger section). */

@@ -44,3 +44,6 @@
 ## 2024-11-21 - Zustand Atomic Selectors Optimization (Addendum)
 **Learning:** Batching multiple atomic selectors into a single `useShallow` call introduces object allocation and shallow diffing overhead on every render, overriding the rapid referential equality check built natively into Zustand atomic selectors.
 **Action:** When extracting multiple primitive or atomic values from a Zustand store, strictly map them to multiple individual `useAppStore` hooks rather than batching them inside a `useShallow` object.
+## 2024-07-25 - Prevent O(N*M) Hover Lag in PersonDetailPanel
+**Learning:** Extracting data from large global state stores via filtering arrays inside render loops causes extreme lag during UI interactions (like hover states or focus shifts) that trigger localized re-renders. In `PersonDetailPanel`, calculating `personTitles` without memoization iterated the entire library and nested arrays on every render.
+**Action:** Always wrap expensive O(N) array filtering/mapping operations over large datasets (like `titles`) in `useMemo`, ensuring they depend only on the explicit source array and specific identifier required for the filter to avoid needless recalculation during unrelated re-renders.

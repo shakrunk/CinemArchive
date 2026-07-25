@@ -82,7 +82,6 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
-import work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow
 import work.kumarfamilynet.cinemarchive.core.designsystem.LineChartCanvas
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
@@ -90,14 +89,11 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerLayoutRules
-import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
 import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
 import work.kumarfamilynet.cinemarchive.core.model.LedgerSettingKey
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
-import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
-import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWatchlistEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetId
@@ -135,9 +131,13 @@ private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
  * All 20 Ledger widgets (docs/android-contracts/ledger.md §2), rendered from a
  * [LedgerWidgetConfig] list — the fixed default order on first launch, or whatever the user
  * has locally customized (edit mode: add/remove/move/resize/settings). Every chart primitive
- * ([BarChartCanvas]/[HeatmapRow]) is decorative and paired with a real, focusable list of the
- * same data — per ledger.md §5, Android must give every widget a genuine accessible
- * alternative rather than the web app's tooltip-only fallback on five widgets.
+ * ([BarChartCanvas]/[LineChartCanvas]/[DailyHeatmapGrid]) is decorative and paired with a
+ * real, focusable list of the same data — per ledger.md §5, Android must give every widget a
+ * genuine accessible alternative rather than the web app's tooltip-only fallback on five
+ * widgets. Three panels (Second Opinions, The Marathon, At the Movies) instead render through
+ * [LedgerWidgetPanels.kt][VerdictsPanel]'s purpose-built visuals, which carry their own
+ * accessible text — see that file's kdoc for why those three don't share this one's row
+ * vocabulary.
  *
  * The layout persists **locally only** (DataStore via [LedgerLayoutRepository]) — syncing it
  * to `user_prefs.ledger_layout` needs a real, authenticated `RemoteMutationWriter` (see
@@ -431,28 +431,13 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
             board.monthlyRun.applyTopN(config).forEach { CategoryRow(LedgerCategoryCount(it.monthLabel, it.count)) }
         }
         LedgerWidgetId.RATINGS -> CategorySection(title, board.ratingBuckets.applyTopN(config), "No ratings logged yet.")
-        LedgerWidgetId.GENRES -> CategorySection(title, board.genres.applyTopN(config), "No genres logged yet.")
+        LedgerWidgetId.GENRES -> GenresPanel(title, board.genres.applyTopN(config))
         LedgerWidgetId.AUTEURS -> CategorySection(title, board.auteurs.applyTopN(config), "No director data logged yet.")
         LedgerWidgetId.ENSEMBLE -> CategorySection(title, board.ensemble.applyTopN(config), "No cast data logged yet.")
-        LedgerWidgetId.VERDICTS -> {
-            SectionHeader(title)
-            val entries = board.verdicts.applyTopN(config)
-            if (entries.isEmpty()) EmptyRow("No title has both your rating and an IMDb rating yet.")
-            else entries.forEach { VerdictRow(it) }
-        }
+        LedgerWidgetId.VERDICTS -> VerdictsPanel(title, board.verdicts.applyTopN(config))
         LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config), "No non-English titles logged yet.")
-        LedgerWidgetId.WEEKDAYS -> {
-            SectionHeader(title)
-            BarChartCanvas(data = board.weekdays.map { ChartDatum(it.weekday, it.count.toFloat()) })
-            board.weekdays.forEach { CategoryRow(LedgerCategoryCount(it.weekday, it.count)) }
-        }
-        LedgerWidgetId.STREAKS -> {
-            SectionHeader(title)
-            if (board.streaks.last30Nights.any { it }) {
-                HeatmapRow(values = board.streaks.last30Nights.map { if (it) 1 else 0 })
-            }
-            StreakSummary(board.streaks)
-        }
+        LedgerWidgetId.WEEKDAYS -> WeekdaysPanel(title, board.weekdays)
+        LedgerWidgetId.STREAKS -> MarathonPanel(title, board.streaks)
         LedgerWidgetId.TRAJECTORY -> {
             SectionHeader(title)
             val entries = board.trajectory.applyTopN(config)
@@ -478,10 +463,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
             if (entries.isEmpty()) EmptyRow("Nothing in progress.")
             else entries.forEach { ProgressRow(it) }
         }
-        LedgerWidgetId.MOVIEGOING -> {
-            SectionHeader(title)
-            MoviegoingSection(board.moviegoing)
-        }
+        LedgerWidgetId.MOVIEGOING -> MoviegoingPanel(title, board.moviegoing)
     }
 }
 
@@ -1083,17 +1065,6 @@ private fun EncoreRow(entry: LedgerEncoreEntry) {
 }
 
 @Composable
-private fun VerdictRow(entry: LedgerVerdictEntry) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(entry.title, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "Us %.1f vs IMDb %.1f (Δ%.1f)".format(entry.ourRatingOn10, entry.imdbRating, entry.delta),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
-}
-
-@Composable
 private fun QuarterRow(entry: LedgerQuarterRating) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(entry.quarterLabel, style = MaterialTheme.typography.bodyMedium)
@@ -1114,49 +1085,6 @@ private fun ProgressRow(entry: LedgerProgressEntry) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(entry.title, style = MaterialTheme.typography.bodyMedium)
         Text("${entry.episodesWatched} / ${entry.episodeCount} episodes", style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-/** Real text stats, not a data-free dot grid — the accessible replacement for the web app's
- *  tooltip-only 30-night grid (ledger.md §5). */
-@Composable
-private fun StreakSummary(streaks: LedgerStreaks) {
-    Column {
-        Text("Current streak: ${streaks.currentStreakDays} day(s)", style = MaterialTheme.typography.bodyMedium)
-        Text("Longest streak: ${streaks.longestStreakDays} day(s)", style = MaterialTheme.typography.bodyMedium)
-        if (streaks.recentActiveDates.isNotEmpty()) {
-            Text("Recent screening dates:", style = MaterialTheme.typography.bodySmall)
-            streaks.recentActiveDates.forEach { date ->
-                Text(date, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoviegoingSection(stats: LedgerMoviegoingStats) {
-    Column {
-        Text("Trips: ${stats.tripCount}", style = MaterialTheme.typography.bodyMedium)
-        stats.totalSpend?.let { Text("Total spend: $%.2f".format(it), style = MaterialTheme.typography.bodyMedium) }
-        if (stats.byYear.isNotEmpty()) {
-            Text("By year", style = MaterialTheme.typography.bodySmall)
-            stats.byYear.forEach { CategoryRow(it) }
-        }
-        if (stats.venues.isNotEmpty()) {
-            Text("Venues", style = MaterialTheme.typography.bodySmall)
-            stats.venues.forEach { CategoryRow(it) }
-        }
-        if (stats.companions.isNotEmpty()) {
-            Text("Companions", style = MaterialTheme.typography.bodySmall)
-            stats.companions.forEach { CategoryRow(it) }
-        }
-        if (stats.formats.isNotEmpty()) {
-            Text("Formats", style = MaterialTheme.typography.bodySmall)
-            stats.formats.forEach { CategoryRow(it) }
-        }
-        if (stats.tripCount == 0) {
-            Text("No cinema trips logged yet.", style = MaterialTheme.typography.bodyMedium)
-        }
     }
 }
 

@@ -9,7 +9,27 @@ number is chosen.
 
 ## [Unreleased]
 
-## [1.14.2] - 2026-07-25
+## [1.15.0] - 2026-07-25
+
+### Changed
+
+- Native Android app (in development, not yet distributed): five Ledger widgets were rebuilt
+  around the shape of their own data instead of the shared label/count row every panel used
+  to share. **Second Opinions** now plots your score and IMDb's as a dumbbell on one shared
+  0–10 rail, sorted so the biggest disagreements lead, with a plain-language summary of which
+  way you lean. **The Marathon** renders the last 30 nights as a perforated filmstrip with the
+  live run picked out in accent, an oversized current-streak numeral, and a rail showing that
+  run against your all-time best. **At the Movies** prints trip count, spend, and average
+  price on a torn cinema ticket, with trips-by-year as bars below the tear and venue/companion/
+  format tallies as receipt-style leader rows. **Screening Nights** wraps the week into a
+  seven-spoke dial so a weekend habit reads as one lobe instead of two bars at opposite ends
+  of a chart, with the peak night called out. **By the Genre** shows genre tallies as a field
+  of bubbles sized on √(count/max), with a ranked list carrying the exact counts and shares.
+  Every panel gained a one-line subtitle saying what it counts.
+- Native Android app: the last two of those close parity gaps against the web app, which draws
+  a radar for Screening Nights and bubbles for By the Genre where Android had a plain bar chart
+  and a flat list. The Marathon's filmstrip also carries a run-encoded description covering all
+  30 nights, closing the "no per-night label at all" accessibility gap the web app still has.
 
 ### Fixed
 

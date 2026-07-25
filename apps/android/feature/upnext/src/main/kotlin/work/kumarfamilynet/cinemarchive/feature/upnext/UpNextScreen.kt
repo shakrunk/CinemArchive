@@ -59,6 +59,7 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
+import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
@@ -139,6 +140,8 @@ fun UpNextRoute(
     outingsRepository: OutingsRepository,
     librarySyncRepository: LibrarySyncRepository,
     onTitleClick: (String) -> Unit,
+    onOpenProfile: () -> Unit = {},
+    profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
 ) {
     val viewModel: UpNextViewModel = viewModel(
@@ -155,6 +158,8 @@ fun UpNextRoute(
         onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
         onDismissFollowUp = viewModel::onDismissFollowUp,
         onDidntMakeIt = viewModel::onDidntMakeIt,
+        onOpenProfile = onOpenProfile,
+        profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refresh,
@@ -172,6 +177,8 @@ private fun UpNextScreen(
     onSaveFollowUpNotes: (String, String) -> Unit,
     onDismissFollowUp: (String) -> Unit,
     onDidntMakeIt: (String) -> Unit,
+    onOpenProfile: () -> Unit = {},
+    profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
@@ -204,16 +211,21 @@ private fun UpNextScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             item {
-                Text(
-                    "ON THE MARQUEE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    "Up Next",
-                    style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "ON THE MARQUEE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text("Up Next", style = MaterialTheme.typography.headlineLarge)
+                    }
+                    ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
+                }
             }
 
             itemsIndexed(board.freshFromTheLobby, key = { _, it -> "lobby-${it.outing.id}" }) { index, entry ->

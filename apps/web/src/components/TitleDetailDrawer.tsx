@@ -1434,7 +1434,7 @@ function OutingBanner({ title }: { title: Title }) {
 
   if (!outing && pendingFollowUp) {
     return (
-      <div className="px-4 sm:px-6 pt-4">
+      <div className="px-4 sm:px-6 pt-4 pb-4">
         <button
           onClick={() => openPostShowSheet(pendingFollowUp.id)}
           className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left"
@@ -1459,7 +1459,7 @@ function OutingBanner({ title }: { title: Title }) {
     .join(' · ')
 
   return (
-    <div className="px-4 sm:px-6 pt-4">
+    <div className="px-4 sm:px-6 pt-4 pb-4">
       <div
         className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06]"
         aria-label={`Scheduled cinema outing: ${summary}`}

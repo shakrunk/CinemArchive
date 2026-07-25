@@ -1022,47 +1022,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
       {/* Bulk pre-platform mark: selected-season scope */}
       {renderPrePlatformMark('season')}
 
-      {/* Season cast */}
-      {season?.cast && season.cast.length > 0 && (
-        <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
-          <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-            Season {season.seasonNumber} Cast
-          </div>
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
-            {season.cast.map((member) => (
-              <button
-                key={member.tmdbPersonId}
-                type="button"
-                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
-                aria-label={`View details for ${member.name}`}
-                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
-                style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-              >
-                <div className="aspect-[2/3] overflow-hidden">
-                  {member.profileUrl ? (
-                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
-                      <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>{member.name.charAt(0).toUpperCase()}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-2">
-                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
-                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
-                  {member.episodeCount != null && (
-                    <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
-                      {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Episode carousel */}
+      {/* Episode carousel — the season's primary content, so it leads (#132) */}
       {season && hasEpisodes(season) && (
         <div>
           <div className="relative">
@@ -1126,6 +1086,46 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Season cast */}
+      {season?.cast && season.cast.length > 0 && (
+        <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
+          <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+            Season {season.seasonNumber} Cast
+          </div>
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
+            {season.cast.map((member) => (
+              <button
+                key={member.tmdbPersonId}
+                type="button"
+                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+                aria-label={`View details for ${member.name}`}
+                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
+                style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
+              >
+                <div className="aspect-[2/3] overflow-hidden">
+                  {member.profileUrl ? (
+                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                      <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>{member.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-2">
+                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
+                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
+                  {member.episodeCount != null && (
+                    <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
+                      {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -6,12 +6,13 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -53,12 +54,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -67,6 +70,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePillFab
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingBottomNav
 import work.kumarfamilynet.cinemarchive.core.designsystem.NavDestination
+import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
@@ -326,10 +330,22 @@ private fun CinemArchiveApp(
     // through to the default Activity behavior (finish()) — it wouldn't unwind overlays at
     // all, it'd just exit the app from underneath one. Appearance/About nest one level below
     // Profile (matching their own in-overlay back arrows); everything else closes outright.
-    BackHandler(enabled = overlay != null) {
-        overlay = when (overlay) {
-            Overlay.Appearance, Overlay.About, Overlay.Permissions -> Overlay.Profile
-            else -> null
+    //
+    // PredictiveBackHandler rather than BackHandler so the overlay's exit follows the
+    // gesture instead of popping the instant the finger lifts: `backProgress` tracks the
+    // swipe (0..1) and drives the transform below. Only a *completed* gesture commits the
+    // navigation; a cancelled one springs the overlay back to rest.
+    val backProgress = remember { Animatable(0f) }
+    PredictiveBackHandler(enabled = overlay != null) { progress ->
+        try {
+            progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
+            overlay = when (overlay) {
+                Overlay.Appearance, Overlay.About, Overlay.Permissions -> Overlay.Profile
+                else -> null
+            }
+            backProgress.snapTo(0f)
+        } catch (_: CancellationException) {
+            backProgress.animateTo(0f, expressiveSpring())
         }
     }
 
@@ -395,6 +411,19 @@ private fun CinemArchiveApp(
             }
         }
 
+        // The overlay's predictive-back transform: shrink it and ease it toward the trailing
+        // edge as the gesture progresses, so the tab content behind is revealed underneath
+        // rather than the overlay vanishing in one frame.
+        Box(
+            modifier = Modifier.graphicsLayer {
+                val p = backProgress.value
+                val scale = 1f - BACK_SCALE_TRAVEL * p
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - BACK_ALPHA_TRAVEL * p
+                translationX = size.width * BACK_SLIDE_FRACTION * p
+            },
+        ) {
         when (val current = overlay) {
             null -> Unit
             is Overlay.Detail -> TitleDetailRoute(
@@ -419,5 +448,12 @@ private fun CinemArchiveApp(
             Overlay.About -> AboutRoute(appVersionName, onBack = openProfile)
             Overlay.Permissions -> PermissionsRoute(onBack = openProfile)
         }
+        }
     }
 }
+
+/** How far the overlay travels under a full predictive-back swipe. Deliberately restrained —
+ *  the system is already animating the window behind it. */
+private const val BACK_SCALE_TRAVEL = 0.12f
+private const val BACK_ALPHA_TRAVEL = 0.35f
+private const val BACK_SLIDE_FRACTION = 0.10f

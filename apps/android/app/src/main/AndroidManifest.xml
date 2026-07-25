@@ -11,9 +11,14 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- enableOnBackInvokedCallback opts into the predictive back APIs, so the system runs
+         its back animation and MainActivity's PredictiveBackHandler can drive the overlay's
+         exit off the gesture's progress. Defaulted on when targeting SDK 36, but declared
+         explicitly so the behaviour doesn't hinge on the target level. -->
     <application
         android:name=".CinemArchiveApplication"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="CinemArchive"

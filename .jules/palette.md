@@ -87,3 +87,6 @@
 ## 2024-07-24 - Dynamic ARIA Labels & Focus States in TitleCommentsPanel
 **Learning:** Found multiple icon-only buttons (reaction, delete comment, submit post) in `TitleCommentsPanel` lacking explicit focus rings and context-rich ARIA labels. Using static `aria-label`s for toggle states (like reactions) can confuse screen reader users who can't see the visual color change indicating selection.
 **Action:** Added explicit focus-visible Tailwind utilities (`focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60`), made the reaction button's `aria-label` dynamic (`Add` vs `Remove`), and included comment text snippets in the delete button's `aria-label` to provide unique context.
+## 2025-02-20 - Ensure buttons have outline focus states
+**Learning:** Found some text buttons using generic transition colors but skipping focus rings. Standard text buttons without background colors still need an explicit focus indicator for accessibility in this codebase, just as icon buttons do.
+**Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm' to unstyled text buttons that were missing proper accessibility focus indicators.

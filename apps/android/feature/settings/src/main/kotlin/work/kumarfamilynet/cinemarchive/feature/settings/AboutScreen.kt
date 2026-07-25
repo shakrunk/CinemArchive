@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
@@ -92,6 +93,9 @@ fun AboutRoute(
     val autoCheck by preferencesRepository.observeAutoCheckUpdates()
         .collectAsStateWithLifecycle(initialValue = true)
     var updateResult by remember { mutableStateOf<UpdateCheckResult>(UpdateCheckResult.Idle) }
+    // Owned by ApkInstaller rather than this screen: the decisive transitions arrive on a
+    // manifest receiver (InstallStatusReceiver) that outlives this composable.
+    val installState by apkInstaller.installState.collectAsStateWithLifecycle()
     // Re-read on each recomposition rather than caching: the user can grant the permission in
     // Settings and come straight back, and a cached "false" would strand them on the fallback.
     val canInstallDirectly = apkInstaller.canRequestInstalls()
@@ -126,13 +130,10 @@ fun AboutRoute(
             updateResult = updateResult,
             canInstallDirectly = canInstallDirectly,
             onCheckNow = ::runCheck,
-            onInstall = { apkUrl ->
-                scope.launch {
-                    apkInstaller.downloadAndInstall(apkUrl).onFailure { e ->
-                        updateResult = UpdateCheckResult.Failed(e.message ?: "Install failed")
-                    }
-                }
-            },
+            installState = installState,
+            // Failures surface through installState, not updateResult: overwriting the latter
+            // would drop the Available result this screen needs to keep offering a retry.
+            onInstall = { apkUrl -> scope.launch { apkInstaller.downloadAndInstall(apkUrl) } },
             onOpenReleasePage = { url -> uriHandler.openUri(url) },
             onGrantInstallPermission = {
                 apkInstaller.unknownSourcesSettingsIntent()?.let { intent ->
@@ -155,6 +156,7 @@ private fun AboutListScreen(
     onSetAutoCheck: (Boolean) -> Unit,
     updateResult: UpdateCheckResult,
     canInstallDirectly: Boolean,
+    installState: ApkInstallState,
     onCheckNow: () -> Unit,
     onInstall: (String) -> Unit,
     onOpenReleasePage: (String) -> Unit,
@@ -219,6 +221,7 @@ private fun AboutListScreen(
                     onSetAutoCheck = onSetAutoCheck,
                     result = updateResult,
                     canInstallDirectly = canInstallDirectly,
+                    installState = installState,
                     onCheckNow = onCheckNow,
                     onInstall = onInstall,
                     onOpenReleasePage = onOpenReleasePage,

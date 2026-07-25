@@ -22,6 +22,30 @@ sealed interface UpdateCheckResult {
 }
 
 /**
+ * Progress of a direct in-app APK install, tracked separately from [UpdateCheckResult] because
+ * the two aren't alternatives: an install is happening *to* an already-found update, and
+ * folding a failure into [UpdateCheckResult.Failed] would erase the
+ * [UpdateCheckResult.Available] that the retry button depends on.
+ *
+ * [AwaitingConfirmation] is a real state, not a formality — `PackageInstaller` never installs
+ * without the user accepting a system dialog, even with `REQUEST_INSTALL_PACKAGES` granted, so
+ * the app hands the session over and waits.
+ */
+sealed interface ApkInstallState {
+    data object Idle : ApkInstallState
+
+    data object Downloading : ApkInstallState
+
+    /** Handed to the system installer; its confirmation dialog is up. */
+    data object AwaitingConfirmation : ApkInstallState
+
+    /** Rarely observed — the system usually kills the app as it swaps the package out. */
+    data object Installed : ApkInstallState
+
+    data class Failed(val message: String) : ApkInstallState
+}
+
+/**
  * Compares two `MAJOR.MINOR.PATCH` version strings, ignoring a leading `v` and any
  * pre-release/build suffix. Returns >0 when [a] is newer than [b], 0 when equal, <0 when older.
  *

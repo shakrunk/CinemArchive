@@ -9,6 +9,23 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-07-25
+
+### Fixed
+
+- Native Android app (in development, not yet distributed): the in-app **Install** button for
+  sideloaded builds did nothing — it downloaded the update and then stopped, with no prompt and
+  no error, even with "install unknown apps" granted. The app committed the install session but
+  never registered a receiver for the status broadcast the system replies with, and that
+  broadcast carries the install-confirmation dialog the app has to launch itself. Nothing
+  installs until it does; the granted permission only makes the app eligible to ask. Settings →
+  Updates now also shows the download and the "waiting for the system installer" step instead of
+  looking inert while they run, and reports install failures in plain language — including the
+  signing-key mismatch you get from installing a CI-signed release APK over a locally-built one.
+- Restored the `## [1.14.2]` heading in this changelog, dropped by an editing error while
+  assembling 1.15.0. Its pull-to-refresh entry had been left sitting under `[1.15.0]`, which
+  also put it into the published v1.15.0 release notes.
+
 ## [1.15.0] - 2026-07-25
 
 ### Changed
@@ -30,6 +47,8 @@ number is chosen.
   a radar for Screening Nights and bubbles for By the Genre where Android had a plain bar chart
   and a flat list. The Marathon's filmstrip also carries a run-encoded description covering all
   30 nights, closing the "no per-night label at all" accessibility gap the web app still has.
+
+## [1.14.2] - 2026-07-25
 
 ### Fixed
 

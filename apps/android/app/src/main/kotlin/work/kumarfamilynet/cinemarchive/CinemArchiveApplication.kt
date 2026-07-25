@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
+import work.kumarfamilynet.cinemarchive.data.InstallSourceProvider
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
@@ -48,6 +49,9 @@ class CinemArchiveApplication : Application() {
     val discoverRepository: DiscoverRepository by lazy { DiscoverRepository(supabaseClient, authRepository) }
 
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }
+
+    private val installSourceProvider: InstallSourceProvider by lazy { InstallSourceProvider(this) }
+
     val ledgerLayoutRepository: LedgerLayoutRepository by lazy {
         LedgerLayoutRepository(this, authRepository, SupabaseLedgerLayoutWriter(supabaseClient))
     }

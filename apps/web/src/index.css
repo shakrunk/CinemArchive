@@ -945,14 +945,17 @@
   }
 
   /* ── Poster wall (responsive grid) ── */
+  /* Density is driven by --poster-min (how narrow a column may get) and, below
+     the auto-fill breakpoint, an explicit --poster-cols. Both are set inline by
+     PosterWall from the persisted gridSize; the values here are the defaults. */
   .poster-wall {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--poster-min, 180px), 1fr));
     gap: clamp(14px, 1.6vw, 22px);
   }
   @media (max-width: 640px) {
     .poster-wall {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(var(--poster-cols, 2), 1fr);
       gap: 12px;
     }
   }

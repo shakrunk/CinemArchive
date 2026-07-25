@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-07-25
+
 ### Fixed
 
 - Native Android app (in development, not yet distributed): magic-link sign-in failed on

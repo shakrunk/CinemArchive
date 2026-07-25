@@ -304,6 +304,7 @@ export interface Recommendation {
   year: number | null
   posterUrl: string | null
   note: string | null
+  watchUrl: string | null
   status: 'unread' | 'read' | 'dismissed'
   createdAt: string
 }
@@ -320,6 +321,7 @@ function mapDbRecommendationToLocal(row: any): Recommendation {
     year: row.year,
     posterUrl: row.poster_url,
     note: row.note,
+    watchUrl: row.watch_url,
     status: row.status,
     createdAt: row.created_at,
   }
@@ -330,7 +332,12 @@ function mapDbRecommendationToLocal(row: any): Recommendation {
 // changes. Requires an accepted friendship — enforced by the send_recommendation
 // SQL function, not the client. Resending the same title to the same friend
 // just bumps the existing row back to unread (see recommendations_unique_idx).
-export async function sendRecommendation(recipientUserId: string, title: Title, note?: string): Promise<void> {
+export async function sendRecommendation(
+  recipientUserId: string,
+  title: Title,
+  note?: string,
+  watchUrl?: string
+): Promise<void> {
   if (!supabase) return
 
   const { error } = await supabase.rpc('send_recommendation', {
@@ -341,6 +348,7 @@ export async function sendRecommendation(recipientUserId: string, title: Title, 
     p_year: title.year,
     p_poster_url: title.posterUrl ?? null,
     p_note: note?.trim() || null,
+    p_watch_url: watchUrl?.trim() || null,
   })
 
   unwrap(error, 'Error sending recommendation:')

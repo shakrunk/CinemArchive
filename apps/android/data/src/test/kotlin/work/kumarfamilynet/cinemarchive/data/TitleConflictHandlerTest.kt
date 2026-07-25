@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleIdByTmdbKey
 import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 
 private class RecordingTitleDao : TitleDao {
@@ -18,6 +19,7 @@ private class RecordingTitleDao : TitleDao {
     override fun observeLibrary(): Flow<List<TitleListRow>> = flowOf(emptyList())
     override fun observeTitle(titleId: String): Flow<TitleEntity?> = flowOf(null)
     override fun observeLibraryTmdbIds(): Flow<List<Int>> = flowOf(emptyList())
+    override fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>> = flowOf(emptyList())
     override fun observeAllTitles(): Flow<List<TitleEntity>> = flowOf(emptyList())
     override suspend fun upsertAll(titles: List<TitleEntity>) = Unit
     override suspend fun count(): Int = 0

@@ -96,6 +96,7 @@ import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.profileInitial
 import work.kumarfamilynet.cinemarchive.feature.upnext.UpNextRoute
 
 private val VoidColor = Color(0xFF0B0907)
@@ -292,6 +293,9 @@ private fun CinemArchiveApp(
     val openProfile = { overlay = Overlay.Profile }
     val closeOverlay = { overlay = null }
 
+    val session by authRepository.observeSession().collectAsStateWithLifecycle()
+    val profileInitial = remember(session?.email) { profileInitial(session?.email) }
+
     // Requested contextually — the moment the user opens the schedule sheet, not at app
     // launch (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6) — the OS prompt
     // means nothing before the user has expressed intent to get a "how was it?" notification.
@@ -400,7 +404,10 @@ private fun CinemArchiveApp(
                             repository,
                             gridColumns = posterGridColumns,
                             onGridColumnsChange = onPosterGridColumnsChange,
+                            onOpenProfile = openProfile,
+                            profileInitial = profileInitial,
                             onFabExpandedChange = { fabExpanded = it },
+                            onTitleClick = { overlay = Overlay.Detail(it) },
                         )
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
@@ -410,6 +417,7 @@ private fun CinemArchiveApp(
                             gridColumns = posterGridColumns,
                             onGridColumnsChange = onPosterGridColumnsChange,
                             onOpenProfile = openProfile,
+                            profileInitial = profileInitial,
                             onTitleClick = { overlay = Overlay.Detail(it) },
                             onFabExpandedChange = { fabExpanded = it },
                         )
@@ -417,21 +425,30 @@ private fun CinemArchiveApp(
                             repository,
                             outingsRepository,
                             librarySyncRepository,
+                            onOpenProfile = openProfile,
+                            profileInitial = profileInitial,
                             onTitleClick = { overlay = Overlay.Detail(it) },
                             onFabExpandedChange = { fabExpanded = it },
                         )
-                        Tab.LEDGER -> LedgerRoute(ledgerRepository, ledgerLayoutRepository, onOpenProfile = openProfile)
+                        Tab.LEDGER -> LedgerRoute(
+                            ledgerRepository,
+                            ledgerLayoutRepository,
+                            onOpenProfile = openProfile,
+                            profileInitial = profileInitial,
+                        )
                     }
                 }
 
-                ExpressivePillFab(
-                    label = "New Title",
-                    expanded = fabExpanded,
-                    onClick = { overlay = Overlay.Add },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
-                )
+                if (tab != Tab.LEDGER) {
+                    ExpressivePillFab(
+                        label = "New Title",
+                        expanded = fabExpanded,
+                        onClick = { overlay = Overlay.Add },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
+                    )
+                }
             }
         }
 

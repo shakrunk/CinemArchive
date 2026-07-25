@@ -28,7 +28,9 @@ fun PosterSurface(
     modifier: Modifier = Modifier,
     imageUrl: String? = null,
     aspectRatio: Float = 2f / 3f,
-    cornerRadius: androidx.compose.ui.unit.Dp = 26.dp,
+    // #159: was 26.dp — noticeably rounder than the app's shape scale (CinemArchiveTypography's
+    // own "large" shape token is 16.dp), giving posters a softer look than intended.
+    cornerRadius: androidx.compose.ui.unit.Dp = 16.dp,
     scrimStop: Float = 0.4f,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit = {},

@@ -8,8 +8,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -31,14 +32,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,11 +78,15 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
+import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
+import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
+import work.kumarfamilynet.cinemarchive.core.model.LibraryGrouping
+import work.kumarfamilynet.cinemarchive.core.model.LibrarySortOrder
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
@@ -117,6 +131,7 @@ fun LibraryRoute(
     gridColumns: Int,
     onGridColumnsChange: (Int) -> Unit,
     onOpenProfile: () -> Unit,
+    profileInitial: String = "C",
     onTitleClick: (String) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
 ) {
@@ -126,23 +141,55 @@ fun LibraryRoute(
 
     var search by rememberSaveable { mutableStateOf("") }
     var statusFilters by rememberSaveable { mutableStateOf(setOf<LibraryStatus>()) }
+    var genreFilters by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var minRating by rememberSaveable { mutableStateOf(0) }
+    var sortOrder by rememberSaveable { mutableStateOf(LibrarySortOrder.TITLE) }
+    var grouping by rememberSaveable { mutableStateOf(LibraryGrouping.NONE) }
+
+    val availableGenres = remember(uiState.titles) {
+        uiState.titles.flatMap { it.genres }.distinct().sorted()
+    }
 
     val filtered = uiState.titles.filter { title ->
         (statusFilters.isEmpty() || title.status in statusFilters) &&
+            (genreFilters.isEmpty() || title.genres.any { it in genreFilters }) &&
+            (minRating == 0 || (title.rating ?: 0.0) >= minRating) &&
             (search.isBlank() || title.name.contains(search, ignoreCase = true))
+    }
+    val sorted = when (sortOrder) {
+        LibrarySortOrder.TITLE -> filtered.sortedBy { it.name.lowercase() }
+        LibrarySortOrder.YEAR_NEWEST -> filtered.sortedWith(compareByDescending<LibraryTitle> { it.year ?: Int.MIN_VALUE }.thenBy { it.name.lowercase() })
+        LibrarySortOrder.RATING_HIGHEST -> filtered.sortedWith(compareByDescending<LibraryTitle> { it.rating ?: -1.0 }.thenBy { it.name.lowercase() })
     }
 
     LibraryScreen(
-        titles = filtered,
+        titles = sorted,
         search = search,
         onSearchChange = { search = it },
         statusFilters = statusFilters,
         onToggleStatus = { s -> statusFilters = if (s in statusFilters) statusFilters - s else statusFilters + s },
+        availableGenres = availableGenres,
+        genreFilters = genreFilters,
+        onToggleGenre = { g -> genreFilters = if (g in genreFilters) genreFilters - g else genreFilters + g },
+        minRating = minRating,
+        onMinRatingChange = { minRating = it },
+        sortOrder = sortOrder,
+        onSortOrderChange = { sortOrder = it },
+        grouping = grouping,
+        onGroupingChange = { grouping = it },
+        onResetFilters = {
+            statusFilters = emptySet()
+            genreFilters = emptySet()
+            minRating = 0
+            sortOrder = LibrarySortOrder.TITLE
+            grouping = LibraryGrouping.NONE
+        },
         viewMode = viewMode,
         onToggleViewMode = onToggleViewMode,
         gridColumns = gridColumns,
         onGridColumnsChange = onGridColumnsChange,
         onOpenProfile = onOpenProfile,
+        profileInitial = profileInitial,
         onTitleClick = onTitleClick,
         onFabExpandedChange = onFabExpandedChange,
         isRefreshing = isRefreshing,
@@ -158,16 +205,30 @@ private fun LibraryScreen(
     onSearchChange: (String) -> Unit,
     statusFilters: Set<LibraryStatus>,
     onToggleStatus: (LibraryStatus) -> Unit,
+    availableGenres: List<String>,
+    genreFilters: Set<String>,
+    onToggleGenre: (String) -> Unit,
+    minRating: Int,
+    onMinRatingChange: (Int) -> Unit,
+    sortOrder: LibrarySortOrder,
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
+    grouping: LibraryGrouping,
+    onGroupingChange: (LibraryGrouping) -> Unit,
+    onResetFilters: () -> Unit,
     viewMode: LibraryViewMode,
     onToggleViewMode: () -> Unit,
     gridColumns: Int,
     onGridColumnsChange: (Int) -> Unit,
     onOpenProfile: () -> Unit,
+    profileInitial: String = "C",
     onTitleClick: (String) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
 ) {
+    var showFilterSheet by remember { mutableStateOf(false) }
+    val activeFilterCount = statusFilters.size + genreFilters.size + (if (minRating > 0) 1 else 0)
+
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     val collapsed = if (viewMode == LibraryViewMode.GRID) {
@@ -194,17 +255,7 @@ private fun LibraryScreen(
                 )
                 Text("Library", style = MaterialTheme.typography.headlineLarge)
             }
-            Surface(
-                onClick = onOpenProfile,
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(36.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Text("C", style = MaterialTheme.typography.titleMedium)
-                }
-            }
+            ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
         }
 
         AnimatedVisibility(
@@ -240,6 +291,19 @@ private fun LibraryScreen(
                             inner()
                         },
                     )
+                    IconButton(onClick = { showFilterSheet = true }, modifier = Modifier.size(32.dp)) {
+                        BadgedBox(badge = {
+                            if (activeFilterCount > 0) {
+                                Badge { Text(activeFilterCount.toString()) }
+                            }
+                        }) {
+                            Icon(
+                                Icons.Filled.FilterList,
+                                contentDescription = "Filter and sort library",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                     IconButton(onClick = onToggleViewMode, modifier = Modifier.size(32.dp)) {
                         Icon(
                             // Shows the icon for the mode a tap will switch TO, not the current mode —
@@ -250,19 +314,37 @@ private fun LibraryScreen(
                         )
                     }
                 }
-
-                ConnectedToggleGroup(
-                    options = listOf(
-                        ChoiceOption(LibraryStatus.WATCHED, "Watched"),
-                        ChoiceOption(LibraryStatus.WATCHING, "Watching"),
-                        ChoiceOption(LibraryStatus.WATCHLIST, "Watchlist"),
-                        ChoiceOption(LibraryStatus.DROPPED, "Dropped"),
-                    ),
-                    selected = statusFilters,
-                    onToggle = onToggleStatus,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                )
             }
+        }
+
+        if (showFilterSheet) {
+            LibraryFilterSheet(
+                statusFilters = statusFilters,
+                onToggleStatus = onToggleStatus,
+                availableGenres = availableGenres,
+                genreFilters = genreFilters,
+                onToggleGenre = onToggleGenre,
+                minRating = minRating,
+                onMinRatingChange = onMinRatingChange,
+                sortOrder = sortOrder,
+                onSortOrderChange = onSortOrderChange,
+                grouping = grouping,
+                onGroupingChange = onGroupingChange,
+                onReset = onResetFilters,
+                onDismiss = { showFilterSheet = false },
+            )
+        }
+
+        // Status order matches the filter sheet's status chips — grouping just re-buckets the
+        // already-sorted list, so relative order within each bucket is unaffected.
+        val groupedTitles: List<Pair<LibraryStatus?, List<LibraryTitle>>> = if (grouping == LibraryGrouping.STATUS) {
+            listOf(LibraryStatus.WATCHED, LibraryStatus.WATCHING, LibraryStatus.WATCHLIST, LibraryStatus.DROPPED)
+                .mapNotNull { status ->
+                    val group = titles.filter { it.status == status }
+                    if (group.isEmpty()) null else status to group
+                }
+        } else {
+            listOf(null to titles)
         }
 
         ExpressivePullToRefresh(
@@ -291,12 +373,19 @@ private fun LibraryScreen(
                             .fillMaxWidth()
                             .pinchToResizeGrid(gridColumns, onGridColumnsChange),
                     ) {
-                        items(titles, key = LibraryTitle::id) { title ->
-                            LibraryGridCard(
-                                title,
-                                columns = gridColumns,
-                                onClick = { onTitleClick(title.id) },
-                            )
+                        groupedTitles.forEach { (status, group) ->
+                            if (status != null) {
+                                item(span = { GridItemSpan(maxLineSpan) }, key = "header-${status.name}") {
+                                    LibraryGroupHeader(libraryStatusLabel(status))
+                                }
+                            }
+                            items(group, key = LibraryTitle::id) { title ->
+                                LibraryGridCard(
+                                    title,
+                                    columns = gridColumns,
+                                    onClick = { onTitleClick(title.id) },
+                                )
+                            }
                         }
                     }
                 } else {
@@ -305,12 +394,19 @@ private fun LibraryScreen(
                         contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
                         verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
                     ) {
-                        itemsIndexed(titles, key = { _, title -> title.id }) { index, title ->
-                            LibraryListRow(
-                                title,
-                                shape = groupedItemShape(isFirst = index == 0, isLast = index == titles.lastIndex),
-                                onClick = { onTitleClick(title.id) },
-                            )
+                        groupedTitles.forEach { (status, group) ->
+                            if (status != null) {
+                                item(key = "header-${status.name}") {
+                                    LibraryGroupHeader(libraryStatusLabel(status))
+                                }
+                            }
+                            itemsIndexed(group, key = { _, title -> title.id }) { index, title ->
+                                LibraryListRow(
+                                    title,
+                                    shape = groupedItemShape(isFirst = index == 0, isLast = index == group.lastIndex),
+                                    onClick = { onTitleClick(title.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -432,6 +528,142 @@ private fun LibraryListRow(title: LibraryTitle, shape: Shape, onClick: () -> Uni
 private fun starGlyphs(rating: Double): String {
     val n = rating.toInt().coerceIn(0, 5)
     return "★".repeat(n) + "☆".repeat(5 - n)
+}
+
+private fun libraryStatusLabel(status: LibraryStatus): String = when (status) {
+    LibraryStatus.WATCHED -> "Watched"
+    LibraryStatus.WATCHING -> "Watching"
+    LibraryStatus.WATCHLIST -> "Watchlist"
+    LibraryStatus.DROPPED -> "Dropped"
+}
+
+@Composable
+private fun LibraryGroupHeader(label: String) {
+    Text(
+        label.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+    )
+}
+
+/**
+ * The Library filter/sort sheet (#120/KP-050) — replaces the old always-visible status row.
+ * Status stays a [ConnectedToggleGroup] (multi-select), sort/grouping are single-select
+ * [SegmentedGroup]s, minimum rating is a tappable star row (tapping the already-selected star
+ * clears it back to "any"), and genres — when the library has any — are wrap-flowing
+ * [FilterChip]s.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LibraryFilterSheet(
+    statusFilters: Set<LibraryStatus>,
+    onToggleStatus: (LibraryStatus) -> Unit,
+    availableGenres: List<String>,
+    genreFilters: Set<String>,
+    onToggleGenre: (String) -> Unit,
+    minRating: Int,
+    onMinRatingChange: (Int) -> Unit,
+    sortOrder: LibrarySortOrder,
+    onSortOrderChange: (LibrarySortOrder) -> Unit,
+    grouping: LibraryGrouping,
+    onGroupingChange: (LibraryGrouping) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).padding(bottom = 24.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            ) {
+                Text("Filter & sort", style = MaterialTheme.typography.titleMedium)
+                val hasAnyFilter = statusFilters.isNotEmpty() || genreFilters.isNotEmpty() || minRating > 0 ||
+                    sortOrder != LibrarySortOrder.TITLE || grouping != LibraryGrouping.NONE
+                if (hasAnyFilter) {
+                    TextButton(onClick = onReset) {
+                        Text("Reset")
+                    }
+                }
+            }
+
+            FilterSheetLabel("Status")
+            ConnectedToggleGroup(
+                options = listOf(
+                    ChoiceOption(LibraryStatus.WATCHED, "Watched"),
+                    ChoiceOption(LibraryStatus.WATCHING, "Watching"),
+                    ChoiceOption(LibraryStatus.WATCHLIST, "Watchlist"),
+                    ChoiceOption(LibraryStatus.DROPPED, "Dropped"),
+                ),
+                selected = statusFilters,
+                onToggle = onToggleStatus,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+
+            FilterSheetLabel("Sort by")
+            SegmentedGroup(
+                options = listOf(
+                    ChoiceOption(LibrarySortOrder.TITLE, "Title"),
+                    ChoiceOption(LibrarySortOrder.YEAR_NEWEST, "Newest"),
+                    ChoiceOption(LibrarySortOrder.RATING_HIGHEST, "Top rated"),
+                ),
+                selected = sortOrder,
+                onSelect = onSortOrderChange,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+
+            FilterSheetLabel("Group by")
+            SegmentedGroup(
+                options = listOf(
+                    ChoiceOption(LibraryGrouping.NONE, "None"),
+                    ChoiceOption(LibraryGrouping.STATUS, "Status"),
+                ),
+                selected = grouping,
+                onSelect = onGroupingChange,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+
+            FilterSheetLabel("Minimum rating")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(bottom = if (availableGenres.isEmpty()) 0.dp else 16.dp),
+            ) {
+                for (star in 1..5) {
+                    IconButton(onClick = { onMinRatingChange(if (minRating == star) 0 else star) }) {
+                        Icon(
+                            if (star <= minRating) Icons.Filled.Star else Icons.Filled.StarBorder,
+                            contentDescription = "At least $star star${if (star == 1) "" else "s"}",
+                            tint = if (star <= minRating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            if (availableGenres.isNotEmpty()) {
+                FilterSheetLabel("Genres")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    availableGenres.forEach { genre ->
+                        FilterChip(
+                            selected = genre in genreFilters,
+                            onClick = { onToggleGenre(genre) },
+                            label = { Text(genre) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterSheetLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
 }
 
 @Composable

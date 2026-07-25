@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Send, Check, Loader2, Search, RefreshCw } from 'lucide-react'
+import { Send, Check, Loader2, Search, RefreshCw, Link2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
@@ -35,6 +35,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
   const [friendsError, setFriendsError] = useState(false)
   const [search, setSearch] = useState('')
   const [note, setNote] = useState('')
+  const [watchUrl, setWatchUrl] = useState(title.customWatchUrl ?? '')
   const [sendState, setSendState] = useState<Record<string, SendState>>({})
 
   async function loadFriends() {
@@ -74,7 +75,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
     const name = friendName(friend)
     setSendState((s) => ({ ...s, [friend.friend_user_id]: 'sending' }))
     try {
-      await sendRecommendation(friend.friend_user_id, title, note)
+      await sendRecommendation(friend.friend_user_id, title, note, watchUrl)
       setSendState((s) => ({ ...s, [friend.friend_user_id]: 'sent' }))
       pushNotification({ message: `Sent "${title.title}" to ${name}.`, kind: 'tip', autoClose: 4000 })
     } catch (err) {
@@ -158,6 +159,24 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
           <div className="text-right font-mono mt-1" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
             {note.length}/{NOTE_MAX_LEN}
           </div>
+        </div>
+
+        {/* Optional where-to-watch link — pre-filled from the title's own
+            custom link (if set) but editable per-send/per-recipient */}
+        <div className="px-5 pb-3 shrink-0">
+          <label className="flex items-center gap-1.5 mb-1.5 font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+            <Link2 className="w-3 h-3" />
+            Where to watch (optional)
+          </label>
+          <input
+            type="url"
+            value={watchUrl}
+            onChange={(e) => setWatchUrl(e.target.value)}
+            placeholder="https://…"
+            aria-label="Where-to-watch link to include with this recommendation"
+            className="w-full rounded-md px-3 py-2 text-sm font-sans focus:outline-none"
+            style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
+          />
         </div>
 
         {/* Friend search */}

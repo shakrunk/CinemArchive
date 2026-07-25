@@ -90,6 +90,7 @@ class LibraryRepository(
                 rating = row.rating,
                 hasScheduledOuting = row.id in scheduledTitleIds,
                 releaseDate = row.releaseDate,
+                genres = row.genres,
             )
         }
     }
@@ -97,6 +98,14 @@ class LibraryRepository(
     /** TMDB ids already in the library, for Discover to mark its results with. */
     fun observeLibraryTmdbIds(): Flow<Set<Int>> =
         titleDao.observeLibraryTmdbIds().map { it.toSet() }
+
+    /** Real local row id for every already-owned title, keyed by (tmdbId, type) — lets Discover
+     *  open the shared title-detail screen for a trending result that's already in the library
+     *  instead of its own bare preview (#119/KP-049). */
+    fun observeLibraryTitleIdsByTmdbKey(): Flow<Map<Pair<Int, MediaType>, String>> =
+        titleDao.observeLibraryTitleIdsByTmdbKey().map { rows ->
+            rows.associate { (it.tmdbId to MediaType.valueOf(it.type)) to it.id }
+        }
 
     /** Continue-watching + watchlist + marquee board for the Up Next screen. Episode totals
      *  come from [SeasonDao.observeAllSeasons]'s already-aggregated per-season counts (same

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
+import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 
 private fun cameraGranted(context: Context) =
     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -130,53 +134,63 @@ private fun PermissionsScreen(
             Text("Permissions", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
         }
 
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
-            item {
-                PermissionRow(
-                    icon = Icons.Filled.Notifications,
-                    title = "Notifications",
-                    subtitle = "The \"how was it?\" prompt when a cinema outing you logged wraps up.",
-                    granted = notificationsGranted,
-                    actionLabel = if (Build.VERSION.SDK_INT >= 33) "Enable" else "Open Settings",
-                    onAction = onRequestNotifications,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
-                PermissionRow(
-                    icon = Icons.Filled.CameraAlt,
-                    title = "Camera",
-                    subtitle = "Scans the QR code to sign in from a paired desktop session.",
-                    granted = cameraGranted,
-                    actionLabel = "Enable",
-                    onAction = onRequestCamera,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
-                PermissionRow(
-                    icon = Icons.Filled.Alarm,
-                    title = "Alarms & reminders",
-                    subtitle = "Lets an outing's \"how was it?\" notification fire on time even if the app is closed.",
-                    granted = exactAlarmsGranted,
-                    actionLabel = "Open Settings",
-                    onAction = onOpenExactAlarmSettings,
-                )
+        // One grouped container rather than a flat run of separate cards, so the three
+        // permissions read as a single set — the same convention Appearance's palette list
+        // uses (#153: this section previously stood apart with individually rounded, gapped
+        // cards instead of the seam-grouped M3 Expressive pattern used elsewhere in Settings).
+        val rows = listOf(
+            PermissionRowSpec(
+                icon = Icons.Filled.Notifications,
+                title = "Notifications",
+                subtitle = "The \"how was it?\" prompt when a cinema outing you logged wraps up.",
+                granted = notificationsGranted,
+                actionLabel = if (Build.VERSION.SDK_INT >= 33) "Enable" else "Open Settings",
+                onAction = onRequestNotifications,
+            ),
+            PermissionRowSpec(
+                icon = Icons.Filled.CameraAlt,
+                title = "Camera",
+                subtitle = "Scans the QR code to sign in from a paired desktop session.",
+                granted = cameraGranted,
+                actionLabel = "Enable",
+                onAction = onRequestCamera,
+            ),
+            PermissionRowSpec(
+                icon = Icons.Filled.Alarm,
+                title = "Alarms & reminders",
+                subtitle = "Lets an outing's \"how was it?\" notification fire on time even if the app is closed.",
+                granted = exactAlarmsGranted,
+                actionLabel = "Open Settings",
+                onAction = onOpenExactAlarmSettings,
+            ),
+        )
+        LazyColumn(
+            contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp),
+            verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
+        ) {
+            itemsIndexed(rows) { index, row ->
+                PermissionRow(row, shape = groupedItemShape(isFirst = index == 0, isLast = index == rows.lastIndex))
             }
         }
     }
 }
 
+private data class PermissionRowSpec(
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String,
+    val granted: Boolean,
+    val actionLabel: String,
+    val onAction: () -> Unit,
+)
+
 @Composable
-private fun PermissionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    granted: Boolean,
-    actionLabel: String,
-    onAction: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
+    val (icon, title, subtitle, granted, actionLabel, onAction) = row
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -77,8 +77,9 @@ internal fun ArchiveThemeMode.label(): String = when (this) {
 
 /** The name to head the Profile screen with. Magic-link sign-in gives us no
  *  profile name, so derive one from the email's local part (dropping any `+tag`)
- *  and fall back to the app name when signed out. */
-internal fun profileDisplayName(email: String?): String {
+ *  and fall back to the app name when signed out. Public (not `internal`): also backs the
+ *  top-bar avatar's initial across every tab — see [profileInitial] and #156/#157. */
+fun profileDisplayName(email: String?): String {
     val local = email?.substringBefore('@')?.substringBefore('+')?.trim().orEmpty()
     return local
         .split('.', '_', '-')
@@ -86,6 +87,14 @@ internal fun profileDisplayName(email: String?): String {
         .joinToString(" ") { part -> part.replaceFirstChar { it.uppercaseChar() } }
         .ifBlank { "CinemArchive" }
 }
+
+/** Single-letter initial for [ProfileAvatarButton][work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton]
+ *  across every tab header — Android has no separate `name`/`username` fields to prefer
+ *  between (no `profiles` table sync; magic-link auth only gives an email), so this is the
+ *  closest equivalent to the web app's name-then-username precedence (#157): the same
+ *  email-derived display name already used to head the Profile screen itself. */
+fun profileInitial(email: String?): String =
+    profileDisplayName(email).firstOrNull()?.uppercaseChar()?.toString() ?: "C"
 
 internal fun ArchivePalette.label(): String = when (this) {
     ArchivePalette.BRAND -> "Brand"

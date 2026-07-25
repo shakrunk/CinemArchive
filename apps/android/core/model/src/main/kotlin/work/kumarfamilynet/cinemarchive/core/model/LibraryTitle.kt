@@ -17,6 +17,8 @@ data class LibraryTitle(
     /** YYYY-MM-DD if known — drives the Up Next watchlist card's "releases <date>" label for
      *  a title that hasn't come out yet (see UpNextBoard.kt). */
     val releaseDate: String? = null,
+    /** Drives the Library filter sheet's genre chips (#120/KP-050). */
+    val genres: List<String> = emptyList(),
 )
 
 enum class LibraryStatus {

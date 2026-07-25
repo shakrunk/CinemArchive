@@ -84,6 +84,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
 import work.kumarfamilynet.cinemarchive.core.designsystem.HeatmapRow
 import work.kumarfamilynet.cinemarchive.core.designsystem.LineChartCanvas
+import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
@@ -179,7 +180,12 @@ class LedgerViewModel(
 }
 
 @Composable
-fun LedgerRoute(repository: LedgerRepository, layoutRepository: LedgerLayoutRepository, onOpenProfile: () -> Unit) {
+fun LedgerRoute(
+    repository: LedgerRepository,
+    layoutRepository: LedgerLayoutRepository,
+    onOpenProfile: () -> Unit,
+    profileInitial: String = "C",
+) {
     val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository, layoutRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val layout by viewModel.layout.collectAsStateWithLifecycle()
@@ -191,6 +197,7 @@ fun LedgerRoute(repository: LedgerRepository, layoutRepository: LedgerLayoutRepo
         onToggleEditMode = { viewModel.setEditMode(!editMode) },
         onLayoutChange = viewModel::updateLayout,
         onOpenProfile = onOpenProfile,
+        profileInitial = profileInitial,
     )
 }
 
@@ -203,6 +210,7 @@ fun LedgerScreen(
     onToggleEditMode: () -> Unit = {},
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    profileInitial: String = "C",
     // Android has no friend/shared viewer mode yet (see LedgerWidgets.kt's kdoc on the same
     // gap), so this is always null today — threaded through now so the eventual Friends/
     // Sharing work only needs to supply a real value, not rewire this call chain. See
@@ -216,17 +224,7 @@ fun LedgerScreen(
             modifier = Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 0.dp),
         ) {
             Text("THE NUMBERS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            Surface(
-                onClick = onOpenProfile,
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(36.dp),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize()) {
-                    Text("C", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
-                }
-            }
+            ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

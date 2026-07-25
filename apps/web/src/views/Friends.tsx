@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2, Ticket } from 'lucide-react'
+import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2, Ticket, Link2 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { useAppStore } from 'src/store/useAppStore'
@@ -454,6 +454,19 @@ function InboxSection() {
                     <p className="font-sans text-[11px] text-muted-foreground italic mt-1 line-clamp-2">
                       "{r.note}"
                     </p>
+                  )}
+                  {r.watchUrl && (
+                    <a
+                      href={r.watchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 font-mono mt-1 text-amber/80 hover:text-amber transition-colors"
+                      style={{ fontSize: '9px' }}
+                    >
+                      <Link2 className="w-2.5 h-2.5" />
+                      Where to watch
+                    </a>
                   )}
                 </div>
                 <Button

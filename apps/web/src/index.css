@@ -1029,6 +1029,12 @@
   .poster.has-img .poster__face::before {
     opacity: 0;
   }
+  /* The has-img scrim exists purely to keep face content legible over artwork.
+     When the face carries nothing (badges hidden, not the rich editorial face),
+     it would only darken the poster for no reason — so drop it. */
+  .poster.has-img .poster__face--bare {
+    background: none;
+  }
   /* sheen sweep on hover */
   .poster::after {
     content: '';

@@ -431,16 +431,12 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
             board.monthlyRun.applyTopN(config).forEach { CategoryRow(LedgerCategoryCount(it.monthLabel, it.count)) }
         }
         LedgerWidgetId.RATINGS -> CategorySection(title, board.ratingBuckets.applyTopN(config), "No ratings logged yet.")
-        LedgerWidgetId.GENRES -> CategorySection(title, board.genres.applyTopN(config), "No genres logged yet.")
+        LedgerWidgetId.GENRES -> GenresPanel(title, board.genres.applyTopN(config))
         LedgerWidgetId.AUTEURS -> CategorySection(title, board.auteurs.applyTopN(config), "No director data logged yet.")
         LedgerWidgetId.ENSEMBLE -> CategorySection(title, board.ensemble.applyTopN(config), "No cast data logged yet.")
         LedgerWidgetId.VERDICTS -> VerdictsPanel(title, board.verdicts.applyTopN(config))
         LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config), "No non-English titles logged yet.")
-        LedgerWidgetId.WEEKDAYS -> {
-            SectionHeader(title)
-            BarChartCanvas(data = board.weekdays.map { ChartDatum(it.weekday, it.count.toFloat()) })
-            board.weekdays.forEach { CategoryRow(LedgerCategoryCount(it.weekday, it.count)) }
-        }
+        LedgerWidgetId.WEEKDAYS -> WeekdaysPanel(title, board.weekdays)
         LedgerWidgetId.STREAKS -> MarathonPanel(title, board.streaks)
         LedgerWidgetId.TRAJECTORY -> {
             SectionHeader(title)

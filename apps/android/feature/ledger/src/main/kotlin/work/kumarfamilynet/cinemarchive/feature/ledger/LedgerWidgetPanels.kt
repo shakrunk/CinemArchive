@@ -35,23 +35,28 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import work.kumarfamilynet.cinemarchive.core.designsystem.BubbleCloud
+import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
 import work.kumarfamilynet.cinemarchive.core.designsystem.ComparisonDumbbell
 import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
 import work.kumarfamilynet.cinemarchive.core.designsystem.FilmstripTrack
 import work.kumarfamilynet.cinemarchive.core.designsystem.LedgerTrackInset
+import work.kumarfamilynet.cinemarchive.core.designsystem.RadialSpokePlot
 import work.kumarfamilynet.cinemarchive.core.designsystem.TicketStub
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
 import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerWeekdayCount
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * The three Ledger widgets whose data doesn't reduce to "count per bucket," rendered in a
- * visual language of their own rather than the shared label/count row every other panel uses.
- * Each one pairs a purpose-built primitive from `core:designsystem`'s
- * `LedgerWidgetPrimitives.kt` with a plain-language subtitle and a full set of real,
- * screen-reader-reachable figures (ledger.md §5):
+ * The Ledger widgets whose data doesn't reduce to "count per bucket," rendered in a visual
+ * language of their own rather than the shared label/count row every other panel uses. Each
+ * one pairs a purpose-built primitive from `core:designsystem`'s `LedgerWidgetPrimitives.kt`
+ * with a plain-language subtitle and a full set of real, screen-reader-reachable figures
+ * (ledger.md §5):
  *
  * - [VerdictsPanel] (Second Opinions) — dumbbell rows on one shared 0–10 scale, because the
  *   widget's subject is the *gap* between two scores, not either score alone.
@@ -59,9 +64,16 @@ import kotlin.math.abs
  *   consecutive runs, which a per-day intensity grid actively obscures.
  * - [MoviegoingPanel] (At the Movies) — a torn ticket, because trips/spend/venue are
  *   unrelated headline figures from one physical event, not a series.
+ * - [WeekdaysPanel] (Screening Nights) — a seven-spoke dial, because day-of-week is cyclical
+ *   and a left-to-right axis puts Sunday and Monday at opposite ends of the widget.
+ * - [GenresPanel] (By the Genre) — a bubble field sized on √(count/max), restoring the
+ *   encoding the web app uses and Android had flattened into a list.
  *
- * All three render inside `LedgerScreen`'s fixed-height, internally scrolling widget card and
- * are also what the edit-mode palette thumbnail scales down, so they stay legible at 0.28×.
+ * The last two also close parity gaps the contract names: the web app draws a radar for
+ * Screening Nights and bubbles for By the Genre, both of which Android had reduced to bars or
+ * rows. All of them render inside `LedgerScreen`'s fixed-height, internally scrolling widget
+ * card and are also what the edit-mode palette thumbnail scales down, so they stay legible at
+ * 0.28×.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -699,6 +711,150 @@ private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) {
                     entry.count.toString(),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.background(knockout).padding(start = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// Screening Nights — the week as a dial
+// ---------------------------------------------------------------------------------------
+
+/**
+ * Screening Nights as a radial plot rather than seven bars. Day-of-week is cyclical — Sunday
+ * runs back into Monday — so a left-to-right axis invents a start and an end the data doesn't
+ * have, and makes "weekends" (the two ends of the axis) look maximally far apart when they're
+ * actually adjacent. Wrapped into a ring, a weekend habit reads as one lobe.
+ *
+ * `weekdays` always arrives as exactly seven entries in Monday..Sunday order with localized
+ * short names (`LedgerRepository.weekdays`), including zero-count days, so the ring is always
+ * complete and the panel never has to gap-fill. The paired list underneath carries the counts
+ * and each day's share, which is what the plot deliberately doesn't encode.
+ */
+@Composable
+internal fun WeekdaysPanel(title: String, weekdays: List<LedgerWeekdayCount>) {
+    PanelHeading(title, "Which nights of the week you actually watch")
+    val total = weekdays.sumOf { it.count }
+    if (total == 0) {
+        PanelEmpty("No dated viewings logged yet — a screening needs a date to land on a night.")
+        return
+    }
+
+    val peakIndex = weekdays.indices.maxBy { weekdays[it].count }
+    val peak = weekdays[peakIndex]
+    Text(
+        "%s is your night — %d of %d screenings (%d%%).".format(
+            peak.weekday,
+            peak.count,
+            total,
+            (peak.count * 100.0 / total).roundToInt(),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    RadialSpokePlot(
+        values = weekdays.map { it.count.toFloat() },
+        labels = weekdays.map { it.weekday },
+        highlightIndex = peakIndex,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        weekdays.forEachIndexed { index, entry ->
+            val share = entry.count * 100.0 / total
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    entry.weekday,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (index == peakIndex) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+                )
+                MonoFigure(
+                    "%d · %d%%".format(entry.count, share.roundToInt()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (index == peakIndex) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// By the Genre — bubble field
+// ---------------------------------------------------------------------------------------
+
+/**
+ * By the Genre as a bubble field, restoring the encoding the web app already uses and Android
+ * had flattened to a plain list (ledger.md §2: "bubble size ∝ √(count/max)"). A tally of
+ * overlapping labels — a title is Drama *and* Thriller — isn't really a ranking; it's a shape,
+ * and circles show one genre dominating while the tail stays visible in a way a top-6 list of
+ * numbers doesn't.
+ *
+ * The ranked list underneath is both the accessible pairing for the (cleared) bubbles and the
+ * precise read the sizes deliberately don't give — it also mirrors the web app's own ranked-
+ * list fallback at `sm` width. Entries arrive ranked by count and already capped to the
+ * widget's effective `topN` by the caller.
+ */
+@Composable
+internal fun GenresPanel(title: String, entries: List<LedgerCategoryCount>) {
+    PanelHeading(title, "Your library's shape, by how often each genre is tagged")
+    if (entries.isEmpty()) {
+        PanelEmpty("No genres logged yet.")
+        return
+    }
+
+    val shown = entries.sumOf { it.count }
+    val lead = entries.first()
+    Text(
+        "%s leads — %d of the %d tags shown (%d%%).".format(
+            lead.label,
+            lead.count,
+            shown,
+            (lead.count * 100.0 / shown).roundToInt(),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    BubbleCloud(
+        data = entries.map { ChartDatum(it.label, it.count.toFloat()) },
+        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+    )
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        entries.forEachIndexed { index, entry ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
+                    MonoFigure(
+                        "${index + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text(
+                        entry.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                MonoFigure(
+                    "%d · %d%%".format(entry.count, (entry.count * 100.0 / shown).roundToInt()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

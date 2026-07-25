@@ -1,20 +1,30 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -31,8 +41,18 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Shape-language primitives for Ledger widgets whose data doesn't read as a bar, line, or
@@ -47,9 +67,13 @@ import androidx.compose.ui.unit.dp
  *   not the per-day total (The Marathon's 30 nights).
  * - [TicketStub] — a container for a small set of unrelated headline figures that belong to
  *   one physical event (At the Movies' trip count, spend, and venue).
+ * - [RadialSpokePlot] — a *cyclical* series where the last bucket is adjacent to the first,
+ *   which a left-to-right axis actively misrepresents (Screening Nights' Mon–Sun).
+ * - [BubbleCloud] — a ranked set where relative magnitude matters more than exact values and
+ *   the long tail should still be visible (By the Genre).
  *
- * All three are decorative in the same sense [BarChartCanvas] is: callers pair them with real
- * text (ledger.md §5). [FilmstripTrack] is the exception that takes a [String] description,
+ * All of them are decorative in the same sense [BarChartCanvas] is: callers pair them with
+ * real text (ledger.md §5). [FilmstripTrack] is the exception that takes a [String] description,
  * because the web app's equivalent grid has *no* per-night label at all and a run-encoded
  * summary is the accessible alternative §5 asks for.
  */
@@ -290,5 +314,165 @@ fun TicketStub(
             modifier = Modifier.fillMaxWidth().padding(contentPadding),
             content = stub,
         )
+    }
+}
+
+/**
+ * A closed radial plot: [values] laid out as evenly-spaced spokes around a circle, first entry
+ * at twelve o'clock, joined into a filled polygon. Day-of-week counts are *cyclical* — Sunday
+ * sits next to Monday — and a bar chart's left-to-right axis asserts a beginning and an end
+ * that the data doesn't have. Wrapping the axis into a ring says "this repeats," and the
+ * polygon's lopsidedness reads as "these nights, not those" at a glance.
+ *
+ * [values] are raw, not normalized: the outermost ring is the largest of them, so the shape
+ * shows *relative* distribution and the caller's paired list carries the absolute figures.
+ * [highlightIndex] emphasizes one vertex (typically the peak). An all-zero [values] draws the
+ * grid alone rather than collapsing the polygon onto the centre point.
+ *
+ * Decorative — semantics are cleared, same pairing rule as [BarChartCanvas].
+ */
+@Composable
+fun RadialSpokePlot(
+    values: List<Float>,
+    labels: List<String>,
+    modifier: Modifier = Modifier,
+    highlightIndex: Int = -1,
+    fillColor: Color = MaterialTheme.colorScheme.primary,
+    gridColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    highlightColor: Color = MaterialTheme.colorScheme.tertiary,
+    labelStyle: TextStyle = MaterialTheme.typography.labelSmall,
+    height: Dp = 196.dp,
+) {
+    if (values.isEmpty()) return
+    val measurer = rememberTextMeasurer()
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clearAndSetSemantics {},
+    ) {
+        val labelInset = 20.dp.toPx()
+        val radius = (min(size.width, size.height) / 2f) - labelInset
+        if (radius <= 0f) return@Canvas
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val maxValue = values.max().coerceAtLeast(0.0001f)
+        val allZero = values.all { it <= 0f }
+        val step = 2.0 * PI / values.size
+
+        fun angleAt(index: Int): Double = -PI / 2.0 + index * step
+        fun pointAt(index: Int, distance: Float): Offset {
+            val angle = angleAt(index)
+            return Offset(
+                center.x + (distance * cos(angle)).toFloat(),
+                center.y + (distance * sin(angle)).toFloat(),
+            )
+        }
+
+        listOf(0.34f, 0.67f, 1f).forEach { ring ->
+            drawCircle(color = gridColor, radius = radius * ring, center = center, style = Stroke(1.dp.toPx()))
+        }
+        values.indices.forEach { index ->
+            drawLine(gridColor, center, pointAt(index, radius), strokeWidth = 1.dp.toPx())
+        }
+
+        if (!allZero) {
+            val points = values.mapIndexed { index, value -> pointAt(index, radius * (value / maxValue)) }
+            val shape = Path().apply {
+                moveTo(points.first().x, points.first().y)
+                points.drop(1).forEach { lineTo(it.x, it.y) }
+                close()
+            }
+            drawPath(shape, fillColor.copy(alpha = 0.22f))
+            drawPath(shape, fillColor, style = Stroke(width = 2.dp.toPx()))
+            points.forEachIndexed { index, point ->
+                val isPeak = index == highlightIndex
+                drawCircle(
+                    color = if (isPeak) highlightColor else fillColor,
+                    radius = if (isPeak) 5.dp.toPx() else 3.5f.dp.toPx(),
+                    center = point,
+                )
+            }
+        }
+
+        labels.forEachIndexed { index, label ->
+            if (index >= values.size) return@forEachIndexed
+            val anchor = pointAt(index, radius + labelInset * 0.55f)
+            val laid = measurer.measure(label, labelStyle)
+            drawText(
+                textLayoutResult = laid,
+                color = if (index == highlightIndex) highlightColor else labelColor,
+                topLeft = Offset(anchor.x - laid.size.width / 2f, anchor.y - laid.size.height / 2f),
+            )
+        }
+    }
+}
+
+/**
+ * A field of circles, one per datum, area-ranked by value — the encoding the web app's genre
+ * panel already uses (`docs/android-contracts/ledger.md` §2: "bubble size ∝ √(count/max)"),
+ * which Android had flattened into a plain list. Diameter interpolates on √(value/max) rather
+ * than value/max so the *area* tracks the count, which is how a reader actually judges circle
+ * size; a linear diameter would exaggerate the leader by its square.
+ *
+ * Labels are real text inside the circles, not a canvas, so they stay crisp at any font scale
+ * — but the whole field is cleared for screen readers, since a caller pairs it with a ranked
+ * list carrying the same figures and announcing both would just double every entry.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BubbleCloud(
+    data: List<ChartDatum>,
+    modifier: Modifier = Modifier,
+    minDiameter: Dp = 46.dp,
+    maxDiameter: Dp = 98.dp,
+    leadColor: Color = MaterialTheme.colorScheme.primary,
+    onLeadColor: Color = MaterialTheme.colorScheme.onPrimary,
+    bubbleColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    onBubbleColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+) {
+    if (data.isEmpty()) return
+    val maxValue = data.maxOf { it.value }.coerceAtLeast(0.0001f)
+    FlowRow(
+        modifier = modifier.fillMaxWidth().clearAndSetSemantics {},
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        data.forEachIndexed { index, datum ->
+            val diameter = minDiameter + (maxDiameter - minDiameter) * sqrt(datum.value / maxValue)
+            val isLead = index == 0
+            Box(
+                modifier = Modifier
+                    .size(diameter)
+                    .clip(CircleShape)
+                    .background(if (isLead) leadColor else bubbleColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 6.dp),
+                ) {
+                    // Below ~62dp there isn't room for a name and a figure without one of them
+                    // wrapping to an unreadable sliver, so small bubbles keep only the count and
+                    // lean on the caller's ranked list for identification.
+                    if (diameter >= 62.dp) {
+                        Text(
+                            datum.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isLead) onLeadColor else onBubbleColor,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    Text(
+                        datum.value.toInt().toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isLead) onLeadColor else onBubbleColor,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
     }
 }

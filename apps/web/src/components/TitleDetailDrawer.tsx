@@ -2026,6 +2026,7 @@ export function TitleDetailDrawer() {
                 <StarRating
                   value={title.rating ?? 0}
                   size="sm"
+                  tone="onArt"
                   onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
                 />
               </div>
@@ -2113,6 +2114,7 @@ export function TitleDetailDrawer() {
                     <StarRating
                       value={title.rating ?? 0}
                       size="sm"
+                      tone="onArt"
                       onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
                     />
                   </div>

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
+import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 
@@ -30,6 +31,11 @@ import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
  * a published APK asset and the install permission granted. Otherwise the affordance is
  * [onOpenReleasePage], so an ungranted permission degrades to "here's the release" instead of
  * failing silently.
+ *
+ * [installState] is tracked separately from [result] because an install runs *against* an
+ * already-found update: the download takes seconds and the system's confirmation dialog is a
+ * mandatory extra step even with the permission granted, so both need to be visible or the
+ * button reads as dead while it's actually working.
  */
 @Composable
 fun UpdatesSection(
@@ -38,6 +44,7 @@ fun UpdatesSection(
     onSetAutoCheck: (Boolean) -> Unit,
     result: UpdateCheckResult,
     canInstallDirectly: Boolean,
+    installState: ApkInstallState,
     onCheckNow: () -> Unit,
     onInstall: (String) -> Unit,
     onOpenReleasePage: (String) -> Unit,
@@ -106,22 +113,52 @@ fun UpdatesSection(
                 }
 
                 if (result is UpdateCheckResult.Available) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    ) {
-                        if (canInstallDirectly && result.apkUrl != null) {
-                            Button(onClick = { onInstall(result.apkUrl!!) }, modifier = Modifier.weight(1f)) {
-                                Text("Install ${result.latestVersion}")
+                    val busyLabel = when (installState) {
+                        ApkInstallState.Downloading -> "Downloading ${result.latestVersion}…"
+                        // The system dialog is up (or the user backgrounded it). Naming it
+                        // matters: the app can't install by itself, and a plain spinner here
+                        // looks identical to the old do-nothing bug.
+                        ApkInstallState.AwaitingConfirmation -> "Waiting for the system installer…"
+                        ApkInstallState.Installed -> "Installed — reopen to finish"
+                        else -> null
+                    }
+                    if (busyLabel != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                        ) {
+                            if (installState != ApkInstallState.Installed) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             }
-                        } else {
-                            Button(
-                                onClick = { onOpenReleasePage(result.releasePageUrl) },
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text("Open release")
+                            Text(busyLabel, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        ) {
+                            if (canInstallDirectly && result.apkUrl != null) {
+                                Button(onClick = { onInstall(result.apkUrl!!) }, modifier = Modifier.weight(1f)) {
+                                    Text("Install ${result.latestVersion}")
+                                }
+                            } else {
+                                Button(
+                                    onClick = { onOpenReleasePage(result.releasePageUrl) },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text("Open release")
+                                }
                             }
                         }
+                    }
+                    if (installState is ApkInstallState.Failed) {
+                        Text(
+                            installState.message,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
                     }
                     if (!canInstallDirectly) {
                         OutlinedButton(

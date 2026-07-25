@@ -8,9 +8,13 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 
 /**
  * Installs an update APK for sideloaded builds.
@@ -19,11 +23,30 @@ import okhttp3.Request
  * asset and hand it to [PackageInstaller], so the update is one confirmation away. Without it
  * we never fail silently — the caller falls back to opening the release page, and can send the
  * user to the "install unknown apps" screen if they want the direct path next time.
+ *
+ * **Committing a session is not the end of the flow.** [PackageInstaller] answers a commit by
+ * broadcasting back to [INSTALL_STATUS_ACTION] with `STATUS_PENDING_USER_ACTION` and the
+ * system's confirmation [Intent] in [Intent.EXTRA_INTENT]; nothing installs until *the app*
+ * launches that intent. The granted permission only makes us eligible to ask. That broadcast
+ * needs a manifest-registered receiver, which has to live in the `app` module — see
+ * `InstallStatusReceiver`, which is also what drives [installState] past [
+ * ApkInstallState.Downloading].
  */
 class ApkInstaller(
     private val context: Context,
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
+    private val installStateFlow = MutableStateFlow<ApkInstallState>(ApkInstallState.Idle)
+
+    /** Observable progress of the current install, for the Settings UI. Advanced from here
+     *  while downloading and from `InstallStatusReceiver` once the system takes over. */
+    val installState: StateFlow<ApkInstallState> = installStateFlow.asStateFlow()
+
+    /** Entry point for the install-status receiver, which lives in `app` and can't reach this
+     *  class's private state directly. */
+    fun publishInstallState(state: ApkInstallState) {
+        installStateFlow.value = state
+    }
     /** Whether the system will let us hand it a package to install. */
     fun canRequestInstalls(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -48,10 +71,12 @@ class ApkInstaller(
 
     /**
      * Streams [apkUrl] straight into a [PackageInstaller] session — no copy in app storage to
-     * clean up afterwards. Returns the session's [android.app.PendingIntent]-backed status
-     * intent via [onStatusIntent] once the system is ready to prompt.
+     * clean up afterwards. Success here means only that the session was *committed*: the
+     * system's confirmation prompt is raised later, off the [INSTALL_STATUS_ACTION] broadcast
+     * (see this class's kdoc). Watch [installState] for what actually happened.
      */
     suspend fun downloadAndInstall(apkUrl: String): Result<Unit> = withContext(Dispatchers.IO) {
+        installStateFlow.value = ApkInstallState.Downloading
         runCatching {
             val request = Request.Builder().url(apkUrl).build()
             httpClient.newCall(request).execute().use { response ->
@@ -74,6 +99,8 @@ class ApkInstaller(
                     session.commit(installStatusSender(sessionId))
                 }
             }
+        }.onFailure { error ->
+            installStateFlow.value = ApkInstallState.Failed(error.message ?: "Download failed")
         }
     }
 

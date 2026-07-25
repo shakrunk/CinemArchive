@@ -52,6 +52,18 @@
             android:name=".OutingCompletionReceiver"
             android:exported="false" />
 
+        <!-- PackageInstaller's reply to a committed update session. Not optional: the system
+             delivers its install-confirmation Intent here and installs nothing until the app
+             launches it, so without this receiver the Install button silently does nothing.
+             Not exported — the broadcast originates from this app's own PendingIntent. -->
+        <receiver
+            android:name=".InstallStatusReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="work.kumarfamilynet.cinemarchive.INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".BootCompletedReceiver"
             android:exported="true"

@@ -33,6 +33,18 @@ number is chosen.
 
 ### Fixed
 
+- Native Android app (in development, not yet distributed): the in-app **Install** button for
+  sideloaded builds did nothing — it downloaded the update and then stopped, with no prompt and
+  no error, even with "install unknown apps" granted. The app committed the install session but
+  never registered a receiver for the status broadcast the system replies with, and that
+  broadcast carries the install-confirmation dialog the app has to launch itself. Nothing
+  installs until it does; the granted permission only makes the app eligible to ask. Settings →
+  Updates now also shows the download and the "waiting for the system installer" step instead of
+  looking inert while they run, and reports install failures in plain language — including the
+  signing-key mismatch you get from installing a CI-signed release APK over a locally-built one.
+
+### Fixed
+
 - Native Android app (in development, not yet distributed): the pull-to-refresh indicator on
   Library, Discover, and Up Next now morphs between M3 Expressive shapes while refreshing
   (circle → cookie → burst → circle) instead of spinning a plain circular arc, and holds a

@@ -40,6 +40,10 @@ import type { SearchResult } from '../lib/media'
 export type SortField = 'title' | 'year' | 'rating' | 'addedAt' | 'director' | 'lastInteraction'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
+
+/** Poster-wall density. Drives how narrow a grid column is allowed to get, so
+ *  'compact' fits more (smaller) posters per row and 'large' fewer. */
+export type GridSize = 'compact' | 'default' | 'large'
 export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
 
 /** Default theme for users with no persisted choice yet — matches the OS
@@ -151,6 +155,7 @@ interface LedgerSlice {
 
 interface UISlice {
   viewMode: ViewMode
+  gridSize: GridSize
   theme: Theme
   // Themes beyond dark/light are locked until earned via an in-app easter egg
   // (e.g. Spider-Noir black & white, The Matrix red pill). Always includes
@@ -175,6 +180,7 @@ interface UISlice {
   preselectedResult: SearchResult | null
 
   setViewMode: (mode: ViewMode) => void
+  setGridSize: (size: GridSize) => void
   setTheme: (theme: Theme) => void
   // No-op if already unlocked or the theme is dark/light (always unlocked).
   unlockTheme: (theme: Theme) => void
@@ -846,6 +852,7 @@ export const useAppStore = create<AppStore>()(
 
   // ── UI ─────────────────────────────────────────────────────
   viewMode: 'grid',
+  gridSize: 'default',
   theme: getSystemTheme(),
   unlockedThemes: ['dark', 'light'],
   navPrefs: defaultNavPrefs,
@@ -857,6 +864,8 @@ export const useAppStore = create<AppStore>()(
   preselectedResult: null,
 
   setViewMode: (viewMode) => set({ viewMode }),
+
+  setGridSize: (gridSize) => set({ gridSize }),
 
   setTheme: (theme) => set({ theme }),
 
@@ -1537,6 +1546,7 @@ export const useAppStore = create<AppStore>()(
         outings: s.viewerContext.kind === 'friend' ? [] : s.outings,
         filters: s.filters,
         viewMode: s.viewMode,
+        gridSize: s.gridSize,
         theme: s.theme,
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,

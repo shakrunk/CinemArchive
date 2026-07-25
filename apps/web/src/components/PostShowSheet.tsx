@@ -8,6 +8,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { formatCompanions } from 'src/store/outings'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import type { CinemaOuting, Title, Viewing } from 'src/store/mockData'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // Post-show follow-up — "How was it?" (plan §4.4). One screen, no navigation:
 // rate, jot a note, deep-link to a recommendation, or back out via "Didn't
@@ -94,14 +95,14 @@ function PostShowBody({
       </div>
 
       <div>
-        <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">How was it?</p>
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="mb-2">How was it?</Eyebrow>
         <StarRating value={rating} onChange={handleRate} size="lg" />
       </div>
 
       <div>
-        <label htmlFor="postshow-note" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+        <Eyebrow as="label" htmlFor="postshow-note" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           Quick note
-        </label>
+        </Eyebrow>
         <textarea
           id="postshow-note"
           value={note}

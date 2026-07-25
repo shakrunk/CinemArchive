@@ -1,6 +1,7 @@
 // Dashboard hero + stat ribbon shown above the widget board.
 
 import { useAppStore } from 'src/store/useAppStore'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export function DashHero() {
   const stats = useAppStore((s) => s.stats)
@@ -60,9 +61,9 @@ export function StatRibbon() {
               {item.value}
               {item.unit && <span className="unit">{item.unit === 'star' ? '★' : item.unit}</span>}
             </div>
-            <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-paper-faint mt-1.5 whitespace-nowrap">
+            <Eyebrow as="div" size="md" className="mt-1.5 whitespace-nowrap">
               {item.sub}
-            </div>
+            </Eyebrow>
           </div>
         </div>
       ))}

@@ -6,7 +6,7 @@ import { PosterLightbox } from 'src/components/ui/poster-lightbox'
 import { SeriesGraph } from 'src/components/ui/series-graph'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
-import { CardTitle, BodyText, MetaBadge, StatLabel } from 'src/components/ui/typography'
+import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
@@ -125,10 +125,10 @@ function VenueCompanionsFields({
   return (
     <>
       <div>
-        <label className="flex items-center gap-1 font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="label" size="xl" tone="muted" font="sans" className="flex items-center gap-1 mb-2">
           <MapPin className="w-3 h-3" />
           Theater
-        </label>
+        </Eyebrow>
         <Input
           list={datalistId}
           value={venue}
@@ -141,10 +141,10 @@ function VenueCompanionsFields({
         </datalist>
       </div>
       <div>
-        <p className="flex items-center gap-1 font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="flex items-center gap-1 mb-2">
           <Users className="w-3 h-3" />
           Companions
-        </p>
+        </Eyebrow>
         <CompanionInput companions={companions} onChange={onCompanionsChange} suggestions={suggestions} />
       </div>
     </>
@@ -260,7 +260,7 @@ function ViewingEditForm({
       </div>
 
       <div>
-        <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">Rating</p>
+        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="mb-2">Rating</Eyebrow>
         <StarRating value={rating} onChange={setRating} size="md" />
       </div>
 
@@ -272,10 +272,10 @@ function ViewingEditForm({
       />
 
       <div>
-        <label htmlFor="viewing-edit-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+        <Eyebrow as="label" htmlFor="viewing-edit-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           <FileText className="inline w-3 h-3 mr-1" />
           Notes
-        </label>
+        </Eyebrow>
         <textarea
           id="viewing-edit-notes"
           value={notes}
@@ -287,9 +287,9 @@ function ViewingEditForm({
 
       {outing && (
         <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}>
-          <p className="font-mono uppercase tracking-widest" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+          <Eyebrow as="p" size="md">
             Ticket details
-          </p>
+          </Eyebrow>
           <div className="flex flex-wrap gap-2">
             {CINEMA_FORMATS.map((f) => (
               <button
@@ -310,9 +310,9 @@ function ViewingEditForm({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="viewing-edit-price" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+              <Eyebrow as="label" htmlFor="viewing-edit-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                 Ticket price
-              </label>
+              </Eyebrow>
               <Input
                 id="viewing-edit-price"
                 type="number"
@@ -325,9 +325,9 @@ function ViewingEditForm({
               />
             </div>
             <div>
-              <label htmlFor="viewing-edit-seat" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+              <Eyebrow as="label" htmlFor="viewing-edit-seat" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                 Seat
-              </label>
+              </Eyebrow>
               <Input
                 id="viewing-edit-seat"
                 value={seat}
@@ -338,9 +338,9 @@ function ViewingEditForm({
             </div>
           </div>
           <div>
-            <label htmlFor="viewing-edit-booking-ref" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+            <Eyebrow as="label" htmlFor="viewing-edit-booking-ref" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
               Booking ref
-            </label>
+            </Eyebrow>
             <Input
               id="viewing-edit-booking-ref"
               value={bookingRef}
@@ -523,7 +523,7 @@ function SectionCard({
     >
       {(title || action) && (
         <div className="flex items-center justify-between gap-3 mb-4">
-          <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">{title}</h4>
+          <SubsectionLabel className="mb-0">{title}</SubsectionLabel>
           {action}
         </div>
       )}
@@ -575,7 +575,7 @@ function StatusCard({
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
-      <dt className="font-mono text-xs uppercase tracking-wider text-muted-foreground shrink-0">{label}</dt>
+      <Eyebrow as="dt" size="xl" tone="muted" className="shrink-0">{label}</Eyebrow>
       <dd className="font-sans text-sm text-foreground text-right min-w-0 break-words">{value}</dd>
     </div>
   )
@@ -650,9 +650,15 @@ function CastCard({
   )
 }
 
-// Wrapping cast layout: the first 5 members show, with a "View All" tile in the
-// 6th slot expanding the rest (no single-axis horizontal scroll).
-const CAST_COLLAPSED_COUNT = 5
+// Wrapping cast layout: as many members as fit one row show, with a "View All"
+// tile in the final slot expanding the rest (no single-axis horizontal scroll).
+// Both constants must track the w-[110px] on CastCard/the tile and the gap-2.5
+// on the row below.
+const CAST_CARD_WIDTH = 110
+const CAST_ROW_GAP = 10
+// Used until the row has been measured — matches the old fixed count, so the
+// first paint is never emptier than it used to be.
+const CAST_FALLBACK_COUNT = 5
 
 function CastGrid({
   cast,
@@ -662,12 +668,38 @@ function CastGrid({
   onPersonClick: (person: PersonDetailTarget) => void
 }) {
   const [showAll, setShowAll] = useState(false)
-  // No point hiding a single member behind a button — collapse only above 6.
-  const collapsible = cast.length > CAST_COLLAPSED_COUNT
-  const visible = collapsible && !showAll ? cast.slice(0, CAST_COLLAPSED_COUNT) : cast
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [perRow, setPerRow] = useState(0)
+
+  // The drawer mounts before the row has a width, so measure the element itself
+  // rather than once on mount.
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const measure = () => {
+      const width = el.clientWidth
+      if (width <= 0) return
+      setPerRow(Math.max(1, Math.floor((width + CAST_ROW_GAP) / (CAST_CARD_WIDTH + CAST_ROW_GAP))))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // Fill the row: if the whole cast fits there is nothing to collapse, otherwise
+  // keep the last slot for the "View All" tile so the row stays flush.
+  const collapsedCount =
+    perRow === 0
+      ? CAST_FALLBACK_COUNT
+      : cast.length <= perRow
+        ? cast.length
+        : Math.max(1, perRow - 1)
+  const collapsible = cast.length > collapsedCount
+  const visible = collapsible && !showAll ? cast.slice(0, collapsedCount) : cast
 
   return (
-    <div className="flex flex-wrap gap-2.5">
+    <div ref={rowRef} className="flex flex-wrap gap-2.5">
       {visible.map((member) => (
         <CastCard key={member.tmdbPersonId} member={member} onPersonClick={onPersonClick} />
       ))}
@@ -689,7 +721,7 @@ function CastGrid({
           </span>
           {!showAll && (
             <span className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
-              +{cast.length - CAST_COLLAPSED_COUNT} more
+              +{cast.length - collapsedCount} more
             </span>
           )}
         </button>
@@ -721,9 +753,9 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
         aria-expanded={expanded}
         className="flex items-center gap-2 mb-4 group focus:outline-none"
       >
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim group-hover:text-amber transition-colors">
+        <Eyebrow as="h4" size="xl" tone="dim" font="sans" className="font-semibold group-hover:text-amber transition-colors">
           Cast &amp; Crew
-        </h4>
+        </Eyebrow>
         <ChevronDown
           className={cn('w-3.5 h-3.5 text-paper-faint transition-transform group-hover:text-amber', expanded ? 'rotate-180' : '')}
         />
@@ -732,12 +764,9 @@ function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioClick }: 
       <div className="space-y-4">
       {hasCast && (
         <div>
-          <div
-            className="font-mono mb-2"
-            style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}
-          >
+          <Eyebrow as="div" className="mb-2">
             Main Cast
-          </div>
+          </Eyebrow>
           <CastGrid cast={cast} onPersonClick={onPersonClick} />
         </div>
       )}
@@ -831,7 +860,6 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
   const [confirmPrePlatform, setConfirmPrePlatform] = useState<'series' | 'season' | null>(null)
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
-  const [castExpanded, setCastExpanded] = useState(true)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -934,17 +962,17 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>
             {totalWatched}<span className="text-sm font-mono ml-0.5" style={{ color: 'var(--paper-faint)' }}>/{totalCount}</span>
           </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Episodes</div>
+          <Eyebrow as="div" className="mt-0.5">Episodes</Eyebrow>
         </div>
         <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--amber)', fontVariationSettings: '"opsz" 30' }}>
             {seriesAvg !== null ? `★ ${seriesAvg.toFixed(1)}` : '—'}
           </div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Avg Rating</div>
+          <Eyebrow as="div" className="mt-0.5">Avg Rating</Eyebrow>
         </div>
         <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
           <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>{seasons.length}</div>
-          <div className="font-mono mt-0.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Seasons</div>
+          <Eyebrow as="div" className="mt-0.5">Seasons</Eyebrow>
         </div>
       </div>
 
@@ -954,9 +982,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
       {/* Series Graph heatmap */}
       {seasons.some(hasEpisodes) && (
         <div>
-          <h4 className="font-mono mb-3" style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--paper-faint)' }}>
+          <Eyebrow as="h4" size="md" className="mb-3">
             Series Graph
-          </h4>
+          </Eyebrow>
           <SeriesGraph
             seasons={seasons}
             onCellClick={(seasonNumber, episodeNumber) => {
@@ -1023,59 +1051,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
       {/* Bulk pre-platform mark: selected-season scope */}
       {renderPrePlatformMark('season')}
 
-      {/* Season cast */}
-      {season?.cast && season.cast.length > 0 && (
-        <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
-          <button
-            type="button"
-            onClick={() => setCastExpanded((e) => !e)}
-            aria-expanded={castExpanded}
-            className="flex items-center gap-1.5 mb-2 group focus:outline-none"
-          >
-            <span className="font-mono group-hover:text-amber transition-colors" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-              Season {season.seasonNumber} Cast
-            </span>
-            <ChevronDown
-              className={cn('w-3 h-3 text-paper-faint transition-transform group-hover:text-amber', castExpanded ? 'rotate-180' : '')}
-            />
-          </button>
-          {castExpanded && (
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
-            {season.cast.map((member) => (
-              <button
-                key={member.tmdbPersonId}
-                type="button"
-                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
-                aria-label={`View details for ${member.name}`}
-                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
-                style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-              >
-                <div className="aspect-[2/3] overflow-hidden">
-                  {member.profileUrl ? (
-                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
-                      <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>{member.name.charAt(0).toUpperCase()}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-2">
-                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
-                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
-                  {member.episodeCount != null && (
-                    <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
-                      {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-          )}
-        </div>
-      )}
-
-      {/* Episode carousel */}
+      {/* Episode carousel — the season's primary content, so it leads (#132) */}
       {season && hasEpisodes(season) && (
         <div>
           <div className="relative">
@@ -1139,6 +1115,46 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Season cast */}
+      {season?.cast && season.cast.length > 0 && (
+        <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
+          <Eyebrow as="div" className="mb-2">
+            Season {season.seasonNumber} Cast
+          </Eyebrow>
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
+            {season.cast.map((member) => (
+              <button
+                key={member.tmdbPersonId}
+                type="button"
+                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+                aria-label={`View details for ${member.name}`}
+                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
+                style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
+              >
+                <div className="aspect-[2/3] overflow-hidden">
+                  {member.profileUrl ? (
+                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
+                      <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>{member.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-2">
+                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
+                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
+                  {member.episodeCount != null && (
+                    <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
+                      {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1313,9 +1329,9 @@ function FranchiseSection({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-widest text-paper-dim">
+        <SubsectionLabel className="mb-0">
           {franchiseLabel} <span className="normal-case tracking-normal text-muted-foreground font-normal">· franchise</span>
-        </h4>
+        </SubsectionLabel>
         {!loading && (
           <span className="font-mono text-[11px] text-paper-faint">
             Watched <span className="text-amber">{watchedCount}</span>/{parts.length}
@@ -1976,9 +1992,9 @@ export function TitleDetailDrawer() {
               ) : (
                 <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               )}
-              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+              <StatLabel>
                 {title.type === 'tv' ? 'Series' : 'Film'}
-              </span>
+              </StatLabel>
               {title.network && (
                 <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
               )}
@@ -2072,9 +2088,9 @@ export function TitleDetailDrawer() {
                   ) : (
                     <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                   )}
-                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+                  <StatLabel>
                     {title.type === 'tv' ? 'Series' : 'Film'}
-                  </span>
+                  </StatLabel>
                   {title.network && (
                     <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
                   )}
@@ -2231,10 +2247,10 @@ export function TitleDetailDrawer() {
                 {showLogForm && (
                   <div className="border-t pt-3 mb-4 space-y-3" style={{ borderColor: 'var(--line)' }}>
                     <div>
-                      <label htmlFor="viewing-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+                      <Eyebrow as="label" htmlFor="viewing-date" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                         <Calendar className="inline w-3 h-3 mr-1" />
                         Date Watched
-                      </label>
+                      </Eyebrow>
                       {!logPrePlatform && (
                         <Input
                           id="viewing-date"
@@ -2258,9 +2274,9 @@ export function TitleDetailDrawer() {
                       </label>
                     </div>
                     <div>
-                      <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
                         Rating
-                      </p>
+                      </Eyebrow>
                       <StarRating value={logRating} onChange={setLogRating} size="md" />
                     </div>
                     <VenueCompanionsFields
@@ -2270,10 +2286,10 @@ export function TitleDetailDrawer() {
                       onCompanionsChange={setLogCompanions}
                     />
                     <div>
-                      <label htmlFor="viewing-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+                      <Eyebrow as="label" htmlFor="viewing-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                         <FileText className="inline w-3 h-3 mr-1" />
                         Notes
-                      </label>
+                      </Eyebrow>
                       <textarea
                         id="viewing-notes"
                         value={logNotes}

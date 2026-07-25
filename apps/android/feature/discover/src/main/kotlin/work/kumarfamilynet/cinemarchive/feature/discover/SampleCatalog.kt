@@ -42,7 +42,12 @@ val SAMPLE_CATALOG: List<SampleTitle> = listOf(
 
 /** Process-lifetime "added to library" state, shared by the sample catalog's Add overlay and
  *  Discover's real trending grid (keyed by tmdbId there) — deliberately not persisted (see
- *  [SampleTitle] kdoc): this is a demo of the add *interaction*, not a real library write. */
+ *  [SampleTitle] kdoc): this is a demo of the add *interaction*, not a real library write.
+ *
+ *  This is only ever half the answer for the trending grid, which unions it with the real
+ *  library's tmdbIds so a title synced down (or added from the web app) reads as in-library
+ *  without having been tapped in this process — see [DiscoverRoute]. The Add overlay has no
+ *  such union to make: its fixtures carry `smpN` ids and no tmdbId at all. */
 object DiscoverSampleStore {
     private val _addedIds = MutableStateFlow<Set<String>>(emptySet())
     val addedIds: StateFlow<Set<String>> = _addedIds

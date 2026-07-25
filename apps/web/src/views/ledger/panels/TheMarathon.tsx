@@ -6,6 +6,7 @@ import { cn } from 'src/lib/utils'
 import { deriveStreaks } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export function TheMarathon({ className, settings, width = 'sm' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
@@ -36,9 +37,9 @@ export function TheMarathon({ className, settings, width = 'sm' }: { className?:
             {streaks.longest}
             <span className="unit">d</span>
           </span>
-          <span className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mt-1">
+          <Eyebrow as="span" className="mt-1">
             longest streak
-          </span>
+          </Eyebrow>
         </div>
         <div className="flex flex-col">
           <span
@@ -48,9 +49,9 @@ export function TheMarathon({ className, settings, width = 'sm' }: { className?:
             {streaks.current}
             <span className="unit">d</span>
           </span>
-          <span className="font-mono text-[9px] tracking-[0.16em] uppercase text-paper-faint mt-1">
+          <Eyebrow as="span" className="mt-1">
             current streak
-          </span>
+          </Eyebrow>
         </div>
       </div>
 
@@ -71,7 +72,7 @@ export function TheMarathon({ className, settings, width = 'sm' }: { className?:
             )
           })}
         </div>
-        <p className="mt-2 font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint">last 30 nights</p>
+        <Eyebrow as="p" className="mt-2">last 30 nights</Eyebrow>
       </div>
 
       <p className={cn('mt-5', FOOTER_CAPTION)}>

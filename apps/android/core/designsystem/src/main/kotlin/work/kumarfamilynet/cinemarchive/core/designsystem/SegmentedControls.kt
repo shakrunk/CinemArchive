@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -94,6 +95,9 @@ private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, isFi
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall,
+                // Weight, not just colour: the selected option must stay readable as
+                // "selected" without relying on the container tint alone.
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check } from 'lucide-react'
+import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check, Grid3x3, Grid2x2, Square } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
@@ -10,7 +10,21 @@ import { cn, languageName, staggerDelays } from 'src/lib/utils'
 import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import { buildRecommendationPrompt } from 'src/lib/recommendationPrompt'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
-import type { SortField, SortDir, ViewMode } from 'src/store/useAppStore'
+import type { SortField, SortDir, ViewMode, GridSize } from 'src/store/useAppStore'
+import { Eyebrow } from 'src/components/ui/typography'
+
+// ─── Poster wall density ─────────────────────────────────────────────────────
+
+// `min` is the narrowest an auto-fill column may get; `cols` is the explicit
+// column count below the 640px breakpoint, where auto-fill would otherwise
+// collapse to a single very wide poster.
+const GRID_SIZES: Record<GridSize, { min: string; cols: number; label: string; Icon: typeof LayoutGrid }> = {
+  compact: { min: '130px', cols: 3, label: 'Compact posters', Icon: Grid3x3 },
+  default: { min: '180px', cols: 2, label: 'Default posters', Icon: Grid2x2 },
+  large: { min: '260px', cols: 1, label: 'Large posters', Icon: Square },
+}
+
+const GRID_SIZE_ORDER: GridSize[] = ['compact', 'default', 'large']
 
 // ─── Status colors for the ledger list ───────────────────────────────────────
 
@@ -55,9 +69,9 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-3">
+      <Eyebrow as="h4" size="md" className="mb-3">
         {label}
-      </h4>
+      </Eyebrow>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   )
@@ -129,10 +143,10 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
         </div>
 
         <div>
-          <h4 className="font-mono text-[10px] uppercase tracking-[0.18em] text-paper-faint mb-3">
+          <Eyebrow as="h4" size="md" className="mb-3">
             Min Rating:{' '}
             <span className="text-amber">{filters.minRating > 0 ? `★ ${filters.minRating}` : 'Any'}</span>
-          </h4>
+          </Eyebrow>
           <Slider
             value={[filters.minRating]}
             onValueChange={([v]) => setFilter('minRating', v)}
@@ -291,6 +305,7 @@ function LibraryEmptyState() {
 function PosterWall({ titles }: { titles: Title[] }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const outings = useAppStore((s) => s.outings)
+  const gridSize = useAppStore((s) => s.gridSize)
 
   // Plan §4.6: a small amber 🎟 corner badge on movies with a scheduled cinema
   // outing, clearing the moment it completes/cancels (those statuses aren't
@@ -304,8 +319,16 @@ function PosterWall({ titles }: { titles: Title[] }) {
 
   if (titles.length === 0) return <LibraryEmptyState />
 
+  const density = GRID_SIZES[gridSize]
+
   return (
-    <div className="poster-wall">
+    <div
+      className="poster-wall"
+      style={{
+        ['--poster-min' as string]: density.min,
+        ['--poster-cols' as string]: density.cols,
+      }}
+    >
       {titles.map((title, i) => (
         <DynamicPoster
           key={title.id}
@@ -381,10 +404,10 @@ function LedgerList({ titles }: { titles: Title[] }) {
               </td>
               <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-paper-dim">{title.year}</td>
               <td className="px-4 py-3">
-                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] uppercase text-paper-dim">
+                <Eyebrow as="span" size="md" tone="dim" className="inline-flex items-center gap-1.5">
                   <span aria-hidden="true" className={cn('w-[7px] h-[7px] rounded-full', STATUS_DOT[title.status])} />
                   {title.status}
-                </span>
+                </Eyebrow>
               </td>
               <td className="px-4 py-3 font-mono text-sm text-amber whitespace-nowrap">
                 {title.rating ? `★ ${title.rating}` : '—'}
@@ -482,8 +505,10 @@ export function Library() {
   const filteredTitles = useAppStore((s) => s.filteredTitles)
   const filters = useAppStore((s) => s.filters)
   const viewMode = useAppStore((s) => s.viewMode)
+  const gridSize = useAppStore((s) => s.gridSize)
   const setFilter = useAppStore((s) => s.setFilter)
   const setViewMode = useAppStore((s) => s.setViewMode)
+  const setGridSize = useAppStore((s) => s.setGridSize)
   const [filterOpen, setFilterOpen] = useState(false)
   const { copiedId, copy } = useCopyFeedback()
   const copied = copiedId === 'rec-prompt'
@@ -548,6 +573,31 @@ export function Library() {
         </div>
 
         <div className="flex-1" />
+
+        {/* Poster density — only meaningful for the grid, so it hides with it. */}
+        {viewMode === 'grid' && (
+          <div
+            className="flex items-center gap-0.5 seg !p-1"
+            role="group"
+            aria-label="Poster size"
+          >
+            {GRID_SIZE_ORDER.map((size) => {
+              const { label, Icon } = GRID_SIZES[size]
+              return (
+                <button
+                  key={size}
+                  onClick={() => setGridSize(size)}
+                  className={cn('icon-btn w-8 h-8', gridSize === size && '!text-amber-bright bg-amber/12')}
+                  aria-label={label}
+                  aria-pressed={gridSize === size}
+                  title={label}
+                >
+                  <Icon className="w-[17px] h-[17px]" />
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
           <button

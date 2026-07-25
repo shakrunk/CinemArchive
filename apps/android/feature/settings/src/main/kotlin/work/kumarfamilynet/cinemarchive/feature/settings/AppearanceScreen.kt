@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,13 +39,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
+import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.cinemArchiveTypography
+import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
@@ -106,7 +110,7 @@ private fun AppearanceScreen(
     onBack: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 20.dp, 20.dp, 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
@@ -139,11 +143,17 @@ private fun AppearanceScreen(
                     modifier = Modifier.padding(bottom = 10.dp),
                 )
             }
-            items(PALETTE_SWATCHES) { swatch ->
+            // One grouped container rather than a flat run of separate cards, so the
+            // palettes read as a single set of mutually exclusive options (#141).
+            itemsIndexed(PALETTE_SWATCHES) { index, swatch ->
                 PaletteCard(
                     swatch = swatch,
                     label = swatch.palette.label(),
                     selected = swatch.palette == palette,
+                    shape = groupedItemShape(
+                        isFirst = index == 0,
+                        isLast = index == PALETTE_SWATCHES.lastIndex,
+                    ),
                     onClick = { onSetPalette(swatch.palette) },
                 )
             }
@@ -274,13 +284,25 @@ private fun TextPreview(fontFamily: ArchiveFontFamily, fontScale: ArchiveFontSca
 }
 
 @Composable
-private fun PaletteCard(swatch: PaletteSwatch, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun PaletteCard(
+    swatch: PaletteSwatch,
+    label: String,
+    selected: Boolean,
+    shape: Shape,
+    onClick: () -> Unit,
+) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = shape,
+        // The selected row lifts to a higher container tone as well as taking the outline —
+        // inside a grouped container a border alone reads as a seam, not a selection.
+        color = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = GroupedSeamGap),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

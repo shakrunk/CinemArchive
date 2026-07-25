@@ -9,6 +9,7 @@ import { useChartTip } from 'src/components/ChartTip'
 import { MiniLineChart, type SparklinePoint } from 'src/components/LedgerCharts'
 import { Panel, PanelEmpty, FOOTER_CAPTION } from '../PanelShell'
 import { monthLabel, monthYearLabel } from '../labels'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // How many x-axis labels a card can carry before they start crowding —
 // keyed by the widget's board-width preset since that's known up front (see
@@ -148,7 +149,7 @@ function RunStat({
       >
         {value}
       </span>
-      <span className="font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint whitespace-nowrap">{label}</span>
+      <Eyebrow as="span" className="whitespace-nowrap">{label}</Eyebrow>
     </div>
   )
 }

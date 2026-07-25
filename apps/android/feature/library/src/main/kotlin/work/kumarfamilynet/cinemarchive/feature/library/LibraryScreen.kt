@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -37,7 +39,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -63,8 +65,12 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
+import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
+import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
+import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
+import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
@@ -108,6 +114,8 @@ fun LibraryRoute(
     librarySyncRepository: LibrarySyncRepository,
     viewMode: LibraryViewMode,
     onToggleViewMode: () -> Unit,
+    gridColumns: Int,
+    onGridColumnsChange: (Int) -> Unit,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
@@ -132,6 +140,8 @@ fun LibraryRoute(
         onToggleStatus = { s -> statusFilters = if (s in statusFilters) statusFilters - s else statusFilters + s },
         viewMode = viewMode,
         onToggleViewMode = onToggleViewMode,
+        gridColumns = gridColumns,
+        onGridColumnsChange = onGridColumnsChange,
         onOpenProfile = onOpenProfile,
         onTitleClick = onTitleClick,
         onFabExpandedChange = onFabExpandedChange,
@@ -150,6 +160,8 @@ private fun LibraryScreen(
     onToggleStatus: (LibraryStatus) -> Unit,
     viewMode: LibraryViewMode,
     onToggleViewMode: () -> Unit,
+    gridColumns: Int,
+    onGridColumnsChange: (Int) -> Unit,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
@@ -165,17 +177,23 @@ private fun LibraryScreen(
     }
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+        // Eyebrow and title share a column beside the avatar rather than each claiming a
+        // row of their own — the avatar is taller than the eyebrow, so the old layout paid
+        // for its height twice over (#142).
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         ) {
-            Text(
-                "THE COLLECTION",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "THE COLLECTION",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text("Library", style = MaterialTheme.typography.headlineLarge)
+            }
             Surface(
                 onClick = onOpenProfile,
                 shape = RoundedCornerShape(12.dp),
@@ -188,11 +206,6 @@ private fun LibraryScreen(
                 }
             }
         }
-        Text(
-            "Library",
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
-        )
 
         AnimatedVisibility(
             visible = !collapsed,
@@ -252,7 +265,7 @@ private fun LibraryScreen(
             }
         }
 
-        PullToRefreshBox(
+        ExpressivePullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxWidth(),
@@ -269,21 +282,35 @@ private fun LibraryScreen(
                     EmptyLibrary(modifier = Modifier.fillMaxSize())
                 } else if (viewMode == LibraryViewMode.GRID) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                        columns = GridCells.Fixed(gridColumns),
                         state = gridState,
                         contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pinchToResizeGrid(gridColumns, onGridColumnsChange),
                     ) {
                         items(titles, key = LibraryTitle::id) { title ->
-                            LibraryGridCard(title, onClick = { onTitleClick(title.id) })
+                            LibraryGridCard(
+                                title,
+                                columns = gridColumns,
+                                onClick = { onTitleClick(title.id) },
+                            )
                         }
                     }
                 } else {
-                    LazyColumn(state = listState, contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp)) {
-                        items(titles, key = LibraryTitle::id) { title ->
-                            LibraryListRow(title, onClick = { onTitleClick(title.id) })
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
+                    ) {
+                        itemsIndexed(titles, key = { _, title -> title.id }) { index, title ->
+                            LibraryListRow(
+                                title,
+                                shape = groupedItemShape(isFirst = index == 0, isLast = index == titles.lastIndex),
+                                onClick = { onTitleClick(title.id) },
+                            )
                         }
                     }
                 }
@@ -292,18 +319,32 @@ private fun LibraryScreen(
     }
 }
 
+/**
+ * [columns] is the current grid density (#126). A card only has room for so much: at three or
+ * more across the poster is too narrow for the secondary line, and at four the title goes too —
+ * the artwork carries it, and the status badge alone stays as the one piece of state worth
+ * keeping legible.
+ */
 @Composable
-private fun LibraryGridCard(title: LibraryTitle, onClick: () -> Unit) {
+private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Unit) {
+    val showTitle = columns <= 3
+    val showMeta = columns <= 2
+    val padding = if (columns >= 3) 8.dp else 12.dp
+
     PosterSurface(tint = tintForKey(title.id), imageUrl = title.posterUrl, onClick = onClick) {
         Row(
-            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(10.dp),
+            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(if (columns >= 3) 6.dp else 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                if (title.type == MediaType.TV) "SERIES" else "FILM",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.6f),
-            )
+            if (showMeta) {
+                Text(
+                    if (title.type == MediaType.TV) "SERIES" else "FILM",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
+            } else {
+                Spacer(Modifier.size(0.dp))
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (title.hasScheduledOuting) {
                     Icon(
@@ -316,39 +357,48 @@ private fun LibraryGridCard(title: LibraryTitle, onClick: () -> Unit) {
                 StatusBadge(title.status)
             }
         }
-        Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp)) {
-            Text(
-                title.name,
-                style = MaterialTheme.typography.titleSmall,
-                color = Color(0xFFF3EAD9),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                listOfNotNull(title.year?.toString(), title.director ?: title.network).joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFF3EAD9).copy(alpha = 0.6f),
-            )
-            title.rating?.let { rating ->
+        if (showTitle) {
+            Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(padding)) {
                 Text(
-                    starGlyphs(rating),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 4.dp),
+                    title.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color(0xFFF3EAD9),
+                    maxLines = if (showMeta) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (showMeta) {
+                    Text(
+                        listOfNotNull(title.year?.toString(), title.director ?: title.network).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFF3EAD9).copy(alpha = 0.6f),
+                    )
+                    title.rating?.let { rating ->
+                        Text(
+                            starGlyphs(rating),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LibraryListRow(title: LibraryTitle, onClick: () -> Unit) {
+private fun LibraryListRow(title: LibraryTitle, shape: Shape, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         PosterSurface(
@@ -375,6 +425,7 @@ private fun LibraryListRow(title: LibraryTitle, onClick: () -> Unit) {
             )
         }
         StatusBadge(title.status)
+    }
     }
 }
 

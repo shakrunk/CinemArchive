@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export interface ChartTipContent {
   label: string
@@ -82,9 +83,9 @@ export function useChartTip() {
             maxWidth: 260,
           }}
         >
-          <span className="block font-mono text-[9px] tracking-[0.14em] uppercase text-paper-faint whitespace-nowrap">
+          <Eyebrow as="span" className="block whitespace-nowrap">
             {tip.label}
-          </span>
+          </Eyebrow>
           {tip.value && (
             <span className="block text-[12px] text-paper mt-0.5 whitespace-nowrap">{tip.value}</span>
           )}

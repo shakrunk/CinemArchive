@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -35,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,13 +58,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
+import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
+import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
+import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 
 private enum class TypeFilter(val label: String) { ALL("All"), MOVIE("Movies"), TV("TV") }
 
@@ -113,11 +116,25 @@ private class DiscoverViewModelFactory(
 }
 
 @Composable
-fun DiscoverRoute(repository: DiscoverRepository, onFabExpandedChange: (Boolean) -> Unit = {}) {
+fun DiscoverRoute(
+    repository: DiscoverRepository,
+    libraryRepository: LibraryRepository,
+    gridColumns: Int,
+    onGridColumnsChange: (Int) -> Unit,
+    onFabExpandedChange: (Boolean) -> Unit = {},
+) {
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val addedIds by DiscoverSampleStore.addedIds.collectAsState()
+    // A Discover result counts as added when it is in the real library, not just when it
+    // was tapped in this process — DiscoverSampleStore alone reset on every launch and
+    // never knew about anything synced down or added from the web app (#118).
+    val libraryTmdbIds by libraryRepository.observeLibraryTmdbIds()
+        .collectAsStateWithLifecycle(initialValue = emptySet())
+    val tappedIds by DiscoverSampleStore.addedIds.collectAsState()
+    val addedIds = remember(libraryTmdbIds, tappedIds) {
+        tappedIds + libraryTmdbIds.map(Int::toString)
+    }
     var search by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableStateOf(TypeFilter.ALL) }
     var preview by remember { mutableStateOf<TrendingTitle?>(null) }
@@ -141,6 +158,8 @@ fun DiscoverRoute(repository: DiscoverRepository, onFabExpandedChange: (Boolean)
         addedIds = addedIds,
         onOpenPreview = { preview = it },
         onAdd = DiscoverSampleStore::add,
+        gridColumns = gridColumns,
+        onGridColumnsChange = onGridColumnsChange,
         onFabExpandedChange = onFabExpandedChange,
     )
 
@@ -170,13 +189,15 @@ private fun DiscoverScreen(
     addedIds: Set<String>,
     onOpenPreview: (TrendingTitle) -> Unit,
     onAdd: (String) -> Unit,
+    gridColumns: Int,
+    onGridColumnsChange: (Int) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
 ) {
     val gridState = rememberLazyGridState()
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
         Text(
             "EXPLORE THE REEL",
             style = MaterialTheme.typography.labelSmall,
@@ -186,7 +207,7 @@ private fun DiscoverScreen(
         Text(
             "Discover",
             style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 20.dp),
         )
 
         AnimatedVisibility(
@@ -259,7 +280,7 @@ private fun DiscoverScreen(
                 )
                 Button(onClick = onRetry) { Text("Retry") }
             }
-            else -> PullToRefreshBox(
+            else -> ExpressivePullToRefresh(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
                 modifier = Modifier.fillMaxWidth(),
@@ -273,17 +294,20 @@ private fun DiscoverScreen(
                     )
 
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                        columns = GridCells.Fixed(gridColumns),
                         state = gridState,
                         contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pinchToResizeGrid(gridColumns, onGridColumnsChange),
                     ) {
                         items(titles, key = TrendingTitle::tmdbId) { title ->
                             DiscoverCard(
                                 title = title,
                                 isAdded = title.tmdbId.toString() in addedIds,
+                                columns = gridColumns,
                                 onOpen = { onOpenPreview(title) },
                                 onAdd = { onAdd(title.tmdbId.toString()) },
                             )
@@ -295,8 +319,18 @@ private fun DiscoverScreen(
     }
 }
 
+/** [columns] is the current grid density (#126): a narrower card drops the metadata line, then
+ *  the title, and finally trades the full-width Add button for a compact corner affordance. */
 @Composable
-private fun DiscoverCard(title: TrendingTitle, isAdded: Boolean, onOpen: () -> Unit, onAdd: () -> Unit) {
+private fun DiscoverCard(
+    title: TrendingTitle,
+    isAdded: Boolean,
+    columns: Int,
+    onOpen: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    val showMeta = columns <= 2
+    val showTitle = columns <= 3
     PosterSurface(tint = tintForKey(title.tmdbId.toString()), imageUrl = title.posterUrl, onClick = onOpen) {
         if (isAdded) {
             Box(
@@ -316,34 +350,56 @@ private fun DiscoverCard(title: TrendingTitle, isAdded: Boolean, onOpen: () -> U
                 )
             }
         }
-        Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp)) {
-            Text(
-                title.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = androidx.compose.ui.graphics.Color(0xFFF3EAD9),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                "${title.year ?: "—"}" + if (title.type == MediaType.TV) " · TV" else "",
-                style = MaterialTheme.typography.labelSmall,
-                color = androidx.compose.ui.graphics.Color(0xFFF3EAD9).copy(alpha = 0.65f),
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            if (!isAdded) {
-                Surface(
-                    onClick = onAdd,
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
+        // At four across the card can't carry a label at all, so the add affordance becomes a
+        // corner button on the artwork rather than a full-width bar under a missing title.
+        if (!showTitle && !isAdded) {
+            Surface(
+                onClick = onAdd,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add ${title.title}", modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+        if (showTitle) {
+            Column(
+                modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                    .padding(if (columns >= 3) 8.dp else 12.dp),
+            ) {
+                Text(
+                    title.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = androidx.compose.ui.graphics.Color(0xFFF3EAD9),
+                    maxLines = if (showMeta) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (showMeta) {
                     Text(
-                        "+ Add",
+                        "${title.year ?: "—"}" + if (title.type == MediaType.TV) " · TV" else "",
                         style = MaterialTheme.typography.labelSmall,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        color = androidx.compose.ui.graphics.Color(0xFFF3EAD9).copy(alpha = 0.65f),
+                        modifier = Modifier.padding(bottom = 8.dp),
                     )
+                }
+                if (!isAdded) {
+                    Surface(
+                        onClick = onAdd,
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.fillMaxWidth().padding(top = if (showMeta) 0.dp else 6.dp),
+                    ) {
+                        Text(
+                            "+ Add",
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        )
+                    }
                 }
             }
         }

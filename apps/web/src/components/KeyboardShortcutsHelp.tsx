@@ -3,6 +3,7 @@ import { modKey } from 'src/lib/utils'
 import { useVisibleNavItems } from 'src/store/useAppStore'
 import { NAV_ITEM_LABELS } from 'src/lib/navigation'
 import { ModalCloseButton } from 'src/components/ui/modal-close-button'
+import { Eyebrow } from 'src/components/ui/typography'
 
 interface ShortcutEntry {
   keys: string[]
@@ -59,7 +60,9 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
         <DialogPrimitive.Overlay className="command-overlay" />
         <DialogPrimitive.Content
           className="command-content"
-          style={{ maxWidth: '420px' }}
+          // Wider than the palette it shares .command-content with, so the
+          // groups below have room to sit two-up instead of fully stacked.
+          style={{ width: 'min(92vw, 680px)', maxWidth: 'none' }}
           aria-label="Keyboard shortcuts"
         >
           <DialogPrimitive.Title className="sr-only">Keyboard shortcuts</DialogPrimitive.Title>
@@ -79,12 +82,14 @@ export function KeyboardShortcutsHelp({ open, onClose }: KeyboardShortcutsHelpPr
             </DialogPrimitive.Close>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 space-y-5">
+          {/* Multi-column rather than a grid: the groups have uneven heights, and
+              CSS columns balance them instead of leaving one column ragged. */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-1 sm:columns-2 sm:gap-8">
             {SHORTCUTS.map(({ group, entries }) => (
-              <div key={group}>
-                <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-amber-deep mb-2">
+              <div key={group} className="mb-5 break-inside-avoid">
+                <Eyebrow as="div" size="md" tone="accent" className="mb-2">
                   {group}
-                </div>
+                </Eyebrow>
                 <div className="space-y-0.5">
                   {entries.map(({ keys, label }) => (
                     <div key={label} className="flex items-center justify-between py-1.5">

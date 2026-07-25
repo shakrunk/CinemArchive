@@ -9,11 +9,41 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-07-24
+
+### Added
+
+- Library: a poster-size control on the grid — compact / default / large, remembered between
+  visits. Available at every width, since it is the only way to reach the mobile column counts.
+- Native Android app (in development, not yet distributed): pinch the Library and Discover
+  grids to resize them between one and four columns. The setting is shared by both tabs and
+  remembered; cards shed their metadata line, then their title, as they get narrower.
+- Native Android app (in development, not yet distributed): Settings → About now has an
+  Updates section — an "Automatically check for updates" toggle (on by default) and a "Check
+  for updates" action that always runs regardless of the toggle. Sideloaded installs compare
+  themselves against the latest GitHub Release and can install the update in-app when the
+  install permission is granted, falling back to opening the release page when it isn't.
+
 ### Changed
 
 - Poster cards no longer dim their artwork behind a contrast scrim when nothing is drawn over
   the poster — most visibly on the Up Next tab, where the cards' posters carry no overlaid
   text.
+- Title drawer: the episode carousel now comes before the season cast, and Cast & Crew is the
+  only collapsible section — the season cast row renders expanded.
+- Title drawer: the Cast & Crew preview now shows as many people as fit the available width
+  instead of a fixed five.
+- The keyboard shortcuts panel is laid out in two columns and no longer needs scrolling.
+- Native Android app (in development, not yet distributed): the back gesture is now predictive
+  — overlays follow your finger and reveal the screen behind, and an abandoned swipe springs
+  back instead of navigating.
+- Native Android app (in development, not yet distributed): pull-to-refresh uses the Material 3
+  Expressive indicator on Library, Discover and Up Next.
+- Native Android app (in development, not yet distributed): Library list rows and the
+  Appearance colour palettes are grouped M3 containers rather than loose rows and separate
+  cards, and the screen top bars have been tightened so more content fits above the fold.
+- Native Android app (in development, not yet distributed): "Source on GitHub" and "Release
+  notes" in Settings → About & Legal are buttons with icons rather than plain text.
 
 ### Fixed
 
@@ -26,6 +56,13 @@ number is chosen.
   beneath it.
 - The trailer strip in the title drawer now shows its right-hand edge fade on open, instead of
   only after the first scroll.
+- Native Android app (in development, not yet distributed): Discover no longer offers an add
+  button for titles already in your library — it previously only knew about titles added in
+  the current session, forgetting anything synced down or added on the web.
+- Native Android app (in development, not yet distributed): Settings shows your name instead
+  of a hardcoded "Cinephile" placeholder.
+- Native Android app (in development, not yet distributed): bottom nav icons are centred in
+  their indicator pill, and single-select button groups bold the selected option.
 
 ## [1.12.1] - 2026-07-24
 

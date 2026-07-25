@@ -9,6 +9,7 @@ import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { useClickOutside } from 'src/lib/useClickOutside'
 import type { AppView } from 'src/lib/navigation'
 import type { AppNotificationItem, NotificationType } from 'src/lib/db'
+import { Eyebrow } from 'src/components/ui/typography'
 
 interface TypeMeta {
   Icon: typeof Bell
@@ -174,7 +175,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
           style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
         >
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
-            <span className="font-sans text-xs uppercase tracking-widest text-muted-foreground">Notifications</span>
+            <Eyebrow as="span" size="xl" tone="muted" font="sans">Notifications</Eyebrow>
             {unreadNotificationCount > 0 && (
               <button
                 onClick={() => markAllNotificationsSeen()}

@@ -11,6 +11,7 @@ import {
   type LedgerWidgetSettings,
 } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, COL_GROW_ANIMATION } from '../PanelShell'
+import { Eyebrow } from 'src/components/ui/typography'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -145,9 +146,9 @@ export function ScreeningNights({
             </svg>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pt-1">
               <span className="stat-num text-3xl">{DAY_LABELS[peak]}</span>
-              <span className="font-mono text-[8px] uppercase tracking-[0.15em] text-paper-faint">
+              <Eyebrow as="span" size="xs">
                 peak night
-              </span>
+              </Eyebrow>
             </div>
           </div>
 
@@ -156,15 +157,15 @@ export function ScreeningNights({
               <div className="mb-5 grid grid-cols-2 gap-3">
                 <div>
                   <span className="stat-num text-3xl">{total}</span>
-                  <p className="font-mono text-[9px] uppercase tracking-widest text-paper-faint">
+                  <Eyebrow as="p">
                     screenings
-                  </p>
+                  </Eyebrow>
                 </div>
                 <div>
                   <span className="stat-num text-3xl">{Math.round((weekend / total) * 100)}%</span>
-                  <p className="font-mono text-[9px] uppercase tracking-widest text-paper-faint">
+                  <Eyebrow as="p">
                     weekend
-                  </p>
+                  </Eyebrow>
                 </div>
               </div>
               {width !== 'md' && (

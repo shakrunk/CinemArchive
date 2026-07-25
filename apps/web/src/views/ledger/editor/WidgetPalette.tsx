@@ -13,6 +13,7 @@ import {
 } from 'src/lib/ledgerPanels'
 import { PANEL_REGISTRY } from '../panelRegistry'
 import { floatingPanelStyle } from './chrome'
+import { Eyebrow } from 'src/components/ui/typography'
 
 /** Live, scaled-down render of a panel type for the palette. Memoized — the
  *  palette renders one live preview per panel type and re-renders on every
@@ -68,7 +69,7 @@ export function WidgetPalette({
       style={floatingPanelStyle}
     >
       <header className="flex items-center justify-between gap-2 shrink-0">
-        <h2 className="font-mono text-[10px] tracking-[0.18em] uppercase text-paper-dim">Widgets</h2>
+        <Eyebrow as="h2" size="md" tone="dim">Widgets</Eyebrow>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -87,9 +88,9 @@ export function WidgetPalette({
           </button>
         </div>
       </header>
-      <p className="font-mono text-[9px] tracking-[0.12em] uppercase text-paper-faint shrink-0">
+      <Eyebrow as="p" className="shrink-0">
         drag onto the board · or tap to add
-      </p>
+      </Eyebrow>
       <ul className="flex flex-col gap-2.5 overflow-y-auto scrollbar-thin -mx-1 px-1 min-h-0">
         {DEFAULT_LEDGER_PANEL_ORDER.map((panel) => {
           const count = counts.get(panel) ?? 0

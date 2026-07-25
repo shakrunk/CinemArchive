@@ -1,4 +1,5 @@
 import { ReelMark } from 'src/components/ui/reel-mark'
+import { Eyebrow } from 'src/components/ui/typography'
 
 interface Props {
   onSignIn: () => void
@@ -26,9 +27,9 @@ export function LandingScreen({ onSignIn }: Props) {
           >
             CinemArchive
           </h1>
-          <p className="font-mono text-[10px] tracking-[0.36em] text-amber-deep uppercase mt-1">
+          <Eyebrow as="p" size="md" tone="accent" className="mt-1">
             a private film archive
-          </p>
+          </Eyebrow>
         </div>
 
         {/* Tagline */}

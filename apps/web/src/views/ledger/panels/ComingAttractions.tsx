@@ -6,6 +6,7 @@ import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
 import { deriveAttractions } from 'src/store/ledgerDerive'
 import type { LedgerPanelWidth, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty } from '../PanelShell'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export function ComingAttractions({
   className,
@@ -44,9 +45,9 @@ export function ComingAttractions({
       <div className={cn('flex py-1', isSplit ? 'flex-row items-center gap-10' : 'flex-col')}>
         <div className={cn('flex flex-col shrink-0', isSplit && 'min-w-[180px]')}>
           <span className="stat-num text-[clamp(44px,5vw,64px)]">{queue.count}</span>
-          <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-paper-faint mt-1">
+          <Eyebrow as="span" size="md" className="mt-1">
             {queue.movies} film{queue.movies !== 1 ? 's' : ''} · {queue.series} series awaiting
-          </span>
+          </Eyebrow>
         </div>
 
         {isSplit && <div className="w-px self-stretch bg-[var(--line-2)]" />}

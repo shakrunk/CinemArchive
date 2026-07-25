@@ -15,24 +15,37 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.model.InstallSource
+import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
+import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
+import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
 private data class LegalDoc(val title: String, val body: String)
 
@@ -64,9 +77,37 @@ private val LEGAL_DOCS = listOf(
 )
 
 @Composable
-fun AboutRoute(appVersionName: String, onBack: () -> Unit) {
+fun AboutRoute(
+    appVersionName: String,
+    appUpdateRepository: AppUpdateRepository,
+    apkInstaller: ApkInstaller,
+    preferencesRepository: PreferencesRepository,
+    onBack: () -> Unit,
+) {
     var subpage by remember { mutableStateOf<LegalDoc?>(null) }
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val autoCheck by preferencesRepository.observeAutoCheckUpdates()
+        .collectAsStateWithLifecycle(initialValue = true)
+    var updateResult by remember { mutableStateOf<UpdateCheckResult>(UpdateCheckResult.Idle) }
+    // Re-read on each recomposition rather than caching: the user can grant the permission in
+    // Settings and come straight back, and a cached "false" would strand them on the fallback.
+    val canInstallDirectly = apkInstaller.canRequestInstalls()
+
+    fun runCheck() {
+        scope.launch {
+            updateResult = UpdateCheckResult.Checking
+            updateResult = appUpdateRepository.checkForUpdate()
+        }
+    }
+
+    // The automatic check the toggle governs. Runs once per entry into About; the manual
+    // button below ignores the toggle entirely.
+    LaunchedEffect(autoCheck) {
+        if (autoCheck && updateResult == UpdateCheckResult.Idle) runCheck()
+    }
 
     BackHandler(enabled = subpage != null) { subpage = null }
 
@@ -79,6 +120,25 @@ fun AboutRoute(appVersionName: String, onBack: () -> Unit) {
             onOpenDoc = { subpage = it },
             onOpenSource = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive") },
             onOpenReleaseNotes = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive/releases") },
+            installSource = appUpdateRepository.installSource,
+            autoCheckEnabled = autoCheck,
+            onSetAutoCheck = { enabled -> scope.launch { preferencesRepository.setAutoCheckUpdates(enabled) } },
+            updateResult = updateResult,
+            canInstallDirectly = canInstallDirectly,
+            onCheckNow = ::runCheck,
+            onInstall = { apkUrl ->
+                scope.launch {
+                    apkInstaller.downloadAndInstall(apkUrl).onFailure { e ->
+                        updateResult = UpdateCheckResult.Failed(e.message ?: "Install failed")
+                    }
+                }
+            },
+            onOpenReleasePage = { url -> uriHandler.openUri(url) },
+            onGrantInstallPermission = {
+                apkInstaller.unknownSourcesSettingsIntent()?.let { intent ->
+                    context.startActivity(intent)
+                }
+            },
         )
     }
 }
@@ -90,9 +150,18 @@ private fun AboutListScreen(
     onOpenDoc: (LegalDoc) -> Unit,
     onOpenSource: () -> Unit,
     onOpenReleaseNotes: () -> Unit,
+    installSource: InstallSource,
+    autoCheckEnabled: Boolean,
+    onSetAutoCheck: (Boolean) -> Unit,
+    updateResult: UpdateCheckResult,
+    canInstallDirectly: Boolean,
+    onCheckNow: () -> Unit,
+    onInstall: (String) -> Unit,
+    onOpenReleasePage: (String) -> Unit,
+    onGrantInstallPermission: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 20.dp, 20.dp, 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
@@ -129,20 +198,33 @@ private fun AboutListScreen(
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
-                    Text(
-                        "Source on GitHub",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onOpenSource),
-                    )
-                    Text(
-                        "Release notes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onOpenReleaseNotes),
-                    )
+                // Buttons rather than bare tappable text: these leave the app, and
+                // plain labels gave no affordance that they were actionable at all.
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
+                    OutlinedButton(onClick = onOpenSource, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Code, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Source", modifier = Modifier.padding(start = 8.dp))
+                    }
+                    OutlinedButton(onClick = onOpenReleaseNotes, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Releases", modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
+            }
+
+            item {
+                UpdatesSection(
+                    installSource = installSource,
+                    autoCheckEnabled = autoCheckEnabled,
+                    onSetAutoCheck = onSetAutoCheck,
+                    result = updateResult,
+                    canInstallDirectly = canInstallDirectly,
+                    onCheckNow = onCheckNow,
+                    onInstall = onInstall,
+                    onOpenReleasePage = onOpenReleasePage,
+                    onGrantInstallPermission = onGrantInstallPermission,
+                    modifier = Modifier.padding(bottom = 22.dp),
+                )
             }
 
             item {
@@ -185,7 +267,7 @@ private fun AboutListScreen(
 @Composable
 private fun AboutDetailScreen(doc: LegalDoc, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 20.dp, 20.dp, 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }

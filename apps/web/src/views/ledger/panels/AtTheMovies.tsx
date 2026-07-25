@@ -6,6 +6,7 @@ import { cn, fmtCurrency, getInitials, maxOrOne, rankBarFill } from 'src/lib/uti
 import { deriveAtTheMovies } from 'src/store/outings'
 import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle, FOOTER_CAPTION, COL_GROW_ANIMATION } from '../PanelShell'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // How many of the trailing per-year bars fit before the strip crowds a card
 // this narrow — mirrors TheRun.tsx's LABEL_BUDGET idea, but for whole years
@@ -71,7 +72,7 @@ export function AtTheMovies({
 
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
             <div className="min-w-0">
-              <p className="mb-2 font-mono text-[9px] uppercase tracking-widest text-paper-faint">Favorite theater</p>
+              <Eyebrow as="p" className="mb-2">Favorite theater</Eyebrow>
               {stats.venues.length === 0 ? (
                 <p className="text-sm text-paper-faint">No theater logged yet</p>
               ) : (
@@ -92,7 +93,7 @@ export function AtTheMovies({
             <div className="flex min-w-0 flex-col gap-3">
               {stats.topCompanion && (
                 <div>
-                  <p className="mb-2 font-mono text-[9px] uppercase tracking-widest text-paper-faint">Usual companion</p>
+                  <Eyebrow as="p" className="mb-2">Usual companion</Eyebrow>
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wash)] font-serif text-[10px] text-paper-dim">
                       {getInitials(stats.topCompanion.name)}
@@ -104,7 +105,7 @@ export function AtTheMovies({
               )}
               {stats.formats.length > 0 && (
                 <div>
-                  <p className="mb-2 font-mono text-[9px] uppercase tracking-widest text-paper-faint">Formats</p>
+                  <Eyebrow as="p" className="mb-2">Formats</Eyebrow>
                   <div className="flex flex-wrap gap-1.5">
                     {stats.formats.map((f) => (
                       <span
@@ -140,7 +141,7 @@ function StatBlock({ value, label, accent }: { value: number; label: string; acc
       <span className="stat-num text-[24px]" style={accent ? { color: 'var(--amber-bright)' } : undefined}>
         {value}
       </span>
-      <span className="whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-paper-faint">{label}</span>
+      <Eyebrow as="span" className="whitespace-nowrap">{label}</Eyebrow>
     </div>
   )
 }

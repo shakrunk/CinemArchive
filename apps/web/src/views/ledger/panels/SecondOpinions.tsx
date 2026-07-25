@@ -7,6 +7,7 @@ import { scopedTitles } from 'src/store/ledgerDerive'
 import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { useChartTip } from 'src/components/ChartTip'
 import { Panel, PanelEmpty, RowTitle, LIST_ROW_HOVER } from '../PanelShell'
+import { Eyebrow } from 'src/components/ui/typography'
 
 export function SecondOpinions({ className, settings, width = 'lg' }: { className?: string; settings?: LedgerWidgetSettings; width?: LedgerPanelWidth }) {
   const titles = useAppStore((s) => s.titles)
@@ -59,7 +60,7 @@ export function SecondOpinions({ className, settings, width = 'lg' }: { classNam
                   </div>
                   <div className={cn('flex flex-col gap-1', width === 'sm' && 'col-span-2 row-start-2')}>
                     <span className="flex items-center gap-1.5">
-                      <span className="font-mono text-[8px] uppercase tracking-widest text-paper-faint w-7 shrink-0">you</span>
+                      <Eyebrow as="span" size="xs" className="w-7 shrink-0">you</Eyebrow>
                       <span className="flex-1 h-[6px] rounded-full bg-[var(--wash)] overflow-hidden">
                         <span
                           className="block h-full rounded-full bar-fill"
@@ -68,7 +69,7 @@ export function SecondOpinions({ className, settings, width = 'lg' }: { classNam
                       </span>
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="font-mono text-[8px] uppercase tracking-widest text-paper-faint w-7 shrink-0">imdb</span>
+                      <Eyebrow as="span" size="xs" className="w-7 shrink-0">imdb</Eyebrow>
                       <span className="flex-1 h-[6px] rounded-full bg-[var(--wash)] overflow-hidden">
                         <span
                           className="block h-full rounded-full bar-fill"

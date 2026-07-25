@@ -10,6 +10,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import type { Title, WatchStatus, Season, CastMember, EpisodeCrew } from 'src/store/mockData'
 import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
+import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Search hook ─────────────────────────────────────────────────────────────
 
@@ -592,9 +593,9 @@ export function AddTitleWorkflow() {
 
           {/* Status */}
           <div>
-            <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
               Status
-            </p>
+            </Eyebrow>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPTIONS.map((opt) => (
                 <button
@@ -615,9 +616,9 @@ export function AddTitleWorkflow() {
 
           {/* Rating */}
           <div>
-            <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
               Your Rating
-            </p>
+            </Eyebrow>
             <StarRating
               value={log.rating}
               onChange={(r) => setLog((l) => ({ ...l, rating: r }))}
@@ -628,10 +629,10 @@ export function AddTitleWorkflow() {
           {/* Date */}
           {log.status === 'watched' && (
             <div>
-              <label htmlFor="log-date" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+              <Eyebrow as="label" htmlFor="log-date" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
                 <Calendar className="inline w-3 h-3 mr-1" />
                 Date Watched
-              </label>
+              </Eyebrow>
               {!log.prePlatform && (
                 <Input
                   id="log-date"
@@ -659,9 +660,9 @@ export function AddTitleWorkflow() {
           {selected.type === 'tv' && log.seasons.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
+                <Eyebrow as="p" size="xl" tone="muted" font="sans">
                   Season Progress
-                </p>
+                </Eyebrow>
                 <button
                   onClick={() => {
                     setLog((l) => ({
@@ -683,10 +684,10 @@ export function AddTitleWorkflow() {
 
           {/* Tags */}
           <div>
-            <p className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
               <Tag className="inline w-3 h-3 mr-1" />
               Tags
-            </p>
+            </Eyebrow>
             <TagInput
               tags={log.tags}
               onChange={(tags) => setLog((l) => ({ ...l, tags }))}
@@ -695,10 +696,10 @@ export function AddTitleWorkflow() {
 
           {/* Notes */}
           <div>
-            <label htmlFor="log-notes" className="block font-sans text-xs uppercase tracking-widest text-muted-foreground mb-2 cursor-pointer">
+            <Eyebrow as="label" htmlFor="log-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
               <FileText className="inline w-3 h-3 mr-1" />
               Notes
-            </label>
+            </Eyebrow>
             <textarea
               id="log-notes"
               value={log.notes}

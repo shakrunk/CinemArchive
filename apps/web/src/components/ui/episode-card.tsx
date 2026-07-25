@@ -3,6 +3,7 @@ import { Eye, Check, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { avgEpisodeRating } from 'src/store/episodeUtils'
 import { StarRating } from 'src/components/ui/star-rating'
+import { Eyebrow } from 'src/components/ui/typography'
 import { Input } from 'src/components/ui/input'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import { cn, fmtDate, fmtDateTime, fmtRuntime } from 'src/lib/utils'
@@ -297,9 +298,9 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
         <div className={cn('grid gap-2 text-xs', histCols === 1 ? 'grid-cols-1' : histCols === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
           {watched && (
             <div>
-              <div className="font-mono mb-1.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+              <Eyebrow as="div" className="mb-1.5">
                 Watched
-              </div>
+              </Eyebrow>
               {episode.watchEvents.map((we) => (
                 <div key={we.id}>
                   {pendingDeleteWeId === we.id ? (
@@ -336,7 +337,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
 
           {hasRatings && (
             <div>
-              <div className="font-mono mb-1.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Ratings</div>
+              <Eyebrow as="div" className="mb-1.5">Ratings</Eyebrow>
               {episode.ratings.map((er) => (
                 <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
                   ★ {er.rating}
@@ -354,7 +355,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
 
           {hasReviews && (
             <div>
-              <div className="font-mono mb-1.5" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>Reviews</div>
+              <Eyebrow as="div" className="mb-1.5">Reviews</Eyebrow>
               {episode.reviews.map((rv) => (
                 <div key={rv.id}>
                   <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>"{rv.reviewText}"</div>

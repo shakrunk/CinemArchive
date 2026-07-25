@@ -13,7 +13,18 @@ package work.kumarfamilynet.cinemarchive.core.model
  */
 data class LedgerCategoryCount(val label: String, val count: Int)
 
-data class LedgerWatchlistEntry(val titleId: String, val title: String, val year: Int?, val runtimeMinutes: Int?)
+/** [isMovie] mirrors the same `type == 'movie'` test [LedgerBoard.watchlistMovieMinutesOwed]
+ *  is summed over, so a widget can break that total down per title without re-deriving the
+ *  rule — a series carrying an episode runtime would otherwise slip into the estimate and
+ *  make the per-title figures disagree with the header total (ledger.md §2: `hoursOwed` sums
+ *  movie runtimes only). */
+data class LedgerWatchlistEntry(
+    val titleId: String,
+    val title: String,
+    val year: Int?,
+    val runtimeMinutes: Int?,
+    val isMovie: Boolean,
+)
 
 data class LedgerBoard(
     /** Feature Lengths: movie runtime histogram, buckets <90/90-120/120-150/150+. */

@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -71,6 +73,8 @@ import kotlin.math.sqrt
  *   which a left-to-right axis actively misrepresents (Screening Nights' Mon–Sun).
  * - [BubbleCloud] — a ranked set where relative magnitude matters more than exact values and
  *   the long tail should still be visible (By the Genre).
+ * - [ProportionalStackBar] — one total broken into its parts, where the composition is the
+ *   question rather than any ranking (Coming Attractions' runtime backlog).
  *
  * All of them are decorative in the same sense [BarChartCanvas] is: callers pair them with
  * real text (ledger.md §5). [FilmstripTrack] is the exception that takes a [String] description,
@@ -473,6 +477,62 @@ fun BubbleCloud(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * One bar divided into segments proportional to [values] — a part-to-whole strip, where the
+ * question is how a single total is *composed* rather than how items rank against each other.
+ * Coming Attractions uses it for the watchlist's runtime backlog: the bar is the whole queue,
+ * each segment one film, so a couple of long features visibly dominating a dozen short ones is
+ * the thing you see first.
+ *
+ * Segments fade toward the tail so position in the queue is legible without a per-segment
+ * label, and [remainder] collects everything a caller chose not to draw individually (a long
+ * queue turns into hairlines otherwise) into one muted block at the end. Non-positive values
+ * are dropped — [androidx.compose.foundation.layout.RowScope.weight] rejects them, and a
+ * zero-runtime segment has nothing to show anyway.
+ *
+ * Decorative: the caller lists each segment's real figures beneath.
+ */
+@Composable
+fun ProportionalStackBar(
+    values: List<Float>,
+    modifier: Modifier = Modifier,
+    remainder: Float = 0f,
+    height: Dp = 14.dp,
+    segmentColor: Color = MaterialTheme.colorScheme.primary,
+    remainderColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+) {
+    val drawn = values.filter { it > 0f }
+    if (drawn.isEmpty() && remainder <= 0f) return
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(CircleShape)
+            .background(trackColor)
+            .clearAndSetSemantics {},
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        drawn.forEachIndexed { index, value ->
+            val fade = if (drawn.size > 1) index.toFloat() / (drawn.size - 1) else 0f
+            Box(
+                modifier = Modifier
+                    .weight(value)
+                    .fillMaxHeight()
+                    .background(segmentColor.copy(alpha = 0.95f - 0.45f * fade)),
+            )
+        }
+        if (remainder > 0f) {
+            Box(
+                modifier = Modifier
+                    .weight(remainder)
+                    .fillMaxHeight()
+                    .background(remainderColor.copy(alpha = 0.3f)),
+            )
         }
     }
 }

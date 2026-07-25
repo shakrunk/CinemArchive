@@ -37,6 +37,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 
+/** Geometry of the sliding pill indicator. Each item's icon box matches it exactly, so the
+ *  glyph is centred in the pill rather than in the taller bar. */
+private val INDICATOR_TOP_INSET = 10.dp
+private val INDICATOR_HEIGHT = 34.dp
+
 /**
  * [icon] is the resting/unselected glyph (typically an outlined variant); [selectedIcon]
  * (defaults to [icon] when not given) is swapped in for the active tab — mirrors the M3
@@ -83,10 +88,10 @@ fun <T> MorphingBottomNav(
 
             Box(
                 modifier = Modifier
-                    .padding(top = 10.dp)
+                    .padding(top = INDICATOR_TOP_INSET)
                     .offset(x = indicatorOffset + 6.dp)
-                    .size(width = itemWidth - 12.dp, height = 34.dp)
-                    .clip(RoundedCornerShape(17.dp))
+                    .size(width = itemWidth - 12.dp, height = INDICATOR_HEIGHT)
+                    .clip(RoundedCornerShape(INDICATOR_HEIGHT / 2))
                     .background(MaterialTheme.colorScheme.secondaryContainer),
             )
 
@@ -108,6 +113,10 @@ fun <T> MorphingBottomNav(
                             animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
                             label = "navIconScale",
                         )
+                        // Lay the item out from the indicator's own top inset rather
+                        // than centring icon+label in the full 80dp bar: centring
+                        // pushed the icon's centre below the pill's, so the glyph
+                        // sat low in its container.
                         Column(
                             modifier = Modifier
                                 .weight(1f)
@@ -115,16 +124,22 @@ fun <T> MorphingBottomNav(
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = LocalIndication.current,
-                                ) { onSelect(destination.value) },
+                                ) { onSelect(destination.value) }
+                                .padding(top = INDICATOR_TOP_INSET),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
+                            verticalArrangement = Arrangement.Top,
                         ) {
-                            Icon(
-                                if (isSelected) destination.selectedIcon else destination.icon,
-                                contentDescription = destination.label,
-                                tint = color,
-                                modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
-                            )
+                            Box(
+                                modifier = Modifier.height(INDICATOR_HEIGHT),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    if (isSelected) destination.selectedIcon else destination.icon,
+                                    contentDescription = destination.label,
+                                    tint = color,
+                                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                                )
+                            }
                             Text(
                                 destination.label,
                                 style = MaterialTheme.typography.labelSmall,

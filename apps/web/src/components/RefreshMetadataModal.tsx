@@ -131,7 +131,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
               )}
               <button
                 onClick={startSearch}
-                className="w-full text-xs font-mono text-muted-foreground hover:text-amber transition-colors py-1"
+                className="w-full text-xs font-mono text-muted-foreground hover:text-amber transition-colors py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 Wrong entry? Search for the correct one →
               </button>
@@ -203,7 +203,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
 
               <button
                 onClick={() => setShowSearch(false)}
-                className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 ← Back
               </button>

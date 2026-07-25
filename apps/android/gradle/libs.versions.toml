@@ -5,7 +5,9 @@ androidx-core = "1.16.0"
 androidx-splashscreen = "1.0.1"
 activity-compose = "1.10.1"
 lifecycle = "2.9.1"
-compose-bom = "2025.06.01"
+# Carries material3 1.4.0, the stable release that ships M3 Expressive — the
+# expressive LoadingIndicator and shape scale this app's design language targets.
+compose-bom = "2026.06.01"
 room = "2.7.1"
 datastore = "1.1.1"
 junit = "4.13.2"

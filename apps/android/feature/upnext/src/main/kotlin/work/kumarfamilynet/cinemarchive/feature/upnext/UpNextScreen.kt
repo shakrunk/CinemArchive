@@ -29,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +56,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
@@ -192,7 +192,7 @@ private fun UpNextScreen(
     val collapsed = rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
-    PullToRefreshBox(
+    ExpressivePullToRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),

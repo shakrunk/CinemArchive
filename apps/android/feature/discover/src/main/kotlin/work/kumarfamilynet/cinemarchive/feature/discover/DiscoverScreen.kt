@@ -35,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,6 +57,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
+import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
@@ -272,7 +272,7 @@ private fun DiscoverScreen(
                 )
                 Button(onClick = onRetry) { Text("Retry") }
             }
-            else -> PullToRefreshBox(
+            else -> ExpressivePullToRefresh(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
                 modifier = Modifier.fillMaxWidth(),

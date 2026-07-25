@@ -37,7 +37,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +62,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
+import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
@@ -252,7 +252,7 @@ private fun LibraryScreen(
             }
         }
 
-        PullToRefreshBox(
+        ExpressivePullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxWidth(),

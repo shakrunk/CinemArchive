@@ -831,7 +831,6 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
   const [confirmPrePlatform, setConfirmPrePlatform] = useState<'series' | 'season' | null>(null)
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
   const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
-  const [castExpanded, setCastExpanded] = useState(true)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -1026,20 +1025,9 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
       {/* Season cast */}
       {season?.cast && season.cast.length > 0 && (
         <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
-          <button
-            type="button"
-            onClick={() => setCastExpanded((e) => !e)}
-            aria-expanded={castExpanded}
-            className="flex items-center gap-1.5 mb-2 group focus:outline-none"
-          >
-            <span className="font-mono group-hover:text-amber transition-colors" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
-              Season {season.seasonNumber} Cast
-            </span>
-            <ChevronDown
-              className={cn('w-3 h-3 text-paper-faint transition-transform group-hover:text-amber', castExpanded ? 'rotate-180' : '')}
-            />
-          </button>
-          {castExpanded && (
+          <div className="font-mono mb-2" style={{ fontSize: '9px', letterSpacing: '0.14em', color: 'var(--paper-faint)', textTransform: 'uppercase' }}>
+            Season {season.seasonNumber} Cast
+          </div>
           <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
             {season.cast.map((member) => (
               <button
@@ -1071,7 +1059,6 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
               </button>
             ))}
           </div>
-          )}
         </div>
       )}
 

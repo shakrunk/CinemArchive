@@ -1,0 +1,75 @@
+name: CodeQL
+
+# Advanced setup, not default setup. Default setup's autobuild cannot build the
+# Android app because its Gradle project lives at apps/android/ rather than the
+# repo root — that silently produced zero java-kotlin results and the language
+# was later dropped from coverage entirely. This workflow builds it explicitly
+# so the Android/Kotlin code is actually scanned.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    - cron: "19 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Set up JDK
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        if: matrix.language == 'java-kotlin'
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform / build-tools
+        if: matrix.language == 'java-kotlin'
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build Android app
+        if: matrix.language == 'java-kotlin'
+        working-directory: apps/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Send, Check, Loader2, Search, RefreshCw, Link2 } from 'lucide-react'
+import { Send, Check, Loader2, Search, RefreshCw, Link2, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
@@ -225,8 +225,20 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
               You don't have any friends yet. Add one from your Profile to start sharing recommendations.
             </div>
           ) : filteredFriends.length === 0 ? (
-            <div className="py-6 px-5 text-center font-sans text-xs italic" style={{ color: 'var(--paper-faint)' }}>
-              No friends match "{search}".
+            <div className="py-6 px-5 text-center font-sans text-xs italic flex flex-col items-center gap-3" style={{ color: 'var(--paper-faint)' }}>
+              <div>No friends match "{search}".</div>
+              {search && (
+                <button
+                  onClick={() => {
+                    setSearch('')
+                  }}
+                  aria-label="Clear search"
+                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Clear search
+                </button>
+              )}
             </div>
           ) : (
             <div className="py-1.5">

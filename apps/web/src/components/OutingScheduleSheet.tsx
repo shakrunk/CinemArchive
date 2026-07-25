@@ -153,8 +153,20 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
         />
       </div>
       {results.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground text-sm font-sans">
+        <div className="text-center py-10 text-muted-foreground text-sm font-sans flex flex-col items-center gap-3">
           {query ? `No movies match "${query}".` : 'Nothing on your watchlist yet — search for a movie above.'}
+          {query && (
+            <button
+              onClick={() => {
+                setQuery('')
+              }}
+              aria-label="Clear search"
+              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear search
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-thin">

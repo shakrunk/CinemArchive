@@ -3,6 +3,7 @@ package work.kumarfamilynet.cinemarchive.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +30,7 @@ class PreferencesRepository(context: Context) {
     private val fontScaleKey = stringPreferencesKey("font_scale")
     private val libraryViewModeKey = stringPreferencesKey("library_view_mode")
     private val autoCheckUpdatesKey = booleanPreferencesKey("auto_check_updates")
+    private val posterGridColumnsKey = intPreferencesKey("poster_grid_columns")
 
     fun observeThemeMode(): Flow<ArchiveThemeMode> = dataStore.data.map { preferences ->
         preferences[themeModeKey]?.let { stored ->
@@ -88,5 +90,22 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setAutoCheckUpdates(enabled: Boolean) {
         dataStore.edit { it[autoCheckUpdatesKey] = enabled }
+    }
+
+    /** Column count for the Library and Discover poster grids, set by pinching either one.
+     *  Shared deliberately: they are the same poster grid on two tabs, and a density set on
+     *  one reading differently on the other is the surprising behaviour. */
+    fun observePosterGridColumns(): Flow<Int> = dataStore.data.map { preferences ->
+        preferences[posterGridColumnsKey]?.takeIf { it in POSTER_GRID_COLUMN_RANGE }
+            ?: DEFAULT_POSTER_GRID_COLUMNS
+    }
+
+    suspend fun setPosterGridColumns(columns: Int) {
+        dataStore.edit { it[posterGridColumnsKey] = columns.coerceIn(POSTER_GRID_COLUMN_RANGE) }
+    }
+
+    private companion object {
+        val POSTER_GRID_COLUMN_RANGE = 1..4
+        const val DEFAULT_POSTER_GRID_COLUMNS = 2
     }
 }

@@ -284,6 +284,11 @@ private fun CinemArchiveApp(
     val libraryViewMode by preferencesRepository.observeLibraryViewMode()
         .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
 
+    // Hoisted for the same reason, and shared by both poster grids: pinching the density on
+    // Discover and finding Library unchanged would be the surprising behaviour.
+    val posterGridColumns by preferencesRepository.observePosterGridColumns()
+        .collectAsStateWithLifecycle(initialValue = 2)
+
     val openProfile = { overlay = Overlay.Profile }
     val closeOverlay = { overlay = null }
 
@@ -311,6 +316,9 @@ private fun CinemArchiveApp(
     val onToggleLibraryViewMode: () -> Unit = {
         val next = if (libraryViewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
         coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
+    }
+    val onPosterGridColumnsChange: (Int) -> Unit = { next ->
+        coroutineScope.launch { preferencesRepository.setPosterGridColumns(next) }
     }
 
     // The FAB is a single instance shared across tabs, but only Discover/Library/Up Next report
@@ -387,12 +395,20 @@ private fun CinemArchiveApp(
             Box(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.padding(innerPadding)) {
                     when (tab) {
-                        Tab.DISCOVER -> DiscoverRoute(discoverRepository, repository, onFabExpandedChange = { fabExpanded = it })
+                        Tab.DISCOVER -> DiscoverRoute(
+                            discoverRepository,
+                            repository,
+                            gridColumns = posterGridColumns,
+                            onGridColumnsChange = onPosterGridColumnsChange,
+                            onFabExpandedChange = { fabExpanded = it },
+                        )
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
                             librarySyncRepository,
                             viewMode = libraryViewMode,
                             onToggleViewMode = onToggleLibraryViewMode,
+                            gridColumns = posterGridColumns,
+                            onGridColumnsChange = onPosterGridColumnsChange,
                             onOpenProfile = openProfile,
                             onTitleClick = { overlay = Overlay.Detail(it) },
                             onFabExpandedChange = { fabExpanded = it },

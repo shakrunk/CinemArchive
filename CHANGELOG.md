@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-07-25
+
+### Fixed
+
+- Native Android app (in development, not yet distributed): magic-link sign-in failed on
+  release builds ("Expected URL scheme 'http' or 'https' but no scheme was found") because the
+  release APK build never populated the Supabase URL/key — the CI job now writes them before
+  building.
+
 ## [1.14.0] - 2026-07-25
 
 ### Added

@@ -65,6 +65,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
+import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 
 private enum class TypeFilter(val label: String) { ALL("All"), MOVIE("Movies"), TV("TV") }
 
@@ -113,11 +114,23 @@ private class DiscoverViewModelFactory(
 }
 
 @Composable
-fun DiscoverRoute(repository: DiscoverRepository, onFabExpandedChange: (Boolean) -> Unit = {}) {
+fun DiscoverRoute(
+    repository: DiscoverRepository,
+    libraryRepository: LibraryRepository,
+    onFabExpandedChange: (Boolean) -> Unit = {},
+) {
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val addedIds by DiscoverSampleStore.addedIds.collectAsState()
+    // A Discover result counts as added when it is in the real library, not just when it
+    // was tapped in this process — DiscoverSampleStore alone reset on every launch and
+    // never knew about anything synced down or added from the web app (#118).
+    val libraryTmdbIds by libraryRepository.observeLibraryTmdbIds()
+        .collectAsStateWithLifecycle(initialValue = emptySet())
+    val tappedIds by DiscoverSampleStore.addedIds.collectAsState()
+    val addedIds = remember(libraryTmdbIds, tappedIds) {
+        tappedIds + libraryTmdbIds.map(Int::toString)
+    }
     var search by rememberSaveable { mutableStateOf("") }
     var typeFilter by rememberSaveable { mutableStateOf(TypeFilter.ALL) }
     var preview by remember { mutableStateOf<TrendingTitle?>(null) }

@@ -35,6 +35,11 @@ interface TitleDao {
     @Query("SELECT * FROM titles WHERE id = :titleId")
     fun observeTitle(titleId: String): Flow<TitleEntity?>
 
+    /** TMDB ids of everything already in the library. Discover matches its results
+     *  against this to show an in-library state instead of an add button. */
+    @Query("SELECT tmdbId FROM titles")
+    fun observeLibraryTmdbIds(): Flow<List<Int>>
+
     // Ledger hero-stat rollup (docs/android-contracts/ledger.md) reads every title's
     // type/status/rating/runtime — small enough locally to just select the full row rather
     // than add a second bespoke projection alongside TitleListRow.

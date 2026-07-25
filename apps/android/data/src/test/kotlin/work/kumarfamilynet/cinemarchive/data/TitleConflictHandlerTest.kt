@@ -17,6 +17,7 @@ private class RecordingTitleDao : TitleDao {
 
     override fun observeLibrary(): Flow<List<TitleListRow>> = flowOf(emptyList())
     override fun observeTitle(titleId: String): Flow<TitleEntity?> = flowOf(null)
+    override fun observeLibraryTmdbIds(): Flow<List<Int>> = flowOf(emptyList())
     override fun observeAllTitles(): Flow<List<TitleEntity>> = flowOf(emptyList())
     override suspend fun upsertAll(titles: List<TitleEntity>) = Unit
     override suspend fun count(): Int = 0

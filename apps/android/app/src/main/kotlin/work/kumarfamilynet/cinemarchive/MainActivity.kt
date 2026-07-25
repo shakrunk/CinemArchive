@@ -363,7 +363,7 @@ private fun CinemArchiveApp(
             Box(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.padding(innerPadding)) {
                     when (tab) {
-                        Tab.DISCOVER -> DiscoverRoute(discoverRepository, onFabExpandedChange = { fabExpanded = it })
+                        Tab.DISCOVER -> DiscoverRoute(discoverRepository, repository, onFabExpandedChange = { fabExpanded = it })
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
                             librarySyncRepository,

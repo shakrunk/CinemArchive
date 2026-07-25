@@ -44,6 +44,7 @@ private class FakeTitleDao(titles: List<TitleEntity>) : TitleDao {
     private val flow = MutableStateFlow(titles)
     override fun observeLibrary(): Flow<List<TitleListRow>> = throw UnsupportedOperationException()
     override fun observeTitle(titleId: String): Flow<TitleEntity?> = throw UnsupportedOperationException()
+    override fun observeLibraryTmdbIds(): Flow<List<Int>> = throw UnsupportedOperationException()
     override fun observeAllTitles(): Flow<List<TitleEntity>> = flow
     override suspend fun upsertAll(titles: List<TitleEntity>) = throw UnsupportedOperationException()
     override suspend fun updateStatus(titleId: String, status: String, updatedAt: String) = throw UnsupportedOperationException()

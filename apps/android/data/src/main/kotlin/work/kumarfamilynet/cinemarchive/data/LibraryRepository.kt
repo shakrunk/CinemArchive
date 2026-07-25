@@ -94,6 +94,10 @@ class LibraryRepository(
         }
     }
 
+    /** TMDB ids already in the library, for Discover to mark its results with. */
+    fun observeLibraryTmdbIds(): Flow<Set<Int>> =
+        titleDao.observeLibraryTmdbIds().map { it.toSet() }
+
     /** Continue-watching + watchlist + marquee board for the Up Next screen. Episode totals
      *  come from [SeasonDao.observeAllSeasons]'s already-aggregated per-season counts (same
      *  rollup the Ledger board uses) rather than a new query — a WATCHING title with zero

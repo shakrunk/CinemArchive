@@ -69,11 +69,13 @@ import kotlin.math.roundToInt
  * - [GenresPanel] (By the Genre) — a bubble field sized on √(count/max), restoring the
  *   encoding the web app uses and Android had flattened into a list.
  *
- * The last two also close parity gaps the contract names: the web app draws a radar for
- * Screening Nights and bubbles for By the Genre, both of which Android had reduced to bars or
- * rows. All of them render inside `LedgerScreen`'s fixed-height, internally scrolling widget
- * card and are also what the edit-mode palette thumbnail scales down, so they stay legible at
- * 0.28×.
+ * [WeekdaysPanel] and [GenresPanel] also close parity gaps the contract names: the web app
+ * draws a radar for Screening Nights and bubbles for By the Genre, both of which Android had
+ * reduced to bars or rows. Two further panels live in
+ * [LedgerQueuePanels.kt][AttractionsPanel] — same chrome, split off only for file length.
+ *
+ * All of them render inside `LedgerScreen`'s fixed-height, internally scrolling widget card
+ * and are also what the edit-mode palette thumbnail scales down, so they stay legible at 0.28×.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -104,7 +106,7 @@ internal fun PanelHeading(title: String, subtitle: String) {
 }
 
 @Composable
-private fun PanelEmpty(message: String) {
+internal fun PanelEmpty(message: String) {
     Text(
         message,
         style = MaterialTheme.typography.bodyMedium,
@@ -114,7 +116,7 @@ private fun PanelEmpty(message: String) {
 
 /** Small-caps overline used for figure labels on the ticket and the marathon's rails. */
 @Composable
-private fun Overline(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+internal fun Overline(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
@@ -128,7 +130,7 @@ private fun Overline(text: String, modifier: Modifier = Modifier, color: Color =
 /** A figure rendered in the tabular mono face — every number in these three panels goes
  *  through here so digits line up column-to-column across rows. */
 @Composable
-private fun MonoFigure(
+internal fun MonoFigure(
     text: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,

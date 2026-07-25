@@ -9,6 +9,18 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Native Android app (in development, not yet distributed): two more Ledger widgets rebuilt
+  around their own data shape, bringing the total to seven. **Coming Attractions** now leads
+  with the total runtime queued up, draws the backlog as one bar split into per-film segments,
+  and gives every row a *running* total — read down the column and you can stop where the
+  evening runs out. Series are listed but marked untimed, matching the rule that the estimate
+  counts films only. **Critical Record** shows the ten rating buckets as a distribution whose
+  shape is the point: bars fade as the rating drops, the most-used bucket is picked out, and
+  the row your average falls in is flagged, so "I mostly give fours, and I average just under
+  that" reads without arithmetic.
+
 ## [1.15.1] - 2026-07-25
 
 ### Fixed

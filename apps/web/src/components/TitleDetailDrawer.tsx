@@ -650,9 +650,15 @@ function CastCard({
   )
 }
 
-// Wrapping cast layout: the first 5 members show, with a "View All" tile in the
-// 6th slot expanding the rest (no single-axis horizontal scroll).
-const CAST_COLLAPSED_COUNT = 5
+// Wrapping cast layout: as many members as fit one row show, with a "View All"
+// tile in the final slot expanding the rest (no single-axis horizontal scroll).
+// Both constants must track the w-[110px] on CastCard/the tile and the gap-2.5
+// on the row below.
+const CAST_CARD_WIDTH = 110
+const CAST_ROW_GAP = 10
+// Used until the row has been measured — matches the old fixed count, so the
+// first paint is never emptier than it used to be.
+const CAST_FALLBACK_COUNT = 5
 
 function CastGrid({
   cast,
@@ -662,12 +668,38 @@ function CastGrid({
   onPersonClick: (person: PersonDetailTarget) => void
 }) {
   const [showAll, setShowAll] = useState(false)
-  // No point hiding a single member behind a button — collapse only above 6.
-  const collapsible = cast.length > CAST_COLLAPSED_COUNT
-  const visible = collapsible && !showAll ? cast.slice(0, CAST_COLLAPSED_COUNT) : cast
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [perRow, setPerRow] = useState(0)
+
+  // The drawer mounts before the row has a width, so measure the element itself
+  // rather than once on mount.
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const measure = () => {
+      const width = el.clientWidth
+      if (width <= 0) return
+      setPerRow(Math.max(1, Math.floor((width + CAST_ROW_GAP) / (CAST_CARD_WIDTH + CAST_ROW_GAP))))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // Fill the row: if the whole cast fits there is nothing to collapse, otherwise
+  // keep the last slot for the "View All" tile so the row stays flush.
+  const collapsedCount =
+    perRow === 0
+      ? CAST_FALLBACK_COUNT
+      : cast.length <= perRow
+        ? cast.length
+        : Math.max(1, perRow - 1)
+  const collapsible = cast.length > collapsedCount
+  const visible = collapsible && !showAll ? cast.slice(0, collapsedCount) : cast
 
   return (
-    <div className="flex flex-wrap gap-2.5">
+    <div ref={rowRef} className="flex flex-wrap gap-2.5">
       {visible.map((member) => (
         <CastCard key={member.tmdbPersonId} member={member} onPersonClick={onPersonClick} />
       ))}
@@ -689,7 +721,7 @@ function CastGrid({
           </span>
           {!showAll && (
             <span className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
-              +{cast.length - CAST_COLLAPSED_COUNT} more
+              +{cast.length - collapsedCount} more
             </span>
           )}
         </button>

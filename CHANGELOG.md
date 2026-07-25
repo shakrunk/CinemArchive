@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.14.2] - 2026-07-25
+
 ### Fixed
 
 - Native Android app (in development, not yet distributed): the pull-to-refresh indicator on

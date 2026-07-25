@@ -109,7 +109,7 @@ private fun ProfileScreen(
 ) {
     val displayName = profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 20.dp, 20.dp, 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onClose) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
             }

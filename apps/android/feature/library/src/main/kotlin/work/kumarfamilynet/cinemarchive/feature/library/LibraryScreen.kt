@@ -169,17 +169,23 @@ private fun LibraryScreen(
     }
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+        // Eyebrow and title share a column beside the avatar rather than each claiming a
+        // row of their own — the avatar is taller than the eyebrow, so the old layout paid
+        // for its height twice over (#142).
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         ) {
-            Text(
-                "THE COLLECTION",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "THE COLLECTION",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text("Library", style = MaterialTheme.typography.headlineLarge)
+            }
             Surface(
                 onClick = onOpenProfile,
                 shape = RoundedCornerShape(12.dp),
@@ -192,11 +198,6 @@ private fun LibraryScreen(
                 }
             }
         }
-        Text(
-            "Library",
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
-        )
 
         AnimatedVisibility(
             visible = !collapsed,

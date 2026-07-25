@@ -189,7 +189,7 @@ private fun DiscoverScreen(
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
         Text(
             "EXPLORE THE REEL",
             style = MaterialTheme.typography.labelSmall,
@@ -199,7 +199,7 @@ private fun DiscoverScreen(
         Text(
             "Discover",
             style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 20.dp),
         )
 
         AnimatedVisibility(

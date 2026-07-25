@@ -212,7 +212,7 @@ private fun UpNextScreen(
                 Text(
                     "Up Next",
                     style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 20.dp),
+                    modifier = Modifier.padding(bottom = 12.dp),
                 )
             }
 

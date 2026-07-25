@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -63,8 +65,10 @@ import androidx.lifecycle.viewModelScope
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
+import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
+import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
@@ -281,9 +285,17 @@ private fun LibraryScreen(
                         }
                     }
                 } else {
-                    LazyColumn(state = listState, contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp)) {
-                        items(titles, key = LibraryTitle::id) { title ->
-                            LibraryListRow(title, onClick = { onTitleClick(title.id) })
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
+                    ) {
+                        itemsIndexed(titles, key = { _, title -> title.id }) { index, title ->
+                            LibraryListRow(
+                                title,
+                                shape = groupedItemShape(isFirst = index == 0, isLast = index == titles.lastIndex),
+                                onClick = { onTitleClick(title.id) },
+                            )
                         }
                     }
                 }
@@ -342,13 +354,18 @@ private fun LibraryGridCard(title: LibraryTitle, onClick: () -> Unit) {
 }
 
 @Composable
-private fun LibraryListRow(title: LibraryTitle, onClick: () -> Unit) {
+private fun LibraryListRow(title: LibraryTitle, shape: Shape, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         PosterSurface(
@@ -375,6 +392,7 @@ private fun LibraryListRow(title: LibraryTitle, onClick: () -> Unit) {
             )
         }
         StatusBadge(title.status)
+    }
     }
 }
 

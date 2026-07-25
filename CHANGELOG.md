@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-07-25
+
 ### Fixed
 
 - Native Android app (in development, not yet distributed): **Premieres & Revivals** charted

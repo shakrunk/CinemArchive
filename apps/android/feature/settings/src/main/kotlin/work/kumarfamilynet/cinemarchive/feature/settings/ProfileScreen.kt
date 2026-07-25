@@ -75,6 +75,18 @@ internal fun ArchiveThemeMode.label(): String = when (this) {
     ArchiveThemeMode.DARK -> "Dark"
 }
 
+/** The name to head the Profile screen with. Magic-link sign-in gives us no
+ *  profile name, so derive one from the email's local part (dropping any `+tag`)
+ *  and fall back to the app name when signed out. */
+internal fun profileDisplayName(email: String?): String {
+    val local = email?.substringBefore('@')?.substringBefore('+')?.trim().orEmpty()
+    return local
+        .split('.', '_', '-')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { part -> part.replaceFirstChar { it.uppercaseChar() } }
+        .ifBlank { "CinemArchive" }
+}
+
 internal fun ArchivePalette.label(): String = when (this) {
     ArchivePalette.BRAND -> "Brand"
     ArchivePalette.MATERIAL_YOU -> "Material You"
@@ -95,6 +107,7 @@ private fun ProfileScreen(
     onOpenPermissions: () -> Unit,
     onSignOut: () -> Unit,
 ) {
+    val displayName = profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 20.dp, 20.dp, 4.dp)) {
             IconButton(onClick = onClose) {
@@ -120,10 +133,13 @@ private fun ProfileScreen(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("C", style = MaterialTheme.typography.headlineMedium)
+                            Text(
+                                displayName.first().uppercaseChar().toString(),
+                                style = MaterialTheme.typography.headlineMedium,
+                            )
                         }
                     }
-                    Text("Cinephile", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
+                    Text(displayName, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
                     Text(
                         "a private film archive",
                         style = MaterialTheme.typography.labelMedium,

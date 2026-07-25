@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Native Android app (in development, not yet distributed): the pull-to-refresh indicator on
+  Library, Discover, and Up Next now morphs between M3 Expressive shapes while refreshing
+  (circle → cookie → burst → circle) instead of spinning a plain circular arc, and holds a
+  checkmark briefly on completion so a successful refresh is actually visible.
+
 ## [1.14.1] - 2026-07-25
 
 ### Fixed

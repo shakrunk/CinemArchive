@@ -20,7 +20,7 @@ class AndroidOutingAlarmScheduler(private val context: Context) : OutingAlarmSch
         get() = PendingIntent.getBroadcast(
             context,
             REQUEST_CODE,
-            Intent(context, OutingCompletionReceiver::class.java),
+            Intent(context, OutingCompletionReceiver::class.java).apply { setPackage(context.packageName) },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 

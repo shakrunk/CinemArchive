@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Send, Check, Loader2, Search, RefreshCw, Share2, Download, Ticket } from 'lucide-react'
+import { Send, Check, Loader2, Search, RefreshCw, Share2, Download, Ticket, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
@@ -225,8 +225,20 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
               You don't have any friends yet — the out-of-app share above still works.
             </div>
           ) : filteredFriends.length === 0 ? (
-            <div className="py-6 px-5 text-center font-sans text-xs italic" style={{ color: 'var(--paper-faint)' }}>
-              No friends match "{search}".
+            <div className="py-6 px-5 text-center font-sans text-xs italic flex flex-col items-center gap-3" style={{ color: 'var(--paper-faint)' }}>
+              <div>No friends match "{search}".</div>
+              {search && (
+                <button
+                  onClick={() => {
+                    setSearch('')
+                  }}
+                  aria-label="Clear search"
+                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Clear search
+                </button>
+              )}
             </div>
           ) : (
             <div className="py-1.5">

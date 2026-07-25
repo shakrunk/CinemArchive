@@ -9,6 +9,33 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Web: "Send to a friend" now supports attaching a where-to-watch link, pre-filled from the
+  title's own custom link when set — friends see it right in their recommendations inbox.
+- Native Android app (in development, not yet distributed): Library's status filter row moved
+  behind a filter button, which now also offers sort order (title / newest / top rated),
+  grouping by status, a minimum-rating filter, and genre filters.
+- Native Android app (in development, not yet distributed): tapping a Discover result already
+  in the library now opens the same title-detail screen Library uses, instead of a separate
+  preview.
+
+### Fixed
+
+- Native Android app (in development, not yet distributed): two CodeQL-flagged PendingIntents
+  (the cinema-outing alarm and its completion notification) now set an explicit package so
+  they can't be intercepted by another app.
+- Native Android app (in development, not yet distributed): the top-bar "→ Settings" avatar
+  now shows the signed-in user's own initial instead of a hardcoded "C", and appears
+  consistently on all four tabs (it was previously missing from Discover and Up Next).
+- Native Android app (in development, not yet distributed): removed the "+ New Title" FAB from
+  the Ledger tab — a stats dashboard isn't a place to add titles.
+- Native Android app (in development, not yet distributed): poster corner radius reduced to
+  match the app's shape scale (was noticeably rounder than intended).
+- Native Android app (in development, not yet distributed): Permissions now shares the same
+  seam-grouped card list Appearance's palette picker uses, and Appearance gained a divider
+  separating theme/color settings from font/text settings.
+
 ## [1.13.0] - 2026-07-24
 
 ### Added

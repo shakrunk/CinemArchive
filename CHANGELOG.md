@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-07-25
+
 ### Added
 
 - Web: "Send to a friend" now supports attaching a where-to-watch link, pre-filled from the

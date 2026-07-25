@@ -1,6 +1,7 @@
 package work.kumarfamilynet.cinemarchive.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -27,6 +28,7 @@ class PreferencesRepository(context: Context) {
     private val fontFamilyKey = stringPreferencesKey("font_family")
     private val fontScaleKey = stringPreferencesKey("font_scale")
     private val libraryViewModeKey = stringPreferencesKey("library_view_mode")
+    private val autoCheckUpdatesKey = booleanPreferencesKey("auto_check_updates")
 
     fun observeThemeMode(): Flow<ArchiveThemeMode> = dataStore.data.map { preferences ->
         preferences[themeModeKey]?.let { stored ->
@@ -76,5 +78,15 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setLibraryViewMode(mode: LibraryViewMode) {
         dataStore.edit { it[libraryViewModeKey] = mode.name }
+    }
+
+    /** Whether the app checks for a newer release on its own. On by default; governs only the
+     *  automatic check — the manual "Check for Updates" action ignores it. */
+    fun observeAutoCheckUpdates(): Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[autoCheckUpdatesKey] ?: true
+    }
+
+    suspend fun setAutoCheckUpdates(enabled: Boolean) {
+        dataStore.edit { it[autoCheckUpdatesKey] = enabled }
     }
 }

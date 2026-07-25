@@ -76,6 +76,8 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
+import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
@@ -128,6 +130,8 @@ class MainActivity : ComponentActivity() {
         val outingsRepository = (application as CinemArchiveApplication).outingsRepository
         val authRepository = (application as CinemArchiveApplication).authRepository
         val librarySyncRepository = (application as CinemArchiveApplication).librarySyncRepository
+        val appUpdateRepository = (application as CinemArchiveApplication).appUpdateRepository
+        val apkInstaller = (application as CinemArchiveApplication).apkInstaller
         val initialTitleId = intent.getStringExtra(EXTRA_OPEN_TITLE_ID)
 
         // Magic-link tap: standard launchMode means this is a fresh onCreate (same pattern
@@ -164,6 +168,8 @@ class MainActivity : ComponentActivity() {
                                 outingsRepository,
                                 authRepository,
                                 librarySyncRepository,
+                                appUpdateRepository,
+                                apkInstaller,
                                 initialTitleId = initialTitleId,
                                 appVersionName = BuildConfig.VERSION_NAME,
                             )
@@ -262,6 +268,8 @@ private fun CinemArchiveApp(
     outingsRepository: OutingsRepository,
     authRepository: AuthRepository,
     librarySyncRepository: LibrarySyncRepository,
+    appUpdateRepository: AppUpdateRepository,
+    apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     appVersionName: String,
 ) {
@@ -445,7 +453,13 @@ private fun CinemArchiveApp(
                 onOpenPermissions = { overlay = Overlay.Permissions },
             )
             Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
-            Overlay.About -> AboutRoute(appVersionName, onBack = openProfile)
+            Overlay.About -> AboutRoute(
+                appVersionName,
+                appUpdateRepository,
+                apkInstaller,
+                preferencesRepository,
+                onBack = openProfile,
+            )
             Overlay.Permissions -> PermissionsRoute(onBack = openProfile)
         }
         }

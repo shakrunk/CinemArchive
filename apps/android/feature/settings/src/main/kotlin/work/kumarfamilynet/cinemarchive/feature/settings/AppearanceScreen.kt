@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -158,11 +159,18 @@ private fun AppearanceScreen(
                 )
             }
             item {
+                // Divider, not just another eyebrow label, so "Theme"+"Color Palette" reads as
+                // one related cluster and "Text" as a clearly separate one (#152) — the
+                // labelSmall eyebrows alone didn't give the two groups enough visual weight.
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(top = 18.dp, bottom = 18.dp),
+                )
                 Text(
                     "TEXT",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 14.dp, bottom = 10.dp),
+                    modifier = Modifier.padding(bottom = 10.dp),
                 )
                 TextSettingsCard(
                     fontFamily = fontFamily,

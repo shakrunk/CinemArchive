@@ -510,10 +510,17 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
     })
   }, [])
 
+  // The strip is measured inside a drawer that mounts before it has a real
+  // layout, so a mount-only pass reads clientWidth/scrollWidth as 0 and decides
+  // there is nothing to fade on the right. Observe the element instead, so the
+  // edges settle whenever it actually gets (or changes) its size.
   useEffect(() => {
+    const el = stripRef.current
+    if (!el) return
     updateStripEdges()
-    window.addEventListener('resize', updateStripEdges)
-    return () => window.removeEventListener('resize', updateStripEdges)
+    const observer = new ResizeObserver(updateStripEdges)
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [videos, updateStripEdges])
 
   const stripMask = stripEdges.left && stripEdges.right

@@ -71,8 +71,10 @@ import kotlin.math.roundToInt
  *
  * [WeekdaysPanel] and [GenresPanel] also close parity gaps the contract names: the web app
  * draws a radar for Screening Nights and bubbles for By the Genre, both of which Android had
- * reduced to bars or rows. Two further panels live in
- * [LedgerQueuePanels.kt][AttractionsPanel] — same chrome, split off only for file length.
+ * reduced to bars or rows. Further panels share this file's chrome from
+ * [LedgerQueuePanels.kt][AttractionsPanel] (Coming Attractions, Critical Record),
+ * [LedgerCadencePanels.kt][RevivalsPanel] (Premieres & Revivals, Still Rolling), and
+ * [LedgerCreditsPanel.kt][EnsemblePanel] (The Ensemble) — split off only for file length.
  *
  * All of them render inside `LedgerScreen`'s fixed-height, internally scrolling widget card
  * and are also what the edit-mode palette thumbnail scales down, so they stay legible at 0.28×.

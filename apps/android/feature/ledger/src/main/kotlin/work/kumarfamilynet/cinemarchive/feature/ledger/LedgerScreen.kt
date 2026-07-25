@@ -89,8 +89,6 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerLayoutRules
-import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
-import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
 import work.kumarfamilynet.cinemarchive.core.model.LedgerSettingKey
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
@@ -426,7 +424,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
         LedgerWidgetId.RATINGS -> RatingsPanel(title, board.ratingBuckets.applyTopN(config))
         LedgerWidgetId.GENRES -> GenresPanel(title, board.genres.applyTopN(config))
         LedgerWidgetId.AUTEURS -> CategorySection(title, board.auteurs.applyTopN(config), "No director data logged yet.")
-        LedgerWidgetId.ENSEMBLE -> CategorySection(title, board.ensemble.applyTopN(config), "No cast data logged yet.")
+        LedgerWidgetId.ENSEMBLE -> EnsemblePanel(title, board.ensemble.applyTopN(config))
         LedgerWidgetId.VERDICTS -> VerdictsPanel(title, board.verdicts.applyTopN(config))
         LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config), "No non-English titles logged yet.")
         LedgerWidgetId.WEEKDAYS -> WeekdaysPanel(title, board.weekdays)
@@ -440,22 +438,9 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
                 entries.forEach { QuarterRow(it) }
             }
         }
-        LedgerWidgetId.REVIVALS -> {
-            SectionHeader(title)
-            val entries = board.revivals.applyTopN(config)
-            if (entries.isEmpty()) EmptyRow("No dated viewings logged yet.")
-            else {
-                LineChartCanvas(data = entries.map { ChartDatum(it.monthLabel, (it.premieres + it.revivals).toFloat()) })
-                entries.forEach { RevivalRow(it) }
-            }
-        }
+        LedgerWidgetId.REVIVALS -> RevivalsPanel(title, board.revivals.applyTopN(config))
         LedgerWidgetId.TIMEWARP -> CategorySection(title, board.timewarp.applyTopN(config), "No dated titles logged yet.")
-        LedgerWidgetId.PROGRESS -> {
-            SectionHeader(title)
-            val entries = board.stillRolling.applyTopN(config)
-            if (entries.isEmpty()) EmptyRow("Nothing in progress.")
-            else entries.forEach { ProgressRow(it) }
-        }
+        LedgerWidgetId.PROGRESS -> ProgressPanel(title, board.stillRolling.applyTopN(config))
         LedgerWidgetId.MOVIEGOING -> MoviegoingPanel(title, board.moviegoing)
     }
 }
@@ -1054,22 +1039,6 @@ private fun QuarterRow(entry: LedgerQuarterRating) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(entry.quarterLabel, style = MaterialTheme.typography.bodyMedium)
         Text("★%.1f (%d titles)".format(entry.averageRating, entry.titleCount), style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun RevivalRow(entry: LedgerPremiereRevivalBucket) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(entry.monthLabel, style = MaterialTheme.typography.bodyMedium)
-        Text("${entry.premieres} premiere(s), ${entry.revivals} revival(s)", style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun ProgressRow(entry: LedgerProgressEntry) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(entry.title, style = MaterialTheme.typography.bodyMedium)
-        Text("${entry.episodesWatched} / ${entry.episodeCount} episodes", style = MaterialTheme.typography.bodyMedium)
     }
 }
 

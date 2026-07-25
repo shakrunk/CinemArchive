@@ -75,6 +75,10 @@ import kotlin.math.sqrt
  *   the long tail should still be visible (By the Genre).
  * - [ProportionalStackBar] — one total broken into its parts, where the composition is the
  *   question rather than any ranking (Coming Attractions' runtime backlog).
+ * - [DivergingColumns] — two counterpart series against a shared baseline, where which way a
+ *   bucket leaned is the whole point (Premieres & Revivals' first watches vs. rewatches).
+ * - [SegmentedProgressTrack] — completion where the *remainder* is countable rather than a
+ *   percentage (Still Rolling's episodes left).
  *
  * All of them are decorative in the same sense [BarChartCanvas] is: callers pair them with
  * real text (ledger.md §5). [FilmstripTrack] is the exception that takes a [String] description,
@@ -533,6 +537,131 @@ fun ProportionalStackBar(
                     .fillMaxHeight()
                     .background(remainderColor.copy(alpha = 0.3f)),
             )
+        }
+    }
+}
+
+/**
+ * Two series drawn against a shared baseline, one rising and one falling — a diverging column
+ * plot. Reach for it when the pair are *counterparts* rather than independent quantities:
+ * Premieres & Revivals is first-watches against rewatches, and the honest question is which way
+ * a month leaned — which summing them into one line destroys outright.
+ *
+ * [above] and [below] are paired by index and truncated to the shorter of the two. Both scale
+ * against one shared maximum, so a tall bar means the same magnitude whichever side of the
+ * baseline it sits on; scaling each half independently would make a month of 2 rewatches look
+ * like a month of 20.
+ *
+ * Decorative: the caller lists each bucket's real figures beneath.
+ */
+@Composable
+fun DivergingColumns(
+    above: List<Float>,
+    below: List<Float>,
+    modifier: Modifier = Modifier,
+    aboveColor: Color = MaterialTheme.colorScheme.primary,
+    belowColor: Color = MaterialTheme.colorScheme.secondary,
+    baselineColor: Color = MaterialTheme.colorScheme.outline,
+    height: Dp = 136.dp,
+) {
+    val count = minOf(above.size, below.size)
+    if (count == 0) return
+    val peak = (above.take(count) + below.take(count)).maxOrNull()?.coerceAtLeast(1f) ?: 1f
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clearAndSetSemantics {},
+    ) {
+        val baselineY = size.height / 2f
+        val columnWidth = size.width / count
+        val gap = (columnWidth * 0.3f).coerceAtMost(6.dp.toPx())
+        val barWidth = (columnWidth - gap).coerceAtLeast(1f)
+        // Keep the baseline stroke and a hair of breathing room out of the usable half.
+        val usableHalf = baselineY - 3.dp.toPx()
+        val corner = CornerRadius(2.dp.toPx())
+
+        repeat(count) { index ->
+            val x = index * columnWidth + gap / 2f
+            val upHeight = usableHalf * (above[index] / peak)
+            val downHeight = usableHalf * (below[index] / peak)
+            if (upHeight > 0f) {
+                drawRoundRect(
+                    color = aboveColor,
+                    topLeft = Offset(x, baselineY - upHeight),
+                    size = Size(barWidth, upHeight),
+                    cornerRadius = corner,
+                )
+            }
+            if (downHeight > 0f) {
+                drawRoundRect(
+                    color = belowColor,
+                    topLeft = Offset(x, baselineY),
+                    size = Size(barWidth, downHeight),
+                    cornerRadius = corner,
+                )
+            }
+        }
+        drawLine(
+            color = baselineColor,
+            start = Offset(0f, baselineY),
+            end = Offset(size.width, baselineY),
+            strokeWidth = 1.dp.toPx(),
+        )
+    }
+}
+
+/**
+ * A completion track divided into one cell per unit, filled up to [completed]. Unlike a plain
+ * progress bar the cells are *countable*, and for a series you're partway through "four
+ * episodes left" is the actionable fact — an 83%-full bar makes you do arithmetic to recover it.
+ *
+ * Past [maxSegments] the cells would be thinner than the gaps between them, so the track falls
+ * back to a continuous fill; at that length a proportion is the honest reading anyway. A [total]
+ * of zero draws nothing rather than dividing by it.
+ *
+ * Decorative: the caller states the counts in text alongside.
+ */
+@Composable
+fun SegmentedProgressTrack(
+    completed: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+    maxSegments: Int = 36,
+    filledColor: Color = MaterialTheme.colorScheme.primary,
+    emptyColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    height: Dp = 12.dp,
+) {
+    if (total <= 0) return
+    val done = completed.coerceIn(0, total)
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clearAndSetSemantics {},
+    ) {
+        val corner = CornerRadius(size.height / 2f)
+        if (total <= maxSegments) {
+            val cellWidth = size.width / total
+            val gap = (cellWidth * 0.22f).coerceAtMost(3.dp.toPx())
+            repeat(total) { index ->
+                drawRoundRect(
+                    color = if (index < done) filledColor else emptyColor,
+                    topLeft = Offset(index * cellWidth + gap / 2f, 0f),
+                    size = Size((cellWidth - gap).coerceAtLeast(1f), size.height),
+                    cornerRadius = CornerRadius(2.dp.toPx()),
+                )
+            }
+        } else {
+            drawRoundRect(color = emptyColor, size = size, cornerRadius = corner)
+            val filledWidth = size.width * (done.toFloat() / total)
+            if (filledWidth > 0f) {
+                drawRoundRect(
+                    color = filledColor,
+                    size = Size(filledWidth, size.height),
+                    cornerRadius = corner,
+                )
+            }
         }
     }
 }

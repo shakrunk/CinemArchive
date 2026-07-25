@@ -6,6 +6,10 @@ deployment/release process — this file covers only what's specific to the web 
 
 **Live:** https://cinemarchive.kumarfamilynet.work/
 
+**Deeper reading:** the wiki's [Web App](https://github.com/shakrunk/CinemArchive/wiki/Web-App)
+page covers the store slices, the key patterns (optimistic UI, client-side filtering, URL-as-state),
+the Ledger panel catalogue, and the gotchas worth knowing before your first change.
+
 ---
 
 ## Tech stack
@@ -108,7 +112,12 @@ npm run test        # Vitest
 
 ## Design system
 
-- **Colors:** Void `#0b0907` (background), Amber `#e9b266` (highlights/accents), with ink surfaces, a cool "moon" blue, and ember/paper tones.
+- **Colors:** Void `#0b0907` (background), Amber `#e9b266` (highlights/accents), with ink surfaces, a cool "moon" blue, and ember/paper tones. Declared as RGB triples in CSS vars so opacity modifiers work *and* the palette flips with `[data-theme]` — always use the tokens, never raw hex.
 - **Fonts:** `Fraunces` (serif titles), `Hanken Grotesk` (UI sans), `DM Mono` (stats/numbers).
 - **Atmosphere:** `.projector-beam` (flickering amber glow), `.dust`, `.vignette`, and a `.grain` overlay rendered once as fixed full-viewport siblings.
 - **Mobile-first:** bottom-sheet modals on mobile, `TopBar` + `BottomNav` shell.
+- **Themes:** default, `light`, `noir` (Spider-Noir) and `matrix`, selected by `data-theme` on `:root`.
+
+The token reference, per-theme rules, voice/copy conventions and component conventions are in the
+wiki's [Design System](https://github.com/shakrunk/CinemArchive/wiki/Design-System) page;
+`src/index.css` and `tailwind.config.js` remain the source of truth.

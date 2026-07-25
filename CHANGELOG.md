@@ -9,6 +9,24 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Poster cards no longer dim their artwork behind a contrast scrim when nothing is drawn over
+  the poster — most visibly on the Up Next tab, where the cards' posters carry no overlaid
+  text.
+
+### Fixed
+
+- The star rating now stays legible in light mode. Previously it inherited the surrounding
+  text colour, so on the title drawer's hero — a dark scrim over backdrop art that stays dark
+  in both themes — light mode painted dark stars onto a near-black chip.
+- The "I've got tickets for…" button and the post-show dismiss button on Up Next cards no
+  longer render as a black disc in light mode.
+- The Cinema Outing banner in the title drawer no longer sits flush against the content
+  beneath it.
+- The trailer strip in the title drawer now shows its right-hand edge fade on open, instead of
+  only after the first scroll.
+
 ## [1.12.1] - 2026-07-24
 
 ### Fixed

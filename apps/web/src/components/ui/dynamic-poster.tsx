@@ -74,6 +74,9 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
   const hasImage = Boolean(title.posterUrl)
   const tint = useMemo(() => TINTS[hashString(title.title) % TINTS.length], [title.title])
   const badge = STATUS_BADGE[title.status]
+  // With badges hidden and no editorial face, an image-backed poster renders an
+  // empty face — so its contrast scrim has nothing to protect (see #138).
+  const faceHasContent = !hideBadges || rich || !hasImage
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (!onClick) return
@@ -107,7 +110,7 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
         </span>
       )}
 
-      <div className="poster__face">
+      <div className={cn('poster__face', !faceHasContent && 'poster__face--bare')}>
         {/* top row: category + status */}
         {!hideBadges && (
           <div className="relative z-[2] flex items-center justify-between">

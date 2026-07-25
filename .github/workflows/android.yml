@@ -11,6 +11,9 @@ on:
       - "apps/android/**"
       - ".github/workflows/android.yml"
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest

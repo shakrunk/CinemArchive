@@ -1,0 +1,74 @@
+name: Feature request
+description: Suggest an idea, enhancement, or new capability for CinemArchive.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Check [docs/planned-features-human-written.md](../../docs/planned-features-human-written.md) and existing issues first — it might already be planned.
+
+  - type: dropdown
+    id: clients
+    attributes:
+      label: Affected client(s)
+      multiple: true
+      options:
+        - Web app
+        - Android app
+        - Shared backend (Supabase schema / Edge Functions)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What's missing or frustrating today? Who runs into this, and when?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen? Be as specific as you can — UI flow, data model changes, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches or workarounds you've thought about, and why they fall short.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: parity
+    attributes:
+      label: Cross-platform parity
+      description: If this only applies to one client today, should the other client track it as a parity gap?
+      options:
+        - N/A — backend or single-client-only feature
+        - Yes — add to the parity matrix once implemented
+        - Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links, references to similar features elsewhere, related issues.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and docs/planned-features-human-written.md for duplicates
+          required: true

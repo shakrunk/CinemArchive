@@ -8,6 +8,24 @@ It's a JAMstack app: a static React frontend on GitHub Pages, backed by a shared
 
 ---
 
+## Documentation
+
+**📖 [The wiki](https://github.com/shakrunk/CinemArchive/wiki) is the place to start** — architecture, local setup for both clients, the security model, the release process, troubleshooting, and a glossary.
+
+| Looking for | Go to |
+|-------------|-------|
+| How the pieces fit together, and why | [Architecture](https://github.com/shakrunk/CinemArchive/wiki/Architecture) |
+| Running either client locally | [Getting Started](https://github.com/shakrunk/CinemArchive/wiki/Getting-Started) |
+| Changing the schema | [Database Migrations](https://github.com/shakrunk/CinemArchive/wiki/Database-Migrations) |
+| RLS, share tokens, secrets handling | [Security Model](https://github.com/shakrunk/CinemArchive/wiki/Security-Model) |
+| Shipping a release | [Deployment & Releases](https://github.com/shakrunk/CinemArchive/wiki/Deployment-and-Releases) |
+| Something is broken | [Troubleshooting](https://github.com/shakrunk/CinemArchive/wiki/Troubleshooting) |
+| Which doc owns which fact | [Documentation Map](https://github.com/shakrunk/CinemArchive/wiki/Documentation-Map) |
+
+The wiki **explains and navigates**; anything normative lives in this repository — `schema.sql`, `CHANGELOG.md`, `docs/`, and the `CLAUDE.md` convention files. Where they disagree, the repo wins.
+
+---
+
 ## Clients
 
 | Client | Location | Notes |
@@ -47,24 +65,11 @@ The Supabase project, schema, and Edge Functions are genuinely shared infrastruc
 - **`supabase/migrations/`** — versioned migrations applied by CI. The baseline migration (`20260620084847_initial_schema.sql`) captures the schema as of the multi-client split and is already marked **applied** on the remote.
 - **`supabase/functions/media-proxy/`** — Edge Function proxying TMDB/OMDb (keeps API keys server-side).
 
-The schema covers core library/episode tracking, cast & crew, sharing, and a social layer:
-
-- **`titles`** — movies and TV series (`type` enum: `movie` | `tv`)
-- **`seasons`** / **`episodes`** — TV season and episode rows (episodes unique per `title + season + episode number`)
-- **`episode_watch_events`** / **`episode_ratings`** / **`episode_reviews`** — independent, timestamped logs per episode
-- **`viewings`** — re-watch timeline entries per title (venue/companions/outing carried for cinema trips)
-- **`cinema_outings`** — a booked movie trip; `complete_due_outings()` auto-transitions it to a logged viewing once showtime + runtime passes
-- **`title_cast`** / **`title_crew`** / **`season_cast`** / **`episode_crew`** — cached TMDB credit metadata
-- **`shared_access_keys`** / **`share_scopes`** — time-bound, scope-configurable read-only access tokens
-- **`profiles`** / **`friendships`** / **`invite_codes`** / **`invite_redeem_attempts`** — invite-only accounts and the friend graph
-- **`recommendations`** / **`title_comments`** / **`title_reactions`** / **`notifications`** — the social/activity layer
-- **`user_prefs`** / **`user_title_pins`** — per-user Ledger layout and pinned titles
-- **`sync_tombstones`** — deletion log consumed by the Android client's incremental sync
-- **`api_cache`** — used by the `media-proxy` Edge Function
+The schema covers core library and episode tracking (`titles`, `seasons`, `episodes`, the three independent `episode_watch_events` / `episode_ratings` / `episode_reviews` logs, `viewings`), cinema outings, cached TMDB credits, scoped read-only sharing, invite-only accounts and the friend/social graph, per-user preferences, and the `sync_tombstones` deletion log the Android client's incremental sync consumes.
 
 **Row Level Security:** the authenticated owner gets full CRUD on their rows; holders of a valid shared token get read-only access (scoped by `share_scopes`) via the `app.shared_token` session setting.
 
-`schema.sql` is the canonical, human-readable copy of the full schema and RLS policies — the table list above is its shape, not a substitute for it.
+Read [`schema.sql`](schema.sql) for the authoritative tables, columns and policies, or the wiki's [Backend & Database](https://github.com/shakrunk/CinemArchive/wiki/Backend-and-Database) page for a walkthrough of the tables, the RPC surface, and the Edge Functions.
 
 ### Changing the schema (automated — no manual SQL)
 
@@ -82,11 +87,21 @@ The workflow needs these set in **GitHub → Settings → Secrets and variables 
 
 > Working with migrations locally: `supabase db push` and `supabase migration repair` connect directly to the remote and need no Docker. Only `supabase db pull` (which dumps the schema with a version-matched `pg_dump`) requires Docker Desktop running.
 
+Full workflow, including how migrations reach production and the failure modes: [Database Migrations](https://github.com/shakrunk/CinemArchive/wiki/Database-Migrations).
+
 ---
 
 ## Deployment & release
 
-`.github/workflows/deploy.yml` runs on push to `main`: applies pending Supabase migrations, builds and publishes the web app (`apps/web/`) to GitHub Pages, tags a `vX.Y.Z` GitHub Release from the root `package.json` version and `CHANGELOG.md`, and — for a genuinely new release — builds and attaches a signed Android release APK. `.github/workflows/deploy-functions.yml` deploys `supabase/functions/**` independently on change. See [CLAUDE.md](CLAUDE.md#versioning) for the versioning/release policy.
+`.github/workflows/deploy.yml` runs on push to `main`: applies pending Supabase migrations, builds and publishes the web app (`apps/web/`) to GitHub Pages, tags a `vX.Y.Z` GitHub Release from the root `package.json` version and `CHANGELOG.md`, and — for a genuinely new release — builds and attaches a signed Android release APK. `.github/workflows/deploy-functions.yml` deploys `supabase/functions/**` independently on change. See [CLAUDE.md](CLAUDE.md#versioning) for the versioning/release policy, and the wiki's [Deployment & Releases](https://github.com/shakrunk/CinemArchive/wiki/Deployment-and-Releases) for the pipeline in detail.
+
+---
+
+## Contributing
+
+Conventions are strict and written down: verification gates, Conventional Commits, branch topology, and the versioning policy live in [CLAUDE.md](CLAUDE.md) (authoritative), with a walkthrough in [CONTRIBUTING.md](CONTRIBUTING.md) and the wiki's [Contributing](https://github.com/shakrunk/CinemArchive/wiki/Contributing) page.
+
+Security issues: please don't open a public issue — see [SECURITY.md](SECURITY.md).
 
 ---
 

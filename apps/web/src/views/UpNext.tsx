@@ -257,7 +257,7 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
         <button
           onClick={() => openOutingSchedule(title.id)}
           aria-label={`I've got tickets for ${title.title}`}
-          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-sm text-amber/80 hover:text-amber hover:bg-black/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--inset)] backdrop-blur-sm text-amber/80 hover:text-amber hover:bg-[var(--inset-strong)] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <Ticket className="w-3.5 h-3.5" />
         </button>
@@ -406,7 +406,7 @@ function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?:
         <button
           onClick={() => dismissOutingFollowUp(outing.id)}
           aria-label={`Dismiss the "how was it" prompt for ${title.title}`}
-          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-sm text-paper-faint hover:text-paper hover:bg-black/70 transition-colors"
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--inset)] backdrop-blur-sm text-paper-faint hover:text-paper hover:bg-[var(--inset-strong)] transition-colors"
         >
           <X className="w-3.5 h-3.5" />
         </button>

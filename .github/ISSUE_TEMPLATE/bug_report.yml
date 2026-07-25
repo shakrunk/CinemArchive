@@ -1,0 +1,154 @@
+name: Bug report
+description: Something in the web app, Android app, or shared backend isn't working as expected.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Before submitting, please check [docs/known-problems.md](../../docs/known-problems.md) and existing issues to avoid duplicates.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Where did you see the bug?
+      options:
+        - Web app
+        - Android app
+        - Both / shared backend (Supabase)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Web — footer/About section. Android — Settings → About & Legal.
+      placeholder: e.g. 1.12.1
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      description: Which part of the app is affected? Select all that apply.
+      multiple: true
+      options:
+        - Library (poster wall / list view)
+        - Discover
+        - Command palette
+        - Episode-level TV tracking
+        - The Ledger (stats dashboard)
+        - Re-watch timeline
+        - Cast, crew & franchise info
+        - Cinema Outings
+        - Friends & social
+        - Where to watch / physical media
+        - Import / export
+        - Auth (passkey / WebAuthn)
+        - Shareable read-only links
+        - Offline / PWA / service worker
+        - Android sync
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser + version (web), or device + Android version (Android).
+      placeholder: |
+        e.g. Windows 11, Chrome 126
+        e.g. Pixel 8, Android 15
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear, concise description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps so this is reliably reproducible.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll to '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots, recordings, or console/logcat output
+      description: Drag and drop images/videos here, or paste relevant error output.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Blocker (app unusable / data loss / security)
+        - Major (feature broken, no workaround)
+        - Minor (feature broken, workaround exists)
+        - Cosmetic (visual/UX polish only)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Is this a regression?
+      description: Did this work correctly in a previous version?
+      options:
+        - "No / not sure"
+        - "Yes — worked in a previous version"
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else — related issues, recent changes you noticed, workarounds you found.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and docs/known-problems.md for duplicates
+          required: true
+        - label: I reproduced this on the latest deployed/installed version
+          required: true
+        - label: I included steps to reproduce
+          required: true

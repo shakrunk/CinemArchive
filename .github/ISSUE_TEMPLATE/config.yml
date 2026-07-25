@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation (wiki)
+    url: https://github.com/shakrunk/CinemArchive/wiki
+    about: Architecture, local setup, the release process, and a troubleshooting guide — check here before filing.
+  - name: Report a security vulnerability
+    url: https://github.com/shakrunk/CinemArchive/security/advisories/new
+    about: Do not open a public issue for anything that could expose another user's data.
+  - name: Known problems backlog
+    url: https://github.com/shakrunk/CinemArchive/blob/main/docs/known-problems.md
+    about: Browse or add a smaller item directly to the tracked backlog instead of opening an issue.
+  - name: Android parity matrix
+    url: https://github.com/shakrunk/CinemArchive/blob/main/docs/android-parity-matrix.md
+    about: Check whether an Android/web difference is already a tracked parity gap.

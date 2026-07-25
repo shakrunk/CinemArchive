@@ -61,6 +61,10 @@
     --ivory: 243 234 217; /* constant light — text over dark art */
     --poster-ink: 17 13 11; /* constant dark poster surfaces */
     --poster-ink-2: 30 23 20;
+    /* Amber marks sitting on a dark art scrim (hero chips, poster badges). The
+       theme-aware --amber deepens on light to stay legible on ivory, which goes
+       muddy against black/55 — so those call sites pin this constant instead. */
+    --amber-on-art: 233 178 102;
     /* Ink-on-amber: text/icons sitting on an amber fill. Constant across themes
        (amber stays a mid-warm tone in both), so it must NOT flip with --void. */
     --on-amber: #25160a;
@@ -1024,6 +1028,12 @@
   }
   .poster.has-img .poster__face::before {
     opacity: 0;
+  }
+  /* The has-img scrim exists purely to keep face content legible over artwork.
+     When the face carries nothing (badges hidden, not the rich editorial face),
+     it would only darken the poster for no reason — so drop it. */
+  .poster.has-img .poster__face--bare {
+    background: none;
   }
   /* sheen sweep on hover */
   .poster::after {

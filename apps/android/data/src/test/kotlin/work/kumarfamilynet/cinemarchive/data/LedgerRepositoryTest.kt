@@ -26,6 +26,7 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleIdByTmdbKey
 import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
@@ -45,6 +46,7 @@ private class FakeTitleDao(titles: List<TitleEntity>) : TitleDao {
     override fun observeLibrary(): Flow<List<TitleListRow>> = throw UnsupportedOperationException()
     override fun observeTitle(titleId: String): Flow<TitleEntity?> = throw UnsupportedOperationException()
     override fun observeLibraryTmdbIds(): Flow<List<Int>> = throw UnsupportedOperationException()
+    override fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>> = throw UnsupportedOperationException()
     override fun observeAllTitles(): Flow<List<TitleEntity>> = flow
     override suspend fun upsertAll(titles: List<TitleEntity>) = throw UnsupportedOperationException()
     override suspend fun updateStatus(titleId: String, status: String, updatedAt: String) = throw UnsupportedOperationException()

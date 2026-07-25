@@ -20,14 +20,20 @@ data class TitleListRow(
     val network: String?,
     val rating: Double?,
     val releaseDate: String?,
+    val genres: List<String>,
 )
 
 data class EpisodeWatchCount(val episodeId: String, val watchCount: Int)
 
+/** Just enough to resolve a Discover trending result (identified by tmdbId + type) to its
+ *  real local row id, so a tap on an already-owned result can open the same title-detail
+ *  screen Library uses (#119/KP-049) instead of a bare preview. */
+data class TitleIdByTmdbKey(val id: String, val tmdbId: Int, val type: String)
+
 @Dao
 interface TitleDao {
     @Query(
-        "SELECT id, title, year, posterUrl, status, type, director, network, rating, releaseDate " +
+        "SELECT id, title, year, posterUrl, status, type, director, network, rating, releaseDate, genres " +
             "FROM titles ORDER BY title COLLATE NOCASE",
     )
     fun observeLibrary(): Flow<List<TitleListRow>>
@@ -39,6 +45,9 @@ interface TitleDao {
      *  against this to show an in-library state instead of an add button. */
     @Query("SELECT tmdbId FROM titles")
     fun observeLibraryTmdbIds(): Flow<List<Int>>
+
+    @Query("SELECT id, tmdbId, type FROM titles")
+    fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>>
 
     // Ledger hero-stat rollup (docs/android-contracts/ledger.md) reads every title's
     // type/status/rating/runtime — small enough locally to just select the full row rather

@@ -9,6 +9,35 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-07-25
+
+### Fixed
+
+- Native Android app (in development, not yet distributed): **Premieres & Revivals** charted
+  first watches and rewatches *added together*, which is the one transformation that makes the
+  widget meaningless — a month of pure rediscovery and a month of pure rewatching drew the same
+  line. The two are now split across a shared baseline, first watches rising and rewatches
+  falling, so the balance the widget is named for is the thing you actually see.
+
+### Changed
+
+- Native Android app (in development, not yet distributed): three more Ledger widgets rebuilt
+  around their own data shape, bringing the total to ten. **Premieres & Revivals** is described
+  above. **Still Rolling** leads with how many episodes are left across the series shown and
+  draws one countable cell per episode, since "six left" is what you act on where "75%
+  complete" makes you do the subtraction. **The Ensemble** drops the chart entirely for a poster
+  billing block — a cast tally is a ranked list of names, and putting the ranking into the
+  typography reads the way the object it describes does.
+- Native Android app (in development, not yet distributed): two more Ledger widgets rebuilt
+  around their own data shape, bringing the total to seven. **Coming Attractions** now leads
+  with the total runtime queued up, draws the backlog as one bar split into per-film segments,
+  and gives every row a *running* total — read down the column and you can stop where the
+  evening runs out. Series are listed but marked untimed, matching the rule that the estimate
+  counts films only. **Critical Record** shows the ten rating buckets as a distribution whose
+  shape is the point: bars fade as the rating drops, the most-used bucket is picked out, and
+  the row your average falls in is flagged, so "I mostly give fours, and I average just under
+  that" reads without arithmetic.
+
 ## [1.15.1] - 2026-07-25
 
 ### Fixed

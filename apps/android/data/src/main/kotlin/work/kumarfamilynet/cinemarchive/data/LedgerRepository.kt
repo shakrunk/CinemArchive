@@ -250,7 +250,13 @@ class LedgerRepository(
 
         val watchlisted = titles.filter { it.status == LibraryStatus.WATCHLIST.name }
         val watchlist = watchlisted.map {
-            LedgerWatchlistEntry(titleId = it.id, title = it.title, year = it.year, runtimeMinutes = it.runtime)
+            LedgerWatchlistEntry(
+                titleId = it.id,
+                title = it.title,
+                year = it.year,
+                runtimeMinutes = it.runtime,
+                isMovie = it.type == MediaType.MOVIE.name,
+            )
         }
         val watchlistMovieMinutesOwed = watchlisted
             .filter { it.type == MediaType.MOVIE.name }

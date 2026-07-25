@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Sideloaded installs update themselves from a GitHub Release APK (#146). Runtime-gated
+         behind Settings.canRequestPackageInstalls(); when it isn't granted the update flow
+         deep-links to the release page instead of failing. Only ever exercised for non-Play
+         installs, so it carries no Play policy implication. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- enableOnBackInvokedCallback opts into the predictive back APIs, so the system runs
          its back animation and MainActivity's PredictiveBackHandler can drive the overlay's

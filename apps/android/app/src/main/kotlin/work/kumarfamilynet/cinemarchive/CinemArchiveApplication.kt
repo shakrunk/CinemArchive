@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
+import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.InstallSourceProvider
@@ -51,6 +53,12 @@ class CinemArchiveApplication : Application() {
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(this) }
 
     private val installSourceProvider: InstallSourceProvider by lazy { InstallSourceProvider(this) }
+
+    val appUpdateRepository: AppUpdateRepository by lazy {
+        AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME)
+    }
+
+    val apkInstaller: ApkInstaller by lazy { ApkInstaller(this) }
 
     val ledgerLayoutRepository: LedgerLayoutRepository by lazy {
         LedgerLayoutRepository(this, authRepository, SupabaseLedgerLayoutWriter(supabaseClient))

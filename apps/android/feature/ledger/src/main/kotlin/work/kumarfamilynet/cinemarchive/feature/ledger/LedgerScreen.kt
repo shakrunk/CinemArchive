@@ -82,14 +82,12 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ChartDatum
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DailyHeatmapGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.DmMonoFamily
-import work.kumarfamilynet.cinemarchive.core.designsystem.LineChartCanvas
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerLayoutRules
-import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
 import work.kumarfamilynet.cinemarchive.core.model.LedgerSettingKey
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
@@ -128,7 +126,7 @@ private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
  * All 20 Ledger widgets (docs/android-contracts/ledger.md §2), rendered from a
  * [LedgerWidgetConfig] list — the fixed default order on first launch, or whatever the user
  * has locally customized (edit mode: add/remove/move/resize/settings). Every chart primitive
- * ([BarChartCanvas]/[LineChartCanvas]/[DailyHeatmapGrid]) is decorative and paired with a
+ * ([BarChartCanvas]/[DailyHeatmapGrid]) is decorative and paired with a
  * real, focusable list of the same data — per ledger.md §5, Android must give every widget a
  * genuine accessible alternative rather than the web app's tooltip-only fallback on five
  * widgets. Three panels (Second Opinions, The Marathon, At the Movies) instead render through
@@ -396,7 +394,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
     when (config.panel) {
         LedgerWidgetId.RUNTIMES -> CategorySection(title, board.runtimeBuckets.applyTopN(config), "No movies logged yet.")
         LedgerWidgetId.NETWORKS -> CategorySection(title, board.networks.applyTopN(config), "No TV series logged yet.")
-        LedgerWidgetId.DECADES -> CategorySection(title, board.decades.applyTopN(config), "No dated titles logged yet.")
+        LedgerWidgetId.DECADES -> DecadesPanel(title, board.decades.applyTopN(config))
         LedgerWidgetId.ATTRACTIONS ->
             AttractionsPanel(title, board.watchlist.applyTopN(config), board.watchlistMovieMinutesOwed)
         LedgerWidgetId.ACTIVITY -> {
@@ -429,15 +427,7 @@ private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
         LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config), "No non-English titles logged yet.")
         LedgerWidgetId.WEEKDAYS -> WeekdaysPanel(title, board.weekdays)
         LedgerWidgetId.STREAKS -> MarathonPanel(title, board.streaks)
-        LedgerWidgetId.TRAJECTORY -> {
-            SectionHeader(title)
-            val entries = board.trajectory.applyTopN(config)
-            if (entries.isEmpty()) EmptyRow("No rated, dated titles yet.")
-            else {
-                LineChartCanvas(data = entries.map { ChartDatum(it.quarterLabel, it.averageRating.toFloat()) })
-                entries.forEach { QuarterRow(it) }
-            }
-        }
+        LedgerWidgetId.TRAJECTORY -> TrajectoryPanel(title, board.trajectory.applyTopN(config))
         LedgerWidgetId.REVIVALS -> RevivalsPanel(title, board.revivals.applyTopN(config))
         LedgerWidgetId.TIMEWARP -> CategorySection(title, board.timewarp.applyTopN(config), "No dated titles logged yet.")
         LedgerWidgetId.PROGRESS -> ProgressPanel(title, board.stillRolling.applyTopN(config))
@@ -1034,13 +1024,6 @@ private fun EncoreRow(entry: LedgerEncoreEntry) {
     }
 }
 
-@Composable
-private fun QuarterRow(entry: LedgerQuarterRating) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(entry.quarterLabel, style = MaterialTheme.typography.bodyMedium)
-        Text("★%.1f (%d titles)".format(entry.averageRating, entry.titleCount), style = MaterialTheme.typography.bodyMedium)
-    }
-}
 
 private class LedgerViewModelFactory(
     private val repository: LedgerRepository,

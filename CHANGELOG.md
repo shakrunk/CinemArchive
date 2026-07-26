@@ -9,6 +9,21 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Native Android app (in development, not yet distributed): **Appearance settings** — the text
+  controls now sit in their own container, matching the palette group above them instead of
+  floating loose on the page; the theme toggle's System/Light/Dark options carry icons; and each
+  font option's label is set in the typeface that option would actually apply, so the choice is
+  shown rather than named.
+- Native Android app (in development, not yet distributed): two more Ledger widgets rebuilt
+  around their own data shape, bringing the total to twelve. **By the Era** becomes a timeline
+  spine — decades are contiguous positions in time, so the run is gap-filled and a decade you
+  own nothing from shows as a hollow tick rather than quietly closing up. **Shifting Standards**
+  now draws your all-time average as a reference line and fills the area between it and the
+  quarterly averages by sign, so a run of harsher quarters reads as a block below the line
+  instead of a slightly lower squiggle.
+
 ## [1.16.0] - 2026-07-25
 
 ### Fixed

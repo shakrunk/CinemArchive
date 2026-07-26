@@ -18,7 +18,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -128,9 +131,9 @@ private fun AppearanceScreen(
                 )
                 SegmentedGroup(
                     options = listOf(
-                        ChoiceOption(ArchiveThemeMode.SYSTEM, "System"),
-                        ChoiceOption(ArchiveThemeMode.LIGHT, "Light"),
-                        ChoiceOption(ArchiveThemeMode.DARK, "Dark"),
+                        ChoiceOption(ArchiveThemeMode.SYSTEM, "System", icon = Icons.Filled.BrightnessAuto),
+                        ChoiceOption(ArchiveThemeMode.LIGHT, "Light", icon = Icons.Filled.LightMode),
+                        ChoiceOption(ArchiveThemeMode.DARK, "Dark", icon = Icons.Filled.DarkMode),
                     ),
                     selected = themeMode,
                     onSelect = onSetThemeMode,
@@ -190,6 +193,10 @@ private fun AppearanceScreen(
  * try a few slider positions against the [TextPreview] before touching the real setting.
  * Pending state is keyed off the persisted values so it resets to match whenever they change
  * out from under this composable (e.g. navigating back in and out of Appearance).
+ *
+ * Wrapped in its own container so it carries the same weight as the palette group above it —
+ * previously these controls sat loose on the page while every other choice on the screen was
+ * boxed, which read as leftover content rather than a third setting.
  */
 @Composable
 private fun TextSettingsCard(
@@ -201,62 +208,76 @@ private fun TextSettingsCard(
     var pendingFontScale by remember(fontScale) { mutableStateOf(fontScale) }
     val fontScaleSteps = ArchiveFontScale.entries
 
-    Text(
-        "Font",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 6.dp),
-    )
-    SegmentedGroup(
-        options = listOf(
-            ChoiceOption(ArchiveFontFamily.DEFAULT, ArchiveFontFamily.DEFAULT.label()),
-            ChoiceOption(ArchiveFontFamily.DYSLEXIA_FRIENDLY, ArchiveFontFamily.DYSLEXIA_FRIENDLY.label()),
-        ),
-        selected = pendingFontFamily,
-        onSelect = { pendingFontFamily = it },
-        modifier = Modifier.padding(bottom = 20.dp),
-    )
-
-    Row(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-    ) {
-        Text(
-            "Size",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            pendingFontScale.label(),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-    Slider(
-        value = fontScaleSteps.indexOf(pendingFontScale).toFloat(),
-        onValueChange = { pendingFontScale = fontScaleSteps[it.toInt().coerceIn(fontScaleSteps.indices)] },
-        valueRange = 0f..(fontScaleSteps.size - 1).toFloat(),
-        steps = fontScaleSteps.size - 2,
-        colors = SliderDefaults.colors(
-            activeTrackColor = MaterialTheme.colorScheme.primary,
-            thumbColor = MaterialTheme.colorScheme.primary,
-        ),
-        modifier = Modifier.padding(bottom = 16.dp),
-    )
-
-    TextPreview(
-        fontFamily = pendingFontFamily,
-        fontScale = pendingFontScale,
-        modifier = Modifier.padding(bottom = 16.dp),
-    )
-
-    val hasPendingChanges = pendingFontFamily != fontFamily || pendingFontScale != fontScale
-    Button(
-        onClick = { onApply(pendingFontFamily, pendingFontScale) },
-        enabled = hasPendingChanges,
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(if (hasPendingChanges) "Apply" else "Applied")
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Font",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+            // Each option's label is set in the face that option would actually apply, so the
+            // choice is shown rather than named — "Dyslexia-friendly" written in the app's
+            // current font tells you nothing about what you'd be switching to.
+            SegmentedGroup(
+                options = ArchiveFontFamily.entries.map { family ->
+                    ChoiceOption(
+                        value = family,
+                        label = family.label(),
+                        labelFontFamily = cinemArchiveTypography(family).labelSmall.fontFamily,
+                    )
+                },
+                selected = pendingFontFamily,
+                onSelect = { pendingFontFamily = it },
+                modifier = Modifier.padding(bottom = 20.dp),
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            ) {
+                Text(
+                    "Size",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    pendingFontScale.label(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Slider(
+                value = fontScaleSteps.indexOf(pendingFontScale).toFloat(),
+                onValueChange = { pendingFontScale = fontScaleSteps[it.toInt().coerceIn(fontScaleSteps.indices)] },
+                valueRange = 0f..(fontScaleSteps.size - 1).toFloat(),
+                steps = fontScaleSteps.size - 2,
+                colors = SliderDefaults.colors(
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+
+            TextPreview(
+                fontFamily = pendingFontFamily,
+                fontScale = pendingFontScale,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+
+            val hasPendingChanges = pendingFontFamily != fontFamily || pendingFontScale != fontScale
+            Button(
+                onClick = { onApply(pendingFontFamily, pendingFontScale) },
+                enabled = hasPendingChanges,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (hasPendingChanges) "Apply" else "Applied")
+            }
+        }
     }
 }
 
@@ -273,7 +294,9 @@ private fun TextPreview(fontFamily: ArchiveFontFamily, fontScale: ArchiveFontSca
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        // A tone above its parent container, not level with it — nested at the same
+        // surfaceContainer the enclosing card now uses, the preview would vanish into it.
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth(),
     ) {

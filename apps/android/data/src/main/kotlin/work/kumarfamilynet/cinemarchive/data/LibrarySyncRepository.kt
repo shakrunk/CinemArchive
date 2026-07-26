@@ -122,7 +122,11 @@ class LibrarySyncRepository(
     private suspend fun applyPage(rows: JSONArray) {
         val byType = (0 until rows.length()).map { rows.getJSONObject(it) }.groupBy { it.getString("entity_type") }
 
-        byType["title"]?.forEach { titleDao.upsertAll(listOf(it.payload().toTitleEntity())) }
+        byType["title"]?.forEach { row ->
+            val payload = row.payload()
+            // Carry forward whatever the RPC doesn't send — see toTitleEntity's kdoc.
+            titleDao.upsertAll(listOf(payload.toTitleEntity(titleDao.getById(payload.getString("id")))))
+        }
         byType["season"]?.forEach { seasonDao.upsertAll(listOf(it.payload().toSeasonEntity())) }
         byType["episode"]?.forEach { row ->
             val payload = row.payload()
@@ -165,7 +169,20 @@ class LibrarySyncRepository(
         this?.let { arr -> (0 until arr.length()).map { i -> (arr.opt(i) as? JSONObject)?.optString("name") ?: arr.getString(i) } }
             ?: emptyList()
 
-    private fun JSONObject.toTitleEntity() = TitleEntity(
+    /**
+     * [existing] is the local row this one is replacing, when there is one.
+     *
+     * `sync_library_changes`' title arm doesn't select every column the local mirror holds —
+     * `imdb_rating` and `original_language` in particular are absent (see
+     * supabase/migrations/20260713000000_android_sync_layer.sql). Mapping a missing key
+     * straight to null means the first sync after a title is added on this device silently
+     * erases its critic score and language, which are exactly what the Ledger's Second
+     * Opinions and In Translation widgets read. Falling back to the existing local value keeps
+     * them until the RPC learns to send them, and the payload still wins whenever it does —
+     * the same problem `releaseDate` had, fixed there by adding it to the RPC
+     * (20260723000000_sync_release_date.sql); adding these two is the proper follow-up.
+     */
+    private fun JSONObject.toTitleEntity(existing: TitleEntity? = null) = TitleEntity(
         id = getString("id"),
         tmdbId = getInt("tmdbId"),
         // Postgres's media_type/watch_status enums are lowercase ('movie', 'watched', ...);
@@ -187,7 +204,9 @@ class LibrarySyncRepository(
         notes = optStringOrNull("notes"),
         addedAt = getString("addedAt"),
         updatedAt = getString("updatedAt"),
-        releaseDate = optStringOrNull("releaseDate"),
+        releaseDate = optStringOrNull("releaseDate") ?: existing?.releaseDate,
+        imdbRating = optDoubleOrNull("imdbRating") ?: existing?.imdbRating,
+        originalLanguage = optStringOrNull("originalLanguage") ?: existing?.originalLanguage,
     )
 
     private fun JSONObject.toSeasonEntity() = SeasonEntity(

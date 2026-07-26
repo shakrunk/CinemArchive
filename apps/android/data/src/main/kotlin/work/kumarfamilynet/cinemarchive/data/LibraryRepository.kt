@@ -20,10 +20,16 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
+import work.kumarfamilynet.cinemarchive.core.model.AddTitleRequest
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
@@ -70,8 +76,137 @@ class LibraryRepository(
     private val reviewDao: EpisodeReviewDao,
     private val viewingDao: ViewingDao,
     private val cinemaOutingDao: CinemaOutingDao,
+    private val titleCastDao: TitleCastDao,
+    private val titleCrewDao: TitleCrewDao,
     private val outbox: MutationOutbox,
 ) {
+    /**
+     * Adds a catalog result to the library: an optimistic Room write of everything the title
+     * brings with it (the title row, its seasons and episodes, top-billed cast and key crew,
+     * and a seed viewing when it's being logged as already watched), plus **one** outbox entry
+     * carrying all of it.
+     *
+     * One entry, not one per table, on purpose. Every child row here is foreign-keyed to the
+     * title server-side, and [MutationOutbox.flush] pushes entries independently in
+     * `createdAt` order — separate entries enqueued in the same millisecond could push a
+     * season before its title existed. Bundling them lets the writer order the inserts itself
+     * and makes a partial failure retry as a whole (every insert is an id-keyed upsert, so
+     * replaying one that already landed is a no-op).
+     *
+     * Returns the new title's local id — or the existing one, without writing anything, if
+     * this TMDB id is already in the library. That guard mirrors the server's
+     * `unique_user_tmdb` constraint, so the duplicate case is refused here rather than
+     * surfacing later as a push that can never succeed.
+     */
+    suspend fun addTitle(request: AddTitleRequest): String {
+        val details = request.details
+        titleDao.findIdByTmdbKey(details.tmdbId, details.type.name)?.let { return it }
+
+        val titleId = UUID.randomUUID().toString()
+        val now = Instant.now().toString()
+        val seasons = details.seasons.map { season ->
+            SeasonEntity(
+                id = UUID.randomUUID().toString(),
+                titleId = titleId,
+                seasonNumber = season.seasonNumber,
+                episodeCount = season.episodeCount,
+                episodesWatched = 0,
+                airYear = season.airYear,
+            ) to season.episodes
+        }
+        val episodes = seasons.flatMap { (seasonEntity, seasonEpisodes) ->
+            seasonEpisodes.map { episode ->
+                EpisodeEntity(
+                    id = UUID.randomUUID().toString(),
+                    titleId = titleId,
+                    seasonId = seasonEntity.id,
+                    episodeNumber = episode.episodeNumber,
+                    episodeName = episode.name,
+                    airDate = episode.airDate,
+                    runtime = episode.runtime,
+                )
+            }
+        }
+        val cast = details.cast.take(MAX_CAST_ROWS).map { credit ->
+            TitleCastEntity(
+                id = UUID.randomUUID().toString(),
+                titleId = titleId,
+                tmdbPersonId = credit.tmdbPersonId,
+                name = credit.name,
+                characterName = credit.characterName,
+                castOrder = credit.order,
+            )
+        }
+        val crew = details.crew.map { credit ->
+            TitleCrewEntity(
+                id = UUID.randomUUID().toString(),
+                titleId = titleId,
+                tmdbPersonId = credit.tmdbPersonId,
+                name = credit.name,
+                job = credit.job,
+                department = credit.department,
+            )
+        }
+        // A title logged as already watched gets its first viewing here, so it lands on the
+        // Ledger's date-bucketed widgets immediately instead of only counting once the user
+        // logs a re-watch. Matches the web Add workflow, which seeds a viewing on the same
+        // condition. Any other status has nothing to date yet.
+        val viewing = if (request.status == LibraryStatus.WATCHED) {
+            ViewingEntity(
+                id = UUID.randomUUID().toString(),
+                titleId = titleId,
+                date = request.watchedOn,
+                rating = request.rating,
+                notes = request.notes,
+                venue = null,
+            )
+        } else {
+            null
+        }
+        val title = TitleEntity(
+            id = titleId,
+            tmdbId = details.tmdbId,
+            type = details.type.name,
+            title = details.title,
+            year = details.year,
+            director = details.director,
+            genres = details.genres,
+            posterUrl = details.posterUrl,
+            backdropUrl = details.backdropUrl,
+            synopsis = details.synopsis,
+            runtime = details.runtime,
+            network = details.network,
+            status = request.status.name,
+            rating = request.rating,
+            notes = request.notes,
+            addedAt = now,
+            updatedAt = now,
+            imdbRating = details.imdbRating,
+            originalLanguage = details.originalLanguage,
+            releaseDate = details.releaseDate,
+        )
+
+        titleDao.upsertAll(listOf(title))
+        seasonDao.upsertAll(seasons.map { it.first })
+        episodeDao.upsertAll(episodes)
+        if (cast.isNotEmpty()) titleCastDao.upsertAll(cast)
+        if (crew.isNotEmpty()) titleCrewDao.upsertAll(crew)
+        viewing?.let { viewingDao.upsertAll(listOf(it)) }
+
+        outbox.enqueue(
+            entityType = "title",
+            entityId = titleId,
+            operation = "insert",
+            payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing),
+        )
+        return titleId
+    }
+
+    /** Local row id for an already-owned TMDB title, if any — lets the Add flow show
+     *  "In library" and route a tap to the real title-detail screen instead of re-adding. */
+    suspend fun findLibraryTitleId(tmdbId: Int, type: MediaType): String? =
+        titleDao.findIdByTmdbKey(tmdbId, type.name)
+
     fun observeLibrary(): Flow<List<LibraryTitle>> = combine(
         titleDao.observeLibrary(),
         cinemaOutingDao.observeAllOutings(),

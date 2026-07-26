@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 /** Library-list projection — only the columns the poster wall needs (see
@@ -49,14 +50,29 @@ interface TitleDao {
     @Query("SELECT id, tmdbId, type FROM titles")
     fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>>
 
+    /** One-shot version of the above for a single candidate — the Add flow's duplicate guard,
+     *  mirroring the server's own `unique_user_tmdb (user_id, tmdb_id, type)` constraint
+     *  (schema.sql) so a duplicate is refused before it can fail mid-push. */
+    @Query("SELECT id FROM titles WHERE tmdbId = :tmdbId AND type = :type LIMIT 1")
+    suspend fun findIdByTmdbKey(tmdbId: Int, type: String): String?
+
     // Ledger hero-stat rollup (docs/android-contracts/ledger.md) reads every title's
     // type/status/rating/runtime — small enough locally to just select the full row rather
     // than add a second bespoke projection alongside TitleListRow.
     @Query("SELECT * FROM titles")
     fun observeAllTitles(): Flow<List<TitleEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /** [Upsert], not `@Insert(REPLACE)`: Room implements REPLACE as DELETE + INSERT, and
+     *  `seasons`/`episodes`/`viewings`/`title_cast`/`title_crew`/`cinema_outings` all declare
+     *  `ON DELETE CASCADE` against this table. Re-syncing a title therefore *deleted its whole
+     *  subtree*; the sync RPC re-sends seasons/episodes/viewings so those came back, but it has
+     *  no arm for cast or crew, so those were destroyed permanently on the first sync after
+     *  they were written. Upsert updates in place and never fires the cascade. */
+    @Upsert
     suspend fun upsertAll(titles: List<TitleEntity>)
+
+    @Query("SELECT * FROM titles WHERE id = :id")
+    suspend fun getById(id: String): TitleEntity?
 
     @Query("UPDATE titles SET status = :status, updatedAt = :updatedAt WHERE id = :titleId")
     suspend fun updateStatus(titleId: String, status: String, updatedAt: String)
@@ -81,7 +97,9 @@ interface SeasonDao {
     @Query("SELECT * FROM seasons")
     fun observeAllSeasons(): Flow<List<SeasonEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /** [Upsert] for the same cascade reason as [TitleDao.upsertAll] — `episodes` cascades
+     *  from `seasons.id`. */
+    @Upsert
     suspend fun upsertAll(seasons: List<SeasonEntity>)
 
     // LibrarySyncRepository's episode->season resolution: sync_library_changes' episode
@@ -105,7 +123,9 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes")
     fun observeAllEpisodes(): Flow<List<EpisodeEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /** [Upsert] for the same cascade reason as [TitleDao.upsertAll] — episode watch events,
+     *  ratings and reviews all cascade from `episodes.id`. */
+    @Upsert
     suspend fun upsertAll(episodes: List<EpisodeEntity>)
 
     @Query("DELETE FROM episodes WHERE id = :id")

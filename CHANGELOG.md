@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Web: `Ctrl+,` / `Cmd+,` now opens Settings from anywhere, alongside the existing numbered nav
+  shortcut. Listed in the keyboard shortcuts help (`?`) under Actions.
+
 ## [1.19.0] - 2026-07-25
 
 ### Changed

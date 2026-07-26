@@ -17,6 +17,7 @@ const OTHER_GROUPS: { group: string; entries: ShortcutEntry[] }[] = [
       { keys: ['n'], label: 'Add a title' },
       { keys: ['/'], label: 'Open command palette' },
       { keys: [modKey, 'K'], label: 'Open command palette' },
+      { keys: [modKey, ','], label: 'Open Settings' },
     ],
   },
   {

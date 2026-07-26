@@ -20,6 +20,9 @@
           var state = raw && JSON.parse(raw).state;
           var theme = state && state.theme;
           var unlocked = (state && state.unlockedThemes) || ['dark', 'light'];
+          // themeMode 'system' always re-resolves against the live OS
+          // preference rather than trusting whatever was last persisted.
+          if (state && state.themeMode === 'system') theme = systemTheme();
           if (!COLORS.hasOwnProperty(theme) || unlocked.indexOf(theme) === -1) theme = systemTheme();
           document.documentElement.setAttribute('data-theme', theme);
           if (theme !== 'dark') {

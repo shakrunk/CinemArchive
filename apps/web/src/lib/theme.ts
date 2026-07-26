@@ -1,4 +1,4 @@
-import { useAppStore, type Theme } from 'src/store/useAppStore'
+import { useAppStore, type Theme, type ThemeMode } from 'src/store/useAppStore'
 import { prefersReducedMotion } from './motion'
 
 type ViewTransitionResult = { ready: Promise<void>; finished: Promise<void> }
@@ -101,17 +101,21 @@ export function transitionSpiderNoir(commit: () => void): void {
   })
 }
 
-/** Flip the theme. When the View Transitions API is available (and motion is
- *  allowed), the new theme irises in from the click point as an expanding
- *  circle — the projector "aperture" opening. Otherwise it applies instantly.
- *  Spider-noir's #root filter is captured in the transition snapshot, so the
- *  easter egg composes with the reveal automatically. */
-export function toggleTheme(origin?: { clientX: number; clientY: number }): void {
-  const next: Theme = useAppStore.getState().theme === 'dark' ? 'light' : 'dark'
-
+/** Switch the quick-toggle's theme mode (light/dark/system). When the View
+ *  Transitions API is available (and motion is allowed), the new theme irises
+ *  in from the click point as an expanding circle — the projector "aperture"
+ *  opening. Otherwise it applies instantly. Spider-noir's #root filter is
+ *  captured in the transition snapshot, so the easter egg composes with the
+ *  reveal automatically.
+ *
+ *  'system' resolves to the current OS preference and keeps tracking it live
+ *  via `watchSystemTheme`; picking 'light'/'dark' here is an explicit
+ *  override that breaks out of system-follow (mirrors the full Appearance
+ *  grid's `setTheme`, which does the same for noir/matrix). */
+export function chooseThemeMode(mode: ThemeMode, origin?: { clientX: number; clientY: number }): void {
   const commit = () => {
-    applyTheme(next)
-    useAppStore.getState().setTheme(next)
+    useAppStore.getState().setThemeMode(mode)
+    applyTheme(useAppStore.getState().theme)
   }
 
   const prefersReduced = prefersReducedMotion()
@@ -146,4 +150,29 @@ export function toggleTheme(origin?: { clientX: number; clientY: number }): void
     .catch(() => {
       /* transition was skipped/interrupted — theme already committed */
     })
+}
+
+/** Flip between explicit dark/light (the `T` key / single-button toggle).
+ *  Always resolves against the *current* theme, so pressing it while
+ *  'system' is active jumps to the opposite of whatever it resolved to —
+ *  same escape-system-follow behavior as picking a theme from the grid. */
+export function toggleTheme(origin?: { clientX: number; clientY: number }): void {
+  const next: ThemeMode = useAppStore.getState().theme === 'dark' ? 'light' : 'dark'
+  chooseThemeMode(next, origin)
+}
+
+let systemThemeMql: MediaQueryList | null = null
+
+/** Idempotently starts tracking OS light/dark scheme changes, so a persisted
+ *  'system' themeMode keeps following the OS live instead of freezing at
+ *  whatever it resolved to on last load. Call once on app mount. */
+export function watchSystemTheme(): void {
+  if (typeof window === 'undefined' || !window.matchMedia || systemThemeMql) return
+  systemThemeMql = window.matchMedia('(prefers-color-scheme: light)')
+  systemThemeMql.addEventListener('change', (e) => {
+    if (useAppStore.getState().themeMode !== 'system') return
+    const next: Theme = e.matches ? 'light' : 'dark'
+    applyTheme(next)
+    useAppStore.setState({ theme: next })
+  })
 }

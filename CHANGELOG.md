@@ -9,6 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Web: a persistent "System" theme mode that keeps following your OS's light/dark preference
+  live, not just at first load. The quick dark/light toggle (top bar and account menu) is now a
+  3-way Light/Dark/System segmented control, and Settings → Appearance shows the same control
+  alongside the full theme grid so the two never disagree. Picking Light/Dark explicitly (via the
+  toggle, the `T` key, or the Appearance grid) breaks out of System mode, same as before.
+
 ## [1.20.0] - 2026-07-26
 
 ### Added

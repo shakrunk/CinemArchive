@@ -1,14 +1,14 @@
-import { Plus, LogIn, Search, Sun, Moon, X, Eye, Users } from 'lucide-react'
+import { Plus, LogIn, Search, X, Eye, Users } from 'lucide-react'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { cn, modKey } from 'src/lib/utils'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { DEV_MOCK_USER } from 'src/lib/devAuth'
-import { toggleTheme } from 'src/lib/theme'
 import { resolveNavIcon } from 'src/lib/navIcons'
 import type { AppView, NavItemId } from 'src/lib/navigation'
 import { ReelMark } from 'src/components/ui/reel-mark'
 import { NotificationCenter } from 'src/components/NotificationCenter'
 import { AccountMenu } from 'src/components/AccountMenu'
+import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
 
 interface TopBarProps {
   currentView: AppView
@@ -34,7 +34,6 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
   const viewerContext = useAppStore((s) => s.viewerContext)
   const exitFriendView = useAppStore((s) => s.exitFriendView)
   const openCommandPalette = useAppStore((s) => s.openCommandPalette)
-  const theme = useAppStore((s) => s.theme)
   const navPrefs = useAppStore((s) => s.navPrefs)
   const friendView = viewerContext.kind === 'friend' ? viewerContext : null
   // Theme lives in AccountMenu once it's shown, but AccountMenu only renders
@@ -106,21 +105,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
 
         {/* Actions */}
         <div className="flex items-center gap-2 ml-auto shrink-0">
-          {!showAccountMenu && (
-            <button
-              onClick={(e) => toggleTheme({ clientX: e.clientX, clientY: e.clientY })}
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="icon-btn w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
-              style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-[17px] h-[17px]" />
-              ) : (
-                <Moon className="w-[17px] h-[17px]" />
-              )}
-            </button>
-          )}
+          {!showAccountMenu && <ThemeModeToggle />}
 
           <button
             onClick={openCommandPalette}

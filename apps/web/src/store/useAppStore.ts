@@ -46,10 +46,18 @@ export type ViewMode = 'grid' | 'list'
 export type GridSize = 'compact' | 'default' | 'large'
 export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
 
-/** Default theme for users with no persisted choice yet — matches the OS
- *  preference instead of hard-coding dark. Keep in sync with the inline FOUC
- *  script in index.html. */
-function getSystemTheme(): Theme {
+/** The quick-toggle's 3-way choice — independent of the locked/secret
+ *  noir/matrix styles, which are only picked from the full Appearance grid
+ *  (and, when picked, count as an explicit dark-bucketed override; see
+ *  `setTheme`). 'system' keeps tracking `prefers-color-scheme` live for as
+ *  long as it's selected (see `watchSystemTheme` in lib/theme.ts) rather
+ *  than just resolving it once. */
+export type ThemeMode = 'light' | 'dark' | 'system'
+
+/** Resolves 'system' mode to the current OS preference. Also used as the
+ *  default theme for users with no persisted choice yet. Keep in sync with
+ *  the inline FOUC script in index.html. */
+export function getSystemTheme(): Theme {
   if (typeof window === 'undefined' || !window.matchMedia) return 'dark'
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
@@ -157,6 +165,9 @@ interface UISlice {
   viewMode: ViewMode
   gridSize: GridSize
   theme: Theme
+  // The persisted 3-way quick-toggle choice (light/dark/system) driving
+  // `theme` above. See `ThemeMode`'s doc comment.
+  themeMode: ThemeMode
   // Themes beyond dark/light are locked until earned via an in-app easter egg
   // (e.g. Spider-Noir black & white, The Matrix red pill). Always includes
   // 'dark' and 'light'.
@@ -181,7 +192,14 @@ interface UISlice {
 
   setViewMode: (mode: ViewMode) => void
   setGridSize: (size: GridSize) => void
+  // Explicit theme pick (Settings → Appearance grid, incl. noir/matrix).
+  // Always breaks out of 'system' mode — dark/light set themeMode to match;
+  // noir/matrix (both dark-on-black styles) bucket into 'dark'.
   setTheme: (theme: Theme) => void
+  // The quick-toggle's 3-way pick. 'system' resolves `theme` to the current
+  // OS preference and keeps tracking it live; 'light'/'dark' set both fields
+  // to the same explicit value.
+  setThemeMode: (mode: ThemeMode) => void
   // No-op if already unlocked or the theme is dark/light (always unlocked).
   unlockTheme: (theme: Theme) => void
   moveNavItem: (id: NavItemId, direction: 'up' | 'down') => void
@@ -854,6 +872,7 @@ export const useAppStore = create<AppStore>()(
   viewMode: 'grid',
   gridSize: 'default',
   theme: getSystemTheme(),
+  themeMode: 'system',
   unlockedThemes: ['dark', 'light'],
   navPrefs: defaultNavPrefs,
   ledgerPrefs: defaultLedgerPrefs,
@@ -867,7 +886,9 @@ export const useAppStore = create<AppStore>()(
 
   setGridSize: (gridSize) => set({ gridSize }),
 
-  setTheme: (theme) => set({ theme }),
+  setTheme: (theme) => set({ theme, themeMode: theme === 'light' ? 'light' : 'dark' }),
+
+  setThemeMode: (mode) => set({ themeMode: mode, theme: mode === 'system' ? getSystemTheme() : mode }),
 
   unlockTheme: (theme) => {
     if (theme === 'dark' || theme === 'light') return
@@ -1548,12 +1569,24 @@ export const useAppStore = create<AppStore>()(
         viewMode: s.viewMode,
         gridSize: s.gridSize,
         theme: s.theme,
+        themeMode: s.themeMode,
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,
         ledgerPrefs: s.ledgerPrefs,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
+        // Older persisted payloads predate themeMode entirely — preserve their
+        // persisted theme as an explicit choice rather than opting them into
+        // live system-tracking they never asked for.
+        if (state.themeMode === undefined) {
+          state.themeMode = state.theme === 'light' ? 'light' : 'dark'
+        }
+        // A 'system' mode may be stale after time away — re-resolve against
+        // the current OS preference now, same as the FOUC script does.
+        if (state.themeMode === 'system') {
+          state.theme = getSystemTheme()
+        }
         // Older persisted payloads may lack newer filter keys — backfill them.
         state.filters = { ...defaultFilters, ...state.filters }
         // One-time migration: the default sort used to be 'addedAt'. Flip

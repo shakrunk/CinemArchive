@@ -30,7 +30,7 @@ const OTHER_GROUPS: { group: string; entries: ShortcutEntry[] }[] = [
   {
     group: 'Appearance',
     entries: [
-      { keys: ['t'], label: 'Toggle dark / light mode' },
+      { keys: ['t'], label: 'Toggle dark / light mode (exits System)' },
     ],
   },
   {

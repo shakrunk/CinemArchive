@@ -54,6 +54,7 @@ private class AddTitleTitleDao(private val existing: MutableMap<Pair<Int, String
     override fun observeLibraryTmdbIds(): Flow<List<Int>> = throw UnsupportedOperationException()
     override fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>> = throw UnsupportedOperationException()
     override suspend fun findIdByTmdbKey(tmdbId: Int, type: String): String? = existing[tmdbId to type]
+    override suspend fun getById(id: String): TitleEntity? = written.firstOrNull { it.id == id }
     override fun observeAllTitles(): Flow<List<TitleEntity>> = MutableStateFlow(written)
     override suspend fun upsertAll(titles: List<TitleEntity>) { written += titles }
     override suspend fun updateStatus(titleId: String, status: String, updatedAt: String) = throw UnsupportedOperationException()

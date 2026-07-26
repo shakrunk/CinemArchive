@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-07-25
+
 ### Added
 
 - Native Android app (in development, not yet distributed): **you can add titles from your

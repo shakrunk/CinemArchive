@@ -56,7 +56,21 @@ android {
     }
 
     buildTypes {
+        // A debug build installs *alongside* a release one rather than replacing it. The two
+        // are signed with different keys (the release keystore only exists in CI), so a debug
+        // APK cannot update a sideloaded release install at all — before this, testing a change
+        // on a phone running a release build meant uninstalling it and losing the session and
+        // local prefs with it. Safe to suffix: the magic-link callback is a fixed
+        // `cinemarchive://auth-callback` custom scheme rather than one derived from the
+        // applicationId, so the suffixed build reuses the same Supabase redirect allowlist
+        // entry and signs in normally.
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "CinemArchive Debug"
+        }
         release {
+            manifestPlaceholders["appLabel"] = "CinemArchive"
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (releaseStorePath != null) {

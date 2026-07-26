@@ -127,23 +127,20 @@ fun DiscoverRoute(
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
     onTitleClick: (String) -> Unit = {},
+    onAddTitle: (TrendingTitle) -> Unit = {},
 ) {
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // A Discover result counts as added when it is in the real library, not just when it
-    // was tapped in this process — DiscoverSampleStore alone reset on every launch and
-    // never knew about anything synced down or added from the web app (#118).
+    // "Added" now means exactly one thing — the title is a real row in the library, whether it
+    // got there from this grid, the Add overlay, the web app, or a sync. The process-lifetime
+    // DiscoverSampleStore this used to be unioned with is gone along with the mock add path.
     val libraryTmdbIds by libraryRepository.observeLibraryTmdbIds()
         .collectAsStateWithLifecycle(initialValue = emptySet())
-    val tappedIds by DiscoverSampleStore.addedIds.collectAsState()
-    val addedIds = remember(libraryTmdbIds, tappedIds) {
-        tappedIds + libraryTmdbIds.map(Int::toString)
-    }
+    val addedIds = remember(libraryTmdbIds) { libraryTmdbIds.map(Int::toString).toSet() }
     // Resolves a trending result already in the real library to its Room row id, so tapping
     // it opens the same title-detail screen Library uses instead of the bare preview sheet
-    // below — real parity for anything actually owned (#119/KP-049). A result only tapped
-    // locally via DiscoverSampleStore has no such row and still falls back to the preview.
+    // below — real parity for anything actually owned (#119/KP-049).
     val idsByTmdbKey by libraryRepository.observeLibraryTitleIdsByTmdbKey()
         .collectAsStateWithLifecycle(initialValue = emptyMap())
     var search by rememberSaveable { mutableStateOf("") }
@@ -171,7 +168,7 @@ fun DiscoverRoute(
             val realId = idsByTmdbKey[title.tmdbId to title.type]
             if (realId != null) onTitleClick(realId) else preview = title
         },
-        onAdd = DiscoverSampleStore::add,
+        onAdd = onAddTitle,
         gridColumns = gridColumns,
         onGridColumnsChange = onGridColumnsChange,
         onOpenProfile = onOpenProfile,
@@ -183,7 +180,7 @@ fun DiscoverRoute(
         TrendingTitlePreviewSheet(
             title = title,
             isAdded = title.tmdbId.toString() in addedIds,
-            onAdd = { DiscoverSampleStore.add(title.tmdbId.toString()) },
+            onAdd = { preview = null; onAddTitle(title) },
             onDismiss = { preview = null },
         )
     }
@@ -204,7 +201,7 @@ private fun DiscoverScreen(
     onRefresh: () -> Unit,
     addedIds: Set<String>,
     onOpenTitle: (TrendingTitle) -> Unit,
-    onAdd: (String) -> Unit,
+    onAdd: (TrendingTitle) -> Unit,
     gridColumns: Int,
     onGridColumnsChange: (Int) -> Unit,
     onOpenProfile: () -> Unit = {},
@@ -331,7 +328,7 @@ private fun DiscoverScreen(
                                 isAdded = title.tmdbId.toString() in addedIds,
                                 columns = gridColumns,
                                 onOpen = { onOpenTitle(title) },
-                                onAdd = { onAdd(title.tmdbId.toString()) },
+                                onAdd = { onAdd(title) },
                             )
                         }
                     }

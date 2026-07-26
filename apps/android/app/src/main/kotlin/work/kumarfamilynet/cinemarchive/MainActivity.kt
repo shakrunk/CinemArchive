@@ -76,6 +76,8 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
+import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
+import work.kumarfamilynet.cinemarchive.core.model.asSearchResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
@@ -245,7 +247,10 @@ private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER }
 
 private sealed interface Overlay {
     data class Detail(val titleId: String) : Overlay
-    data object Add : Overlay
+
+    /** [preselected] is set when the add was started from a specific Discover result rather
+     *  than the FAB, so the overlay opens on its log step instead of an empty search box. */
+    data class Add(val preselected: MediaSearchResult? = null) : Overlay
     data object Profile : Overlay
     data object Appearance : Overlay
     data object About : Overlay
@@ -408,6 +413,7 @@ private fun CinemArchiveApp(
                             profileInitial = profileInitial,
                             onFabExpandedChange = { fabExpanded = it },
                             onTitleClick = { overlay = Overlay.Detail(it) },
+                            onAddTitle = { overlay = Overlay.Add(it.asSearchResult()) },
                         )
                         Tab.LIBRARY -> LibraryRoute(
                             repository,
@@ -443,7 +449,7 @@ private fun CinemArchiveApp(
                     ExpressivePillFab(
                         label = "New Title",
                         expanded = fabExpanded,
-                        onClick = { overlay = Overlay.Add },
+                        onClick = { overlay = Overlay.Add() },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
@@ -474,7 +480,17 @@ private fun CinemArchiveApp(
                 onBack = closeOverlay,
                 onRequestNotificationPermission = requestNotificationPermission,
             )
-            Overlay.Add -> AddTitleOverlayRoute(onClose = closeOverlay)
+            is Overlay.Add -> AddTitleOverlayRoute(
+                discoverRepository,
+                repository,
+                onClose = closeOverlay,
+                // Land on what was just created rather than back where the add started — the
+                // title detail screen is where every follow-up action (rate, log a viewing,
+                // book an outing) lives.
+                onAdded = { overlay = Overlay.Detail(it) },
+                onOpenTitle = { overlay = Overlay.Detail(it) },
+                preselected = current.preselected,
+            )
             Overlay.Profile -> ProfileRoute(
                 repository,
                 preferencesRepository,

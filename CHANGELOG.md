@@ -26,6 +26,12 @@ number is chosen.
 
 ### Fixed
 
+- Native Android app (in development, not yet distributed): a title's cast and crew were wiped
+  the first time the library synced after they were saved, so the Ledger's Auteurs and Ensemble
+  widgets could never show anything, and a title's critic score and language were erased the
+  same way. Syncing a title was deleting everything attached to it and putting the title back —
+  seasons and episodes returned on the next sync and hid the damage, but cast and crew had
+  nothing to bring them back.
 - Native Android app (in development, not yet distributed): rating a title, and rating or
   annotating a viewing from the post-show sheet, never reached the server. Each of those writes
   sends only the field it changed, and the sync layer assumed a field none of them carry, so

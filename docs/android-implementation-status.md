@@ -508,9 +508,41 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
     the fields present (`viewing`/`update` routes to a new `patchViewing`).
   - Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — build succeeds,
     lint clean (58 pre-existing warnings, none in the changed files), 25 new unit tests pass.
-    **Not verified on a device** — no Android device was reachable via adb during this pass, so
-    the search/details network path and the real Supabase push have not been exercised against
-    live TMDB or a real account. That's the outstanding check for this work.
+  - [x] **Verified live on a physical device** (2026-07-25, Samsung SM-A256E, Android 16/API 36,
+        wireless adb). The device already ran a *release* build, which a debug APK cannot update
+        (different signing keys), so `applicationIdSuffix ".debug"` was added — see that commit
+        for why suffixing is safe here and why passkey sign-in is not available on it. Signed in
+        by magic link; 69 titles synced down.
+        - Real TMDB search across films and series, merged and popularity-ranked. Details
+          hydrated correctly for both kinds: a series showed "TV-MA · 3 seasons" (US
+          `content_ratings`, specials excluded) and a film "PG-13 · 94m" (US `release_dates`).
+        - Adding *Severance* wrote 3 seasons, 19 episodes with real TMDB episode names, 20 cast
+          (the `MAX_CAST_ROWS` cap), 5 crew including "Dan Erickson · Creator", and imdbRating
+          8.6 from OMDb — then landed on its title-detail screen showing "0 / 19 episodes
+          watched", trackable episode by episode.
+        - **Full round trip proven**: after the outbox flushed, the *release* app — a separate
+          install with its own session and sync cursor — pulled Severance down from Supabase
+          with the right status, year and network. The write genuinely reached the server.
+        - Duplicate guard confirmed: re-selecting an owned title shows "Already in your library"
+          with an "Open it" affordance instead of adding a second copy.
+        - **Found and fixed two real bugs this pass**, neither reachable from the unit tests:
+          the add overlay reopening on the previous title's log step (ViewModel reuse), and — far
+          more serious — library sync destroying a title's cast and crew via Room's REPLACE
+          cascade, plus nulling `imdbRating`/`originalLanguage`. Both have their own commits;
+          the cascade one is a latent pre-existing defect that this feature is simply the first
+          thing to expose. Re-verified after fixing: 10 cast and 10 crew rows, the seed viewing,
+          imdbRating and originalLanguage all survived two full force-stop / push / sync cycles.
+        - Full gate re-run after both fixes: build successful, lint clean, all unit tests pass.
+  - **Known gap, not fixed here:** `MutationOutbox.flush()` only runs from
+    `CinemArchiveApplication.onCreate`, so a queued write does not reach Supabase until the next
+    cold start — the `ON_RESUME` observer in `MainActivity` syncs and reconciles outings but
+    never flushes. Pre-existing and affects every mutation, not just adds; called out here
+    because this pass is what made it visible (an added title is invisible to the web app until
+    the phone app is restarted).
+  - **Automated coverage gap:** the cascade and carry-forward fixes are verified on-device but
+    have no regression test — asserting them needs a real Room database (instrumented or
+    Robolectric), and neither harness exists in this project yet. That is the first thing the
+    screenshot/golden-test harness item in Phase 0 should bring with it.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.
   - [x] CI now builds a signed release APK and attaches it to the GitHub Release whenever a

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,8 +60,15 @@ private const val QUEUE_SEGMENT_LIMIT = 12
  * [LedgerWatchlistEntry.isMovie] exists — without it the per-title figures would drift from the
  * header total.
  */
+private const val QUEUE_PREVIEW_ROWS = 3
+
 @Composable
-internal fun AttractionsPanel(title: String, entries: List<LedgerWatchlistEntry>, movieMinutesOwed: Int) {
+internal fun ColumnScope.AttractionsPanel(
+    title: String,
+    entries: List<LedgerWatchlistEntry>,
+    movieMinutesOwed: Int,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "What's queued up, and how long it would take to clear")
     if (entries.isEmpty()) {
         PanelEmpty("Nothing on the watchlist — the queue is clear.")
@@ -120,18 +128,23 @@ internal fun AttractionsPanel(title: String, entries: List<LedgerWatchlistEntry>
 
     // A running total, not just each film's runtime: the column answers "how far in am I by the
     // time this one ends", which is the only reason to put a backlog in an order at all.
+    // Accumulated up front rather than during rendering, so a collapsed tail doesn't reset the
+    // running figure the visible rows are counting toward.
     var cumulative = 0
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        entries.forEach { entry ->
-            val counts = entry.isMovie && (entry.runtimeMinutes ?: 0) > 0
-            if (counts) cumulative += entry.runtimeMinutes ?: 0
-            QueueRow(entry = entry, cumulativeMinutes = cumulative.takeIf { counts })
-        }
+    val queue = entries.map { entry ->
+        val counts = entry.isMovie && (entry.runtimeMinutes ?: 0) > 0
+        if (counts) cumulative += entry.runtimeMinutes ?: 0
+        QueueStep(entry, cumulative.takeIf { counts })
+    }
+    DisclosedList(queue, disclosure, "queued titles", previewCount = QUEUE_PREVIEW_ROWS, spacing = 7.dp) { step ->
+        QueueRow(entry = step.entry, cumulativeMinutes = step.cumulativeMinutes)
     }
 }
+
+/** One watchlist row plus the running total it lands on — precomputed so the disclosure can
+ *  split the list anywhere without the totals restarting. Null [cumulativeMinutes] means the
+ *  title doesn't count toward the estimate (a series, or a film with no runtime). */
+private data class QueueStep(val entry: LedgerWatchlistEntry, val cumulativeMinutes: Int?)
 
 @Composable
 private fun QueueRow(entry: LedgerWatchlistEntry, cumulativeMinutes: Int?) {
@@ -204,9 +217,13 @@ private const val RATING_STEP = 0.5
  * falls in is flagged, so "I mostly give fours, and I average just under that" reads without
  * arithmetic. Bucket values come from position rather than from parsing the `★4.5` labels back
  * apart — that sequence is fixed by the repository, and the label is display text.
+ *
+ * The one panel with no [PanelDisclosure]: its rows *are* its visualization, so collapsing them
+ * would leave a card with nothing on it but a sentence. Ten fixed buckets at one line each is
+ * short enough not to need it.
  */
 @Composable
-internal fun RatingsPanel(title: String, buckets: List<LedgerCategoryCount>) {
+internal fun ColumnScope.RatingsPanel(title: String, buckets: List<LedgerCategoryCount>) {
     PanelHeading(title, "How your ratings fall, five stars down to half a star")
     val total = buckets.sumOf { it.count }
     if (buckets.isEmpty() || total == 0) {

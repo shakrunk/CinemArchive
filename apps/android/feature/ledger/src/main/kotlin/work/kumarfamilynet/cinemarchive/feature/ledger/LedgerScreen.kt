@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,9 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -60,10 +59,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -137,10 +141,12 @@ private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
  * The layout persists **locally only** (DataStore via [LedgerLayoutRepository]) — syncing it
  * to `user_prefs.ledger_layout` needs a real, authenticated `RemoteMutationWriter` (see
  * docs/android-implementation-status.md for what that needs). Every widget renders as a
- * fixed-400dp card (ledger.md §1) with internally scrolling content; at a `lg`+ window width
- * (>= 840dp, [LG_BREAKPOINT]) cards pack into a 12-column grid by `width` span
- * (sm/md/lg/full = 4/6/8/12, see [spanOf12]); below that, every card is full-width regardless
- * of its stored width, per ledger.md §1's "always full below lg". `topN`/`title` are applied
+ * wrap-height card whose detail rows collapse behind a labelled expander (see
+ * [LedgerDisclosure.kt][PanelDisclosure] for why this diverges from ledger.md §1's fixed-400px
+ * internally-scrolling card); at a `lg`+ window width (>= 840dp, [LG_BREAKPOINT]) cards pack
+ * into a 12-column grid by `width` span (sm/md/lg/full = 4/6/8/12, see [spanOf12]); below that,
+ * every card is full-width regardless of its stored width, per ledger.md §1's "always full
+ * below lg". `topN`/`title` are applied
  * to a widget's rendered output as a post-hoc take(n)/header-override; `timeRange`/`scope` are
  * consumed further upstream, in [LedgerRepository.observeLedgerBoards]'s per-widget-instance
  * aggregation — each widget in [LedgerUiState.boards] is keyed by its own
@@ -165,8 +171,26 @@ class LedgerViewModel(
     private val editModeFlow = MutableStateFlow(false)
     val editMode: StateFlow<Boolean> = editModeFlow
 
+    /**
+     * Which widgets have their detail rows expanded, by [LedgerWidgetConfig.id]. Held here
+     * rather than in the card's own composition because `MainActivity` swaps tab content with a
+     * plain `when (tab)`, so every card is disposed the moment you leave the Ledger and would
+     * otherwise collapse behind your back. This ViewModel is activity-scoped, so expansions
+     * survive tab switches and rotation; they're deliberately *not* persisted to DataStore —
+     * "which panels did I have open" is a transient reading position, not a layout preference
+     * worth restoring days later.
+     */
+    private val expandedWidgetsFlow = MutableStateFlow<Set<String>>(emptySet())
+    val expandedWidgets: StateFlow<Set<String>> = expandedWidgetsFlow
+
     fun setEditMode(enabled: Boolean) {
         editModeFlow.value = enabled
+    }
+
+    fun toggleExpanded(widgetId: String) {
+        expandedWidgetsFlow.value = expandedWidgetsFlow.value.let { current ->
+            if (widgetId in current) current - widgetId else current + widgetId
+        }
     }
 
     fun updateLayout(widgets: List<LedgerWidgetConfig>) {
@@ -185,11 +209,14 @@ fun LedgerRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val layout by viewModel.layout.collectAsStateWithLifecycle()
     val editMode by viewModel.editMode.collectAsStateWithLifecycle()
+    val expandedWidgets by viewModel.expandedWidgets.collectAsStateWithLifecycle()
     LedgerScreen(
         uiState = uiState,
         layout = layout,
         editMode = editMode,
+        expandedWidgets = expandedWidgets,
         onToggleEditMode = { viewModel.setEditMode(!editMode) },
+        onToggleExpanded = viewModel::toggleExpanded,
         onLayoutChange = viewModel::updateLayout,
         onOpenProfile = onOpenProfile,
         profileInitial = profileInitial,
@@ -202,7 +229,9 @@ fun LedgerScreen(
     uiState: LedgerUiState?,
     layout: List<LedgerWidgetConfig>?,
     editMode: Boolean = false,
+    expandedWidgets: Set<String> = emptySet(),
     onToggleEditMode: () -> Unit = {},
+    onToggleExpanded: (String) -> Unit = {},
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
@@ -260,6 +289,8 @@ fun LedgerScreen(
                 modifier = Modifier.fillMaxSize(),
                 uiState = uiState,
                 layout = layout,
+                expandedWidgets = expandedWidgets,
+                onToggleExpanded = onToggleExpanded,
                 viewedDisplayName = viewedDisplayName,
             )
         }
@@ -270,7 +301,12 @@ fun LedgerScreen(
  *  keys `width` off. Below this, every widget card is full-width regardless of its stored
  *  `width` ("always full below lg"). */
 private val LG_BREAKPOINT = 840.dp
-private const val CARD_HEIGHT_DP = 400
+
+/** The height the edit-mode palette thumbnail *measures* its content at before scaling it down
+ *  — the old fixed card height, kept only here. Real cards wrap their content now (see
+ *  [WidgetCard]); a thumbnail still needs a fixed box to scale into, and this is a
+ *  representative amount of a panel to show in one. */
+private const val THUMBNAIL_SOURCE_HEIGHT_DP = 400
 
 private fun LedgerWidgetWidth.spanOf12(): Int = when (this) {
     LedgerWidgetWidth.SM -> 4
@@ -304,6 +340,8 @@ private fun LedgerBoardContent(
     modifier: Modifier,
     uiState: LedgerUiState,
     layout: List<LedgerWidgetConfig>,
+    expandedWidgets: Set<String>,
+    onToggleExpanded: (String) -> Unit,
     viewedDisplayName: String? = null,
 ) {
     val (stats, boards) = uiState
@@ -336,14 +374,38 @@ private fun LedgerBoardContent(
 
             if (isGrid) {
                 items(packRows(layout), key = { row -> row.joinToString("-") { it.id } }) { row ->
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        row.forEach { config -> WidgetCard(config, boards[config.id], Modifier.weight(config.width.spanOf12().toFloat())) }
+                    // Cards wrap their own content now, so a row's cards end at different
+                    // heights; aligning them to the top keeps the headings on one line rather
+                    // than forcing every card in the row to the tallest one's height, which is
+                    // what the old fixed height did for free.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        row.forEach { config ->
+                            WidgetCard(
+                                config = config,
+                                board = boards[config.id],
+                                expanded = config.id in expandedWidgets,
+                                onToggleExpanded = { onToggleExpanded(config.id) },
+                                modifier = Modifier.weight(config.width.spanOf12().toFloat()),
+                            )
+                        }
                         val usedSpan = row.sumOf { it.width.spanOf12() }
                         if (usedSpan < 12) Spacer(Modifier.weight((12 - usedSpan).toFloat()))
                     }
                 }
             } else {
-                items(layout, key = { it.id }) { config -> WidgetCard(config, boards[config.id], Modifier.fillMaxWidth()) }
+                items(layout, key = { it.id }) { config ->
+                    WidgetCard(
+                        config = config,
+                        board = boards[config.id],
+                        expanded = config.id in expandedWidgets,
+                        onToggleExpanded = { onToggleExpanded(config.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
@@ -361,85 +423,187 @@ private fun <T> List<T>.applyTopN(config: LedgerWidgetConfig): List<T> {
 
 private fun headerFor(config: LedgerWidgetConfig, default: String): String = config.settings?.title ?: default
 
-/** One widget, as a fixed [CARD_HEIGHT_DP]dp card with internally scrolling content
- *  (ledger.md §1: "Every widget renders at a fixed 400px card height... content scrolls/
- *  compresses internally"). [modifier] carries either `fillMaxWidth()` (single column) or a
- *  `weight()` (grid column span) from the caller. [board] is null for exactly one
- *  recomposition frame right after a widget is added in edit mode — [LedgerUiState.boards] is
- *  keyed off the same layout list but recomputed one flow step behind it; render nothing that
- *  frame rather than crash, it self-heals on the next emission. */
+/**
+ * One widget, as a card that wraps its own content — no fixed height and, crucially, no
+ * internal scroll container. The board's `LazyColumn` is the only scroller on the tab; a
+ * widget's detail rows collapse behind [PanelDisclosure]'s labelled expander instead of being
+ * clipped into a 400dp window you had to scroll inside a scroll.
+ *
+ * [modifier] carries either `fillMaxWidth()` (single column) or a `weight()` (grid column span)
+ * from the caller. [board] is null for exactly one recomposition frame right after a widget is
+ * added in edit mode — [LedgerUiState.boards] is keyed off the same layout list but recomputed
+ * one flow step behind it; render nothing that frame rather than crash, it self-heals on the
+ * next emission.
+ */
 @Composable
-private fun WidgetCard(config: LedgerWidgetConfig, board: LedgerBoard?, modifier: Modifier) {
+private fun WidgetCard(
+    config: LedgerWidgetConfig,
+    board: LedgerBoard?,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    modifier: Modifier,
+) {
     if (board == null) return
     Card(
-        modifier = modifier.height(CARD_HEIGHT_DP.dp),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            WidgetContent(config, board)
+            WidgetContent(config, board, PanelDisclosure(expanded, onToggleExpanded))
         }
     }
 }
 
 @Composable
-private fun WidgetContent(config: LedgerWidgetConfig, board: LedgerBoard) {
+private fun ColumnScope.WidgetContent(
+    config: LedgerWidgetConfig,
+    board: LedgerBoard,
+    disclosure: PanelDisclosure,
+) {
     val title = headerFor(config, PANEL_LABELS[config.panel] ?: config.panel.raw)
     when (config.panel) {
-        LedgerWidgetId.RUNTIMES -> CategorySection(title, board.runtimeBuckets.applyTopN(config), "No movies logged yet.")
-        LedgerWidgetId.NETWORKS -> CategorySection(title, board.networks.applyTopN(config), "No TV series logged yet.")
-        LedgerWidgetId.DECADES -> DecadesPanel(title, board.decades.applyTopN(config))
+        LedgerWidgetId.RUNTIMES -> CategorySection(
+            title, "How your films split across the running-time brackets",
+            board.runtimeBuckets.applyTopN(config), "No movies logged yet.", disclosure, "brackets",
+        )
+        LedgerWidgetId.NETWORKS -> CategorySection(
+            title, "Who broadcast the series in your library",
+            board.networks.applyTopN(config), "No TV series logged yet.", disclosure, "networks",
+        )
+        LedgerWidgetId.DECADES -> DecadesPanel(title, board.decades.applyTopN(config), disclosure)
         LedgerWidgetId.ATTRACTIONS ->
-            AttractionsPanel(title, board.watchlist.applyTopN(config), board.watchlistMovieMinutesOwed)
+            AttractionsPanel(title, board.watchlist.applyTopN(config), board.watchlistMovieMinutesOwed, disclosure)
         LedgerWidgetId.ACTIVITY -> {
-            SectionHeader(title)
-            if (board.weeklyActivity.any { it.count > 0 }) {
+            PanelHeading(title, "Every screening of the last year, a cell per day")
+            val weeks = board.weeklyActivity.filter { it.count > 0 }.applyTopN(config)
+            if (weeks.isNotEmpty()) {
                 DailyHeatmapGrid(values = board.dailyActivity)
-                board.weeklyActivity.filter { it.count > 0 }.applyTopN(config).forEach {
-                    CategoryRow(LedgerCategoryCount("Week of ${it.weekLabel}", it.count))
+                val busiestWeek = weeks.maxOf { it.count }
+                DisclosedList(weeks, disclosure, "weeks") { week ->
+                    CategoryRow(
+                        LedgerCategoryCount("Week of ${week.weekLabel}", week.count),
+                        fractionOf(week.count, busiestWeek),
+                    )
                 }
-            } else EmptyRow("No dated viewings logged yet.")
+            } else PanelEmpty("No dated viewings logged yet.")
         }
         LedgerWidgetId.ENCORES -> {
-            SectionHeader(title)
+            PanelHeading(title, "The titles you've gone back to more than once")
             val entries = board.encores.applyTopN(config)
-            if (entries.isEmpty()) EmptyRow("No title has been watched more than once yet.")
-            else entries.forEach { EncoreRow(it) }
+            if (entries.isEmpty()) {
+                PanelEmpty("No title has been watched more than once yet.")
+            } else {
+                val peak = entries.maxOf { it.viewingCount }
+                DisclosedList(entries, disclosure, "titles", previewCount = ENCORE_PREVIEW_ROWS) {
+                    EncoreRow(it, fractionOf(it.viewingCount, peak))
+                }
+            }
         }
         LedgerWidgetId.RUN -> {
-            SectionHeader(title)
-            if (board.monthlyRun.any { it.count > 0 }) {
-                BarChartCanvas(data = board.monthlyRun.map { ChartDatum(it.monthLabel, it.count.toFloat()) })
+            PanelHeading(title, "Screenings month by month across the window")
+            val months = board.monthlyRun.applyTopN(config)
+            val screenings = months.sumOf { it.count }
+            if (months.isEmpty() || screenings == 0) {
+                PanelEmpty("No dated viewings in this window.")
+            } else {
+                // A bare run of columns can't be read: nothing says which month is which, and
+                // nothing says what the tallest one is worth. Every other trend panel in this
+                // feature anchors its chart with real text underneath, so this one does too —
+                // the ends name the window, and the peak figure is the scale that makes every
+                // other bar's height mean something.
+                val peakIndex = months.indices.maxBy { months[it].count }
+                val peak = months[peakIndex]
+                Text(
+                    "%d screenings across %d months — %s was the busiest at %d, against %.1f a month.".format(
+                        screenings,
+                        months.size,
+                        peak.monthLabel,
+                        peak.count,
+                        screenings.toDouble() / months.size,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BarChartCanvas(
+                    data = months.map { ChartDatum(it.monthLabel, it.count.toFloat()) },
+                    highlightIndex = peakIndex,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().clearAndSetSemantics {},
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Overline(months.first().monthLabel)
+                    Overline("peak ${peak.count}")
+                    Overline(months.last().monthLabel)
+                }
+                DisclosedList(months, disclosure, "months") {
+                    CategoryRow(LedgerCategoryCount(it.monthLabel, it.count), fractionOf(it.count, peak.count))
+                }
             }
-            board.monthlyRun.applyTopN(config).forEach { CategoryRow(LedgerCategoryCount(it.monthLabel, it.count)) }
         }
         LedgerWidgetId.RATINGS -> RatingsPanel(title, board.ratingBuckets.applyTopN(config))
-        LedgerWidgetId.GENRES -> GenresPanel(title, board.genres.applyTopN(config))
-        LedgerWidgetId.AUTEURS -> CategorySection(title, board.auteurs.applyTopN(config), "No director data logged yet.")
-        LedgerWidgetId.ENSEMBLE -> EnsemblePanel(title, board.ensemble.applyTopN(config))
-        LedgerWidgetId.VERDICTS -> VerdictsPanel(title, board.verdicts.applyTopN(config))
-        LedgerWidgetId.LANGUAGES -> CategorySection(title, board.languages.applyTopN(config), "No non-English titles logged yet.")
-        LedgerWidgetId.WEEKDAYS -> WeekdaysPanel(title, board.weekdays)
-        LedgerWidgetId.STREAKS -> MarathonPanel(title, board.streaks)
-        LedgerWidgetId.TRAJECTORY -> TrajectoryPanel(title, board.trajectory.applyTopN(config))
-        LedgerWidgetId.REVIVALS -> RevivalsPanel(title, board.revivals.applyTopN(config))
-        LedgerWidgetId.TIMEWARP -> CategorySection(title, board.timewarp.applyTopN(config), "No dated titles logged yet.")
-        LedgerWidgetId.PROGRESS -> ProgressPanel(title, board.stillRolling.applyTopN(config))
-        LedgerWidgetId.MOVIEGOING -> MoviegoingPanel(title, board.moviegoing)
+        LedgerWidgetId.GENRES -> GenresPanel(title, board.genres.applyTopN(config), disclosure)
+        LedgerWidgetId.AUTEURS -> CategorySection(
+            title, "The directors who turn up most across your library",
+            board.auteurs.applyTopN(config), "No director data logged yet.", disclosure, "directors",
+        )
+        LedgerWidgetId.ENSEMBLE -> EnsemblePanel(title, board.ensemble.applyTopN(config), disclosure)
+        LedgerWidgetId.VERDICTS -> VerdictsPanel(title, board.verdicts.applyTopN(config), disclosure)
+        LedgerWidgetId.LANGUAGES -> CategorySection(
+            title, "The languages your library was originally made in",
+            board.languages.applyTopN(config), "No non-English titles logged yet.", disclosure, "languages",
+        )
+        LedgerWidgetId.WEEKDAYS -> WeekdaysPanel(title, board.weekdays, disclosure)
+        LedgerWidgetId.STREAKS -> MarathonPanel(title, board.streaks, disclosure)
+        LedgerWidgetId.TRAJECTORY -> TrajectoryPanel(title, board.trajectory.applyTopN(config), disclosure)
+        LedgerWidgetId.REVIVALS -> RevivalsPanel(title, board.revivals.applyTopN(config), disclosure)
+        LedgerWidgetId.TIMEWARP -> CategorySection(
+            title, "How old a title was by the time you got to it",
+            board.timewarp.applyTopN(config), "No dated titles logged yet.", disclosure, "brackets",
+        )
+        LedgerWidgetId.PROGRESS -> ProgressPanel(title, board.stillRolling.applyTopN(config), disclosure)
+        LedgerWidgetId.MOVIEGOING -> MoviegoingPanel(title, board.moviegoing, disclosure)
     }
 }
 
+/** How many rows a plain tally panel keeps above its expander. Four is enough to establish the
+ *  shape of a ranking (leader, runner-up, and that there's a tail) without the card growing
+ *  past a glance. */
+private const val CATEGORY_PREVIEW_ROWS = 4
+private const val ENCORE_PREVIEW_ROWS = 4
+
+/**
+ * The panels that are a bare tally — no chart of their own, just labels and counts. They carry
+ * the same [PanelHeading] chrome as every purpose-built panel (a collapsed card has to say what
+ * it is without its detail), and each row draws its own count as a proportion of the leader, so
+ * the four preview rows read as a distribution rather than as four loose numbers.
+ */
 @Composable
-private fun CategorySection(title: String, entries: List<LedgerCategoryCount>, emptyMessage: String) {
-    SectionHeader(title)
-    if (entries.isEmpty()) EmptyRow(emptyMessage) else entries.forEach { CategoryRow(it) }
+private fun ColumnScope.CategorySection(
+    title: String,
+    subtitle: String,
+    entries: List<LedgerCategoryCount>,
+    emptyMessage: String,
+    disclosure: PanelDisclosure,
+    noun: String,
+) {
+    PanelHeading(title, subtitle)
+    if (entries.isEmpty()) {
+        PanelEmpty(emptyMessage)
+        return
+    }
+    val peak = entries.maxOf { it.count }
+    DisclosedList(entries, disclosure, noun, previewCount = CATEGORY_PREVIEW_ROWS) {
+        CategoryRow(it, fractionOf(it.count, peak))
+    }
 }
+
+private fun fractionOf(count: Int, peak: Int): Float =
+    if (peak <= 0) 0f else (count.toFloat() / peak).coerceIn(0f, 1f)
 
 /** Fallback row height (dp) used to convert a reorder drag's accumulated pixel offset into
  *  "how many rows has this crossed" — an approximation (real [EditableWidgetRow]s vary a bit
@@ -859,15 +1023,16 @@ private fun PaletteRow(
 private fun WidgetPreviewThumbnail(config: LedgerWidgetConfig, board: LedgerBoard, modifier: Modifier = Modifier) {
     val scale = 0.28f
     val thumbWidth = 84.dp
-    val thumbHeight = (CARD_HEIGHT_DP * scale).dp
+    val thumbHeight = (THUMBNAIL_SOURCE_HEIGHT_DP * scale).dp
     val fullWidth = thumbWidth / scale
     Layout(
         content = {
             Column(
-                modifier = Modifier.width(fullWidth).height(CARD_HEIGHT_DP.dp).padding(10.dp),
+                modifier = Modifier.width(fullWidth).height(THUMBNAIL_SOURCE_HEIGHT_DP.dp).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                WidgetContent(config, board)
+                // Summary only, no expander: a thumbnail is a non-interactive scaled render.
+                WidgetContent(config, board, PanelDisclosure.Preview)
             }
         },
         modifier = modifier
@@ -876,7 +1041,7 @@ private fun WidgetPreviewThumbnail(config: LedgerWidgetConfig, board: LedgerBoar
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) { measurables, _ ->
-        val fullConstraints = Constraints(maxWidth = fullWidth.roundToPx(), maxHeight = CARD_HEIGHT_DP.dp.roundToPx())
+        val fullConstraints = Constraints(maxWidth = fullWidth.roundToPx(), maxHeight = THUMBNAIL_SOURCE_HEIGHT_DP.dp.roundToPx())
         val placeable = measurables.first().measure(fullConstraints)
         layout(thumbWidth.roundToPx(), thumbHeight.roundToPx()) {
             placeable.placeWithLayer(0, 0) {
@@ -1003,25 +1168,54 @@ private fun SectionHeader(title: String) {
     Text(title, style = MaterialTheme.typography.titleMedium)
 }
 
+/** A tally row with its own share of the leader drawn behind it. Painted with [drawBehind]
+ *  rather than as a sibling bar so the row stays one line tall — a chart-less panel needs the
+ *  encoding, but not at the cost of doubling every row's height. */
 @Composable
-private fun EmptyRow(message: String) {
-    Text(message, style = MaterialTheme.typography.bodyMedium)
-}
-
-@Composable
-private fun CategoryRow(category: LedgerCategoryCount) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(category.label, style = MaterialTheme.typography.bodyMedium)
-        Text(category.count.toString(), style = MaterialTheme.typography.bodyMedium)
+private fun TallyRow(label: String, value: String, fraction: Float, description: String) {
+    val fill = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .drawBehind {
+                if (fraction > 0f) drawRect(color = fill, size = Size(size.width * fraction, size.height))
+            }
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+            .clearAndSetSemantics { contentDescription = description },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
+        )
+        MonoFigure(value, style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
-private fun EncoreRow(entry: LedgerEncoreEntry) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("${entry.title}${entry.year?.let { " ($it)" } ?: ""}", style = MaterialTheme.typography.bodyMedium)
-        Text("${entry.viewingCount}×", style = MaterialTheme.typography.bodyMedium)
-    }
+private fun CategoryRow(category: LedgerCategoryCount, fraction: Float) {
+    TallyRow(
+        label = category.label,
+        value = category.count.toString(),
+        fraction = fraction,
+        description = "${category.label}: ${category.count}",
+    )
+}
+
+@Composable
+private fun EncoreRow(entry: LedgerEncoreEntry, fraction: Float) {
+    val label = "${entry.title}${entry.year?.let { " ($it)" } ?: ""}"
+    TallyRow(
+        label = label,
+        value = "${entry.viewingCount}×",
+        fraction = fraction,
+        description = "$label, watched ${entry.viewingCount} times",
+    )
 }
 
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -78,8 +79,10 @@ import kotlin.math.roundToInt
  * [LedgerEraPanels.kt][DecadesPanel] (By the Era, Shifting Standards) — split off only for
  * file length.
  *
- * All of them render inside `LedgerScreen`'s fixed-height, internally scrolling widget card
- * and are also what the edit-mode palette thumbnail scales down, so they stay legible at 0.28×.
+ * All of them render inside `LedgerScreen`'s wrap-height widget card and are also what the
+ * edit-mode palette thumbnail scales down, so they stay legible at 0.28×. Each splits itself
+ * into a permanently-visible summary (heading, insight, visual) and a
+ * [LedgerDisclosure.kt][PanelDisclosure]-gated detail block — see that file for why.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -166,9 +169,20 @@ private const val VERDICT_SCALE_MAX = 10f
  *
  * Every row is one merged accessibility node carrying both raw scores and the direction of
  * the gap, since the dumbbell canvas itself is decorative.
+ *
+ * A dumbbell row is three stacked elements tall, so only the [VERDICT_PREVIEW_ROWS] widest
+ * disagreements stay up front — which is no loss, because the rows arrive sorted by |delta| and
+ * those *are* the widget's claim. The rest, where you and IMDb broadly agree, sit behind the
+ * expander.
  */
+private const val VERDICT_PREVIEW_ROWS = 2
+
 @Composable
-internal fun VerdictsPanel(title: String, entries: List<LedgerVerdictEntry>) {
+internal fun ColumnScope.VerdictsPanel(
+    title: String,
+    entries: List<LedgerVerdictEntry>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Your score against IMDb's, on one 0–10 scale")
     if (entries.isEmpty()) {
         PanelEmpty("No title carries both your rating and an IMDb score yet.")
@@ -200,7 +214,9 @@ internal fun VerdictsPanel(title: String, entries: List<LedgerVerdictEntry>) {
     }
 
     ScaleRule()
-    entries.forEach { VerdictDumbbellRow(it) }
+    DisclosedList(entries, disclosure, "comparisons", previewCount = VERDICT_PREVIEW_ROWS, spacing = 0.dp) {
+        VerdictDumbbellRow(it)
+    }
 }
 
 @Composable
@@ -332,7 +348,11 @@ private fun DeltaChip(delta: Double, accent: Color) {
  * last frame, since a streak stays current while yesterday had activity (ledger.md §2).
  */
 @Composable
-internal fun MarathonPanel(title: String, streaks: LedgerStreaks) {
+internal fun ColumnScope.MarathonPanel(
+    title: String,
+    streaks: LedgerStreaks,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Nights in a row with a screening or an episode logged")
 
     val nights = streaks.last30Nights
@@ -390,12 +410,16 @@ internal fun MarathonPanel(title: String, streaks: LedgerStreaks) {
     }
 
     if (streaks.recentActiveDates.isNotEmpty()) {
-        Text(
-            "Latest screening nights",
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        RecentNightsGrid(streaks.recentActiveDates)
+        // The filmstrip above already shows *where* the recent nights fall; this names them,
+        // which is detail rather than summary.
+        PanelDetail(disclosure, "Show the latest screening nights") {
+            Text(
+                "Latest screening nights",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            RecentNightsGrid(streaks.recentActiveDates)
+        }
     } else {
         PanelEmpty("Nothing logged with a date yet — a streak starts on the first dated night.")
     }
@@ -545,7 +569,11 @@ private const val YEAR_BAR_LIMIT = 8
  * has no shared-viewer mode yet, so both always render.
  */
 @Composable
-internal fun MoviegoingPanel(title: String, stats: LedgerMoviegoingStats) {
+internal fun ColumnScope.MoviegoingPanel(
+    title: String,
+    stats: LedgerMoviegoingStats,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Trips out to an actual cinema, off the ticket")
 
     val theatre = stats.venues.firstOrNull()?.label ?: "No venue on record"
@@ -613,9 +641,18 @@ internal fun MoviegoingPanel(title: String, stats: LedgerMoviegoingStats) {
         },
     )
 
-    FacetLedger("Venues", stats.venues)
-    FacetLedger("In good company", stats.companions)
-    FacetLedger("Formats", stats.formats)
+    // The ticket already prints the leading venue, companion and format; these are the full
+    // tallies behind those three headline fields.
+    val facets = listOf(
+        "Venues" to stats.venues,
+        "In good company" to stats.companions,
+        "Formats" to stats.formats,
+    ).filter { (_, entries) -> entries.isNotEmpty() }
+    if (facets.isNotEmpty()) {
+        PanelDetail(disclosure, "Show every venue, companion and format") {
+            facets.forEach { (heading, entries) -> FacetLedger(heading, entries) }
+        }
+    }
 }
 
 @Composable
@@ -739,7 +776,11 @@ private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) {
  * and each day's share, which is what the plot deliberately doesn't encode.
  */
 @Composable
-internal fun WeekdaysPanel(title: String, weekdays: List<LedgerWeekdayCount>) {
+internal fun ColumnScope.WeekdaysPanel(
+    title: String,
+    weekdays: List<LedgerWeekdayCount>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Which nights of the week you actually watch")
     val total = weekdays.sumOf { it.count }
     if (total == 0) {
@@ -767,7 +808,8 @@ internal fun WeekdaysPanel(title: String, weekdays: List<LedgerWeekdayCount>) {
         modifier = Modifier.padding(top = 4.dp),
     )
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // The dial gives the shape; these give the seven exact counts and shares it doesn't.
+    PanelDetail(disclosure, "Show all seven nights", spacing = 2.dp) {
         weekdays.forEachIndexed { index, entry ->
             val share = entry.count * 100.0 / total
             Row(
@@ -811,7 +853,11 @@ internal fun WeekdaysPanel(title: String, weekdays: List<LedgerWeekdayCount>) {
  * widget's effective `topN` by the caller.
  */
 @Composable
-internal fun GenresPanel(title: String, entries: List<LedgerCategoryCount>) {
+internal fun ColumnScope.GenresPanel(
+    title: String,
+    entries: List<LedgerCategoryCount>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Your library's shape, by how often each genre is tagged")
     if (entries.isEmpty()) {
         PanelEmpty("No genres logged yet.")
@@ -836,7 +882,8 @@ internal fun GenresPanel(title: String, entries: List<LedgerCategoryCount>) {
         modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
     )
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // The bubbles deliberately don't give a precise read; the ranking does.
+    PanelDetail(disclosure, "Show the ranked ${entries.size} genres", spacing = 2.dp) {
         entries.forEachIndexed { index, entry ->
             Row(
                 modifier = Modifier.fillMaxWidth(),

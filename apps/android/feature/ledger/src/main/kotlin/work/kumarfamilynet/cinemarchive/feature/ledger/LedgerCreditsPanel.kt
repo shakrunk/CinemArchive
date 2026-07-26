@@ -1,9 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.ledger
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,7 +37,11 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
  * (ledger.md §2).
  */
 @Composable
-internal fun EnsemblePanel(title: String, entries: List<LedgerCategoryCount>) {
+internal fun ColumnScope.EnsemblePanel(
+    title: String,
+    entries: List<LedgerCategoryCount>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "The faces that turn up most across your library")
     if (entries.isEmpty()) {
         PanelEmpty("No cast data logged yet.")
@@ -74,18 +78,17 @@ internal fun EnsemblePanel(title: String, entries: List<LedgerCategoryCount>) {
     val supporting = entries.drop(1)
     if (supporting.isEmpty()) return
 
-    Box(
-        modifier = Modifier
-            .padding(top = 16.dp, bottom = 12.dp)
-            .width(46.dp)
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant),
-    )
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
+    // Top billing is the summary; the supporting cast is the billing block's small print, and
+    // reads as such whether it's showing or not.
+    PanelDetail(disclosure, "Show the supporting ${supporting.size}", spacing = 9.dp) {
+        Box(
+            modifier = Modifier
+                .padding(top = 16.dp, bottom = 12.dp)
+                .width(46.dp)
+                .height(1.dp)
+                .align(Alignment.CenterHorizontally)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
         supporting.forEach { entry ->
             Text(
                 "${entry.label.uppercase()}   ${entry.count}",
@@ -94,9 +97,11 @@ internal fun EnsemblePanel(title: String, entries: List<LedgerCategoryCount>) {
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clearAndSetSemantics {
-                    contentDescription = "${entry.label}, in ${entry.count} titles"
-                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clearAndSetSemantics {
+                        contentDescription = "${entry.label}, in ${entry.count} titles"
+                    },
             )
         }
     }

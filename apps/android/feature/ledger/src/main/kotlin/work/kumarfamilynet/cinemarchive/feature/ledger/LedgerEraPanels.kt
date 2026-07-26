@@ -2,6 +2,7 @@ package work.kumarfamilynet.cinemarchive.feature.ledger
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,7 +49,11 @@ private const val DECADE_STEP = 10
  * the list.
  */
 @Composable
-internal fun DecadesPanel(title: String, decades: List<LedgerCategoryCount>) {
+internal fun ColumnScope.DecadesPanel(
+    title: String,
+    decades: List<LedgerCategoryCount>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Which eras your library actually draws from")
     if (decades.isEmpty()) {
         PanelEmpty("No dated titles logged yet.")
@@ -87,10 +92,7 @@ internal fun DecadesPanel(title: String, decades: List<LedgerCategoryCount>) {
         modifier = Modifier.padding(top = 4.dp),
     )
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
+    PanelDetail(disclosure, "Show all ${filled.size} decades") {
         filled.forEach { entry ->
             val share = if (total > 0) entry.count * 100.0 / total else 0.0
             val description = "%s: %d %s, %d%%".format(
@@ -164,7 +166,11 @@ private fun gapFilledDecades(decades: List<LedgerCategoryCount>): List<LedgerCat
  * first dated viewing (ledger.md §2).
  */
 @Composable
-internal fun TrajectoryPanel(title: String, quarters: List<LedgerQuarterRating>) {
+internal fun ColumnScope.TrajectoryPanel(
+    title: String,
+    quarters: List<LedgerQuarterRating>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Whether you've been scoring harder or softer than usual")
     if (quarters.isEmpty()) {
         PanelEmpty("No rated, dated titles yet.")
@@ -207,10 +213,7 @@ internal fun TrajectoryPanel(title: String, quarters: List<LedgerQuarterRating>)
         Overline(quarters.last().quarterLabel)
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
+    PanelDetail(disclosure, "Show all ${quarters.size} quarters") {
         quarters.forEach { quarter ->
             val delta = quarter.averageRating - allTimeAverage
             val description = "%s: averaged %.1f stars across %d %s, %s".format(

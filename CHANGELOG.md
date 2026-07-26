@@ -9,6 +9,21 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Native Android app (in development, not yet distributed): **the Ledger no longer scrolls
+  inside itself.** Every widget was a fixed-height box with its own scrollbar sitting inside the
+  page's scrollbar, so reading one panel meant scrolling within it, and getting to the next one
+  meant scrolling past it — two scrolls fighting over the same drag, with each widget showing
+  about a third of what it had to say. Cards now size to their content, and the row-by-row
+  detail underneath each visual collapses behind a button that says what it's hiding ("Show 8
+  more decades"). What a widget is *telling* you — its heading, its one-line explanation, its
+  headline figure and its chart — is always on screen. The result is one scroll for the whole
+  tab, twenty widgets you can take in at a glance, and full width and height for the detail once
+  you open it. Panels that were previously a bare list of labels and counts (Feature Lengths, On
+  the Air, The Auteurs, In Translation, The Revival House) also gained the same subtitle and
+  proportion bars the rest of the board already had.
+
 ## [1.18.0] - 2026-07-25
 
 ### Added

@@ -35,6 +35,7 @@ import { insertTitleToDb, insertOutingToDb } from 'src/lib/db'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
+import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
@@ -441,9 +442,10 @@ function SecuritySection() {
 // ─── Appearance ───────────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { theme, setTheme, unlockedThemes, titles } = useAppStore(
+  const { theme, themeMode, setTheme, unlockedThemes, titles } = useAppStore(
     useShallow((s) => ({
       theme: s.theme,
+      themeMode: s.themeMode,
       setTheme: s.setTheme,
       unlockedThemes: s.unlockedThemes,
       titles: s.titles,
@@ -491,8 +493,15 @@ function AppearanceSection() {
       id="appearance"
       title="Appearance"
       Icon={Sun}
-      description="Pick a house style. You can also flip dark/light any time with the T key or the toggle in the top bar. A couple of styles are secret — find them by watching the right films the right way."
+      description="Pick a house style, or leave it on System to follow your OS automatically. The T key and the toggle in the top bar flip dark/light directly, which breaks out of System. A couple of styles are secret — find them by watching the right films the right way."
     >
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <span className="font-sans text-xs text-muted-foreground">
+          {themeMode === 'system' ? `Following your device (currently ${theme}).` : 'Quick toggle'}
+        </span>
+        <ThemeModeToggle />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
         {visibleOptions.map(({ value, label, hint, Icon, lockedHint }) => {
           const locked = !unlockedThemes.includes(value)

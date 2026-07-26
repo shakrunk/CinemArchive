@@ -19,7 +19,7 @@ import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
 import { useOutingReconciler } from 'src/lib/useOutingReconciler'
-import { applyTheme, toggleTheme } from 'src/lib/theme'
+import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
 import { AppCommandPalette } from 'src/components/AppCommandPalette'
 import { KeyboardShortcutsHelp } from 'src/components/KeyboardShortcutsHelp'
 import { NotificationStack } from 'src/components/NotificationStack'
@@ -95,8 +95,10 @@ export default function App() {
 
   // Re-sync <html data-theme> with the rehydrated store. The inline FOUC script
   // in index.html sets it before paint; this covers any post-rehydration drift.
+  // Also starts live OS scheme tracking for a persisted 'system' theme mode.
   useEffect(() => {
     applyTheme(useAppStore.getState().theme)
+    watchSystemTheme()
   }, [])
 
   // ⌘K / Ctrl+K toggles the palette from anywhere.

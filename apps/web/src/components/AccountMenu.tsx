@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
-import { User, Users, Sun, Moon, LogOut } from 'lucide-react'
+import { User, Users, LogOut } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import { signOut } from 'src/lib/auth'
-import { toggleTheme } from 'src/lib/theme'
 import { useClickOutside } from 'src/lib/useClickOutside'
+import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
 import type { AppView } from 'src/lib/navigation'
 
 interface AccountMenuProps {
@@ -13,7 +13,6 @@ interface AccountMenuProps {
 }
 
 export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
-  const theme = useAppStore((s) => s.theme)
   const setUser = useAppStore((s) => s.setUser)
 
   const [open, setOpen] = useState(false)
@@ -59,17 +58,12 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
           className="absolute right-0 mt-2 w-52 rounded-xl overflow-hidden z-[220] shadow-xl py-1"
           style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
         >
-          <button
-            role="menuitem"
-            onClick={(e) => {
-              setOpen(false)
-              toggleTheme({ clientX: e.clientX, clientY: e.clientY })
-            }}
-            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] text-paper-dim hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          </button>
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+            <span className="font-sans text-[13px] text-paper-dim whitespace-nowrap">Theme</span>
+            <ThemeModeToggle size="compact" />
+          </div>
+
+          <div className="h-px my-1" style={{ background: 'var(--line)' }} />
 
           <button
             role="menuitem"

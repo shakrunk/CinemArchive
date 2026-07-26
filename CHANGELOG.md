@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-07-26
+
 ### Added
 
 - Web: a persistent "System" theme mode that keeps following your OS's light/dark preference

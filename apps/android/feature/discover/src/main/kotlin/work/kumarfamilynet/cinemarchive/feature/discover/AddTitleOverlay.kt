@@ -63,17 +63,26 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
  *
  * [onAdded] receives the new local title id — the caller opens its detail screen, so the add
  * ends on the thing that was just created rather than back where it started.
+ *
+ * [openKey] must be distinct per *opening* of the overlay. `viewModel()` is scoped to the
+ * Activity's ViewModelStore and keyed by composition position, so without it a second add
+ * reuses the first one's ViewModel: reopening from the FAB would land on the previously added
+ * title's log step instead of an empty search box, and an add opened from a Discover tap would
+ * keep showing that title on every subsequent open. Keying per opening also keeps the form
+ * surviving a configuration change *within* one add, which resetting state on entry would not.
  */
 @Composable
 fun AddTitleOverlayRoute(
     discoverRepository: DiscoverRepository,
     libraryRepository: LibraryRepository,
+    openKey: String,
     onClose: () -> Unit,
     onAdded: (String) -> Unit,
     onOpenTitle: (String) -> Unit,
     preselected: MediaSearchResult? = null,
 ) {
     val viewModel: AddTitleViewModel = viewModel(
+        key = openKey,
         factory = AddTitleViewModelFactory(discoverRepository, libraryRepository, preselected),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()

@@ -249,8 +249,13 @@ private sealed interface Overlay {
     data class Detail(val titleId: String) : Overlay
 
     /** [preselected] is set when the add was started from a specific Discover result rather
-     *  than the FAB, so the overlay opens on its log step instead of an empty search box. */
-    data class Add(val preselected: MediaSearchResult? = null) : Overlay
+     *  than the FAB, so the overlay opens on its log step instead of an empty search box.
+     *  [openKey] is generated per opening and scopes the overlay's ViewModel to *this* add —
+     *  see AddTitleOverlayRoute's kdoc for what it reuses otherwise. */
+    data class Add(
+        val preselected: MediaSearchResult? = null,
+        val openKey: String = java.util.UUID.randomUUID().toString(),
+    ) : Overlay
     data object Profile : Overlay
     data object Appearance : Overlay
     data object About : Overlay
@@ -483,6 +488,7 @@ private fun CinemArchiveApp(
             is Overlay.Add -> AddTitleOverlayRoute(
                 discoverRepository,
                 repository,
+                openKey = current.openKey,
                 onClose = closeOverlay,
                 // Land on what was just created rather than back where the add started — the
                 // title detail screen is where every follow-up action (rate, log a viewing,

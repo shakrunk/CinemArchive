@@ -35,6 +35,16 @@ interface LedgerWidgetSettings {
 Every widget renders at a fixed 400px card height regardless of `width` — only width
 varies; content scrolls/compresses internally. Missing `settings` keys fall back to a
 per-panel default; a panel ignores any settings key not in its own allowlist.
+
+> **Android deliberately diverges on the card height.** On a phone the fixed-height rule puts a
+> scroll container inside the board's own scroll container — two nested vertical scrollers, with
+> each widget showing roughly a third of what it has to say. Android instead renders every card
+> at its natural height and collapses each panel's *detail rows* behind a labelled expander
+> ("Show 8 more decades"), keeping heading, subtitle, insight sentence and visual permanently
+> visible. This is a presentation-only divergence: it changes no `LedgerWidget` field, no
+> aggregation, and no persisted layout, so a board authored on either platform still round-trips
+> unchanged. `width`, `topN`, `timeRange`, `scope` and `title` all behave exactly as above. See
+> `feature/ledger/.../LedgerDisclosure.kt` for the rationale.
 `normalizeLedgerWidgets(raw)` is the sanitizer run on both localStorage rehydrate and DB
 fetch — drops unknown `panel` values, backfills missing/invalid `width`, keeps only
 well-typed settings keys, re-clamps `topN`/`title`. **Android's own layout parser must apply

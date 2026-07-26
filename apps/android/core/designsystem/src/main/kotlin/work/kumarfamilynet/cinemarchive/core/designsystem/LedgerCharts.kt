@@ -32,12 +32,28 @@ data class ChartDatum(val label: String, val value: Float)
  * accessible alternative... rather than mirroring the web app's current tooltip-only
  * fallback"). [clearAndSetSemantics] with no properties makes TalkBack skip straight past
  * the canvas to that list instead of announcing an empty, data-free node.
+ *
+ * Bars are drawn against a **baseline rule** and each one over a faint full-height track, so a
+ * zero-value bucket reads as a deliberate gap in a known series rather than as blank canvas —
+ * without those two cues a run of bare columns gives no sense of where the floor is or how many
+ * buckets there even are. [highlightIndex] picks out one bar (conventionally the peak) in
+ * [highlightColor], matching the `highlightIndex` contract [EraSpine] and [RadialSpokePlot]
+ * already use.
+ *
+ * The chart still encodes no scale of its own: callers are expected to anchor it with real text
+ * — first/last bucket labels and the peak value — exactly as `LedgerScreen`'s The Run panel
+ * does. Bar heights are relative to the largest value, so that peak figure is what makes every
+ * other bar readable.
  */
 @Composable
 fun BarChartCanvas(
     data: List<ChartDatum>,
     modifier: Modifier = Modifier,
     barColor: Color = MaterialTheme.colorScheme.primary,
+    highlightIndex: Int? = null,
+    highlightColor: Color = MaterialTheme.colorScheme.tertiary,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    baselineColor: Color = MaterialTheme.colorScheme.outlineVariant,
 ) {
     if (data.isEmpty()) return
     val maxValue = data.maxOf { it.value }.coerceAtLeast(1f)
@@ -49,14 +65,31 @@ fun BarChartCanvas(
     ) {
         val barWidth = size.width / data.size
         val gap = barWidth * 0.2f
+        val baselineStroke = 1.dp.toPx()
+        val plotHeight = size.height - baselineStroke
         data.forEachIndexed { index, datum ->
-            val barHeight = size.height * (datum.value / maxValue)
+            val left = index * barWidth + gap / 2
+            val width = barWidth - gap
             drawRect(
-                color = barColor,
-                topLeft = Offset(index * barWidth + gap / 2, size.height - barHeight),
-                size = Size(barWidth - gap, barHeight),
+                color = trackColor,
+                topLeft = Offset(left, 0f),
+                size = Size(width, plotHeight),
             )
+            val barHeight = plotHeight * (datum.value / maxValue)
+            if (barHeight > 0f) {
+                drawRect(
+                    color = if (index == highlightIndex) highlightColor else barColor,
+                    topLeft = Offset(left, plotHeight - barHeight),
+                    size = Size(width, barHeight),
+                )
+            }
         }
+        drawLine(
+            color = baselineColor,
+            start = Offset(0f, plotHeight),
+            end = Offset(size.width, plotHeight),
+            strokeWidth = baselineStroke,
+        )
     }
 }
 

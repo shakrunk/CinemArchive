@@ -543,6 +543,31 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
     have no regression test — asserting them needs a real Room database (instrumented or
     Robolectric), and neither harness exists in this project yet. That is the first thing the
     screenshot/golden-test harness item in Phase 0 should bring with it.
+  - [x] **Ledger board restructured around progressive disclosure.** The board had two nested
+        vertical scrollers: `LedgerScreen`'s `LazyColumn` and, inside every card, a
+        `verticalScroll` forced on it by ledger.md §1's fixed 400px card height. Reading one
+        widget meant scrolling inside it while the board scrolled underneath, and each panel
+        showed roughly a third of its content. Cards now wrap their own content and each panel's
+        detail rows sit behind a labelled expander (`LedgerDisclosure.kt`: `PanelDisclosure`,
+        `PanelDetail`, `DisclosedList`), so the board has exactly one scroller and every card's
+        heading, subtitle, insight sentence and visual are permanently on screen.
+        - The design follows "overview first, details on demand" over the alternative of a
+          full-viewport horizontal pager, which was rejected because sequential access across 20
+          widgets is a known engagement sink, and a horizontal swipe on a bottom-nav destination
+          collides with both the system back gesture and the tab-switch idiom. It would also
+          have made the customizable `width` span meaningless.
+        - Deliberate divergence from ledger.md §1's fixed-400px rule, recorded in that contract.
+          Presentation only: no `LedgerWidget` field, aggregation, or persisted layout changes,
+          so a board still round-trips between platforms unchanged.
+        - Expansion state lives in `LedgerViewModel` (activity-scoped) rather than in each
+          card's composition, because `MainActivity` swaps tabs with a plain `when (tab)` and
+          would otherwise collapse every panel on leaving the tab. Not persisted — reading
+          position, not preference.
+        - Critical Record is the one panel with no expander: its bucket rows *are* its chart.
+        - The five bare-tally panels (Feature Lengths, On the Air, The Auteurs, In Translation,
+          The Revival House) picked up the `PanelHeading` subtitle chrome the purpose-built
+          panels already had, plus a per-row proportion bar — a collapsed card has to explain
+          itself without its detail.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.
   - [x] CI now builds a signed release APK and attaches it to the GitHub Release whenever a

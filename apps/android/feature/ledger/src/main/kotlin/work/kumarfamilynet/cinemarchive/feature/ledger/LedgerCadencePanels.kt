@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -56,7 +57,11 @@ import kotlin.math.roundToInt
  * gap-filled and chronological, default window 12 months.
  */
 @Composable
-internal fun RevivalsPanel(title: String, buckets: List<LedgerPremiereRevivalBucket>) {
+internal fun ColumnScope.RevivalsPanel(
+    title: String,
+    buckets: List<LedgerPremiereRevivalBucket>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Discovering something new, against going back for more")
     if (buckets.isEmpty()) {
         PanelEmpty("No dated viewings logged yet.")
@@ -103,10 +108,7 @@ internal fun RevivalsPanel(title: String, buckets: List<LedgerPremiereRevivalBuc
         Overline(buckets.last().monthLabel)
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
+    PanelDetail(disclosure, "Show all ${buckets.size} months") {
         buckets.forEach { bucket ->
             val description = "%s: %d first %s, %d %s".format(
                 bucket.monthLabel,
@@ -173,8 +175,14 @@ private fun SeriesKey(color: Color, label: String) {
  * (default 5), so that total covers what's on screen rather than the whole library, and it says
  * so.
  */
+private const val PROGRESS_PREVIEW_ROWS = 2
+
 @Composable
-internal fun ProgressPanel(title: String, entries: List<LedgerProgressEntry>) {
+internal fun ColumnScope.ProgressPanel(
+    title: String,
+    entries: List<LedgerProgressEntry>,
+    disclosure: PanelDisclosure,
+) {
     PanelHeading(title, "Series you're partway through, and what's left of them")
     if (entries.isEmpty()) {
         PanelEmpty("Nothing in progress — every series is either finished or unstarted.")
@@ -201,11 +209,8 @@ internal fun ProgressPanel(title: String, entries: List<LedgerProgressEntry>) {
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        entries.forEach { entry -> ProgressTrackRow(entry) }
+    DisclosedList(entries, disclosure, "series", previewCount = PROGRESS_PREVIEW_ROWS, spacing = 12.dp) { entry ->
+        ProgressTrackRow(entry)
     }
 }
 

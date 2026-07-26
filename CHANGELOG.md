@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-07-25
+
 ### Changed
 
 - Native Android app (in development, not yet distributed): **Appearance settings** — the text

@@ -9,6 +9,29 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Native Android app (in development, not yet distributed): **you can add titles from your
+  phone.** Adding was the last mock left in the app — the "Add a title" overlay searched a
+  hardcoded list of twelve films, and Add (there and on the Discover grid) only marked the
+  poster for as long as the app stayed open, so the library could be tracked from Android but
+  only *grown* from the web. It's now real end to end: a debounced TMDB search across films and
+  series, a log step for status, rating and notes, and a write that lands in the local library
+  immediately — offline included — before syncing up. A series brings its seasons and episodes
+  down with it, so it's trackable episode by episode straight away, and every title carries its
+  director, cast, genres, studios, certification and critic scores, so the Ledger's Auteurs,
+  Ensemble and Second Opinions widgets have something to count. Add on a Discover poster now
+  opens the same flow with that title already chosen, and adding something you already own is
+  refused with an offer to open the copy you have.
+
+### Fixed
+
+- Native Android app (in development, not yet distributed): rating a title, and rating or
+  annotating a viewing from the post-show sheet, never reached the server. Each of those writes
+  sends only the field it changed, and the sync layer assumed a field none of them carry, so
+  they failed on every attempt and sat in the pending queue forever — visible on the phone,
+  absent everywhere else. They now sync.
+
 ## [1.17.0] - 2026-07-25
 
 ### Changed

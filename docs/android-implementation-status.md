@@ -471,6 +471,46 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
         - Full verification gate re-run after the fix:
           `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — build successful,
           lint clean, all unit tests pass.
+- [x] Real add-to-library (2026-07-25) — the last mock in the app. `SampleCatalog.kt` (a
+      hardcoded 12-title fixture) and `DiscoverSampleStore` (process-lifetime "added" state)
+      are deleted; the FAB overlay and Discover's Add buttons now share one real two-step flow.
+  - New `core:model` catalog types (`MediaSearchResult`/`MediaDetails`/`MediaSeason`/
+    `MediaEpisode`/`MediaCredit`/`MediaCrewCredit`/`AddTitleRequest`), deliberately distinct
+    from `LibraryTitle`/`TitleDetail` — a search hit has no status, rating or history yet.
+  - `DiscoverRepository` grew `searchMedia()` and `fetchDetails()` over the `media-proxy`
+    `search`/`details`/`season`/`ratings` actions. Details is two round trips: the details call,
+    then OMDb critic scores and one `season` call per season in parallel, each degrading on its
+    own (a failed season keeps its episode *count*, so progress still works).
+  - `MediaProxyParsing.kt` holds the whole TMDB→domain mapping as pure functions, tracking
+    `apps/web/src/lib/media.ts` field for field since both clients write the same `titles` rows.
+    `MediaProxyParsingTest` (14 cases) covers the shapes that would otherwise only surface as a
+    quietly-missing column weeks later: US-certification extraction (TMDB often leaves the first
+    US entry blank), `aggregate_credits` vs `credits` for TV, cast de-duplication (`title_cast`
+    is uniquely keyed by person, so a double-billed actor would fail the whole add), the
+    `Creator`-not-`Director` crew rule for series, season-0 exclusion, and OMDb's `"N/A"`.
+  - `LibraryRepository.addTitle` writes title/seasons/episodes/cast/crew (+ a seed viewing for a
+    WATCHED add) to Room and enqueues **one** `title`/`insert` outbox entry carrying all of it —
+    one entry rather than one per table because `MutationOutbox.flush` pushes entries
+    independently in `createdAt` order, and same-millisecond entries could push a season before
+    its title existed. `SupabaseRemoteMutationWriter.insertTitle` orders the inserts itself;
+    every one is an id-keyed upsert, so a partial failure retries as a whole.
+  - Duplicates are refused up front against the local mirror of the server's
+    `unique_user_tmdb (user_id, tmdb_id, type)` constraint (`TitleDao.findIdByTmdbKey`), so the
+    duplicate case can't become a push that never succeeds. `LibraryRepositoryAddTitleTest`
+    (11 cases) covers the Room writes and the outbox payload directly — that payload is the
+    contract between the two halves of the add, and the only record of the write if the app dies
+    before flushing.
+  - Fixed alongside, in the same code path: `SupabaseRemoteMutationWriter` assumed a `status`
+    key on every `title` update and a full row on every `viewing` write, but `updateTitleRating`,
+    `rateViewing` and `updateViewingNotes` each enqueue only the field they changed. All three
+    threw on the missing key, were caught as `PushResult.Retry`, and requeued forever — the
+    writes were visible locally and absent server-side indefinitely. Both paths now send only
+    the fields present (`viewing`/`update` routes to a new `patchViewing`).
+  - Verified: `./gradlew :app:assembleDebug :app:lintDebug testDebugUnitTest` — build succeeds,
+    lint clean (58 pre-existing warnings, none in the changed files), 25 new unit tests pass.
+    **Not verified on a device** — no Android device was reachable via adb during this pass, so
+    the search/details network path and the real Supabase push have not been exercised against
+    live TMDB or a real account. That's the outstanding check for this work.
 - [ ] Phase 4 — sharing, social, notifications, and push.
 - [ ] Phase 5 — beta hardening and release operations.
   - [x] CI now builds a signed release APK and attaches it to the GitHub Release whenever a

@@ -20,12 +20,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** A labeled option in a [SegmentedGroup] / [ConnectedToggleGroup]. */
-data class ChoiceOption<T>(val value: T, val label: String)
+/**
+ * A labeled option in a [SegmentedGroup] / [ConnectedToggleGroup].
+ *
+ * [icon] and [labelFontFamily] are both optional and both only honored by [SegmentedGroup]:
+ * they exist for option sets where the label alone under-describes the choice. An [icon] gives
+ * a set like System/Light/Dark a glyph to recognise before the word is read, and
+ * [labelFontFamily] lets a font picker set each option's own label in the typeface that option
+ * would apply — showing the thing rather than naming it.
+ */
+data class ChoiceOption<T>(
+    val value: T,
+    val label: String,
+    val icon: ImageVector? = null,
+    val labelFontFamily: FontFamily? = null,
+)
 
 /**
  * M3 Expressive "standard" button group: single-select, mutually exclusive (e.g. media-type
@@ -44,6 +59,8 @@ fun <T> SegmentedGroup(
         options.forEachIndexed { index, option ->
             SegmentedGroupItem(
                 label = option.label,
+                icon = option.icon,
+                labelFontFamily = option.labelFontFamily,
                 isSelected = option.value == selected,
                 isFirst = index == 0,
                 isLast = index == options.lastIndex,
@@ -57,7 +74,15 @@ private val SegmentBigCorner = 23.dp
 private val SegmentSmallCorner = 12.dp
 
 @Composable
-private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, isFirst: Boolean, isLast: Boolean, onClick: () -> Unit) {
+private fun RowScope.SegmentedGroupItem(
+    label: String,
+    icon: ImageVector?,
+    labelFontFamily: FontFamily?,
+    isSelected: Boolean,
+    isFirst: Boolean,
+    isLast: Boolean,
+    onClick: () -> Unit,
+) {
     val weight by animateFloatAsState(
         targetValue = if (isSelected) 1.5f else 1f,
         animationSpec = expressiveSpring(),
@@ -85,16 +110,23 @@ private fun RowScope.SegmentedGroupItem(label: String, isSelected: Boolean, isFi
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (isSelected) {
+            // An option carrying its own glyph keeps it in both states rather than swapping to
+            // the checkmark on selection: the glyph is what identifies the option, and trading
+            // it away exactly when the option is active loses that at the worst moment. The
+            // container tint, bold weight, and the width/corner morph already carry selection.
+            val leadingIcon = icon ?: Icons.Filled.Check.takeIf { isSelected }
+            if (leadingIcon != null) {
                 Icon(
-                    Icons.Filled.Check,
+                    leadingIcon,
                     contentDescription = null,
-                    modifier = Modifier.padding(end = 4.dp).size(14.dp),
+                    modifier = Modifier.padding(end = 4.dp).size(if (icon != null) 16.dp else 14.dp),
                 )
             }
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.let {
+                    if (labelFontFamily != null) it.copy(fontFamily = labelFontFamily) else it
+                },
                 // Weight, not just colour: the selected option must stay readable as
                 // "selected" without relying on the container tint alone.
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,

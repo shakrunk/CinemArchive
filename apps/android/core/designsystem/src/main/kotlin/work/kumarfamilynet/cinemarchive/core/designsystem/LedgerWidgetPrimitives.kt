@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -79,6 +80,10 @@ import kotlin.math.sqrt
  *   bucket leaned is the whole point (Premieres & Revivals' first watches vs. rewatches).
  * - [SegmentedProgressTrack] — completion where the *remainder* is countable rather than a
  *   percentage (Still Rolling's episodes left).
+ * - [EraSpine] — buckets that are contiguous positions in time, where the gaps carry meaning
+ *   (By the Era's decades).
+ * - [DeviationAreaChart] — one series against a reference line, where being above or below it
+ *   is the reading (Shifting Standards vs. your own all-time average).
  *
  * All of them are decorative in the same sense [BarChartCanvas] is: callers pair them with
  * real text (ledger.md §5). [FilmstripTrack] is the exception that takes a [String] description,
@@ -662,6 +667,171 @@ fun SegmentedProgressTrack(
                     cornerRadius = corner,
                 )
             }
+        }
+    }
+}
+
+/**
+ * A timeline: one evenly-spaced node per slot along a horizontal spine, sized by value. Built
+ * for By the Era, where the buckets are *contiguous positions in time* rather than free-floating
+ * categories — a ranked list of decades sorted by count throws away the one relationship that
+ * matters, which is that the 1970s come before the 1980s.
+ *
+ * Empty slots draw as hollow ticks rather than being skipped, so a decade you own nothing from
+ * reads as a gap in the run instead of silently closing up. Node radius scales on √(value/max)
+ * for the same reason [BubbleCloud] does — area, not diameter, is what a reader compares.
+ *
+ * [labels] are drawn beneath their nodes, so callers should pass an abbreviated form; a dozen
+ * slots of `1970s` will collide where `'70s` will not.
+ *
+ * Decorative: the caller lists each slot's real figures beneath.
+ */
+@Composable
+fun EraSpine(
+    values: List<Float>,
+    labels: List<String>,
+    modifier: Modifier = Modifier,
+    highlightIndex: Int = -1,
+    nodeColor: Color = MaterialTheme.colorScheme.primary,
+    highlightColor: Color = MaterialTheme.colorScheme.tertiary,
+    spineColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    labelStyle: TextStyle = MaterialTheme.typography.labelSmall,
+    height: Dp = 108.dp,
+) {
+    if (values.isEmpty()) return
+    val measurer = rememberTextMeasurer()
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clearAndSetSemantics {},
+    ) {
+        val peak = values.max().coerceAtLeast(0.0001f)
+        val slotWidth = size.width / values.size
+        val spineY = size.height * 0.42f
+        val maxRadius = (slotWidth * 0.42f).coerceAtMost(20.dp.toPx())
+        val minRadius = 3.dp.toPx()
+
+        drawLine(
+            color = spineColor,
+            start = Offset(slotWidth / 2f, spineY),
+            end = Offset(size.width - slotWidth / 2f, spineY),
+            strokeWidth = 1.5.dp.toPx(),
+        )
+
+        values.forEachIndexed { index, value ->
+            val centerX = slotWidth * (index + 0.5f)
+            val isPeak = index == highlightIndex && value > 0f
+            val color = if (isPeak) highlightColor else nodeColor
+            if (value <= 0f) {
+                // A decade with nothing in it: a hollow tick keeps the slot on the timeline
+                // rather than letting the run close up over the gap.
+                drawCircle(
+                    color = spineColor,
+                    radius = minRadius,
+                    center = Offset(centerX, spineY),
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
+            } else {
+                val radius = (minRadius + (maxRadius - minRadius) * sqrt(value / peak)).coerceAtLeast(minRadius)
+                drawCircle(color = color.copy(alpha = 0.22f), radius = radius, center = Offset(centerX, spineY))
+                drawCircle(color = color, radius = radius * 0.55f, center = Offset(centerX, spineY))
+            }
+
+            labels.getOrNull(index)?.let { label ->
+                val laid = measurer.measure(label, labelStyle)
+                drawText(
+                    textLayoutResult = laid,
+                    color = if (isPeak) highlightColor else labelColor,
+                    topLeft = Offset(centerX - laid.size.width / 2f, size.height * 0.78f - laid.size.height / 2f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One series plotted against a fixed reference line, with the area between the two filled in
+ * different colours above and below. Where [LineChartCanvas] answers "what was the value", this
+ * answers "was it above or below where you normally sit" — which is the entire subject of
+ * Shifting Standards, and something a bare trend line leaves the reader to eyeball.
+ *
+ * [baseline] is in the same units as [values] and is included when fitting the vertical range,
+ * so the reference is always on-canvas even if every value sits to one side of it. The signed
+ * fills are produced by drawing the closed value-to-baseline path twice under complementary
+ * clips, rather than by splitting the polyline at its crossings — same result, without the
+ * intersection arithmetic.
+ *
+ * Decorative: the caller lists each point's real figures beneath.
+ */
+@Composable
+fun DeviationAreaChart(
+    values: List<Float>,
+    baseline: Float,
+    modifier: Modifier = Modifier,
+    aboveColor: Color = MaterialTheme.colorScheme.primary,
+    belowColor: Color = MaterialTheme.colorScheme.secondary,
+    lineColor: Color = MaterialTheme.colorScheme.onSurface,
+    baselineColor: Color = MaterialTheme.colorScheme.outline,
+    height: Dp = 132.dp,
+) {
+    if (values.isEmpty()) return
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clearAndSetSemantics {},
+    ) {
+        val lowest = minOf(values.min(), baseline)
+        val highest = maxOf(values.max(), baseline)
+        // A flat series would otherwise divide by zero; pad it into a visible band.
+        val padding = ((highest - lowest) * 0.15f).coerceAtLeast(0.25f)
+        val low = lowest - padding
+        val span = (highest + padding - low).coerceAtLeast(0.0001f)
+
+        val inset = 6.dp.toPx()
+        val usableHeight = size.height - inset * 2
+        fun y(value: Float) = inset + usableHeight * (1f - (value - low) / span)
+
+        val step = if (values.size > 1) size.width / (values.size - 1) else 0f
+        val points = values.mapIndexed { index, value ->
+            Offset(if (values.size > 1) index * step else size.width / 2f, y(value))
+        }
+        val baselineY = y(baseline)
+
+        val area = Path().apply {
+            moveTo(points.first().x, baselineY)
+            points.forEach { lineTo(it.x, it.y) }
+            lineTo(points.last().x, baselineY)
+            close()
+        }
+        clipRect(top = 0f, bottom = baselineY) {
+            drawPath(area, aboveColor.copy(alpha = 0.28f))
+        }
+        clipRect(top = baselineY, bottom = size.height) {
+            drawPath(area, belowColor.copy(alpha = 0.28f))
+        }
+
+        drawLine(
+            color = baselineColor,
+            start = Offset(0f, baselineY),
+            end = Offset(size.width, baselineY),
+            strokeWidth = 1.5.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
+        )
+
+        val line = Path().apply {
+            moveTo(points.first().x, points.first().y)
+            points.drop(1).forEach { lineTo(it.x, it.y) }
+        }
+        drawPath(line, lineColor, style = Stroke(width = 2.dp.toPx()))
+        points.forEachIndexed { index, point ->
+            drawCircle(
+                color = if (values[index] >= baseline) aboveColor else belowColor,
+                radius = 3.5f.dp.toPx(),
+                center = point,
+            )
         }
     }
 }

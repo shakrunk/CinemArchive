@@ -26,7 +26,7 @@ class SupabaseRemoteMutationWriter(
         val payload = JSONObject(entry.payloadJson)
         return try {
             when (entry.entityType) {
-                "title" -> pushTitleUpdate(payload)
+                "title" -> if (entry.operation == "insert") insertTitle(payload) else pushTitleUpdate(payload)
                 "episode_watch_event" -> upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
@@ -37,6 +37,112 @@ class SupabaseRemoteMutationWriter(
         } catch (e: Exception) {
             PushResult.Retry(e.message ?: e.javaClass.simpleName)
         }
+    }
+
+    /**
+     * A brand-new title and everything hanging off it, inserted parent-first so each child's
+     * foreign key already resolves: title, then seasons/episodes/cast/crew/viewing.
+     *
+     * Every statement is an id-keyed upsert, which is what makes a partial failure safe to
+     * retry: the outbox re-pushes the whole entry (see `LibraryRepository.addTitle` for why
+     * it's one entry), and any insert that already landed simply merges onto itself. The one
+     * genuinely unrecoverable case is a duplicate `unique_user_tmdb` — that's guarded before
+     * the write, in `addTitle`.
+     */
+    private fun insertTitle(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val titleId = payload.getString("id")
+        val userId = session.userId
+        val title = JSONObject()
+            .put("id", titleId)
+            .put("user_id", userId)
+            .put("tmdb_id", payload.getInt("tmdbId"))
+            // Postgres's media_type/watch_status enums are lowercase; Room stores the
+            // MediaType.name/LibraryStatus.name spelling — same conversion every other
+            // boundary crossing in this file applies.
+            .put("type", payload.getString("type").lowercase())
+            .put("title", payload.getString("title"))
+            .put("year", payload.getInt("year"))
+            .putNullable("release_date", payload, "releaseDate")
+            .putNullable("director", payload, "director")
+            .put("genres", payload.getJSONArray("genres"))
+            .putNullable("poster_url", payload, "posterUrl")
+            .putNullable("backdrop_url", payload, "backdropUrl")
+            .putNullable("synopsis", payload, "synopsis")
+            .putNullable("runtime", payload, "runtime")
+            .putNullable("network", payload, "network")
+            .put("status", payload.getString("status").lowercase())
+            .putNullable("rating", payload, "rating")
+            .putNullable("notes", payload, "notes")
+            .putNullable("original_language", payload, "originalLanguage")
+            .putNullable("content_rating", payload, "contentRating")
+            .putNullable("imdb_id", payload, "imdbId")
+            .putNullable("imdb_rating", payload, "imdbRating")
+            .putNullable("rt_score", payload, "rtScore")
+            .putNullable("metacritic_score", payload, "metacriticScore")
+            .put("studios", payload.getJSONArray("studios"))
+            .putNullable("collection_id", payload, "collectionId")
+            .putNullable("collection_name", payload, "collectionName")
+            .put("added_at", payload.getString("addedAt"))
+            .put("updated_at", payload.getString("updatedAt"))
+        client.upsert("titles", session.accessToken, title.toString())
+
+        payload.rows("seasons") { season ->
+            JSONObject()
+                .put("id", season.getString("id"))
+                .put("title_id", titleId)
+                .put("user_id", userId)
+                .put("season_number", season.getInt("seasonNumber"))
+                .put("episode_count", season.getInt("episodeCount"))
+                .put("episodes_watched", season.getInt("episodesWatched"))
+                .putNullable("air_year", season, "airYear")
+        }?.let { client.upsert("seasons", session.accessToken, it.toString()) }
+
+        payload.rows("episodes") { episode ->
+            JSONObject()
+                .put("id", episode.getString("id"))
+                .put("title_id", titleId)
+                .put("user_id", userId)
+                .put("season_number", episode.getInt("seasonNumber"))
+                .put("episode_number", episode.getInt("episodeNumber"))
+                .putNullable("episode_name", episode, "episodeName")
+                .putNullable("air_date", episode, "airDate")
+                .putNullable("runtime", episode, "runtime")
+        }?.let { client.upsert("episodes", session.accessToken, it.toString()) }
+
+        payload.rows("cast") { member ->
+            JSONObject()
+                .put("id", member.getString("id"))
+                .put("title_id", titleId)
+                .put("user_id", userId)
+                .put("tmdb_person_id", member.getInt("tmdbPersonId"))
+                .put("name", member.getString("name"))
+                .putNullable("character_name", member, "characterName")
+                .put("cast_order", member.getInt("castOrder"))
+        }?.let { client.upsert("title_cast", session.accessToken, it.toString()) }
+
+        payload.rows("crew") { member ->
+            JSONObject()
+                .put("id", member.getString("id"))
+                .put("title_id", titleId)
+                .put("user_id", userId)
+                .put("tmdb_person_id", member.getInt("tmdbPersonId"))
+                .put("name", member.getString("name"))
+                .put("job", member.getString("job"))
+                .putNullable("department", member, "department")
+        }?.let { client.upsert("title_crew", session.accessToken, it.toString()) }
+
+        payload.optJSONObject("viewing")?.let { viewing ->
+            val body = JSONObject()
+                .put("id", viewing.getString("id"))
+                .put("title_id", titleId)
+                .put("user_id", userId)
+                .putNullable("viewed_at", viewing, "date")
+                .putNullable("rating", viewing, "rating")
+                .putNullable("notes", viewing, "notes")
+            client.upsert("viewings", session.accessToken, body.toString())
+        }
+        return PushResult.Success
     }
 
     /** The one conflict-capable write — see class kdoc. A 0-row PATCH result means the
@@ -174,3 +280,13 @@ class SupabaseRemoteMutationWriter(
  *  as "leave this column alone" rather than "set it to null". */
 private fun JSONObject.putNullable(column: String, source: JSONObject, key: String): JSONObject =
     put(column, source.opt(key).takeUnless { it == null || it == JSONObject.NULL } ?: JSONObject.NULL)
+
+/** Maps a payload's nested array into a PostgREST bulk-insert body, or null when there's
+ *  nothing to send — an empty array would be a pointless round trip. */
+private fun JSONObject.rows(key: String, map: (JSONObject) -> JSONObject): JSONArray? {
+    val source = optJSONArray(key) ?: return null
+    if (source.length() == 0) return null
+    val out = JSONArray()
+    for (i in 0 until source.length()) out.put(map(source.getJSONObject(i)))
+    return out
+}

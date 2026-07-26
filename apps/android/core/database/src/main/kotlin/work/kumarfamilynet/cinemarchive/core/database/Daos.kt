@@ -49,6 +49,12 @@ interface TitleDao {
     @Query("SELECT id, tmdbId, type FROM titles")
     fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>>
 
+    /** One-shot version of the above for a single candidate — the Add flow's duplicate guard,
+     *  mirroring the server's own `unique_user_tmdb (user_id, tmdb_id, type)` constraint
+     *  (schema.sql) so a duplicate is refused before it can fail mid-push. */
+    @Query("SELECT id FROM titles WHERE tmdbId = :tmdbId AND type = :type LIMIT 1")
+    suspend fun findIdByTmdbKey(tmdbId: Int, type: String): String?
+
     // Ledger hero-stat rollup (docs/android-contracts/ledger.md) reads every title's
     // type/status/rating/runtime — small enough locally to just select the full row rather
     // than add a second bespoke projection alongside TitleListRow.

@@ -113,6 +113,21 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // ⌘, / Ctrl+, opens Settings from anywhere — the near-universal desktop
+  // convention for preferences. Additive alongside the numbered nav slot
+  // (visibleNav.length + 1 below), which stays as the configurable "N jumps
+  // to nav slot N" system's stable-enough fallback.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault()
+        setCurrentView('profile')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // Single-key shortcuts — suppressed while any modal/dialog is open or focus
   // is in a text field (handled inside the hook).
   const shortcutsActive =

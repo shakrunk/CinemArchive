@@ -59,8 +59,8 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
           style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
         >
           <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
-            <span className="font-sans text-[13px] text-paper-dim">Appearance</span>
-            <ThemeModeToggle />
+            <span className="font-sans text-[13px] text-paper-dim whitespace-nowrap">Theme</span>
+            <ThemeModeToggle size="compact" />
           </div>
 
           <div className="h-px my-1" style={{ background: 'var(--line)' }} />

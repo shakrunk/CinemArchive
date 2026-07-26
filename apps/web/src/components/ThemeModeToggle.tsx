@@ -11,6 +11,9 @@ const OPTIONS: { value: ThemeMode; label: string; Icon: typeof Sun }[] = [
 
 interface ThemeModeToggleProps {
   className?: string
+  // 'compact' shrinks the tap targets to fit AccountMenu's w-52 dropdown
+  // alongside a label without wrapping to a second line.
+  size?: 'default' | 'compact'
 }
 
 /** 3-way Light / Dark / System segmented control — the quick-access theme
@@ -19,14 +22,15 @@ interface ThemeModeToggleProps {
  *  Appearance's full grid: picking noir/matrix there (or `T`/this control's
  *  own Light/Dark buttons) is an explicit override that breaks out of
  *  'system', same as everywhere else theme mode changes. */
-export function ThemeModeToggle({ className }: ThemeModeToggleProps) {
+export function ThemeModeToggle({ className, size = 'default' }: ThemeModeToggleProps) {
   const themeMode = useAppStore((s) => s.themeMode)
+  const compact = size === 'compact'
 
   return (
     <div
       role="radiogroup"
       aria-label="Theme"
-      className={cn('inline-flex items-center rounded-md border p-0.5 gap-0.5', className)}
+      className={cn('inline-flex items-center shrink-0 rounded-md border p-0.5 gap-0.5', className)}
       style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
     >
       {OPTIONS.map(({ value, label, Icon }) => {
@@ -41,11 +45,12 @@ export function ThemeModeToggle({ className }: ThemeModeToggleProps) {
             title={label}
             onClick={(e) => chooseThemeMode(value, { clientX: e.clientX, clientY: e.clientY })}
             className={cn(
-              'flex items-center justify-center w-7 h-7 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+              'flex items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+              compact ? 'w-6 h-6' : 'w-7 h-7',
               active ? 'bg-amber/15 text-amber' : 'text-paper-dim hover:text-amber hover:bg-secondary/30'
             )}
           >
-            <Icon className="w-[15px] h-[15px]" />
+            <Icon className={compact ? 'w-[13px] h-[13px]' : 'w-[15px] h-[15px]'} />
           </button>
         )
       })}

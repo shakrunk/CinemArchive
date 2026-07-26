@@ -30,7 +30,7 @@ class SupabaseRemoteMutationWriter(
                 "episode_watch_event" -> upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
-                "viewing" -> upsertViewing(payload)
+                "viewing" -> if (entry.operation == "update") patchViewing(payload) else upsertViewing(payload)
                 "cinema_outing" -> upsertOuting(payload)
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
             }
@@ -41,14 +41,20 @@ class SupabaseRemoteMutationWriter(
 
     /** The one conflict-capable write — see class kdoc. A 0-row PATCH result means the
      *  server's current `updated_at` is already >= ours, so we fetch and return it as the
-     *  server-authoritative payload rather than treating this as a retryable failure. */
+     *  server-authoritative payload rather than treating this as a retryable failure.
+     *
+     *  Sends only the columns the payload actually carries: `updateTitleStatus` and
+     *  `updateTitleRating` each enqueue their own field alone, so assuming either is present
+     *  would make the other's push throw and requeue forever. */
     private fun pushTitleUpdate(payload: JSONObject): PushResult {
         val session = sessionProvider()
         val id = payload.getString("id")
         val updatedAt = payload.getString("updatedAt")
+        val body = JSONObject().put("updated_at", updatedAt)
         // payload.status is LibraryStatus.name (uppercase); titles.status is the lowercase
         // watch_status enum — same conversion the cinema_outing upsert below already does.
-        val body = JSONObject().put("status", payload.getString("status").lowercase()).put("updated_at", updatedAt)
+        if (payload.has("status")) body.put("status", payload.getString("status").lowercase())
+        if (payload.has("rating")) body.putNullable("rating", payload, "rating")
         val filter = "id=eq.$id&updated_at=lt.$updatedAt"
         val updated = JSONArray(client.patchWithFilter("titles", filter, session.accessToken, body.toString()))
         if (updated.length() > 0) return PushResult.Success
@@ -99,6 +105,27 @@ class SupabaseRemoteMutationWriter(
         return PushResult.Success
     }
 
+    /**
+     * In-place edit of an existing viewing — the post-show sheet's rating and notes actions,
+     * which each enqueue only the one field they changed and no `titleId`. The append-only
+     * [upsertViewing] path can't serve them: it requires a full row, so these payloads threw
+     * on the missing key and requeued forever instead of ever reaching the server.
+     *
+     * Unconditional, unlike [pushTitleUpdate]: a viewing has no client-side `updatedAt` to
+     * arbitrate on (the column exists server-side but is trigger-maintained), and the web app
+     * has no competing writer for these two fields.
+     */
+    private fun patchViewing(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val id = payload.getString("id")
+        val body = JSONObject()
+        if (payload.has("rating")) body.putNullable("rating", payload, "rating")
+        if (payload.has("notes")) body.putNullable("notes", payload, "notes")
+        if (body.length() == 0) return PushResult.Success
+        client.patchWithFilter("viewings", "id=eq.$id", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
     private fun upsertViewing(payload: JSONObject): PushResult {
         val session = sessionProvider()
         val body = JSONObject()
@@ -141,3 +168,9 @@ class SupabaseRemoteMutationWriter(
         return PushResult.Success
     }
 }
+
+/** Copies [key] from [source] under a (usually snake_case) [column], preserving an explicit
+ *  JSON null. `JSONObject.put(key, null)` would drop the key entirely, which PostgREST reads
+ *  as "leave this column alone" rather than "set it to null". */
+private fun JSONObject.putNullable(column: String, source: JSONObject, key: String): JSONObject =
+    put(column, source.opt(key).takeUnless { it == null || it == JSONObject.NULL } ?: JSONObject.NULL)

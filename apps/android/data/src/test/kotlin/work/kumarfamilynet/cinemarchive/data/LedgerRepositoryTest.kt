@@ -212,11 +212,14 @@ private object LedgerFixture {
         ),
     )
 
-    fun repository() = LedgerRepository(
+    /** [crewRows] is overridable so The Auteurs can be exercised against an empty
+     *  `title_crew` mirror, which is what every synced-down library looked like before
+     *  supabase/migrations/20260726000000_sync_cast_crew_and_scores.sql (#177). */
+    fun repository(crewRows: List<TitleCrewEntity> = crew) = LedgerRepository(
         titleDao = FakeTitleDao(titles),
         viewingDao = FakeViewingDao(viewings),
         titleCastDao = FakeTitleCastDao(cast),
-        titleCrewDao = FakeTitleCrewDao(crew),
+        titleCrewDao = FakeTitleCrewDao(crewRows),
         cinemaOutingDao = FakeCinemaOutingDao(outings),
         watchEventDao = FakeEpisodeWatchEventDao(watchEvents),
         seasonDao = FakeSeasonDao(seasons),
@@ -294,6 +297,32 @@ class LedgerRepositoryTest {
             board.auteurs.map { it.label to it.count }.toSet(),
         )
         assertEquals(2, board.auteurs.size)
+    }
+
+    /** #177: the widget read `title_crew` exclusively, and nothing ever wrote that table on a
+     *  phone that synced its library down rather than adding titles itself — so it rendered
+     *  empty forever while the Library list showed the very same directors off the
+     *  denormalized column. ledger.md §2 lists `director` first for exactly this reason. */
+    @Test
+    fun `The Auteurs still populates from the director column with an empty title_crew mirror`() = runTest {
+        val board = LedgerFixture.repository(crewRows = emptyList()).observeLedgerBoard().first()
+        assertEquals(
+            setOf("Christopher Nolan" to 1, "David Fincher" to 1),
+            board.auteurs.map { it.label to it.count }.toSet(),
+        )
+    }
+
+    /** The reverse gap: Breaking Bad carries no `director` column value, so its credited
+     *  Director — and only a Director, not the Creator the fixture ships — fills in. */
+    @Test
+    fun `The Auteurs falls back to credited crew for a title with no director column`() = runTest {
+        val withDirectedBreakingBad = LedgerFixture.crew +
+            TitleCrewEntity("crew-4", LedgerFixture.BREAKING_BAD_ID, 66633, "Vince Gilligan", "Director", "Directing")
+        val board = LedgerFixture.repository(crewRows = withDirectedBreakingBad).observeLedgerBoard().first()
+        assertEquals(
+            setOf("Christopher Nolan" to 1, "David Fincher" to 1, "Vince Gilligan" to 1),
+            board.auteurs.map { it.label to it.count }.toSet(),
+        )
     }
 
     @Test

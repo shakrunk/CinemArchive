@@ -450,7 +450,7 @@ private fun CinemArchiveApp(
                     }
                 }
 
-                if (tab != Tab.LEDGER) {
+                if (tab != Tab.LEDGER && tab != Tab.DISCOVER) {
                     ExpressivePillFab(
                         label = "New Title",
                         expanded = fabExpanded,

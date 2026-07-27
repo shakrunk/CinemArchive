@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Loader2, Send, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import {
@@ -23,6 +23,7 @@ function reactionAuthorName(r: TitleReaction): string {
 // viewerContext.kind !== 'shared-link', so an anonymous share-link visitor
 // never sees this section at all.
 export function TitleCommentsPanel({ titleId }: { titleId: string }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const user = useAppStore((s) => s.user)
   const pushNotification = useAppStore((s) => s.pushNotification)
 
@@ -149,7 +150,17 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
       {loading ? (
         <div className="text-center py-3 text-xs font-mono text-muted-foreground">Loading comments...</div>
       ) : comments.length === 0 ? (
-        <p className="font-sans text-xs text-muted-foreground italic">No comments yet.</p>
+        <div className="flex flex-col items-center gap-2 py-4">
+          <p className="font-sans text-xs text-muted-foreground italic">No comments yet.</p>
+          {user && (
+            <button
+              onClick={() => textareaRef.current?.focus()}
+              className="text-xs font-medium text-amber hover:text-amber/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 px-2 py-1 rounded"
+            >
+              Be the first to comment
+            </button>
+          )}
+        </div>
       ) : (
         <div className="space-y-2">
           {comments.map((c) => (
@@ -184,6 +195,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
       {user && (
         <form onSubmit={handlePost} className="flex gap-2">
           <textarea
+            ref={textareaRef}
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, BODY_MAX_LEN))}
             placeholder="Add a comment…"

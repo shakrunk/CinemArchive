@@ -22,5 +22,16 @@ jobs:
       - name: Link Supabase project
         run: supabase link --project-ref ${{ vars.SUPABASE_PROJECT_REF }}
 
+      # A green run is not on its own evidence that anything was applied: the CLI prints
+      # "Remote database is up to date." whether nothing was pending or it found no local
+      # migrations to compare against, and current versions no longer log a line per
+      # migration the way they used to. The before/after version table is what actually
+      # shows which versions crossed over, so read it rather than the exit code.
+      - name: List migration versions
+        run: supabase migration list
+
       - name: Push pending migrations
         run: supabase db push
+
+      - name: Confirm migration versions after push
+        run: supabase migration list

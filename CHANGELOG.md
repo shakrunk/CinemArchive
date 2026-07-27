@@ -9,6 +9,23 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-07-26
+
+### Added
+
+- Android: the "Credits & Open Source Licenses" entry in About & Legal now shows real, tappable
+  attributions — TMDB and OMDb, the app's Google Fonts (Fraunces, Hanken Grotesk, DM Mono,
+  Lexend), and every open-source library it ships with its actual license and a link to the
+  source or license page — replacing the placeholder summary paragraph.
+
+### Fixed
+
+- Android: the global "+ New Title" FAB no longer appears on the Discover tab, which already
+  surfaces per-result add actions inline — matching its existing Ledger-only exclusion.
+- Android: poster corner radius on the Discover and Library grids now scales with the
+  pinch-to-resize column count instead of staying a flat 16dp — larger at one column, tighter
+  once four columns narrow the poster.
+
 ## [1.21.1] - 2026-07-26
 
 ### Fixed

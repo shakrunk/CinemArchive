@@ -83,6 +83,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
+import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryGrouping
@@ -427,7 +428,12 @@ private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Un
     val showMeta = columns <= 2
     val padding = if (columns >= 3) 8.dp else 12.dp
 
-    PosterSurface(tint = tintForKey(title.id), imageUrl = title.posterUrl, onClick = onClick) {
+    PosterSurface(
+        tint = tintForKey(title.id),
+        imageUrl = title.posterUrl,
+        cornerRadius = posterGridCornerRadius(columns),
+        onClick = onClick,
+    ) {
         Row(
             modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(if (columns >= 3) 6.dp else 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,

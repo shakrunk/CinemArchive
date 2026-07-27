@@ -68,6 +68,18 @@ fun PosterSurface(
     }
 }
 
+/**
+ * Corner radius for a pinch-to-resize poster grid card (Discover/Library — see
+ * [PosterGridColumnRange]), scaled to how much room [columns] actually leaves each tile. A flat
+ * radius reads chunky once four columns narrow the poster and stingy at a single wide one.
+ */
+fun posterGridCornerRadius(columns: Int): androidx.compose.ui.unit.Dp = when {
+    columns <= 1 -> 20.dp
+    columns == 2 -> 16.dp
+    columns == 3 -> 12.dp
+    else -> 10.dp
+}
+
 /** A deterministic, decorative fallback tint derived from a title's id/name — used when no
  *  poster image is available, so cards stay visually distinct rather than uniformly gray. */
 fun tintForKey(key: String): Color {

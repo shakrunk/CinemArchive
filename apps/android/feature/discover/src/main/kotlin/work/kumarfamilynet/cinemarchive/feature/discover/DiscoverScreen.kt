@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
+import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
@@ -350,7 +351,12 @@ private fun DiscoverCard(
 ) {
     val showMeta = columns <= 2
     val showTitle = columns <= 3
-    PosterSurface(tint = tintForKey(title.tmdbId.toString()), imageUrl = title.posterUrl, onClick = onOpen) {
+    PosterSurface(
+        tint = tintForKey(title.tmdbId.toString()),
+        imageUrl = title.posterUrl,
+        cornerRadius = posterGridCornerRadius(columns),
+        onClick = onOpen,
+    ) {
         if (isAdded) {
             Box(
                 modifier = Modifier

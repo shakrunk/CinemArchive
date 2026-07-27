@@ -1887,6 +1887,8 @@ create trigger episode_watch_events_tombstone before delete on episode_watch_eve
 create trigger episode_ratings_tombstone      before delete on episode_ratings      for each row execute function record_tombstone('episode_rating');
 create trigger episode_reviews_tombstone      before delete on episode_reviews      for each row execute function record_tombstone('episode_review');
 create trigger cinema_outings_tombstone       before delete on cinema_outings       for each row execute function record_tombstone('cinema_outing');
+create trigger title_cast_tombstone           before delete on title_cast           for each row execute function record_tombstone('title_cast');
+create trigger title_crew_tombstone           before delete on title_crew           for each row execute function record_tombstone('title_crew');
 
 create or replace function sync_library_changes(p_since timestamptz, p_limit integer default 500)
 returns table (
@@ -1897,14 +1899,15 @@ returns table (
   payload jsonb
 )
 language sql security definer stable as $$
-  select * from (
+  with changes as (
     select 'title'::text as entity_type, t.id as entity_id, null::uuid as parent_id, t.updated_at as updated_at,
       jsonb_build_object(
         'id', t.id, 'tmdbId', t.tmdb_id, 'type', t.type, 'title', t.title, 'year', t.year,
         'director', t.director, 'genres', t.genres, 'posterUrl', t.poster_url,
         'backdropUrl', t.backdrop_url, 'synopsis', t.synopsis, 'runtime', t.runtime,
         'network', t.network, 'status', t.status, 'rating', t.rating, 'notes', t.notes,
-        'addedAt', t.added_at, 'updatedAt', t.updated_at, 'releaseDate', t.release_date
+        'addedAt', t.added_at, 'updatedAt', t.updated_at, 'releaseDate', t.release_date,
+        'imdbRating', t.imdb_rating, 'originalLanguage', t.original_language
       ) as payload
     from titles t where t.user_id = auth.uid() and t.updated_at > p_since
 
@@ -1926,6 +1929,26 @@ language sql security definer stable as $$
         'airDate', e.air_date, 'runtime', e.runtime
       )
     from episodes e where e.user_id = auth.uid() and e.updated_at > p_since
+
+    union all
+
+    -- Only the columns the Android mirror holds (core/database/Entities.kt);
+    -- profile_url/episode_count stay out rather than inflate a payload nothing reads.
+    select 'title_cast'::text, tc.id, tc.title_id, tc.updated_at,
+      jsonb_build_object(
+        'id', tc.id, 'titleId', tc.title_id, 'tmdbPersonId', tc.tmdb_person_id,
+        'name', tc.name, 'characterName', tc.character_name, 'castOrder', tc.cast_order
+      )
+    from title_cast tc where tc.user_id = auth.uid() and tc.updated_at > p_since
+
+    union all
+
+    select 'title_crew'::text, cw.id, cw.title_id, cw.updated_at,
+      jsonb_build_object(
+        'id', cw.id, 'titleId', cw.title_id, 'tmdbPersonId', cw.tmdb_person_id,
+        'name', cw.name, 'job', cw.job, 'department', cw.department
+      )
+    from title_crew cw where cw.user_id = auth.uid() and cw.updated_at > p_since
 
     union all
 
@@ -1974,7 +1997,23 @@ language sql security definer stable as $$
     select 'tombstone'::text, st.entity_id, null::uuid, st.deleted_at,
       jsonb_build_object('entityType', st.entity_type)
     from sync_tombstones st where st.user_id = auth.uid() and st.deleted_at > p_since
-  ) changes
-  order by updated_at, entity_id
-  limit least(coalesce(p_limit, 500), 500);
+  ),
+  ordered as (
+    select c.*, row_number() over (order by c.updated_at, c.entity_id) as rn
+    from changes c
+  )
+  -- The limit is a floor, not a ceiling: take every row up to and including the
+  -- last one sharing the limit-th row's `updated_at`, so a same-timestamp group is
+  -- never split across pages. Both `updated_at` defaults are the *transaction*
+  -- timestamp, so a title's whole cast lands on one microsecond, while the client's
+  -- cursor is a single watermark advanced with a strict `>` — a split group would
+  -- lose its tail permanently and silently
+  -- (supabase/migrations/20260726000000_sync_cast_crew_and_scores.sql).
+  select o.entity_type, o.entity_id, o.parent_id, o.updated_at, o.payload
+  from ordered o
+  where o.updated_at <= coalesce(
+    (select o2.updated_at from ordered o2 where o2.rn = least(coalesce(p_limit, 500), 500)),
+    'infinity'::timestamptz
+  )
+  order by o.updated_at, o.entity_id;
 $$;

@@ -70,7 +70,8 @@ New RPC: `sync_library_changes(p_since timestamptz, p_limit integer default 500)
 
   ```
   entity_type   text      -- 'title' | 'season' | 'episode' | 'viewing' |
-                           -- 'episode_watch_event' | 'episode_ratings' | ... | 'tombstone'
+                           -- 'episode_watch_event' | 'episode_ratings' |
+                           -- 'title_cast' | 'title_crew' | ... | 'tombstone'
   entity_id     uuid
   parent_id     uuid      -- title_id, for entities that need it to route locally
   updated_at    timestamptz
@@ -80,9 +81,23 @@ New RPC: `sync_library_changes(p_since timestamptz, p_limit integer default 500)
 - Client loop: call with `p_since` = last cursor, apply the page, advance the cursor to
   the last row's `updated_at`, repeat while a full page (`p_limit`) came back. Empty/partial
   page means caught up.
-- `p_since` is exclusive; the row-level cursor is `(updated_at, id)` to make pagination
-  stable when multiple rows share a timestamp (sub-millisecond writes in a batch import are
-  the case that breaks a naive `updated_at`-only cursor).
+- `p_since` is exclusive and the cursor `LibrarySyncRepository` persists is a **single
+  `updated_at` watermark** — the client has no per-row id component, so a group of rows
+  sharing one timestamp must never be split across pages, or the tail of that group falls
+  permanently behind the watermark with no error and no gap indication. Batch writes make
+  that routine rather than exotic: `updated_at` defaults to `now()`, which is the
+  *transaction* timestamp, so an import or a title's whole cast lands on one microsecond.
+  `p_limit` is therefore a **floor, not a ceiling** — the RPC orders by `(updated_at,
+  entity_id)` and then runs the page on to the end of whatever `updated_at` the limit landed
+  in, overshooting `p_limit` by however many rows share that final timestamp
+  (`supabase/migrations/20260726000000_sync_cast_crew_and_scores.sql`). A page *shorter* than
+  `p_limit` still reliably means "caught up", since the RPC only undershoots when there was
+  nothing left to send.
+- Rows are ordered by `updated_at` globally, not grouped by parent, so a child can arrive
+  pages ahead of its parent — a `title_cast` row whose title was edited later sorts in front
+  of that `titles` row. The client holds such credits back and re-applies them once every
+  page is in (`LibrarySyncRepository.OrphanedCredits`) rather than letting the local foreign
+  key reject the insert.
 
 ### 2.3 Clock source and the "boundary write" problem
 

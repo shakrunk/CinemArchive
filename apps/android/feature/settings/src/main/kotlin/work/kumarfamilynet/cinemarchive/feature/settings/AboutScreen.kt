@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -68,12 +71,155 @@ private val LEGAL_DOCS = listOf(
             "film and TV viewing. This section will be replaced with real terms before the app " +
             "is offered more broadly.",
     ),
-    LegalDoc(
-        title = "Credits & Open Source Licenses",
-        body = "Metadata & posters — TMDB\nCritic scores — OMDb\n\nThis app is built with " +
-            "Jetpack Compose, Room, Coil and other open-source packages, each under its " +
-            "respective license (MIT/Apache-2.0). This product uses the TMDB API but is not " +
-            "endorsed or certified by TMDB.",
+)
+
+private sealed interface AboutSubpage {
+    data class Doc(val doc: LegalDoc) : AboutSubpage
+    data object Credits : AboutSubpage
+}
+
+private data class CreditEntry(
+    val name: String,
+    val detail: String,
+    val license: String,
+    val url: String,
+)
+
+private data class CreditSection(val title: String, val entries: List<CreditEntry>)
+
+// Sourced from apps/android/gradle/libs.versions.toml and CinemArchiveTypography.kt — keep in
+// sync when a dependency or Google Font is added, swapped, or dropped.
+private val CREDIT_SECTIONS = listOf(
+    CreditSection(
+        title = "Data & Media",
+        entries = listOf(
+            CreditEntry(
+                name = "TMDB",
+                detail = "Movie & TV metadata, artwork, and posters. This product uses the " +
+                    "TMDB API but is not endorsed or certified by TMDB.",
+                license = "TMDB API Terms of Use",
+                url = "https://www.themoviedb.org/",
+            ),
+            CreditEntry(
+                name = "OMDb API",
+                detail = "Critic and audience scores.",
+                license = "OMDb API Terms of Use",
+                url = "https://www.omdbapi.com/",
+            ),
+        ),
+    ),
+    CreditSection(
+        title = "Fonts",
+        entries = listOf(
+            CreditEntry(
+                name = "Fraunces",
+                detail = "Display/heading typeface. Delivered at runtime via the Google Play " +
+                    "services Downloadable Fonts API.",
+                license = "SIL Open Font License 1.1",
+                url = "https://fonts.google.com/specimen/Fraunces",
+            ),
+            CreditEntry(
+                name = "Hanken Grotesk",
+                detail = "UI and body typeface.",
+                license = "SIL Open Font License 1.1",
+                url = "https://fonts.google.com/specimen/Hanken+Grotesk",
+            ),
+            CreditEntry(
+                name = "DM Mono",
+                detail = "Tabular/stat typeface.",
+                license = "SIL Open Font License 1.1",
+                url = "https://fonts.google.com/specimen/DM+Mono",
+            ),
+            CreditEntry(
+                name = "Lexend",
+                detail = "Dyslexia-friendly accessibility typeface.",
+                license = "SIL Open Font License 1.1",
+                url = "https://fonts.google.com/specimen/Lexend",
+            ),
+        ),
+    ),
+    CreditSection(
+        title = "Open Source Libraries",
+        entries = listOf(
+            CreditEntry(
+                name = "Kotlin",
+                detail = "Language and standard library.",
+                license = "Apache License 2.0",
+                url = "https://github.com/JetBrains/kotlin",
+            ),
+            CreditEntry(
+                name = "Kotlin Coroutines",
+                detail = "Asynchronous and concurrent code.",
+                license = "Apache License 2.0",
+                url = "https://github.com/Kotlin/kotlinx.coroutines",
+            ),
+            CreditEntry(
+                name = "Jetpack Compose & AndroidX",
+                detail = "UI toolkit, Activity, Lifecycle, Core, and DataStore.",
+                license = "Apache License 2.0",
+                url = "https://developer.android.com/jetpack",
+            ),
+            CreditEntry(
+                name = "Material Components for Android",
+                detail = "Material 3 design system components.",
+                license = "Apache License 2.0",
+                url = "https://github.com/material-components/material-components-android",
+            ),
+            CreditEntry(
+                name = "AndroidX Room",
+                detail = "Local SQLite persistence.",
+                license = "Apache License 2.0",
+                url = "https://developer.android.com/jetpack/androidx/releases/room",
+            ),
+            CreditEntry(
+                name = "AndroidX Security Crypto",
+                detail = "Encrypted local storage.",
+                license = "Apache License 2.0",
+                url = "https://developer.android.com/jetpack/androidx/releases/security",
+            ),
+            CreditEntry(
+                name = "AndroidX CameraX",
+                detail = "Camera capture for invite QR-code scanning.",
+                license = "Apache License 2.0",
+                url = "https://developer.android.com/jetpack/androidx/releases/camera",
+            ),
+            CreditEntry(
+                name = "AndroidX Graphics Shapes",
+                detail = "Expressive shape morphing.",
+                license = "Apache License 2.0",
+                url = "https://developer.android.com/jetpack/androidx/releases/graphics",
+            ),
+            CreditEntry(
+                name = "Coil",
+                detail = "Image loading.",
+                license = "Apache License 2.0",
+                url = "https://github.com/coil-kt/coil",
+            ),
+            CreditEntry(
+                name = "OkHttp",
+                detail = "HTTP client.",
+                license = "Apache License 2.0",
+                url = "https://github.com/square/okhttp",
+            ),
+            CreditEntry(
+                name = "JSON-java (org.json)",
+                detail = "JSON parsing.",
+                license = "The JSON License",
+                url = "https://github.com/stleary/JSON-java",
+            ),
+        ),
+    ),
+    CreditSection(
+        title = "Google Services",
+        entries = listOf(
+            CreditEntry(
+                name = "Google ML Kit — Barcode Scanning",
+                detail = "On-device QR-code recognition for invite redemption. Proprietary — " +
+                    "not open source.",
+                license = "Google APIs Terms of Service",
+                url = "https://developers.google.com/ml-kit/vision/barcode-scanning",
+            ),
+        ),
     ),
 )
 
@@ -85,7 +231,7 @@ fun AboutRoute(
     preferencesRepository: PreferencesRepository,
     onBack: () -> Unit,
 ) {
-    var subpage by remember { mutableStateOf<LegalDoc?>(null) }
+    var subpage by remember { mutableStateOf<AboutSubpage?>(null) }
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -115,13 +261,14 @@ fun AboutRoute(
 
     BackHandler(enabled = subpage != null) { subpage = null }
 
-    if (subpage != null) {
-        AboutDetailScreen(doc = subpage!!, onBack = { subpage = null })
-    } else {
-        AboutListScreen(
+    when (val current = subpage) {
+        is AboutSubpage.Doc -> AboutDetailScreen(doc = current.doc, onBack = { subpage = null })
+        AboutSubpage.Credits -> CreditsScreen(onBack = { subpage = null })
+        null -> AboutListScreen(
             appVersionName = appVersionName,
             onBack = onBack,
-            onOpenDoc = { subpage = it },
+            onOpenDoc = { subpage = AboutSubpage.Doc(it) },
+            onOpenCredits = { subpage = AboutSubpage.Credits },
             onOpenSource = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive") },
             onOpenReleaseNotes = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive/releases") },
             installSource = appUpdateRepository.installSource,
@@ -149,6 +296,7 @@ private fun AboutListScreen(
     appVersionName: String,
     onBack: () -> Unit,
     onOpenDoc: (LegalDoc) -> Unit,
+    onOpenCredits: () -> Unit,
     onOpenSource: () -> Unit,
     onOpenReleaseNotes: () -> Unit,
     installSource: InstallSource,
@@ -237,23 +385,11 @@ private fun AboutListScreen(
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainer),
                 ) {
-                    LEGAL_DOCS.forEachIndexed { index, doc ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenDoc(doc) }
-                                .padding(16.dp),
-                        ) {
-                            Text(doc.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                            Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (index < LEGAL_DOCS.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    LEGAL_DOCS.forEach { doc ->
+                        LegalRow(title = doc.title, onClick = { onOpenDoc(doc) })
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
+                    LegalRow(title = "Credits & Open Source Licenses", onClick = onOpenCredits)
                 }
                 Text(
                     "© 2026 CinemArchive · Not endorsed by TMDB or OMDb",
@@ -282,5 +418,108 @@ private fun AboutDetailScreen(doc: LegalDoc, onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(20.dp, 16.dp, 20.dp, 28.dp),
         )
+    }
+}
+
+@Composable
+private fun LegalRow(title: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CreditsScreen(onBack: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text(
+                "Credits & Open Source Licenses",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+            item {
+                Text(
+                    "CinemArchive is built on the following data providers, type families, " +
+                        "and open-source software. Tap an entry to open its source or license " +
+                        "page.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 20.dp),
+                )
+            }
+            CREDIT_SECTIONS.forEachIndexed { sectionIndex, section ->
+                item {
+                    Text(
+                        section.title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                    ) {
+                        section.entries.forEachIndexed { index, entry ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { uriHandler.openUri(entry.url) }
+                                    .padding(16.dp),
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        entry.detail,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                    Text(
+                                        entry.license,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                }
+                                Icon(
+                                    Icons.AutoMirrored.Filled.OpenInNew,
+                                    contentDescription = "Open link",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 12.dp).size(18.dp),
+                                )
+                            }
+                            if (index < section.entries.lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
+                    }
+                }
+                if (sectionIndex < CREDIT_SECTIONS.lastIndex) {
+                    item { Spacer(modifier = Modifier.height(20.dp)) }
+                }
+            }
+        }
     }
 }

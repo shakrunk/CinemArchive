@@ -16,6 +16,12 @@ number is chosen.
   Lexend), and every open-source library it ships with its actual license and a link to the
   source or license page — replacing the placeholder summary paragraph.
 
+### Fixed
+
+- Android: poster corner radius on the Discover and Library grids now scales with the
+  pinch-to-resize column count instead of staying a flat 16dp — larger at one column, tighter
+  once four columns narrow the poster.
+
 ## [1.21.1] - 2026-07-26
 
 ### Fixed

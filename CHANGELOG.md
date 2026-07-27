@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.21.1] - 2026-07-26
+
 ### Fixed
 
 - Four Ledger widgets that rendered empty or wrong on the native Android app, none of them a

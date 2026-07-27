@@ -213,7 +213,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2010-07-15",
+    "addedAt": "2026-06-16",
     "cast": [
       { "tmdbPersonId": 6193, "name": "Leonardo DiCaprio", "character": "Dom Cobb", "order": 0 },
       { "tmdbPersonId": 24045, "name": "Joseph Gordon-Levitt", "character": "Arthur", "order": 1 },
@@ -247,7 +247,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1994-09-10",
+    "addedAt": "2026-06-16",
     "cast": [
       { "tmdbPersonId": 8891, "name": "John Travolta", "character": "Vincent Vega", "order": 0 },
       { "tmdbPersonId": 2231, "name": "Samuel L. Jackson", "character": "Jules Winnfield", "order": 1 },
@@ -278,7 +278,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1994-09-23",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -300,7 +300,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2008-07-16",
+    "addedAt": "2026-06-16",
     "collectionId": 263,
     "collectionName": "The Dark Knight Collection",
     "viewings": []
@@ -324,7 +324,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1994-06-23",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -346,7 +346,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2014-11-05",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -367,7 +367,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1997-07-09",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -388,7 +388,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1998-11-25",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -408,7 +408,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1999-08-06",
+    "addedAt": "2026-06-16",
     "cast": [
       { "tmdbPersonId": 62, "name": "Bruce Willis", "character": "Malcolm Crowe", "order": 0 },
       { "tmdbPersonId": 6597, "name": "Haley Joel Osment", "character": "Cole Sear", "order": 1 },
@@ -437,7 +437,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1999-03-31",
+    "addedAt": "2026-06-16",
     "collectionId": 2344,
     "collectionName": "The Matrix Collection",
     "viewings": []
@@ -458,7 +458,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2012-09-28",
+    "addedAt": "2026-06-16",
     "cast": [
       { "tmdbPersonId": 24045, "name": "Joseph Gordon-Levitt", "character": "Joe", "order": 0 },
       { "tmdbPersonId": 62, "name": "Bruce Willis", "character": "Old Joe", "order": 1 },
@@ -488,7 +488,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2018-06-01",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -508,7 +508,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2022-03-25",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -528,7 +528,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2015-04-10",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -548,7 +548,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2016-11-11",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -593,7 +593,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2009-10-16",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -613,7 +613,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2014-08-28",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -632,7 +632,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2022-08-12",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -651,7 +651,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2018-08-24",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -671,7 +671,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2024-11-08",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -691,7 +691,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2010-05-13",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -711,7 +711,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2024-08-23",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -1236,7 +1236,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2006-10-20",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -1258,7 +1258,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "1997-09-12",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -1308,7 +1308,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2013-09-20",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -1328,7 +1328,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2011-04-01",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {
@@ -1348,7 +1348,7 @@ export const mockTitles: Title[] = [
     "tags": [
       "rewatch"
     ],
-    "addedAt": "2000-09-05",
+    "addedAt": "2026-06-16",
     "viewings": []
   },
   {

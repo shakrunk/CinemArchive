@@ -205,8 +205,11 @@ data class TitleCastEntity(
 )
 
 /**
- * Local mirror of `title_crew` (schema.sql) — used by the Ledger Auteurs widget, which
- * tallies by crew rows where `job == "Director"` (ledger.md §2).
+ * Local mirror of `title_crew` (schema.sql) — the Ledger Auteurs widget's *secondary* source.
+ * That widget tallies [TitleEntity.director] (ledger.md §2 lists it first, matching the web
+ * app's `deriveTopDirectors`) and only reaches for a `job == "Director"` row here to cover a
+ * title whose denormalized column is empty. Reading this table exclusively is what left the
+ * widget blank on every synced-down library, back when nothing populated it (#177).
  */
 @Entity(
     tableName = "title_crew",

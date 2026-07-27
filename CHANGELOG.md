@@ -9,6 +9,29 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.21.1] - 2026-07-26
+
+### Fixed
+
+- Four Ledger widgets that rendered empty or wrong on the native Android app, none of them a
+  display bug — the panels were faithfully reporting gaps in what sync had actually delivered:
+  - **The Ensemble** and **Second Opinions** / **In Translation** were blank on any library
+    synced down from the web app rather than added on the phone. Cast, crew, IMDb rating and
+    original language were never included in what the server sends a phone, so those columns
+    sat empty locally no matter how many times you synced. They are part of the payload now,
+    and the app does one automatic full resync after this update to backfill them.
+  - **The Auteurs** counted directors from credit rows alone, so it too came up empty on a
+    synced library — while the Library list showed the very same directors, because it reads a
+    different column. It now counts the same director field the web app's Auteurs panel does,
+    falling back to the credits only for a title that has no director recorded.
+  - **Shifting Standards** plotted quarters back to 1994. Titles imported from the old
+    MovieTracker data with no watch dates had their "added to library" date filled in with the
+    film's *release* date, so a 1994 film looked like it had been in the library since 1994.
+    The importer no longer does that, and the affected rows are corrected in place.
+- A batch of rows written in the same instant — a title's whole cast, or an import — could be
+  split across two sync pages, and everything after the split was silently never delivered.
+  Sync pages now always run to the end of such a batch.
+
 ## [1.21.0] - 2026-07-26
 
 ### Added

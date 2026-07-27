@@ -13,6 +13,15 @@ const OUT = resolve(root, 'src/store/mockData.ts')
 const raw = JSON.parse(readFileSync(SRC, 'utf8'))
 const log = raw.log ?? []
 
+// When an entry has no watch dates there is nothing in v1 that says when it entered the
+// library, so it gets the date this import ran. Pinned rather than `new Date()` so a re-run
+// reproduces the committed mockData.ts byte for byte. This used to fall back to the entry's
+// `ReleaseDate`, which is how `titles.added_at` ended up holding dates back to 1994 and
+// stretched the Ledger's Shifting Standards three decades into the past — see issue #177 and
+// supabase/migrations/20260726010000_repair_v1_imported_added_at.sql, which repairs the rows
+// that fallback already produced.
+const IMPORT_DATE = '2026-06-16'
+
 const STATUS_MAP = {
   watched: 'watched',
   watched_no_date: 'watched',
@@ -57,7 +66,7 @@ const titles = log.map((e, i) => {
   const year = e.ReleaseDate ? parseInt(String(e.ReleaseDate).slice(0, 4), 10) : 0
   const rating = typeof e.Rating === 'number' && e.Rating > 0 ? e.Rating : undefined
   const notes = e.Notes && String(e.Notes).trim() ? String(e.Notes).trim() : undefined
-  const addedAt = dates[0] || (e.ReleaseDate ?? '2024-01-01')
+  const addedAt = dates[0] || IMPORT_DATE
 
   const viewings = dates.map((d, k) => ({
     id: `${id}-v${k + 1}`,

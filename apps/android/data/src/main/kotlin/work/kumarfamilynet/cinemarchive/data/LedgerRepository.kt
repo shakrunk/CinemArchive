@@ -274,7 +274,7 @@ class LedgerRepository(
             monthlyRun = monthlyRun(viewings),
             ratingBuckets = ratingBuckets(titles),
             genres = tally(titles.flatMap { it.genres }),
-            auteurs = tally(s.crew.filter { it.job == "Director" }.map { it.name }),
+            auteurs = auteurs(titles, s.crew),
             ensemble = tally(s.cast.filter { it.castOrder < 5 }.map { it.name }),
             verdicts = verdicts(titles),
             languages = tally(titles.mapNotNull { it.originalLanguage?.let { code -> displayLanguage(code) } }),
@@ -285,6 +285,28 @@ class LedgerRepository(
             timewarp = timewarp(viewings, titleById),
             stillRolling = stillRolling(titles, s.seasons, s.episodes, s.watchEvents),
             moviegoing = moviegoing(viewings, s.outings),
+        )
+    }
+
+    /**
+     * The Auteurs: tallies the denormalized `titles.director` display string, with
+     * `title_crew`'s `Director` rows filling in only for a title whose column is empty
+     * (ledger.md §2 lists both as sources; the web app's `deriveTopDirectors` reads
+     * `Title.director` and touches crew only to recover a TMDB person id, which this board
+     * has no field for).
+     *
+     * Reading crew *first* is what left this widget permanently blank on any library synced
+     * down from Supabase: `title_cast`/`title_crew` had no arm in `sync_library_changes`
+     * until 20260726000000_sync_cast_crew_and_scores.sql, so the tables were empty on a phone
+     * that never added a title itself — while the Library list happily showed directors,
+     * because it reads the denormalized column (#177).
+     */
+    private fun auteurs(titles: List<TitleEntity>, crew: List<TitleCrewEntity>): List<LedgerCategoryCount> {
+        val creditedDirectors = crew.filter { it.job == "Director" }.groupBy({ it.titleId }, { it.name })
+        return tally(
+            titles.flatMap { title ->
+                title.director?.let { listOf(it) } ?: creditedDirectors[title.id].orEmpty().distinct()
+            },
         )
     }
 

@@ -97,12 +97,14 @@ private class RecordingCastDao : TitleCastDao {
     val written = mutableListOf<TitleCastEntity>()
     override fun observeAllCast(): Flow<List<TitleCastEntity>> = MutableStateFlow(written)
     override suspend fun upsertAll(rows: List<TitleCastEntity>) { written += rows }
+    override suspend fun deleteById(id: String) { written.removeAll { it.id == id } }
 }
 
 private class RecordingCrewDao : TitleCrewDao {
     val written = mutableListOf<TitleCrewEntity>()
     override fun observeAllCrew(): Flow<List<TitleCrewEntity>> = MutableStateFlow(written)
     override suspend fun upsertAll(rows: List<TitleCrewEntity>) { written += rows }
+    override suspend fun deleteById(id: String) { written.removeAll { it.id == id } }
 }
 
 private class RecordingOutboxDao : OutboxDao {

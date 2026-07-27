@@ -22,6 +22,10 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
+import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
@@ -52,8 +56,14 @@ private const val PAGE_SIZE = 500
  * up on the Up Next marquee card). Rows already pulled under the old parser have the bad
  * string baked into Room and, per this constant's own kdoc, are otherwise stuck there forever
  * since their `updated_at` never changes.
+ *
+ * 5: the `title_cast`/`title_crew` arms and the title arm's imdbRating/originalLanguage
+ * (supabase/migrations/20260726000000_sync_cast_crew_and_scores.sql) — every one of those rows
+ * predates the cursor on an existing install, which is exactly the case this constant exists
+ * for. Without the reset the Ledger's Ensemble/Second Opinions/In Translation widgets stay
+ * empty forever on any library that was synced down rather than added on the phone (#177).
  */
-private const val SYNC_SCHEMA_VERSION = 4
+private const val SYNC_SCHEMA_VERSION = 5
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -63,12 +73,12 @@ private const val SYNC_SCHEMA_VERSION = 4
  * RPC serves both bootstrap (`p_since` = epoch) and incremental sync — no separate bootstrap
  * endpoint was ever built server-side, only this RPC.
  *
- * Cast/crew are still deliberately not handled here: the migration gave them `updated_at`/
- * tombstone triggers but the RPC itself has no `union all` arm for either — a server-side
- * gap, not an omission here. `cinema_outings` got its arm in
- * supabase/migrations/20260722000000_cinema_outings_sync.sql once passkey auth and the real
- * outbox writer landed, closing the read half to match [SupabaseRemoteMutationWriter]'s
- * `cinema_outing` push case.
+ * `cinema_outings` got its arm in supabase/migrations/20260722000000_cinema_outings_sync.sql
+ * once passkey auth and the real outbox writer landed, closing the read half to match
+ * [SupabaseRemoteMutationWriter]'s `cinema_outing` push case; `title_cast`/`title_crew`
+ * followed in 20260726000000_sync_cast_crew_and_scores.sql. Until then those two tables were
+ * only ever written by this phone's own add-title flow, so a library synced down from Supabase
+ * had no credits at all and the Ledger's Ensemble widget could never populate (#177).
  */
 class LibrarySyncRepository(
     context: Context,
@@ -82,6 +92,8 @@ class LibrarySyncRepository(
     private val reviewDao: EpisodeReviewDao,
     private val viewingDao: ViewingDao,
     private val cinemaOutingDao: CinemaOutingDao,
+    private val titleCastDao: TitleCastDao,
+    private val titleCrewDao: TitleCrewDao,
 ) {
     private val dataStore = context.librarySyncDataStore
     private val cursorKey = stringPreferencesKey("last_synced_at")
@@ -100,26 +112,67 @@ class LibrarySyncRepository(
         // that as version 1, so every pre-existing install also gets the one-time reset.
         val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
         var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
+        val orphans = OrphanedCredits()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
             if (rows.length() == 0) break
-            applyPage(rows)
+            applyPage(rows, orphans)
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
             dataStore.edit { it[cursorKey] = cursor }
+            // A page may overshoot PAGE_SIZE — the RPC widens it to avoid splitting a group of
+            // rows sharing one `updated_at` — but it can only ever *under*shoot when there was
+            // nothing left to send, so a short page is still a reliable "that was the last one".
             if (rows.length() < PAGE_SIZE) break
         }
+        orphans.flush()
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
         // idempotently) does the full resync again rather than settling for a partial one.
         if (storedSchemaVersion < SYNC_SCHEMA_VERSION) dataStore.edit { it[schemaVersionKey] = SYNC_SCHEMA_VERSION }
     }
 
+    /**
+     * Credit rows whose title hasn't been applied yet, held back until the whole run is in.
+     *
+     * Rows are ordered by `updated_at` across the entire run, not grouped by title, so a
+     * title edited after its credits were written sorts *behind* them — on a from-epoch
+     * resync that means a `title_cast` row can land pages before the `titles` row it points
+     * at, and [TitleCastEntity]'s foreign key would reject the insert outright. [flush]
+     * re-checks each one once every page has been applied and drops the ones whose title
+     * never arrived (deleted server-side, so a tombstone would have removed them anyway).
+     */
+    private inner class OrphanedCredits {
+        private val cast = mutableListOf<TitleCastEntity>()
+        private val crew = mutableListOf<TitleCrewEntity>()
+
+        suspend fun addCast(row: TitleCastEntity) {
+            if (titleDao.getById(row.titleId) != null) titleCastDao.upsertAll(listOf(row)) else cast += row
+        }
+
+        suspend fun addCrew(row: TitleCrewEntity) {
+            if (titleDao.getById(row.titleId) != null) titleCrewDao.upsertAll(listOf(row)) else crew += row
+        }
+
+        /** Drops a held-back row that a later page went on to tombstone, so [flush] can't
+         *  resurrect it after the delete already ran. */
+        fun forget(entityId: String) {
+            cast.removeAll { it.id == entityId }
+            crew.removeAll { it.id == entityId }
+        }
+
+        suspend fun flush() {
+            titleCastDao.upsertAll(cast.filter { titleDao.getById(it.titleId) != null })
+            titleCrewDao.upsertAll(crew.filter { titleDao.getById(it.titleId) != null })
+        }
+    }
+
     /** Applies one page grouped by entity_type in a fixed order — title/season before
-     *  episode (episodes resolve their seasonId against already-applied seasons), and
-     *  tombstones strictly last so a same-page delete always wins over an upsert of the
-     *  same id, regardless of the RPC's own (updated_at, entity_id) row order. */
-    private suspend fun applyPage(rows: JSONArray) {
+     *  episode (episodes resolve their seasonId against already-applied seasons) and before
+     *  cast/crew (which hold a foreign key to it), and tombstones strictly last so a same-page
+     *  delete always wins over an upsert of the same id, regardless of the RPC's own
+     *  (updated_at, entity_id) row order. */
+    private suspend fun applyPage(rows: JSONArray, orphans: OrphanedCredits) {
         val byType = (0 until rows.length()).map { rows.getJSONObject(it) }.groupBy { it.getString("entity_type") }
 
         byType["title"]?.forEach { row ->
@@ -133,6 +186,8 @@ class LibrarySyncRepository(
             val seasonId = seasonDao.findSeasonId(payload.getString("titleId"), payload.getInt("seasonNumber"))
             if (seasonId != null) episodeDao.upsertAll(listOf(payload.toEpisodeEntity(seasonId)))
         }
+        byType["title_cast"]?.forEach { orphans.addCast(it.payload().toTitleCastEntity()) }
+        byType["title_crew"]?.forEach { orphans.addCrew(it.payload().toTitleCrewEntity()) }
         byType["viewing"]?.forEach { viewingDao.upsertAll(listOf(it.payload().toViewingEntity())) }
         byType["episode_watch_event"]?.forEach { watchEventDao.upsertAll(listOf(it.payload().toWatchEventEntity())) }
         byType["episode_rating"]?.forEach { ratingDao.upsertAll(listOf(it.payload().toRatingEntity())) }
@@ -150,6 +205,8 @@ class LibrarySyncRepository(
                 "episode_rating" -> ratingDao.deleteById(entityId)
                 "episode_review" -> reviewDao.deleteById(entityId)
                 "cinema_outing" -> cinemaOutingDao.deleteById(entityId)
+                "title_cast" -> titleCastDao.deleteById(entityId).also { orphans.forget(entityId) }
+                "title_crew" -> titleCrewDao.deleteById(entityId).also { orphans.forget(entityId) }
             }
         }
     }
@@ -172,15 +229,13 @@ class LibrarySyncRepository(
     /**
      * [existing] is the local row this one is replacing, when there is one.
      *
-     * `sync_library_changes`' title arm doesn't select every column the local mirror holds —
-     * `imdb_rating` and `original_language` in particular are absent (see
-     * supabase/migrations/20260713000000_android_sync_layer.sql). Mapping a missing key
-     * straight to null means the first sync after a title is added on this device silently
-     * erases its critic score and language, which are exactly what the Ledger's Second
-     * Opinions and In Translation widgets read. Falling back to the existing local value keeps
-     * them until the RPC learns to send them, and the payload still wins whenever it does —
-     * the same problem `releaseDate` had, fixed there by adding it to the RPC
-     * (20260723000000_sync_release_date.sql); adding these two is the proper follow-up.
+     * `imdb_rating`/`original_language` joined the title arm in
+     * supabase/migrations/20260726000000_sync_cast_crew_and_scores.sql, so the payload now
+     * carries every column this mirror holds. The carry-forward stays: mapping a missing key
+     * straight to null would silently erase a locally-added title's critic score and language
+     * — exactly what the Ledger's Second Opinions and In Translation widgets read — against
+     * any Supabase project still on an older migration. The payload wins whenever it has the
+     * key, so a genuine server-side clear still propagates once that project catches up.
      */
     private fun JSONObject.toTitleEntity(existing: TitleEntity? = null) = TitleEntity(
         id = getString("id"),
@@ -207,6 +262,28 @@ class LibrarySyncRepository(
         releaseDate = optStringOrNull("releaseDate") ?: existing?.releaseDate,
         imdbRating = optDoubleOrNull("imdbRating") ?: existing?.imdbRating,
         originalLanguage = optStringOrNull("originalLanguage") ?: existing?.originalLanguage,
+    )
+
+    // `castOrder`/`department` are the only fields either Ledger credits widget reads
+    // (The Ensemble filters on castOrder < 5, The Auteurs no longer touches crew at all —
+    // see LedgerRepository.buildBoard). The RPC deliberately omits profile_url/episode_count,
+    // which this mirror has no column for.
+    private fun JSONObject.toTitleCastEntity() = TitleCastEntity(
+        id = getString("id"),
+        titleId = getString("titleId"),
+        tmdbPersonId = getInt("tmdbPersonId"),
+        name = getString("name"),
+        characterName = optStringOrNull("characterName"),
+        castOrder = optIntOrNull("castOrder") ?: 0,
+    )
+
+    private fun JSONObject.toTitleCrewEntity() = TitleCrewEntity(
+        id = getString("id"),
+        titleId = getString("titleId"),
+        tmdbPersonId = getInt("tmdbPersonId"),
+        name = getString("name"),
+        job = getString("job"),
+        department = optStringOrNull("department"),
     )
 
     private fun JSONObject.toSeasonEntity() = SeasonEntity(

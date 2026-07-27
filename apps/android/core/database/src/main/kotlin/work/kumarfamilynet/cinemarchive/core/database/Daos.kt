@@ -225,6 +225,9 @@ interface TitleCastDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(rows: List<TitleCastEntity>)
+
+    @Query("DELETE FROM title_cast WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -234,6 +237,9 @@ interface TitleCrewDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(rows: List<TitleCrewEntity>)
+
+    @Query("DELETE FROM title_crew WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao

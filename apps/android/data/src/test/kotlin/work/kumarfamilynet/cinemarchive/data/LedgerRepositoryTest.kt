@@ -73,12 +73,14 @@ private class FakeTitleCastDao(cast: List<TitleCastEntity>) : TitleCastDao {
     private val flow = MutableStateFlow(cast)
     override fun observeAllCast(): Flow<List<TitleCastEntity>> = flow
     override suspend fun upsertAll(rows: List<TitleCastEntity>) = throw UnsupportedOperationException()
+    override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
 
 private class FakeTitleCrewDao(crew: List<TitleCrewEntity>) : TitleCrewDao {
     private val flow = MutableStateFlow(crew)
     override fun observeAllCrew(): Flow<List<TitleCrewEntity>> = flow
     override suspend fun upsertAll(rows: List<TitleCrewEntity>) = throw UnsupportedOperationException()
+    override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
 
 private class FakeCinemaOutingDao(outings: List<CinemaOutingEntity>) : CinemaOutingDao {

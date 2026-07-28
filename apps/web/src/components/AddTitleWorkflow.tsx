@@ -139,20 +139,20 @@ function SeasonEditor({ seasons, onChange }: SeasonEditorProps) {
                 type="button"
                 onClick={() => toggleEpisodes(i, -1)}
                 aria-label={`Decrease episodes watched for season ${s.seasonNumber}`}
-                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center"
+                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               >−</button>
               <button
                 type="button"
                 onClick={() => toggleEpisodes(i, 1)}
                 aria-label={`Increase episodes watched for season ${s.seasonNumber}`}
-                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center"
+                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               >+</button>
               <button
                 type="button"
                 onClick={() => markSeasonComplete(i)}
                 aria-label={complete ? `Mark season ${s.seasonNumber} incomplete` : `Mark season ${s.seasonNumber} complete`}
                 className={cn(
-                  'w-5 h-5 rounded flex items-center justify-center transition-colors',
+                  'w-5 h-5 rounded flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
                   complete ? 'bg-amber/20 text-amber' : 'bg-secondary text-muted-foreground hover:text-amber'
                 )}
               >
@@ -253,7 +253,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); removeTag(tag) }}
-            className="hover:text-amber-bright transition-colors"
+            className="hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
             aria-label={`Remove tag ${tag}`}
           >
             <X className="w-2.5 h-2.5" />
@@ -518,7 +518,7 @@ export function AddTitleWorkflow() {
                     <button
                       key={r.tmdbId}
                       onClick={() => selectResult(r)}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left"
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                     >
                       <PosterThumb src={r.posterUrl} alt={r.title} type={r.type} />
                       <div className="flex-1 min-w-0">
@@ -559,7 +559,7 @@ export function AddTitleWorkflow() {
         <div className="space-y-6">
           <button
             onClick={() => setStep('search')}
-            className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
             ← Back to search
           </button>
@@ -602,7 +602,7 @@ export function AddTitleWorkflow() {
                   key={opt.value}
                   onClick={() => setLog((l) => ({ ...l, status: opt.value }))}
                   className={cn(
-                    'px-3 py-1.5 rounded-md text-xs font-sans border transition-all',
+                    'px-3 py-1.5 rounded-md text-xs font-sans border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
                     log.status === opt.value
                       ? 'bg-amber/20 border-amber/50 text-amber'
                       : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
@@ -670,7 +670,7 @@ export function AddTitleWorkflow() {
                       seasons: l.seasons.map((s) => ({ ...s, episodesWatched: s.episodeCount })),
                     }))
                   }}
-                  className="text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                  className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                 >
                   Mark All Complete
                 </button>
@@ -731,7 +731,7 @@ export function AddTitleWorkflow() {
           <div className="flex flex-col gap-2 items-center pt-2">
             <button
               onClick={handleGotTickets}
-              className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors"
+              className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
               🎟 Got tickets already?
             </button>

@@ -423,7 +423,7 @@ function ViewingTimeline({
                           onDeleteViewing?.(v.id)
                           setPendingDeleteId(null)
                         }}
-                        className="font-mono text-xs transition-opacity hover:opacity-80"
+                        className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--ember)' }}
                         aria-label={`Delete forever: viewing from ${formattedDate}`}
                       >
@@ -431,7 +431,7 @@ function ViewingTimeline({
                       </button>
                       <button
                         onClick={() => setPendingDeleteId(null)}
-                        className="font-mono text-xs transition-opacity hover:opacity-80"
+                        className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--paper-faint)' }}
                         aria-label={`Cancel deleting viewing from ${formattedDate}`}
                       >
@@ -935,7 +935,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           </button>
           <button
             onClick={() => setConfirmPrePlatform(null)}
-            className="font-mono text-xs transition-opacity hover:opacity-80"
+            className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
             style={{ color: 'var(--paper-faint)' }}
             aria-label="Cancel marking as watched before joining"
           >
@@ -1485,10 +1485,10 @@ function OutingBanner({ title }: { title: Title }) {
         {confirmingCancel ? (
           <span className="flex items-center gap-2 ml-auto">
             <span className="font-mono text-xs text-muted-foreground">Cancel these tickets?</span>
-            <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
+            <button onClick={() => cancelOuting(outing.id)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
               Yes
             </button>
-            <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
+            <button onClick={() => setConfirmingCancel(false)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
               No
             </button>
           </span>
@@ -1496,21 +1496,21 @@ function OutingBanner({ title }: { title: Title }) {
           <span className="flex items-center gap-3 ml-auto">
             <button
               onClick={() => setSharePanelOpen(true)}
-              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
               aria-label="Share these tickets"
             >
               Share
             </button>
             <button
               onClick={() => openOutingSchedule(title.id, outing.id)}
-              className="font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
               aria-label="Edit these tickets"
             >
               Edit
             </button>
             <button
               onClick={() => setConfirmingCancel(true)}
-              className="font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
+              className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
               aria-label="Cancel these tickets"
             >
               Cancel
@@ -2362,7 +2362,7 @@ export function TitleDetailDrawer() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleDelete}
-                      className="font-mono text-xs transition-opacity hover:opacity-80"
+                      className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--ember)' }}
                       aria-label="Delete forever: title from library"
                     >
@@ -2370,7 +2370,7 @@ export function TitleDetailDrawer() {
                     </button>
                     <button
                       onClick={() => setPendingDeleteTitle(false)}
-                      className="font-mono text-xs transition-opacity hover:opacity-80"
+                      className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--paper-faint)' }}
                       aria-label="Cancel deleting title from library"
                     >

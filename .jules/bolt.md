@@ -47,3 +47,11 @@
 ## 2024-07-25 - Prevent O(N*M) Hover Lag in PersonDetailPanel
 **Learning:** Extracting data from large global state stores via filtering arrays inside render loops causes extreme lag during UI interactions (like hover states or focus shifts) that trigger localized re-renders. In `PersonDetailPanel`, calculating `personTitles` without memoization iterated the entire library and nested arrays on every render.
 **Action:** Always wrap expensive O(N) array filtering/mapping operations over large datasets (like `titles`) in `useMemo`, ensuring they depend only on the explicit source array and specific identifier required for the filter to avoid needless recalculation during unrelated re-renders.
+
+## 2024-03-09 - Performance Optimizations Must Not Alter Functional Behavior
+**Learning:** When moving filtering logic (e.g., hiding zero-count emojis) out of inline render operations and into a memoized `Map` (`reactionStats`), introducing a new conditional return like `if (count === 0 && !mine) return null` actively suppresses elements that the user expects to see based on the previous implementation, causing an unintended visual regression.
+**Action:** When implementing performance optimizations (such as wrapping calculations in `useMemo`), strictly preserve the original render logic and return conditions. Do not introduce new conditional returns unless explicitly requested, as this causes visual regressions and fails the functional equivalence check.
+
+## 2024-03-09 - Clean Up Temporary Scripts Before Review
+**Learning:** Requesting a code review with a temporary patch script (`patch_comments.cjs`) still in the working directory pollutes the commit and fails the review validation step.
+**Action:** Ensure all temporary workspace files (e.g., patching scripts like `.cjs` files) are explicitly deleted before requesting a code review to prevent them from being accidentally included in the final validation and commit.

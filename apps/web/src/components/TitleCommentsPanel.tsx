@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { Loader2, Send, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import {
@@ -84,7 +84,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
     }
   }
 
-  const myReaction = reactions.find((r) => r.authorId === user?.id)?.emoji ?? null
+  const myReaction = useMemo(() => reactions.find((r) => r.authorId === user?.id)?.emoji ?? null, [reactions, user?.id])
 
   async function handleToggleReaction(emoji: ReactionEmoji) {
     if (reacting) return
@@ -106,11 +106,21 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
     }
   }
 
-  const reactionCounts = REACTION_EMOJIS.map((emoji) => ({
-    emoji,
-    count: reactions.filter((r) => r.emoji === emoji).length,
-    names: reactions.filter((r) => r.emoji === emoji).map(reactionAuthorName),
-  })).filter((r) => r.count > 0 || myReaction === r.emoji)
+  // ⚡ Bolt: Memoize reaction aggregations to prevent O(E*N) calculations on every keystroke
+  const reactionStats = useMemo(() => {
+    const stats = new Map<string, { count: number; names: string[] }>()
+    for (const emoji of REACTION_EMOJIS) {
+      stats.set(emoji, { count: 0, names: [] })
+    }
+    for (const r of reactions) {
+      const stat = stats.get(r.emoji)
+      if (stat) {
+        stat.count++
+        stat.names.push(reactionAuthorName(r))
+      }
+    }
+    return stats
+  }, [reactions])
 
   return (
     <div className="pt-2 border-t space-y-3" style={{ borderColor: 'var(--line)' }}>
@@ -119,7 +129,9 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
       {/* Reactions */}
       <div className="flex flex-wrap gap-1.5">
         {REACTION_EMOJIS.map((emoji) => {
-          const count = reactions.filter((r) => r.emoji === emoji).length
+          const stat = reactionStats.get(emoji)
+          const count = stat?.count || 0
+          const names = stat?.names.join(', ') || ''
           const mine = myReaction === emoji
           return (
             <button
@@ -128,7 +140,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
               disabled={reacting}
               onClick={() => handleToggleReaction(emoji)}
               aria-label={`${mine ? 'Remove' : 'Add'} ${emoji} reaction`}
-              title={reactionCounts.find((r) => r.emoji === emoji)?.names.join(', ')}
+              title={names}
               className="flex items-center gap-1 rounded-full px-2.5 py-1 text-sm border transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               style={{
                 borderColor: mine ? 'var(--amber)' : 'var(--line)',

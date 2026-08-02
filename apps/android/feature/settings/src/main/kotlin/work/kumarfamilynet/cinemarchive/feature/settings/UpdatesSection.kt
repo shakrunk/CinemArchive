@@ -1,9 +1,11 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
@@ -103,12 +105,17 @@ fun UpdatesSection(
                             },
                         )
                     }
-                    if (result is UpdateCheckResult.Checking) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        // Always available, even with the toggle off — the toggle governs the
-                        // automatic check only.
-                        OutlinedButton(onClick = onCheckNow) { Text("Check") }
+                    // Min-height box so the row doesn't shrink when the button is swapped for
+                    // the smaller spinner and back (#188); heightIn rather than height so a
+                    // larger font scale can still grow the button instead of clipping it.
+                    Box(modifier = Modifier.heightIn(min = 40.dp), contentAlignment = Alignment.Center) {
+                        if (result is UpdateCheckResult.Checking) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            // Always available, even with the toggle off — the toggle governs the
+                            // automatic check only.
+                            OutlinedButton(onClick = onCheckNow) { Text("Check") }
+                        }
                     }
                 }
 

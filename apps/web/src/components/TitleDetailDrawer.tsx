@@ -1453,7 +1453,7 @@ function OutingBanner({ title }: { title: Title }) {
       <div className="px-4 sm:px-6 pt-4 pb-4">
         <button
           onClick={() => openPostShowSheet(pendingFollowUp.id)}
-          className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left"
+          className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <Clapperboard className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
           <span className="font-mono text-xs text-amber">{title.title} just let out — how was it?</span>
@@ -2227,7 +2227,7 @@ export function TitleDetailDrawer() {
                       {(title.status === 'watchlist' || title.status === 'watching') && (
                         <button
                           onClick={() => openOutingSchedule(title.id)}
-                          className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                          className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                         >
                           <Ticket className="w-3.5 h-3.5" />
                           I've got tickets
@@ -2235,7 +2235,7 @@ export function TitleDetailDrawer() {
                       )}
                       <button
                         onClick={() => setShowLogForm(true)}
-                        className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors"
+                        className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Log a viewing

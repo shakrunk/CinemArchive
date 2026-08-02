@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.22.1] - 2026-08-01
+
 ### Fixed
 
 - Android: a from-epoch library resync (fresh install, sign-in on a new device, or an app

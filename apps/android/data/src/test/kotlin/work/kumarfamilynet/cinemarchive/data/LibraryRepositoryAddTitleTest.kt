@@ -78,6 +78,7 @@ private class RecordingEpisodeDao : EpisodeDao {
     override fun observeEpisodes(titleId: String): Flow<List<EpisodeEntity>> = throw UnsupportedOperationException()
     override fun observeAllEpisodes(): Flow<List<EpisodeEntity>> = MutableStateFlow(written)
     override suspend fun upsertAll(episodes: List<EpisodeEntity>) { written += episodes }
+    override suspend fun getById(id: String): EpisodeEntity? = written.firstOrNull { it.id == id }
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
 

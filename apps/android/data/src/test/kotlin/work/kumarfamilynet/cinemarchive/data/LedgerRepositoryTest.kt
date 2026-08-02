@@ -116,6 +116,7 @@ private class FakeEpisodeDao(episodes: List<EpisodeEntity>) : EpisodeDao {
     override fun observeEpisodes(titleId: String): Flow<List<EpisodeEntity>> = throw UnsupportedOperationException()
     override fun observeAllEpisodes(): Flow<List<EpisodeEntity>> = flow
     override suspend fun upsertAll(episodes: List<EpisodeEntity>) = throw UnsupportedOperationException()
+    override suspend fun getById(id: String): EpisodeEntity? = throw UnsupportedOperationException()
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
 

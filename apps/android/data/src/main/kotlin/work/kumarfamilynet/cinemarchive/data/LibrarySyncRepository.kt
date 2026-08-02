@@ -62,6 +62,12 @@ private const val PAGE_SIZE = 500
  * predates the cursor on an existing install, which is exactly the case this constant exists
  * for. Without the reset the Ledger's Ensemble/Second Opinions/In Translation widgets stay
  * empty forever on any library that was synced down rather than added on the phone (#177).
+ *
+ * No bump for [DeferredRows] gaining hold-back arms beyond `title_cast`/`title_crew`: unlike
+ * the cases above, a row that hit that ordering hazard never landed with missing data — it hit
+ * `SQLiteConstraintException` and crashed before the page's cursor was persisted, so a stuck
+ * install already retries the same page from scratch once the fix ships, no forced resync
+ * needed.
  */
 private const val SYNC_SCHEMA_VERSION = 5
 
@@ -112,12 +118,12 @@ class LibrarySyncRepository(
         // that as version 1, so every pre-existing install also gets the one-time reset.
         val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
         var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
-        val orphans = OrphanedCredits()
+        val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
             if (rows.length() == 0) break
-            applyPage(rows, orphans)
+            applyPage(rows, deferred)
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
             dataStore.edit { it[cursorKey] = cursor }
             // A page may overshoot PAGE_SIZE — the RPC widens it to avoid splitting a group of
@@ -125,7 +131,7 @@ class LibrarySyncRepository(
             // nothing left to send, so a short page is still a reliable "that was the last one".
             if (rows.length() < PAGE_SIZE) break
         }
-        orphans.flush()
+        deferred.flush()
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
         // idempotently) does the full resync again rather than settling for a partial one.
@@ -133,18 +139,51 @@ class LibrarySyncRepository(
     }
 
     /**
-     * Credit rows whose title hasn't been applied yet, held back until the whole run is in.
+     * Rows whose parent hasn't been applied yet, held back until the whole run is in.
      *
-     * Rows are ordered by `updated_at` across the entire run, not grouped by title, so a
-     * title edited after its credits were written sorts *behind* them — on a from-epoch
-     * resync that means a `title_cast` row can land pages before the `titles` row it points
-     * at, and [TitleCastEntity]'s foreign key would reject the insert outright. [flush]
-     * re-checks each one once every page has been applied and drops the ones whose title
-     * never arrived (deleted server-side, so a tombstone would have removed them anyway).
+     * Rows are ordered by `updated_at` across the entire run, not grouped by parent, so a
+     * title edited after one of its children was written sorts *behind* that child — on a
+     * from-epoch resync that means (say) a `season` row can land pages before the `titles`
+     * row it points at, and [SeasonEntity]'s foreign key would reject the insert outright —
+     * originally only guarded for `title_cast`/`title_crew` (see f73e750), widened here after
+     * the same hazard crashed on a `season` row on a real device instead. [flush] re-checks
+     * each one once every page has been applied and drops the ones whose parent never arrived
+     * (deleted server-side, so a tombstone would have removed them anyway).
+     *
+     * Two levels deep: `episode` depends on `season` (resolved by titleId+seasonNumber, not a
+     * direct id), and `episode_watch_event`/`episode_rating`/`episode_review` depend on
+     * `episode`. [flush] applies season/viewing/cinema_outing/cast/crew first — everything
+     * that depends only on `titles`, which is fully applied by the time [flush] runs — then
+     * re-resolves episodes against those newly-applied seasons, then re-checks the
+     * episode-children against those newly-applied episodes.
      */
-    private inner class OrphanedCredits {
+    private inner class DeferredRows {
+        private val seasons = mutableListOf<SeasonEntity>()
+        private val episodes = mutableListOf<JSONObject>()
+        private val viewings = mutableListOf<ViewingEntity>()
+        private val cinemaOutings = mutableListOf<CinemaOutingEntity>()
         private val cast = mutableListOf<TitleCastEntity>()
         private val crew = mutableListOf<TitleCrewEntity>()
+        private val watchEvents = mutableListOf<EpisodeWatchEventEntity>()
+        private val ratings = mutableListOf<EpisodeRatingEntity>()
+        private val reviews = mutableListOf<EpisodeReviewEntity>()
+
+        suspend fun addSeason(row: SeasonEntity) {
+            if (titleDao.getById(row.titleId) != null) seasonDao.upsertAll(listOf(row)) else seasons += row
+        }
+
+        suspend fun addEpisode(payload: JSONObject) {
+            val seasonId = seasonDao.findSeasonId(payload.getString("titleId"), payload.getInt("seasonNumber"))
+            if (seasonId != null) episodeDao.upsertAll(listOf(payload.toEpisodeEntity(seasonId))) else episodes += payload
+        }
+
+        suspend fun addViewing(row: ViewingEntity) {
+            if (titleDao.getById(row.titleId) != null) viewingDao.upsertAll(listOf(row)) else viewings += row
+        }
+
+        suspend fun addCinemaOuting(row: CinemaOutingEntity) {
+            if (titleDao.getById(row.titleId) != null) cinemaOutingDao.upsert(row) else cinemaOutings += row
+        }
 
         suspend fun addCast(row: TitleCastEntity) {
             if (titleDao.getById(row.titleId) != null) titleCastDao.upsertAll(listOf(row)) else cast += row
@@ -154,25 +193,61 @@ class LibrarySyncRepository(
             if (titleDao.getById(row.titleId) != null) titleCrewDao.upsertAll(listOf(row)) else crew += row
         }
 
+        suspend fun addWatchEvent(row: EpisodeWatchEventEntity) {
+            if (episodeDao.getById(row.episodeId) != null) watchEventDao.upsertAll(listOf(row)) else watchEvents += row
+        }
+
+        suspend fun addRating(row: EpisodeRatingEntity) {
+            if (episodeDao.getById(row.episodeId) != null) ratingDao.upsertAll(listOf(row)) else ratings += row
+        }
+
+        suspend fun addReview(row: EpisodeReviewEntity) {
+            if (episodeDao.getById(row.episodeId) != null) reviewDao.upsertAll(listOf(row)) else reviews += row
+        }
+
         /** Drops a held-back row that a later page went on to tombstone, so [flush] can't
          *  resurrect it after the delete already ran. */
-        fun forget(entityId: String) {
-            cast.removeAll { it.id == entityId }
-            crew.removeAll { it.id == entityId }
+        fun forget(entityType: String, entityId: String) {
+            when (entityType) {
+                "season" -> seasons.removeAll { it.id == entityId }
+                "episode" -> episodes.removeAll { it.getString("id") == entityId }
+                "viewing" -> viewings.removeAll { it.id == entityId }
+                "cinema_outing" -> cinemaOutings.removeAll { it.id == entityId }
+                "title_cast" -> cast.removeAll { it.id == entityId }
+                "title_crew" -> crew.removeAll { it.id == entityId }
+                "episode_watch_event" -> watchEvents.removeAll { it.id == entityId }
+                "episode_rating" -> ratings.removeAll { it.id == entityId }
+                "episode_review" -> reviews.removeAll { it.id == entityId }
+            }
         }
 
         suspend fun flush() {
+            seasonDao.upsertAll(seasons.filter { titleDao.getById(it.titleId) != null })
+            viewingDao.upsertAll(viewings.filter { titleDao.getById(it.titleId) != null })
+            cinemaOutings.filter { titleDao.getById(it.titleId) != null }.forEach { cinemaOutingDao.upsert(it) }
             titleCastDao.upsertAll(cast.filter { titleDao.getById(it.titleId) != null })
             titleCrewDao.upsertAll(crew.filter { titleDao.getById(it.titleId) != null })
+
+            val resolvedEpisodes = episodes.mapNotNull { payload ->
+                seasonDao.findSeasonId(payload.getString("titleId"), payload.getInt("seasonNumber"))
+                    ?.let { payload.toEpisodeEntity(it) }
+            }
+            episodeDao.upsertAll(resolvedEpisodes)
+
+            watchEventDao.upsertAll(watchEvents.filter { episodeDao.getById(it.episodeId) != null })
+            ratingDao.upsertAll(ratings.filter { episodeDao.getById(it.episodeId) != null })
+            reviewDao.upsertAll(reviews.filter { episodeDao.getById(it.episodeId) != null })
         }
     }
 
-    /** Applies one page grouped by entity_type in a fixed order — title/season before
-     *  episode (episodes resolve their seasonId against already-applied seasons) and before
-     *  cast/crew (which hold a foreign key to it), and tombstones strictly last so a same-page
-     *  delete always wins over an upsert of the same id, regardless of the RPC's own
-     *  (updated_at, entity_id) row order. */
-    private suspend fun applyPage(rows: JSONArray, orphans: OrphanedCredits) {
+    /** Applies one page grouped by entity_type in a fixed order — title before everything
+     *  else (every other type either FKs to it directly or, for episode, indirectly through
+     *  season) — and tombstones strictly last so a same-page delete always wins over an
+     *  upsert of the same id, regardless of the RPC's own (updated_at, entity_id) row order.
+     *  Anything whose parent isn't in the local DB yet goes through [deferred] instead of a
+     *  direct DAO call — see [DeferredRows]'s kdoc for why that's necessary even though title
+     *  is always applied first *within* a page. */
+    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows) {
         val byType = (0 until rows.length()).map { rows.getJSONObject(it) }.groupBy { it.getString("entity_type") }
 
         byType["title"]?.forEach { row ->
@@ -180,23 +255,20 @@ class LibrarySyncRepository(
             // Carry forward whatever the RPC doesn't send — see toTitleEntity's kdoc.
             titleDao.upsertAll(listOf(payload.toTitleEntity(titleDao.getById(payload.getString("id")))))
         }
-        byType["season"]?.forEach { seasonDao.upsertAll(listOf(it.payload().toSeasonEntity())) }
-        byType["episode"]?.forEach { row ->
-            val payload = row.payload()
-            val seasonId = seasonDao.findSeasonId(payload.getString("titleId"), payload.getInt("seasonNumber"))
-            if (seasonId != null) episodeDao.upsertAll(listOf(payload.toEpisodeEntity(seasonId)))
-        }
-        byType["title_cast"]?.forEach { orphans.addCast(it.payload().toTitleCastEntity()) }
-        byType["title_crew"]?.forEach { orphans.addCrew(it.payload().toTitleCrewEntity()) }
-        byType["viewing"]?.forEach { viewingDao.upsertAll(listOf(it.payload().toViewingEntity())) }
-        byType["episode_watch_event"]?.forEach { watchEventDao.upsertAll(listOf(it.payload().toWatchEventEntity())) }
-        byType["episode_rating"]?.forEach { ratingDao.upsertAll(listOf(it.payload().toRatingEntity())) }
-        byType["episode_review"]?.forEach { reviewDao.upsertAll(listOf(it.payload().toReviewEntity())) }
-        byType["cinema_outing"]?.forEach { cinemaOutingDao.upsert(it.payload().toCinemaOutingEntity()) }
+        byType["season"]?.forEach { deferred.addSeason(it.payload().toSeasonEntity()) }
+        byType["episode"]?.forEach { deferred.addEpisode(it.payload()) }
+        byType["title_cast"]?.forEach { deferred.addCast(it.payload().toTitleCastEntity()) }
+        byType["title_crew"]?.forEach { deferred.addCrew(it.payload().toTitleCrewEntity()) }
+        byType["viewing"]?.forEach { deferred.addViewing(it.payload().toViewingEntity()) }
+        byType["episode_watch_event"]?.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity()) }
+        byType["episode_rating"]?.forEach { deferred.addRating(it.payload().toRatingEntity()) }
+        byType["episode_review"]?.forEach { deferred.addReview(it.payload().toReviewEntity()) }
+        byType["cinema_outing"]?.forEach { deferred.addCinemaOuting(it.payload().toCinemaOutingEntity()) }
 
         byType["tombstone"]?.forEach { row ->
             val entityId = row.getString("entity_id")
-            when (row.getJSONObject("payload").getString("entityType")) {
+            val entityType = row.getJSONObject("payload").getString("entityType")
+            when (entityType) {
                 "title" -> titleDao.deleteById(entityId)
                 "season" -> seasonDao.deleteById(entityId)
                 "episode" -> episodeDao.deleteById(entityId)
@@ -205,9 +277,10 @@ class LibrarySyncRepository(
                 "episode_rating" -> ratingDao.deleteById(entityId)
                 "episode_review" -> reviewDao.deleteById(entityId)
                 "cinema_outing" -> cinemaOutingDao.deleteById(entityId)
-                "title_cast" -> titleCastDao.deleteById(entityId).also { orphans.forget(entityId) }
-                "title_crew" -> titleCrewDao.deleteById(entityId).also { orphans.forget(entityId) }
+                "title_cast" -> titleCastDao.deleteById(entityId)
+                "title_crew" -> titleCrewDao.deleteById(entityId)
             }
+            deferred.forget(entityType, entityId)
         }
     }
 

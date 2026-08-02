@@ -128,6 +128,12 @@ interface EpisodeDao {
     @Upsert
     suspend fun upsertAll(episodes: List<EpisodeEntity>)
 
+    // LibrarySyncRepository's deferred episode_watch_event/rating/review rows: those three
+    // FK to episodes.id, so a row synced ahead of its own episode (same global-updated_at-order
+    // hazard as seasons/episodes themselves) needs an existence check before insert.
+    @Query("SELECT * FROM episodes WHERE id = :id")
+    suspend fun getById(id: String): EpisodeEntity?
+
     @Query("DELETE FROM episodes WHERE id = :id")
     suspend fun deleteById(id: String)
 }

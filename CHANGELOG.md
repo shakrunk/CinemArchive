@@ -9,6 +9,17 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.22.1] - 2026-08-01
+
+### Fixed
+
+- Android: a from-epoch library resync (fresh install, sign-in on a new device, or an app
+  reinstall) could crash the app on launch with a `SQLiteConstraintException` if a season,
+  viewing, cinema outing, episode, or episode watch event/rating/review row happened to sort
+  ahead of the title/season row it depends on in the sync stream — the same ordering hazard a
+  prior fix addressed for cast/crew rows only. These rows are now held back and re-applied once
+  their parent has landed, instead of being inserted blind.
+
 ## [1.22.0] - 2026-07-26
 
 ### Added

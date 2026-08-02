@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Android: Settings → Updates no longer changes the row's height when the "Check" button swaps
+  for the in-progress spinner and back (#188).
+
 ## [1.23.0] - 2026-08-01
 
 ### Added

@@ -233,12 +233,30 @@ private fun LibraryScreen(
     var showFilterSheet by remember { mutableStateOf(false) }
     val activeFilterCount = statusFilters.size + genreFilters.size + (if (minRating > 0) 1 else 0)
 
+    // Status order matches the filter sheet's status chips — grouping just re-buckets the
+    // already-sorted list, so relative order within each bucket is unaffected.
+    val groupedTitles: List<Pair<LibraryStatus?, List<LibraryTitle>>> = if (grouping == LibraryGrouping.STATUS) {
+        listOf(LibraryStatus.WATCHED, LibraryStatus.WATCHING, LibraryStatus.WATCHLIST, LibraryStatus.DROPPED)
+            .mapNotNull { status ->
+                val group = titles.filter { it.status == status }
+                if (group.isEmpty()) null else status to group
+            }
+    } else {
+        listOf(null to titles)
+    }
+    // Which headers are present — switching "Group by" (or a status filter that changes which
+    // header rows exist) re-anchors the lazy list's first-visible index without the user having
+    // scrolled. Feeding that shape in as the scroll hook's content key stops the re-anchor from
+    // being misread as a downward scroll, which otherwise fed back into a collapse/expand loop
+    // between this and the shrinking search bar below (#187).
+    val headerShape = groupedTitles.map { it.first }
+
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
     val collapsed = if (viewMode == LibraryViewMode.GRID) {
-        rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
+        rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, headerShape)
     } else {
-        rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+        rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, headerShape)
     }
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
@@ -337,18 +355,6 @@ private fun LibraryScreen(
                 onReset = onResetFilters,
                 onDismiss = { showFilterSheet = false },
             )
-        }
-
-        // Status order matches the filter sheet's status chips — grouping just re-buckets the
-        // already-sorted list, so relative order within each bucket is unaffected.
-        val groupedTitles: List<Pair<LibraryStatus?, List<LibraryTitle>>> = if (grouping == LibraryGrouping.STATUS) {
-            listOf(LibraryStatus.WATCHED, LibraryStatus.WATCHING, LibraryStatus.WATCHLIST, LibraryStatus.DROPPED)
-                .mapNotNull { status ->
-                    val group = titles.filter { it.status == status }
-                    if (group.isEmpty()) null else status to group
-                }
-        } else {
-            listOf(null to titles)
         }
 
         ExpressivePullToRefresh(

@@ -13,6 +13,8 @@ number is chosen.
 
 - Android: Settings → Updates no longer changes the row's height when the "Check" button swaps
   for the in-progress spinner and back (#188).
+- Android: selecting "Status" under Library's "Group by" no longer causes the screen to flicker
+  in a collapse/expand loop between the search bar and the newly-inserted status headers (#187).
 
 ## [1.23.0] - 2026-08-01
 

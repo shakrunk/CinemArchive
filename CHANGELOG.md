@@ -9,6 +9,18 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-08-01
+
+### Added
+
+- Android: the app now adapts to wide/unfolded layouts (foldables opened flat, tablets) instead
+  of stretching phone-first chrome across the extra width — bottom navigation switches to a
+  leading-edge rail at medium window widths and up, poster grids in Library/Discover use
+  adaptive column counts that scale continuously with available width instead of a fixed count,
+  search/filter bars and single-column screens (title detail, settings, Up Next) cap to a
+  reading-width column instead of stretching edge to edge, and the Ledger widget board's
+  existing wide-layout packing now triggers correctly at these widths.
+
 ## [1.22.1] - 2026-08-01
 
 ### Fixed

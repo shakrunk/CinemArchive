@@ -51,6 +51,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
+import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 
 private fun cameraGranted(context: Context) =
@@ -169,7 +170,9 @@ private fun PermissionsScreen(
             verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
         ) {
             itemsIndexed(rows) { index, row ->
-                PermissionRow(row, shape = groupedItemShape(isFirst = index == 0, isLast = index == rows.lastIndex))
+                ReadingWidthColumn {
+                    PermissionRow(row, shape = groupedItemShape(isFirst = index == 0, isLast = index == rows.lastIndex))
+                }
             }
         }
     }

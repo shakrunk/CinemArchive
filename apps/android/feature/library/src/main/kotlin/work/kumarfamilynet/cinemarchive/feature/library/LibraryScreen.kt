@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -82,8 +83,10 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
+import work.kumarfamilynet.cinemarchive.core.designsystem.ContentReadingMaxWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
+import work.kumarfamilynet.cinemarchive.core.designsystem.posterMinTileWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryGrouping
@@ -269,7 +272,7 @@ private fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .padding(horizontal = 20.dp, vertical = 10.dp)
-                        .fillMaxWidth()
+                        .widthIn(max = ContentReadingMaxWidth)
                         .height(52.dp)
                         .clip(RoundedCornerShape(26.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -365,7 +368,7 @@ private fun LibraryScreen(
                     EmptyLibrary(modifier = Modifier.fillMaxSize())
                 } else if (viewMode == LibraryViewMode.GRID) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(gridColumns),
+                        columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
                         state = gridState,
                         contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),

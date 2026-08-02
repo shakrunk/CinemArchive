@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -59,9 +60,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
+import work.kumarfamilynet.cinemarchive.core.designsystem.ContentReadingMaxWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
+import work.kumarfamilynet.cinemarchive.core.designsystem.posterMinTileWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
@@ -240,7 +243,7 @@ private fun DiscoverScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .padding(horizontal = 20.dp, vertical = 8.dp)
-                        .fillMaxWidth()
+                        .widthIn(max = ContentReadingMaxWidth)
                         .height(56.dp)
                         .clip(RoundedCornerShape(28.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -314,7 +317,7 @@ private fun DiscoverScreen(
                     )
 
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(gridColumns),
+                        columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
                         state = gridState,
                         contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),

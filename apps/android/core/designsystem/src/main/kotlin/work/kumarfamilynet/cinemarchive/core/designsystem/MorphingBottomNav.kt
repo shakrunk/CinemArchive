@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -121,6 +122,108 @@ fun <T> MorphingBottomNav(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = LocalIndication.current,
+                                ) { onSelect(destination.value) }
+                                .padding(top = INDICATOR_TOP_INSET),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Top,
+                        ) {
+                            Box(
+                                modifier = Modifier.height(INDICATOR_HEIGHT),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    if (isSelected) destination.selectedIcon else destination.icon,
+                                    contentDescription = destination.label,
+                                    tint = color,
+                                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                                )
+                            }
+                            Text(
+                                destination.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = color,
+                                modifier = Modifier.padding(top = 3.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Fixed per-item height for [MorphingNavigationRail] — deliberately not "available height /
+ *  item count" the way [MorphingBottomNav]'s `itemWidth` divides the bar's width, since a rail
+ *  runs the full device height: dividing that by 4 would make each item enormous. The item
+ *  stack is a fixed-height block instead, centered in whatever height the rail is given. */
+private val RAIL_WIDTH = 88.dp
+private val RAIL_ITEM_HEIGHT = 72.dp
+
+/**
+ * Leading-edge counterpart to [MorphingBottomNav] for wide/unfolded layouts — same sliding-pill
+ * M3 Expressive language, transposed to a vertical, fixed-width rail instead of a bar stretched
+ * across the full device width.
+ */
+@Composable
+fun <T> MorphingNavigationRail(
+    destinations: List<NavDestination<T>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.fillMaxHeight(),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(RAIL_WIDTH)
+                .fillMaxHeight()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val stackHeight = RAIL_ITEM_HEIGHT * destinations.size
+            Box(modifier = Modifier.width(RAIL_WIDTH).height(stackHeight)) {
+                val selectedIndex = destinations.indexOfFirst { it.value == selected }.coerceAtLeast(0)
+                val indicatorOffset by animateDpAsState(
+                    targetValue = RAIL_ITEM_HEIGHT * selectedIndex,
+                    animationSpec = expressiveSpring(),
+                    label = "railIndicatorOffset",
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = indicatorOffset + INDICATOR_TOP_INSET)
+                        .size(width = RAIL_WIDTH - 24.dp, height = INDICATOR_HEIGHT)
+                        .clip(RoundedCornerShape(INDICATOR_HEIGHT / 2))
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                )
+
+                Column(modifier = Modifier.fillMaxWidth().fillMaxHeight().zIndex(1f)) {
+                    destinations.forEach { destination ->
+                        val isSelected = destination.value == selected
+                        val color = if (isSelected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (isPressed) 0.8f else 1f,
+                            animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
+                            label = "railIconScale",
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(RAIL_ITEM_HEIGHT)
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = LocalIndication.current,

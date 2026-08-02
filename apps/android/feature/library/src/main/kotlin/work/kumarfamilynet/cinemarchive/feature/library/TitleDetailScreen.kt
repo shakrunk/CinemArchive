@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
@@ -222,7 +223,7 @@ fun TitleDetailScreen(
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { DetailHero(detail, onBack) }
             item {
-                Column(modifier = Modifier.padding(22.dp, 0.dp, 22.dp, 28.dp)) {
+                ReadingWidthColumn(modifier = Modifier.padding(22.dp, 0.dp, 22.dp, 28.dp)) {
                     Text(detail.title, style = MaterialTheme.typography.headlineMedium)
                     Text(
                         metaLine(detail),
@@ -342,33 +343,41 @@ fun TitleDetailScreen(
 
             if (detail.seasons.isNotEmpty()) {
                 item {
-                    Text(
-                        "Seasons",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
-                    )
+                    ReadingWidthColumn {
+                        Text(
+                            "Seasons",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                        )
+                    }
                 }
                 items(detail.seasons, key = SeasonDetail::id) { season ->
-                    SeasonRow(season, onMarkWatched, onRateEpisode, onSubmitReview)
+                    ReadingWidthColumn {
+                        SeasonRow(season, onMarkWatched, onRateEpisode, onSubmitReview)
+                    }
                 }
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(22.dp, 16.dp, 22.dp, 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Viewing history", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = onLogViewing) { Text("Log a viewing") }
+                ReadingWidthColumn {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(22.dp, 16.dp, 22.dp, 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Viewing history", style = MaterialTheme.typography.titleMedium)
+                        TextButton(onClick = onLogViewing) { Text("Log a viewing") }
+                    }
                 }
             }
             items(detail.viewings, key = Viewing::id) { viewing ->
-                ViewingRow(
-                    viewing,
-                    onRateClick = { postShowViewing = viewing },
-                    modifier = Modifier.padding(horizontal = 22.dp),
-                )
+                ReadingWidthColumn {
+                    ViewingRow(
+                        viewing,
+                        onRateClick = { postShowViewing = viewing },
+                        modifier = Modifier.padding(horizontal = 22.dp),
+                    )
+                }
             }
             item { Box(modifier = Modifier.height(28.dp)) }
         }

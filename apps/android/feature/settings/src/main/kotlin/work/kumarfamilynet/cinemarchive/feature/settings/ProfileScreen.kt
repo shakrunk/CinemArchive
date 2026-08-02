@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
@@ -127,87 +128,99 @@ private fun ProfileScreen(
 
         LazyColumn(contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 28.dp)) {
             item {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp),
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(76.dp),
+                ReadingWidthColumn {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
+                        Surface(
+                            shape = RoundedCornerShape(28.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(76.dp),
                         ) {
-                            Text(
-                                displayName.first().uppercaseChar().toString(),
-                                style = MaterialTheme.typography.headlineMedium,
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    displayName.first().uppercaseChar().toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                )
+                            }
                         }
+                        Text(displayName, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
+                        Text(
+                            "a private film archive",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    Text(displayName, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
-                    Text(
-                        "a private film archive",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                }
+            }
+
+            item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Palette,
+                        iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        title = "Appearance",
+                        subtitle = appearanceSummary,
+                        onClick = onOpenAppearance,
+                    )
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Lock,
+                        iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        title = "Permissions",
+                        subtitle = "Camera, notifications & alarms",
+                        onClick = onOpenPermissions,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Info,
+                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        title = "About & Legal",
+                        subtitle = "Version $appVersionName",
+                        onClick = onOpenAbout,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
                     )
                 }
             }
 
             item {
-                ProfileRow(
-                    icon = Icons.Filled.Palette,
-                    iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    title = "Appearance",
-                    subtitle = appearanceSummary,
-                    onClick = onOpenAppearance,
-                )
-            }
-            item {
-                ProfileRow(
-                    icon = Icons.Filled.Lock,
-                    iconContainer = MaterialTheme.colorScheme.primaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    title = "Permissions",
-                    subtitle = "Camera, notifications & alarms",
-                    onClick = onOpenPermissions,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
-            }
-            item {
-                ProfileRow(
-                    icon = Icons.Filled.Info,
-                    iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    title = "About & Legal",
-                    subtitle = "Version $appVersionName",
-                    onClick = onOpenAbout,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
-                )
-            }
-
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp)) {
-                    StatTile(value = ownedCount.toString(), label = "Titles logged", modifier = Modifier.weight(1f))
-                    StatTile(value = watchedCount.toString(), label = "Watched", modifier = Modifier.weight(1f))
+                ReadingWidthColumn {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp)) {
+                        StatTile(value = ownedCount.toString(), label = "Titles logged", modifier = Modifier.weight(1f))
+                        StatTile(value = watchedCount.toString(), label = "Watched", modifier = Modifier.weight(1f))
+                    }
                 }
             }
 
             item {
-                OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
-                    Text("Sign out")
-                }
-                if (signedInEmail != null) {
-                    Text(
-                        "Signed in as $signedInEmail",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                ReadingWidthColumn {
+                    OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
+                        Text("Sign out")
+                    }
+                    if (signedInEmail != null) {
+                        Text(
+                            "Signed in as $signedInEmail",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                 }
             }
         }

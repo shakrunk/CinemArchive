@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
+import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.cinemArchiveTypography
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
@@ -123,66 +124,72 @@ private fun AppearanceScreen(
 
         LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
             item {
-                Text(
-                    "THEME",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
-                SegmentedGroup(
-                    options = listOf(
-                        ChoiceOption(ArchiveThemeMode.SYSTEM, "System", icon = Icons.Filled.BrightnessAuto),
-                        ChoiceOption(ArchiveThemeMode.LIGHT, "Light", icon = Icons.Filled.LightMode),
-                        ChoiceOption(ArchiveThemeMode.DARK, "Dark", icon = Icons.Filled.DarkMode),
-                    ),
-                    selected = themeMode,
-                    onSelect = onSetThemeMode,
-                    modifier = Modifier.padding(bottom = 24.dp),
-                )
+                ReadingWidthColumn {
+                    Text(
+                        "THEME",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 10.dp),
+                    )
+                    SegmentedGroup(
+                        options = listOf(
+                            ChoiceOption(ArchiveThemeMode.SYSTEM, "System", icon = Icons.Filled.BrightnessAuto),
+                            ChoiceOption(ArchiveThemeMode.LIGHT, "Light", icon = Icons.Filled.LightMode),
+                            ChoiceOption(ArchiveThemeMode.DARK, "Dark", icon = Icons.Filled.DarkMode),
+                        ),
+                        selected = themeMode,
+                        onSelect = onSetThemeMode,
+                        modifier = Modifier.padding(bottom = 24.dp),
+                    )
 
-                Text(
-                    "COLOR PALETTE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
+                    Text(
+                        "COLOR PALETTE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 10.dp),
+                    )
+                }
             }
             // One grouped container rather than a flat run of separate cards, so the
             // palettes read as a single set of mutually exclusive options (#141).
             itemsIndexed(PALETTE_SWATCHES) { index, swatch ->
-                PaletteCard(
-                    swatch = swatch,
-                    label = swatch.palette.label(),
-                    selected = swatch.palette == palette,
-                    shape = groupedItemShape(
-                        isFirst = index == 0,
-                        isLast = index == PALETTE_SWATCHES.lastIndex,
-                    ),
-                    onClick = { onSetPalette(swatch.palette) },
-                )
+                ReadingWidthColumn {
+                    PaletteCard(
+                        swatch = swatch,
+                        label = swatch.palette.label(),
+                        selected = swatch.palette == palette,
+                        shape = groupedItemShape(
+                            isFirst = index == 0,
+                            isLast = index == PALETTE_SWATCHES.lastIndex,
+                        ),
+                        onClick = { onSetPalette(swatch.palette) },
+                    )
+                }
             }
             item {
-                // Divider, not just another eyebrow label, so "Theme"+"Color Palette" reads as
-                // one related cluster and "Text" as a clearly separate one (#152) — the
-                // labelSmall eyebrows alone didn't give the two groups enough visual weight.
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(top = 18.dp, bottom = 18.dp),
-                )
-                Text(
-                    "TEXT",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
-                TextSettingsCard(
-                    fontFamily = fontFamily,
-                    fontScale = fontScale,
-                    onApply = { family, scale ->
-                        onSetFontFamily(family)
-                        onSetFontScale(scale)
-                    },
-                )
+                ReadingWidthColumn {
+                    // Divider, not just another eyebrow label, so "Theme"+"Color Palette" reads as
+                    // one related cluster and "Text" as a clearly separate one (#152) — the
+                    // labelSmall eyebrows alone didn't give the two groups enough visual weight.
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(top = 18.dp, bottom = 18.dp),
+                    )
+                    Text(
+                        "TEXT",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 10.dp),
+                    )
+                    TextSettingsCard(
+                        fontFamily = fontFamily,
+                        fontScale = fontScale,
+                        onApply = { family, scale ->
+                            onSetFontFamily(family)
+                            onSetFontScale(scale)
+                        },
+                    )
+                }
             }
         }
     }

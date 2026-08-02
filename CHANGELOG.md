@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.23.1] - 2026-08-01
+
 ### Fixed
 
 - Android: Settings → Updates no longer changes the row's height when the "Check" button swaps

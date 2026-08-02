@@ -80,6 +80,30 @@ fun posterGridCornerRadius(columns: Int): androidx.compose.ui.unit.Dp = when {
     else -> 10.dp
 }
 
+/**
+ * Minimum tile width to feed [androidx.compose.foundation.lazy.grid.GridCells.Adaptive] for a
+ * given density preference ([PosterGridColumnRange] — pinch-adjustable, see
+ * [Modifier.pinchToResizeGrid][pinchToResizeGrid]). `columns` is a density preference, not a
+ * literal column count: `Adaptive` derives the actual count from whatever width it's given, so
+ * the same preference naturally yields more columns on a wider screen instead of the same fixed
+ * count stretched into oversized tiles.
+ *
+ * Solved (not estimated) against three real widths so each density's actual column count comes
+ * out as intended at every one of them: a foldable's cover display (317dp physical / 277dp
+ * usable after 20dp+20dp padding), a conservative phone (320dp usable), and that same foldable
+ * unfolded (674dp physical / 634dp usable). At the default density (2), that resolves to
+ * 2/2/4 columns respectively — i.e. the unfolded width shows twice as many columns as either
+ * phone-width state, matching two phone-widths of content side by side rather than one phone's
+ * column count stretched across both.
+ */
+fun posterMinTileWidth(columns: Int): androidx.compose.ui.unit.Dp = when (columns) {
+    1 -> 260.dp
+    2 -> 125.dp
+    3 -> 96.dp
+    4 -> 68.dp
+    else -> 125.dp
+}
+
 /** A deterministic, decorative fallback tint derived from a title's id/name — used when no
  *  poster image is available, so cards stay visually distinct rather than uniformly gray. */
 fun tintForKey(key: String): Color {

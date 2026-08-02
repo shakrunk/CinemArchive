@@ -60,6 +60,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefres
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
+import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
@@ -229,64 +230,78 @@ private fun UpNextScreen(
             }
 
             itemsIndexed(board.freshFromTheLobby, key = { _, it -> "lobby-${it.outing.id}" }) { index, entry ->
-                FreshFromTheLobbyCard(
-                    entry,
-                    shape = groupShape(index, board.freshFromTheLobby.size),
-                    onOpen = { postShowEntry = entry },
-                )
+                ReadingWidthColumn {
+                    FreshFromTheLobbyCard(
+                        entry,
+                        shape = groupShape(index, board.freshFromTheLobby.size),
+                        onOpen = { postShowEntry = entry },
+                    )
+                }
             }
 
             itemsIndexed(board.onTheMarquee, key = { _, it -> "marquee-${it.outing.id}" }) { index, entry ->
-                MarqueeCard(
-                    entry,
-                    now,
-                    shape = groupShape(index, board.onTheMarquee.size),
-                    onOpen = { onTitleClick(entry.outing.titleId) },
-                    onCancel = { onCancelOuting(entry.outing.id) },
-                )
+                ReadingWidthColumn {
+                    MarqueeCard(
+                        entry,
+                        now,
+                        shape = groupShape(index, board.onTheMarquee.size),
+                        onOpen = { onTitleClick(entry.outing.titleId) },
+                        onCancel = { onCancelOuting(entry.outing.id) },
+                    )
+                }
             }
 
             if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty()) {
                 item {
-                    Text(
-                        "Nothing queued up yet — start something from your Library.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    ReadingWidthColumn {
+                        Text(
+                            "Nothing queued up yet — start something from your Library.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
             if (board.watching.isNotEmpty()) {
                 item {
-                    Text(
-                        "NEXT EPISODE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
-                    )
+                    ReadingWidthColumn {
+                        Text(
+                            "NEXT EPISODE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                        )
+                    }
                 }
             }
             itemsIndexed(board.watching, key = { _, it -> it.id }) { index, title ->
-                ContinueWatchingCard(
-                    title,
-                    shape = groupShape(index, board.watching.size),
-                    onOpen = { onTitleClick(title.id) },
-                    onMarkWatched = { onMarkWatched(title.id) },
-                )
+                ReadingWidthColumn {
+                    ContinueWatchingCard(
+                        title,
+                        shape = groupShape(index, board.watching.size),
+                        onOpen = { onTitleClick(title.id) },
+                        onMarkWatched = { onMarkWatched(title.id) },
+                    )
+                }
             }
 
             if (board.watchlist.isNotEmpty()) {
                 item {
-                    Text(
-                        "ON YOUR WATCHLIST",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
-                    )
+                    ReadingWidthColumn {
+                        Text(
+                            "ON YOUR WATCHLIST",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                        )
+                    }
                 }
             }
             itemsIndexed(board.watchlist, key = { _, it -> it.id }) { index, title ->
-                WatchlistCard(title, shape = groupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
+                ReadingWidthColumn {
+                    WatchlistCard(title, shape = groupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
+                }
             }
         }
     }

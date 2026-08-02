@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -204,6 +203,7 @@ fun LedgerRoute(
     layoutRepository: LedgerLayoutRepository,
     onOpenProfile: () -> Unit,
     profileInitial: String = "C",
+    isWideLayout: Boolean = false,
 ) {
     val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository, layoutRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -220,6 +220,7 @@ fun LedgerRoute(
         onLayoutChange = viewModel::updateLayout,
         onOpenProfile = onOpenProfile,
         profileInitial = profileInitial,
+        isWideLayout = isWideLayout,
     )
 }
 
@@ -235,6 +236,12 @@ fun LedgerScreen(
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
+    // Sourced from MainActivity's own top-level window-width measurement (the same one that
+    // decides bottom-nav-vs-rail) rather than re-measuring this screen's own content pane —
+    // the pane narrows by the rail's width once one is showing, so a local re-measurement can
+    // fall just under the threshold on exactly the widths a rail appears at, in the same
+    // breath as switching nav (see docs: responsive-foldable-layout plan).
+    isWideLayout: Boolean = false,
     // Android has no friend/shared viewer mode yet (see LedgerWidgets.kt's kdoc on the same
     // gap), so this is always null today — threaded through now so the eventual Friends/
     // Sharing work only needs to supply a real value, not rewire this call chain. See
@@ -291,16 +298,12 @@ fun LedgerScreen(
                 layout = layout,
                 expandedWidgets = expandedWidgets,
                 onToggleExpanded = onToggleExpanded,
+                isWideLayout = isWideLayout,
                 viewedDisplayName = viewedDisplayName,
             )
         }
     }
 }
-
-/** Material's "expanded" window-size-class threshold — the `lg`+ breakpoint ledger.md §1
- *  keys `width` off. Below this, every widget card is full-width regardless of its stored
- *  `width` ("always full below lg"). */
-private val LG_BREAKPOINT = 840.dp
 
 /** The height the edit-mode palette thumbnail *measures* its content at before scaling it down
  *  — the old fixed card height, kept only here. Real cards wrap their content now (see
@@ -342,70 +345,69 @@ private fun LedgerBoardContent(
     layout: List<LedgerWidgetConfig>,
     expandedWidgets: Set<String>,
     onToggleExpanded: (String) -> Unit,
+    isWideLayout: Boolean,
     viewedDisplayName: String? = null,
 ) {
     val (stats, boards) = uiState
-    BoxWithConstraints(modifier = modifier) {
-        val isGrid = maxWidth >= LG_BREAKPOINT
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HeroCopy(stats, viewedDisplayName)
-                    val totalScreeningDays = stats.totalWatchedMovieMinutes / 60.0 / 24.0
-                    val tiles = listOf(
-                        StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
-                        StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
-                        StatTileData("Screenings", stats.totalViewings.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
-                        StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
-                        StatTileData("Days in the dark", "%.1fd".format(totalScreeningDays), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
-                        StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
-                    )
-                    tiles.chunked(2).forEach { rowTiles ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            rowTiles.forEach { tile -> StatTile(tile, modifier = Modifier.weight(1f)) }
-                        }
+    val isGrid = isWideLayout
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier,
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroCopy(stats, viewedDisplayName)
+                val totalScreeningDays = stats.totalWatchedMovieMinutes / 60.0 / 24.0
+                val tiles = listOf(
+                    StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
+                    StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
+                    StatTileData("Screenings", stats.totalViewings.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
+                    StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                    StatTileData("Days in the dark", "%.1fd".format(totalScreeningDays), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                    StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
+                )
+                tiles.chunked(if (isGrid) 3 else 2).forEach { rowTiles ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        rowTiles.forEach { tile -> StatTile(tile, modifier = Modifier.weight(1f)) }
                     }
                 }
             }
+        }
 
-            if (isGrid) {
-                items(packRows(layout), key = { row -> row.joinToString("-") { it.id } }) { row ->
-                    // Cards wrap their own content now, so a row's cards end at different
-                    // heights; aligning them to the top keeps the headings on one line rather
-                    // than forcing every card in the row to the tallest one's height, which is
-                    // what the old fixed height did for free.
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        row.forEach { config ->
-                            WidgetCard(
-                                config = config,
-                                board = boards[config.id],
-                                expanded = config.id in expandedWidgets,
-                                onToggleExpanded = { onToggleExpanded(config.id) },
-                                modifier = Modifier.weight(config.width.spanOf12().toFloat()),
-                            )
-                        }
-                        val usedSpan = row.sumOf { it.width.spanOf12() }
-                        if (usedSpan < 12) Spacer(Modifier.weight((12 - usedSpan).toFloat()))
+        if (isGrid) {
+            items(packRows(layout), key = { row -> row.joinToString("-") { it.id } }) { row ->
+                // Cards wrap their own content now, so a row's cards end at different
+                // heights; aligning them to the top keeps the headings on one line rather
+                // than forcing every card in the row to the tallest one's height, which is
+                // what the old fixed height did for free.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    row.forEach { config ->
+                        WidgetCard(
+                            config = config,
+                            board = boards[config.id],
+                            expanded = config.id in expandedWidgets,
+                            onToggleExpanded = { onToggleExpanded(config.id) },
+                            modifier = Modifier.weight(config.width.spanOf12().toFloat()),
+                        )
                     }
+                    val usedSpan = row.sumOf { it.width.spanOf12() }
+                    if (usedSpan < 12) Spacer(Modifier.weight((12 - usedSpan).toFloat()))
                 }
-            } else {
-                items(layout, key = { it.id }) { config ->
-                    WidgetCard(
-                        config = config,
-                        board = boards[config.id],
-                        expanded = config.id in expandedWidgets,
-                        onToggleExpanded = { onToggleExpanded(config.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+            }
+        } else {
+            items(layout, key = { it.id }) { config ->
+                WidgetCard(
+                    config = config,
+                    board = boards[config.id],
+                    expanded = config.id in expandedWidgets,
+                    onToggleExpanded = { onToggleExpanded(config.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

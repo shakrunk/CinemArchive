@@ -22,8 +22,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -68,7 +72,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePillFab
+import work.kumarfamilynet.cinemarchive.core.designsystem.MediumWindowBreakpoint
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingBottomNav
+import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingNavigationRail
 import work.kumarfamilynet.cinemarchive.core.designsystem.NavDestination
 import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
@@ -383,83 +389,115 @@ private fun CinemArchiveApp(
     // paints above the bottom nav bar regardless of Scaffold's own internal draw order —
     // mirroring the design handoff's overlays (z-index 40/50, above the nav's implicit
     // stacking context) covering the full device frame, nav bar included. Scaffold's own
-    // contentWindowInsets is zeroed (MorphingBottomNav insets its own bottom edge instead),
-    // so the status bar inset is applied once here, above both the Scaffold and the overlay.
+    // contentWindowInsets is zeroed (MorphingBottomNav/MorphingNavigationRail inset their own
+    // edges instead), so the status bar inset is applied once here, above both the Scaffold
+    // and the overlay.
     Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-        Scaffold(
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = {
-                MorphingBottomNav(
-                    destinations = listOf(
-                        NavDestination(Tab.DISCOVER, "Discover", Icons.Outlined.Explore, Icons.Filled.Explore),
-                        NavDestination(
-                            Tab.LIBRARY,
-                            "Library",
-                            icon = if (libraryViewMode == LibraryViewMode.GRID) Icons.Outlined.Apps else Icons.AutoMirrored.Outlined.ViewList,
-                            selectedIcon = if (libraryViewMode == LibraryViewMode.GRID) Icons.Filled.Apps else Icons.AutoMirrored.Filled.ViewList,
-                        ),
-                        NavDestination(Tab.UP_NEXT, "Up Next", Icons.Outlined.PlayArrow, Icons.Filled.PlayArrow),
-                        NavDestination(Tab.LEDGER, "Ledger", Icons.Outlined.Insights, Icons.Filled.Insights),
-                    ),
-                    selected = tab,
-                    onSelect = { tab = it },
-                )
-            },
-        ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                Box(modifier = Modifier.padding(innerPadding)) {
-                    when (tab) {
-                        Tab.DISCOVER -> DiscoverRoute(
-                            discoverRepository,
-                            repository,
-                            gridColumns = posterGridColumns,
-                            onGridColumnsChange = onPosterGridColumnsChange,
-                            onOpenProfile = openProfile,
-                            profileInitial = profileInitial,
-                            onFabExpandedChange = { fabExpanded = it },
-                            onTitleClick = { overlay = Overlay.Detail(it) },
-                            onAddTitle = { overlay = Overlay.Add(it.asSearchResult()) },
-                        )
-                        Tab.LIBRARY -> LibraryRoute(
-                            repository,
-                            librarySyncRepository,
-                            viewMode = libraryViewMode,
-                            onToggleViewMode = onToggleLibraryViewMode,
-                            gridColumns = posterGridColumns,
-                            onGridColumnsChange = onPosterGridColumnsChange,
-                            onOpenProfile = openProfile,
-                            profileInitial = profileInitial,
-                            onTitleClick = { overlay = Overlay.Detail(it) },
-                            onFabExpandedChange = { fabExpanded = it },
-                        )
-                        Tab.UP_NEXT -> UpNextRoute(
-                            repository,
-                            outingsRepository,
-                            librarySyncRepository,
-                            onOpenProfile = openProfile,
-                            profileInitial = profileInitial,
-                            onTitleClick = { overlay = Overlay.Detail(it) },
-                            onFabExpandedChange = { fabExpanded = it },
-                        )
-                        Tab.LEDGER -> LedgerRoute(
-                            ledgerRepository,
-                            ledgerLayoutRepository,
-                            onOpenProfile = openProfile,
-                            profileInitial = profileInitial,
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            // Below Medium, nav stays a bottom bar as before. At/above it — an unfolded
+            // foldable, a tablet — a bottom bar stretched across the full width reads as a
+            // phone control blown up rather than adapted, so nav moves to a leading-edge rail.
+            val useNavigationRail = maxWidth >= MediumWindowBreakpoint
+            val navDestinations = listOf(
+                NavDestination(Tab.DISCOVER, "Discover", Icons.Outlined.Explore, Icons.Filled.Explore),
+                NavDestination(
+                    Tab.LIBRARY,
+                    "Library",
+                    icon = if (libraryViewMode == LibraryViewMode.GRID) Icons.Outlined.Apps else Icons.AutoMirrored.Outlined.ViewList,
+                    selectedIcon = if (libraryViewMode == LibraryViewMode.GRID) Icons.Filled.Apps else Icons.AutoMirrored.Filled.ViewList,
+                ),
+                NavDestination(Tab.UP_NEXT, "Up Next", Icons.Outlined.PlayArrow, Icons.Filled.PlayArrow),
+                NavDestination(Tab.LEDGER, "Ledger", Icons.Outlined.Insights, Icons.Filled.Insights),
+            )
+
+            @Composable
+            fun TabScaffoldContent(innerPadding: PaddingValues) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        when (tab) {
+                            Tab.DISCOVER -> DiscoverRoute(
+                                discoverRepository,
+                                repository,
+                                gridColumns = posterGridColumns,
+                                onGridColumnsChange = onPosterGridColumnsChange,
+                                onOpenProfile = openProfile,
+                                profileInitial = profileInitial,
+                                onFabExpandedChange = { fabExpanded = it },
+                                onTitleClick = { overlay = Overlay.Detail(it) },
+                                onAddTitle = { overlay = Overlay.Add(it.asSearchResult()) },
+                            )
+                            Tab.LIBRARY -> LibraryRoute(
+                                repository,
+                                librarySyncRepository,
+                                viewMode = libraryViewMode,
+                                onToggleViewMode = onToggleLibraryViewMode,
+                                gridColumns = posterGridColumns,
+                                onGridColumnsChange = onPosterGridColumnsChange,
+                                onOpenProfile = openProfile,
+                                profileInitial = profileInitial,
+                                onTitleClick = { overlay = Overlay.Detail(it) },
+                                onFabExpandedChange = { fabExpanded = it },
+                            )
+                            Tab.UP_NEXT -> UpNextRoute(
+                                repository,
+                                outingsRepository,
+                                librarySyncRepository,
+                                onOpenProfile = openProfile,
+                                profileInitial = profileInitial,
+                                onTitleClick = { overlay = Overlay.Detail(it) },
+                                onFabExpandedChange = { fabExpanded = it },
+                            )
+                            Tab.LEDGER -> LedgerRoute(
+                                ledgerRepository,
+                                ledgerLayoutRepository,
+                                onOpenProfile = openProfile,
+                                profileInitial = profileInitial,
+                                isWideLayout = useNavigationRail,
+                            )
+                        }
+                    }
+
+                    if (tab != Tab.LEDGER && tab != Tab.DISCOVER) {
+                        ExpressivePillFab(
+                            label = "New Title",
+                            expanded = fabExpanded,
+                            onClick = { overlay = Overlay.Add() },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
                         )
                     }
                 }
+            }
 
-                if (tab != Tab.LEDGER && tab != Tab.DISCOVER) {
-                    ExpressivePillFab(
-                        label = "New Title",
-                        expanded = fabExpanded,
-                        onClick = { overlay = Overlay.Add() },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
+            if (useNavigationRail) {
+                // No bottomBar here to self-apply WindowInsets.navigationBars the way
+                // MorphingBottomNav does below — the gesture-nav pill is still at the bottom
+                // of the device regardless of nav living in a leading rail, so the whole row
+                // (rail included, so its last item doesn't sit under the pill) gets its own
+                // bottom inset explicitly instead.
+                Row(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+                    MorphingNavigationRail(
+                        destinations = navDestinations,
+                        selected = tab,
+                        onSelect = { tab = it },
                     )
+                    Scaffold(
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                        modifier = Modifier.weight(1f),
+                    ) { innerPadding -> TabScaffoldContent(innerPadding) }
                 }
+            } else {
+                Scaffold(
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    bottomBar = {
+                        MorphingBottomNav(
+                            destinations = navDestinations,
+                            selected = tab,
+                            onSelect = { tab = it },
+                        )
+                    },
+                ) { innerPadding -> TabScaffoldContent(innerPadding) }
             }
         }
 

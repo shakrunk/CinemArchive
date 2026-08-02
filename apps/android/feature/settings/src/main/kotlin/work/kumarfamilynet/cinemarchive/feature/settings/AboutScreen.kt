@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
@@ -320,84 +321,90 @@ private fun AboutListScreen(
 
         LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
             item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .padding(16.dp),
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(48.dp),
+                ReadingWidthColumn {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .padding(16.dp),
                     ) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            Text("C", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                Text("C", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 10.dp))
+                            }
+                        }
+                        Column(modifier = Modifier.padding(start = 14.dp)) {
+                            Text("CinemArchive", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Version $appVersionName",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
-                    Column(modifier = Modifier.padding(start = 14.dp)) {
-                        Text("CinemArchive", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Version $appVersionName",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
 
-                // Buttons rather than bare tappable text: these leave the app, and
-                // plain labels gave no affordance that they were actionable at all.
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
-                    OutlinedButton(onClick = onOpenSource, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Filled.Code, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("Source", modifier = Modifier.padding(start = 8.dp))
-                    }
-                    OutlinedButton(onClick = onOpenReleaseNotes, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("Releases", modifier = Modifier.padding(start = 8.dp))
+                    // Buttons rather than bare tappable text: these leave the app, and
+                    // plain labels gave no affordance that they were actionable at all.
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
+                        OutlinedButton(onClick = onOpenSource, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Code, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text("Source", modifier = Modifier.padding(start = 8.dp))
+                        }
+                        OutlinedButton(onClick = onOpenReleaseNotes, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text("Releases", modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
             }
 
             item {
-                UpdatesSection(
-                    installSource = installSource,
-                    autoCheckEnabled = autoCheckEnabled,
-                    onSetAutoCheck = onSetAutoCheck,
-                    result = updateResult,
-                    canInstallDirectly = canInstallDirectly,
-                    installState = installState,
-                    onCheckNow = onCheckNow,
-                    onInstall = onInstall,
-                    onOpenReleasePage = onOpenReleasePage,
-                    onGrantInstallPermission = onGrantInstallPermission,
-                    modifier = Modifier.padding(bottom = 22.dp),
-                )
+                ReadingWidthColumn {
+                    UpdatesSection(
+                        installSource = installSource,
+                        autoCheckEnabled = autoCheckEnabled,
+                        onSetAutoCheck = onSetAutoCheck,
+                        result = updateResult,
+                        canInstallDirectly = canInstallDirectly,
+                        installState = installState,
+                        onCheckNow = onCheckNow,
+                        onInstall = onInstall,
+                        onOpenReleasePage = onOpenReleasePage,
+                        onGrantInstallPermission = onGrantInstallPermission,
+                        modifier = Modifier.padding(bottom = 22.dp),
+                    )
+                }
             }
 
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer),
-                ) {
-                    LEGAL_DOCS.forEach { doc ->
-                        LegalRow(title = doc.title, onClick = { onOpenDoc(doc) })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ReadingWidthColumn {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                    ) {
+                        LEGAL_DOCS.forEach { doc ->
+                            LegalRow(title = doc.title, onClick = { onOpenDoc(doc) })
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                        LegalRow(title = "Credits & Open Source Licenses", onClick = onOpenCredits)
                     }
-                    LegalRow(title = "Credits & Open Source Licenses", onClick = onOpenCredits)
+                    Text(
+                        "© 2026 CinemArchive · Not endorsed by TMDB or OMDb",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 18.dp).fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                    )
                 }
-                Text(
-                    "© 2026 CinemArchive · Not endorsed by TMDB or OMDb",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 18.dp).fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                )
             }
         }
     }
@@ -412,12 +419,14 @@ private fun AboutDetailScreen(doc: LegalDoc, onBack: () -> Unit) {
             }
             Text(doc.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
         }
-        Text(
-            doc.body,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(20.dp, 16.dp, 20.dp, 28.dp),
-        )
+        ReadingWidthColumn {
+            Text(
+                doc.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(20.dp, 16.dp, 20.dp, 28.dp),
+            )
+        }
     }
 }
 
@@ -455,63 +464,69 @@ private fun CreditsScreen(onBack: () -> Unit) {
         }
         LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
             item {
-                Text(
-                    "CinemArchive is built on the following data providers, type families, " +
-                        "and open-source software. Tap an entry to open its source or license " +
-                        "page.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 20.dp),
-                )
+                ReadingWidthColumn {
+                    Text(
+                        "CinemArchive is built on the following data providers, type families, " +
+                            "and open-source software. Tap an entry to open its source or license " +
+                            "page.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 20.dp),
+                    )
+                }
             }
             CREDIT_SECTIONS.forEachIndexed { sectionIndex, section ->
                 item {
-                    Text(
-                        section.title,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
+                    ReadingWidthColumn {
+                        Text(
+                            section.title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                 }
                 item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainer),
-                    ) {
-                        section.entries.forEachIndexed { index, entry ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { uriHandler.openUri(entry.url) }
-                                    .padding(16.dp),
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(entry.name, style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        entry.detail,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp),
-                                    )
-                                    Text(
-                                        entry.license,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp),
+                    ReadingWidthColumn {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainer),
+                        ) {
+                            section.entries.forEachIndexed { index, entry ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { uriHandler.openUri(entry.url) }
+                                        .padding(16.dp),
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            entry.detail,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 2.dp),
+                                        )
+                                        Text(
+                                            entry.license,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(top = 2.dp),
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = "Open link",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 12.dp).size(18.dp),
                                     )
                                 }
-                                Icon(
-                                    Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = "Open link",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 12.dp).size(18.dp),
-                                )
-                            }
-                            if (index < section.entries.lastIndex) {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                if (index < section.entries.lastIndex) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
                             }
                         }
                     }

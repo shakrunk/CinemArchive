@@ -9,6 +9,24 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Cinema outings now record where you're sitting as auditorium, row and seats rather than one
+  free-text "Seat" field, on both clients. Outings saved before this keep their original text
+  and still display it — nothing is re-parsed or lost (#221).
+- Android: the in-theater ticket view is now two modes instead of one screen. **Scan** shows
+  the code full-width at maximum brightness for the ticket-taker; **Auditorium** drops the
+  backlight to a theater-safe floor and shows the auditorium in large dim amber on black so
+  you can find your seat without lighting up the rows behind you. It opens on whichever
+  matches the showtime and switches by tap (#221).
+
+### Fixed
+
+- Android: the ticket QR code was rendered light-on-dark under every dark theme (i.e. all of
+  them but Light), which most theater scanners cannot read. It is now always black on white
+  regardless of theme, with an explicit quiet zone and error-correction level (#221).
+- Android: the screen no longer times out while a ticket is open.
+
 ## [1.24.0] - 2026-08-03
 
 ### Added

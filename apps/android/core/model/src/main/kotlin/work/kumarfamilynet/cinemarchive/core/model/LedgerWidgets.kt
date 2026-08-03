@@ -44,12 +44,20 @@ data class LedgerProgressEntry(
     val episodeCount: Int,
 )
 
+/** A venue or format's ticket spend, e.g. "AMC Downtown" / $47.50 across 3 trips. Only
+ *  outings with a recorded [work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity.ticketPrice]
+ *  count toward [totalSpend]/[tripCount] — free/comped or unpriced trips widen the tally
+ *  counts elsewhere but can't contribute a dollar figure here. */
+data class LedgerSpendBreakdown(val label: String, val totalSpend: Double, val tripCount: Int) {
+    val perTrip: Double get() = totalSpend / tripCount
+}
+
 /**
- * The "At the Movies" widget. [totalSpend] and [formats] are the two owner-private fields
- * (ledger.md §3 — sourced from [work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity]);
- * everything else lives on the shared-readable `viewings` row. Android has no friend/shared
- * viewer mode yet, so this always renders the full (owner) view — see [LedgerRepository]
- * kdoc.
+ * The "At the Movies" widget. [totalSpend], [formats], [venueSpend], [formatSpend], and
+ * [bestValueVenue] are the owner-private fields (ledger.md §3 — sourced from
+ * [work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity]); everything else
+ * lives on the shared-readable `viewings` row. Android has no friend/shared viewer mode yet,
+ * so this always renders the full (owner) view — see [LedgerRepository] kdoc.
  */
 data class LedgerMoviegoingStats(
     val tripCount: Int,
@@ -58,4 +66,12 @@ data class LedgerMoviegoingStats(
     val companions: List<LedgerCategoryCount>,
     val formats: List<LedgerCategoryCount>,
     val totalSpend: Double?,
+    /** Total ticket spend per venue, descending. */
+    val venueSpend: List<LedgerSpendBreakdown> = emptyList(),
+    /** Total ticket spend per format, descending — the cost-per-outing-by-format breakdown. */
+    val formatSpend: List<LedgerSpendBreakdown> = emptyList(),
+    /** The venue with the lowest average price per trip, among venues with 2+ priced trips
+     *  (a single trip can't establish a venue's typical value). Null with fewer than two such
+     *  venues. */
+    val bestValueVenue: LedgerSpendBreakdown? = null,
 )

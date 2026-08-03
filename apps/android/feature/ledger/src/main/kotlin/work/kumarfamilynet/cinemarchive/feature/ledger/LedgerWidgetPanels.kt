@@ -46,6 +46,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.RadialSpokePlot
 import work.kumarfamilynet.cinemarchive.core.designsystem.TicketStub
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
+import work.kumarfamilynet.cinemarchive.core.model.LedgerSpendBreakdown
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
 import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWeekdayCount
@@ -624,6 +625,21 @@ internal fun ColumnScope.MoviegoingPanel(
                 TicketField("companions", stats.companions.firstOrNull()?.label ?: "—", Alignment.CenterHorizontally)
                 TicketField("format", stats.formats.firstOrNull()?.label ?: "—", Alignment.End)
             }
+            stats.bestValueVenue?.let { bestValue ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Overline("best value")
+                    Text(
+                        "${bestValue.label} · $%,.2f/trip".format(bestValue.perTrip),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         },
         stub = {
             if (stats.byYear.isNotEmpty()) {
@@ -642,15 +658,21 @@ internal fun ColumnScope.MoviegoingPanel(
     )
 
     // The ticket already prints the leading venue, companion and format; these are the full
-    // tallies behind those three headline fields.
+    // tallies behind those three headline fields, plus the cost breakdowns behind "best value".
     val facets = listOf(
         "Venues" to stats.venues,
         "In good company" to stats.companions,
         "Formats" to stats.formats,
     ).filter { (_, entries) -> entries.isNotEmpty() }
-    if (facets.isNotEmpty()) {
-        PanelDetail(disclosure, "Show every venue, companion and format") {
+    if (facets.isNotEmpty() || stats.formatSpend.isNotEmpty() || stats.venueSpend.isNotEmpty()) {
+        PanelDetail(disclosure, "Show every venue, companion, format and cost breakdown") {
             facets.forEach { (heading, entries) -> FacetLedger(heading, entries) }
+            if (stats.formatSpend.isNotEmpty()) {
+                SpendLedger("Cost per outing by format", stats.formatSpend) { it.perTrip }
+            }
+            if (stats.venueSpend.isNotEmpty()) {
+                SpendLedger("Spend by venue", stats.venueSpend) { it.totalSpend }
+            }
         }
     }
 }
@@ -712,17 +734,19 @@ private fun YearBars(byYear: List<LedgerCategoryCount>) {
     }
 }
 
-/** One tally group as receipt rows: label on the left, count on the right, dashed leader
- *  bridging the gap. The leader is drawn behind the whole row and knocked out by the two
- *  labels' own backgrounds, so it lands correctly for any label length. */
+/** One tally or spend group as receipt rows: label on the left, figure on the right, dashed
+ *  leader bridging the gap. The leader is drawn behind the whole row and knocked out by the
+ *  two labels' own backgrounds, so it lands correctly for any label length. Shared by
+ *  [FacetLedger] (counts) and [SpendLedger] (dollar figures) — same receipt language, only
+ *  the right-hand value differs. */
 @Composable
-private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) {
-    if (entries.isEmpty()) return
+private fun ReceiptLedger(heading: String, rows: List<Pair<String, String>>) {
+    if (rows.isEmpty()) return
     val leaderColor = MaterialTheme.colorScheme.outlineVariant
     val knockout = MaterialTheme.colorScheme.surfaceContainer
     Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Overline(heading, color = MaterialTheme.colorScheme.onSurface)
-        entries.forEach { entry ->
+        rows.forEach { (label, value) ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -741,7 +765,7 @@ private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    entry.label,
+                    label,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -751,7 +775,7 @@ private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) {
                         .padding(end = 6.dp),
                 )
                 MonoFigure(
-                    entry.count.toString(),
+                    value,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.background(knockout).padding(start = 6.dp),
                 )
@@ -759,6 +783,16 @@ private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) {
         }
     }
 }
+
+@Composable
+private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) =
+    ReceiptLedger(heading, entries.map { it.label to it.count.toString() })
+
+/** Cost breakdown by venue or format (#201/#210/#212) — [amount] picks per-trip or total
+ *  spend depending on which figure the caller wants on the right. */
+@Composable
+private fun SpendLedger(heading: String, entries: List<LedgerSpendBreakdown>, amount: (LedgerSpendBreakdown) -> Double) =
+    ReceiptLedger(heading, entries.map { it.label to "$%,.2f".format(amount(it)) })
 
 // ---------------------------------------------------------------------------------------
 // Screening Nights — the week as a dial

@@ -34,6 +34,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
 import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
 import work.kumarfamilynet.cinemarchive.core.model.LedgerQuarterRating
 import work.kumarfamilynet.cinemarchive.core.model.LedgerSettingKey
+import work.kumarfamilynet.cinemarchive.core.model.LedgerSpendBreakdown
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
 import work.kumarfamilynet.cinemarchive.core.model.LedgerVerdictEntry
@@ -532,6 +533,9 @@ class LedgerRepository(
         val outingById = outings.associateBy { it.id }
         val joinedOutings = trips.mapNotNull { it.outingId?.let { id -> outingById[id] } }
 
+        val venueSpend = spendBy(joinedOutings) { it.venue }
+        val formatSpend = spendBy(joinedOutings) { it.format }
+
         return LedgerMoviegoingStats(
             tripCount = trips.size,
             byYear = tally(trips.mapNotNull { parseLocalDate(it.date)?.year?.toString() }),
@@ -539,6 +543,20 @@ class LedgerRepository(
             companions = tally(trips.flatMap { it.companions }),
             formats = tally(joinedOutings.mapNotNull { it.format }),
             totalSpend = joinedOutings.mapNotNull { it.ticketPrice }.takeIf { it.isNotEmpty() }?.sum(),
+            venueSpend = venueSpend,
+            formatSpend = formatSpend,
+            bestValueVenue = venueSpend.filter { it.tripCount >= 2 }.minByOrNull { it.perTrip },
         )
     }
+
+    /** Total ticket spend grouped by [label] (venue or format), descending — priced outings
+     *  only, unpriced trips simply don't contribute to any group. */
+    private fun spendBy(
+        outings: List<CinemaOutingEntity>,
+        label: (CinemaOutingEntity) -> String?,
+    ): List<LedgerSpendBreakdown> =
+        outings.mapNotNull { outing -> outing.ticketPrice?.let { price -> label(outing)?.let { it to price } } }
+            .groupBy({ it.first }, { it.second })
+            .map { (name, prices) -> LedgerSpendBreakdown(name, prices.sum(), prices.size) }
+            .sortedByDescending { it.totalSpend }
 }

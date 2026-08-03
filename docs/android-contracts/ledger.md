@@ -125,6 +125,11 @@ spend vanish, since those two fields come only from the owner-private `cinema_ou
 which the web client never even fetches for a friend/shared viewer. **Android must replicate
 this exact partial degradation**, not treat the widget as all-or-nothing per viewer.
 
+Android-exclusive additions to this widget (`venueSpend`, `formatSpend`, `bestValueVenue` —
+issues #201/#210/#212, no web equivalent) are derived from the same owner-private
+`ticketPrice`/`format`/`venue` columns as `formats`/`totalSpend`, so they degrade the same
+way: absent for a friend/shared viewer once that mode exists.
+
 ## 4. Persistence / idempotency (layout only — widget data itself has no write path)
 
 Every layout-editing action (add/duplicate/remove/move/reorder widget, resize, change

@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-08-03
+
 ### Fixed
 
 - Android: the "I've got tickets" outing form's content could grow taller than the screen (worse

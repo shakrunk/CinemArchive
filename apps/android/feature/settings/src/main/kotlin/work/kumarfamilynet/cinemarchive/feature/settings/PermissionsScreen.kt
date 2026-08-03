@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +54,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
+import work.kumarfamilynet.cinemarchive.core.model.InstallSource
+import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 
 private fun cameraGranted(context: Context) =
     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -69,23 +73,30 @@ private fun exactAlarmSettingsIntent(context: Context) =
     Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
 
 /**
- * Surfaces the three permissions this app actually asks for, each contextually when a feature
- * first needs it (QR sign-in's camera preview, an outing's "how was it?" notification) rather
- * than up front at launch — this screen is the one place to see current status and fix a denial
- * without hunting through system Settings. Exact alarms has no runtime request dialog at all,
- * so it always routes to its Settings screen; the other two try the in-app dialog first.
+ * Surfaces the permissions this app actually asks for, each contextually when a feature first
+ * needs it (QR sign-in's camera preview, an outing's "how was it?" notification, a sideloaded
+ * update's install prompt) rather than up front at launch — this screen is the one place to see
+ * current status and fix a denial without hunting through system Settings. Exact alarms and
+ * install-unknown-apps have no runtime request dialog at all, so they always route to their
+ * Settings screen; the other two try the in-app dialog first.
  */
 @Composable
-fun PermissionsRoute(onBack: () -> Unit) {
+fun PermissionsRoute(
+    onBack: () -> Unit,
+    apkInstaller: ApkInstaller? = null,
+    appUpdateRepository: AppUpdateRepository? = null,
+) {
     val context = LocalContext.current
     var cameraOk by remember { mutableStateOf(cameraGranted(context)) }
     var notificationsOk by remember { mutableStateOf(notificationsGranted(context)) }
     var exactAlarmsOk by remember { mutableStateOf(exactAlarmsGranted(context)) }
+    var installUnknownAppsOk by remember { mutableStateOf(apkInstaller?.canRequestInstalls() ?: false) }
 
     fun refresh() {
         cameraOk = cameraGranted(context)
         notificationsOk = notificationsGranted(context)
         exactAlarmsOk = exactAlarmsGranted(context)
+        installUnknownAppsOk = apkInstaller?.canRequestInstalls() ?: false
     }
 
     // Exact alarms and (pre-33) notifications only ever change via a system Settings screen this
@@ -100,10 +111,16 @@ fun PermissionsRoute(onBack: () -> Unit) {
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
 
+    // Meaningless for a Play-installed build — same gate AppUpdateRepository.checkForUpdate()
+    // already applies, since Play (not this app) owns that install path.
+    val showInstallUnknownApps = apkInstaller != null && appUpdateRepository?.installSource != InstallSource.PLAY_STORE
+
     PermissionsScreen(
         cameraGranted = cameraOk,
         notificationsGranted = notificationsOk,
         exactAlarmsGranted = exactAlarmsOk,
+        installUnknownAppsGranted = installUnknownAppsOk,
+        showInstallUnknownApps = showInstallUnknownApps,
         onBack = onBack,
         onRequestCamera = { cameraLauncher.launch(Manifest.permission.CAMERA) },
         onRequestNotifications = {
@@ -114,6 +131,7 @@ fun PermissionsRoute(onBack: () -> Unit) {
             }
         },
         onOpenExactAlarmSettings = { context.startActivity(exactAlarmSettingsIntent(context)) },
+        onOpenInstallUnknownAppsSettings = { apkInstaller?.unknownSourcesSettingsIntent()?.let(context::startActivity) },
     )
 }
 
@@ -122,10 +140,13 @@ private fun PermissionsScreen(
     cameraGranted: Boolean,
     notificationsGranted: Boolean,
     exactAlarmsGranted: Boolean,
+    installUnknownAppsGranted: Boolean,
+    showInstallUnknownApps: Boolean,
     onBack: () -> Unit,
     onRequestCamera: () -> Unit,
     onRequestNotifications: () -> Unit,
     onOpenExactAlarmSettings: () -> Unit,
+    onOpenInstallUnknownAppsSettings: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
@@ -139,7 +160,7 @@ private fun PermissionsScreen(
         // permissions read as a single set — the same convention Appearance's palette list
         // uses (#153: this section previously stood apart with individually rounded, gapped
         // cards instead of the seam-grouped M3 Expressive pattern used elsewhere in Settings).
-        val rows = listOf(
+        val rows = listOfNotNull(
             PermissionRowSpec(
                 icon = Icons.Filled.Notifications,
                 title = "Notifications",
@@ -164,6 +185,18 @@ private fun PermissionsScreen(
                 actionLabel = "Open Settings",
                 onAction = onOpenExactAlarmSettings,
             ),
+            if (showInstallUnknownApps) {
+                PermissionRowSpec(
+                    icon = Icons.Filled.InstallMobile,
+                    title = "Install unknown apps",
+                    subtitle = "Lets an in-app update install with one tap instead of opening the release page.",
+                    granted = installUnknownAppsGranted,
+                    actionLabel = "Open Settings",
+                    onAction = onOpenInstallUnknownAppsSettings,
+                )
+            } else {
+                null
+            },
         )
         LazyColumn(
             contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp),

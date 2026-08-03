@@ -324,3 +324,12 @@ interface CinemaOutingDao {
     @Query("SELECT * FROM cinema_outings WHERE status = 'SCHEDULED'")
     suspend fun getScheduledOutings(): List<CinemaOutingEntity>
 }
+
+@Dao
+interface VenueNoteDao {
+    @Query("SELECT * FROM venue_notes")
+    fun observeAll(): Flow<List<VenueNoteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: VenueNoteEntity)
+}

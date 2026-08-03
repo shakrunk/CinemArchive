@@ -86,6 +86,15 @@ class TitleDetailViewModel(
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    val venueSuggestions = outingsRepository.observeVenueSuggestions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val companionSuggestions = outingsRepository.observeCompanionSuggestions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val venueNotes = outingsRepository.observeVenueNotes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     init {
         // Fire-and-forget, same as the web app's drawer-open effect: fills in episode
         // synopsis/stills for whichever seasons are missing them, independent of whether this
@@ -168,6 +177,10 @@ class TitleDetailViewModel(
     fun onDidntMakeIt(outingId: String) {
         viewModelScope.launch { outingsRepository.revertCompletion(outingId) }
     }
+
+    fun onSaveVenueNotes(venue: String, notes: String) {
+        viewModelScope.launch { outingsRepository.saveVenueNotes(venue, notes) }
+    }
 }
 
 @Composable
@@ -181,6 +194,9 @@ fun TitleDetailRoute(
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, titleId))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
+    val venueSuggestions by viewModel.venueSuggestions.collectAsStateWithLifecycle()
+    val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
+    val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
     TitleDetailScreen(
         detail,
         onBack,
@@ -197,6 +213,10 @@ fun TitleDetailRoute(
         onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
         onDidntMakeIt = viewModel::onDidntMakeIt,
         onRequestNotificationPermission = onRequestNotificationPermission,
+        venueSuggestions = venueSuggestions,
+        companionSuggestions = companionSuggestions,
+        venueNotes = venueNotes,
+        onSaveVenueNotes = viewModel::onSaveVenueNotes,
     )
 }
 
@@ -218,6 +238,10 @@ fun TitleDetailScreen(
     onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
     onDidntMakeIt: (String) -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
+    venueSuggestions: List<String> = emptyList(),
+    companionSuggestions: List<String> = emptyList(),
+    venueNotes: Map<String, String> = emptyMap(),
+    onSaveVenueNotes: (String, String) -> Unit = { _, _ -> },
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -435,6 +459,10 @@ fun TitleDetailScreen(
                     onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
                 }
             },
+            venueSuggestions = venueSuggestions,
+            companionSuggestions = companionSuggestions,
+            venueNotes = venueNotes,
+            onSaveVenueNotes = onSaveVenueNotes,
         )
     }
 

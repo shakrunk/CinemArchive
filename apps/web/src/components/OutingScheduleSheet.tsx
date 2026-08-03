@@ -13,6 +13,7 @@ import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type Title } from 'src/store/mockData'
 import { Eyebrow } from 'src/components/ui/typography'
+import { formatSeatShort, parseSeatsInput } from 'src/lib/seating'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
 // Exported for reuse by the viewing editor (TitleDetailDrawer, plan §4.6/§7.4)
@@ -205,7 +206,13 @@ interface FormState {
   previewsMinutes: number
   runtimeMinutes: number
   ticketPrice: string
+  /** Legacy free-text seat, carried through untouched — the form no longer
+   *  offers an input for it, it only surfaces it as a hint under the trio. */
   seat: string
+  auditorium: string
+  seatRow: string
+  /** Raw text entry; parsed to the stored array with `parseSeatsInput`. */
+  seats: string
   bookingRef: string
   notes: string
 }
@@ -231,6 +238,9 @@ function defaultForm(runtime?: number, prefill?: OutingSchedulePrefill | null): 
     runtimeMinutes: runtime ?? 120,
     ticketPrice: '',
     seat: '',
+    auditorium: '',
+    seatRow: '',
+    seats: '',
     bookingRef: '',
     notes: '',
   }
@@ -249,6 +259,9 @@ function formFromOuting(outing: CinemaOuting): FormState {
     runtimeMinutes: outing.runtimeMinutes,
     ticketPrice: outing.ticketPrice != null ? String(outing.ticketPrice) : '',
     seat: outing.seat ?? '',
+    auditorium: outing.auditorium ?? '',
+    seatRow: outing.seatRow ?? '',
+    seats: (outing.seats ?? []).join(', '),
     bookingRef: outing.bookingRef ?? '',
     notes: outing.notes ?? '',
   }
@@ -332,6 +345,9 @@ function OutingForm({
       format: form.format || undefined,
       ticketPrice: form.ticketPrice.trim() ? Number(form.ticketPrice) : undefined,
       seat: form.seat.trim() || undefined,
+      auditorium: form.auditorium.trim() || undefined,
+      seatRow: form.seatRow.trim() || undefined,
+      seats: parseSeatsInput(form.seats),
       bookingRef: form.bookingRef.trim() || undefined,
       notes: form.notes.trim() || undefined,
     }
@@ -513,34 +529,71 @@ function OutingForm({
         Lets out ≈ {endsAtLabel}
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Eyebrow as="label" htmlFor="outing-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
-            Ticket price
-          </Eyebrow>
-          <Input
-            id="outing-price"
-            type="number"
-            min={0}
-            step={0.01}
-            value={form.ticketPrice}
-            onChange={(e) => patch({ ticketPrice: e.target.value })}
-            placeholder="0.00"
-            className="bg-secondary/50 border-border font-mono"
-          />
+      <div>
+        <Eyebrow as="label" htmlFor="outing-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
+          Ticket price
+        </Eyebrow>
+        <Input
+          id="outing-price"
+          type="number"
+          min={0}
+          step={0.01}
+          value={form.ticketPrice}
+          onChange={(e) => patch({ ticketPrice: e.target.value })}
+          placeholder="0.00"
+          className="bg-secondary/50 border-border font-mono"
+        />
+      </div>
+
+      {/* Auditorium first, matching the order you need them in at the theater
+          (and the order the Android in-theater view renders them). */}
+      <div>
+        <Eyebrow as="span" size="xl" tone="muted" font="sans" className="block mb-2">
+          Where you're sitting
+        </Eyebrow>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label htmlFor="outing-auditorium" className="block mb-1 font-sans text-xs text-muted-foreground cursor-pointer">
+              Auditorium
+            </label>
+            <Input
+              id="outing-auditorium"
+              value={form.auditorium}
+              onChange={(e) => patch({ auditorium: e.target.value })}
+              placeholder="7"
+              className="bg-secondary/50 border-border"
+            />
+          </div>
+          <div>
+            <label htmlFor="outing-seat-row" className="block mb-1 font-sans text-xs text-muted-foreground cursor-pointer">
+              Row
+            </label>
+            <Input
+              id="outing-seat-row"
+              value={form.seatRow}
+              onChange={(e) => patch({ seatRow: e.target.value })}
+              placeholder="F"
+              className="bg-secondary/50 border-border"
+            />
+          </div>
+          <div>
+            <label htmlFor="outing-seats" className="block mb-1 font-sans text-xs text-muted-foreground cursor-pointer">
+              Seats
+            </label>
+            <Input
+              id="outing-seats"
+              value={form.seats}
+              onChange={(e) => patch({ seats: e.target.value })}
+              placeholder="12, 13"
+              className="bg-secondary/50 border-border"
+            />
+          </div>
         </div>
-        <div>
-          <Eyebrow as="label" htmlFor="outing-seat" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
-            Seat
-          </Eyebrow>
-          <Input
-            id="outing-seat"
-            value={form.seat}
-            onChange={(e) => patch({ seat: e.target.value })}
-            placeholder="H12"
-            className="bg-secondary/50 border-border"
-          />
-        </div>
+        {form.seat && (
+          <p className="mt-2 font-sans text-xs text-muted-foreground">
+            Previously saved as “{form.seat}” — fill in the fields above to replace it.
+          </p>
+        )}
       </div>
 
       <div>
@@ -595,7 +648,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
       </div>
       <p className="font-serif text-lg text-foreground">Tickets saved — share your plans?</p>
       <p className="font-sans text-xs text-muted-foreground max-w-[280px] mx-auto">
-        {formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, outing.seat)}
+        {formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, formatSeatShort(outing))}
       </p>
       <div className="flex flex-col gap-2 items-center pt-2">
         <Button

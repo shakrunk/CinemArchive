@@ -45,6 +45,7 @@ import { TrailerRow } from 'src/components/ui/trailer-row'
 import { WatchProvidersSection } from 'src/components/ui/watch-providers'
 import { ReviewBadges, ExternalLinks, HeroScores } from 'src/components/ui/media-badges'
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
+import { parseSeatsInput } from 'src/lib/seating'
 
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
@@ -202,7 +203,9 @@ function ViewingEditForm({
 
   const [format, setFormat] = useState<CinemaFormat | ''>(outing?.format ?? '')
   const [ticketPrice, setTicketPrice] = useState(outing?.ticketPrice != null ? String(outing.ticketPrice) : '')
-  const [seat, setSeat] = useState(outing?.seat ?? '')
+  const [auditorium, setAuditorium] = useState(outing?.auditorium ?? '')
+  const [seatRow, setSeatRow] = useState(outing?.seatRow ?? '')
+  const [seats, setSeats] = useState((outing?.seats ?? []).join(', '))
   const [bookingRef, setBookingRef] = useState(outing?.bookingRef ?? '')
 
   function handleSave(e: React.FormEvent) {
@@ -227,7 +230,9 @@ function ViewingEditForm({
       updateOuting(outing.id, {
         format: format || undefined,
         ticketPrice: ticketPrice.trim() ? Number(ticketPrice) : undefined,
-        seat: seat.trim() || undefined,
+        auditorium: auditorium.trim() || undefined,
+        seatRow: seatRow.trim() || undefined,
+        seats: parseSeatsInput(seats),
         bookingRef: bookingRef.trim() || undefined,
       })
     }
@@ -325,14 +330,40 @@ function ViewingEditForm({
               />
             </div>
             <div>
-              <Eyebrow as="label" htmlFor="viewing-edit-seat" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
-                Seat
+              <Eyebrow as="label" htmlFor="viewing-edit-auditorium" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
+                Auditorium
               </Eyebrow>
               <Input
-                id="viewing-edit-seat"
-                value={seat}
-                onChange={(e) => setSeat(e.target.value)}
-                placeholder="H12"
+                id="viewing-edit-auditorium"
+                value={auditorium}
+                onChange={(e) => setAuditorium(e.target.value)}
+                placeholder="7"
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Eyebrow as="label" htmlFor="viewing-edit-seat-row" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
+                Row
+              </Eyebrow>
+              <Input
+                id="viewing-edit-seat-row"
+                value={seatRow}
+                onChange={(e) => setSeatRow(e.target.value)}
+                placeholder="F"
+                className="bg-secondary/50 border-border"
+              />
+            </div>
+            <div>
+              <Eyebrow as="label" htmlFor="viewing-edit-seats" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
+                Seats
+              </Eyebrow>
+              <Input
+                id="viewing-edit-seats"
+                value={seats}
+                onChange={(e) => setSeats(e.target.value)}
+                placeholder="12, 13"
                 className="bg-secondary/50 border-border"
               />
             </div>

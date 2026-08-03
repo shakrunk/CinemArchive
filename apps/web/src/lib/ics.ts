@@ -1,5 +1,6 @@
 import type { CinemaOuting } from 'src/store/mockData'
 import { formatCompanions, type OutingSharePayload } from 'src/store/outings'
+import { formatSeatLine, hasStructuredSeating } from 'src/lib/seating'
 
 // Hand-rolled cinema-outing calendar/share helpers (plan §4.5/§4.10) — no
 // calendar/share npm dependency anywhere in this feature.
@@ -35,13 +36,16 @@ function icsDateTime(iso: string): string {
   return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 }
 
-/** Builds the DESCRIPTION body: companions, seat, booking ref, notes — each
- *  on its own line, blank fields simply omitted (plan §13). */
+/** Builds the DESCRIPTION body: companions, seat assignment, booking ref,
+ *  notes — each on its own line, blank fields simply omitted (plan §13). */
 function buildDescription(outing: CinemaOuting): string {
   const lines: string[] = []
   const companions = formatCompanions(outing.companions)
   if (companions) lines.push(`With ${companions}`)
-  if (outing.seat) lines.push(`Seat ${outing.seat}`)
+  // The structured line names its own parts ("Theatre 7 · Row F · Seats 12");
+  // the legacy free-text fallback is a bare string and still needs the label.
+  const seatLine = formatSeatLine(outing)
+  if (seatLine) lines.push(hasStructuredSeating(outing) ? seatLine : `Seat ${seatLine}`)
   if (outing.bookingRef) lines.push(`Booking ref: ${outing.bookingRef}`)
   if (outing.notes) lines.push(outing.notes)
   return lines.join('\n')

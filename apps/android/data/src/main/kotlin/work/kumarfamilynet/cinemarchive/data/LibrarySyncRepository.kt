@@ -295,6 +295,12 @@ class LibrarySyncRepository(
     // stringify each companion object wholesale instead of extracting its name, which is what
     // showed raw JSON blobs on the Up Next marquee card. Falls back to the element itself for
     // any legacy row that already got written as a bare string.
+    /** A plain jsonb string array (`cinema_outings.seats`). Blank entries are dropped so a
+     *  stray "" from the server can't render as an empty seat in the in-theater view. */
+    private fun JSONArray?.toStringList(): List<String> =
+        this?.let { arr -> (0 until arr.length()).mapNotNull { i -> arr.optString(i).takeIf(String::isNotBlank) } }
+            ?: emptyList()
+
     private fun JSONArray?.toCompanionNames(): List<String> =
         this?.let { arr -> (0 until arr.length()).map { i -> (arr.opt(i) as? JSONObject)?.optString("name") ?: arr.getString(i) } }
             ?: emptyList()
@@ -405,6 +411,9 @@ class LibrarySyncRepository(
         format = optStringOrNull("format"),
         ticketPrice = optDoubleOrNull("ticketPrice"),
         seat = optStringOrNull("seat"),
+        auditorium = optStringOrNull("auditorium"),
+        seatRow = optStringOrNull("seatRow"),
+        seats = optJSONArray("seats").toStringList(),
         bookingRef = optStringOrNull("bookingRef"),
         notes = optStringOrNull("notes"),
         status = getString("status").uppercase(),

@@ -19,6 +19,7 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingTransition
+import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 
 /**
  * Owns [CinemaOuting] CRUD and the local completion engine — the Android analogue of the web
@@ -55,7 +56,7 @@ class OutingsRepository(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ): String {
@@ -72,7 +73,12 @@ class OutingsRepository(
             companions = companions,
             format = format?.name,
             ticketPrice = ticketPrice,
-            seat = seat,
+            // A new outing never gets a legacy free-text `seat` — that column only ever
+            // holds what pre-#221 rows already had (see SeatAssignment's kdoc).
+            seat = null,
+            auditorium = seating.auditorium,
+            seatRow = seating.seatRow,
+            seats = seating.seats,
             bookingRef = bookingRef,
             notes = notes,
             status = OutingStatus.SCHEDULED.name,
@@ -96,7 +102,7 @@ class OutingsRepository(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ) {
@@ -110,7 +116,12 @@ class OutingsRepository(
             companions = companions,
             format = format?.name,
             ticketPrice = ticketPrice,
-            seat = seat,
+            // `seat` is deliberately carried forward untouched: the edit form has no input
+            // for it, so taking it from `seating` would erase a pre-#221 row's only seat
+            // record the first time it's edited for any other reason.
+            auditorium = seating.auditorium,
+            seatRow = seating.seatRow,
+            seats = seating.seats,
             bookingRef = bookingRef,
             notes = notes,
             updatedAt = Instant.now().toString(),
@@ -302,6 +313,9 @@ class OutingsRepository(
                 put("format", entity.format ?: JSONObject.NULL)
                 put("ticketPrice", entity.ticketPrice ?: JSONObject.NULL)
                 put("seat", entity.seat ?: JSONObject.NULL)
+                put("auditorium", entity.auditorium ?: JSONObject.NULL)
+                put("seatRow", entity.seatRow ?: JSONObject.NULL)
+                put("seats", JSONArray(entity.seats))
                 put("bookingRef", entity.bookingRef ?: JSONObject.NULL)
                 put("notes", entity.notes ?: JSONObject.NULL)
                 put("status", entity.status)
@@ -327,6 +341,9 @@ internal fun CinemaOutingEntity.toDomain(): CinemaOuting = CinemaOuting(
     format = format?.let { runCatching { CinemaFormat.valueOf(it) }.getOrNull() },
     ticketPrice = ticketPrice,
     seat = seat,
+    auditorium = auditorium,
+    seatRow = seatRow,
+    seats = seats,
     bookingRef = bookingRef,
     notes = notes,
     status = runCatching { OutingStatus.valueOf(status) }.getOrDefault(OutingStatus.SCHEDULED),

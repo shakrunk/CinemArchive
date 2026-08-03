@@ -63,6 +63,7 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
@@ -111,12 +112,12 @@ class TitleDetailViewModel(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ) {
         viewModelScope.launch {
-            outingsRepository.scheduleOuting(titleId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seat, bookingRef, notes)
+            outingsRepository.scheduleOuting(titleId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
         }
     }
 
@@ -129,12 +130,12 @@ class TitleDetailViewModel(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ) {
         viewModelScope.launch {
-            outingsRepository.updateOuting(outingId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seat, bookingRef, notes)
+            outingsRepository.updateOuting(outingId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
         }
     }
 
@@ -196,8 +197,8 @@ fun TitleDetailScreen(
     onLogViewing: () -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
-    onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
+    onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
+    onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onCancelOuting: (String) -> Unit = {},
     onRatePostShow: (String, Double) -> Unit = { _, _ -> },
     onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
@@ -388,12 +389,12 @@ fun TitleDetailScreen(
             defaultRuntimeMinutes = detail?.runtime,
             initial = editingOuting,
             onDismiss = { showScheduleSheet = false; editingOuting = null },
-            onSave = { showtime, previews, runtime, venue, companions, format, price, seat, bookingRef, notes ->
+            onSave = { showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes ->
                 val outing = editingOuting
                 if (outing != null) {
-                    onEditOuting(outing.id, showtime, previews, runtime, venue, companions, format, price, seat, bookingRef, notes)
+                    onEditOuting(outing.id, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
                 } else {
-                    onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seat, bookingRef, notes)
+                    onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
                 }
             },
         )

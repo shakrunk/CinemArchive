@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TitleCrewEntity::class,
         CinemaOutingEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -52,12 +52,26 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Splits `cinema_outings.seat` into the auditorium/row/seats trio (issue #221).
+         *  The old column stays and keeps its value — the clients fall back to it, and
+         *  parsing free text like "Row F, seats 12 and 13" into columns would be guesswork
+         *  on real data (see supabase/migrations/20260803000000_outing_seat_details.sql).
+         *  `seats` is a `List<String>` through [Converters], i.e. a delimited TEXT column,
+         *  so it defaults to the empty string rather than SQL NULL. */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN auditorium TEXT")
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN seatRow TEXT")
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN seats TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
         )
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.

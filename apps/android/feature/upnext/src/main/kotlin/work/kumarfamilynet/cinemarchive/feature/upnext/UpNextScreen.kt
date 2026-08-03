@@ -69,6 +69,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
+import work.kumarfamilynet.cinemarchive.core.model.seating
 import work.kumarfamilynet.cinemarchive.core.model.UpNextBoard
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
@@ -442,7 +443,7 @@ private fun addOutingToCalendar(context: android.content.Context, entry: UpNextO
     val outing = entry.outing
     val details = listOfNotNull(
         outing.companions.takeIf { it.isNotEmpty() }?.let { "With ${it.joinToString(", ")}" },
-        outing.seat?.let { "Seat $it" },
+        outing.seating.line,
         outing.bookingRef?.let { "Booking ref $it" },
         outing.notes,
     ).joinToString("\n")

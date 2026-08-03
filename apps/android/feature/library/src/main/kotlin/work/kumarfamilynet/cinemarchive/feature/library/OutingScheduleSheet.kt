@@ -33,6 +33,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
+import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 
 /** Display label for [CinemaFormat] — the fixed UI list from the web plan §4.1, kept as a UI
  *  concern here rather than on the enum itself (the enum stays a plain data value). */
@@ -67,7 +68,7 @@ fun OutingScheduleSheet(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ) -> Unit,
@@ -82,7 +83,9 @@ fun OutingScheduleSheet(
     var previews by rememberSaveable { mutableStateOf((initial?.previewsMinutes ?: 20).toString()) }
     var runtime by rememberSaveable { mutableStateOf((initial?.runtimeMinutes ?: defaultRuntimeMinutes ?: 120).toString()) }
     var ticketPrice by rememberSaveable { mutableStateOf(initial?.ticketPrice?.toString() ?: "") }
-    var seat by rememberSaveable { mutableStateOf(initial?.seat ?: "") }
+    var auditorium by rememberSaveable { mutableStateOf(initial?.auditorium ?: "") }
+    var seatRow by rememberSaveable { mutableStateOf(initial?.seatRow ?: "") }
+    var seats by rememberSaveable { mutableStateOf(initial?.seats?.joinToString(", ") ?: "") }
     var bookingRef by rememberSaveable { mutableStateOf(initial?.bookingRef ?: "") }
     var notes by rememberSaveable { mutableStateOf(initial?.notes ?: "") }
 
@@ -148,18 +151,53 @@ fun OutingScheduleSheet(
                 )
             }
 
+            OutlinedTextField(
+                value = ticketPrice,
+                onValueChange = { ticketPrice = it },
+                label = { Text("Ticket price") },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+            )
+
+            // Auditorium first — the order you need them in at the theater, and the order
+            // TicketScreen's in-theater view renders them.
+            Text(
+                "WHERE YOU'RE SITTING",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
                 OutlinedTextField(
-                    value = ticketPrice,
-                    onValueChange = { ticketPrice = it },
-                    label = { Text("Ticket price") },
-                    modifier = Modifier.weight(1f),
+                    value = auditorium,
+                    onValueChange = { auditorium = it },
+                    label = { Text("Auditorium") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1.1f),
                 )
                 OutlinedTextField(
-                    value = seat,
-                    onValueChange = { seat = it },
-                    label = { Text("Seat") },
-                    modifier = Modifier.weight(1f),
+                    value = seatRow,
+                    onValueChange = { seatRow = it },
+                    label = { Text("Row") },
+                    singleLine = true,
+                    modifier = Modifier.weight(0.8f),
+                )
+                OutlinedTextField(
+                    value = seats,
+                    onValueChange = { seats = it },
+                    label = { Text("Seats") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1.1f),
+                )
+            }
+
+            // Pre-#221 outings only have the free-text string; the form can't safely split
+            // it, so it's shown as a hint rather than silently dropped.
+            initial?.seat?.takeIf { it.isNotBlank() }?.let { legacySeat ->
+                Text(
+                    "Previously saved as “$legacySeat” — fill in the fields above to replace it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 14.dp),
                 )
             }
 
@@ -196,7 +234,11 @@ fun OutingScheduleSheet(
                         companionsText.split(",").map(String::trim).filter(String::isNotBlank),
                         format,
                         ticketPrice.toDoubleOrNull(),
-                        seat.ifBlank { null },
+                        SeatAssignment(
+                            auditorium = auditorium.ifBlank { null },
+                            seatRow = seatRow.ifBlank { null },
+                            seats = SeatAssignment.parseSeats(seats),
+                        ),
                         bookingRef.ifBlank { null },
                         notes.ifBlank { null },
                     )

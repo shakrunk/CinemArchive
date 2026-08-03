@@ -265,7 +265,10 @@ data class CinemaOutingEntity(
     val companions: List<String> = emptyList(),
     val format: String?,
     val ticketPrice: Double?,
-    val seat: String? = null,
+    val seat: String? = null, // legacy free-text; display fallback for the trio below
+    val auditorium: String? = null,
+    val seatRow: String? = null,
+    val seats: List<String> = emptyList(),
     val bookingRef: String? = null,
     val notes: String? = null,
     val status: String = "SCHEDULED", // OutingStatus.name

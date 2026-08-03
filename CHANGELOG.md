@@ -14,6 +14,8 @@ number is chosen.
 - Android: cinema outings' Theater and Companions fields now autocomplete from your own outing
   history, and a per-venue parking/transit notes field remembers logistics notes ("park in the
   garage across the street") the next time you pick the same theater (#197, #198, #214).
+- Android: Settings → Permissions now lists "Install unknown apps" for sideloaded builds, so its
+  status can be checked and fixed from the same place as every other permission (#167).
 
 ## [1.25.0] - 2026-08-03
 

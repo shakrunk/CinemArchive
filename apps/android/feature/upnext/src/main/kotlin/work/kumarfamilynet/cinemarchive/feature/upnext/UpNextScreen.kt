@@ -4,6 +4,8 @@ import android.content.Intent
 import android.provider.CalendarContract
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -141,6 +144,7 @@ fun UpNextRoute(
     outingsRepository: OutingsRepository,
     librarySyncRepository: LibrarySyncRepository,
     onTitleClick: (String) -> Unit,
+    onViewTicket: (UpNextOuting) -> Unit,
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
@@ -153,6 +157,7 @@ fun UpNextRoute(
     UpNextScreen(
         board,
         onTitleClick,
+        onViewTicket = onViewTicket,
         onMarkWatched = viewModel::onMarkEpisodeWatched,
         onCancelOuting = viewModel::onCancelOuting,
         onRatePostShow = viewModel::onRatePostShow,
@@ -172,6 +177,7 @@ fun UpNextRoute(
 private fun UpNextScreen(
     board: UpNextBoard,
     onTitleClick: (String) -> Unit,
+    onViewTicket: (UpNextOuting) -> Unit,
     onMarkWatched: (String) -> Unit,
     onCancelOuting: (String) -> Unit,
     onRatePostShow: (String, String, Double) -> Unit,
@@ -247,6 +253,7 @@ private fun UpNextScreen(
                         shape = groupShape(index, board.onTheMarquee.size),
                         onOpen = { onTitleClick(entry.outing.titleId) },
                         onCancel = { onCancelOuting(entry.outing.id) },
+                        onViewTicket = { onViewTicket(entry) },
                     )
                 }
             }
@@ -372,7 +379,7 @@ private fun FreshFromTheLobbyCard(entry: UpNextOuting, shape: Shape, onOpen: () 
 }
 
 @Composable
-private fun MarqueeCard(entry: UpNextOuting, now: Instant, shape: Shape, onOpen: () -> Unit, onCancel: () -> Unit) {
+private fun MarqueeCard(entry: UpNextOuting, now: Instant, shape: Shape, onOpen: () -> Unit, onCancel: () -> Unit, onViewTicket: () -> Unit) {
     val context = LocalContext.current
     val outing = entry.outing
     val countdown = CinemaOutingRules.countdownLabel(outing, now)
@@ -412,7 +419,11 @@ private fun MarqueeCard(entry: UpNextOuting, now: Instant, shape: Shape, onOpen:
                 }
             }
         }
-        Row(modifier = Modifier.padding(top = 8.dp)) {
+        Row(modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState())) {
+            TextButton(onClick = onViewTicket) {
+                Icon(Icons.Filled.QrCode, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text("View ticket", modifier = Modifier.padding(start = 6.dp))
+            }
             TextButton(onClick = { addOutingToCalendar(context, entry) }) {
                 Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
                 Text("Add to calendar", modifier = Modifier.padding(start = 6.dp))

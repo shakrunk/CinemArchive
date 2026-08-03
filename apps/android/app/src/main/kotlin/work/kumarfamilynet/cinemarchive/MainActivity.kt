@@ -76,11 +76,13 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.MediumWindowBreakpoint
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingBottomNav
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingNavigationRail
 import work.kumarfamilynet.cinemarchive.core.designsystem.NavDestination
+import work.kumarfamilynet.cinemarchive.core.designsystem.TicketScreen
 import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
+import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.asSearchResult
@@ -266,6 +268,11 @@ private sealed interface Overlay {
     data object Appearance : Overlay
     data object About : Overlay
     data object Permissions : Overlay
+
+    /** The "at the theater" screen (seat + ticket QR code) — carries the outing and title name
+     *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
+     *  that opens this already has both in memory. */
+    data class Ticket(val outing: CinemaOuting, val titleName: String) : Overlay
 }
 
 /**
@@ -445,6 +452,7 @@ private fun CinemArchiveApp(
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 onTitleClick = { overlay = Overlay.Detail(it) },
+                                onViewTicket = { overlay = Overlay.Ticket(it.outing, it.titleName) },
                                 onFabExpandedChange = { fabExpanded = it },
                             )
                             Tab.LEDGER -> LedgerRoute(
@@ -554,6 +562,7 @@ private fun CinemArchiveApp(
                 onBack = openProfile,
             )
             Overlay.Permissions -> PermissionsRoute(onBack = openProfile)
+            is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
         }
         }
     }

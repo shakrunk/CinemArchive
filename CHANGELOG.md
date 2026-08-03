@@ -26,6 +26,8 @@ number is chosen.
   them but Light), which most theater scanners cannot read. It is now always black on white
   regardless of theme, with an explicit quiet zone and error-correction level (#221).
 - Android: the screen no longer times out while a ticket is open.
+- Up Next's "next episode" card no longer offers "Mark watched" for an episode that hasn't
+  aired yet on a still-airing series — it now shows the air date instead, on both clients.
 
 ## [1.24.0] - 2026-08-03
 

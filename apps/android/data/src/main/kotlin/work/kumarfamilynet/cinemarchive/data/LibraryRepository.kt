@@ -303,6 +303,7 @@ class LibraryRepository(
                     nextSeasonNumber = next?.let { seasonById[it.seasonId]?.seasonNumber },
                     nextEpisodeNumber = next?.episodeNumber,
                     nextEpisodeName = next?.episodeName,
+                    nextEpisodeAirDate = next?.airDate,
                 )
             }
         val watchlist = titles

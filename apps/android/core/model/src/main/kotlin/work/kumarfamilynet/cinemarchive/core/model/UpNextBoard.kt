@@ -4,7 +4,9 @@ package work.kumarfamilynet.cinemarchive.core.model
  *  the Up Next screen. Movies (no seasons) never produce one of these; see
  *  LibraryRepository.observeUpNext(). [nextSeasonNumber]/[nextEpisodeNumber]/[nextEpisodeName]
  *  are null when every locally-known episode is already watched (e.g. a finale, still marked
- *  WATCHING). */
+ *  WATCHING). [nextEpisodeAirDate] is the raw TMDB `air_date` (YYYY-MM-DD) for that next
+ *  episode, if known — used to show an air date instead of a "mark watched" action for an
+ *  episode that hasn't aired yet on a still-airing series. */
 data class UpNextWatching(
     val id: String,
     val name: String,
@@ -14,6 +16,7 @@ data class UpNextWatching(
     val nextSeasonNumber: Int? = null,
     val nextEpisodeNumber: Int? = null,
     val nextEpisodeName: String? = null,
+    val nextEpisodeAirDate: String? = null,
 )
 
 /** One "On the Marquee" card's presentation-ready shape (see [CinemaOutingRules]). */

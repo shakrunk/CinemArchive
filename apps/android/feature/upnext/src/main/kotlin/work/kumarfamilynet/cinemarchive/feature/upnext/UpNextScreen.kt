@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -463,6 +465,9 @@ private fun addOutingToCalendar(context: android.content.Context, entry: UpNextO
 @Composable
 private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: () -> Unit, onMarkWatched: () -> Unit) {
     val pct = if (title.episodesTotal > 0) (title.episodesWatched.toFloat() / title.episodesTotal) else 0f
+    val hasNotAired = title.nextEpisodeAirDate?.let { iso ->
+        runCatching { LocalDate.parse(iso).isAfter(LocalDate.now()) }.getOrDefault(false)
+    } ?: false
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -527,19 +532,34 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
                 ) {}
             }
         }
-        Surface(
-            onClick = onMarkWatched,
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(44.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Check, contentDescription = "Mark episode watched", modifier = Modifier.size(20.dp))
+        if (hasNotAired) {
+            Text(
+                "Airs\n${formatShortDate(title.nextEpisodeAirDate!!)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(56.dp),
+            )
+        } else {
+            Surface(
+                onClick = onMarkWatched,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Check, contentDescription = "Mark episode watched", modifier = Modifier.size(20.dp))
+                }
             }
         }
     }
 }
+
+/** Compact "Aug 12" form of an episode air date, for the Up Next card's not-yet-aired label. */
+private fun formatShortDate(iso: String): String =
+    runCatching { LocalDate.parse(iso).format(DateTimeFormatter.ofPattern("MMM d", Locale.US)) }
+        .getOrDefault(iso)
 
 /** Mirrors src/views/UpNext.tsx's formatReleaseDate: parses the plain YYYY-MM-DD as a local
  *  date (not an instant) so no timezone shift can push it a day off. */

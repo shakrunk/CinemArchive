@@ -86,6 +86,13 @@ class TitleDetailViewModel(
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    init {
+        // Fire-and-forget, same as the web app's drawer-open effect: fills in episode
+        // synopsis/stills for whichever seasons are missing them, independent of whether this
+        // title was ever opened on the web app. See LibraryRepository.backfillEpisodeMetadata.
+        viewModelScope.launch { repository.backfillEpisodeMetadata(titleId) }
+    }
+
     /** Optimistic local write + queued remote push — see LibraryRepository.logEpisodeWatched. */
     fun onMarkWatched(episodeId: String) {
         viewModelScope.launch { repository.logEpisodeWatched(episodeId, LocalDate.now().toString()) }

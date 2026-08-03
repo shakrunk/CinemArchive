@@ -98,6 +98,7 @@ class CinemArchiveApplication : Application() {
             titleCastDao = database.titleCastDao(),
             titleCrewDao = database.titleCrewDao(),
             outbox = outbox,
+            episodeMetadataFetcher = discoverRepository,
         )
     }
 

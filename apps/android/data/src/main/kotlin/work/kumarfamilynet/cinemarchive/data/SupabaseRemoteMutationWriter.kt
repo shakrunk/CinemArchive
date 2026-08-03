@@ -30,6 +30,7 @@ class SupabaseRemoteMutationWriter(
                 "episode_watch_event" -> upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
+                "episode_metadata" -> patchEpisodeMetadata(payload)
                 "viewing" -> if (entry.operation == "update") patchViewing(payload) else upsertViewing(payload)
                 "cinema_outing" -> upsertOuting(payload)
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
@@ -231,6 +232,23 @@ class SupabaseRemoteMutationWriter(
         if (payload.has("notes")) body.putNullable("notes", payload, "notes")
         if (body.length() == 0) return PushResult.Success
         client.patchWithFilter("viewings", "id=eq.$id", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    /**
+     * Partial update for the TMDB fields [LibraryRepository.backfillEpisodeMetadata] fetches —
+     * same unconditional PATCH-by-id shape as [patchViewing]. Unconditional, not last-write-wins
+     * like [pushTitleUpdate]: synopsis/stillUrl have no other client-side writer to race
+     * against, so there's nothing to arbitrate — a losing write here just means the next open
+     * asks TMDB again.
+     */
+    private fun patchEpisodeMetadata(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val id = payload.getString("id")
+        val body = JSONObject()
+            .putNullable("synopsis", payload, "synopsis")
+            .putNullable("still_url", payload, "stillUrl")
+        client.patchWithFilter("episodes", "id=eq.$id", session.accessToken, body.toString())
         return PushResult.Success
     }
 

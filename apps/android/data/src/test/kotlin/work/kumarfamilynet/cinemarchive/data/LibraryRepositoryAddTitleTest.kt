@@ -139,6 +139,12 @@ private object NoEpisodeReviewsDao : EpisodeReviewDao {
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
 
+// addTitle never backfills episode metadata — that's TitleDetailViewModel's job, on open —
+// so this stays unimplemented same as the other "not exercised by addTitle" fakes above.
+private object NoEpisodeMetadataFetcher : EpisodeMetadataFetcher {
+    override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = throw UnsupportedOperationException()
+}
+
 /**
  * Covers `LibraryRepository.addTitle` — the Room write and the single outbox entry that
  * carries it to Supabase.
@@ -172,6 +178,7 @@ class LibraryRepositoryAddTitleTest {
             titleCastDao = castDao,
             titleCrewDao = crewDao,
             outbox = MutationOutbox(outboxDao, NoopWriter, NoopConflictHandler),
+            episodeMetadataFetcher = NoEpisodeMetadataFetcher,
         )
     }
 

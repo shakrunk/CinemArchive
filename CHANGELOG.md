@@ -24,7 +24,8 @@ number is chosen.
   default, as it already was on the web app.
 - Android: TV titles' detail screen gets a season selector and episode thumbnails/synopses,
   closing most of the gap with the web app's title drawer. Episode metadata now syncs both
-  ways between clients.
+  ways between clients, and Android backfills it from TMDB itself on open — so a series added
+  on the phone gets thumbnails and synopses even if it's never opened on the web app.
 
 ### Changed
 

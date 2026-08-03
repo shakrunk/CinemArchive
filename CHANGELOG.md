@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Android: Up Next's "On the Marquee" cards gain a "View ticket" action showing a large seat
+  display and a scannable QR code generated from the outing's booking reference, with the
+  screen brightness boosted for easier scanning at the theater (#221).
+
 ## [1.23.1] - 2026-08-01
 
 ### Fixed

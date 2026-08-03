@@ -124,6 +124,8 @@ class LibraryRepository(
                     episodeName = episode.name,
                     airDate = episode.airDate,
                     runtime = episode.runtime,
+                    synopsis = episode.synopsis,
+                    stillUrl = episode.stillUrl,
                 )
             }
         }
@@ -417,6 +419,8 @@ class LibraryRepository(
                                 runtime = episode.runtime,
                                 watchCount = watchCountByEpisode[episode.id] ?: 0,
                                 latestRating = latestRatingByEpisode[episode.id],
+                                synopsis = episode.synopsis,
+                                stillUrl = episode.stillUrl,
                             )
                         },
                     )

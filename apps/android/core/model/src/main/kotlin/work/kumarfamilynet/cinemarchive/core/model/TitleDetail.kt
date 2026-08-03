@@ -45,6 +45,8 @@ data class EpisodeDetail(
     val runtime: Int?,
     val watchCount: Int,
     val latestRating: Double?,
+    val synopsis: String? = null,
+    val stillUrl: String? = null,
 )
 
 data class Viewing(

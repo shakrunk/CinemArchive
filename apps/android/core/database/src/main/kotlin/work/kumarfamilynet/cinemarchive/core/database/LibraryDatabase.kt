@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TitleCrewEntity::class,
         CinemaOutingEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -66,12 +66,22 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds episodes.synopsis/stillUrl (see Entities.kt's EpisodeEntity kdoc), backing the
+         *  Title detail screen's season selector/episode cards. Same real-data rationale as
+         *  MIGRATION_4_5/MIGRATION_5_6 — additive ALTER TABLEs, not a destructive fallback. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE episodes ADD COLUMN synopsis TEXT")
+                db.execSQL("ALTER TABLE episodes ADD COLUMN stillUrl TEXT")
+            }
+        }
+
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.

@@ -108,6 +108,8 @@ class SupabaseRemoteMutationWriter(
                 .putNullable("episode_name", episode, "episodeName")
                 .putNullable("air_date", episode, "airDate")
                 .putNullable("runtime", episode, "runtime")
+                .putNullable("synopsis", episode, "synopsis")
+                .putNullable("still_url", episode, "stillUrl")
         }?.let { client.upsert("episodes", session.accessToken, it.toString()) }
 
         payload.rows("cast") { member ->

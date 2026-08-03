@@ -88,6 +88,11 @@ data class EpisodeEntity(
     val episodeName: String?,
     val airDate: String?,
     val runtime: Int?,
+    // Mirrors schema.sql's episodes.synopsis/still_url — see docs/android-contracts/
+    // episode-tracking.md §1. Null until a TMDB season fetch (add-time, or backfilled by the
+    // web app and synced down) has populated them for this episode.
+    val synopsis: String? = null,
+    val stillUrl: String? = null,
 )
 
 /** Independent watch log — see docs/android-contracts/episode-tracking.md §1. */

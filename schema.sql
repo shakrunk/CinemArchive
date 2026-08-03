@@ -1932,7 +1932,8 @@ language sql security definer stable as $$
       jsonb_build_object(
         'id', e.id, 'titleId', e.title_id, 'seasonNumber', e.season_number,
         'episodeNumber', e.episode_number, 'episodeName', e.episode_name,
-        'airDate', e.air_date, 'runtime', e.runtime
+        'airDate', e.air_date, 'runtime', e.runtime,
+        'synopsis', e.synopsis, 'stillUrl', e.still_url
       )
     from episodes e where e.user_id = auth.uid() and e.updated_at > p_since
 

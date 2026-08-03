@@ -104,6 +104,8 @@ internal fun buildAddTitlePayload(
                             putOrNull("episodeName", episode.episodeName)
                             putOrNull("airDate", episode.airDate)
                             putOrNull("runtime", episode.runtime)
+                            putOrNull("synopsis", episode.synopsis)
+                            putOrNull("stillUrl", episode.stillUrl)
                         },
                     )
                 }

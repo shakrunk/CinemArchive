@@ -382,6 +382,8 @@ class LibrarySyncRepository(
         episodeName = optStringOrNull("episodeName"),
         airDate = optStringOrNull("airDate"),
         runtime = optIntOrNull("runtime"),
+        synopsis = optStringOrNull("synopsis"),
+        stillUrl = optStringOrNull("stillUrl"),
     )
 
     private fun JSONObject.toViewingEntity() = ViewingEntity(

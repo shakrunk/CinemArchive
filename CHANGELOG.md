@@ -22,6 +22,9 @@ number is chosen.
 - Android: the Library's "Sort by" gains **Smart**, ordering titles by the most recent thing you
   did with them — added, watched, or any episode watch, rating or review — and it is now the
   default, as it already was on the web app.
+- Android: TV titles' detail screen gets a season selector and episode thumbnails/synopses,
+  closing most of the gap with the web app's title drawer. Episode metadata now syncs both
+  ways between clients.
 
 ### Changed
 

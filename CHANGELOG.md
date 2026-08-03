@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Android: the "I've got tickets" outing form's content could grow taller than the screen (worse
+  now that Theater/Companions autocomplete and a parking-notes field added another row) with no
+  way to scroll to it, stranding the Save button off-screen and unreachable on ordinary phone
+  sizes.
+
 ### Added
 
 - Android: cinema outings' Theater and Companions fields now autocomplete from your own outing

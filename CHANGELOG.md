@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-08-03
+
 ### Added
 
 - Android: Up Next's "On the Marquee" cards gain a "View ticket" action showing a large seat

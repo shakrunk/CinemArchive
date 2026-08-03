@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -48,11 +51,13 @@ fun CinemaFormat.displayLabel(): String = when (this) {
 }
 
 /**
- * "I've got tickets" — the scheduling/editing form (web plan §4.1), scoped to what Android v1
- * needs: no friend-aware companion autocomplete (no friend graph yet — plain comma-separated
- * names), no venue autocomplete (deferred polish, not the headline flow). [initial] non-null
- * means editing an existing outing (pre-fills every field); null means a fresh "I've got
- * tickets" schedule.
+ * "I've got tickets" — the scheduling/editing form (web plan §4.1). Venue and companions
+ * autocomplete from the user's own outing history (issues #197/#198); no friend-aware
+ * suggestions yet (no friend graph — plain comma-separated names for companions). [initial]
+ * non-null means editing an existing outing (pre-fills every field); null means a fresh "I've
+ * got tickets" schedule. [venueNotes] backs the per-venue parking/transit notes pre-fill
+ * (issue #214): picking a venue from the autocomplete list loads that venue's saved notes;
+ * [onSaveVenueNotes] is fired on Save so edits to those notes are remembered for next time.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +77,10 @@ fun OutingScheduleSheet(
         bookingRef: String?,
         notes: String?,
     ) -> Unit,
+    venueSuggestions: List<String> = emptyList(),
+    companionSuggestions: List<String> = emptyList(),
+    venueNotes: Map<String, String> = emptyMap(),
+    onSaveVenueNotes: (venue: String, notes: String) -> Unit = { _, _ -> },
 ) {
     val zone = remember { ZoneId.systemDefault() }
     val initialInstant = initial?.showtime?.let { Instant.parse(it) } ?: Instant.now().plusSeconds(3600)
@@ -88,9 +97,26 @@ fun OutingScheduleSheet(
     var seats by rememberSaveable { mutableStateOf(initial?.seats?.joinToString(", ") ?: "") }
     var bookingRef by rememberSaveable { mutableStateOf(initial?.bookingRef ?: "") }
     var notes by rememberSaveable { mutableStateOf(initial?.notes ?: "") }
+    var parkingNotes by rememberSaveable { mutableStateOf(initial?.venue?.let { venueNotes[it] } ?: "") }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var venueMenuExpanded by remember { mutableStateOf(false) }
+    var companionMenuExpanded by remember { mutableStateOf(false) }
+
+    val venueMatches = remember(venue, venueSuggestions) {
+        if (venue.isBlank()) venueSuggestions else venueSuggestions.filter { it.contains(venue, ignoreCase = true) && !it.equals(venue, ignoreCase = true) }
+    }
+    val typedCompanions = remember(companionsText) { companionsText.split(",").map(String::trim) }
+    val companionPrefix = typedCompanions.lastOrNull().orEmpty()
+    val companionMatches = remember(companionsText, companionSuggestions) {
+        val already = typedCompanions.dropLast(1).map { it.lowercase() }.toSet()
+        companionSuggestions.filter {
+            it.lowercase() !in already &&
+                (companionPrefix.isBlank() || it.contains(companionPrefix, ignoreCase = true)) &&
+                !it.equals(companionPrefix, ignoreCase = true)
+        }
+    }
 
     val parsedDate = runCatching { LocalDate.parse(date) }.getOrDefault(LocalDate.now())
     val parsedTime = runCatching { LocalTime.parse(time) }.getOrDefault(LocalTime.of(19, 0))
@@ -113,17 +139,61 @@ fun OutingScheduleSheet(
                 PickerField(label = "Showtime", value = parsedTime.toString().take(5), onClick = { showTimePicker = true }, modifier = Modifier.weight(1f))
             }
 
-            OutlinedTextField(
-                value = venue,
-                onValueChange = { venue = it },
-                label = { Text("Theater") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-            )
+            ExposedDropdownMenuBox(
+                expanded = venueMenuExpanded && venueMatches.isNotEmpty(),
+                onExpandedChange = { venueMenuExpanded = it },
+                modifier = Modifier.padding(bottom = 14.dp),
+            ) {
+                OutlinedTextField(
+                    value = venue,
+                    onValueChange = { venue = it; venueMenuExpanded = true },
+                    label = { Text("Theater") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true),
+                )
+                ExposedDropdownMenu(expanded = venueMenuExpanded && venueMatches.isNotEmpty(), onDismissRequest = { venueMenuExpanded = false }) {
+                    venueMatches.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion) },
+                            onClick = {
+                                venue = suggestion
+                                parkingNotes = venueNotes[suggestion] ?: parkingNotes
+                                venueMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            ExposedDropdownMenuBox(
+                expanded = companionMenuExpanded && companionMatches.isNotEmpty(),
+                onExpandedChange = { companionMenuExpanded = it },
+                modifier = Modifier.padding(bottom = 14.dp),
+            ) {
+                OutlinedTextField(
+                    value = companionsText,
+                    onValueChange = { companionsText = it; companionMenuExpanded = true },
+                    label = { Text("Companions (comma separated)") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true),
+                )
+                ExposedDropdownMenu(expanded = companionMenuExpanded && companionMatches.isNotEmpty(), onDismissRequest = { companionMenuExpanded = false }) {
+                    companionMatches.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion) },
+                            onClick = {
+                                val prefix = companionsText.substringBeforeLast(",", "").let { if (it.isBlank()) "" else "$it, " }
+                                companionsText = "$prefix$suggestion, "
+                                companionMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
-                value = companionsText,
-                onValueChange = { companionsText = it },
-                label = { Text("Companions (comma separated)") },
+                value = parkingNotes,
+                onValueChange = { parkingNotes = it },
+                label = { Text("Parking / transit notes") },
+                supportingText = { Text("Remembered for this venue") },
                 modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
             )
 
@@ -242,6 +312,7 @@ fun OutingScheduleSheet(
                         bookingRef.ifBlank { null },
                         notes.ifBlank { null },
                     )
+                    if (venue.isNotBlank()) onSaveVenueNotes(venue, parkingNotes)
                     onDismiss()
                 }) { Text(if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
             }

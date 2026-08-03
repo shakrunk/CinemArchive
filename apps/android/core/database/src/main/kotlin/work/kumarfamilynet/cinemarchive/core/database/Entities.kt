@@ -284,6 +284,21 @@ data class CinemaOutingEntity(
     val updatedAt: String,
 )
 
+/**
+ * Per-venue logistics notes ("park in the garage across the street") — local-only convenience
+ * memory (issue #214), separate from [CinemaOutingEntity.notes] which is per-outing. Keyed on
+ * the trimmed venue string itself rather than a synthetic id: there's no dedicated `venues`
+ * table (see [CinemaOutingEntity]'s kdoc on why venue stays free text), so the venue name is
+ * already this row's natural identity, and it doubles as the join key back to
+ * [CinemaOutingEntity.venue] for the pre-fill lookup.
+ */
+@Entity(tableName = "venue_notes")
+data class VenueNoteEntity(
+    @PrimaryKey val venue: String,
+    val notes: String,
+    val updatedAt: String,
+)
+
 class Converters {
     @TypeConverter
     fun fromGenres(value: String?): List<String> =

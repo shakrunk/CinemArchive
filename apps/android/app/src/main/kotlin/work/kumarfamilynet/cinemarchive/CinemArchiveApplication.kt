@@ -108,6 +108,7 @@ class CinemArchiveApplication : Application() {
             viewingDao = database.viewingDao(),
             titleDao = database.titleDao(),
             outbox = outbox,
+            venueNoteDao = database.venueNoteDao(),
             alarmScheduler = AndroidOutingAlarmScheduler(this),
         )
     }

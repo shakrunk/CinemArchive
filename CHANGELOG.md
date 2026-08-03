@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-08-03
+
 ### Added
 
 - Cinema outings now record where you're sitting as auditorium, row and seats rather than one

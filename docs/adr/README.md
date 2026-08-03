@@ -7,6 +7,7 @@ decided.
 |---|-------|--------|------|
 | [0001](0001-android-foundation.md) | Native Android foundation and provisional identifiers | Accepted for foundation spike | 2026-07-11 |
 | [0002](0002-multi-platform-repo-layout.md) | Multi-platform repo layout (`apps/*`) | Accepted — executed 2026-07-24 | 2026-07-23 |
+| [0003](0003-ticket-ingestion-via-forwarding-address.md) | Ticket ingestion via a forwarding address, not Gmail OAuth | Accepted — not yet implemented | 2026-08-03 |
 
 Summaries and cross-links: [Decision Records](https://github.com/shakrunk/CinemArchive/wiki/Decision-Records)
 in the wiki. The files here are authoritative.

@@ -58,7 +58,9 @@ const TYPE_OPTIONS: { value: MediaType | 'all'; label: string }[] = [
 ]
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: 'lastInteraction', label: 'Last Interaction' },
+  // "Smart", not the field it sorts on: every other option here names a column, and this one
+  // is a rollup of several (see titleLastInteractionAt). Same label on Android.
+  { value: 'lastInteraction', label: 'Smart' },
   { value: 'addedAt', label: 'Date Added' },
   { value: 'title', label: 'Title' },
   { value: 'year', label: 'Year' },

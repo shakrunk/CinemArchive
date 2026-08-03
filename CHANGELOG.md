@@ -23,6 +23,11 @@ number is chosen.
   did with them — added, watched, or any episode watch, rating or review — and it is now the
   default, as it already was on the web app.
 
+### Changed
+
+- Web: the Library's default sort, previously "Last Interaction", is now called **Smart** — the
+  same name the Android app uses for it. The ordering itself is unchanged.
+
 ### Fixed
 
 - Android: the ticket QR code was rendered light-on-dark under every dark theme (i.e. all of

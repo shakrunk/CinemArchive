@@ -4,7 +4,6 @@ import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { PosterThumb } from 'src/components/ui/poster-thumb'
-import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, getInitials } from 'src/lib/utils'
 import { companionSuggestions, venueSuggestions, type OutingSchedulePrefill } from 'src/store/outings'
@@ -287,17 +286,15 @@ function OutingForm({
   onSaved: (outing: CinemaOuting) => void
   onClose: () => void
 }) {
-  const { addOuting, updateOuting, reconcileOutings, selectTitle, openRefreshMetadata, outings, titles } = useAppStore(
-    useShallow((s) => ({
-      addOuting: s.addOuting,
-      updateOuting: s.updateOuting,
-      reconcileOutings: s.reconcileOutings,
-      selectTitle: s.selectTitle,
-      openRefreshMetadata: s.openRefreshMetadata,
-      outings: s.outings,
-      titles: s.titles,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const addOuting = useAppStore((s) => s.addOuting)
+  const updateOuting = useAppStore((s) => s.updateOuting)
+  const reconcileOutings = useAppStore((s) => s.reconcileOutings)
+  const selectTitle = useAppStore((s) => s.selectTitle)
+  const openRefreshMetadata = useAppStore((s) => s.openRefreshMetadata)
+  const outings = useAppStore((s) => s.outings)
+  const titles = useAppStore((s) => s.titles)
+
   const allViewings = useMemo(() => titles.flatMap((t) => t.viewings), [titles])
 
   const [friends, setFriends] = useState<FriendshipView[]>([])
@@ -680,15 +677,12 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
 // for the same "fresh mount resets local state" idiom) ───────────────────────
 
 function OutingScheduleBody({ onClose }: { onClose: () => void }) {
-  const { titles, outings, outingScheduleTitleId, outingScheduleOutingId, outingSchedulePrefill } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      outings: s.outings,
-      outingScheduleTitleId: s.outingScheduleTitleId,
-      outingScheduleOutingId: s.outingScheduleOutingId,
-      outingSchedulePrefill: s.outingSchedulePrefill,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const titles = useAppStore((s) => s.titles)
+  const outings = useAppStore((s) => s.outings)
+  const outingScheduleTitleId = useAppStore((s) => s.outingScheduleTitleId)
+  const outingScheduleOutingId = useAppStore((s) => s.outingScheduleOutingId)
+  const outingSchedulePrefill = useAppStore((s) => s.outingSchedulePrefill)
 
   const editingOuting = outingScheduleOutingId
     ? outings.find((o) => o.id === outingScheduleOutingId) ?? null

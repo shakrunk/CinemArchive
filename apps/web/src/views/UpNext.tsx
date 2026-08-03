@@ -86,6 +86,8 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
 
   const { title, season, episode, watchedCount, totalCount } = entry
   const epName = episode.episodeName ?? `Episode ${episode.episodeNumber}`
+  const today = new Date().toISOString().slice(0, 10)
+  const hasNotAired = !!episode.airDate && episode.airDate > today
 
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
   const [showNoirModal, setShowNoirModal] = useState(false)
@@ -143,7 +145,11 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
       <p className="font-sans text-sm text-paper-dim truncate">{epName}</p>
       <div className="mt-auto pt-3">
         <ProgressBar watched={watchedCount} total={totalCount} />
-        {!isSharedView && (
+        {hasNotAired ? (
+          <p className="font-mono text-xs text-paper-faint mt-3 inline-flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" /> Airs {formatReleaseDate(episode.airDate!)}
+          </p>
+        ) : !isSharedView && (
           pendingUndo ? (
             <div className="flex items-center justify-between mt-3">
               <span className="font-mono text-xs text-amber inline-flex items-center gap-1.5">

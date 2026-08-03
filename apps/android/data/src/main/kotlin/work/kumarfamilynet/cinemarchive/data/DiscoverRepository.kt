@@ -6,6 +6,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
+import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
@@ -22,7 +23,7 @@ import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 class DiscoverRepository(
     private val client: SupabaseRestClient,
     private val authRepository: AuthRepository,
-) {
+) : EpisodeMetadataFetcher {
     /** This week's trending movies and TV, interleaved so both kinds stay visible near the
      *  top — matching `fetchTrending('all')`'s alternating merge in the web app. */
     suspend fun fetchTrending(): List<TrendingTitle> = withContext(Dispatchers.IO) {
@@ -103,6 +104,22 @@ class DiscoverRepository(
             )
         }
     }
+
+    /**
+     * On-demand backfill of one season's episode rows — [LibraryRepository]'s equivalent of
+     * the web app's `TitleDetailDrawer` backfill effect (`fetchSeasonDetails`), so a title
+     * *added on Android* still gets synopsis/still images without ever having been opened on
+     * web. Same call [fetchDetails] already makes at add-time; exposed separately because the
+     * backfill runs later, against seasons that already exist locally.
+     */
+    override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int): List<MediaEpisode> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                parseSeasonEpisodes(
+                    client.invokeFunction("media-proxy", "action=season&id=$tmdbId&season=$seasonNumber", accessToken()),
+                )
+            }.getOrDefault(emptyList())
+        }
 
     /** Discover browsing deliberately works signed-out, so the anon key backstops the bearer
      *  token — the same fallback `supabase-js`'s `functions.invoke` applies. */

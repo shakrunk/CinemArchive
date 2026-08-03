@@ -1,0 +1,166 @@
+-- Structured seat assignment for cinema outings (issue #221).
+--
+-- `cinema_outings.seat` has been a single free-text column since
+-- 20260711000000_cinema_outings.sql, and the Android in-theater ticket view
+-- renders it under a bare "SEAT" label. That loses the thing you actually need
+-- when you walk into a dark multiplex: which *auditorium* you're headed to.
+-- The row and the seat numbers only matter once you're already through the
+-- right door, so a single string can't be laid out by priority.
+--
+-- Three columns replace the one string as the *preferred* representation:
+--
+--   auditorium  -- "7", "Theatre 7", "Grand Hall" — vendor-shaped, free text
+--   seat_row    -- "F"
+--   seats       -- ["12", "13"] — a party occupies more than one seat
+--
+-- `seat` is deliberately kept, not dropped or backfilled:
+--
+--   * It's the only field the web app writes today, and it holds whatever the
+--     user typed ("F12-13", "Row F, seats 12 and 13", "recliner 4"). Parsing
+--     that server-side would be guesswork on real user data, and a wrong guess
+--     is worse than no guess when the output is "walk to auditorium 4".
+--   * Clients render the structured trio when any part of it is present and
+--     fall back to `seat` otherwise, so existing rows keep displaying exactly
+--     what they display now.
+--   * Ticket-import ingestion (#219/#223) will populate the structured columns
+--     directly from vendor payloads, where the split is already machine-made.
+--
+-- `seat_row` rather than `row`: ROW is a reserved keyword in Postgres, and a
+-- column named `row` needs quoting in every reference forever after.
+
+alter table cinema_outings
+  add column auditorium text,
+  add column seat_row   text,
+  add column seats      jsonb not null default '[]';
+
+-- Guard the shape the clients rely on: a flat array of strings. Mirrors the
+-- absence of a companions check only in that companions predates this file —
+-- new jsonb columns get validated at the boundary.
+alter table cinema_outings
+  add constraint cinema_outings_seats_is_array
+  check (jsonb_typeof(seats) = 'array');
+
+-- Republish the Android sync payload with the three new fields. Unchanged from
+-- 20260726000000_sync_cast_crew_and_scores.sql apart from the cinema_outing arm.
+create or replace function sync_library_changes(p_since timestamptz, p_limit integer default 500)
+returns table (
+  entity_type text,
+  entity_id uuid,
+  parent_id uuid,
+  updated_at timestamptz,
+  payload jsonb
+)
+language sql security definer stable as $$
+  with changes as (
+    select 'title'::text as entity_type, t.id as entity_id, null::uuid as parent_id, t.updated_at as updated_at,
+      jsonb_build_object(
+        'id', t.id, 'tmdbId', t.tmdb_id, 'type', t.type, 'title', t.title, 'year', t.year,
+        'director', t.director, 'genres', t.genres, 'posterUrl', t.poster_url,
+        'backdropUrl', t.backdrop_url, 'synopsis', t.synopsis, 'runtime', t.runtime,
+        'network', t.network, 'status', t.status, 'rating', t.rating, 'notes', t.notes,
+        'addedAt', t.added_at, 'updatedAt', t.updated_at, 'releaseDate', t.release_date,
+        'imdbRating', t.imdb_rating, 'originalLanguage', t.original_language
+      ) as payload
+    from titles t where t.user_id = auth.uid() and t.updated_at > p_since
+
+    union all
+
+    select 'season'::text, s.id, s.title_id, s.updated_at,
+      jsonb_build_object(
+        'id', s.id, 'titleId', s.title_id, 'seasonNumber', s.season_number,
+        'episodeCount', s.episode_count, 'episodesWatched', s.episodes_watched, 'airYear', s.air_year
+      )
+    from seasons s where s.user_id = auth.uid() and s.updated_at > p_since
+
+    union all
+
+    select 'episode'::text, e.id, e.title_id, e.updated_at,
+      jsonb_build_object(
+        'id', e.id, 'titleId', e.title_id, 'seasonNumber', e.season_number,
+        'episodeNumber', e.episode_number, 'episodeName', e.episode_name,
+        'airDate', e.air_date, 'runtime', e.runtime
+      )
+    from episodes e where e.user_id = auth.uid() and e.updated_at > p_since
+
+    union all
+
+    select 'title_cast'::text, tc.id, tc.title_id, tc.updated_at,
+      jsonb_build_object(
+        'id', tc.id, 'titleId', tc.title_id, 'tmdbPersonId', tc.tmdb_person_id,
+        'name', tc.name, 'characterName', tc.character_name, 'castOrder', tc.cast_order
+      )
+    from title_cast tc where tc.user_id = auth.uid() and tc.updated_at > p_since
+
+    union all
+
+    select 'title_crew'::text, cw.id, cw.title_id, cw.updated_at,
+      jsonb_build_object(
+        'id', cw.id, 'titleId', cw.title_id, 'tmdbPersonId', cw.tmdb_person_id,
+        'name', cw.name, 'job', cw.job, 'department', cw.department
+      )
+    from title_crew cw where cw.user_id = auth.uid() and cw.updated_at > p_since
+
+    union all
+
+    select 'viewing'::text, v.id, v.title_id, v.updated_at,
+      jsonb_build_object(
+        'id', v.id, 'titleId', v.title_id, 'date', v.viewed_at, 'rating', v.rating,
+        'notes', v.notes, 'venue', v.venue, 'companions', v.companions, 'outingId', v.outing_id
+      )
+    from viewings v where v.user_id = auth.uid() and v.updated_at > p_since
+
+    union all
+
+    select 'episode_watch_event'::text, we.id, we.episode_id, we.updated_at,
+      jsonb_build_object('id', we.id, 'episodeId', we.episode_id, 'watchedAt', we.watched_at)
+    from episode_watch_events we where we.user_id = auth.uid() and we.updated_at > p_since
+
+    union all
+
+    select 'episode_rating'::text, er.id, er.episode_id, er.updated_at,
+      jsonb_build_object('id', er.id, 'episodeId', er.episode_id, 'rating', er.rating, 'ratedAt', er.rated_at)
+    from episode_ratings er where er.user_id = auth.uid() and er.updated_at > p_since
+
+    union all
+
+    select 'episode_review'::text, rv.id, rv.episode_id, rv.updated_at,
+      jsonb_build_object('id', rv.id, 'episodeId', rv.episode_id, 'reviewText', rv.review_text, 'reviewedAt', rv.reviewed_at)
+    from episode_reviews rv where rv.user_id = auth.uid() and rv.updated_at > p_since
+
+    union all
+
+    select 'cinema_outing'::text, co.id, co.title_id, co.updated_at,
+      jsonb_build_object(
+        'id', co.id, 'titleId', co.title_id, 'showtime', co.showtime,
+        'previewsMinutes', co.previews_minutes, 'runtimeMinutes', co.runtime_minutes,
+        'endsAt', co.ends_at, 'venue', co.venue, 'companions', co.companions,
+        'format', co.format, 'ticketPrice', co.ticket_price, 'seat', co.seat,
+        'auditorium', co.auditorium, 'seatRow', co.seat_row, 'seats', co.seats,
+        'bookingRef', co.booking_ref, 'notes', co.notes, 'status', co.status,
+        'previousStatus', co.previous_status, 'completedViewingId', co.completed_viewing_id,
+        'followUpDismissedAt', co.follow_up_dismissed_at, 'createdAt', co.created_at,
+        'updatedAt', co.updated_at
+      )
+    from cinema_outings co where co.user_id = auth.uid() and co.updated_at > p_since
+
+    union all
+
+    select 'tombstone'::text, st.entity_id, null::uuid, st.deleted_at,
+      jsonb_build_object('entityType', st.entity_type)
+    from sync_tombstones st where st.user_id = auth.uid() and st.deleted_at > p_since
+  ),
+  ordered as (
+    select c.*, row_number() over (order by c.updated_at, c.entity_id) as rn
+    from changes c
+  )
+  -- The limit is a floor, not a ceiling: take every row up to and including the
+  -- last one sharing the limit-th row's `updated_at`, so a same-timestamp group is
+  -- never split across pages (see 20260726000000_sync_cast_crew_and_scores.sql).
+  select o.entity_type, o.entity_id, o.parent_id, o.updated_at, o.payload
+  from ordered o
+  where o.updated_at <= coalesce(
+    (select o2.updated_at from ordered o2 where o2.rn = least(coalesce(p_limit, 500), 500)),
+    'infinity'::timestamptz
+  )
+  order by o.updated_at, o.entity_id;
+$$;

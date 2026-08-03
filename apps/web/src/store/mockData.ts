@@ -111,7 +111,10 @@ export interface CinemaOuting {
   companions: Companion[]
   format?: CinemaFormat
   ticketPrice?: number
-  seat?: string
+  seat?: string                // legacy free-text seat string; display fallback when the trio below is empty
+  auditorium?: string          // "7", "Theatre 7", "Grand Hall" — what you look for first walking in
+  seatRow?: string             // "F"
+  seats: string[]              // ["12", "13"] — a party occupies more than one seat
   bookingRef?: string          // confirmation code — deliberately excluded from shared plans
   notes?: string
   status: OutingStatus

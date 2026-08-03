@@ -28,6 +28,7 @@ function makeOuting(overrides: Partial<CinemaOuting> = {}): CinemaOuting {
     runtimeMinutes: 136,
     endsAt: '2026-07-17T22:06:00.000Z',
     companions: [{ name: 'Alex' }],
+    seats: [],
     status: 'completed',
     previousStatus: 'watchlist',
     completedViewingId: 'v1',

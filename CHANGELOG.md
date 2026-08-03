@@ -9,6 +9,40 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-08-03
+
+### Added
+
+- Cinema outings now record where you're sitting as auditorium, row and seats rather than one
+  free-text "Seat" field, on both clients. Outings saved before this keep their original text
+  and still display it — nothing is re-parsed or lost (#221).
+- Android: the in-theater ticket view is now two modes instead of one screen. **Scan** shows
+  the code full-width at maximum brightness for the ticket-taker; **Auditorium** drops the
+  backlight to a theater-safe floor and shows the auditorium in large dim amber on black so
+  you can find your seat without lighting up the rows behind you. It opens on whichever
+  matches the showtime and switches by tap (#221).
+- Android: the Library's "Sort by" gains **Smart**, ordering titles by the most recent thing you
+  did with them — added, watched, or any episode watch, rating or review — and it is now the
+  default, as it already was on the web app.
+- Android: TV titles' detail screen gets a season selector and episode thumbnails/synopses,
+  closing most of the gap with the web app's title drawer. Episode metadata now syncs both
+  ways between clients, and Android backfills it from TMDB itself on open — so a series added
+  on the phone gets thumbnails and synopses even if it's never opened on the web app.
+
+### Changed
+
+- Web: the Library's default sort, previously "Last Interaction", is now called **Smart** — the
+  same name the Android app uses for it. The ordering itself is unchanged.
+
+### Fixed
+
+- Android: the ticket QR code was rendered light-on-dark under every dark theme (i.e. all of
+  them but Light), which most theater scanners cannot read. It is now always black on white
+  regardless of theme, with an explicit quiet zone and error-correction level (#221).
+- Android: the screen no longer times out while a ticket is open.
+- Up Next's "next episode" card no longer offers "Mark watched" for an episode that hasn't
+  aired yet on a still-airing series — it now shows the air date instead, on both clients.
+
 ## [1.24.0] - 2026-08-03
 
 ### Added

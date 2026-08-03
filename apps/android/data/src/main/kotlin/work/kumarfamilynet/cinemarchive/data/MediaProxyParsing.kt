@@ -25,6 +25,7 @@ import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 
 private const val TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w500"
 private const val TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
+private const val TMDB_STILL_BASE = "https://image.tmdb.org/t/p/w300"
 
 /** Title-level crew jobs worth keeping, matching `TITLE_CREW_JOBS` in the web app's
  *  `fetchMediaDetails`. TMDB's full crew list runs to hundreds of rows for a big production. */
@@ -211,7 +212,9 @@ internal fun parseSeasons(data: JSONObject, type: MediaType): List<MediaSeason> 
         .sortedBy { it.seasonNumber }
 }
 
-/** Maps one `action=season` payload into the episode rows for that season. */
+/** Maps one `action=season` payload into the episode rows for that season. Still images are
+ *  resolved to a full URL here (not a bare TMDB path), matching how the web app's backfill
+ *  effect stores `stillUrl` — see `apps/web/src/components/TitleDetailDrawer.tsx`. */
 internal fun parseSeasonEpisodes(body: String): List<MediaEpisode> =
     JSONObject(body).optJSONArray("episodes").objects()
         .mapNotNull { episode ->
@@ -221,6 +224,8 @@ internal fun parseSeasonEpisodes(body: String): List<MediaEpisode> =
                 name = episode.stringOrNull("name"),
                 airDate = episode.stringOrNull("air_date"),
                 runtime = episode.intOrNull("runtime"),
+                synopsis = episode.stringOrNull("overview"),
+                stillUrl = episode.stringOrNull("still_path")?.let { "$TMDB_STILL_BASE$it" },
             )
         }
         .sortedBy { it.episodeNumber }

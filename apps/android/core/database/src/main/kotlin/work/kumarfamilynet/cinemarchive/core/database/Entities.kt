@@ -88,6 +88,11 @@ data class EpisodeEntity(
     val episodeName: String?,
     val airDate: String?,
     val runtime: Int?,
+    // Mirrors schema.sql's episodes.synopsis/still_url — see docs/android-contracts/
+    // episode-tracking.md §1. Null until a TMDB season fetch (add-time, or backfilled by the
+    // web app and synced down) has populated them for this episode.
+    val synopsis: String? = null,
+    val stillUrl: String? = null,
 )
 
 /** Independent watch log — see docs/android-contracts/episode-tracking.md §1. */
@@ -265,7 +270,10 @@ data class CinemaOutingEntity(
     val companions: List<String> = emptyList(),
     val format: String?,
     val ticketPrice: Double?,
-    val seat: String? = null,
+    val seat: String? = null, // legacy free-text; display fallback for the trio below
+    val auditorium: String? = null,
+    val seatRow: String? = null,
+    val seats: List<String> = emptyList(),
     val bookingRef: String? = null,
     val notes: String? = null,
     val status: String = "SCHEDULED", // OutingStatus.name

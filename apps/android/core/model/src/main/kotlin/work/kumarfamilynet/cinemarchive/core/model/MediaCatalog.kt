@@ -95,6 +95,8 @@ data class MediaEpisode(
     val name: String?,
     val airDate: String?,
     val runtime: Int?,
+    val synopsis: String? = null,
+    val stillUrl: String? = null,
 )
 
 data class MediaCredit(

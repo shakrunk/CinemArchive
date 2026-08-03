@@ -1641,7 +1641,12 @@ create table cinema_outings (
   companions              jsonb not null default '[]',  -- [{ name, friendUserId? }]
   format                  text,          -- from the fixed UI list; free text at rest
   ticket_price            numeric(6,2) check (ticket_price >= 0),
+  -- Legacy free-text seat string. Still written by the web app and still the
+  -- display fallback; the structured trio below is preferred where present.
   seat                    text,
+  auditorium              text,          -- "7", "Theatre 7", "Grand Hall"
+  seat_row                text,          -- "F" (not `row` — reserved keyword)
+  seats                   jsonb not null default '[]',  -- ["12", "13"]
   booking_ref             text,
   notes                   text,
   status                  text not null default 'scheduled'
@@ -1651,7 +1656,8 @@ create table cinema_outings (
   follow_up_dismissed_at  timestamptz,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now(),
-  constraint outing_ends_after_start check (ends_at > showtime)
+  constraint outing_ends_after_start check (ends_at > showtime),
+  constraint cinema_outings_seats_is_array check (jsonb_typeof(seats) = 'array')
 );
 
 create index cinema_outings_user_idx  on cinema_outings(user_id, status, ends_at);
@@ -1926,7 +1932,8 @@ language sql security definer stable as $$
       jsonb_build_object(
         'id', e.id, 'titleId', e.title_id, 'seasonNumber', e.season_number,
         'episodeNumber', e.episode_number, 'episodeName', e.episode_name,
-        'airDate', e.air_date, 'runtime', e.runtime
+        'airDate', e.air_date, 'runtime', e.runtime,
+        'synopsis', e.synopsis, 'stillUrl', e.still_url
       )
     from episodes e where e.user_id = auth.uid() and e.updated_at > p_since
 
@@ -1985,6 +1992,7 @@ language sql security definer stable as $$
         'previewsMinutes', co.previews_minutes, 'runtimeMinutes', co.runtime_minutes,
         'endsAt', co.ends_at, 'venue', co.venue, 'companions', co.companions,
         'format', co.format, 'ticketPrice', co.ticket_price, 'seat', co.seat,
+        'auditorium', co.auditorium, 'seatRow', co.seat_row, 'seats', co.seats,
         'bookingRef', co.booking_ref, 'notes', co.notes, 'status', co.status,
         'previousStatus', co.previous_status, 'completedViewingId', co.completed_viewing_id,
         'followUpDismissedAt', co.follow_up_dismissed_at, 'createdAt', co.created_at,

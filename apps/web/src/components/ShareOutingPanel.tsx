@@ -8,6 +8,7 @@ import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { formatCompanions } from 'src/store/outings'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSnippet, shareOutingSnippet } from 'src/lib/ics'
 import type { CinemaOuting, Title } from 'src/store/mockData'
+import { formatSeatShort } from 'src/lib/seating'
 
 // One panel for both plan-sharing channels (plan §4.10): the in-app friend
 // picker (modeled on SendRecommendationPanel) plus the out-of-app copy/
@@ -78,7 +79,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
   async function handleCopyOrShare() {
     setCopying(true)
     try {
-      const snippet = formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, outing.seat)
+      const snippet = formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, formatSeatShort(outing))
       const outcome = await shareOutingSnippet(snippet)
       if (outcome === 'copied') {
         pushNotification({ message: "Copied — paste it wherever you're texting your friends.", kind: 'tip', autoClose: 4000 })

@@ -79,6 +79,7 @@ class LibraryRepository(
     private val titleCastDao: TitleCastDao,
     private val titleCrewDao: TitleCrewDao,
     private val outbox: MutationOutbox,
+    private val episodeMetadataFetcher: EpisodeMetadataFetcher,
 ) {
     /**
      * Adds a catalog result to the library: an optimistic Room write of everything the title
@@ -124,6 +125,8 @@ class LibraryRepository(
                     episodeName = episode.name,
                     airDate = episode.airDate,
                     runtime = episode.runtime,
+                    synopsis = episode.synopsis,
+                    stillUrl = episode.stillUrl,
                 )
             }
         }
@@ -210,8 +213,10 @@ class LibraryRepository(
     fun observeLibrary(): Flow<List<LibraryTitle>> = combine(
         titleDao.observeLibrary(),
         cinemaOutingDao.observeAllOutings(),
-    ) { rows, outings ->
+        titleDao.observeLastInteractions(),
+    ) { rows, outings, interactions ->
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings.map { it.toDomain() })
+        val lastInteractionByTitle = interactions.associate { it.titleId to it.lastInteractionAt }
         rows.map { row ->
             LibraryTitle(
                 id = row.id,
@@ -226,6 +231,7 @@ class LibraryRepository(
                 hasScheduledOuting = row.id in scheduledTitleIds,
                 releaseDate = row.releaseDate,
                 genres = row.genres,
+                lastInteractionAt = lastInteractionByTitle[row.id],
             )
         }
     }
@@ -303,6 +309,7 @@ class LibraryRepository(
                     nextSeasonNumber = next?.let { seasonById[it.seasonId]?.seasonNumber },
                     nextEpisodeNumber = next?.episodeNumber,
                     nextEpisodeName = next?.episodeName,
+                    nextEpisodeAirDate = next?.airDate,
                 )
             }
         val watchlist = titles
@@ -413,6 +420,8 @@ class LibraryRepository(
                                 runtime = episode.runtime,
                                 watchCount = watchCountByEpisode[episode.id] ?: 0,
                                 latestRating = latestRatingByEpisode[episode.id],
+                                synopsis = episode.synopsis,
+                                stillUrl = episode.stillUrl,
                             )
                         },
                     )
@@ -431,6 +440,62 @@ class LibraryRepository(
                 scheduledOuting = outingRows.map { it.toDomain() }
                     .filter { it.status == OutingStatus.SCHEDULED }
                     .minByOrNull { it.showtime },
+            )
+        }
+    }
+
+    /**
+     * On-demand TMDB backfill for a TV title's missing episode synopsis/still image —
+     * Android's own equivalent of the web app's `TitleDetailDrawer` backfill effect. Relying
+     * solely on data the web app has already fetched and synced down would leave every title
+     * *added on Android* permanently thumbnail-less if the user never opens the web app, so
+     * this repeats the same on-open fetch-and-persist here instead of assuming web did it
+     * first. Symmetric with why the fetched fields are also pushed to the outbox below: neither
+     * client should end up depending on the other having visited a title first.
+     *
+     * Only ever touches seasons that already have local episode rows (matched to the fetched
+     * TMDB rows by episode number) and only ever fills a currently-null [EpisodeEntity.synopsis]
+     * /[EpisodeEntity.stillUrl] — never overwrites a value either client already wrote. A season
+     * with no local episode rows at all (the add-time TMDB season call failed) is left for a
+     * later sync to populate first; there is nothing here to attach metadata to yet.
+     */
+    suspend fun backfillEpisodeMetadata(titleId: String) {
+        val title = titleDao.getById(titleId) ?: return
+        if (MediaType.valueOf(title.type) != MediaType.TV) return
+
+        val episodesBySeason = episodeDao.observeEpisodes(titleId).first().groupBy { it.seasonId }
+        val staleSeasons = seasonDao.observeSeasons(titleId).first().filter { season ->
+            episodesBySeason[season.id].orEmpty().let { episodes -> episodes.isNotEmpty() && episodes.any { it.synopsis == null } }
+        }
+        if (staleSeasons.isEmpty()) return
+
+        val updated = mutableListOf<EpisodeEntity>()
+        for (season in staleSeasons) {
+            val fetchedByNumber = episodeMetadataFetcher.fetchSeasonEpisodes(title.tmdbId, season.seasonNumber)
+                .associateBy { it.episodeNumber }
+            if (fetchedByNumber.isEmpty()) continue
+            for (episode in episodesBySeason[season.id].orEmpty()) {
+                if (episode.synopsis != null && episode.stillUrl != null) continue
+                val fetched = fetchedByNumber[episode.episodeNumber] ?: continue
+                updated += episode.copy(
+                    synopsis = episode.synopsis ?: fetched.synopsis,
+                    stillUrl = episode.stillUrl ?: fetched.stillUrl,
+                )
+            }
+        }
+        if (updated.isEmpty()) return
+
+        episodeDao.upsertAll(updated)
+        for (episode in updated) {
+            outbox.enqueue(
+                entityType = "episode_metadata",
+                entityId = episode.id,
+                operation = "update",
+                payload = JSONObject().apply {
+                    put("id", episode.id)
+                    put("synopsis", episode.synopsis ?: JSONObject.NULL)
+                    put("stillUrl", episode.stillUrl ?: JSONObject.NULL)
+                },
             )
         }
     }

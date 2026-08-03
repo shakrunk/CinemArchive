@@ -9,19 +9,24 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -54,6 +60,7 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
@@ -63,6 +70,7 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
@@ -77,6 +85,13 @@ class TitleDetailViewModel(
 ) : ViewModel() {
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    init {
+        // Fire-and-forget, same as the web app's drawer-open effect: fills in episode
+        // synopsis/stills for whichever seasons are missing them, independent of whether this
+        // title was ever opened on the web app. See LibraryRepository.backfillEpisodeMetadata.
+        viewModelScope.launch { repository.backfillEpisodeMetadata(titleId) }
+    }
 
     /** Optimistic local write + queued remote push — see LibraryRepository.logEpisodeWatched. */
     fun onMarkWatched(episodeId: String) {
@@ -111,12 +126,12 @@ class TitleDetailViewModel(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ) {
         viewModelScope.launch {
-            outingsRepository.scheduleOuting(titleId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seat, bookingRef, notes)
+            outingsRepository.scheduleOuting(titleId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
         }
     }
 
@@ -129,12 +144,12 @@ class TitleDetailViewModel(
         companions: List<String>,
         format: CinemaFormat?,
         ticketPrice: Double?,
-        seat: String?,
+        seating: SeatAssignment,
         bookingRef: String?,
         notes: String?,
     ) {
         viewModelScope.launch {
-            outingsRepository.updateOuting(outingId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seat, bookingRef, notes)
+            outingsRepository.updateOuting(outingId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
         }
     }
 
@@ -196,8 +211,8 @@ fun TitleDetailScreen(
     onLogViewing: () -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
-    onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
+    onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
+    onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onCancelOuting: (String) -> Unit = {},
     onRatePostShow: (String, Double) -> Unit = { _, _ -> },
     onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
@@ -207,6 +222,11 @@ fun TitleDetailScreen(
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
     var postShowViewing by remember { mutableStateOf<Viewing?>(null) }
+    // Keyed on the title id (not just rememberSaveable) so navigating from one series' detail
+    // screen straight to another's doesn't carry over a season number that may not exist there.
+    var selectedSeasonNumber by rememberSaveable(detail?.id) {
+        mutableStateOf(detail?.seasons?.firstOrNull()?.seasonNumber ?: 0)
+    }
 
     if (showScheduleSheet || editingOuting != null) {
         androidx.compose.runtime.LaunchedEffect(Unit) { onRequestNotificationPermission() }
@@ -351,9 +371,28 @@ fun TitleDetailScreen(
                         )
                     }
                 }
-                items(detail.seasons, key = SeasonDetail::id) { season ->
+                item {
                     ReadingWidthColumn {
-                        SeasonRow(season, onMarkWatched, onRateEpisode, onSubmitReview)
+                        SeasonSelector(
+                            seasons = detail.seasons,
+                            selectedSeasonNumber = selectedSeasonNumber,
+                            onSelect = { selectedSeasonNumber = it },
+                        )
+                    }
+                }
+                item { Box(modifier = Modifier.height(14.dp)) }
+
+                val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
+                    ?: detail.seasons.first()
+                items(selectedSeason.episodes, key = EpisodeDetail::id) { episode ->
+                    ReadingWidthColumn {
+                        EpisodeRow(
+                            episode,
+                            onMarkWatched,
+                            onRateEpisode,
+                            onSubmitReview,
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
+                        )
                     }
                 }
             }
@@ -388,12 +427,12 @@ fun TitleDetailScreen(
             defaultRuntimeMinutes = detail?.runtime,
             initial = editingOuting,
             onDismiss = { showScheduleSheet = false; editingOuting = null },
-            onSave = { showtime, previews, runtime, venue, companions, format, price, seat, bookingRef, notes ->
+            onSave = { showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes ->
                 val outing = editingOuting
                 if (outing != null) {
-                    onEditOuting(outing.id, showtime, previews, runtime, venue, companions, format, price, seat, bookingRef, notes)
+                    onEditOuting(outing.id, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
                 } else {
-                    onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seat, bookingRef, notes)
+                    onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
                 }
             },
         )
@@ -483,80 +522,152 @@ private fun DetailHero(detail: TitleDetail, onBack: () -> Unit) {
     }
 }
 
+/** Horizontally scrollable season tabs — the same underlying "pick one of N" interaction as the
+ *  web app's season pills/dropdown (`TVSeriesSection`), but a single scrollable-chip idiom
+ *  regardless of season count instead of switching UI shape past three seasons. */
 @Composable
-private fun SeasonRow(
-    season: SeasonDetail,
-    onMarkWatched: (String) -> Unit,
-    onRateEpisode: (String, Double) -> Unit,
-    onSubmitReview: (String, String) -> Unit,
+private fun SeasonSelector(
+    seasons: List<SeasonDetail>,
+    selectedSeasonNumber: Int,
+    onSelect: (Int) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(horizontal = 22.dp)) {
-        Text(
-            "Season ${season.seasonNumber} — ${season.episodesWatched}/${season.episodeCount} watched",
-            style = MaterialTheme.typography.titleSmall,
-        )
-        season.episodes.forEach { episode -> EpisodeRow(episode, onMarkWatched, onRateEpisode, onSubmitReview) }
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 22.dp),
+    ) {
+        items(seasons, key = SeasonDetail::id) { season ->
+            val pct = if (season.episodeCount > 0) season.episodesWatched * 100 / season.episodeCount else 0
+            FilterChip(
+                selected = season.seasonNumber == selectedSeasonNumber,
+                onClick = { onSelect(season.seasonNumber) },
+                label = { Text("S${season.seasonNumber} · $pct%") },
+            )
+        }
     }
 }
 
+/** One episode of the selected season: a 16:9 still (falling back to a tinted placeholder,
+ *  same pattern as [PosterSurface]'s poster usage elsewhere), name/air-date/runtime, a
+ *  tap-to-expand synopsis, and the mark-watched/star-rating/review actions unchanged from
+ *  before this screen grew thumbnails. */
 @Composable
 private fun EpisodeRow(
     episode: EpisodeDetail,
     onMarkWatched: (String) -> Unit,
     onRateEpisode: (String, Double) -> Unit,
     onSubmitReview: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val watched = episode.watchCount > 0
-    val label = buildString {
-        append("${episode.episodeNumber}. ${episode.episodeName ?: "Untitled"}")
-        if (watched) append(" — watched ${episode.watchCount}×")
-        episode.latestRating?.let { append(" — ★$it") }
-    }
     var reviewExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
     var reviewText by rememberSaveable(episode.id) { mutableStateOf("") }
+    var synopsisExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            if (!watched) {
-                TextButton(onClick = { onMarkWatched(episode.id) }) {
-                    Text("Mark watched")
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PosterSurface(
+                    tint = tintForKey(episode.id),
+                    imageUrl = episode.stillUrl,
+                    modifier = Modifier.width(128.dp),
+                    aspectRatio = 16f / 9f,
+                    cornerRadius = 10.dp,
+                ) {
+                    if (watched) {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = "Watched",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(18.dp),
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "E${episode.episodeNumber}" + (episode.episodeName?.let { " · $it" } ?: ""),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val meta = listOfNotNull(episode.airDate, episode.runtime?.let { "$it min" }).joinToString(" · ")
+                    if (meta.isNotBlank()) {
+                        Text(
+                            meta,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    if (watched && episode.watchCount > 1) {
+                        Text(
+                            "Watched ${episode.watchCount}×",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            for (star in 1..5) {
-                val filled = star <= (episode.latestRating ?: 0.0)
-                Icon(
-                    if (filled) Icons.Filled.Star else Icons.Filled.StarBorder,
-                    contentDescription = "Rate $star star${if (star == 1) "" else "s"}",
-                    tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            episode.synopsis?.takeIf { it.isNotBlank() }?.let { synopsis ->
+                Text(
+                    synopsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (synopsisExpanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .clickable { onRateEpisode(episode.id, star.toDouble()) }
-                        .padding(2.dp),
+                        .padding(top = 10.dp)
+                        .clickable { synopsisExpanded = !synopsisExpanded },
                 )
             }
-            TextButton(onClick = { reviewExpanded = !reviewExpanded }) { Text("Review") }
-        }
-        if (reviewExpanded) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = reviewText,
-                    onValueChange = { reviewText = it },
-                    modifier = Modifier.weight(1f),
-                    label = { Text("Your review") },
-                )
-                TextButton(
-                    onClick = {
-                        onSubmitReview(episode.id, reviewText)
-                        reviewText = ""
-                        reviewExpanded = false
-                    },
-                    enabled = reviewText.isNotBlank(),
-                ) { Text("Submit") }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                if (!watched) {
+                    TextButton(onClick = { onMarkWatched(episode.id) }) {
+                        Text("Mark watched")
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                for (star in 1..5) {
+                    val filled = star <= (episode.latestRating ?: 0.0)
+                    Icon(
+                        if (filled) Icons.Filled.Star else Icons.Filled.StarBorder,
+                        contentDescription = "Rate $star star${if (star == 1) "" else "s"}",
+                        tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable { onRateEpisode(episode.id, star.toDouble()) }
+                            .padding(2.dp)
+                            .size(18.dp),
+                    )
+                }
+                TextButton(onClick = { reviewExpanded = !reviewExpanded }) { Text("Review") }
+            }
+            if (reviewExpanded) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = reviewText,
+                        onValueChange = { reviewText = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("Your review") },
+                    )
+                    TextButton(
+                        onClick = {
+                            onSubmitReview(episode.id, reviewText)
+                            reviewText = ""
+                            reviewExpanded = false
+                        },
+                        enabled = reviewText.isNotBlank(),
+                    ) { Text("Submit") }
+                }
             }
         }
     }

@@ -30,6 +30,7 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleIdByTmdbKey
+import work.kumarfamilynet.cinemarchive.core.database.TitleLastInteraction
 import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
@@ -50,6 +51,7 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 private class AddTitleTitleDao(private val existing: MutableMap<Pair<Int, String>, String> = mutableMapOf()) : TitleDao {
     val written = mutableListOf<TitleEntity>()
     override fun observeLibrary(): Flow<List<TitleListRow>> = throw UnsupportedOperationException()
+    override fun observeLastInteractions(): Flow<List<TitleLastInteraction>> = throw UnsupportedOperationException()
     override fun observeTitle(titleId: String): Flow<TitleEntity?> = throw UnsupportedOperationException()
     override fun observeLibraryTmdbIds(): Flow<List<Int>> = throw UnsupportedOperationException()
     override fun observeLibraryTitleIdsByTmdbKey(): Flow<List<TitleIdByTmdbKey>> = throw UnsupportedOperationException()
@@ -137,6 +139,12 @@ private object NoEpisodeReviewsDao : EpisodeReviewDao {
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
 
+// addTitle never backfills episode metadata — that's TitleDetailViewModel's job, on open —
+// so this stays unimplemented same as the other "not exercised by addTitle" fakes above.
+private object NoEpisodeMetadataFetcher : EpisodeMetadataFetcher {
+    override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = throw UnsupportedOperationException()
+}
+
 /**
  * Covers `LibraryRepository.addTitle` — the Room write and the single outbox entry that
  * carries it to Supabase.
@@ -170,6 +178,7 @@ class LibraryRepositoryAddTitleTest {
             titleCastDao = castDao,
             titleCrewDao = crewDao,
             outbox = MutationOutbox(outboxDao, NoopWriter, NoopConflictHandler),
+            episodeMetadataFetcher = NoEpisodeMetadataFetcher,
         )
     }
 

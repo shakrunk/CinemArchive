@@ -30,6 +30,7 @@ class SupabaseRemoteMutationWriter(
                 "episode_watch_event" -> upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
+                "episode_metadata" -> patchEpisodeMetadata(payload)
                 "viewing" -> if (entry.operation == "update") patchViewing(payload) else upsertViewing(payload)
                 "cinema_outing" -> upsertOuting(payload)
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
@@ -108,6 +109,8 @@ class SupabaseRemoteMutationWriter(
                 .putNullable("episode_name", episode, "episodeName")
                 .putNullable("air_date", episode, "airDate")
                 .putNullable("runtime", episode, "runtime")
+                .putNullable("synopsis", episode, "synopsis")
+                .putNullable("still_url", episode, "stillUrl")
         }?.let { client.upsert("episodes", session.accessToken, it.toString()) }
 
         payload.rows("cast") { member ->
@@ -232,6 +235,23 @@ class SupabaseRemoteMutationWriter(
         return PushResult.Success
     }
 
+    /**
+     * Partial update for the TMDB fields [LibraryRepository.backfillEpisodeMetadata] fetches —
+     * same unconditional PATCH-by-id shape as [patchViewing]. Unconditional, not last-write-wins
+     * like [pushTitleUpdate]: synopsis/stillUrl have no other client-side writer to race
+     * against, so there's nothing to arbitrate — a losing write here just means the next open
+     * asks TMDB again.
+     */
+    private fun patchEpisodeMetadata(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val id = payload.getString("id")
+        val body = JSONObject()
+            .putNullable("synopsis", payload, "synopsis")
+            .putNullable("still_url", payload, "stillUrl")
+        client.patchWithFilter("episodes", "id=eq.$id", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
     private fun upsertViewing(payload: JSONObject): PushResult {
         val session = sessionProvider()
         val body = JSONObject()
@@ -262,6 +282,9 @@ class SupabaseRemoteMutationWriter(
             .put("format", payload.opt("format").takeUnless { it == JSONObject.NULL })
             .put("ticket_price", payload.opt("ticketPrice").takeUnless { it == JSONObject.NULL })
             .put("seat", payload.opt("seat").takeUnless { it == JSONObject.NULL })
+            .put("auditorium", payload.opt("auditorium").takeUnless { it == JSONObject.NULL })
+            .put("seat_row", payload.opt("seatRow").takeUnless { it == JSONObject.NULL })
+            .put("seats", payload.getJSONArray("seats"))
             .put("booking_ref", payload.opt("bookingRef").takeUnless { it == JSONObject.NULL })
             .put("notes", payload.opt("notes").takeUnless { it == JSONObject.NULL })
             .put("status", payload.getString("status").lowercase())

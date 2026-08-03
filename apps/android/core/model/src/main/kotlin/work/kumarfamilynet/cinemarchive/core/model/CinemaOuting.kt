@@ -24,7 +24,12 @@ data class CinemaOuting(
     val companions: List<String>,
     val format: CinemaFormat?,
     val ticketPrice: Double?,
+    /** Legacy free-text seat string — the display fallback when [seats]/[seatRow]/[auditorium]
+     *  are all empty. Never written by this client any more; see [SeatAssignment]. */
     val seat: String?,
+    val auditorium: String?,
+    val seatRow: String?,
+    val seats: List<String>,
     val bookingRef: String?,
     val notes: String?,
     val status: OutingStatus,

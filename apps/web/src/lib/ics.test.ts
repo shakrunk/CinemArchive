@@ -12,6 +12,7 @@ function makeOuting(overrides: Partial<CinemaOuting> = {}): CinemaOuting {
     runtimeMinutes: 166,
     endsAt: '2026-07-17T22:36:00.000-06:00',
     companions: [],
+    seats: [],
     status: 'scheduled',
     createdAt: '2026-07-16T00:00:00.000Z',
     ...overrides,

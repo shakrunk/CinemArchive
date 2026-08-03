@@ -147,7 +147,7 @@ fun LibraryRoute(
     var statusFilters by rememberSaveable { mutableStateOf(setOf<LibraryStatus>()) }
     var genreFilters by rememberSaveable { mutableStateOf(setOf<String>()) }
     var minRating by rememberSaveable { mutableStateOf(0) }
-    var sortOrder by rememberSaveable { mutableStateOf(LibrarySortOrder.TITLE) }
+    var sortOrder by rememberSaveable { mutableStateOf(LibrarySortOrder.LAST_INTERACTION) }
     var grouping by rememberSaveable { mutableStateOf(LibraryGrouping.NONE) }
 
     val availableGenres = remember(uiState.titles) {
@@ -161,6 +161,12 @@ fun LibraryRoute(
             (search.isBlank() || title.name.contains(search, ignoreCase = true))
     }
     val sorted = when (sortOrder) {
+        // Newest interaction first, and a title with no usable timestamp at all sinks to the
+        // bottom rather than floating to the top of "most recent".
+        LibrarySortOrder.LAST_INTERACTION -> filtered.sortedWith(
+            compareByDescending<LibraryTitle, String?>(nullsFirst()) { it.lastInteractionAt }
+                .thenBy { it.name.lowercase() },
+        )
         LibrarySortOrder.TITLE -> filtered.sortedBy { it.name.lowercase() }
         LibrarySortOrder.YEAR_NEWEST -> filtered.sortedWith(compareByDescending<LibraryTitle> { it.year ?: Int.MIN_VALUE }.thenBy { it.name.lowercase() })
         LibrarySortOrder.RATING_HIGHEST -> filtered.sortedWith(compareByDescending<LibraryTitle> { it.rating ?: -1.0 }.thenBy { it.name.lowercase() })
@@ -185,7 +191,7 @@ fun LibraryRoute(
             statusFilters = emptySet()
             genreFilters = emptySet()
             minRating = 0
-            sortOrder = LibrarySortOrder.TITLE
+            sortOrder = LibrarySortOrder.LAST_INTERACTION
             grouping = LibraryGrouping.NONE
         },
         viewMode = viewMode,
@@ -595,7 +601,7 @@ private fun LibraryFilterSheet(
             ) {
                 Text("Filter & sort", style = MaterialTheme.typography.titleMedium)
                 val hasAnyFilter = statusFilters.isNotEmpty() || genreFilters.isNotEmpty() || minRating > 0 ||
-                    sortOrder != LibrarySortOrder.TITLE || grouping != LibraryGrouping.NONE
+                    sortOrder != LibrarySortOrder.LAST_INTERACTION || grouping != LibraryGrouping.NONE
                 if (hasAnyFilter) {
                     TextButton(onClick = onReset) {
                         Text("Reset")
@@ -619,6 +625,7 @@ private fun LibraryFilterSheet(
             FilterSheetLabel("Sort by")
             SegmentedGroup(
                 options = listOf(
+                    ChoiceOption(LibrarySortOrder.LAST_INTERACTION, "Smart"),
                     ChoiceOption(LibrarySortOrder.TITLE, "Title"),
                     ChoiceOption(LibrarySortOrder.YEAR_NEWEST, "Newest"),
                     ChoiceOption(LibrarySortOrder.RATING_HIGHEST, "Top rated"),

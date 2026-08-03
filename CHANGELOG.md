@@ -19,6 +19,9 @@ number is chosen.
   backlight to a theater-safe floor and shows the auditorium in large dim amber on black so
   you can find your seat without lighting up the rows behind you. It opens on whichever
   matches the showtime and switches by tap (#221).
+- Android: the Library's "Sort by" gains **Smart**, ordering titles by the most recent thing you
+  did with them — added, watched, or any episode watch, rating or review — and it is now the
+  default, as it already was on the web app.
 
 ### Fixed
 

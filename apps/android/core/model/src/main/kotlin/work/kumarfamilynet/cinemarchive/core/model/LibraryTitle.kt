@@ -19,6 +19,11 @@ data class LibraryTitle(
     val releaseDate: String? = null,
     /** Drives the Library filter sheet's genre chips (#120/KP-050). */
     val genres: List<String> = emptyList(),
+    /** ISO-8601 instant of the most recent interaction with this title — added, (re)watched, or
+     *  any per-episode watch/rating/review event. Backs [LibrarySortOrder.LAST_INTERACTION]; see
+     *  `TitleDao.observeLastInteractions` for how it's rolled up and why it's a comparable
+     *  string. Null when nothing about the title carries a usable timestamp. */
+    val lastInteractionAt: String? = null,
 )
 
 enum class LibraryStatus {

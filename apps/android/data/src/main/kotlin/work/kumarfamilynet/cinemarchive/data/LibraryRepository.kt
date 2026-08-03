@@ -210,8 +210,10 @@ class LibraryRepository(
     fun observeLibrary(): Flow<List<LibraryTitle>> = combine(
         titleDao.observeLibrary(),
         cinemaOutingDao.observeAllOutings(),
-    ) { rows, outings ->
+        titleDao.observeLastInteractions(),
+    ) { rows, outings, interactions ->
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings.map { it.toDomain() })
+        val lastInteractionByTitle = interactions.associate { it.titleId to it.lastInteractionAt }
         rows.map { row ->
             LibraryTitle(
                 id = row.id,
@@ -226,6 +228,7 @@ class LibraryRepository(
                 hasScheduledOuting = row.id in scheduledTitleIds,
                 releaseDate = row.releaseDate,
                 genres = row.genres,
+                lastInteractionAt = lastInteractionByTitle[row.id],
             )
         }
     }

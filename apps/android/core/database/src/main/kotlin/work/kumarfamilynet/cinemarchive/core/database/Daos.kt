@@ -26,6 +26,14 @@ data class TitleListRow(
 
 data class EpisodeWatchCount(val episodeId: String, val watchCount: Int)
 
+/** Per-title "last interaction" instant, backing the Library's default sort. Mirrors the web
+ *  app's `titleLastInteractionAt` (apps/web/src/store/useAppStore.ts): the newest of the title's
+ *  own `addedAt`, any viewing, and — for TV — any per-episode watch/rating/review event.
+ *  `updatedAt` is deliberately excluded there and here, because bulk metadata refresh bumps it
+ *  on every row and would collapse the whole library into "everything touched just now".
+ *  Null only for a title with no usable timestamp anywhere. */
+data class TitleLastInteraction(val titleId: String, val lastInteractionAt: String?)
+
 /** Just enough to resolve a Discover trending result (identified by tmdbId + type) to its
  *  real local row id, so a tap on an already-owned result can open the same title-detail
  *  screen Library uses (#119/KP-049) instead of a bare preview. */
@@ -38,6 +46,45 @@ interface TitleDao {
             "FROM titles ORDER BY title COLLATE NOCASE",
     )
     fun observeLibrary(): Flow<List<TitleListRow>>
+
+    /**
+     * [TitleLastInteraction] for every title, rolled up in SQL rather than by folding four more
+     * whole-table flows together in the repository — the Library only ever needs one string per
+     * title out of these tables, and Room still re-emits when any of them changes.
+     *
+     * The rollup compares the timestamps as strings. They are ISO-8601 and UTC-based on both
+     * write paths (`Instant.toString()` locally, PostgREST's `timestamptz` rendering when synced
+     * down), so lexicographic order is chronological order down to the second; the formats
+     * differ only in the fractional-second width and the `Z` vs `+00:00` suffix, which can only
+     * reorder events within the same second. `viewings.date` is date-only and therefore sorts as that
+     * day's midnight, matching how the web app's `new Date(...)` parses it.
+     *
+     * Aggregate `MAX` ignores NULLs (a null `watchedAt` — "watched before joining" — contributes
+     * nothing, as it does on the web), while scalar `MAX` returns NULL if *any* argument is, so
+     * the per-source subqueries are coalesced to '' and the empty result mapped back to null.
+     */
+    @Query(
+        """
+        SELECT t.id AS titleId, NULLIF(MAX(
+            IFNULL(t.addedAt, ''),
+            IFNULL((SELECT MAX(v.date) FROM viewings v WHERE v.titleId = t.id), ''),
+            IFNULL((
+                SELECT MAX(w.watchedAt) FROM episode_watch_events w
+                JOIN episodes e ON e.id = w.episodeId WHERE e.titleId = t.id
+            ), ''),
+            IFNULL((
+                SELECT MAX(r.ratedAt) FROM episode_ratings r
+                JOIN episodes e ON e.id = r.episodeId WHERE e.titleId = t.id
+            ), ''),
+            IFNULL((
+                SELECT MAX(rv.reviewedAt) FROM episode_reviews rv
+                JOIN episodes e ON e.id = rv.episodeId WHERE e.titleId = t.id
+            ), '')
+        ), '') AS lastInteractionAt
+        FROM titles t
+        """
+    )
+    fun observeLastInteractions(): Flow<List<TitleLastInteraction>>
 
     @Query("SELECT * FROM titles WHERE id = :titleId")
     fun observeTitle(titleId: String): Flow<TitleEntity?>

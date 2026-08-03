@@ -9,6 +9,27 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-08-03
+
+### Fixed
+
+- Android: the "I've got tickets" outing form's content could grow taller than the screen (worse
+  now that Theater/Companions autocomplete and a parking-notes field added another row) with no
+  way to scroll to it, stranding the Save button off-screen and unreachable on ordinary phone
+  sizes.
+
+### Added
+
+- Android: cinema outings' Theater and Companions fields now autocomplete from your own outing
+  history, and a per-venue parking/transit notes field remembers logistics notes ("park in the
+  garage across the street") the next time you pick the same theater (#197, #198, #214).
+- Android: Settings → Permissions now lists "Install unknown apps" for sideloaded builds, so its
+  status can be checked and fixed from the same place as every other permission (#167).
+- Android: sideloaded builds with "Automatically check for updates" on and the install-unknown-
+  apps permission granted now download and install an available update at app launch, with a
+  notification for progress, instead of only checking when Settings → About happens to be open
+  (#166).
+
 ## [1.25.0] - 2026-08-03
 
 ### Added

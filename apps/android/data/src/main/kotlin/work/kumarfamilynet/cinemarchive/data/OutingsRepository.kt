@@ -11,6 +11,8 @@ import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
+import work.kumarfamilynet.cinemarchive.core.database.VenueNoteDao
+import work.kumarfamilynet.cinemarchive.core.database.VenueNoteEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
@@ -35,6 +37,7 @@ class OutingsRepository(
     private val viewingDao: ViewingDao,
     private val titleDao: TitleDao,
     private val outbox: MutationOutbox,
+    private val venueNoteDao: VenueNoteDao,
     private val alarmScheduler: OutingAlarmScheduler = NoOpOutingAlarmScheduler,
 ) {
     fun observeOutingsForTitle(titleId: String): Flow<List<CinemaOuting>> =
@@ -42,6 +45,36 @@ class OutingsRepository(
 
     fun observeAllOutings(): Flow<List<CinemaOuting>> =
         cinemaOutingDao.observeAllOutings().map { rows -> rows.map { it.toDomain() } }
+
+    /** Distinct past venues, most-recently-used first — sourced from the user's own outing
+     *  history rather than a dedicated `venues` table (issue #197). */
+    fun observeVenueSuggestions(): Flow<List<String>> =
+        cinemaOutingDao.observeAllOutings().map { rows ->
+            rows.sortedByDescending { it.createdAt }
+                .mapNotNull { it.venue?.trim()?.takeIf(String::isNotBlank) }
+                .distinct()
+        }
+
+    /** Distinct past companion names, most-recently-used first, flattened out of every
+     *  outing's [CinemaOutingEntity.companions] list (issue #198). */
+    fun observeCompanionSuggestions(): Flow<List<String>> =
+        cinemaOutingDao.observeAllOutings().map { rows ->
+            rows.sortedByDescending { it.createdAt }
+                .flatMap { it.companions }
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .distinct()
+        }
+
+    /** Per-venue parking/transit notes, keyed by venue name (issue #214). */
+    fun observeVenueNotes(): Flow<Map<String, String>> =
+        venueNoteDao.observeAll().map { rows -> rows.associate { it.venue to it.notes } }
+
+    suspend fun saveVenueNotes(venue: String, notes: String) {
+        val trimmedVenue = venue.trim()
+        if (trimmedVenue.isEmpty()) return
+        venueNoteDao.upsert(VenueNoteEntity(venue = trimmedVenue, notes = notes, updatedAt = Instant.now().toString()))
+    }
 
     /** "I've got tickets" — creates a new scheduled outing. [endsAt] is computed here
      *  (`showtime + previewsMinutes + runtimeMinutes`) rather than left to the caller, per

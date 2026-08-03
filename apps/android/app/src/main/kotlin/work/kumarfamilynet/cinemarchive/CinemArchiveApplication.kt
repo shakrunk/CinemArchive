@@ -4,11 +4,19 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
+import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
+import work.kumarfamilynet.cinemarchive.core.model.InstallSource
+import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
@@ -108,6 +116,7 @@ class CinemArchiveApplication : Application() {
             viewingDao = database.viewingDao(),
             titleDao = database.titleDao(),
             outbox = outbox,
+            venueNoteDao = database.venueNoteDao(),
             alarmScheduler = AndroidOutingAlarmScheduler(this),
         )
     }
@@ -147,6 +156,58 @@ class CinemArchiveApplication : Application() {
                 .distinctUntilChanged()
                 .filterNotNull()
                 .collect { ledgerLayoutRepository.reconcile() }
+        }
+        applicationScope.launch { checkAndInstallUpdateIfDue() }
+    }
+
+    /**
+     * Sideloaded-install analogue of Play's own background auto-update (issue #166) — without
+     * this, "Automatically check for updates" only ever ran when Settings → About happened to be
+     * open (AboutScreen.kt's `LaunchedEffect(autoCheck)`), so granting the install permission and
+     * turning the toggle on still required remembering to open that screen. Play-installed
+     * builds are untouched (see #147/AppUpdateRepository.checkForUpdate's own gate); without the
+     * install permission granted, this changes nothing from #146's original behavior — no silent
+     * download, the user still has to open About and tap through manually.
+     */
+    private suspend fun checkAndInstallUpdateIfDue() {
+        if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
+        if (!preferencesRepository.observeAutoCheckUpdates().first()) return
+
+        val result = appUpdateRepository.checkForUpdate()
+        val apkUrl = (result as? UpdateCheckResult.Available)?.apkUrl ?: return
+        if (!apkInstaller.canRequestInstalls()) return
+
+        // installState's decisive transitions (AwaitingConfirmation/Installed/Failed) arrive
+        // later, off InstallStatusReceiver's broadcast — this has to keep collecting past
+        // downloadAndInstall() returning (which only means the session was committed), and
+        // stop itself once a terminal state lands rather than being cancelled from outside.
+        coroutineScope {
+            var downloadStarted = false
+            val notifyJob = launch {
+                apkInstaller.installState
+                    .onEach { state ->
+                        when (state) {
+                            ApkInstallState.Downloading -> {
+                                downloadStarted = true
+                                UpdateInstallNotifier.postDownloading(this@CinemArchiveApplication, result.latestVersion)
+                            }
+                            ApkInstallState.AwaitingConfirmation -> UpdateInstallNotifier.postAwaitingConfirmation(this@CinemArchiveApplication)
+                            ApkInstallState.Installed -> UpdateInstallNotifier.clear(this@CinemArchiveApplication)
+                            is ApkInstallState.Failed -> UpdateInstallNotifier.postFailed(this@CinemArchiveApplication, state.message)
+                            ApkInstallState.Idle -> Unit
+                        }
+                    }
+                    // Stops once a terminal state lands. Idle only counts as terminal after a
+                    // download started — the initial subscribe-time replay of the StateFlow's
+                    // starting value is also Idle, and must not stop this before it begins.
+                    .takeWhile { state ->
+                        state !is ApkInstallState.Failed && state != ApkInstallState.Installed &&
+                            !(state == ApkInstallState.Idle && downloadStarted)
+                    }
+                    .collect()
+            }
+            apkInstaller.downloadAndInstall(apkUrl)
+            notifyJob.join()
         }
     }
 }

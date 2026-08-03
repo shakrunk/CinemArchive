@@ -561,7 +561,7 @@ private fun CinemArchiveApp(
                 preferencesRepository,
                 onBack = openProfile,
             )
-            Overlay.Permissions -> PermissionsRoute(onBack = openProfile)
+            Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
             is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
         }
         }

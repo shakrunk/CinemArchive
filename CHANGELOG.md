@@ -16,6 +16,10 @@ number is chosen.
   garage across the street") the next time you pick the same theater (#197, #198, #214).
 - Android: Settings → Permissions now lists "Install unknown apps" for sideloaded builds, so its
   status can be checked and fixed from the same place as every other permission (#167).
+- Android: sideloaded builds with "Automatically check for updates" on and the install-unknown-
+  apps permission granted now download and install an available update at app launch, with a
+  notification for progress, instead of only checking when Settings → About happens to be open
+  (#166).
 
 ## [1.25.0] - 2026-08-03
 

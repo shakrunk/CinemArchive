@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { useState, useEffect, useMemo } from 'react'
 import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2, Ticket, Link2 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -336,16 +335,19 @@ function FriendsSection() {
 // ─── Recommendations inbox ────────────────────────────────────────────────────
 
 function InboxSection() {
-  const { titles, openDetailDrawer, openAddTitlePreselected, requestView } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      openDetailDrawer: s.openDetailDrawer,
-      openAddTitlePreselected: s.openAddTitlePreselected,
-      requestView: s.requestView,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const titles = useAppStore((s) => s.titles)
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openAddTitlePreselected = useAppStore((s) => s.openAddTitlePreselected)
+  const requestView = useAppStore((s) => s.requestView)
+
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(false)
+
+  // ⚡ Bolt: Replace O(N*M) lookup with O(N) Set in render loop
+  const ownedSet = useMemo(() => {
+    return new Set(titles.map((t) => `${t.tmdbId}:${t.type}`))
+  }, [titles])
 
   useEffect(() => {
     void load()
@@ -421,7 +423,7 @@ function InboxSection() {
         </div>
         ) : (
           recommendations.map((r) => {
-            const owned = titles.some((t) => t.tmdbId === r.tmdbId && t.type === r.type)
+            const owned = ownedSet.has(`${r.tmdbId}:${r.type}`)
             return (
               <div
                 key={r.id}

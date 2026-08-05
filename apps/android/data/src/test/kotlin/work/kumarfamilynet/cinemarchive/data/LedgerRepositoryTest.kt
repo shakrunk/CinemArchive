@@ -33,6 +33,7 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
+import work.kumarfamilynet.cinemarchive.core.model.LedgerSpendBreakdown
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetId
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetSettings
@@ -422,6 +423,53 @@ class LedgerRepositoryTest {
             moviegoing.companions.map { it.label to it.count }.toSet(),
         )
         assertEquals(listOf(LedgerCategoryCount("IMAX", 1)), moviegoing.formats)
+        assertEquals(listOf(LedgerSpendBreakdown("AMC Lincoln Square", 24.50, 1)), moviegoing.venueSpend)
+        assertEquals(listOf(LedgerSpendBreakdown("IMAX", 24.50, 1)), moviegoing.formatSpend)
+        // Fixture has exactly one priced trip, so no venue clears the 2-trip bar for "best value".
+        assertEquals(null, moviegoing.bestValueVenue)
+    }
+
+    @Test
+    fun `At the Movies best value venue is the cheapest per-trip among venues with 2 plus trips`() = runTest {
+        val cheapOuting1 = CinemaOutingEntity(
+            id = "cheap-1", titleId = LedgerFixture.INCEPTION_ID, showtime = "2026-02-01T19:00:00Z",
+            runtimeMinutes = 100, endsAt = "2026-02-01T20:40:00Z", venue = "Bargain Cinema",
+            format = "STANDARD", ticketPrice = 8.00, status = "COMPLETED",
+            createdAt = "2026-02-01T00:00:00Z", updatedAt = "2026-02-01T20:40:00Z",
+        )
+        val cheapOuting2 = cheapOuting1.copy(id = "cheap-2", ticketPrice = 10.00)
+        val pricyOuting = CinemaOutingEntity(
+            id = "pricy-1", titleId = LedgerFixture.INCEPTION_ID, showtime = "2026-02-05T19:00:00Z",
+            runtimeMinutes = 100, endsAt = "2026-02-05T20:40:00Z", venue = "Luxury Screens",
+            format = "IMAX", ticketPrice = 40.00, status = "COMPLETED",
+            createdAt = "2026-02-05T00:00:00Z", updatedAt = "2026-02-05T20:40:00Z",
+        )
+        val viewings = listOf(
+            ViewingEntity(id = "v-cheap-1", titleId = LedgerFixture.INCEPTION_ID, date = "2026-02-01", rating = null, notes = null, venue = "Bargain Cinema", outingId = "cheap-1"),
+            ViewingEntity(id = "v-cheap-2", titleId = LedgerFixture.INCEPTION_ID, date = "2026-02-02", rating = null, notes = null, venue = "Bargain Cinema", outingId = "cheap-2"),
+            ViewingEntity(id = "v-pricy-1", titleId = LedgerFixture.INCEPTION_ID, date = "2026-02-05", rating = null, notes = null, venue = "Luxury Screens", outingId = "pricy-1"),
+        )
+        val repository = LedgerRepository(
+            titleDao = FakeTitleDao(LedgerFixture.titles),
+            viewingDao = FakeViewingDao(viewings),
+            titleCastDao = FakeTitleCastDao(LedgerFixture.cast),
+            titleCrewDao = FakeTitleCrewDao(LedgerFixture.crew),
+            cinemaOutingDao = FakeCinemaOutingDao(listOf(cheapOuting1, cheapOuting2, pricyOuting)),
+            watchEventDao = FakeEpisodeWatchEventDao(emptyList()),
+            seasonDao = FakeSeasonDao(LedgerFixture.seasons),
+            episodeDao = FakeEpisodeDao(LedgerFixture.episodes),
+        )
+
+        val moviegoing = repository.observeLedgerBoard().first().moviegoing
+
+        // Luxury Screens' single $40 trip is excluded from "best value" regardless of price —
+        // one trip can't establish a venue's typical cost.
+        assertEquals(LedgerSpendBreakdown("Bargain Cinema", 18.00, 2), moviegoing.bestValueVenue)
+        assertEquals(9.0, moviegoing.bestValueVenue!!.perTrip, 0.001)
+        assertEquals(
+            setOf("Bargain Cinema" to 18.00, "Luxury Screens" to 40.00),
+            moviegoing.venueSpend.map { it.label to it.totalSpend }.toSet(),
+        )
     }
 
     // --- Time-relative widgets: pinned against synthetic dates computed from LocalDate.now()

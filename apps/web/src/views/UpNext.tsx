@@ -1,5 +1,17 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { PlayCircle, Check, Undo2, Clock, Bookmark, Ticket, CalendarPlus, MoreVertical, Clapperboard, Star, X } from 'lucide-react'
+import {
+  PlayCircle,
+  Check,
+  Undo2,
+  Clock,
+  Bookmark,
+  Ticket,
+  CalendarPlus,
+  MoreVertical,
+  Clapperboard,
+  Star,
+  X,
+} from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
@@ -18,12 +30,27 @@ import { Eyebrow } from 'src/components/ui/typography'
 
 const UNDO_WINDOW_MS = 6000
 
-type PendingUndo = { seasonNumber: number; episodeNumber: number; watchEventId: string; label: string }
+type PendingUndo = {
+  seasonNumber: number
+  episodeNumber: number
+  watchEventId: string
+  label: string
+}
 type FinishedCard = { snapshot: UpNextEntry; undo: PendingUndo }
 
 // ─── Shared frame (poster + clickable title) ─────────────────────────────────
 
-function CardFrame({ title, onOpen, children, delayMs }: { title: Title; onOpen: () => void; children: React.ReactNode; delayMs?: number }) {
+function CardFrame({
+  title,
+  onOpen,
+  children,
+  delayMs,
+}: {
+  title: Title
+  onOpen: () => void
+  children: React.ReactNode
+  delayMs?: number
+}) {
   return (
     <div
       className="flex gap-4 rounded-xl p-3 sm:p-4"
@@ -38,7 +65,10 @@ function CardFrame({ title, onOpen, children, delayMs }: { title: Title; onOpen:
       </button>
       <div className="flex-1 min-w-0 flex flex-col">
         <button onClick={onOpen} className="text-left">
-          <h3 className="font-serif text-lg sm:text-xl font-medium text-paper truncate" style={{ fontVariationSettings: '"opsz" 30' }}>
+          <h3
+            className="font-serif text-lg sm:text-xl font-medium text-paper truncate"
+            style={{ fontVariationSettings: '"opsz" 30' }}
+          >
             {title.title}
           </h3>
         </button>
@@ -52,10 +82,15 @@ function ProgressBar({ watched, total }: { watched: number; total: number }) {
   const pct = total > 0 ? Math.round((watched / total) * 100) : 0
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--wash)' }}>
+      <div
+        className="flex-1 h-1.5 rounded-full overflow-hidden"
+        style={{ background: 'var(--wash)' }}
+      >
         <div className="h-full rounded-full bg-amber transition-all" style={{ width: `${pct}%` }} />
       </div>
-      <span className="font-mono text-[11px] text-paper-faint shrink-0">{watched}/{total}</span>
+      <span className="font-mono text-[11px] text-paper-faint shrink-0">
+        {watched}/{total}
+      </span>
     </div>
   )
 }
@@ -77,7 +112,15 @@ function UpNextEmptyState({ onBrowseLibrary }: { onBrowseLibrary: () => void }) 
 
 // ─── Live (in-progress) card ─────────────────────────────────────────────────
 
-function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: (snapshot: UpNextEntry, undo: PendingUndo) => void; delayMs?: number }) {
+function LiveCard({
+  entry,
+  onFinale,
+  delayMs,
+}: {
+  entry: UpNextEntry
+  onFinale: (snapshot: UpNextEntry, undo: PendingUndo) => void
+  delayMs?: number
+}) {
   // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const logNextEpisodeWatch = useAppStore((s) => s.logNextEpisodeWatch)
@@ -92,7 +135,12 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
   const [showNoirModal, setShowNoirModal] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    },
+    []
+  )
 
   const isSpiderNoir = title.tmdbId === SPIDER_NOIR_TMDB_ID
 
@@ -134,14 +182,21 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
 
   function handleUndo() {
     if (!pendingUndo) return
-    deleteEpisodeWatchEvent(title.id, pendingUndo.seasonNumber, pendingUndo.episodeNumber, pendingUndo.watchEventId)
+    deleteEpisodeWatchEvent(
+      title.id,
+      pendingUndo.seasonNumber,
+      pendingUndo.episodeNumber,
+      pendingUndo.watchEventId
+    )
     if (timerRef.current) clearTimeout(timerRef.current)
     setPendingUndo(null)
   }
 
   return (
     <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
-      <p className="font-mono text-xs text-amber mt-0.5">S{season.seasonNumber} E{episode.episodeNumber} · Next</p>
+      <p className="font-mono text-xs text-amber mt-0.5">
+        S{season.seasonNumber} E{episode.episodeNumber} · Next
+      </p>
       <p className="font-sans text-sm text-paper-dim truncate">{epName}</p>
       <div className="mt-auto pt-3">
         <ProgressBar watched={watchedCount} total={totalCount} />
@@ -149,21 +204,29 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
           <p className="font-mono text-xs text-paper-faint mt-3 inline-flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5" /> Airs {formatReleaseDate(episode.airDate!)}
           </p>
-        ) : !isSharedView && (
-          pendingUndo ? (
+        ) : (
+          !isSharedView &&
+          (pendingUndo ? (
             <div className="flex items-center justify-between mt-3">
               <span className="font-mono text-xs text-amber inline-flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" /> Watched {pendingUndo.label}
               </span>
-              <button onClick={handleUndo} aria-label={`Undo marking ${title.title} as watched`} className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors">
+              <button
+                onClick={handleUndo}
+                aria-label={`Undo marking ${title.title} as watched`}
+                className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+              >
                 <Undo2 className="w-3.5 h-3.5" /> Undo
               </button>
             </div>
           ) : (
-            <button onClick={handleMarkWatched} className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full mt-3 py-2 text-[13px] font-bold">
+            <button
+              onClick={handleMarkWatched}
+              className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full mt-3 py-2 text-[13px] font-bold"
+            >
               <Check className="w-4 h-4" /> Mark watched
             </button>
-          )
+          ))
         )}
       </div>
       <SpiderNoirModeModal
@@ -177,7 +240,17 @@ function LiveCard({ entry, onFinale, delayMs }: { entry: UpNextEntry; onFinale: 
 
 // ─── Caught-up (just-finished) card ──────────────────────────────────────────
 
-function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNextEntry; undo: PendingUndo; onDismiss: (titleId: string) => void; delayMs?: number }) {
+function CaughtUpCard({
+  snapshot,
+  undo,
+  onDismiss,
+  delayMs,
+}: {
+  snapshot: UpNextEntry
+  undo: PendingUndo
+  onDismiss: (titleId: string) => void
+  delayMs?: number
+}) {
   // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
@@ -189,7 +262,9 @@ function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNext
   // The ref is updated in an effect (not during render) to satisfy the React
   // refs lint rule, while the timer effect below keys only on title?.id.
   const onDismissRef = useRef(onDismiss)
-  useEffect(() => { onDismissRef.current = onDismiss })
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  })
   useEffect(() => {
     if (!title) return
     const id = setTimeout(() => onDismissRef.current(title.id), UNDO_WINDOW_MS)
@@ -218,10 +293,17 @@ function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNext
       <p className="font-sans text-sm text-paper-dim truncate">You finished {title.title}.</p>
       {!isSharedView && (
         <div className="mt-auto pt-3 flex items-center justify-between gap-2">
-          <button onClick={handleMarkSeriesWatched} className="font-mono text-xs text-amber hover:opacity-80 transition-opacity">
+          <button
+            onClick={handleMarkSeriesWatched}
+            className="font-mono text-xs text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+          >
             Mark series watched
           </button>
-          <button onClick={handleUndo} aria-label={`Undo marking ${title.title} series as watched`} className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors">
+          <button
+            onClick={handleUndo}
+            aria-label={`Undo marking ${title.title} series as watched`}
+            className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+          >
             <Undo2 className="w-3.5 h-3.5" /> Undo
           </button>
         </div>
@@ -234,7 +316,11 @@ function CaughtUpCard({ snapshot, undo, onDismiss, delayMs }: { snapshot: UpNext
 
 function formatReleaseDate(iso: string): string {
   const [year, month, day] = iso.split('-').map(Number)
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: number }) {
@@ -251,7 +337,9 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
             <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" /> Upcoming
             </p>
-            <p className="font-sans text-sm text-paper-dim">Releases {formatReleaseDate(releaseDate)}</p>
+            <p className="font-sans text-sm text-paper-dim">
+              Releases {formatReleaseDate(releaseDate)}
+            </p>
           </>
         ) : (
           <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
@@ -290,7 +378,9 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
   useClickOutside(menuRef, () => setMenuOpen(false), menuOpen, { escape: true })
 
   const companionLabel = formatCompanions(outing.companions)
-  const detailLine = [outing.venue, companionLabel && `with ${companionLabel}`].filter(Boolean).join(' · ')
+  const detailLine = [outing.venue, companionLabel && `with ${companionLabel}`]
+    .filter(Boolean)
+    .join(' · ')
 
   function handleAddToCalendar() {
     const ics = buildOutingIcs(outing, title.title)
@@ -315,10 +405,19 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
             {confirmingCancel ? (
               <span className="flex items-center gap-2">
                 <span className="font-mono text-xs text-paper-faint">Cancel these tickets?</span>
-                <button onClick={() => cancelOuting(outing.id)} className="font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
+                <button
+                  onClick={() => cancelOuting(outing.id)}
+                  className="font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                  style={{ color: 'var(--ember)' }}
+                  aria-label="Yes, cancel these tickets"
+                >
                   Yes
                 </button>
-                <button onClick={() => setConfirmingCancel(false)} className="font-mono text-xs text-paper-faint hover:text-paper transition-colors" aria-label="No, keep these tickets">
+                <button
+                  onClick={() => setConfirmingCancel(false)}
+                  className="font-mono text-xs text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                  aria-label="No, keep these tickets"
+                >
                   No
                 </button>
               </span>
@@ -345,25 +444,37 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                       role="menu"
                       aria-label="Outing options"
                       className="absolute right-0 bottom-full mb-1 w-44 rounded-lg overflow-hidden z-10 shadow-xl py-1"
-                      style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
+                      style={{
+                        background: 'rgb(var(--ink-1-rgb))',
+                        border: '1px solid var(--line)',
+                      }}
                     >
                       <button
                         role="menuitem"
-                        onClick={() => { setMenuOpen(false); setSharePanelOpen(true) }}
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setSharePanelOpen(true)
+                        }}
                         className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors"
                       >
                         Share plans
                       </button>
                       <button
                         role="menuitem"
-                        onClick={() => { setMenuOpen(false); openOutingSchedule(title.id, outing.id) }}
+                        onClick={() => {
+                          setMenuOpen(false)
+                          openOutingSchedule(title.id, outing.id)
+                        }}
                         className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors"
                       >
                         Edit tickets
                       </button>
                       <button
                         role="menuitem"
-                        onClick={() => { setMenuOpen(false); setConfirmingCancel(true) }}
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setConfirmingCancel(true)
+                        }}
                         className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-ember transition-colors"
                       >
                         Cancel outing
@@ -455,7 +566,10 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   }, [])
 
   const handleFinale = useCallback((snapshot: UpNextEntry, undo: PendingUndo) => {
-    setFinished((f) => [...f.filter((c) => c.snapshot.title.id !== snapshot.title.id), { snapshot, undo }])
+    setFinished((f) => [
+      ...f.filter((c) => c.snapshot.title.id !== snapshot.title.id),
+      { snapshot, undo },
+    ])
   }, [])
 
   // A title can't be both live and finished; if a finished show reappears live
@@ -471,16 +585,24 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   // Scheduled tickets are content too (plan §4.5: "marquee counts toward the
   // app's smart-landing check") — Up Next isn't "empty" just because nothing's
   // mid-episode or on the watchlist yet.
-  const isEmpty = shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee
+  const isEmpty =
+    shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee
 
-  const totalCards = shows.length + finishedToShow.length + marqueeEntries.length + availableWatchlist.length + comingSoon.length
+  const totalCards =
+    shows.length +
+    finishedToShow.length +
+    marqueeEntries.length +
+    availableWatchlist.length +
+    comingSoon.length
   const delays = useMemo(() => staggerDelays(totalCards), [totalCards])
   let cardIndex = 0
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
       <header className="mb-6">
-        <p className="kicker"><span className="dot" /> continue watching</p>
+        <p className="kicker">
+          <span className="dot" /> continue watching
+        </p>
         <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">Up Next</h1>
       </header>
       {isEmpty ? (
@@ -488,19 +610,36 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
       ) : (
         <div className="upnext-grid grid grid-cols-1 sm:grid-cols-2 gap-3">
           {shows.map((entry) => (
-            <LiveCard key={entry.title.id} entry={entry} onFinale={handleFinale} delayMs={delays[cardIndex++]} />
+            <LiveCard
+              key={entry.title.id}
+              entry={entry}
+              onFinale={handleFinale}
+              delayMs={delays[cardIndex++]}
+            />
           ))}
           {finishedToShow.map((c) => (
-            <CaughtUpCard key={c.snapshot.title.id} snapshot={c.snapshot} undo={c.undo} onDismiss={dismissFinished} delayMs={delays[cardIndex++]} />
+            <CaughtUpCard
+              key={c.snapshot.title.id}
+              snapshot={c.snapshot}
+              undo={c.undo}
+              onDismiss={dismissFinished}
+              delayMs={delays[cardIndex++]}
+            />
           ))}
           {hasMarquee && (
             <>
               {hasLiveSection && (
-                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">On the Marquee</Eyebrow>
+                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
+                  On the Marquee
+                </Eyebrow>
               )}
               {marqueeEntries.map((entry) =>
                 entry.outing.status === 'completed' ? (
-                  <FreshFromLobbyCard key={entry.outing.id} entry={entry} delayMs={delays[cardIndex++]} />
+                  <FreshFromLobbyCard
+                    key={entry.outing.id}
+                    entry={entry}
+                    delayMs={delays[cardIndex++]}
+                  />
                 ) : (
                   <MarqueeCard key={entry.outing.id} entry={entry} delayMs={delays[cardIndex++]} />
                 )
@@ -510,7 +649,9 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {availableWatchlist.length > 0 && (
             <>
               {(hasLiveSection || hasMarquee) && (
-                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">On your watchlist</Eyebrow>
+                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
+                  On your watchlist
+                </Eyebrow>
               )}
               {availableWatchlist.map((entry) => (
                 <UpcomingCard key={entry.title.id} entry={entry} delayMs={delays[cardIndex++]} />
@@ -520,7 +661,9 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           {comingSoon.length > 0 && (
             <>
               {(hasLiveSection || hasMarquee || availableWatchlist.length > 0) && (
-                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">Coming soon</Eyebrow>
+                <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
+                  Coming soon
+                </Eyebrow>
               )}
               {comingSoon.map((entry) => (
                 <UpcomingCard key={entry.title.id} entry={entry} delayMs={delays[cardIndex++]} />

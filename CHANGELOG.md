@@ -29,6 +29,10 @@ number is chosen.
   `Row` — too little room for both, and the pair wrapped onto an extra line instead of eliding.
   They're now a single label ("S1 E12 · 12 / 30 episodes") that reliably truncates with an
   ellipsis at any width.
+- Android: the Up Next "mark episode watched" button was a checkmark in a circle, the same
+  shape the app uses elsewhere (Discover's "Owned" badge, the episode-still "Watched" overlay)
+  for a passive done-state label, not a button. It's now a rounded square with press-shrink
+  feedback so it reads as tappable instead of looking like a status badge.
 - Android: the M3 Expressive segmented/connected toggle groups (used for media-type, theme-mode,
   and library status filters) only showed a color ripple on press with no size feedback. Pressed
   items now shrink slightly and spring back, matching the press language already used by the

@@ -21,6 +21,10 @@ number is chosen.
   works. Status reads from a fully-rounded, animated pill ("Allowed"/"Not allowed"); tapping a
   row requests/enables it when not granted, or routes to wherever it can be revoked once
   granted, so turning one off is as easy as turning it on.
+- Android: added a Developer Settings section, unlocked the traditional way — tap the version
+  number in Settings → About & Legal 7 times. Unlocked by default in debug builds, locked by
+  default in release builds. Currently holds one setting: a "Show build indicator" toggle that
+  displays a permanent DEBUG/RELEASE badge over the whole app.
 
 ### Fixed
 

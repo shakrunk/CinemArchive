@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -44,7 +45,7 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { APPEARANCE, PERMISSIONS, ABOUT }
+enum class SettingsCategory { APPEARANCE, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
@@ -56,6 +57,12 @@ fun ProfileRoute(
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
+    // Governs the Developer Settings row's visibility — see
+    // PreferencesRepository.observeDevSettingsUnlocked: unlocked by default in debug builds,
+    // locked by default in release builds, until the version-number tap gesture in About & Legal
+    // overrides it.
+    devSettingsUnlocked: Boolean,
+    onOpenDeveloperSettings: () -> Unit,
     // Non-null only in the wide/split layout, where this list sits permanently alongside its
     // detail pane rather than being replaced by it — highlights which category is showing
     // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
@@ -77,6 +84,8 @@ fun ProfileRoute(
         onOpenAppearance = onOpenAppearance,
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
+        devSettingsUnlocked = devSettingsUnlocked,
+        onOpenDeveloperSettings = onOpenDeveloperSettings,
         onSignOut = authRepository::signOut,
         selectedCategory = selectedCategory,
     )
@@ -127,6 +136,8 @@ private fun ProfileScreen(
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
+    devSettingsUnlocked: Boolean,
+    onOpenDeveloperSettings: () -> Unit,
     onSignOut: () -> Unit,
     selectedCategory: SettingsCategory? = null,
 ) {
@@ -213,8 +224,24 @@ private fun ProfileScreen(
                         subtitle = "Version $appVersionName",
                         onClick = onOpenAbout,
                         selected = selectedCategory == SettingsCategory.ABOUT,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
+                        modifier = Modifier.padding(top = 10.dp, bottom = if (devSettingsUnlocked) 10.dp else 22.dp),
                     )
+                }
+            }
+            if (devSettingsUnlocked) {
+                item {
+                    ReadingWidthColumn {
+                        ProfileRow(
+                            icon = Icons.Filled.DeveloperMode,
+                            iconContainer = MaterialTheme.colorScheme.errorContainer,
+                            iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                            title = "Developer Settings",
+                            subtitle = "Debug tools & build indicator",
+                            onClick = onOpenDeveloperSettings,
+                            selected = selectedCategory == SettingsCategory.DEVELOPER,
+                            modifier = Modifier.padding(bottom = 22.dp),
+                        )
+                    }
                 }
             }
 

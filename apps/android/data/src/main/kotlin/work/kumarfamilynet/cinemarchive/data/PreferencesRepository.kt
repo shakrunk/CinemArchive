@@ -31,6 +31,8 @@ class PreferencesRepository(context: Context) {
     private val libraryViewModeKey = stringPreferencesKey("library_view_mode")
     private val autoCheckUpdatesKey = booleanPreferencesKey("auto_check_updates")
     private val posterGridColumnsKey = intPreferencesKey("poster_grid_columns")
+    private val devSettingsUnlockedKey = booleanPreferencesKey("dev_settings_unlocked")
+    private val devShowBuildBannerKey = booleanPreferencesKey("dev_show_build_banner")
 
     fun observeThemeMode(): Flow<ArchiveThemeMode> = dataStore.data.map { preferences ->
         preferences[themeModeKey]?.let { stored ->
@@ -102,6 +104,27 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setPosterGridColumns(columns: Int) {
         dataStore.edit { it[posterGridColumnsKey] = columns.coerceIn(POSTER_GRID_COLUMN_RANGE) }
+    }
+
+    /** Whether the Developer Settings row is visible in Settings. Debug builds default
+     *  unlocked, release builds default locked; [defaultUnlocked] should come from
+     *  `BuildConfig.DEBUG` at the call site — tapping the version number 7 times overrides
+     *  it to `true` regardless of build type. */
+    fun observeDevSettingsUnlocked(defaultUnlocked: Boolean): Flow<Boolean> =
+        dataStore.data.map { preferences -> preferences[devSettingsUnlockedKey] ?: defaultUnlocked }
+
+    suspend fun setDevSettingsUnlocked(unlocked: Boolean) {
+        dataStore.edit { it[devSettingsUnlockedKey] = unlocked }
+    }
+
+    /** Whether a persistent debug/release build indicator is shown over the whole app.
+     *  Defaults to [defaultEnabled] (debug builds on, release off) until the user overrides
+     *  it from Developer Settings. */
+    fun observeDevShowBuildBanner(defaultEnabled: Boolean): Flow<Boolean> =
+        dataStore.data.map { preferences -> preferences[devShowBuildBannerKey] ?: defaultEnabled }
+
+    suspend fun setDevShowBuildBanner(enabled: Boolean) {
+        dataStore.edit { it[devShowBuildBannerKey] = enabled }
     }
 
     private companion object {

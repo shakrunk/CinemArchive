@@ -1,8 +1,10 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -35,6 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +60,12 @@ import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+
+// The traditional AOSP "Settings > About > Build number" unlock gesture: 7 taps within a short
+// window, with a countdown hint on the last few so it doesn't read as unresponsive.
+private const val VERSION_TAPS_TO_UNLOCK = 7
+private const val VERSION_TAP_COUNTDOWN_HINTS = 3
+private const val VERSION_TAP_TIMEOUT_MS = 1500L
 
 private data class LegalDoc(val title: String, val body: String)
 
@@ -246,6 +257,29 @@ fun AboutRoute(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // The traditional "tap the version number" unlock (AOSP's Settings > About > Build number).
+    // Ephemeral, not persisted — a stale count surviving process death would make later taps
+    // land at unpredictable points in the sequence, so plain `remember` is correct here, unlike
+    // the unlocked/locked state itself which does need to persist (PreferencesRepository).
+    var versionTapCount by remember { mutableIntStateOf(0) }
+    var lastVersionTapAt by remember { mutableLongStateOf(0L) }
+    val onTapVersion: () -> Unit = {
+        val now = System.currentTimeMillis()
+        versionTapCount = if (now - lastVersionTapAt > VERSION_TAP_TIMEOUT_MS) 1 else versionTapCount + 1
+        lastVersionTapAt = now
+        when {
+            versionTapCount >= VERSION_TAPS_TO_UNLOCK -> {
+                versionTapCount = 0
+                scope.launch { preferencesRepository.setDevSettingsUnlocked(true) }
+                Toast.makeText(context, "Developer settings unlocked", Toast.LENGTH_SHORT).show()
+            }
+            versionTapCount >= VERSION_TAPS_TO_UNLOCK - VERSION_TAP_COUNTDOWN_HINTS -> {
+                val remaining = VERSION_TAPS_TO_UNLOCK - versionTapCount
+                Toast.makeText(context, "$remaining more taps to unlock Developer settings", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val autoCheck by preferencesRepository.observeAutoCheckUpdates()
         .collectAsStateWithLifecycle(initialValue = true)
     var updateResult by remember { mutableStateOf<UpdateCheckResult>(UpdateCheckResult.Idle) }
@@ -278,6 +312,7 @@ fun AboutRoute(
             appVersionName = appVersionName,
             onBack = onBack,
             showBack = showBack,
+            onTapVersion = onTapVersion,
             onOpenDoc = { subpage = AboutSubpage.Doc(it) },
             onOpenCredits = { subpage = AboutSubpage.Credits },
             onOpenSource = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive") },
@@ -308,6 +343,7 @@ private fun AboutListScreen(
     appVersionName: String,
     onBack: () -> Unit,
     showBack: Boolean = true,
+    onTapVersion: () -> Unit,
     onOpenDoc: (LegalDoc) -> Unit,
     onOpenCredits: () -> Unit,
     onOpenSource: () -> Unit,
@@ -361,7 +397,15 @@ private fun AboutListScreen(
                                 Text("C", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 10.dp))
                             }
                         }
-                        Column(modifier = Modifier.padding(start = 14.dp)) {
+                        // pointerInput + detectTapGestures rather than .clickable: this isn't a
+                        // real button (no ripple, no click semantics) — it's a hidden gesture,
+                        // and a ripple here would be a false affordance for what looks like
+                        // static label text.
+                        Column(
+                            modifier = Modifier
+                                .padding(start = 14.dp)
+                                .pointerInput(Unit) { detectTapGestures(onTap = { onTapVersion() }) },
+                        ) {
                             Text("CinemArchive", style = MaterialTheme.typography.titleMedium)
                             Text(
                                 "Version $appVersionName",

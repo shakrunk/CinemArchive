@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.outlined.ViewList
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -106,6 +108,7 @@ import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
 import work.kumarfamilynet.cinemarchive.feature.library.TitleDetailRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.DeveloperSettingsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
@@ -167,6 +170,15 @@ class MainActivity : ComponentActivity() {
             val fontScale by preferencesRepository.observeFontScale()
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
             val session by authRepository.observeSession().collectAsStateWithLifecycle()
+            val isDebugBuild = BuildConfig.DEBUG
+            // Read at this top level (rather than inside CinemArchiveApp) so the banner covers
+            // LoginRoute too, not just the signed-in app shell. remember(isDebugBuild) keeps the
+            // Flow instance stable across recompositions of this whole setContent block instead
+            // of restarting the DataStore collection every time (isDebugBuild itself never
+            // changes, but a fresh `preferencesRepository.observeX(...)` call each recomposition
+            // would still be a fresh Flow instance).
+            val showBuildBannerFlow = remember(isDebugBuild) { preferencesRepository.observeDevShowBuildBanner(isDebugBuild) }
+            val showBuildBanner by showBuildBannerFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
                 Surface {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -186,7 +198,15 @@ class MainActivity : ComponentActivity() {
                                 apkInstaller,
                                 initialTitleId = initialTitleId,
                                 appVersionName = BuildConfig.VERSION_NAME,
+                                isDebugBuild = isDebugBuild,
                             )
+                        }
+                        // Sibling of both LoginRoute and CinemArchiveApp (rather than nested
+                        // inside the latter) so it covers sign-in too — added after the app
+                        // content but before the splash below, so it sits under the splash while
+                        // that's still up and over everything once it fades out.
+                        if (showBuildBanner) {
+                            DebugBuildBanner(isDebugBuild)
                         }
                         var showBrandedSplash by remember { mutableStateOf(true) }
                         AnimatedVisibility(
@@ -254,6 +274,27 @@ private fun CinemArchiveSplash(onFinished: () -> Unit) {
     }
 }
 
+/** Persistent "which build is this" indicator — Settings > Developer Settings' opt-in toggle.
+ *  A small pill rather than a full-width bar so it doesn't compete with the top-bar chrome of
+ *  whatever screen is underneath; no gesture modifier, so it never intercepts touches meant for
+ *  the content behind it. */
+@Composable
+private fun DebugBuildBanner(isDebugBuild: Boolean) {
+    Box(modifier = Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.TopEnd) {
+        Surface(
+            shape = RoundedCornerShape(bottomStart = 12.dp),
+            color = if (isDebugBuild) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+            contentColor = if (isDebugBuild) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onError,
+        ) {
+            Text(
+                if (isDebugBuild) "DEBUG" else "RELEASE",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
 private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER }
 
 private sealed interface Overlay {
@@ -271,6 +312,7 @@ private sealed interface Overlay {
     data object Appearance : Overlay
     data object About : Overlay
     data object Permissions : Overlay
+    data object DeveloperSettings : Overlay
 
     /** The "at the theater" screen (seat + ticket QR code) — carries the outing and title name
      *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
@@ -299,6 +341,7 @@ private fun CinemArchiveApp(
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     appVersionName: String,
+    isDebugBuild: Boolean,
 ) {
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
@@ -319,6 +362,15 @@ private fun CinemArchiveApp(
     // Discover and finding Library unchanged would be the surprising behaviour.
     val posterGridColumns by preferencesRepository.observePosterGridColumns()
         .collectAsStateWithLifecycle(initialValue = 2)
+
+    // Governs the Developer Settings row's visibility in Profile — debug builds default
+    // unlocked, release builds default locked (isDebugBuild), until the version-tap gesture in
+    // About & Legal overrides it. remember(isDebugBuild): see the matching comment in
+    // MainActivity.onCreate's setContent — keeps the Flow instance stable across this
+    // composable's frequent recompositions (tab switches, overlay changes) instead of
+    // restarting the DataStore collection on every one.
+    val devSettingsUnlockedFlow = remember(isDebugBuild) { preferencesRepository.observeDevSettingsUnlocked(isDebugBuild) }
+    val devSettingsUnlocked by devSettingsUnlockedFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
 
     val openProfile = { overlay = Overlay.Profile }
     val closeOverlay = { overlay = null }
@@ -353,6 +405,16 @@ private fun CinemArchiveApp(
     }
     val onPosterGridColumnsChange: (Int) -> Unit = { next ->
         coroutineScope.launch { preferencesRepository.setPosterGridColumns(next) }
+    }
+    // Persists the lock and steers navigation away from Developer Settings in the same step —
+    // without the latter, the row this screen was opened from just disappeared from Profile
+    // (devSettingsUnlocked flips to false) while `overlay`/`selectedSettingsCategory` still
+    // point at it, stranding the split-mode detail pane and the phone-stack overlay on a screen
+    // with no way back in.
+    val lockDeveloperSettings: () -> Unit = {
+        coroutineScope.launch { preferencesRepository.setDevSettingsUnlocked(false) }
+        if (selectedSettingsCategory == SettingsCategory.DEVELOPER) selectedSettingsCategory = SettingsCategory.APPEARANCE
+        if (overlay == Overlay.DeveloperSettings) overlay = Overlay.Profile
     }
 
     // The FAB is a single instance shared across tabs, but only Discover/Library/Up Next report
@@ -390,7 +452,7 @@ private fun CinemArchiveApp(
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
             overlay = when (overlay) {
-                Overlay.Appearance, Overlay.About, Overlay.Permissions -> Overlay.Profile
+                Overlay.Appearance, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
                 else -> null
             }
             backProgress.snapTo(0f)
@@ -536,6 +598,7 @@ private fun CinemArchiveApp(
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
                 Overlay.About -> SettingsCategory.ABOUT
+                Overlay.DeveloperSettings -> SettingsCategory.DEVELOPER
                 else -> null
             }
             val isSettingsOverlay = overlay == Overlay.Profile || settingsCategoryFromOverlay != null
@@ -570,6 +633,8 @@ private fun CinemArchiveApp(
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
                             onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
+                            devSettingsUnlocked = devSettingsUnlocked,
+                            onOpenDeveloperSettings = { selectedSettingsCategory = SettingsCategory.DEVELOPER },
                             selectedCategory = activeCategory,
                         )
                     }
@@ -591,6 +656,14 @@ private fun CinemArchiveApp(
                                 onBack = closeOverlay,
                                 apkInstaller = apkInstaller,
                                 appUpdateRepository = appUpdateRepository,
+                                showBack = false,
+                            )
+                            SettingsCategory.DEVELOPER -> DeveloperSettingsRoute(
+                                preferencesRepository,
+                                appVersionName,
+                                isDebugBuild,
+                                onBack = closeOverlay,
+                                onLock = lockDeveloperSettings,
                                 showBack = false,
                             )
                         }
@@ -627,6 +700,8 @@ private fun CinemArchiveApp(
                     onOpenAppearance = { overlay = Overlay.Appearance },
                     onOpenAbout = { overlay = Overlay.About },
                     onOpenPermissions = { overlay = Overlay.Permissions },
+                    devSettingsUnlocked = devSettingsUnlocked,
+                    onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
                 Overlay.About -> AboutRoute(
@@ -637,6 +712,13 @@ private fun CinemArchiveApp(
                     onBack = openProfile,
                 )
                 Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
+                Overlay.DeveloperSettings -> DeveloperSettingsRoute(
+                    preferencesRepository,
+                    appVersionName,
+                    isDebugBuild,
+                    onBack = openProfile,
+                    onLock = lockDeveloperSettings,
+                )
                 is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
             }
             }

@@ -251,8 +251,9 @@ function ViewingEditForm({
             className="bg-secondary/50 border-border font-mono"
           />
         )}
-        <label className="flex items-center gap-2 cursor-pointer mt-2">
+        <label htmlFor="detail-drawer-pre-platform" className="flex items-center gap-2 cursor-pointer mt-2">
           <input
+            id="detail-drawer-pre-platform"
             type="checkbox"
             checked={prePlatform}
             onChange={(e) => setPrePlatform(e.target.checked)}

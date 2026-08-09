@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -490,30 +491,42 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
             Text(
                 if (hasNext) title.nextEpisodeName ?: "Episode ${title.nextEpisodeNumber}" else title.name,
                 style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             if (hasNext) {
                 Text(
                     title.name,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 1.dp),
                 )
             }
+            // spacedBy (not SpaceBetween) so the two labels never abut when the card is
+            // narrower than their combined natural width (e.g. a foldable's cover display).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     if (hasNext) "S${title.nextSeasonNumber} E${title.nextEpisodeNumber}" else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     "${title.episodesWatched} / ${title.episodesTotal} episodes",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                    textAlign = TextAlign.End,
                 )
             }
             Row(

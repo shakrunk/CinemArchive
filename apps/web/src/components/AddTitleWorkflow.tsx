@@ -642,8 +642,9 @@ export function AddTitleWorkflow() {
                   className="bg-secondary/50 border-border font-mono"
                 />
               )}
-              <label className="flex items-center gap-2 cursor-pointer mt-2">
+              <label htmlFor="add-title-pre-platform" className="flex items-center gap-2 cursor-pointer mt-2">
                 <input
+                  id="add-title-pre-platform"
                   type="checkbox"
                   checked={log.prePlatform}
                   onChange={(e) => setLog((l) => ({ ...l, prePlatform: e.target.checked }))}

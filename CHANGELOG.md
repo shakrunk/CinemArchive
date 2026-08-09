@@ -15,6 +15,10 @@ number is chosen.
   mid-word instead of staying on one line.
 - Android: at larger system font scales, the library grid's status badge (e.g. "Watching")
   could wrap mid-word and overlap the FILM/SERIES label instead of staying on one line.
+- Android: on the Discover grid, the compact add button and "already in library" checkmark sat
+  in different corners and shared the same solid fill, so the two states were hard to tell apart
+  at a glance and the tap target moved when a title got added. Both now sit in the same corner,
+  with the add button solid and the owned badge a tonal (muted) fill instead.
 
 ## [1.27.0] - 2026-08-09
 

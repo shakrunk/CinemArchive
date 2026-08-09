@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Web: page scrolling now eases into motion and decelerates smoothly at the top/bottom instead
+  of stopping instantly, via Lenis; disabled under `prefers-reduced-motion` and suspended while a
+  dialog/sheet has scroll locked.
+
 ## [1.26.0] - 2026-08-03
 
 ### Fixed

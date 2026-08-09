@@ -11,12 +11,16 @@ number is chosen.
 
 ### Added
 
+- Android: Settings now uses a two-pane list-detail layout on unfolded foldables and tablets —
+  the Profile category list stays visible alongside whichever of Appearance/Permissions/About
+  is selected, instead of the category screen replacing the list full-screen.
 - Android: the Title detail screen now has a "Remove from library" action, matching the web
   app — a hard delete (with a confirmation prompt) that also clears the title's watch history.
-- Android: Settings → Permissions now shows a fully-rounded, animated status pill
-  ("Allowed"/"Not allowed") next to each permission instead of small caption text, and every
-  row keeps a button after it's granted — "Manage" routes to wherever that permission can be
-  revoked, so turning one off is as easy as turning it on.
+- Android: Settings → Permissions rows are now tappable end-to-end instead of each holding its
+  own full-width button — one row, one action, matching how Android's own Settings > Permissions
+  works. Status reads from a fully-rounded, animated pill ("Allowed"/"Not allowed"); tapping a
+  row requests/enables it when not granted, or routes to wherever it can be revoked once
+  granted, so turning one off is as easy as turning it on.
 
 ### Fixed
 

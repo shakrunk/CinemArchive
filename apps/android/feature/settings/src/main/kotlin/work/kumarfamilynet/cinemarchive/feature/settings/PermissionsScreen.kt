@@ -10,6 +10,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,22 +22,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -184,7 +183,6 @@ private fun PermissionsScreen(
                 title = "Notifications",
                 subtitle = "The \"how was it?\" prompt when a cinema outing you logged wraps up.",
                 granted = notificationsGranted,
-                actionLabel = if (Build.VERSION.SDK_INT >= 33) "Enable" else "Open Settings",
                 onAction = onRequestNotifications,
                 onManage = onManageNotifications,
             ),
@@ -193,7 +191,6 @@ private fun PermissionsScreen(
                 title = "Camera",
                 subtitle = "Scans the QR code to sign in from a paired desktop session.",
                 granted = cameraGranted,
-                actionLabel = "Enable",
                 onAction = onRequestCamera,
                 onManage = onManageCamera,
             ),
@@ -202,7 +199,6 @@ private fun PermissionsScreen(
                 title = "Alarms & reminders",
                 subtitle = "Lets an outing's \"how was it?\" notification fire on time even if the app is closed.",
                 granted = exactAlarmsGranted,
-                actionLabel = "Open Settings",
                 onAction = onOpenExactAlarmSettings,
                 onManage = onOpenExactAlarmSettings,
             ),
@@ -212,7 +208,6 @@ private fun PermissionsScreen(
                     title = "Install unknown apps",
                     subtitle = "Lets an in-app update install with one tap instead of opening the release page.",
                     granted = installUnknownAppsGranted,
-                    actionLabel = "Open Settings",
                     onAction = onOpenInstallUnknownAppsSettings,
                     onManage = onOpenInstallUnknownAppsSettings,
                 )
@@ -238,67 +233,73 @@ private data class PermissionRowSpec(
     val title: String,
     val subtitle: String,
     val granted: Boolean,
-    val actionLabel: String,
     val onAction: () -> Unit,
     // Every permission here can be taken back from Settings, so the row always offers a way in —
-    // not just a one-shot "Enable" that vanishes once granted (#see PR description: revoking
-    // should be as easy as granting). Defaults to onAction since exact-alarms and install-unknown
-    // route both directions through the same OS toggle screen; camera and notifications override
-    // it because granting and revoking land on different screens.
-    val manageLabel: String = "Manage",
+    // tapping it routes to request/enable when not granted, or to wherever it can be revoked
+    // once granted (#see PR description: revoking should be as easy as granting). Defaults to
+    // onAction since exact-alarms and install-unknown route both directions through the same OS
+    // toggle screen; camera and notifications override it because granting and revoking land on
+    // different screens.
     val onManage: () -> Unit = onAction,
 )
 
 @Composable
 private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
-    val (icon, title, subtitle, granted, actionLabel, onAction, manageLabel, onManage) = row
+    val (icon, title, subtitle, granted, onAction, onManage) = row
+    // The whole row is the target, not a button living inside it — there's exactly one action
+    // per row (request/enable, or manage once granted), so the row itself should be it, the way
+    // Android's own Settings > Permissions works. A `Switch` would be wrong here even though
+    // this looks like a toggle list: the app doesn't own this state, the OS does (a system
+    // dialog or an external Settings screen the user may back out of ungranted), so a switch
+    // that can silently snap back would lie about who's in control.
     Surface(
+        onClick = if (granted) onManage else onAction,
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Granted/not-granted state lives on the pill below, not here — a filled icon
-                // chip next to a filled status pill double-encoded the same state and read as
-                // two loud badges stacked in one row.
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-                }
-                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleSmall)
-                    PermissionStatusPill(granted, modifier = Modifier.padding(top = 2.dp))
+        // Top-aligned, not centered: the subtitle can run to 2-3 lines, and a centered icon/
+        // chevron float in dead space next to a tall paragraph instead of anchoring to the
+        // title they belong beside.
+        Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            // Not-granted gets a tinted icon chip so the row that wants attention still reads as
+            // such, now that there's no filled button left to carry that emphasis; granted rows
+            // settle to the same neutral chip the pill's own color already covers.
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (granted) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.primaryContainer,
+                contentColor = if (granted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
             }
-            if (!granted) {
+            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                // Title and pill share a line instead of stacking — the pill is a short badge,
+                // not paragraph content, so it doesn't need a line of its own.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    PermissionStatusPill(granted, modifier = Modifier.padding(start = 8.dp))
+                }
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 12.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                 )
-                // Not granted is the state that wants the user's attention, so it gets the
-                // filled, higher-emphasis button; once granted the row is in its settled state
-                // and "Manage" (revoke) drops to the same quiet outlined treatment every other
-                // secondary action in this screen uses.
-                Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
-                    Text(actionLabel)
-                }
-            } else {
-                OutlinedButton(
-                    onClick = onManage,
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                ) {
-                    Text(manageLabel)
-                }
             }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+            )
         }
     }
 }

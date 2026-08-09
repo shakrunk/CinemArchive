@@ -47,6 +47,10 @@ fun StatusBadge(status: LibraryStatus, modifier: Modifier = Modifier) {
         meta.label.uppercase(),
         style = MaterialTheme.typography.labelSmall,
         color = meta.onContainer,
+        // A pill is single-line by definition — a squeezed parent (narrow grid columns, large
+        // font scale) should never make this text-wrap mid-word inside its own badge.
+        maxLines = 1,
+        softWrap = false,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(meta.container)

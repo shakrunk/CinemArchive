@@ -13,6 +13,8 @@ number is chosen.
 
 - Android: at larger system font scales, the About screen's Source/Releases buttons could wrap
   mid-word instead of staying on one line.
+- Android: at larger system font scales, the library grid's status badge (e.g. "Watching")
+  could wrap mid-word and overlap the FILM/SERIES label instead of staying on one line.
 
 ## [1.27.0] - 2026-08-09
 

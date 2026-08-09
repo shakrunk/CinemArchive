@@ -504,31 +504,22 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
                     modifier = Modifier.padding(top = 1.dp),
                 )
             }
-            // spacedBy (not SpaceBetween) so the two labels never abut when the card is
-            // narrower than their combined natural width (e.g. a foldable's cover display).
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    if (hasNext) "S${title.nextSeasonNumber} E${title.nextEpisodeNumber}" else "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${title.episodesWatched} / ${title.episodesTotal} episodes",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                    textAlign = TextAlign.End,
-                )
-            }
+            // One Text, not a two-Text Row: on a very narrow width (e.g. a foldable's cover
+            // display, ~320dp) a Row splitting "S1 E12" and "12 / 30 episodes" across two
+            // weighted children left too little room for the second label, and it wrapped
+            // onto an extra line instead of eliding (the fillMaxWidth/weight(fill=false) combo
+            // doesn't reliably cap a sibling's width tight enough for ellipsis to kick in). A
+            // single Text always honors maxLines/ellipsis, so it degrades to "S1 E12 · 12…"
+            // instead of garbling across two lines.
+            val watchedLabel = "${title.episodesWatched} / ${title.episodesTotal} episodes"
+            Text(
+                if (hasNext) "S${title.nextSeasonNumber} E${title.nextEpisodeNumber} · $watchedLabel" else watchedLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

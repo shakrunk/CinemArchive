@@ -24,10 +24,11 @@ number is chosen.
   in different corners and shared the same solid fill, so the two states were hard to tell apart
   at a glance and the tap target moved when a title got added. Both now sit in the same corner,
   with the add button solid and the owned badge a tonal (muted) fill instead.
-- Android: on narrow-width screens (e.g. a foldable's cover display), the Up Next "Next Episode"
-  card's season/episode and watched-count labels had no minimum gap and could butt into each
-  other and wrap; the episode title could also wrap past the card's height. Both rows now hold a
-  fixed gap and truncate with an ellipsis instead of reflowing.
+- Android: on narrow-width screens (e.g. a foldable's cover display, ~320dp), the Up Next "Next
+  Episode" card's season/episode and watched-count labels were two separate `Text`s sharing a
+  `Row` — too little room for both, and the pair wrapped onto an extra line instead of eliding.
+  They're now a single label ("S1 E12 · 12 / 30 episodes") that reliably truncates with an
+  ellipsis at any width.
 - Android: the M3 Expressive segmented/connected toggle groups (used for media-type, theme-mode,
   and library status filters) only showed a color ripple on press with no size feedback. Pressed
   items now shrink slightly and spring back, matching the press language already used by the

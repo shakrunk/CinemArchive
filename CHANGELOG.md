@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Android: the Title detail screen now has a "Remove from library" action, matching the web
+  app — a hard delete (with a confirmation prompt) that also clears the title's watch history.
+
 ### Fixed
 
 - Android: at larger system font scales, the About screen's Source/Releases buttons could wrap

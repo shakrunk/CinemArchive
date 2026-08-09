@@ -205,6 +205,25 @@ class LibraryRepository(
         return titleId
     }
 
+    /**
+     * Removes a title from the library for good — the Title detail screen's "Remove from
+     * library" action. Room's `on delete cascade` (see [TitleEntity]'s children) takes every
+     * locally mirrored season/episode/viewing/cast/crew/outing row with it in the same
+     * statement; the outbox's `delete` entry (pushed by
+     * [SupabaseRemoteMutationWriter.deleteTitle]) does the same server-side via schema.sql's
+     * own cascades. Mirrors the web app's `removeTitle` (`useAppStore.ts`), which is likewise
+     * a plain hard delete with no undo.
+     */
+    suspend fun removeTitle(titleId: String) {
+        titleDao.deleteById(titleId)
+        outbox.enqueue(
+            entityType = "title",
+            entityId = titleId,
+            operation = "delete",
+            payload = JSONObject().put("id", titleId),
+        )
+    }
+
     /** Local row id for an already-owned TMDB title, if any — lets the Add flow show
      *  "In library" and route a tap to the real title-detail screen instead of re-adding. */
     suspend fun findLibraryTitleId(tmdbId: Int, type: MediaType): String? =

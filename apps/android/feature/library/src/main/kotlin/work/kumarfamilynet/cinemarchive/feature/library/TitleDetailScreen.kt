@@ -23,8 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -181,6 +183,16 @@ class TitleDetailViewModel(
     fun onSaveVenueNotes(venue: String, notes: String) {
         viewModelScope.launch { outingsRepository.saveVenueNotes(venue, notes) }
     }
+
+    /** "Remove from library" — a hard delete with no undo, see [LibraryRepository.removeTitle].
+     *  [onRemoved] closes the detail screen once the local write lands, since [uiState] would
+     *  otherwise just start emitting null for a title that no longer exists. */
+    fun onRemoveTitle(onRemoved: () -> Unit) {
+        viewModelScope.launch {
+            repository.removeTitle(titleId)
+            onRemoved()
+        }
+    }
 }
 
 @Composable
@@ -217,6 +229,7 @@ fun TitleDetailRoute(
         companionSuggestions = companionSuggestions,
         venueNotes = venueNotes,
         onSaveVenueNotes = viewModel::onSaveVenueNotes,
+        onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
     )
 }
 
@@ -242,10 +255,12 @@ fun TitleDetailScreen(
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
     onSaveVenueNotes: (String, String) -> Unit = { _, _ -> },
+    onRemoveTitle: () -> Unit = {},
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
     var postShowViewing by remember { mutableStateOf<Viewing?>(null) }
+    var showRemoveConfirm by rememberSaveable { mutableStateOf(false) }
     // Keyed on the title id (not just rememberSaveable) so navigating from one series' detail
     // screen straight to another's doesn't carry over a season number that may not exist there.
     var selectedSeasonNumber by rememberSaveable(detail?.id) {
@@ -442,6 +457,26 @@ fun TitleDetailScreen(
                     )
                 }
             }
+            item {
+                ReadingWidthColumn {
+                    TextButton(
+                        onClick = { showRemoveConfirm = true },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.DeleteOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            "Remove from library",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
+                }
+            }
             item { Box(modifier = Modifier.height(28.dp)) }
         }
     }
@@ -480,6 +515,22 @@ fun TitleDetailScreen(
                 postShowViewing = null
             },
             onDismiss = { postShowViewing = null },
+        )
+    }
+
+    if (showRemoveConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRemoveConfirm = false },
+            title = { Text("Remove from library forever?") },
+            text = { Text("This deletes ${detail?.title ?: "this title"} and its watch history. There's no undo.") },
+            confirmButton = {
+                TextButton(onClick = { showRemoveConfirm = false; onRemoveTitle() }) {
+                    Text("Delete forever", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveConfirm = false }) { Text("Cancel") }
+            },
         )
     }
 }

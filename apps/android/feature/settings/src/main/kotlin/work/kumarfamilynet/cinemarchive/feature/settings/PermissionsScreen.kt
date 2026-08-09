@@ -21,15 +21,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +59,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
+import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
@@ -255,10 +259,13 @@ private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Granted/not-granted state lives on the pill below, not here — a filled icon
+                // chip next to a filled status pill double-encoded the same state and read as
+                // two loud badges stacked in one row.
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (granted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = if (granted) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(36.dp),
                 ) {
                     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -277,32 +284,53 @@ private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 10.dp, bottom = 12.dp),
                 )
-            }
-            OutlinedButton(
-                onClick = if (granted) onManage else onAction,
-                modifier = Modifier.fillMaxWidth().padding(top = if (granted) 12.dp else 0.dp),
-            ) {
-                Text(if (granted) manageLabel else actionLabel)
+                // Not granted is the state that wants the user's attention, so it gets the
+                // filled, higher-emphasis button; once granted the row is in its settled state
+                // and "Manage" (revoke) drops to the same quiet outlined treatment every other
+                // secondary action in this screen uses.
+                Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                    Text(actionLabel)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onManage,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) {
+                    Text(manageLabel)
+                }
             }
         }
     }
 }
 
 /** Status readout for a permission row — a filled pill rather than bare text underneath the
- *  title, so "granted" reads as a distinct on/active state instead of a caption easy to miss. */
+ *  title, so "granted" reads as a distinct on/active state instead of a caption easy to miss.
+ *  Fully rounded (not a soft-cornered rectangle) so it reads as a pill, and the flip between
+ *  states animates rather than snapping — M3 Expressive treats state changes as motion, not
+ *  just a color swap. */
 @Composable
 private fun PermissionStatusPill(granted: Boolean, modifier: Modifier = Modifier) {
-    val container = if (granted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest
-    val onContainer = if (granted) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val container by animateColorAsState(
+        if (granted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        animationSpec = expressiveSpring(),
+        label = "permissionPillContainer",
+    )
+    val onContainer by animateColorAsState(
+        if (granted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = expressiveSpring(),
+        label = "permissionPillContent",
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(CircleShape)
             .background(container)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 7.dp, vertical = 2.dp),
     ) {
         Icon(
-            if (granted) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+            // Not-granted is a neutral off-state, not a failure — an outline dot reads as
+            // "unset" where a filled Cancel glyph reads as an error.
+            if (granted) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
             contentDescription = null,
             tint = onContainer,
             modifier = Modifier.size(12.dp),

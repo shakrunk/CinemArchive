@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.outlined.ViewList
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -106,6 +108,7 @@ import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
 import work.kumarfamilynet.cinemarchive.feature.settings.profileInitial
 import work.kumarfamilynet.cinemarchive.feature.upnext.UpNextRoute
 
@@ -299,6 +302,10 @@ private fun CinemArchiveApp(
 ) {
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
+    // stays on screen permanently, so which detail sits opposite it needs its own state
+    // instead of being encoded in `overlay` the way the phone-width push navigation is.
+    var selectedSettingsCategory by remember { mutableStateOf(SettingsCategory.APPEARANCE) }
     // Hoisted above LibraryRoute (rather than let it own this DataStore subscription itself)
     // because LibraryRoute is torn down and recreated every time `tab` switches away from and
     // back to LIBRARY — re-subscribing there would reset to collectAsStateWithLifecycle's
@@ -507,63 +514,133 @@ private fun CinemArchiveApp(
                     },
                 ) { innerPadding -> TabScaffoldContent(innerPadding) }
             }
-        }
 
-        // The overlay's predictive-back transform: shrink it and ease it toward the trailing
-        // edge as the gesture progresses, so the tab content behind is revealed underneath
-        // rather than the overlay vanishing in one frame.
-        Box(
-            modifier = Modifier.graphicsLayer {
-                val p = backProgress.value
-                val scale = 1f - BACK_SCALE_TRAVEL * p
-                scaleX = scale
-                scaleY = scale
-                alpha = 1f - BACK_ALPHA_TRAVEL * p
-                translationX = size.width * BACK_SLIDE_FRACTION * p
-            },
-        ) {
-        when (val current = overlay) {
-            null -> Unit
-            is Overlay.Detail -> TitleDetailRoute(
-                repository,
-                outingsRepository,
-                current.titleId,
-                onBack = closeOverlay,
-                onRequestNotificationPermission = requestNotificationPermission,
-            )
-            is Overlay.Add -> AddTitleOverlayRoute(
-                discoverRepository,
-                repository,
-                openKey = current.openKey,
-                onClose = closeOverlay,
-                // Land on what was just created rather than back where the add started — the
-                // title detail screen is where every follow-up action (rate, log a viewing,
-                // book an outing) lives.
-                onAdded = { overlay = Overlay.Detail(it) },
-                onOpenTitle = { overlay = Overlay.Detail(it) },
-                preselected = current.preselected,
-            )
-            Overlay.Profile -> ProfileRoute(
-                repository,
-                preferencesRepository,
-                authRepository,
-                appVersionName,
-                onClose = closeOverlay,
-                onOpenAppearance = { overlay = Overlay.Appearance },
-                onOpenAbout = { overlay = Overlay.About },
-                onOpenPermissions = { overlay = Overlay.Permissions },
-            )
-            Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
-            Overlay.About -> AboutRoute(
-                appVersionName,
-                appUpdateRepository,
-                apkInstaller,
-                preferencesRepository,
-                onBack = openProfile,
-            )
-            Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
-            is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
-        }
+            // The overlay's predictive-back transform: shrink it and ease it toward the trailing
+            // edge as the gesture progresses, so the tab content behind is revealed underneath
+            // rather than the overlay vanishing in one frame.
+            Box(
+                modifier = Modifier.graphicsLayer {
+                    val p = backProgress.value
+                    val scale = 1f - BACK_SCALE_TRAVEL * p
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - BACK_ALPHA_TRAVEL * p
+                    translationX = size.width * BACK_SLIDE_FRACTION * p
+                },
+            ) {
+            // Which settings sub-screen the trailing pane below shows while wide-mode split is
+            // active: Appearance/About/Permissions overlay values still carry it (e.g. the
+            // device was unfolded mid-visit to one of them), otherwise it's whatever was last
+            // picked from the list, defaulting to Appearance.
+            val settingsCategoryFromOverlay = when (overlay) {
+                Overlay.Appearance -> SettingsCategory.APPEARANCE
+                Overlay.Permissions -> SettingsCategory.PERMISSIONS
+                Overlay.About -> SettingsCategory.ABOUT
+                else -> null
+            }
+            val isSettingsOverlay = overlay == Overlay.Profile || settingsCategoryFromOverlay != null
+
+            // Below Medium, Profile/Appearance/About/Permissions stay the phone-style
+            // full-screen stack (below) — an unfolded foldable or a tablet instead shows the
+            // category list and its detail side by side permanently, same threshold the nav
+            // rail above just switched on rather than a second breakpoint for the same
+            // physical class of device.
+            if (useNavigationRail && isSettingsOverlay) {
+                val activeCategory = settingsCategoryFromOverlay ?: selectedSettingsCategory
+                // Fold/rotate mid-visit to a phone-style Appearance/About/Permissions push can
+                // land here with overlay still holding that value rather than Profile — absorb
+                // it into selectedSettingsCategory once and normalize overlay back to Profile,
+                // so a later list tap isn't overridden by this same stale overlay value on
+                // every recomposition (settingsCategoryFromOverlay would otherwise keep winning
+                // the `?:` above regardless of what's tapped next).
+                LaunchedEffect(settingsCategoryFromOverlay) {
+                    settingsCategoryFromOverlay?.let {
+                        selectedSettingsCategory = it
+                        overlay = Overlay.Profile
+                    }
+                }
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.width(SettingsListPaneWidth)) {
+                        ProfileRoute(
+                            repository,
+                            preferencesRepository,
+                            authRepository,
+                            appVersionName,
+                            onClose = closeOverlay,
+                            onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
+                            onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
+                            onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
+                            selectedCategory = activeCategory,
+                        )
+                    }
+                    VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Box(modifier = Modifier.weight(1f)) {
+                        // showBack = false: this pane has no "back" of its own to unwind — the
+                        // list pane opposite it is the only way out, via its own close button.
+                        when (activeCategory) {
+                            SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.ABOUT -> AboutRoute(
+                                appVersionName,
+                                appUpdateRepository,
+                                apkInstaller,
+                                preferencesRepository,
+                                onBack = closeOverlay,
+                                showBack = false,
+                            )
+                            SettingsCategory.PERMISSIONS -> PermissionsRoute(
+                                onBack = closeOverlay,
+                                apkInstaller = apkInstaller,
+                                appUpdateRepository = appUpdateRepository,
+                                showBack = false,
+                            )
+                        }
+                    }
+                }
+            } else {
+            when (val current = overlay) {
+                null -> Unit
+                is Overlay.Detail -> TitleDetailRoute(
+                    repository,
+                    outingsRepository,
+                    current.titleId,
+                    onBack = closeOverlay,
+                    onRequestNotificationPermission = requestNotificationPermission,
+                )
+                is Overlay.Add -> AddTitleOverlayRoute(
+                    discoverRepository,
+                    repository,
+                    openKey = current.openKey,
+                    onClose = closeOverlay,
+                    // Land on what was just created rather than back where the add started — the
+                    // title detail screen is where every follow-up action (rate, log a viewing,
+                    // book an outing) lives.
+                    onAdded = { overlay = Overlay.Detail(it) },
+                    onOpenTitle = { overlay = Overlay.Detail(it) },
+                    preselected = current.preselected,
+                )
+                Overlay.Profile -> ProfileRoute(
+                    repository,
+                    preferencesRepository,
+                    authRepository,
+                    appVersionName,
+                    onClose = closeOverlay,
+                    onOpenAppearance = { overlay = Overlay.Appearance },
+                    onOpenAbout = { overlay = Overlay.About },
+                    onOpenPermissions = { overlay = Overlay.Permissions },
+                )
+                Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
+                Overlay.About -> AboutRoute(
+                    appVersionName,
+                    appUpdateRepository,
+                    apkInstaller,
+                    preferencesRepository,
+                    onBack = openProfile,
+                )
+                Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
+                is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
+            }
+            }
+            }
         }
     }
 }
@@ -573,3 +650,8 @@ private fun CinemArchiveApp(
 private const val BACK_SCALE_TRAVEL = 0.12f
 private const val BACK_ALPHA_TRAVEL = 0.35f
 private const val BACK_SLIDE_FRACTION = 0.10f
+
+/** Fixed width of the settings list pane in the wide/split layout — a detail pane that grows
+ *  with the window but a list pane that also grew would leave the category rows looking
+ *  stretched well past what their short titles need. */
+private val SettingsListPaneWidth = 320.dp

@@ -233,6 +233,11 @@ fun AboutRoute(
     apkInstaller: ApkInstaller,
     preferencesRepository: PreferencesRepository,
     onBack: () -> Unit,
+    // False in the wide/split settings layout, where this screen sits permanently in the
+    // trailing pane rather than having been navigated to. Only applies to the top-level list —
+    // the Doc/Credits subpages below it are real in-pane navigation (List -> Doc), so they keep
+    // their own back arrow regardless.
+    showBack: Boolean = true,
 ) {
     var subpage by remember { mutableStateOf<AboutSubpage?>(null) }
     val uriHandler = LocalUriHandler.current
@@ -270,6 +275,7 @@ fun AboutRoute(
         null -> AboutListScreen(
             appVersionName = appVersionName,
             onBack = onBack,
+            showBack = showBack,
             onOpenDoc = { subpage = AboutSubpage.Doc(it) },
             onOpenCredits = { subpage = AboutSubpage.Credits },
             onOpenSource = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive") },
@@ -299,6 +305,7 @@ fun AboutRoute(
 private fun AboutListScreen(
     appVersionName: String,
     onBack: () -> Unit,
+    showBack: Boolean = true,
     onOpenDoc: (LegalDoc) -> Unit,
     onOpenCredits: () -> Unit,
     onOpenSource: () -> Unit,
@@ -316,10 +323,16 @@ private fun AboutListScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            if (showBack) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
             }
-            Text("About & Legal", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
+            Text(
+                "About & Legal",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(start = if (showBack) 4.dp else 0.dp),
+            )
         }
 
         LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {

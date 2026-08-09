@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +41,11 @@ import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
+/** The settings sub-screens reachable from Profile — named here (rather than left as bare
+ *  navigation calls) so the foldable/tablet split view can track which one is showing in the
+ *  trailing pane alongside this leading [ProfileRoute] list. */
+enum class SettingsCategory { APPEARANCE, PERMISSIONS, ABOUT }
+
 @Composable
 fun ProfileRoute(
     libraryRepository: LibraryRepository,
@@ -50,6 +56,11 @@ fun ProfileRoute(
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
+    // Non-null only in the wide/split layout, where this list sits permanently alongside its
+    // detail pane rather than being replaced by it — highlights which category is showing
+    // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
+    // the only feedback needed before the screen it names takes over.
+    selectedCategory: SettingsCategory? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -67,6 +78,7 @@ fun ProfileRoute(
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
         onSignOut = authRepository::signOut,
+        selectedCategory = selectedCategory,
     )
 }
 
@@ -116,6 +128,7 @@ private fun ProfileScreen(
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     onSignOut: () -> Unit,
+    selectedCategory: SettingsCategory? = null,
 ) {
     val displayName = profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -169,6 +182,7 @@ private fun ProfileScreen(
                         title = "Appearance",
                         subtitle = appearanceSummary,
                         onClick = onOpenAppearance,
+                        selected = selectedCategory == SettingsCategory.APPEARANCE,
                     )
                 }
             }
@@ -181,6 +195,7 @@ private fun ProfileScreen(
                         title = "Permissions",
                         subtitle = "Camera, notifications & alarms",
                         onClick = onOpenPermissions,
+                        selected = selectedCategory == SettingsCategory.PERMISSIONS,
                         modifier = Modifier.padding(top = 10.dp),
                     )
                 }
@@ -194,6 +209,7 @@ private fun ProfileScreen(
                         title = "About & Legal",
                         subtitle = "Version $appVersionName",
                         onClick = onOpenAbout,
+                        selected = selectedCategory == SettingsCategory.ABOUT,
                         modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
                     )
                 }
@@ -235,12 +251,17 @@ private fun ProfileRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    selected: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
+        // Only meaningful in the split layout, where this row's screen sits permanently in the
+        // trailing pane rather than being navigated away to — a border, not a container-color
+        // swap, so it doesn't fight the row's own icon-chip color underneath.
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(

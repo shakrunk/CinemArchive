@@ -97,6 +97,10 @@ fun PermissionsRoute(
     onBack: () -> Unit,
     apkInstaller: ApkInstaller? = null,
     appUpdateRepository: AppUpdateRepository? = null,
+    // False in the wide/split settings layout, where this screen sits permanently in the
+    // trailing pane rather than having been navigated to — a back arrow there would point at
+    // nothing to go back to.
+    showBack: Boolean = true,
 ) {
     val context = LocalContext.current
     var cameraOk by remember { mutableStateOf(cameraGranted(context)) }
@@ -134,6 +138,7 @@ fun PermissionsRoute(
         installUnknownAppsGranted = installUnknownAppsOk,
         showInstallUnknownApps = showInstallUnknownApps,
         onBack = onBack,
+        showBack = showBack,
         onRequestCamera = { cameraLauncher.launch(Manifest.permission.CAMERA) },
         onManageCamera = { context.startActivity(appDetailsSettingsIntent(context)) },
         onRequestNotifications = {
@@ -158,6 +163,7 @@ private fun PermissionsScreen(
     installUnknownAppsGranted: Boolean,
     showInstallUnknownApps: Boolean,
     onBack: () -> Unit,
+    showBack: Boolean = true,
     onRequestCamera: () -> Unit,
     onManageCamera: () -> Unit,
     onRequestNotifications: () -> Unit,
@@ -167,10 +173,16 @@ private fun PermissionsScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            if (showBack) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
             }
-            Text("Permissions", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
+            Text(
+                "Permissions",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(start = if (showBack) 4.dp else 0.dp),
+            )
         }
 
         // One grouped container rather than a flat run of separate cards, so the three

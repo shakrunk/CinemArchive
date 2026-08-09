@@ -24,6 +24,10 @@ number is chosen.
   in different corners and shared the same solid fill, so the two states were hard to tell apart
   at a glance and the tap target moved when a title got added. Both now sit in the same corner,
   with the add button solid and the owned badge a tonal (muted) fill instead.
+- Android: the M3 Expressive segmented/connected toggle groups (used for media-type, theme-mode,
+  and library status filters) only showed a color ripple on press with no size feedback. Pressed
+  items now shrink slightly and spring back, matching the press language already used by the
+  bottom nav.
 
 ## [1.27.0] - 2026-08-09
 

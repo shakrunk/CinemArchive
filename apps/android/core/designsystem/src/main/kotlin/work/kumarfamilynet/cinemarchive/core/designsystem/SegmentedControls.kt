@@ -2,6 +2,9 @@ package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -18,8 +21,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -96,11 +101,23 @@ private fun RowScope.SegmentedGroupItem(
     val bg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
     val fg = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    // Same press language as MorphingBottomNav's icon: a quick crisp shrink on press-down,
+    // springing back past 1x on release — the ripple alone read as flat for a toggle this size.
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.92f else 1f,
+        animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
+        label = "segPressScale",
+    )
+
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         modifier = Modifier
             .weight(weight.coerceAtLeast(0.01f))
-            .height(46.dp),
+            .height(46.dp)
+            .scale(pressScale),
         shape = RoundedCornerShape(topStart = leading, bottomStart = leading, topEnd = trailing, bottomEnd = trailing),
         color = bg,
         contentColor = fg,
@@ -188,9 +205,18 @@ private fun ConnectedToggleItem(
     val bg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
     val fg = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.92f else 1f,
+        animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
+        label = "connectedPressScale",
+    )
+
     Surface(
         onClick = onClick,
-        modifier = modifier.height(46.dp),
+        interactionSource = interactionSource,
+        modifier = modifier.height(46.dp).scale(pressScale),
         shape = RoundedCornerShape(
             topStart = leading,
             topEnd = trailing,

@@ -32,6 +32,10 @@ number is chosen.
   in different corners and shared the same solid fill, so the two states were hard to tell apart
   at a glance and the tap target moved when a title got added. Both now sit in the same corner,
   with the add button solid and the owned badge a tonal (muted) fill instead.
+- Android: rotating the device or folding/unfolding while inside Settings (or anywhere else)
+  dropped straight back to the Library tab — the Activity had no `configChanges` declared, so
+  the default destroy+recreate on screen-size/orientation change wiped the in-memory tab/overlay
+  state. The app already adapts its layout live to width, so recreation was never needed.
 - Android: on narrow-width screens (e.g. a foldable's cover display, ~320dp), the Up Next "Next
   Episode" card's season/episode and watched-count labels were two separate `Text`s sharing a
   `Row` — too little room for both, and the pair wrapped onto an extra line instead of eliding.

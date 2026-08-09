@@ -230,6 +230,10 @@ private fun PermissionsScreen(
         LazyColumn(
             contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp),
             verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
+            // Without a size modifier a LazyColumn wrap-content-sizes to its rows, leaving the
+            // rest of the screen as a plain, non-touch-owning Column — a drag there fell through
+            // to whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+            modifier = Modifier.weight(1f),
         ) {
             itemsIndexed(rows) { index, row ->
                 ReadingWidthColumn {

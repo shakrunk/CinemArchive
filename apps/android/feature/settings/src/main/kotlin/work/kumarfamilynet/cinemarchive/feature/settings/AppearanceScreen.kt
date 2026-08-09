@@ -137,7 +137,10 @@ private fun AppearanceScreen(
             )
         }
 
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Text(

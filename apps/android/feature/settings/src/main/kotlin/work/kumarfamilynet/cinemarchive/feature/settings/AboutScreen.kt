@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
@@ -335,7 +337,10 @@ private fun AboutListScreen(
             )
         }
 
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Row(
@@ -443,7 +448,10 @@ private fun AboutDetailScreen(doc: LegalDoc, onBack: () -> Unit) {
             }
             Text(doc.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
         }
-        ReadingWidthColumn {
+        // weight(1f) + verticalScroll: without it this pane wrap-content-sizes to the text (so
+        // long legal copy can't scroll at all) and the blank area below it doesn't own touch — a
+        // drag there fell through to whatever's underneath this overlay.
+        ReadingWidthColumn(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Text(
                 doc.body,
                 style = MaterialTheme.typography.bodyMedium,
@@ -486,7 +494,10 @@ private fun CreditsScreen(onBack: () -> Unit) {
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Text(

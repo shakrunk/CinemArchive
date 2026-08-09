@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only override of main's ic_launcher_background: same name, this build type's
+     source set wins over src/main/res during resource merging (AGP precedence: build type >
+     main), so debug installs get a visibly different launcher icon from release without
+     touching the manifest. Foreground/monochrome stay the main film-reel mark; only the
+     background swaps to a warning-red so a debug build is distinguishable at a glance
+     alongside the sideloaded release install (see build.gradle.kts's applicationIdSuffix
+     comment for why the two coexist on-device). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#7A1F1F" />
+</vector>

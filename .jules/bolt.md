@@ -55,3 +55,7 @@
 ## 2024-03-09 - Clean Up Temporary Scripts Before Review
 **Learning:** Requesting a code review with a temporary patch script (`patch_comments.cjs`) still in the working directory pollutes the commit and fails the review validation step.
 **Action:** Ensure all temporary workspace files (e.g., patching scripts like `.cjs` files) are explicitly deleted before requesting a code review to prevent them from being accidentally included in the final validation and commit.
+
+## 2024-03-24 - O(N*M) lookups in render loops
+**Learning:** Checking for title ownership via `titles.some(...)` inside a `recommendations.map(...)` array iteration during render creates an O(N*M) calculation that severely impacts performance for users with large libraries.
+**Action:** When optimizing React render loops, replace nested array lookups (e.g., `.some()` or `.find()` inside a `.map()`) with O(1) `Set` or `Map` lookups, precomputing the hash map in a `useMemo` hook to avoid O(N*M) complexity.

@@ -26,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
@@ -42,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +74,12 @@ private fun notificationSettingsIntent(context: Context) =
 
 private fun exactAlarmSettingsIntent(context: Context) =
     Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
+
+// Camera has no runtime dialog for taking a grant back (unlike notifications, which reopen the
+// same toggle screen used to grant) — the app's permissions sub-page is the one place a granted
+// camera permission can be revoked, so that's where "Manage" routes once it's on.
+private fun appDetailsSettingsIntent(context: Context) =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
 
 /**
  * Surfaces the permissions this app actually asks for, each contextually when a feature first
@@ -123,6 +132,7 @@ fun PermissionsRoute(
         showInstallUnknownApps = showInstallUnknownApps,
         onBack = onBack,
         onRequestCamera = { cameraLauncher.launch(Manifest.permission.CAMERA) },
+        onManageCamera = { context.startActivity(appDetailsSettingsIntent(context)) },
         onRequestNotifications = {
             if (Build.VERSION.SDK_INT >= 33) {
                 notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -130,6 +140,8 @@ fun PermissionsRoute(
                 context.startActivity(notificationSettingsIntent(context))
             }
         },
+        // Same toggle screen either direction — it's just a switch the user flips.
+        onManageNotifications = { context.startActivity(notificationSettingsIntent(context)) },
         onOpenExactAlarmSettings = { context.startActivity(exactAlarmSettingsIntent(context)) },
         onOpenInstallUnknownAppsSettings = { apkInstaller?.unknownSourcesSettingsIntent()?.let(context::startActivity) },
     )
@@ -144,7 +156,9 @@ private fun PermissionsScreen(
     showInstallUnknownApps: Boolean,
     onBack: () -> Unit,
     onRequestCamera: () -> Unit,
+    onManageCamera: () -> Unit,
     onRequestNotifications: () -> Unit,
+    onManageNotifications: () -> Unit,
     onOpenExactAlarmSettings: () -> Unit,
     onOpenInstallUnknownAppsSettings: () -> Unit,
 ) {
@@ -168,6 +182,7 @@ private fun PermissionsScreen(
                 granted = notificationsGranted,
                 actionLabel = if (Build.VERSION.SDK_INT >= 33) "Enable" else "Open Settings",
                 onAction = onRequestNotifications,
+                onManage = onManageNotifications,
             ),
             PermissionRowSpec(
                 icon = Icons.Filled.CameraAlt,
@@ -176,6 +191,7 @@ private fun PermissionsScreen(
                 granted = cameraGranted,
                 actionLabel = "Enable",
                 onAction = onRequestCamera,
+                onManage = onManageCamera,
             ),
             PermissionRowSpec(
                 icon = Icons.Filled.Alarm,
@@ -184,6 +200,7 @@ private fun PermissionsScreen(
                 granted = exactAlarmsGranted,
                 actionLabel = "Open Settings",
                 onAction = onOpenExactAlarmSettings,
+                onManage = onOpenExactAlarmSettings,
             ),
             if (showInstallUnknownApps) {
                 PermissionRowSpec(
@@ -193,6 +210,7 @@ private fun PermissionsScreen(
                     granted = installUnknownAppsGranted,
                     actionLabel = "Open Settings",
                     onAction = onOpenInstallUnknownAppsSettings,
+                    onManage = onOpenInstallUnknownAppsSettings,
                 )
             } else {
                 null
@@ -218,11 +236,18 @@ private data class PermissionRowSpec(
     val granted: Boolean,
     val actionLabel: String,
     val onAction: () -> Unit,
+    // Every permission here can be taken back from Settings, so the row always offers a way in —
+    // not just a one-shot "Enable" that vanishes once granted (#see PR description: revoking
+    // should be as easy as granting). Defaults to onAction since exact-alarms and install-unknown
+    // route both directions through the same OS toggle screen; camera and notifications override
+    // it because granting and revoking land on different screens.
+    val manageLabel: String = "Manage",
+    val onManage: () -> Unit = onAction,
 )
 
 @Composable
 private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
-    val (icon, title, subtitle, granted, actionLabel, onAction) = row
+    val (icon, title, subtitle, granted, actionLabel, onAction, manageLabel, onManage) = row
     Surface(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -242,11 +267,7 @@ private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
                 }
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(title, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        if (granted) "Allowed" else "Not allowed",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    PermissionStatusPill(granted, modifier = Modifier.padding(top = 2.dp))
                 }
             }
             if (!granted) {
@@ -256,10 +277,41 @@ private fun PermissionRow(row: PermissionRowSpec, shape: Shape) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 10.dp, bottom = 12.dp),
                 )
-                OutlinedButton(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
-                    Text(actionLabel)
-                }
+            }
+            OutlinedButton(
+                onClick = if (granted) onManage else onAction,
+                modifier = Modifier.fillMaxWidth().padding(top = if (granted) 12.dp else 0.dp),
+            ) {
+                Text(if (granted) manageLabel else actionLabel)
             }
         }
+    }
+}
+
+/** Status readout for a permission row — a filled pill rather than bare text underneath the
+ *  title, so "granted" reads as a distinct on/active state instead of a caption easy to miss. */
+@Composable
+private fun PermissionStatusPill(granted: Boolean, modifier: Modifier = Modifier) {
+    val container = if (granted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest
+    val onContainer = if (granted) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(container)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Icon(
+            if (granted) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+            contentDescription = null,
+            tint = onContainer,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(
+            if (granted) "Allowed" else "Not allowed",
+            style = MaterialTheme.typography.labelSmall,
+            color = onContainer,
+            modifier = Modifier.padding(start = 4.dp),
+        )
     }
 }

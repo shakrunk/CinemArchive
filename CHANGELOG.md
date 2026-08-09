@@ -13,6 +13,10 @@ number is chosen.
 
 - Android: the Title detail screen now has a "Remove from library" action, matching the web
   app — a hard delete (with a confirmation prompt) that also clears the title's watch history.
+- Android: Settings → Permissions now shows a filled status pill ("Allowed"/"Not allowed") next
+  to each permission instead of small caption text, and every row keeps a button after it's
+  granted — "Manage" routes to wherever that permission can be revoked, so turning one off is as
+  easy as turning it on.
 
 ### Fixed
 

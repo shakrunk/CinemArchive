@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -292,6 +294,7 @@ fun AboutRoute(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AboutListScreen(
     appVersionName: String,
@@ -352,12 +355,20 @@ private fun AboutListScreen(
 
                     // Buttons rather than bare tappable text: these leave the app, and
                     // plain labels gave no affordance that they were actionable at all.
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
-                        OutlinedButton(onClick = onOpenSource, modifier = Modifier.weight(1f)) {
+                    // FlowRow, not a weighted Row: at large font scale / narrow widths, a
+                    // forced 50/50 split leaves no room for "Releases" and Compose breaks it
+                    // mid-word. Sizing buttons to content and letting the second one wrap to
+                    // its own full-width line keeps every label on one line.
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 18.dp),
+                    ) {
+                        OutlinedButton(onClick = onOpenSource) {
                             Icon(Icons.Filled.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("Source", modifier = Modifier.padding(start = 8.dp))
                         }
-                        OutlinedButton(onClick = onOpenReleaseNotes, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(onClick = onOpenReleaseNotes) {
                             Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("Releases", modifier = Modifier.padding(start = 8.dp))
                         }

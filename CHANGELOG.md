@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Android: at larger system font scales, the About screen's Source/Releases buttons could wrap
+  mid-word instead of staying on one line.
+
 ## [1.27.0] - 2026-08-09
 
 ### Added

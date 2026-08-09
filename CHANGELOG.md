@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-08-09
+
 ### Added
 
 - Web: page scrolling now eases into motion and decelerates smoothly at the top/bottom instead

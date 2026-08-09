@@ -9,6 +9,17 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-08-09
+
+### Added
+
+- Android: the Ledger's At the Movies widget now breaks total ticket spend down per venue and
+  per format, and calls out the venue with the lowest average price per trip among those with
+  2+ priced outings (#201, #210, #212).
+- Web: page scrolling now eases into motion and decelerates smoothly at the top/bottom instead
+  of stopping instantly, via Lenis; disabled under `prefers-reduced-motion` and suspended while a
+  dialog/sheet has scroll locked.
+
 ## [1.26.0] - 2026-08-03
 
 ### Fixed

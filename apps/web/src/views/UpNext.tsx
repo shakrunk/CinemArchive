@@ -524,7 +524,7 @@ function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?:
         <button
           onClick={() => dismissOutingFollowUp(outing.id)}
           aria-label={`Dismiss the "how was it" prompt for ${title.title}`}
-          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--inset)] backdrop-blur-sm text-paper-faint hover:text-paper hover:bg-[var(--inset-strong)] transition-colors"
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--inset)] backdrop-blur-sm text-paper-faint hover:text-paper hover:bg-[var(--inset-strong)] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <X className="w-3.5 h-3.5" />
         </button>

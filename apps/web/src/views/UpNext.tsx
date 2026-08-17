@@ -222,7 +222,7 @@ function LiveCard({
           ) : (
             <button
               onClick={handleMarkWatched}
-              className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full mt-3 py-2 text-[13px] font-bold"
+              className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full mt-3 py-2 text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Check className="w-4 h-4" /> Mark watched
             </button>
@@ -513,7 +513,7 @@ function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?:
           <div className="mt-auto pt-3">
             <button
               onClick={() => openPostShowSheet(outing.id)}
-              className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full py-2 text-[13px] font-bold"
+              className="btn-amber inline-flex items-center justify-center gap-2 rounded-md w-full py-2 text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Star className="w-4 h-4" /> Rate it
             </button>

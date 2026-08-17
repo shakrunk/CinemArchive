@@ -172,7 +172,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             <button
               onClick={openAddTitle}
               aria-label="Add Title"
-              className="btn-amber hidden sm:inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"
+              className="btn-amber hidden sm:inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Title</span>

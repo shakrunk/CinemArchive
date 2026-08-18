@@ -28,6 +28,13 @@ number is chosen.
 
 ### Fixed
 
+- Web: the title detail drawer (and every other Radix `Dialog`/`Sheet`) still fought the
+  buttery smooth-scroll feature after the previous fix — Lenis kept driving background/gap
+  scroll while a dialog was open, so wheel input over the drawer's non-carousel areas (header,
+  hero, footer) still scrolled the page underneath instead of doing nothing. The smooth-scroll
+  hook was checking `<html data-scroll-locked>` to know when to suspend, but Radix's scroll
+  lock (`react-remove-scroll-bar`) actually sets that attribute on `<body>` — the check never
+  matched, so Lenis never stopped for any dialog. Now watches `<body>`.
 - Web: the title detail drawer's card carousels (franchise parts, episodes, cast, trailers,
   watch providers) and season selector, along with the drawer's own body scroll, stopped
   scrolling after the buttery smooth-scroll feature landed. The drawer is a bespoke overlay

@@ -432,26 +432,36 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
   }
 
   if (filters.genres.length > 0) {
-    result = result.filter((t) => filters.genres.some((g) => t.genres.includes(g)))
+    // ⚡ Bolt: Replace O(N*M) array includes with O(1) Set lookup
+    const filterGenres = new Set(filters.genres)
+    result = result.filter((t) => t.genres.some((g) => filterGenres.has(g)))
   }
 
   if (filters.tags.length > 0) {
-    result = result.filter((t) => filters.tags.some((tag) => t.tags.includes(tag)))
+    // ⚡ Bolt: Replace O(N*M) array includes with O(1) Set lookup
+    const filterTags = new Set(filters.tags)
+    result = result.filter((t) => t.tags.some((tag) => filterTags.has(tag)))
   }
 
   if (filters.networks.length > 0) {
-    result = result.filter((t) => t.network && filters.networks.includes(t.network))
+    // ⚡ Bolt: Replace O(N*M) array includes with O(1) Set lookup
+    const filterNetworks = new Set(filters.networks)
+    result = result.filter((t) => t.network && filterNetworks.has(t.network))
   }
 
   if (filters.decades.length > 0) {
+    // ⚡ Bolt: Replace O(N*M) array includes with O(1) Set lookup
+    const filterDecades = new Set(filters.decades)
     result = result.filter((t) => {
       const decade = `${decadeOf(t.year)}s`
-      return filters.decades.includes(decade)
+      return filterDecades.has(decade)
     })
   }
 
   if (filters.languages.length > 0) {
-    result = result.filter((t) => t.originalLanguage && filters.languages.includes(t.originalLanguage))
+    // ⚡ Bolt: Replace O(N*M) array includes with O(1) Set lookup
+    const filterLanguages = new Set(filters.languages)
+    result = result.filter((t) => t.originalLanguage && filterLanguages.has(t.originalLanguage))
   }
 
   if (filters.minRating > 0) {

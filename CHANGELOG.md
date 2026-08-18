@@ -28,6 +28,14 @@ number is chosen.
 
 ### Fixed
 
+- Web: the title detail drawer's card carousels (franchise parts, episodes, cast, trailers,
+  watch providers) and season selector, along with the drawer's own body scroll, stopped
+  scrolling after the buttery smooth-scroll feature landed. The drawer is a bespoke overlay
+  rather than a Radix Dialog/Sheet, so it never got the `data-scroll-locked` suspension the
+  smooth-scroll hook relies on — Lenis kept hijacking wheel input meant for these nested
+  scroll regions and routed it to the page scroll instead. They're now marked
+  `data-lenis-prevent`, same as Radix `ScrollArea`. The Library ledger table, Discover's cast
+  row, and the Ledger/Profile stat strips had the same gap and are fixed too.
 - Android: at larger system font scales, the About screen's Source/Releases buttons could wrap
   mid-word instead of staying on one line.
 - Android: at larger system font scales, the library grid's status badge (e.g. "Watching")

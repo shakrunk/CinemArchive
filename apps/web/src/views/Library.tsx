@@ -354,6 +354,7 @@ function LedgerList({ titles }: { titles: Title[] }) {
   return (
     <div
       className="rounded-xl overflow-x-auto"
+      data-lenis-prevent
       style={{
         border: '1px solid var(--line)',
         background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))',
@@ -654,7 +655,7 @@ export function Library() {
       </div>
 
       {/* Status chips (mobile) */}
-      <div className="flex md:hidden gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1">
+      <div className="flex md:hidden gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1" data-lenis-prevent>
         {STATUS_OPTIONS.map((opt) => (
           <Chip key={opt.value} active={filters.status === opt.value} onClick={() => setFilter('status', opt.value)} className="shrink-0">
             {opt.label}

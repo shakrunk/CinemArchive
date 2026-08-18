@@ -50,7 +50,7 @@ export function StatRibbon() {
   ]
 
   return (
-    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-[var(--line)]">
+    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-[var(--line)]" data-lenis-prevent>
       {items.map((item, i) => (
         <div key={item.sub} className="flex items-stretch shrink-0">
           {i > 0 && (

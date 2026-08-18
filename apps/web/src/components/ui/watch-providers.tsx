@@ -46,6 +46,7 @@ function ProviderRow({ label, providers }: { label: string; providers: WatchProv
         onScroll={updateEdges}
         className="flex gap-2 overflow-x-auto scrollbar-thin pb-1"
         style={{ maskImage: edgeMask, WebkitMaskImage: edgeMask }}
+        data-lenis-prevent
       >
         {providers.map((p) => (
           <div

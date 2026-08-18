@@ -993,7 +993,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
           {hydrating && !data.cast ? (
             <div className="mb-5">
               <Eyebrow as="h3" size="md" className="mb-2">Cast</Eyebrow>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-5 px-5">
+              <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-5 px-5" data-lenis-prevent>
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
@@ -1017,7 +1017,7 @@ function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: 
           ) : data.cast && data.cast.length > 0 ? (
             <div className="mb-5">
               <Eyebrow as="h3" size="md" className="mb-2">Cast</Eyebrow>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none -mx-5 px-5">
+              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none -mx-5 px-5" data-lenis-prevent>
                 {data.cast.slice(0, 10).map((c) => (
                   <div
                     key={c.tmdbPersonId}

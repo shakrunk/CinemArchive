@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-08-19
+
 ### Added
 
 - Android: Settings now uses a two-pane list-detail layout on unfolded foldables and tablets —

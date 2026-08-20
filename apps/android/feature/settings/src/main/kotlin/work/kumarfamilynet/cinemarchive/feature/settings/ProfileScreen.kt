@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -40,6 +42,11 @@ import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
+/** The settings sub-screens reachable from Profile — named here (rather than left as bare
+ *  navigation calls) so the foldable/tablet split view can track which one is showing in the
+ *  trailing pane alongside this leading [ProfileRoute] list. */
+enum class SettingsCategory { APPEARANCE, PERMISSIONS, ABOUT, DEVELOPER }
+
 @Composable
 fun ProfileRoute(
     libraryRepository: LibraryRepository,
@@ -50,6 +57,17 @@ fun ProfileRoute(
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
+    // Governs the Developer Settings row's visibility — see
+    // PreferencesRepository.observeDevSettingsUnlocked: unlocked by default in debug builds,
+    // locked by default in release builds, until the version-number tap gesture in About & Legal
+    // overrides it.
+    devSettingsUnlocked: Boolean,
+    onOpenDeveloperSettings: () -> Unit,
+    // Non-null only in the wide/split layout, where this list sits permanently alongside its
+    // detail pane rather than being replaced by it — highlights which category is showing
+    // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
+    // the only feedback needed before the screen it names takes over.
+    selectedCategory: SettingsCategory? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -66,7 +84,10 @@ fun ProfileRoute(
         onOpenAppearance = onOpenAppearance,
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
+        devSettingsUnlocked = devSettingsUnlocked,
+        onOpenDeveloperSettings = onOpenDeveloperSettings,
         onSignOut = authRepository::signOut,
+        selectedCategory = selectedCategory,
     )
 }
 
@@ -115,7 +136,10 @@ private fun ProfileScreen(
     onOpenAppearance: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
+    devSettingsUnlocked: Boolean,
+    onOpenDeveloperSettings: () -> Unit,
     onSignOut: () -> Unit,
+    selectedCategory: SettingsCategory? = null,
 ) {
     val displayName = profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -126,7 +150,10 @@ private fun ProfileScreen(
             Text("Profile", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
         }
 
-        LazyColumn(contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Column(
@@ -169,6 +196,7 @@ private fun ProfileScreen(
                         title = "Appearance",
                         subtitle = appearanceSummary,
                         onClick = onOpenAppearance,
+                        selected = selectedCategory == SettingsCategory.APPEARANCE,
                     )
                 }
             }
@@ -181,6 +209,7 @@ private fun ProfileScreen(
                         title = "Permissions",
                         subtitle = "Camera, notifications & alarms",
                         onClick = onOpenPermissions,
+                        selected = selectedCategory == SettingsCategory.PERMISSIONS,
                         modifier = Modifier.padding(top = 10.dp),
                     )
                 }
@@ -194,8 +223,25 @@ private fun ProfileScreen(
                         title = "About & Legal",
                         subtitle = "Version $appVersionName",
                         onClick = onOpenAbout,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
+                        selected = selectedCategory == SettingsCategory.ABOUT,
+                        modifier = Modifier.padding(top = 10.dp, bottom = if (devSettingsUnlocked) 10.dp else 22.dp),
                     )
+                }
+            }
+            if (devSettingsUnlocked) {
+                item {
+                    ReadingWidthColumn {
+                        ProfileRow(
+                            icon = Icons.Filled.DeveloperMode,
+                            iconContainer = MaterialTheme.colorScheme.errorContainer,
+                            iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                            title = "Developer Settings",
+                            subtitle = "Debug tools & build indicator",
+                            onClick = onOpenDeveloperSettings,
+                            selected = selectedCategory == SettingsCategory.DEVELOPER,
+                            modifier = Modifier.padding(bottom = 22.dp),
+                        )
+                    }
                 }
             }
 
@@ -235,12 +281,17 @@ private fun ProfileRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    selected: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
+        // Only meaningful in the split layout, where this row's screen sits permanently in the
+        // trailing pane rather than being navigated away to — a border, not a container-color
+        // swap, so it doesn't fight the row's own icon-chip color underneath.
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(

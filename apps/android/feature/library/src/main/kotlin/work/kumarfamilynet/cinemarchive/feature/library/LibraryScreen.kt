@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -449,30 +448,32 @@ private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Un
         cornerRadius = posterGridCornerRadius(columns),
         onClick = onClick,
     ) {
+        // Two independently-aligned children, not one Row(SpaceBetween): a plain Row hands the
+        // "FILM"/"SERIES" label first dibs on width and only gives the badge whatever's left,
+        // so at larger font scales the badge lost that tug-of-war and wrapped mid-word over the
+        // label. Aligning each to its own corner gives both the card's full width to lay out in.
+        val cardPadding = if (columns >= 3) 6.dp else 10.dp
+        if (showMeta) {
+            Text(
+                if (title.type == MediaType.TV) "SERIES" else "FILM",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.TopStart).padding(cardPadding),
+            )
+        }
         Row(
-            modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(if (columns >= 3) 6.dp else 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.align(Alignment.TopEnd).padding(cardPadding),
         ) {
-            if (showMeta) {
-                Text(
-                    if (title.type == MediaType.TV) "SERIES" else "FILM",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.6f),
+            if (title.hasScheduledOuting) {
+                Icon(
+                    Icons.Filled.ConfirmationNumber,
+                    contentDescription = "Tickets scheduled",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp),
                 )
-            } else {
-                Spacer(Modifier.size(0.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (title.hasScheduledOuting) {
-                    Icon(
-                        Icons.Filled.ConfirmationNumber,
-                        contentDescription = "Tickets scheduled",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                StatusBadge(title.status)
-            }
+            StatusBadge(title.status)
         }
         if (showTitle) {
             Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(padding)) {

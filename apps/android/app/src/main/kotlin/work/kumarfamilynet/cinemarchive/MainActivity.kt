@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.outlined.ViewList
@@ -45,6 +47,8 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -104,8 +108,10 @@ import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
 import work.kumarfamilynet.cinemarchive.feature.library.TitleDetailRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.DeveloperSettingsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
 import work.kumarfamilynet.cinemarchive.feature.settings.profileInitial
 import work.kumarfamilynet.cinemarchive.feature.upnext.UpNextRoute
 
@@ -164,6 +170,15 @@ class MainActivity : ComponentActivity() {
             val fontScale by preferencesRepository.observeFontScale()
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
             val session by authRepository.observeSession().collectAsStateWithLifecycle()
+            val isDebugBuild = BuildConfig.DEBUG
+            // Read at this top level (rather than inside CinemArchiveApp) so the banner covers
+            // LoginRoute too, not just the signed-in app shell. remember(isDebugBuild) keeps the
+            // Flow instance stable across recompositions of this whole setContent block instead
+            // of restarting the DataStore collection every time (isDebugBuild itself never
+            // changes, but a fresh `preferencesRepository.observeX(...)` call each recomposition
+            // would still be a fresh Flow instance).
+            val showBuildBannerFlow = remember(isDebugBuild) { preferencesRepository.observeDevShowBuildBanner(isDebugBuild) }
+            val showBuildBanner by showBuildBannerFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
                 Surface {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -183,7 +198,15 @@ class MainActivity : ComponentActivity() {
                                 apkInstaller,
                                 initialTitleId = initialTitleId,
                                 appVersionName = BuildConfig.VERSION_NAME,
+                                isDebugBuild = isDebugBuild,
                             )
+                        }
+                        // Sibling of both LoginRoute and CinemArchiveApp (rather than nested
+                        // inside the latter) so it covers sign-in too — added after the app
+                        // content but before the splash below, so it sits under the splash while
+                        // that's still up and over everything once it fades out.
+                        if (showBuildBanner) {
+                            DebugBuildBanner(isDebugBuild)
                         }
                         var showBrandedSplash by remember { mutableStateOf(true) }
                         AnimatedVisibility(
@@ -251,6 +274,27 @@ private fun CinemArchiveSplash(onFinished: () -> Unit) {
     }
 }
 
+/** Persistent "which build is this" indicator — Settings > Developer Settings' opt-in toggle.
+ *  A small pill rather than a full-width bar so it doesn't compete with the top-bar chrome of
+ *  whatever screen is underneath; no gesture modifier, so it never intercepts touches meant for
+ *  the content behind it. */
+@Composable
+private fun DebugBuildBanner(isDebugBuild: Boolean) {
+    Box(modifier = Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.TopEnd) {
+        Surface(
+            shape = RoundedCornerShape(bottomStart = 12.dp),
+            color = if (isDebugBuild) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+            contentColor = if (isDebugBuild) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onError,
+        ) {
+            Text(
+                if (isDebugBuild) "DEBUG" else "RELEASE",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
 private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER }
 
 private sealed interface Overlay {
@@ -268,6 +312,7 @@ private sealed interface Overlay {
     data object Appearance : Overlay
     data object About : Overlay
     data object Permissions : Overlay
+    data object DeveloperSettings : Overlay
 
     /** The "at the theater" screen (seat + ticket QR code) — carries the outing and title name
      *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
@@ -296,9 +341,14 @@ private fun CinemArchiveApp(
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     appVersionName: String,
+    isDebugBuild: Boolean,
 ) {
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
+    // stays on screen permanently, so which detail sits opposite it needs its own state
+    // instead of being encoded in `overlay` the way the phone-width push navigation is.
+    var selectedSettingsCategory by remember { mutableStateOf(SettingsCategory.APPEARANCE) }
     // Hoisted above LibraryRoute (rather than let it own this DataStore subscription itself)
     // because LibraryRoute is torn down and recreated every time `tab` switches away from and
     // back to LIBRARY — re-subscribing there would reset to collectAsStateWithLifecycle's
@@ -312,6 +362,15 @@ private fun CinemArchiveApp(
     // Discover and finding Library unchanged would be the surprising behaviour.
     val posterGridColumns by preferencesRepository.observePosterGridColumns()
         .collectAsStateWithLifecycle(initialValue = 2)
+
+    // Governs the Developer Settings row's visibility in Profile — debug builds default
+    // unlocked, release builds default locked (isDebugBuild), until the version-tap gesture in
+    // About & Legal overrides it. remember(isDebugBuild): see the matching comment in
+    // MainActivity.onCreate's setContent — keeps the Flow instance stable across this
+    // composable's frequent recompositions (tab switches, overlay changes) instead of
+    // restarting the DataStore collection on every one.
+    val devSettingsUnlockedFlow = remember(isDebugBuild) { preferencesRepository.observeDevSettingsUnlocked(isDebugBuild) }
+    val devSettingsUnlocked by devSettingsUnlockedFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
 
     val openProfile = { overlay = Overlay.Profile }
     val closeOverlay = { overlay = null }
@@ -346,6 +405,16 @@ private fun CinemArchiveApp(
     }
     val onPosterGridColumnsChange: (Int) -> Unit = { next ->
         coroutineScope.launch { preferencesRepository.setPosterGridColumns(next) }
+    }
+    // Persists the lock and steers navigation away from Developer Settings in the same step —
+    // without the latter, the row this screen was opened from just disappeared from Profile
+    // (devSettingsUnlocked flips to false) while `overlay`/`selectedSettingsCategory` still
+    // point at it, stranding the split-mode detail pane and the phone-stack overlay on a screen
+    // with no way back in.
+    val lockDeveloperSettings: () -> Unit = {
+        coroutineScope.launch { preferencesRepository.setDevSettingsUnlocked(false) }
+        if (selectedSettingsCategory == SettingsCategory.DEVELOPER) selectedSettingsCategory = SettingsCategory.APPEARANCE
+        if (overlay == Overlay.DeveloperSettings) overlay = Overlay.Profile
     }
 
     // The FAB is a single instance shared across tabs, but only Discover/Library/Up Next report
@@ -383,7 +452,7 @@ private fun CinemArchiveApp(
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
             overlay = when (overlay) {
-                Overlay.Appearance, Overlay.About, Overlay.Permissions -> Overlay.Profile
+                Overlay.Appearance, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
                 else -> null
             }
             backProgress.snapTo(0f)
@@ -507,63 +576,153 @@ private fun CinemArchiveApp(
                     },
                 ) { innerPadding -> TabScaffoldContent(innerPadding) }
             }
-        }
 
-        // The overlay's predictive-back transform: shrink it and ease it toward the trailing
-        // edge as the gesture progresses, so the tab content behind is revealed underneath
-        // rather than the overlay vanishing in one frame.
-        Box(
-            modifier = Modifier.graphicsLayer {
-                val p = backProgress.value
-                val scale = 1f - BACK_SCALE_TRAVEL * p
-                scaleX = scale
-                scaleY = scale
-                alpha = 1f - BACK_ALPHA_TRAVEL * p
-                translationX = size.width * BACK_SLIDE_FRACTION * p
-            },
-        ) {
-        when (val current = overlay) {
-            null -> Unit
-            is Overlay.Detail -> TitleDetailRoute(
-                repository,
-                outingsRepository,
-                current.titleId,
-                onBack = closeOverlay,
-                onRequestNotificationPermission = requestNotificationPermission,
-            )
-            is Overlay.Add -> AddTitleOverlayRoute(
-                discoverRepository,
-                repository,
-                openKey = current.openKey,
-                onClose = closeOverlay,
-                // Land on what was just created rather than back where the add started — the
-                // title detail screen is where every follow-up action (rate, log a viewing,
-                // book an outing) lives.
-                onAdded = { overlay = Overlay.Detail(it) },
-                onOpenTitle = { overlay = Overlay.Detail(it) },
-                preselected = current.preselected,
-            )
-            Overlay.Profile -> ProfileRoute(
-                repository,
-                preferencesRepository,
-                authRepository,
-                appVersionName,
-                onClose = closeOverlay,
-                onOpenAppearance = { overlay = Overlay.Appearance },
-                onOpenAbout = { overlay = Overlay.About },
-                onOpenPermissions = { overlay = Overlay.Permissions },
-            )
-            Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
-            Overlay.About -> AboutRoute(
-                appVersionName,
-                appUpdateRepository,
-                apkInstaller,
-                preferencesRepository,
-                onBack = openProfile,
-            )
-            Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
-            is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
-        }
+            // The overlay's predictive-back transform: shrink it and ease it toward the trailing
+            // edge as the gesture progresses, so the tab content behind is revealed underneath
+            // rather than the overlay vanishing in one frame.
+            Box(
+                modifier = Modifier.graphicsLayer {
+                    val p = backProgress.value
+                    val scale = 1f - BACK_SCALE_TRAVEL * p
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - BACK_ALPHA_TRAVEL * p
+                    translationX = size.width * BACK_SLIDE_FRACTION * p
+                },
+            ) {
+            // Which settings sub-screen the trailing pane below shows while wide-mode split is
+            // active: Appearance/About/Permissions overlay values still carry it (e.g. the
+            // device was unfolded mid-visit to one of them), otherwise it's whatever was last
+            // picked from the list, defaulting to Appearance.
+            val settingsCategoryFromOverlay = when (overlay) {
+                Overlay.Appearance -> SettingsCategory.APPEARANCE
+                Overlay.Permissions -> SettingsCategory.PERMISSIONS
+                Overlay.About -> SettingsCategory.ABOUT
+                Overlay.DeveloperSettings -> SettingsCategory.DEVELOPER
+                else -> null
+            }
+            val isSettingsOverlay = overlay == Overlay.Profile || settingsCategoryFromOverlay != null
+
+            // Below Medium, Profile/Appearance/About/Permissions stay the phone-style
+            // full-screen stack (below) — an unfolded foldable or a tablet instead shows the
+            // category list and its detail side by side permanently, same threshold the nav
+            // rail above just switched on rather than a second breakpoint for the same
+            // physical class of device.
+            if (useNavigationRail && isSettingsOverlay) {
+                val activeCategory = settingsCategoryFromOverlay ?: selectedSettingsCategory
+                // Fold/rotate mid-visit to a phone-style Appearance/About/Permissions push can
+                // land here with overlay still holding that value rather than Profile — absorb
+                // it into selectedSettingsCategory once and normalize overlay back to Profile,
+                // so a later list tap isn't overridden by this same stale overlay value on
+                // every recomposition (settingsCategoryFromOverlay would otherwise keep winning
+                // the `?:` above regardless of what's tapped next).
+                LaunchedEffect(settingsCategoryFromOverlay) {
+                    settingsCategoryFromOverlay?.let {
+                        selectedSettingsCategory = it
+                        overlay = Overlay.Profile
+                    }
+                }
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.width(SettingsListPaneWidth)) {
+                        ProfileRoute(
+                            repository,
+                            preferencesRepository,
+                            authRepository,
+                            appVersionName,
+                            onClose = closeOverlay,
+                            onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
+                            onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
+                            onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
+                            devSettingsUnlocked = devSettingsUnlocked,
+                            onOpenDeveloperSettings = { selectedSettingsCategory = SettingsCategory.DEVELOPER },
+                            selectedCategory = activeCategory,
+                        )
+                    }
+                    VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Box(modifier = Modifier.weight(1f)) {
+                        // showBack = false: this pane has no "back" of its own to unwind — the
+                        // list pane opposite it is the only way out, via its own close button.
+                        when (activeCategory) {
+                            SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.ABOUT -> AboutRoute(
+                                appVersionName,
+                                appUpdateRepository,
+                                apkInstaller,
+                                preferencesRepository,
+                                onBack = closeOverlay,
+                                showBack = false,
+                            )
+                            SettingsCategory.PERMISSIONS -> PermissionsRoute(
+                                onBack = closeOverlay,
+                                apkInstaller = apkInstaller,
+                                appUpdateRepository = appUpdateRepository,
+                                showBack = false,
+                            )
+                            SettingsCategory.DEVELOPER -> DeveloperSettingsRoute(
+                                preferencesRepository,
+                                appVersionName,
+                                isDebugBuild,
+                                onBack = closeOverlay,
+                                onLock = lockDeveloperSettings,
+                                showBack = false,
+                            )
+                        }
+                    }
+                }
+            } else {
+            when (val current = overlay) {
+                null -> Unit
+                is Overlay.Detail -> TitleDetailRoute(
+                    repository,
+                    outingsRepository,
+                    current.titleId,
+                    onBack = closeOverlay,
+                    onRequestNotificationPermission = requestNotificationPermission,
+                )
+                is Overlay.Add -> AddTitleOverlayRoute(
+                    discoverRepository,
+                    repository,
+                    openKey = current.openKey,
+                    onClose = closeOverlay,
+                    // Land on what was just created rather than back where the add started — the
+                    // title detail screen is where every follow-up action (rate, log a viewing,
+                    // book an outing) lives.
+                    onAdded = { overlay = Overlay.Detail(it) },
+                    onOpenTitle = { overlay = Overlay.Detail(it) },
+                    preselected = current.preselected,
+                )
+                Overlay.Profile -> ProfileRoute(
+                    repository,
+                    preferencesRepository,
+                    authRepository,
+                    appVersionName,
+                    onClose = closeOverlay,
+                    onOpenAppearance = { overlay = Overlay.Appearance },
+                    onOpenAbout = { overlay = Overlay.About },
+                    onOpenPermissions = { overlay = Overlay.Permissions },
+                    devSettingsUnlocked = devSettingsUnlocked,
+                    onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
+                )
+                Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
+                Overlay.About -> AboutRoute(
+                    appVersionName,
+                    appUpdateRepository,
+                    apkInstaller,
+                    preferencesRepository,
+                    onBack = openProfile,
+                )
+                Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
+                Overlay.DeveloperSettings -> DeveloperSettingsRoute(
+                    preferencesRepository,
+                    appVersionName,
+                    isDebugBuild,
+                    onBack = openProfile,
+                    onLock = lockDeveloperSettings,
+                )
+                is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
+            }
+            }
+            }
         }
     }
 }
@@ -573,3 +732,8 @@ private fun CinemArchiveApp(
 private const val BACK_SCALE_TRAVEL = 0.12f
 private const val BACK_ALPHA_TRAVEL = 0.35f
 private const val BACK_SLIDE_FRACTION = 0.10f
+
+/** Fixed width of the settings list pane in the wide/split layout — a detail pane that grows
+ *  with the window but a list pane that also grew would leave the category rows looking
+ *  stretched well past what their short titles need. */
+private val SettingsListPaneWidth = 320.dp

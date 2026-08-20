@@ -9,6 +9,68 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-08-19
+
+### Added
+
+- Android: Settings now uses a two-pane list-detail layout on unfolded foldables and tablets —
+  the Profile category list stays visible alongside whichever of Appearance/Permissions/About
+  is selected, instead of the category screen replacing the list full-screen.
+- Android: the Title detail screen now has a "Remove from library" action, matching the web
+  app — a hard delete (with a confirmation prompt) that also clears the title's watch history.
+- Android: Settings → Permissions rows are now tappable end-to-end instead of each holding its
+  own full-width button — one row, one action, matching how Android's own Settings > Permissions
+  works. Status reads from a fully-rounded, animated pill ("Allowed"/"Not allowed"); tapping a
+  row requests/enables it when not granted, or routes to wherever it can be revoked once
+  granted, so turning one off is as easy as turning it on.
+- Android: added a Developer Settings section, unlocked the traditional way — tap the version
+  number in Settings → About & Legal 7 times. Unlocked by default in debug builds, locked by
+  default in release builds. Currently holds one setting: a "Show build indicator" toggle that
+  displays a permanent DEBUG/RELEASE badge over the whole app.
+
+### Fixed
+
+- Web: the title detail drawer (and every other Radix `Dialog`/`Sheet`) still fought the
+  buttery smooth-scroll feature after the previous fix — Lenis kept driving background/gap
+  scroll while a dialog was open, so wheel input over the drawer's non-carousel areas (header,
+  hero, footer) still scrolled the page underneath instead of doing nothing. The smooth-scroll
+  hook was checking `<html data-scroll-locked>` to know when to suspend, but Radix's scroll
+  lock (`react-remove-scroll-bar`) actually sets that attribute on `<body>` — the check never
+  matched, so Lenis never stopped for any dialog. Now watches `<body>`.
+- Web: the title detail drawer's card carousels (franchise parts, episodes, cast, trailers,
+  watch providers) and season selector, along with the drawer's own body scroll, stopped
+  scrolling after the buttery smooth-scroll feature landed. The drawer is a bespoke overlay
+  rather than a Radix Dialog/Sheet, so it never got the `data-scroll-locked` suspension the
+  smooth-scroll hook relies on — Lenis kept hijacking wheel input meant for these nested
+  scroll regions and routed it to the page scroll instead. They're now marked
+  `data-lenis-prevent`, same as Radix `ScrollArea`. The Library ledger table, Discover's cast
+  row, and the Ledger/Profile stat strips had the same gap and are fixed too.
+- Android: at larger system font scales, the About screen's Source/Releases buttons could wrap
+  mid-word instead of staying on one line.
+- Android: at larger system font scales, the library grid's status badge (e.g. "Watching")
+  could wrap mid-word and overlap the FILM/SERIES label instead of staying on one line.
+- Android: on the Discover grid, the compact add button and "already in library" checkmark sat
+  in different corners and shared the same solid fill, so the two states were hard to tell apart
+  at a glance and the tap target moved when a title got added. Both now sit in the same corner,
+  with the add button solid and the owned badge a tonal (muted) fill instead.
+- Android: rotating the device or folding/unfolding while inside Settings (or anywhere else)
+  dropped straight back to the Library tab — the Activity had no `configChanges` declared, so
+  the default destroy+recreate on screen-size/orientation change wiped the in-memory tab/overlay
+  state. The app already adapts its layout live to width, so recreation was never needed.
+- Android: on narrow-width screens (e.g. a foldable's cover display, ~320dp), the Up Next "Next
+  Episode" card's season/episode and watched-count labels were two separate `Text`s sharing a
+  `Row` — too little room for both, and the pair wrapped onto an extra line instead of eliding.
+  They're now a single label ("S1 E12 · 12 / 30 episodes") that reliably truncates with an
+  ellipsis at any width.
+- Android: the Up Next "mark episode watched" button was a checkmark in a circle, the same
+  shape the app uses elsewhere (Discover's "Owned" badge, the episode-still "Watched" overlay)
+  for a passive done-state label, not a button. It's now a rounded square with press-shrink
+  feedback so it reads as tappable instead of looking like a status badge.
+- Android: the M3 Expressive segmented/connected toggle groups (used for media-type, theme-mode,
+  and library status filters) only showed a color ripple on press with no size feedback. Pressed
+  items now shrink slightly and spring back, matching the press language already used by the
+  bottom nav.
+
 ## [1.27.0] - 2026-08-09
 
 ### Added

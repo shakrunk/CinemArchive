@@ -26,7 +26,11 @@ class SupabaseRemoteMutationWriter(
         val payload = JSONObject(entry.payloadJson)
         return try {
             when (entry.entityType) {
-                "title" -> if (entry.operation == "insert") insertTitle(payload) else pushTitleUpdate(payload)
+                "title" -> when (entry.operation) {
+                    "insert" -> insertTitle(payload)
+                    "delete" -> deleteTitle(payload)
+                    else -> pushTitleUpdate(payload)
+                }
                 "episode_watch_event" -> upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
@@ -177,6 +181,18 @@ class SupabaseRemoteMutationWriter(
                 .put("status", currentRow.getString("status"))
                 .put("updatedAt", currentRow.getString("updated_at")),
         )
+    }
+
+    /** Hard-deletes a title — [LibraryRepository.removeTitle]'s remote half. `on delete
+     *  cascade` (schema.sql) takes every FK-linked child row (seasons, episodes, viewings,
+     *  cast/crew, outings) with it in the same statement, matching the local Room delete. No
+     *  conflict case to arbitrate, unlike [pushTitleUpdate]: a title already gone server-side
+     *  (deleted from another client) just means this DELETE matches zero rows — still success. */
+    private fun deleteTitle(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val id = payload.getString("id")
+        client.delete("titles", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken)
+        return PushResult.Success
     }
 
     private fun upsertWatchEvent(payload: JSONObject): PushResult {

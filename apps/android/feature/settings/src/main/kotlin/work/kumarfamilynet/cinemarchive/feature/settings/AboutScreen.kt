@@ -1,10 +1,14 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
@@ -31,6 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +60,12 @@ import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+
+// The traditional AOSP "Settings > About > Build number" unlock gesture: 7 taps within a short
+// window, with a countdown hint on the last few so it doesn't read as unresponsive.
+private const val VERSION_TAPS_TO_UNLOCK = 7
+private const val VERSION_TAP_COUNTDOWN_HINTS = 3
+private const val VERSION_TAP_TIMEOUT_MS = 1500L
 
 private data class LegalDoc(val title: String, val body: String)
 
@@ -231,11 +246,39 @@ fun AboutRoute(
     apkInstaller: ApkInstaller,
     preferencesRepository: PreferencesRepository,
     onBack: () -> Unit,
+    // False in the wide/split settings layout, where this screen sits permanently in the
+    // trailing pane rather than having been navigated to. Only applies to the top-level list —
+    // the Doc/Credits subpages below it are real in-pane navigation (List -> Doc), so they keep
+    // their own back arrow regardless.
+    showBack: Boolean = true,
 ) {
     var subpage by remember { mutableStateOf<AboutSubpage?>(null) }
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // The traditional "tap the version number" unlock (AOSP's Settings > About > Build number).
+    // Ephemeral, not persisted — a stale count surviving process death would make later taps
+    // land at unpredictable points in the sequence, so plain `remember` is correct here, unlike
+    // the unlocked/locked state itself which does need to persist (PreferencesRepository).
+    var versionTapCount by remember { mutableIntStateOf(0) }
+    var lastVersionTapAt by remember { mutableLongStateOf(0L) }
+    val onTapVersion: () -> Unit = {
+        val now = System.currentTimeMillis()
+        versionTapCount = if (now - lastVersionTapAt > VERSION_TAP_TIMEOUT_MS) 1 else versionTapCount + 1
+        lastVersionTapAt = now
+        when {
+            versionTapCount >= VERSION_TAPS_TO_UNLOCK -> {
+                versionTapCount = 0
+                scope.launch { preferencesRepository.setDevSettingsUnlocked(true) }
+                Toast.makeText(context, "Developer settings unlocked", Toast.LENGTH_SHORT).show()
+            }
+            versionTapCount >= VERSION_TAPS_TO_UNLOCK - VERSION_TAP_COUNTDOWN_HINTS -> {
+                val remaining = VERSION_TAPS_TO_UNLOCK - versionTapCount
+                Toast.makeText(context, "$remaining more taps to unlock Developer settings", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     val autoCheck by preferencesRepository.observeAutoCheckUpdates()
         .collectAsStateWithLifecycle(initialValue = true)
@@ -268,6 +311,8 @@ fun AboutRoute(
         null -> AboutListScreen(
             appVersionName = appVersionName,
             onBack = onBack,
+            showBack = showBack,
+            onTapVersion = onTapVersion,
             onOpenDoc = { subpage = AboutSubpage.Doc(it) },
             onOpenCredits = { subpage = AboutSubpage.Credits },
             onOpenSource = { uriHandler.openUri("https://github.com/shakrunk/CinemArchive") },
@@ -292,10 +337,13 @@ fun AboutRoute(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AboutListScreen(
     appVersionName: String,
     onBack: () -> Unit,
+    showBack: Boolean = true,
+    onTapVersion: () -> Unit,
     onOpenDoc: (LegalDoc) -> Unit,
     onOpenCredits: () -> Unit,
     onOpenSource: () -> Unit,
@@ -313,13 +361,22 @@ private fun AboutListScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            if (showBack) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
             }
-            Text("About & Legal", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
+            Text(
+                "About & Legal",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(start = if (showBack) 4.dp else 0.dp),
+            )
         }
 
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Row(
@@ -340,7 +397,15 @@ private fun AboutListScreen(
                                 Text("C", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 10.dp))
                             }
                         }
-                        Column(modifier = Modifier.padding(start = 14.dp)) {
+                        // pointerInput + detectTapGestures rather than .clickable: this isn't a
+                        // real button (no ripple, no click semantics) — it's a hidden gesture,
+                        // and a ripple here would be a false affordance for what looks like
+                        // static label text.
+                        Column(
+                            modifier = Modifier
+                                .padding(start = 14.dp)
+                                .pointerInput(Unit) { detectTapGestures(onTap = { onTapVersion() }) },
+                        ) {
                             Text("CinemArchive", style = MaterialTheme.typography.titleMedium)
                             Text(
                                 "Version $appVersionName",
@@ -352,12 +417,20 @@ private fun AboutListScreen(
 
                     // Buttons rather than bare tappable text: these leave the app, and
                     // plain labels gave no affordance that they were actionable at all.
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 14.dp, bottom = 18.dp)) {
-                        OutlinedButton(onClick = onOpenSource, modifier = Modifier.weight(1f)) {
+                    // FlowRow, not a weighted Row: at large font scale / narrow widths, a
+                    // forced 50/50 split leaves no room for "Releases" and Compose breaks it
+                    // mid-word. Sizing buttons to content and letting the second one wrap to
+                    // its own full-width line keeps every label on one line.
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 18.dp),
+                    ) {
+                        OutlinedButton(onClick = onOpenSource) {
                             Icon(Icons.Filled.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("Source", modifier = Modifier.padding(start = 8.dp))
                         }
-                        OutlinedButton(onClick = onOpenReleaseNotes, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(onClick = onOpenReleaseNotes) {
                             Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text("Releases", modifier = Modifier.padding(start = 8.dp))
                         }
@@ -419,7 +492,10 @@ private fun AboutDetailScreen(doc: LegalDoc, onBack: () -> Unit) {
             }
             Text(doc.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
         }
-        ReadingWidthColumn {
+        // weight(1f) + verticalScroll: without it this pane wrap-content-sizes to the text (so
+        // long legal copy can't scroll at all) and the blank area below it doesn't own touch — a
+        // drag there fell through to whatever's underneath this overlay.
+        ReadingWidthColumn(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Text(
                 doc.body,
                 style = MaterialTheme.typography.bodyMedium,
@@ -462,7 +538,10 @@ private fun CreditsScreen(onBack: () -> Unit) {
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Text(

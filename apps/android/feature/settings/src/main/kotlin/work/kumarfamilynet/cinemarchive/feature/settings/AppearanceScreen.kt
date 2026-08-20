@@ -82,7 +82,14 @@ internal fun ArchiveFontScale.label(): String = when (this) {
 }
 
 @Composable
-fun AppearanceRoute(preferencesRepository: PreferencesRepository, onBack: () -> Unit) {
+fun AppearanceRoute(
+    preferencesRepository: PreferencesRepository,
+    onBack: () -> Unit,
+    // False in the wide/split settings layout, where this screen sits permanently in the
+    // trailing pane rather than having been navigated to — a back arrow there would point at
+    // nothing to go back to.
+    showBack: Boolean = true,
+) {
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
     val palette by preferencesRepository.observePalette().collectAsStateWithLifecycle(initialValue = ArchivePalette.BRAND)
     val fontFamily by preferencesRepository.observeFontFamily().collectAsStateWithLifecycle(initialValue = ArchiveFontFamily.DEFAULT)
@@ -99,6 +106,7 @@ fun AppearanceRoute(preferencesRepository: PreferencesRepository, onBack: () -> 
         onSetFontFamily = { f -> scope.launch { preferencesRepository.setFontFamily(f) } },
         onSetFontScale = { s -> scope.launch { preferencesRepository.setFontScale(s) } },
         onBack = onBack,
+        showBack = showBack,
     )
 }
 
@@ -113,16 +121,26 @@ private fun AppearanceScreen(
     onSetFontFamily: (ArchiveFontFamily) -> Unit,
     onSetFontScale: (ArchiveFontScale) -> Unit,
     onBack: () -> Unit,
+    showBack: Boolean = true,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            if (showBack) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
             }
-            Text("Appearance", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
+            Text(
+                "Appearance",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(start = if (showBack) 4.dp else 0.dp),
+            )
         }
 
-        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp)) {
+        // weight(1f): a size-less LazyColumn wrap-content-sizes to its rows, leaving the rest of
+        // the screen a plain Column that doesn't own touch — a drag there fell through to
+        // whatever's underneath this overlay instead of being absorbed as a no-op scroll.
+        LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 28.dp), modifier = Modifier.weight(1f)) {
             item {
                 ReadingWidthColumn {
                     Text(

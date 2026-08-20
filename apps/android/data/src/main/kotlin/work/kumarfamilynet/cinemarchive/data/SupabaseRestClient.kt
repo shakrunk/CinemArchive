@@ -178,6 +178,21 @@ class SupabaseRestClient(
         return execute(request)
     }
 
+    /** DELETE with a PostgREST filter query string (e.g. `"id=eq.<id>&user_id=eq.<id>"`) —
+     *  the hard-delete mechanism [SupabaseRemoteMutationWriter] uses for entity types whose
+     *  outbox entries carry `operation = "delete"`. Server-side `on delete cascade` (schema.sql)
+     *  removes every FK-linked child row (seasons, episodes, viewings, etc.) in the same
+     *  statement, matching Room's own cascades. */
+    fun delete(table: String, filter: String, accessToken: String): String {
+        val request = Request.Builder()
+            .url("$baseUrl/rest/v1/$table?$filter")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .delete()
+            .build()
+        return execute(request)
+    }
+
     private fun execute(request: Request): String {
         httpClient.newCall(request).execute().use { response ->
             val body = response.body?.string() ?: ""

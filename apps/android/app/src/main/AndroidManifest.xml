@@ -29,9 +29,16 @@
         android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/Theme.CinemArchive.Splash">
+        <!-- Fold/unfold and rotation are handled in-place: BoxWithConstraints in
+             MainActivity already reacts to width (bottom nav <-> rail, settings stack <->
+             split pane) without needing a recreate. Without configChanges the default
+             destroy+recreate wiped tab/overlay state (both plain `remember`, not
+             `rememberSaveable`), so a fold mid-visit dropped the user straight out of
+             Settings back to the Library tab. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

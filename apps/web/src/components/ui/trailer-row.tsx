@@ -546,6 +546,7 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
           onScroll={updateStripEdges}
           className="flex gap-4 overflow-x-auto scrollbar-none pb-1"
           style={{ maskImage: stripMask, WebkitMaskImage: stripMask }}
+          data-lenis-prevent
         >
           {videos.map((v, i) => (
             <button

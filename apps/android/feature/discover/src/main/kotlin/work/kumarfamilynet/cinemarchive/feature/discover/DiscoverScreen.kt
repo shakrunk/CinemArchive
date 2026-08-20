@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -360,6 +361,11 @@ private fun DiscoverCard(
         cornerRadius = posterGridCornerRadius(columns),
         onClick = onOpen,
     ) {
+        // Both states share the same corner now — only the fill (solid vs. tonal) and icon
+        // change. A solid-vs-solid circle that swapped corners by state (#??) read as two
+        // different controls; pinning the spot and leaning on fill weight to carry the "is this
+        // actionable or already-done" distinction reads correctly even at a glance, not just on
+        // the transition between them.
         if (isAdded) {
             Box(
                 modifier = Modifier
@@ -367,13 +373,14 @@ private fun DiscoverCard(
                     .padding(8.dp)
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.35f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Filled.Check,
                     contentDescription = "Owned",
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -386,10 +393,10 @@ private fun DiscoverCard(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(24.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add ${title.title}", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Add, contentDescription = "Add ${title.title}", modifier = Modifier.size(14.dp))
                 }
             }
         }

@@ -1648,6 +1648,12 @@ create table cinema_outings (
   seat_row                text,          -- "F" (not `row` — reserved keyword)
   seats                   jsonb not null default '[]',  -- ["12", "13"]
   booking_ref             text,
+  -- Captured ticket (issue #219) — the real scannable code, decoded on-device from a photo,
+  -- distinct from booking_ref above (a manually-typed confirmation code). Format stored
+  -- alongside payload so it can be redrawn as the right symbology, not guessed as QR.
+  ticket_image_path       text,
+  ticket_barcode_payload  text,
+  ticket_barcode_format   text,
   notes                   text,
   status                  text not null default 'scheduled'
                             check (status in ('scheduled','completed','missed','cancelled')),
@@ -1993,7 +1999,9 @@ language sql security definer stable as $$
         'endsAt', co.ends_at, 'venue', co.venue, 'companions', co.companions,
         'format', co.format, 'ticketPrice', co.ticket_price, 'seat', co.seat,
         'auditorium', co.auditorium, 'seatRow', co.seat_row, 'seats', co.seats,
-        'bookingRef', co.booking_ref, 'notes', co.notes, 'status', co.status,
+        'bookingRef', co.booking_ref, 'ticketImagePath', co.ticket_image_path,
+        'ticketBarcodePayload', co.ticket_barcode_payload, 'ticketBarcodeFormat', co.ticket_barcode_format,
+        'notes', co.notes, 'status', co.status,
         'previousStatus', co.previous_status, 'completedViewingId', co.completed_viewing_id,
         'followUpDismissedAt', co.follow_up_dismissed_at, 'createdAt', co.created_at,
         'updatedAt', co.updated_at

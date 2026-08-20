@@ -22,6 +22,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingTransition
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
+import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 
 /**
  * Owns [CinemaOuting] CRUD and the local completion engine — the Android analogue of the web
@@ -350,6 +351,9 @@ class OutingsRepository(
                 put("seatRow", entity.seatRow ?: JSONObject.NULL)
                 put("seats", JSONArray(entity.seats))
                 put("bookingRef", entity.bookingRef ?: JSONObject.NULL)
+                put("ticketImagePath", entity.ticketImagePath ?: JSONObject.NULL)
+                put("ticketBarcodePayload", entity.ticketBarcodePayload ?: JSONObject.NULL)
+                put("ticketBarcodeFormat", entity.ticketBarcodeFormat ?: JSONObject.NULL)
                 put("notes", entity.notes ?: JSONObject.NULL)
                 put("status", entity.status)
                 put("previousStatus", entity.previousStatus ?: JSONObject.NULL)
@@ -378,6 +382,9 @@ internal fun CinemaOutingEntity.toDomain(): CinemaOuting = CinemaOuting(
     seatRow = seatRow,
     seats = seats,
     bookingRef = bookingRef,
+    ticketImagePath = ticketImagePath,
+    ticketBarcodePayload = ticketBarcodePayload,
+    ticketBarcodeFormat = ticketBarcodeFormat?.let { runCatching { TicketBarcodeFormat.valueOf(it) }.getOrNull() },
     notes = notes,
     status = runCatching { OutingStatus.valueOf(status) }.getOrDefault(OutingStatus.SCHEDULED),
     previousStatus = previousStatus?.let { runCatching { LibraryStatus.valueOf(it) }.getOrNull() },

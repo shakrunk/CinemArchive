@@ -23,7 +23,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CinemaOutingEntity::class,
         VenueNoteEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -89,12 +89,24 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the captured-ticket trio to `cinema_outings` (issue #219) — image path, decoded
+         *  barcode payload, and decoded barcode format, stored alongside each other per
+         *  docs/superpowers/plans/2026-08-19-android-ticket-capture.md §4. Additive ALTER
+         *  TABLEs, same real-data rationale as MIGRATION_4_5. */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN ticketImagePath TEXT")
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN ticketBarcodePayload TEXT")
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN ticketBarcodeFormat TEXT")
+            }
+        }
+
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.

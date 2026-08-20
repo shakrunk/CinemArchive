@@ -275,6 +275,9 @@ data class CinemaOutingEntity(
     val seatRow: String? = null,
     val seats: List<String> = emptyList(),
     val bookingRef: String? = null,
+    val ticketImagePath: String? = null,
+    val ticketBarcodePayload: String? = null,
+    val ticketBarcodeFormat: String? = null, // TicketBarcodeFormat.name
     val notes: String? = null,
     val status: String = "SCHEDULED", // OutingStatus.name
     val previousStatus: String? = null, // LibraryStatus.name, captured at completion

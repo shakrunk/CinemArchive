@@ -59,8 +59,10 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.designsystem.AddToListSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
+import work.kumarfamilynet.cinemarchive.core.designsystem.ListMembershipOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
@@ -77,16 +79,27 @@ import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import coil.compose.AsyncImage
 
 class TitleDetailViewModel(
     private val repository: LibraryRepository,
     private val outingsRepository: OutingsRepository,
+    private val listsRepository: ListsRepository,
     private val titleId: String,
 ) : ViewModel() {
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Every list, each flagged with whether this title is currently a member — what
+     *  [AddToListSheet] needs to render its checkbox rows. */
+    val listOptions = kotlinx.coroutines.flow.combine(
+        listsRepository.observeLists(),
+        listsRepository.observeListIdsForTitle(titleId),
+    ) { lists, memberIds ->
+        lists.map { ListMembershipOption(it.id, it.name, memberIds.contains(it.id)) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val venueSuggestions = outingsRepository.observeVenueSuggestions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -184,6 +197,22 @@ class TitleDetailViewModel(
         viewModelScope.launch { outingsRepository.saveVenueNotes(venue, notes) }
     }
 
+    /** Toggles this title's membership in one list — mirrors [AddToListSheet]'s checkbox rows
+     *  1:1, so the caller doesn't need to know current membership state itself. */
+    fun onToggleListMembership(listId: String) {
+        viewModelScope.launch {
+            val isMember = listOptions.value.find { it.listId == listId }?.isMember ?: false
+            if (isMember) listsRepository.removeTitleFromList(listId, titleId) else listsRepository.addTitleToList(listId, titleId)
+        }
+    }
+
+    fun onCreateAndAddToList(name: String) {
+        viewModelScope.launch {
+            val id = listsRepository.createList(name, description = null)
+            listsRepository.addTitleToList(id, titleId)
+        }
+    }
+
     /** "Remove from library" — a hard delete with no undo, see [LibraryRepository.removeTitle].
      *  [onRemoved] closes the detail screen once the local write lands, since [uiState] would
      *  otherwise just start emitting null for a title that no longer exists. */
@@ -195,20 +224,33 @@ class TitleDetailViewModel(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun TitleDetailRoute(
     repository: LibraryRepository,
     outingsRepository: OutingsRepository,
+    listsRepository: ListsRepository,
     titleId: String,
     onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit = {},
 ) {
     val viewModel: TitleDetailViewModel =
-        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, titleId))
+        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
     val venueSuggestions by viewModel.venueSuggestions.collectAsStateWithLifecycle()
     val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
     val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
+    val listOptions by viewModel.listOptions.collectAsStateWithLifecycle()
+    var showAddToListSheet by rememberSaveable { mutableStateOf(false) }
+    if (showAddToListSheet && detail != null) {
+        AddToListSheet(
+            titleName = detail!!.title,
+            lists = listOptions,
+            onToggle = viewModel::onToggleListMembership,
+            onCreateList = viewModel::onCreateAndAddToList,
+            onDismiss = { showAddToListSheet = false },
+        )
+    }
     TitleDetailScreen(
         detail,
         onBack,
@@ -230,6 +272,8 @@ fun TitleDetailRoute(
         venueNotes = venueNotes,
         onSaveVenueNotes = viewModel::onSaveVenueNotes,
         onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
+        listOptions = listOptions,
+        onOpenAddToList = { showAddToListSheet = true },
     )
 }
 
@@ -256,6 +300,8 @@ fun TitleDetailScreen(
     venueNotes: Map<String, String> = emptyMap(),
     onSaveVenueNotes: (String, String) -> Unit = { _, _ -> },
     onRemoveTitle: () -> Unit = {},
+    listOptions: List<ListMembershipOption> = emptyList(),
+    onOpenAddToList: () -> Unit = {},
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -341,6 +387,37 @@ fun TitleDetailScreen(
                         onSelect = onChangeStatus,
                         modifier = Modifier.padding(bottom = 20.dp),
                     )
+
+                    Text(
+                        "LISTS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 20.dp)) {
+                        val memberOf = listOptions.filter { it.isMember }
+                        if (memberOf.isEmpty()) {
+                            Text(
+                                "Not in any lists yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                                memberOf.take(3).forEach { option ->
+                                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                        Text(
+                                            option.name,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        TextButton(onClick = onOpenAddToList) { Text(if (listOptions.any { it.isMember }) "Edit" else "Add to list") }
+                    }
 
                     Text(
                         "YOUR RATING",
@@ -787,9 +864,10 @@ private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, modifier: Modi
 private class TitleDetailViewModelFactory(
     private val repository: LibraryRepository,
     private val outingsRepository: OutingsRepository,
+    private val listsRepository: ListsRepository,
     private val titleId: String,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        TitleDetailViewModel(repository, outingsRepository, titleId) as T
+        TitleDetailViewModel(repository, outingsRepository, listsRepository, titleId) as T
 }

@@ -302,6 +302,54 @@ data class VenueNoteEntity(
     val updatedAt: String,
 )
 
+/**
+ * Local mirror of `lists` (schema.sql) — a user-created custom list of titles. Private-only,
+ * no FK of its own (same as [TitleEntity] in that respect). See [ListItemEntity] for the
+ * many-to-many membership join.
+ */
+@Entity(tableName = "lists")
+data class ListEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val description: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+/**
+ * Local mirror of `list_items` (schema.sql) — the many-to-many join between [ListEntity] and
+ * [TitleEntity]. `position` is reserved for a future manual-reorder feature; v1 always writes
+ * null and the UI sorts by [addedAt] instead — see the migration's own comment for why the
+ * column ships now rather than being added later. The unique index on (listId, titleId)
+ * mirrors the server's `list_items_unique_membership` constraint.
+ */
+@Entity(
+    tableName = "list_items",
+    foreignKeys = [
+        ForeignKey(
+            entity = ListEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["listId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = TitleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["titleId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("listId"), Index("titleId"), Index(value = ["listId", "titleId"], unique = true)],
+)
+data class ListItemEntity(
+    @PrimaryKey val id: String,
+    val listId: String,
+    val titleId: String,
+    val position: Int? = null,
+    val addedAt: String,
+    val updatedAt: String,
+)
+
 class Converters {
     @TypeConverter
     fun fromGenres(value: String?): List<String> =

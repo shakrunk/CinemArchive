@@ -22,8 +22,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TitleCrewEntity::class,
         CinemaOutingEntity::class,
         VenueNoteEntity::class,
+        ListEntity::class,
+        ListItemEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -40,6 +42,8 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun titleCrewDao(): TitleCrewDao
     abstract fun cinemaOutingDao(): CinemaOutingDao
     abstract fun venueNoteDao(): VenueNoteDao
+    abstract fun listDao(): ListDao
+    abstract fun listItemDao(): ListItemDao
 
     companion object {
         /** Adds titles.releaseDate (see Entities.kt's TitleEntity kdoc). A real ALTER TABLE,
@@ -101,12 +105,29 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the Lists feature's two tables (supabase/migrations/20260821000000_lists.sql) —
+         *  a real CREATE TABLE, not destructive fallback, same rationale as every prior
+         *  migration in this file. */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `lists` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `list_items` (`id` TEXT NOT NULL, `listId` TEXT NOT NULL, `titleId` TEXT NOT NULL, `position` INTEGER, `addedAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`listId`) REFERENCES `lists`(`id`) ON DELETE CASCADE, FOREIGN KEY(`titleId`) REFERENCES `titles`(`id`) ON DELETE CASCADE)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_list_items_listId` ON `list_items` (`listId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_list_items_titleId` ON `list_items` (`titleId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_list_items_listId_titleId` ON `list_items` (`listId`, `titleId`)")
+            }
+        }
+
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.

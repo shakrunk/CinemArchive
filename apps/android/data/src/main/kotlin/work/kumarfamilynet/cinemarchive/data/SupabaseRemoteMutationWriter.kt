@@ -37,6 +37,14 @@ class SupabaseRemoteMutationWriter(
                 "episode_metadata" -> patchEpisodeMetadata(payload)
                 "viewing" -> if (entry.operation == "update") patchViewing(payload) else upsertViewing(payload)
                 "cinema_outing" -> upsertOuting(payload)
+                "list" -> when (entry.operation) {
+                    "delete" -> deleteList(payload)
+                    else -> upsertList(payload)
+                }
+                "list_item" -> when (entry.operation) {
+                    "delete" -> deleteListItem(payload)
+                    else -> upsertListItem(payload)
+                }
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
             }
         } catch (e: Exception) {
@@ -313,6 +321,48 @@ class SupabaseRemoteMutationWriter(
             .put("created_at", payload.getString("createdAt"))
             .put("updated_at", payload.getString("updatedAt"))
         client.upsert("cinema_outings", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    /** `lists`/`list_items` are always a full-row upsert, like [upsertOuting] — private-only
+     *  (no sharing yet), so no cross-writer conflict case exists here either. */
+    private fun upsertList(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val body = JSONObject()
+            .put("id", payload.getString("id"))
+            .put("user_id", session.userId)
+            .put("name", payload.getString("name"))
+            .putNullable("description", payload, "description")
+            .put("updated_at", payload.getString("updatedAt"))
+        client.upsert("lists", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    private fun deleteList(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val id = payload.getString("id")
+        client.delete("lists", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken)
+        return PushResult.Success
+    }
+
+    private fun upsertListItem(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val body = JSONObject()
+            .put("id", payload.getString("id"))
+            .put("list_id", payload.getString("listId"))
+            .put("title_id", payload.getString("titleId"))
+            .put("user_id", session.userId)
+            .putNullable("position", payload, "position")
+            .put("added_at", payload.getString("addedAt"))
+            .put("updated_at", payload.getString("updatedAt"))
+        client.upsert("list_items", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    private fun deleteListItem(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val id = payload.getString("id")
+        client.delete("list_items", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken)
         return PushResult.Success
     }
 }

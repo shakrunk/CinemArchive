@@ -2,14 +2,14 @@
 // by scripts/verify-navigation-logic.mjs. The URL is the source of truth for the
 // active view and which modal (detail drawer / add) is open.
 
-export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'profile' | 'friends'
+export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'lists' | 'profile' | 'friends'
 
-// The four destinations that appear in the customizable nav (TopBar pill nav +
+// The destinations that appear in the customizable nav (TopBar pill nav +
 // BottomNav). 'profile' and 'friends' are excluded — they're fixed account/social
 // icons, not reorderable nav tabs.
-export type NavItemId = 'discover' | 'library' | 'upnext' | 'ledger'
+export type NavItemId = 'discover' | 'library' | 'upnext' | 'ledger' | 'lists'
 
-export const DEFAULT_NAV_ORDER: NavItemId[] = ['discover', 'library', 'upnext', 'ledger']
+export const DEFAULT_NAV_ORDER: NavItemId[] = ['discover', 'library', 'upnext', 'ledger', 'lists']
 
 // Canonical labels for Settings → Navigation. TopBar/BottomNav keep their own
 // (shorter, space-constrained) copy locally rather than importing this.
@@ -18,15 +18,20 @@ export const NAV_ITEM_LABELS: Record<NavItemId, string> = {
   library: 'The Library',
   upnext: 'Up Next',
   ledger: 'The Ledger',
+  lists: 'Lists',
 }
 
 export interface NavState {
   view: AppView
   title: string | null
+  // Deep-link into a single list's detail, ?list=<id> — mirrors `title`'s pattern
+  // for the title detail drawer. Not in PRESERVED_KEYS: it should drop when
+  // navigating away from the Lists view, same as `title` does.
+  list: string | null
   add: boolean
 }
 
-const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'profile', 'friends']
+const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'lists', 'profile', 'friends']
 
 // Params that are not part of NavState but must survive every navigation write.
 // 'friend' additionally gets overridden by useNavigationSync from the live
@@ -40,7 +45,8 @@ export function parseNav(search: string, fallbackView: AppView): NavState {
   const rawView = params.get('view')
   const view = APP_VIEWS.includes(rawView as AppView) ? (rawView as AppView) : fallbackView
   const title = params.get('title')
-  return { view, title: title || null, add: params.get('add') === '1' }
+  const list = params.get('list')
+  return { view, title: title || null, list: list || null, add: params.get('add') === '1' }
 }
 
 export function preservedParams(search: string): Record<string, string> {
@@ -59,6 +65,7 @@ export function serializeNav(nav: NavState, preserved: Record<string, string>): 
   for (const key of Object.keys(preserved).sort()) params.set(key, preserved[key])
   params.set('view', nav.view)
   if (nav.title) params.set('title', nav.title)
+  if (nav.list) params.set('list', nav.list)
   if (nav.add) params.set('add', '1')
   return `?${params.toString()}`
 }

@@ -22,6 +22,7 @@ const NAV_LABELS: Record<NavItemId, string> = {
   library: 'The Library',
   upnext: 'Up Next',
   ledger: 'The Ledger',
+  lists: 'Lists',
 }
 
 export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProps) {

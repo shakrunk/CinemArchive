@@ -5,6 +5,7 @@ import type {
   CinemaOuting,
   CrewMember,
   EpisodeCrew,
+  List,
   OutingStatus,
   Title,
   Viewing,
@@ -1376,6 +1377,102 @@ export async function deleteTitlePin(
     .eq('title_id', titleId)
     .eq('easter_egg_key', easterEggKey)
   if (error) console.error('deleteTitlePin:', error)
+}
+
+// ─── Lists ────────────────────────────────────────────────────────────────
+
+function mapDbListToLocal(row: any): List {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export async function fetchLists(userId: string): Promise<List[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('lists')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  unwrap(error, 'Error fetching lists:')
+  return (data ?? []).map(mapDbListToLocal)
+}
+
+// One round trip for the whole membership graph: listId -> titleId[].
+export async function fetchListMemberships(userId: string): Promise<Record<string, string[]>> {
+  if (!supabase) return {}
+  const { data, error } = await supabase
+    .from('list_items')
+    .select('list_id, title_id')
+    .eq('user_id', userId)
+  unwrap(error, 'Error fetching list memberships:')
+  const out: Record<string, string[]> = {}
+  for (const row of data ?? []) {
+    ;(out[row.list_id] ??= []).push(row.title_id)
+  }
+  return out
+}
+
+export async function insertListToDb(userId: string, list: List): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('lists').insert({
+    id: list.id,
+    user_id: userId,
+    name: list.name,
+    description: list.description,
+    created_at: list.createdAt,
+    updated_at: list.updatedAt,
+  })
+  unwrap(error, 'Error inserting list:')
+}
+
+export async function updateListInDb(userId: string, listId: string, patch: Partial<List>): Promise<void> {
+  if (!supabase) return
+  const mappedPatch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (patch.name !== undefined) mappedPatch.name = patch.name
+  if (patch.description !== undefined) mappedPatch.description = patch.description
+  const { error } = await supabase
+    .from('lists')
+    .update(mappedPatch)
+    .eq('id', listId)
+    .eq('user_id', userId)
+  unwrap(error, 'Error updating list:')
+}
+
+export async function deleteListFromDb(userId: string, listId: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('lists').delete().eq('id', listId).eq('user_id', userId)
+  unwrap(error, 'Error deleting list:')
+}
+
+// Upsert on the unique(list_id, title_id) constraint, ignoring the conflict —
+// idempotent, matching the outbox retry-safety contract Android relies on for
+// the same table.
+export async function addTitleToListInDb(userId: string, listId: string, titleId: string): Promise<void> {
+  if (!supabase) return
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('list_items')
+    .upsert(
+      { id: crypto.randomUUID(), list_id: listId, title_id: titleId, user_id: userId, added_at: now, updated_at: now },
+      { onConflict: 'list_id,title_id', ignoreDuplicates: true }
+    )
+  unwrap(error, 'Error adding title to list:')
+}
+
+export async function removeTitleFromListInDb(userId: string, listId: string, titleId: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('list_items')
+    .delete()
+    .eq('list_id', listId)
+    .eq('title_id', titleId)
+    .eq('user_id', userId)
+  unwrap(error, 'Error removing title from list:')
 }
 
 // ─── User Prefs (account-synced Ledger board layout) ────────────────────────

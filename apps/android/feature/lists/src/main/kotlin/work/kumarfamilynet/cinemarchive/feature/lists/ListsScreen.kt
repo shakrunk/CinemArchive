@@ -120,7 +120,11 @@ fun ListsRoute(
     // Lists has no scroll-collapse signal of its own yet — the shared FAB just stays expanded.
     androidx.compose.runtime.LaunchedEffect(Unit) { onFabExpandedChange(true) }
 
-    var selectedListId by remember { mutableStateOf<String?>(null) }
+    // rememberSaveable, not remember: MainActivity tears this composable down and recreates
+    // it on every tab switch (same reason libraryViewMode is hoisted above the Library tab in
+    // MainActivity) — plain `remember` would silently drop back to the grid every time the
+    // user returns to a list they had open.
+    var selectedListId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     val selectedList = lists.find { it.id == selectedListId }
 
     if (selectedList != null) {

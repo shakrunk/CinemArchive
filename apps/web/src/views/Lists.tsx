@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ListChecks, Plus, Trash2, ArrowLeft, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { Button } from 'src/components/ui/button'
@@ -206,6 +206,13 @@ export function Lists() {
   const closeListDetail = useAppStore((s) => s.closeListDetail)
 
   const selectedList = selectedListId ? lists.find((l) => l.id === selectedListId) ?? null : null
+
+  // This view (and its list-detail sub-state) unmounts whenever currentView navigates away
+  // from 'lists' — e.g. tapping a different BottomNav tab, which doesn't go through
+  // closeListDetail(). Without this, selectedListId would linger globally and leak `?list=`
+  // into another view's URL, or silently reopen this list next time Lists remounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => closeListDetail(), [])
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10 pb-16">

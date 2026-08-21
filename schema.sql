@@ -616,6 +616,69 @@ create policy "user_title_pins: owner full access"
   with check (auth.uid() = user_id);
 
 -- ============================================================
+-- LISTS (user-created custom title lists)
+-- ============================================================
+--
+-- Private-only for v1 — owner-only RLS, no sharing. A title can belong to many lists
+-- and a list can hold many titles (many-to-many via list_items), fully additive to
+-- titles.status (the watchlist/watched/watching/dropped enum). Naming deliberately
+-- "list"/"list_items", not "collection" (already TMDB franchise grouping and
+-- in_home_collection/physical_media) and not "watchlist" (already a titles.status
+-- value).
+--
+-- list_items uses a surrogate `id uuid` primary key, not a composite key like
+-- user_title_pins, because unlike user_title_pins it must be synced: record_tombstone()
+-- needs a single old.id column, and Android's outbox contract is id-keyed upsert
+-- throughout. Duplicate membership is instead prevented by an explicit unique
+-- constraint. list_items also carries a redundant user_id (like seasons/episodes do
+-- despite their own FK chain) because record_tombstone() reads old.user_id directly.
+--
+-- list_items.position is nullable and unused in v1 (UI orders by added_at) — reserved
+-- for a future manual-reorder feature so it never needs a schema migration or forced
+-- Android resync-from-epoch later.
+
+create table lists (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  description text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index lists_user_id_idx on lists(user_id);
+
+alter table lists enable row level security;
+
+create policy "lists: owner full access"
+  on lists for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table list_items (
+  id         uuid primary key default gen_random_uuid(),
+  list_id    uuid not null references lists(id) on delete cascade,
+  title_id   uuid not null references titles(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  position   integer,                        -- reserved for a future manual-reorder
+                                              -- feature; v1 always writes null
+  added_at   timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  constraint list_items_unique_membership unique (list_id, title_id)
+);
+
+create index list_items_list_id_idx on list_items(list_id);
+create index list_items_title_id_idx on list_items(title_id);
+
+alter table list_items enable row level security;
+
+create policy "list_items: owner full access"
+  on list_items for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ============================================================
 -- API CACHE (used by media-proxy Edge Function)
 -- ============================================================
 
@@ -1863,6 +1926,8 @@ create trigger title_cast_updated_at           before update on title_cast      
 create trigger title_crew_updated_at           before update on title_crew           for each row execute function update_updated_at();
 create trigger season_cast_updated_at          before update on season_cast          for each row execute function update_updated_at();
 create trigger episode_crew_updated_at         before update on episode_crew         for each row execute function update_updated_at();
+create trigger lists_updated_at                before update on lists                for each row execute function update_updated_at();
+create trigger list_items_updated_at           before update on list_items           for each row execute function update_updated_at();
 
 -- Tombstones — deliberately NOT a foreign key on user_id (account-deletion
 -- cascade bug found during validation; see docs/android-sync-contract.md §3.3).
@@ -1901,6 +1966,8 @@ create trigger episode_reviews_tombstone      before delete on episode_reviews  
 create trigger cinema_outings_tombstone       before delete on cinema_outings       for each row execute function record_tombstone('cinema_outing');
 create trigger title_cast_tombstone           before delete on title_cast           for each row execute function record_tombstone('title_cast');
 create trigger title_crew_tombstone           before delete on title_crew           for each row execute function record_tombstone('title_crew');
+create trigger lists_tombstone                before delete on lists                for each row execute function record_tombstone('list');
+create trigger list_items_tombstone           before delete on list_items           for each row execute function record_tombstone('list_item');
 
 create or replace function sync_library_changes(p_since timestamptz, p_limit integer default 500)
 returns table (
@@ -2007,6 +2074,24 @@ language sql security definer stable as $$
         'updatedAt', co.updated_at
       )
     from cinema_outings co where co.user_id = auth.uid() and co.updated_at > p_since
+
+    union all
+
+    select 'list'::text, l.id, null::uuid, l.updated_at,
+      jsonb_build_object(
+        'id', l.id, 'name', l.name, 'description', l.description,
+        'createdAt', l.created_at, 'updatedAt', l.updated_at
+      )
+    from lists l where l.user_id = auth.uid() and l.updated_at > p_since
+
+    union all
+
+    select 'list_item'::text, li.id, li.list_id, li.updated_at,
+      jsonb_build_object(
+        'id', li.id, 'listId', li.list_id, 'titleId', li.title_id,
+        'position', li.position, 'addedAt', li.added_at, 'updatedAt', li.updated_at
+      )
+    from list_items li where li.user_id = auth.uid() and li.updated_at > p_since
 
     union all
 

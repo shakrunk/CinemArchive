@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Web & Android: added Lists — user-created custom lists for grouping titles (a marathon, a
+  ranked shortlist, anything you like). A title can belong to any number of lists, independent
+  of its watch status. Private to the owner for now; sharing lists with friends is a future
+  addition. New "Lists" tab on both clients; "Add to list" from a title's detail view.
+
 ## [1.28.0] - 2026-08-19
 
 ### Added

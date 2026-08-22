@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-08-22
+
 ### Added
 
 - Web & Android: added Lists — user-created custom lists for grouping titles (a marathon, a

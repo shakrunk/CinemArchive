@@ -100,3 +100,7 @@
 ## 2026-08-01 - Keyboard Focus Rings on Reusable Icon Buttons
 **Learning:** Found a reusable UI component (`IconBtn` in `trailer-row.tsx`) that was explicitly hiding focus rings with `focus:outline-none`, breaking keyboard accessibility for the trailer media controls. Standard practice in this app requires explicit visible focus rings for interactive elements.
 **Action:** When creating or modifying reusable button components, always ensure `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60` (or `ring-1`) is applied instead of just `focus:outline-none` so that keyboard users have visual feedback during navigation.
+
+## 2026-08-23 - [Download ICS Accessibility]
+**Learning:** Icon-with-text buttons in utility menus (like the '.ics' download button in OutingScheduleSheet) may still need aria-labels if the visible text ('Download .ics') is too brief or technical to fully explain the button's action to screen reader users (e.g., 'Download ICS file for calendar').
+**Action:** When auditing icon buttons, also review buttons with very short or technical text labels to ensure they provide sufficient context for screen reader users, adding a descriptive aria-label when necessary.

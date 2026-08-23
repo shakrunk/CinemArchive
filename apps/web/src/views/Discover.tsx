@@ -1210,8 +1210,7 @@ export function Discover() {
   useEffect(() => {
     if (searchMode !== 'titles' || selectedGenreId === null || query.trim()) return
     let cancelled = false
-    const mediaType: MediaType = filterType === 'all' ? 'movie' : filterType
-    fetchDiscover(mediaType, selectedGenreId)
+    fetchDiscover(filterType, selectedGenreId)
       .then((data) => { if (!cancelled) { setDiscoverResults(data); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
       .catch((err) => { console.error('fetchDiscover error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -1222,8 +1221,7 @@ export function Discover() {
   useEffect(() => {
     if (searchMode !== 'studios' || !selectedCompany) return
     let cancelled = false
-    const type: MediaType = filterType === 'all' ? 'movie' : filterType
-    fetchCompanyTitles(selectedCompany.id, type)
+    fetchCompanyTitles(selectedCompany.id, filterType)
       .then((data) => { if (!cancelled) { setCompanyTitles(data); setLoading(false) } })
       .catch((err) => { console.error('company titles error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }

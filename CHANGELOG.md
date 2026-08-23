@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: Discover page's Both/Movies/TV Shows type filter now actually changes the reel when a
+  genre or studio/company is selected — `fetchDiscover`/`fetchCompanyTitles` previously
+  collapsed "Both" down to movies-only before fetching (#247).
+
 ## [1.29.0] - 2026-08-22
 
 ### Added

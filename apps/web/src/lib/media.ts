@@ -613,17 +613,33 @@ export async function fetchTrending(type: MediaType | 'all', page = 1): Promise<
  * Fetch popular titles for a given media type, optionally filtered by genre.
  * Falls back to mock data in local dev.
  */
-export async function fetchDiscover(type: MediaType, genreId?: number, page = 1): Promise<SearchResult[]> {
+export async function fetchDiscover(type: MediaType | 'all', genreId?: number, page = 1): Promise<SearchResult[]> {
   if (!(isSupabaseConfigured && supabase)) {
+    if (type === 'all') return MOCK_TRENDING.slice(0, 10)
     return MOCK_TRENDING.filter((r) => r.type === type).slice(0, 10)
   }
 
-  const params = new URLSearchParams({ action: 'discover', type, page: String(page) })
-  if (genreId) params.set('genre', String(genreId))
+  const client = supabase
+  const fetchOne = async (t: MediaType): Promise<SearchResult[]> => {
+    const params = new URLSearchParams({ action: 'discover', type: t, page: String(page) })
+    if (genreId) params.set('genre', String(genreId))
+    const { data, error } = await client.functions.invoke(`media-proxy?${params.toString()}`)
+    if (error) throw error
+    return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]
+  }
 
-  const { data, error } = await supabase.functions.invoke(`media-proxy?${params.toString()}`)
-  if (error) throw error
-  return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
+  if (type === 'all') {
+    const [movies, tv] = await Promise.all([fetchOne('movie'), fetchOne('tv')])
+    const combined: SearchResult[] = []
+    const maxLen = Math.max(movies.length, tv.length)
+    for (let i = 0; i < maxLen && combined.length < 20; i++) {
+      if (i < movies.length) combined.push(movies[i])
+      if (i < tv.length) combined.push(tv[i])
+    }
+    return combined
+  }
+
+  return fetchOne(type)
 }
 
 /**
@@ -780,15 +796,30 @@ export async function searchCompanies(query: string): Promise<CompanyResult[]> {
  * Fetch popular titles from a production company using TMDB discover.
  * Note: company-based TV discover is sparse since TV is network-keyed in TMDB.
  */
-export async function fetchCompanyTitles(companyId: number, type: MediaType): Promise<SearchResult[]> {
+export async function fetchCompanyTitles(companyId: number, type: MediaType | 'all'): Promise<SearchResult[]> {
   if (!(isSupabaseConfigured && supabase)) return []
 
-  const { data, error } = await supabase.functions.invoke(
-    `media-proxy?action=discover&type=${type}&company=${companyId}`
-  )
-  if (error) throw error
+  const client = supabase
+  const fetchOne = async (t: MediaType): Promise<SearchResult[]> => {
+    const { data, error } = await client.functions.invoke(
+      `media-proxy?action=discover&type=${t}&company=${companyId}`
+    )
+    if (error) throw error
+    return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]
+  }
 
-  return (data?.results ?? []).map((i: any) => mapSearchItem(i, type)) as SearchResult[]
+  if (type === 'all') {
+    const [movies, tv] = await Promise.all([fetchOne('movie'), fetchOne('tv')])
+    const combined: SearchResult[] = []
+    const maxLen = Math.max(movies.length, tv.length)
+    for (let i = 0; i < maxLen && combined.length < 20; i++) {
+      if (i < movies.length) combined.push(movies[i])
+      if (i < tv.length) combined.push(tv[i])
+    }
+    return combined
+  }
+
+  return fetchOne(type)
 }
 
 export interface TitleImages {

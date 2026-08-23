@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type RefObject } from 'react'
 import Lenis from 'lenis'
 import 'lenis/dist/lenis.css'
 import { prefersReducedMotion } from './motion'
@@ -49,4 +49,41 @@ export function useSmoothScroll(): void {
       lenis.destroy()
     }
   }, [])
+}
+
+/**
+ * Same buttery inertia scroll as {@link useSmoothScroll}, but scoped to a single
+ * scrollable element (e.g. a modal/drawer body) instead of the page. The page-level
+ * instance already suspends itself for the whole `<html>`/`<body>` while a Radix
+ * `Dialog`/`Sheet` holds the scroll lock, so there's no double-smoothing to guard
+ * against here — this element just needs its own instance since it isn't `window`.
+ *
+ * `enabled` gates creation (e.g. only while the drawer is actually open) — pass
+ * `true` once the ref is guaranteed to be attached.
+ */
+export function useScopedSmoothScroll(ref: RefObject<HTMLElement | null>, enabled: boolean): void {
+  useEffect(() => {
+    const el = ref.current
+    if (!enabled || !el || prefersReducedMotion()) return
+
+    const lenis = new Lenis({
+      wrapper: el,
+      content: el,
+      duration: 1.1,
+      easing: (t: number) => 1 - Math.pow(1 - t, 3),
+      syncTouch: false,
+    })
+
+    let frameId: number
+    const raf = (time: number) => {
+      lenis.raf(time)
+      frameId = requestAnimationFrame(raf)
+    }
+    frameId = requestAnimationFrame(raf)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      lenis.destroy()
+    }
+  }, [ref, enabled])
 }

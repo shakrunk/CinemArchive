@@ -18,6 +18,12 @@ number is chosen.
   of its watch status. Private to the owner for now; sharing lists with friends is a future
   addition. New "Lists" tab on both clients; "Add to list" from a title's detail view.
 
+### Fixed
+
+- Web: smooth (Lenis) scrolling now works inside the title detail drawer — previously the
+  drawer's own scroll container never had a Lenis instance, so it silently fell back to plain
+  native scroll.
+
 ## [1.28.0] - 2026-08-19
 
 ### Added

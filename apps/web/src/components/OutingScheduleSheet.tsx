@@ -657,6 +657,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
         </Button>
         <button
           onClick={handleDownloadIcs}
+          aria-label="Download ICS file for calendar"
           className="flex items-center gap-1.5 text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >
           <Download className="w-3.5 h-3.5" />

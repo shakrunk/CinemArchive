@@ -65,7 +65,8 @@ export function ActivityHeatmap({
     const weeks: Array<Array<{ date: string; count: number }>> = []
     for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7))
 
-    const monthLabels: Array<{ weekIndex: number; label: string }> = []
+    // ⚡ Bolt: Use Map for O(1) label lookup during render instead of O(N*M) array find
+    const monthLabels = new Map<number, string>()
     let lastMonth = -1
     let lastLabelWeek = -Infinity
     // Collision guard: a month boundary too close to the previous label would
@@ -78,7 +79,7 @@ export function ActivityHeatmap({
         lastMonth = month
         if (wi - lastLabelWeek < minLabelGapWeeks) return
         const d = new Date(Number(week[0].date.slice(0, 4)), month - 1, 1)
-        monthLabels.push({ weekIndex: wi, label: d.toLocaleDateString('en-US', { month: 'short' }) })
+        monthLabels.set(wi, d.toLocaleDateString('en-US', { month: 'short' }))
         lastLabelWeek = wi
       }
     })
@@ -106,7 +107,7 @@ export function ActivityHeatmap({
         {/* Month labels */}
         <div className="grid gap-[clamp(1px,0.2vw,3px)] mb-1.5" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
           {weeks.map((_, wi) => {
-            const label = monthLabels.find((m) => m.weekIndex === wi)?.label
+            const label = monthLabels.get(wi)
             return (
               <div key={wi} className="min-w-0 overflow-visible">
                 {label && (

@@ -9,8 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-08-23
+
 ### Added
 
+- Web & Android: added Lists — user-created custom lists for grouping titles (a marathon, a
+  ranked shortlist, anything you like). A title can belong to any number of lists, independent
+  of its watch status. Private to the owner for now; sharing lists with friends is a future
+  addition. New "Lists" tab on both clients; "Add to list" from a title's detail view.
 - Android: ticket photo capture — pick a photo of a real cinema ticket from an outing's edit
   sheet, decode whatever barcode is printed on it (QR, CODE_128, PDF_417, and more), and show
   the actual captured ticket at the door instead of a re-encoded QR of the booking reference
@@ -26,24 +32,12 @@ number is chosen.
 
 ### Fixed
 
-- Web: Discover page's Both/Movies/TV Shows type filter now actually changes the reel when a
-  genre or studio/company is selected — `fetchDiscover`/`fetchCompanyTitles` previously
-  collapsed "Both" down to movies-only before fetching (#247).
-
-## [1.29.0] - 2026-08-22
-
-### Added
-
-- Web & Android: added Lists — user-created custom lists for grouping titles (a marathon, a
-  ranked shortlist, anything you like). A title can belong to any number of lists, independent
-  of its watch status. Private to the owner for now; sharing lists with friends is a future
-  addition. New "Lists" tab on both clients; "Add to list" from a title's detail view.
-
-### Fixed
-
 - Web: smooth (Lenis) scrolling now works inside the title detail drawer — previously the
   drawer's own scroll container never had a Lenis instance, so it silently fell back to plain
   native scroll.
+- Web: Discover page's Both/Movies/TV Shows type filter now actually changes the reel when a
+  genre or studio/company is selected — `fetchDiscover`/`fetchCompanyTitles` previously
+  collapsed "Both" down to movies-only before fetching (#247).
 
 ## [1.28.0] - 2026-08-19
 

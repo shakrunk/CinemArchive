@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: the Discover page's "Because You Watched" and "More Starring" reels now respect the
+  Both/Movies/TV Shows type filter — both were previously unfiltered by type (#247).
+
 ## [1.29.0] - 2026-08-23
 
 ### Added

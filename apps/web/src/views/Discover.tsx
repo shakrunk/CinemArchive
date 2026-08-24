@@ -1443,15 +1443,23 @@ export function Discover() {
   }, [becauseWatchedTitle, libraryTmdbIds])
 
   // Hide stale results whenever the current basis isn't the loaded one (or can't
-  // be seeded at all) — mirrors visibleMoreStarringResults below.
-  const visibleBecauseWatchedResults =
-    becauseWatchedSeedable && becauseWatchedId === loadedBecauseWatchedId ? becauseWatchedResults : []
+  // be seeded at all) — mirrors visibleMoreStarringResults below. Filtered by
+  // filterType client-side (like personCredits above) since fetchRecommendations
+  // is keyed to the seed title's own type, not the active type filter.
+  const visibleBecauseWatchedResults = useMemo(() => {
+    if (!(becauseWatchedSeedable && becauseWatchedId === loadedBecauseWatchedId)) return []
+    return filterType === 'all' ? becauseWatchedResults : becauseWatchedResults.filter((r) => r.type === filterType)
+  }, [becauseWatchedSeedable, becauseWatchedId, loadedBecauseWatchedId, becauseWatchedResults, filterType])
 
   const becauseWatchedDelays = useMemo(() => staggerDelays(visibleBecauseWatchedResults.length), [visibleBecauseWatchedResults.length])
 
   // Hide stale results the moment the basis reverts to no selection (e.g. an empty library)
-  // rather than clearing them from an effect.
-  const visibleMoreStarringResults = moreStarringPersonId === null ? [] : moreStarringResults
+  // rather than clearing them from an effect. Filtered by filterType client-side — same
+  // reasoning as visibleBecauseWatchedResults above.
+  const visibleMoreStarringResults = useMemo(() => {
+    if (moreStarringPersonId === null) return []
+    return filterType === 'all' ? moreStarringResults : moreStarringResults.filter((r) => r.type === filterType)
+  }, [moreStarringPersonId, moreStarringResults, filterType])
 
   const moreStarringDelays = useMemo(() => staggerDelays(visibleMoreStarringResults.length), [visibleMoreStarringResults.length])
 

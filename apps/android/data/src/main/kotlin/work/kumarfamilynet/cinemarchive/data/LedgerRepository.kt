@@ -28,6 +28,7 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.LedgerBoard
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerEncoreEntry
+import work.kumarfamilynet.cinemarchive.core.model.LedgerMilestoneBadge
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMonthlyCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
@@ -53,6 +54,10 @@ private val ISO_LANGUAGE_NAMES = mapOf(
     "hi" to "Hindi", "pt" to "Portuguese", "ru" to "Russian", "sv" to "Swedish",
     "da" to "Danish", "no" to "Norwegian", "fi" to "Finnish", "nl" to "Dutch",
 )
+
+/** Venue visit-count thresholds a milestone badge celebrates (issue #217) — ascending, so the
+ *  highest one reached wins. */
+private val VENUE_VISIT_MILESTONES = listOf(5, 10, 25, 50, 100)
 
 /** All bundle of a title's DAO reads the widgets below need together — kept private since
  *  it's purely an intermediate combine() shape, not part of the repository's public API. */
@@ -546,7 +551,25 @@ class LedgerRepository(
             venueSpend = venueSpend,
             formatSpend = formatSpend,
             bestValueVenue = venueSpend.filter { it.tripCount >= 2 }.minByOrNull { it.perTrip },
+            milestoneBadges = milestoneBadges(trips, joinedOutings),
         )
+    }
+
+    /** Milestone badges (issue #217): the highest venue visit-count milestone reached per
+     *  venue, plus one "first outing" badge per format ever used. Simple recognition over the
+     *  data already tracked — no separate points/leveling system, per the issue's own
+     *  rationale for keeping this lightweight. */
+    private fun milestoneBadges(trips: List<ViewingEntity>, joinedOutings: List<CinemaOutingEntity>): List<LedgerMilestoneBadge> {
+        val venueBadges = trips.mapNotNull { it.venue }
+            .groupingBy { it }.eachCount()
+            .mapNotNull { (venue, count) ->
+                val milestone = VENUE_VISIT_MILESTONES.lastOrNull { it <= count } ?: return@mapNotNull null
+                LedgerMilestoneBadge(title = venue, detail = "$milestone visits")
+            }
+        val formatBadges = joinedOutings.mapNotNull { it.format }
+            .distinct()
+            .map { format -> LedgerMilestoneBadge(title = format, detail = "First outing") }
+        return venueBadges + formatBadges
     }
 
     /** Total ticket spend grouped by [label] (venue or format), descending — priced outings

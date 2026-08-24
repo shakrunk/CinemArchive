@@ -32,6 +32,7 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
+import work.kumarfamilynet.cinemarchive.core.model.LedgerMilestoneBadge
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
 import work.kumarfamilynet.cinemarchive.core.model.LedgerSpendBreakdown
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
@@ -470,6 +471,45 @@ class LedgerRepositoryTest {
             setOf("Bargain Cinema" to 18.00, "Luxury Screens" to 40.00),
             moviegoing.venueSpend.map { it.label to it.totalSpend }.toSet(),
         )
+    }
+
+    @Test
+    fun `At the Movies milestone badges award the highest venue threshold reached and one first-outing badge per format`() = runTest {
+        val outings = (1..5).map { n ->
+            CinemaOutingEntity(
+                id = "regular-$n", titleId = LedgerFixture.INCEPTION_ID, showtime = "2026-0$n-01T19:00:00Z",
+                runtimeMinutes = 100, endsAt = "2026-0$n-01T20:40:00Z", venue = "Regular Spot",
+                format = "STANDARD", ticketPrice = null, status = "COMPLETED",
+                createdAt = "2026-0$n-01T00:00:00Z", updatedAt = "2026-0$n-01T20:40:00Z",
+            )
+        }
+        val imaxOuting = CinemaOutingEntity(
+            id = "imax-1", titleId = LedgerFixture.INCEPTION_ID, showtime = "2026-06-01T19:00:00Z",
+            runtimeMinutes = 100, endsAt = "2026-06-01T20:40:00Z", venue = "Regular Spot",
+            format = "IMAX", ticketPrice = null, status = "COMPLETED",
+            createdAt = "2026-06-01T00:00:00Z", updatedAt = "2026-06-01T20:40:00Z",
+        )
+        val viewings = outings.map { outing ->
+            ViewingEntity(id = "v-${outing.id}", titleId = LedgerFixture.INCEPTION_ID, date = outing.showtime.take(10), rating = null, notes = null, venue = outing.venue, outingId = outing.id)
+        } + ViewingEntity(id = "v-imax-1", titleId = LedgerFixture.INCEPTION_ID, date = "2026-06-01", rating = null, notes = null, venue = "Regular Spot", outingId = "imax-1")
+        val repository = LedgerRepository(
+            titleDao = FakeTitleDao(LedgerFixture.titles),
+            viewingDao = FakeViewingDao(viewings),
+            titleCastDao = FakeTitleCastDao(LedgerFixture.cast),
+            titleCrewDao = FakeTitleCrewDao(LedgerFixture.crew),
+            cinemaOutingDao = FakeCinemaOutingDao(outings + imaxOuting),
+            watchEventDao = FakeEpisodeWatchEventDao(emptyList()),
+            seasonDao = FakeSeasonDao(LedgerFixture.seasons),
+            episodeDao = FakeEpisodeDao(LedgerFixture.episodes),
+        )
+
+        val badges = repository.observeLedgerBoard().first().moviegoing.milestoneBadges
+
+        // 6 total visits to "Regular Spot" clears the 5-visit milestone but not 10.
+        assertTrue(badges.contains(LedgerMilestoneBadge("Regular Spot", "5 visits")))
+        assertTrue(badges.none { it.title == "Regular Spot" && it.detail == "10 visits" })
+        assertTrue(badges.contains(LedgerMilestoneBadge("STANDARD", "First outing")))
+        assertTrue(badges.contains(LedgerMilestoneBadge("IMAX", "First outing")))
     }
 
     // --- Time-relative widgets: pinned against synthetic dates computed from LocalDate.now()

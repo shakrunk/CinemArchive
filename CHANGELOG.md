@@ -20,6 +20,9 @@ number is chosen.
   yet, its Up Next watchlist card turns into a prompt to schedule one (#205).
 - Android: an "on this day" memory-lane card on Up Next, surfacing a past cinema outing (venue,
   companions, rating, notes) that happened on today's month/day in a prior year (#218).
+- Android: moviegoing milestone badges in the Ledger's "At the Movies" panel — a venue
+  visit-count milestone (5/10/25/50/100 visits) and a "first outing" badge per cinema format
+  ever used (#217).
 
 ### Fixed
 

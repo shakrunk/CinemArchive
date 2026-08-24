@@ -45,6 +45,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.LedgerTrackInset
 import work.kumarfamilynet.cinemarchive.core.designsystem.RadialSpokePlot
 import work.kumarfamilynet.cinemarchive.core.designsystem.TicketStub
 import work.kumarfamilynet.cinemarchive.core.model.LedgerCategoryCount
+import work.kumarfamilynet.cinemarchive.core.model.LedgerMilestoneBadge
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.LedgerSpendBreakdown
 import work.kumarfamilynet.cinemarchive.core.model.LedgerStreaks
@@ -664,14 +665,17 @@ internal fun ColumnScope.MoviegoingPanel(
         "In good company" to stats.companions,
         "Formats" to stats.formats,
     ).filter { (_, entries) -> entries.isNotEmpty() }
-    if (facets.isNotEmpty() || stats.formatSpend.isNotEmpty() || stats.venueSpend.isNotEmpty()) {
-        PanelDetail(disclosure, "Show every venue, companion, format and cost breakdown") {
+    if (facets.isNotEmpty() || stats.formatSpend.isNotEmpty() || stats.venueSpend.isNotEmpty() || stats.milestoneBadges.isNotEmpty()) {
+        PanelDetail(disclosure, "Show every venue, companion, format, cost breakdown and milestone") {
             facets.forEach { (heading, entries) -> FacetLedger(heading, entries) }
             if (stats.formatSpend.isNotEmpty()) {
                 SpendLedger("Cost per outing by format", stats.formatSpend) { it.perTrip }
             }
             if (stats.venueSpend.isNotEmpty()) {
                 SpendLedger("Spend by venue", stats.venueSpend) { it.totalSpend }
+            }
+            if (stats.milestoneBadges.isNotEmpty()) {
+                MilestoneLedger(stats.milestoneBadges)
             }
         }
     }
@@ -793,6 +797,12 @@ private fun FacetLedger(heading: String, entries: List<LedgerCategoryCount>) =
 @Composable
 private fun SpendLedger(heading: String, entries: List<LedgerSpendBreakdown>, amount: (LedgerSpendBreakdown) -> Double) =
     ReceiptLedger(heading, entries.map { it.label to "$%,.2f".format(amount(it)) })
+
+/** Milestone badges (#217) — venue visit-count milestones and format "firsts", same receipt
+ *  row language as every other breakdown on this panel rather than a separate badge widget. */
+@Composable
+private fun MilestoneLedger(badges: List<LedgerMilestoneBadge>) =
+    ReceiptLedger("Milestones", badges.map { it.title to it.detail })
 
 // ---------------------------------------------------------------------------------------
 // Screening Nights — the week as a dial

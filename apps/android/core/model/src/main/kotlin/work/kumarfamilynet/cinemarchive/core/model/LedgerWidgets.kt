@@ -52,6 +52,11 @@ data class LedgerSpendBreakdown(val label: String, val totalSpend: Double, val t
     val perTrip: Double get() = totalSpend / tripCount
 }
 
+/** A lightweight moviegoing milestone (issue #217) — "first IMAX outing", "25 visits to AMC
+ *  Georgetown". [title] is the format or venue name; [detail] is the human-readable milestone
+ *  itself, already formatted (no separate numeric field to re-derive text from). */
+data class LedgerMilestoneBadge(val title: String, val detail: String)
+
 /**
  * The "At the Movies" widget. [totalSpend], [formats], [venueSpend], [formatSpend], and
  * [bestValueVenue] are the owner-private fields (ledger.md §3 — sourced from
@@ -74,4 +79,7 @@ data class LedgerMoviegoingStats(
      *  (a single trip can't establish a venue's typical value). Null with fewer than two such
      *  venues. */
     val bestValueVenue: LedgerSpendBreakdown? = null,
+    /** Milestone badges (issue #217) — a format's first outing, and venue visit-count
+     *  milestones. Unordered by significance; the UI sorts for display. */
+    val milestoneBadges: List<LedgerMilestoneBadge> = emptyList(),
 )

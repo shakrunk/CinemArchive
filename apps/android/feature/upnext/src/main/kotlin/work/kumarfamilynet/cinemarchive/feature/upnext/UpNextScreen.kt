@@ -77,6 +77,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
+import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.seating
 import work.kumarfamilynet.cinemarchive.core.model.UpNextBoard
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
@@ -593,6 +594,11 @@ private fun formatReleaseDate(iso: String): String =
 private fun WatchlistCard(title: LibraryTitle, shape: Shape, onOpen: () -> Unit) {
     val releaseDate = title.releaseDate
     val isUpcoming = releaseDate != null && runCatching { LocalDate.parse(releaseDate) > LocalDate.now() }.getOrDefault(false)
+    // "I want to see this in theaters" (issue #205) flips the plain watchlist line into a
+    // prompt once the release date has passed — the theatrical window this title was flagged
+    // for is now open, and there's no outing booked yet (a scheduled title never reaches this
+    // list at all — see CinemaOutingRules.titleIdsWithScheduledOuting).
+    val readyToSchedule = title.interestedInTheaters && title.type == MediaType.MOVIE && !isUpcoming
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -613,9 +619,13 @@ private fun WatchlistCard(title: LibraryTitle, shape: Shape, onOpen: () -> Unit)
         Column {
             Text(title.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                if (isUpcoming) "Releases ${formatReleaseDate(releaseDate!!)}" else "On your watchlist",
+                when {
+                    isUpcoming -> "Releases ${formatReleaseDate(releaseDate!!)}"
+                    readyToSchedule -> "Now playing — tap to schedule an outing"
+                    else -> "On your watchlist"
+                },
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (readyToSchedule) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

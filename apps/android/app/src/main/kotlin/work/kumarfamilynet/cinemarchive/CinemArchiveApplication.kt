@@ -116,6 +116,7 @@ class CinemArchiveApplication : Application() {
             cinemaOutingDao = database.cinemaOutingDao(),
             titleCastDao = database.titleCastDao(),
             titleCrewDao = database.titleCrewDao(),
+            theaterInterestDao = database.theaterInterestDao(),
             outbox = outbox,
             episodeMetadataFetcher = discoverRepository,
         )

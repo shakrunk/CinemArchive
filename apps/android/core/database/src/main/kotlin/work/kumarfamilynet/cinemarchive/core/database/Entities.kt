@@ -303,6 +303,21 @@ data class VenueNoteEntity(
 )
 
 /**
+ * "I want to see this in theaters" (issue #205) — a lighter-weight flag than scheduling an
+ * outing, for a title whose theatrical release hasn't opened yet (or has, but no showtime is
+ * picked). Deliberately not [work.kumarfamilynet.cinemarchive.core.model.OutingStatus]: that
+ * models a booked trip, and conflating "definitely going" with "want to go" would give the two
+ * the same UI treatment when they need different ones (no countdown chip makes sense for a
+ * flag with no showtime). Local-only, same as [VenueNoteEntity] — no `theater_interest` table
+ * on the server yet, so this doesn't round-trip through sync.
+ */
+@Entity(tableName = "theater_interest")
+data class TheaterInterestEntity(
+    @PrimaryKey val titleId: String,
+    val createdAt: String,
+)
+
+/**
  * Local mirror of `lists` (schema.sql) — a user-created custom list of titles. Private-only,
  * no FK of its own (same as [TitleEntity] in that respect). See [ListItemEntity] for the
  * many-to-many membership join.

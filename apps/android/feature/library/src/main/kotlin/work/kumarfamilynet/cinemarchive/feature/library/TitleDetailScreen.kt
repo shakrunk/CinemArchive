@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.LocalMovies
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -76,6 +77,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
+import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
@@ -138,6 +140,11 @@ class TitleDetailViewModel(
         viewModelScope.launch { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
     }
 
+    /** "I want to see this in theaters" (GitHub #205). */
+    fun onToggleTheaterInterest(interested: Boolean) {
+        viewModelScope.launch { repository.setTheaterInterest(titleId, interested) }
+    }
+
     fun onRateTitle(rating: Double) {
         viewModelScope.launch { repository.updateTitleRating(titleId, rating, Instant.now().toString()) }
     }
@@ -179,6 +186,15 @@ class TitleDetailViewModel(
 
     fun onCancelOuting(outingId: String) {
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
+    }
+
+    /** Persists a ticket photo picked+decoded by [OutingScheduleSheet] (GitHub #219). */
+    fun onCaptureTicket(outingId: String, imagePath: String, barcodePayload: String?, barcodeFormat: TicketBarcodeFormat?) {
+        viewModelScope.launch { outingsRepository.saveTicketCapture(outingId, imagePath, barcodePayload, barcodeFormat) }
+    }
+
+    fun onClearTicketCapture(outingId: String) {
+        viewModelScope.launch { outingsRepository.clearTicketCapture(outingId) }
     }
 
     fun onRatePostShow(viewingId: String, rating: Double) {
@@ -259,10 +275,13 @@ fun TitleDetailRoute(
         onSubmitReview = viewModel::onSubmitReview,
         onLogViewing = viewModel::onLogViewing,
         onChangeStatus = viewModel::onChangeStatus,
+        onToggleTheaterInterest = viewModel::onToggleTheaterInterest,
         onRateTitle = viewModel::onRateTitle,
         onScheduleOuting = viewModel::onScheduleOuting,
         onEditOuting = viewModel::onEditOuting,
         onCancelOuting = viewModel::onCancelOuting,
+        onCaptureTicket = viewModel::onCaptureTicket,
+        onClearTicketCapture = viewModel::onClearTicketCapture,
         onRatePostShow = viewModel::onRatePostShow,
         onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
         onDidntMakeIt = viewModel::onDidntMakeIt,
@@ -287,10 +306,13 @@ fun TitleDetailScreen(
     onSubmitReview: (String, String) -> Unit = { _, _ -> },
     onLogViewing: () -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
+    onToggleTheaterInterest: (Boolean) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
     onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onCancelOuting: (String) -> Unit = {},
+    onCaptureTicket: (String, String, String?, TicketBarcodeFormat?) -> Unit = { _, _, _, _ -> },
+    onClearTicketCapture: (String) -> Unit = {},
     onRatePostShow: (String, Double) -> Unit = { _, _ -> },
     onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
     onDidntMakeIt: (String) -> Unit = {},
@@ -354,6 +376,16 @@ fun TitleDetailScreen(
                                 modifier = Modifier.padding(start = 6.dp),
                             )
                         }
+                        // Lighter-weight than scheduling an outing (GitHub #205) — flags intent
+                        // to catch this one in a theater before a showtime is even picked. Up
+                        // Next surfaces a prompt for this once the release date passes.
+                        FilterChip(
+                            selected = detail.interestedInTheaters,
+                            onClick = { onToggleTheaterInterest(!detail.interestedInTheaters) },
+                            label = { Text(if (detail.interestedInTheaters) "Want to see in theaters" else "Want to see in theaters?") },
+                            leadingIcon = { Icon(Icons.Filled.LocalMovies, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
                     }
 
                     if (detail.genres.isNotEmpty()) {
@@ -575,6 +607,8 @@ fun TitleDetailScreen(
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
             onSaveVenueNotes = onSaveVenueNotes,
+            onCaptureTicket = onCaptureTicket,
+            onClearTicketCapture = onClearTicketCapture,
         )
     }
 

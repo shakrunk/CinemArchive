@@ -21,6 +21,8 @@ import work.kumarfamilynet.cinemarchive.core.database.OutboxDao
 import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TheaterInterestDao
+import work.kumarfamilynet.cinemarchive.core.database.TheaterInterestEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
@@ -55,6 +57,7 @@ class LibraryRepositoryRemoveTitleTest {
         cinemaOutingDao = NoOutingsDaoRm,
         titleCastDao = NoCastDao,
         titleCrewDao = NoCrewDao,
+        theaterInterestDao = NoTheaterInterestDaoRm,
         outbox = MutationOutbox(outboxDao, NoopWriterRm, NoopConflictHandlerRm),
         episodeMetadataFetcher = NoEpisodeMetadataFetcher2,
     )
@@ -189,6 +192,13 @@ private object NoCrewDao : TitleCrewDao {
     override fun observeAllCrew(): Flow<List<TitleCrewEntity>> = throw UnsupportedOperationException()
     override suspend fun upsertAll(rows: List<TitleCrewEntity>) = throw UnsupportedOperationException()
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
+}
+
+private object NoTheaterInterestDaoRm : TheaterInterestDao {
+    override fun observeAll(): Flow<List<TheaterInterestEntity>> = throw UnsupportedOperationException()
+    override fun observeIsInterested(titleId: String): Flow<Boolean> = throw UnsupportedOperationException()
+    override suspend fun upsert(row: TheaterInterestEntity) = throw UnsupportedOperationException()
+    override suspend fun deleteByTitleId(titleId: String) = throw UnsupportedOperationException()
 }
 
 private object NoEpisodeMetadataFetcher2 : EpisodeMetadataFetcher {

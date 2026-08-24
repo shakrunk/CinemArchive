@@ -24,6 +24,10 @@ data class LibraryTitle(
      *  `TitleDao.observeLastInteractions` for how it's rolled up and why it's a comparable
      *  string. Null when nothing about the title carries a usable timestamp. */
     val lastInteractionAt: String? = null,
+    /** "I want to see this in theaters" (issue #205) — set from the title detail screen,
+     *  independent of [status]/[hasScheduledOuting]. Drives the Up Next watchlist card's
+     *  prompt to schedule an outing once [releaseDate] has passed with no outing booked yet. */
+    val interestedInTheaters: Boolean = false,
 )
 
 enum class LibraryStatus {

@@ -24,8 +24,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         VenueNoteEntity::class,
         ListEntity::class,
         ListItemEntity::class,
+        TheaterInterestEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -44,6 +45,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun venueNoteDao(): VenueNoteDao
     abstract fun listDao(): ListDao
     abstract fun listItemDao(): ListItemDao
+    abstract fun theaterInterestDao(): TheaterInterestDao
 
     companion object {
         /** Adds titles.releaseDate (see Entities.kt's TitleEntity kdoc). A real ALTER TABLE,
@@ -122,12 +124,22 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the `theater_interest` table (issue #205) — see [TheaterInterestEntity]'s
+         *  kdoc. New table, same additive-migration rationale as MIGRATION_4_5. */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `theater_interest` (`titleId` TEXT NOT NULL, `createdAt` TEXT NOT NULL, PRIMARY KEY(`titleId`))",
+                )
+            }
+        }
+
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.

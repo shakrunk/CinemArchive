@@ -335,6 +335,21 @@ interface VenueNoteDao {
 }
 
 @Dao
+interface TheaterInterestDao {
+    @Query("SELECT * FROM theater_interest")
+    fun observeAll(): Flow<List<TheaterInterestEntity>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM theater_interest WHERE titleId = :titleId)")
+    fun observeIsInterested(titleId: String): Flow<Boolean>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: TheaterInterestEntity)
+
+    @Query("DELETE FROM theater_interest WHERE titleId = :titleId")
+    suspend fun deleteByTitleId(titleId: String)
+}
+
+@Dao
 interface ListDao {
     @Query("SELECT * FROM lists ORDER BY createdAt DESC")
     fun observeAllLists(): Flow<List<ListEntity>>

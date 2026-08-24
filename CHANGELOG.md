@@ -15,6 +15,9 @@ number is chosen.
   sheet, decode whatever barcode is printed on it (QR, CODE_128, PDF_417, and more), and show
   the actual captured ticket at the door instead of a re-encoded QR of the booking reference
   (which isn't guaranteed to be scannable for a non-QR ticket) (#219).
+- Android: a "want to see in theaters" flag on movie title details — a lighter-weight signal
+  than scheduling an outing. Once a flagged movie's release date passes with no outing booked
+  yet, its Up Next watchlist card turns into a prompt to schedule one (#205).
 
 ### Fixed
 

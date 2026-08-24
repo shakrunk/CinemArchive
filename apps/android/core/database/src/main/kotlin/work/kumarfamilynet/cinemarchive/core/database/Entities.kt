@@ -275,6 +275,9 @@ data class CinemaOutingEntity(
     val seatRow: String? = null,
     val seats: List<String> = emptyList(),
     val bookingRef: String? = null,
+    val ticketImagePath: String? = null,
+    val ticketBarcodePayload: String? = null,
+    val ticketBarcodeFormat: String? = null, // TicketBarcodeFormat.name
     val notes: String? = null,
     val status: String = "SCHEDULED", // OutingStatus.name
     val previousStatus: String? = null, // LibraryStatus.name, captured at completion
@@ -296,6 +299,69 @@ data class CinemaOutingEntity(
 data class VenueNoteEntity(
     @PrimaryKey val venue: String,
     val notes: String,
+    val updatedAt: String,
+)
+
+/**
+ * "I want to see this in theaters" (issue #205) — a lighter-weight flag than scheduling an
+ * outing, for a title whose theatrical release hasn't opened yet (or has, but no showtime is
+ * picked). Deliberately not [work.kumarfamilynet.cinemarchive.core.model.OutingStatus]: that
+ * models a booked trip, and conflating "definitely going" with "want to go" would give the two
+ * the same UI treatment when they need different ones (no countdown chip makes sense for a
+ * flag with no showtime). Local-only, same as [VenueNoteEntity] — no `theater_interest` table
+ * on the server yet, so this doesn't round-trip through sync.
+ */
+@Entity(tableName = "theater_interest")
+data class TheaterInterestEntity(
+    @PrimaryKey val titleId: String,
+    val createdAt: String,
+)
+
+/**
+ * Local mirror of `lists` (schema.sql) — a user-created custom list of titles. Private-only,
+ * no FK of its own (same as [TitleEntity] in that respect). See [ListItemEntity] for the
+ * many-to-many membership join.
+ */
+@Entity(tableName = "lists")
+data class ListEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val description: String? = null,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+/**
+ * Local mirror of `list_items` (schema.sql) — the many-to-many join between [ListEntity] and
+ * [TitleEntity]. `position` is reserved for a future manual-reorder feature; v1 always writes
+ * null and the UI sorts by [addedAt] instead — see the migration's own comment for why the
+ * column ships now rather than being added later. The unique index on (listId, titleId)
+ * mirrors the server's `list_items_unique_membership` constraint.
+ */
+@Entity(
+    tableName = "list_items",
+    foreignKeys = [
+        ForeignKey(
+            entity = ListEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["listId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = TitleEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["titleId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("listId"), Index("titleId"), Index(value = ["listId", "titleId"], unique = true)],
+)
+data class ListItemEntity(
+    @PrimaryKey val id: String,
+    val listId: String,
+    val titleId: String,
+    val position: Int? = null,
+    val addedAt: String,
     val updatedAt: String,
 )
 

@@ -22,8 +22,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TitleCrewEntity::class,
         CinemaOutingEntity::class,
         VenueNoteEntity::class,
+        ListEntity::class,
+        ListItemEntity::class,
+        TheaterInterestEntity::class,
     ],
-    version = 8,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -40,6 +43,9 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun titleCrewDao(): TitleCrewDao
     abstract fun cinemaOutingDao(): CinemaOutingDao
     abstract fun venueNoteDao(): VenueNoteDao
+    abstract fun listDao(): ListDao
+    abstract fun listItemDao(): ListItemDao
+    abstract fun theaterInterestDao(): TheaterInterestDao
 
     companion object {
         /** Adds titles.releaseDate (see Entities.kt's TitleEntity kdoc). A real ALTER TABLE,
@@ -89,12 +95,51 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the captured-ticket trio to `cinema_outings` (issue #219) — image path, decoded
+         *  barcode payload, and decoded barcode format, stored alongside each other per
+         *  docs/superpowers/plans/2026-08-19-android-ticket-capture.md §4. Additive ALTER
+         *  TABLEs, same real-data rationale as MIGRATION_4_5. */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN ticketImagePath TEXT")
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN ticketBarcodePayload TEXT")
+                db.execSQL("ALTER TABLE cinema_outings ADD COLUMN ticketBarcodeFormat TEXT")
+            }
+        }
+
+        /** Adds the Lists feature's two tables (supabase/migrations/20260821000000_lists.sql) —
+         *  a real CREATE TABLE, not destructive fallback, same rationale as every prior
+         *  migration in this file. */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `lists` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `description` TEXT, `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `list_items` (`id` TEXT NOT NULL, `listId` TEXT NOT NULL, `titleId` TEXT NOT NULL, `position` INTEGER, `addedAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`listId`) REFERENCES `lists`(`id`) ON DELETE CASCADE, FOREIGN KEY(`titleId`) REFERENCES `titles`(`id`) ON DELETE CASCADE)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_list_items_listId` ON `list_items` (`listId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_list_items_titleId` ON `list_items` (`titleId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_list_items_listId_titleId` ON `list_items` (`listId`, `titleId`)")
+            }
+        }
+
+        /** Adds the `theater_interest` table (issue #205) — see [TheaterInterestEntity]'s
+         *  kdoc. New table, same additive-migration rationale as MIGRATION_4_5. */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `theater_interest` (`titleId` TEXT NOT NULL, `createdAt` TEXT NOT NULL, PRIMARY KEY(`titleId`))",
+                )
+            }
+        }
+
         fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
             "cinemarchive.db",
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.

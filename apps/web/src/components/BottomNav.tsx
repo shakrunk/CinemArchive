@@ -16,6 +16,7 @@ const NAV_LABELS: Record<NavItemId, string> = {
   library: 'Library',
   upnext: 'Up Next',
   ledger: 'Ledger',
+  lists: 'Lists',
 }
 
 function NavTab({

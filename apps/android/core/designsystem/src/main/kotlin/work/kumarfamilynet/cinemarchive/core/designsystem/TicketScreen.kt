@@ -40,15 +40,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import java.io.File
 import java.time.Instant
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.seating
@@ -70,11 +73,13 @@ import work.kumarfamilynet.cinemarchive.core.model.seating
  * wrong. The mode starts on whichever matches the clock and is switchable by hand, since
  * "I got waved through without scanning" and "I need to show it again" both happen.
  *
- * Reuses existing [CinemaOuting] fields: the structured auditorium/row/seats trio for the
- * seat block, [CinemaOuting.bookingRef] for the code. Note that `bookingRef` is a *booking
- * confirmation code*, not the vendor's scannable barcode payload — a QR of it will not
- * necessarily open a turnstile. Capturing the real ticket is GitHub #219, and this screen is
- * where it will render once that lands.
+ * Reuses existing [CinemaOuting] fields: the structured auditorium/row/seats trio for the seat
+ * block. For the code, [CinemaOuting.ticketImagePath] (a captured photo of the real ticket —
+ * GitHub #219) is preferred when present, since re-encoding [CinemaOuting.bookingRef] as a QR
+ * is not guaranteed to be scannable — `bookingRef` is a *booking confirmation code*, not
+ * necessarily the vendor's actual barcode payload, and even when it is, a non-QR symbology
+ * (e.g. `CODE_128`) re-drawn as a QR produces a code no turnstile scanner will read. The
+ * bookingRef-as-QR fallback only applies once nothing has been captured.
  */
 @Composable
 fun TicketScreen(titleName: String, outing: CinemaOuting, onBack: () -> Unit) {
@@ -139,13 +144,41 @@ private fun ScanMode(titleName: String, outing: CinemaOuting, onBack: () -> Unit
             verticalArrangement = Arrangement.spacedBy(24.dp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
         ) {
-            TicketCodeCard(outing.bookingRef)
+            val capturedTicketPath = outing.ticketImagePath
+            if (capturedTicketPath != null) {
+                CapturedTicketCard(capturedTicketPath)
+            } else {
+                TicketCodeCard(outing.bookingRef)
+            }
 
             TextButton(onClick = onFindSeat) {
                 Icon(Icons.Filled.EventSeat, contentDescription = null)
                 Text("Scanned — find my seat", modifier = Modifier.padding(start = 8.dp))
             }
         }
+    }
+}
+
+/** Renders the actual captured ticket photo (GitHub #219) rather than a re-encoded code — the
+ *  real proof-of-ticket, whatever symbology or layout the vendor printed it in. Same white
+ *  panel as [TicketCodeCard] for the same reason (scanners read dark-on-light, and this is the
+ *  one place the app deliberately ignores its own theme). */
+@Composable
+private fun CapturedTicketCard(imagePath: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White)
+            .padding(16.dp),
+    ) {
+        Text("YOUR TICKET", style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.55f))
+        AsyncImage(
+            model = File(imagePath),
+            contentDescription = "Captured ticket photo",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.padding(top = 12.dp).widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f),
+        )
     }
 }
 

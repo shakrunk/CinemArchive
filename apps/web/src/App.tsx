@@ -6,6 +6,7 @@ import { UpNext } from 'src/views/UpNext'
 import { Library } from 'src/views/Library'
 import { Ledger } from 'src/views/Ledger'
 import { Discover } from 'src/views/Discover'
+import { Lists } from 'src/views/Lists'
 import { Profile } from 'src/views/Profile'
 import { Friends } from 'src/views/Friends'
 import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
@@ -238,6 +239,7 @@ export default function App() {
             {currentView === 'library' && <Library />}
             {currentView === 'ledger' && <Ledger />}
             {currentView === 'discover' && <Discover />}
+            {currentView === 'lists' && <Lists />}
             {currentView === 'profile' && <Profile />}
             {currentView === 'friends' && <Friends />}
           </main>

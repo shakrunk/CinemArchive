@@ -9,14 +9,15 @@ function assert(label, actual, expected) {
   else { console.error(`  ✗ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); fail++ }
 }
 
-const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'profile', 'friends']
+const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'lists', 'profile', 'friends']
 const PRESERVED_KEYS = ['share', 'friend']
 function parseNav(search, fallbackView) {
   const p = new URLSearchParams(search)
   const raw = p.get('view')
   const view = APP_VIEWS.includes(raw) ? raw : fallbackView
   const title = p.get('title')
-  return { view, title: title || null, add: p.get('add') === '1' }
+  const list = p.get('list')
+  return { view, title: title || null, list: list || null, add: p.get('add') === '1' }
 }
 function preservedParams(search) {
   const p = new URLSearchParams(search)
@@ -29,6 +30,7 @@ function serializeNav(nav, preserved) {
   for (const k of Object.keys(preserved).sort()) p.set(k, preserved[k])
   p.set('view', nav.view)
   if (nav.title) p.set('title', nav.title)
+  if (nav.list) p.set('list', nav.list)
   if (nav.add) p.set('add', '1')
   return `?${p.toString()}`
 }
@@ -36,12 +38,15 @@ function serializeNav(nav, preserved) {
 console.log('\n── 1. parseNav ──')
 assert('empty → fallback view', parseNav('', 'library').view, 'library')
 assert('empty → title null', parseNav('', 'library').title, null)
+assert('empty → list null', parseNav('', 'library').list, null)
 assert('empty → add false', parseNav('', 'library').add, false)
 assert('unknown view → fallback', parseNav('?view=bogus', 'upnext').view, 'upnext')
 assert('valid view', parseNav('?view=ledger', 'library').view, 'ledger')
 assert('valid view (profile)', parseNav('?view=profile', 'library').view, 'profile')
 assert('valid view (friends)', parseNav('?view=friends', 'library').view, 'friends')
+assert('valid view (lists)', parseNav('?view=lists', 'library').view, 'lists')
 assert('title round-trips', parseNav('?view=library&title=abc123', 'library').title, 'abc123')
+assert('list round-trips', parseNav('?view=lists&list=l1', 'library').list, 'l1')
 assert('add=1 → true', parseNav('?add=1', 'library').add, true)
 assert('add=0 → false', parseNav('?add=0', 'library').add, false)
 
@@ -52,21 +57,24 @@ assert('friend extracted', preservedParams('?friend=u1&view=library').friend, 'u
 assert('no friend → undefined', preservedParams('?view=ledger').friend, undefined)
 
 console.log('\n── 3. serializeNav ──')
-assert('includes view', serializeNav({ view: 'ledger', title: null, add: false }, {}), '?view=ledger')
-assert('omits null title/add', serializeNav({ view: 'upnext', title: null, add: false }, {}).includes('title'), false)
-const withTitle = serializeNav({ view: 'library', title: 'x1', add: false }, {})
+assert('includes view', serializeNav({ view: 'ledger', title: null, list: null, add: false }, {}), '?view=ledger')
+assert('omits null title/add', serializeNav({ view: 'upnext', title: null, list: null, add: false }, {}).includes('title'), false)
+const withTitle = serializeNav({ view: 'library', title: 'x1', list: null, add: false }, {})
 assert('title serialized', withTitle.includes('title=x1'), true)
-const withShare = serializeNav({ view: 'ledger', title: null, add: false }, { share: 'tok' })
+const withList = serializeNav({ view: 'lists', title: null, list: 'l1', add: false }, {})
+assert('list serialized', withList.includes('list=l1'), true)
+const withShare = serializeNav({ view: 'ledger', title: null, list: null, add: false }, { share: 'tok' })
 assert('share preserved + view', withShare.includes('share=tok') && withShare.includes('view=ledger'), true)
-assert('determinism', serializeNav({ view: 'library', title: 't', add: true }, { share: 's' }),
-                       serializeNav({ view: 'library', title: 't', add: true }, { share: 's' }))
+assert('determinism', serializeNav({ view: 'library', title: 't', list: null, add: true }, { share: 's' }),
+                       serializeNav({ view: 'library', title: 't', list: null, add: true }, { share: 's' }))
 
 console.log('\n── 4. round-trip identity ──')
 for (const n of [
-  { view: 'upnext', title: null, add: false },
-  { view: 'library', title: 'abc', add: false },
-  { view: 'ledger', title: null, add: true },
-  { view: 'library', title: 'z9', add: true },
+  { view: 'upnext', title: null, list: null, add: false },
+  { view: 'library', title: 'abc', list: null, add: false },
+  { view: 'ledger', title: null, list: null, add: true },
+  { view: 'library', title: 'z9', list: null, add: true },
+  { view: 'lists', title: null, list: 'l1', add: false },
 ]) {
   const round = parseNav(serializeNav(n, {}), 'library')
   assert(`round-trip ${JSON.stringify(n)}`, JSON.stringify(round), JSON.stringify(n))

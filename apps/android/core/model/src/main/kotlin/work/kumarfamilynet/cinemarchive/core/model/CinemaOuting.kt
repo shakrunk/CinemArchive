@@ -9,6 +9,12 @@ enum class OutingStatus { SCHEDULED, COMPLETED, MISSED, CANCELLED }
 
 enum class CinemaFormat { STANDARD, IMAX, THREE_D, DOLBY, SEVENTY_MM, DRIVE_IN, OTHER }
 
+/** Symbology of a captured ticket barcode (issue #219) — stored alongside the decoded payload
+ *  rather than inferred later, because re-encoding a 1D payload (e.g. [CODE_128]) as a QR code
+ *  produces a code no turnstile scanner will read. See
+ *  docs/superpowers/plans/2026-08-19-android-ticket-capture.md §3/§5. */
+enum class TicketBarcodeFormat { QR_CODE, CODE_128, PDF_417, AZTEC, ITF, CODABAR, OTHER }
+
 /** A booked cinema trip — the Android-local analogue of the web app's `cinema_outings` row.
  *  Timestamps are ISO-8601 instants (`Instant.toString()`), matching every other timestamp
  *  field on this layer (e.g. [Viewing.date], [TitleDetail]'s `addedAt`/`updatedAt` at the
@@ -31,6 +37,15 @@ data class CinemaOuting(
     val seatRow: String?,
     val seats: List<String>,
     val bookingRef: String?,
+    /** Local file URI in v1 (`content://`/`file://`); becomes a Supabase Storage object path
+     *  once the remote writer is wired live — see the ticket-capture plan's §3. Null when no
+     *  ticket has been captured for this outing. */
+    val ticketImagePath: String?,
+    /** The barcode's decoded payload, captured from [ticketImagePath] on-device. Not the same
+     *  thing as [bookingRef] (a manually-typed confirmation code) — this is the actual
+     *  scannable value read off the ticket. */
+    val ticketBarcodePayload: String?,
+    val ticketBarcodeFormat: TicketBarcodeFormat?,
     val notes: String?,
     val status: OutingStatus,
     val previousStatus: LibraryStatus?,

@@ -30,6 +30,9 @@ private fun outing(
     seatRow = null,
     seats = emptyList(),
     bookingRef = null,
+    ticketImagePath = null,
+    ticketBarcodePayload = null,
+    ticketBarcodeFormat = null,
     notes = null,
     status = status,
     previousStatus = null,
@@ -122,5 +125,21 @@ class CinemaOutingRulesTest {
         val scheduled = outing(id = "s", titleId = "t1", showtime = "2026-07-25T19:30:00Z", endsAt = "2026-07-25T22:00:00Z")
         val cancelled = outing(id = "c", titleId = "t2", showtime = "2026-07-25T19:30:00Z", endsAt = "2026-07-25T22:00:00Z", status = OutingStatus.CANCELLED)
         assertEquals(setOf("t1"), CinemaOutingRules.titleIdsWithScheduledOuting(listOf(scheduled, cancelled)))
+    }
+
+    @Test
+    fun `onThisDay only matches completed outings on today's month-day in a prior year, most recent first`() {
+        val zone = java.time.ZoneOffset.UTC
+        val now = Instant.parse("2026-07-17T12:00:00Z")
+
+        val lastYear = outing(id = "last-year", showtime = "2025-07-17T19:30:00Z", endsAt = "2025-07-17T22:00:00Z", status = OutingStatus.COMPLETED)
+        val twoYearsAgo = outing(id = "two-years-ago", showtime = "2024-07-17T19:30:00Z", endsAt = "2024-07-17T22:00:00Z", status = OutingStatus.COMPLETED)
+        val differentDay = outing(id = "different-day", showtime = "2025-07-18T19:30:00Z", endsAt = "2025-07-18T22:00:00Z", status = OutingStatus.COMPLETED)
+        val thisYear = outing(id = "this-year", showtime = "2026-01-17T19:30:00Z", endsAt = "2026-01-17T22:00:00Z", status = OutingStatus.COMPLETED)
+        val stillScheduled = outing(id = "still-scheduled", showtime = "2025-07-17T19:30:00Z", endsAt = "2025-07-17T22:00:00Z", status = OutingStatus.SCHEDULED)
+
+        val result = CinemaOutingRules.onThisDay(listOf(lastYear, twoYearsAgo, differentDay, thisYear, stillScheduled), now, zone)
+
+        assertEquals(listOf("last-year", "two-years-ago"), result.map { it.id })
     }
 }

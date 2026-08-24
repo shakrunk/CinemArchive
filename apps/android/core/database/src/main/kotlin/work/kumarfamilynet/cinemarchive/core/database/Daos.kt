@@ -333,3 +333,69 @@ interface VenueNoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(row: VenueNoteEntity)
 }
+
+@Dao
+interface TheaterInterestDao {
+    @Query("SELECT * FROM theater_interest")
+    fun observeAll(): Flow<List<TheaterInterestEntity>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM theater_interest WHERE titleId = :titleId)")
+    fun observeIsInterested(titleId: String): Flow<Boolean>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: TheaterInterestEntity)
+
+    @Query("DELETE FROM theater_interest WHERE titleId = :titleId")
+    suspend fun deleteByTitleId(titleId: String)
+}
+
+@Dao
+interface ListDao {
+    @Query("SELECT * FROM lists ORDER BY createdAt DESC")
+    fun observeAllLists(): Flow<List<ListEntity>>
+
+    @Query("SELECT * FROM lists WHERE id = :id")
+    fun observeList(id: String): Flow<ListEntity?>
+
+    @Query("SELECT * FROM lists WHERE id = :id")
+    suspend fun getById(id: String): ListEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(rows: List<ListEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: ListEntity)
+
+    @Query("DELETE FROM lists WHERE id = :id")
+    suspend fun deleteById(id: String)
+}
+
+@Dao
+interface ListItemDao {
+    @Query("SELECT * FROM list_items WHERE listId = :listId ORDER BY addedAt DESC")
+    fun observeItemsForList(listId: String): Flow<List<ListItemEntity>>
+
+    @Query("SELECT listId FROM list_items WHERE titleId = :titleId")
+    fun observeListIdsForTitle(titleId: String): Flow<List<String>>
+
+    @Query("SELECT * FROM list_items")
+    fun observeAllListItems(): Flow<List<ListItemEntity>>
+
+    @Query("SELECT id FROM list_items WHERE listId = :listId AND titleId = :titleId LIMIT 1")
+    suspend fun findId(listId: String, titleId: String): String?
+
+    @Query("SELECT * FROM list_items WHERE id = :id")
+    suspend fun getById(id: String): ListItemEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(rows: List<ListItemEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(row: ListItemEntity)
+
+    @Query("DELETE FROM list_items WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM list_items WHERE listId = :listId AND titleId = :titleId")
+    suspend fun deleteByListAndTitle(listId: String, titleId: String)
+}

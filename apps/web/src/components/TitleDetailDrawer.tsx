@@ -8,6 +8,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
+import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
   avgSeasonRating,
@@ -31,6 +32,8 @@ import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProvi
 import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
+import { AddToListSheet } from 'src/components/AddToListSheet'
+import { Chip } from 'src/components/ui/chip'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CompanionInput } from 'src/components/OutingScheduleSheet'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
@@ -600,6 +603,34 @@ function StatusCard({
           style={{ color: 'var(--amber)' }}
         />
       </div>
+    </SectionCard>
+  )
+}
+
+// Lists is private-only — never rendered for a shared/friend viewer (isSharedView).
+function ListsCard({ titleId, onOpenPicker }: { titleId: string; onOpenPicker: () => void }) {
+  const lists = useAppStore((s) => s.listsForTitle(titleId))
+  return (
+    <SectionCard
+      title="Lists"
+      action={
+        <button
+          onClick={onOpenPicker}
+          className="font-mono text-xs text-amber hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
+        >
+          {lists.length > 0 ? 'Edit' : 'Add to list'}
+        </button>
+      }
+    >
+      {lists.length === 0 ? (
+        <p className="font-sans text-xs text-muted-foreground">Not in any lists yet.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {lists.map((l) => (
+            <Chip key={l.id} active onClick={onOpenPicker}>{l.name}</Chip>
+          ))}
+        </div>
+      )}
     </SectionCard>
   )
 }
@@ -1582,6 +1613,7 @@ export function TitleDetailDrawer() {
   const [showMatrixRain, setShowMatrixRain] = useState(false)
 
   const [sendPanelOpen, setSendPanelOpen] = useState(false)
+  const [isAddToListOpen, setIsAddToListOpen] = useState(false)
 
   const pinnedModes = useAppStore((s) => s.pinnedModes)
   const setPinnedMode = useAppStore((s) => s.setPinnedMode)
@@ -1762,6 +1794,11 @@ export function TitleDetailDrawer() {
 
   // Track which title IDs have already been backfilled this session to avoid repeat calls.
   const backfilledRef = useRef<Set<string>>(new Set())
+
+  // Scrollable drawer body — own Lenis instance since the page-level one is `window`-scoped
+  // and already suspended while this dialog holds the scroll lock (see useSmoothScroll.ts).
+  const scrollBodyRef = useRef<HTMLDivElement>(null)
+  useScopedSmoothScroll(scrollBodyRef, isDetailDrawerOpen)
 
   // When a TV show is opened and episode metadata is missing, fetch season details
   // from TMDB and hydrate them in-place, then persist to DB. Handles two cases:
@@ -2011,7 +2048,15 @@ export function TitleDetailDrawer() {
         />
       )}
 
-      <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0" data-lenis-prevent>
+      {isAddToListOpen && (
+        <AddToListSheet
+          titleId={title.id}
+          titleName={title.title}
+          onClose={() => setIsAddToListOpen(false)}
+        />
+      )}
+
+      <div ref={scrollBodyRef} className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
         {/* Hero: cinematic backdrop (stored or fetched) or blurred-poster fallback */}
         {(title.backdropUrl || heroBackdropUrl) ? (
           <HeroBackdrop
@@ -2458,6 +2503,7 @@ export function TitleDetailDrawer() {
               isSharedView={isSharedView}
               onChange={(status) => updateTitle(title.id, { status })}
             />
+            {!isSharedView && <ListsCard titleId={title.id} onOpenPicker={() => setIsAddToListOpen(true)} />}
             {title.type === 'movie' && (
               <SectionCard title="Viewing Stats">
                 <div className="space-y-2">

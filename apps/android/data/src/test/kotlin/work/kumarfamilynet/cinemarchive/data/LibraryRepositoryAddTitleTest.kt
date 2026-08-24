@@ -23,6 +23,8 @@ import work.kumarfamilynet.cinemarchive.core.database.OutboxDao
 import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TheaterInterestDao
+import work.kumarfamilynet.cinemarchive.core.database.TheaterInterestEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
@@ -145,6 +147,13 @@ private object NoEpisodeMetadataFetcher : EpisodeMetadataFetcher {
     override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = throw UnsupportedOperationException()
 }
 
+private object NoTheaterInterestDao : TheaterInterestDao {
+    override fun observeAll(): Flow<List<TheaterInterestEntity>> = throw UnsupportedOperationException()
+    override fun observeIsInterested(titleId: String): Flow<Boolean> = throw UnsupportedOperationException()
+    override suspend fun upsert(row: TheaterInterestEntity) = throw UnsupportedOperationException()
+    override suspend fun deleteByTitleId(titleId: String) = throw UnsupportedOperationException()
+}
+
 /**
  * Covers `LibraryRepository.addTitle` — the Room write and the single outbox entry that
  * carries it to Supabase.
@@ -177,6 +186,7 @@ class LibraryRepositoryAddTitleTest {
             cinemaOutingDao = NoOutingsDao,
             titleCastDao = castDao,
             titleCrewDao = crewDao,
+            theaterInterestDao = NoTheaterInterestDao,
             outbox = MutationOutbox(outboxDao, NoopWriter, NoopConflictHandler),
             episodeMetadataFetcher = NoEpisodeMetadataFetcher,
         )

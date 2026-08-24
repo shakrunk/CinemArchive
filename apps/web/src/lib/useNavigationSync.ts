@@ -17,10 +17,11 @@ export function useNavigationSync({
   const selectedTitleId = useAppStore((s) => s.selectedTitleId)
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const selectedListId = useAppStore((s) => s.selectedListId)
   const friendId = useAppStore((s) => (s.viewerContext.kind === 'friend' ? s.viewerContext.userId : null))
 
   const drawerTitle = isDetailDrawerOpen ? selectedTitleId : null
-  const desired: NavState = { view: currentView, title: drawerTitle, add: isAddTitleOpen }
+  const desired: NavState = { view: currentView, title: drawerTitle, list: selectedListId, add: isAddTitleOpen }
 
   const prevRef = useRef<NavState | null>(null)
   const pushDepth = useRef(0)
@@ -41,6 +42,8 @@ export function useNavigationSync({
     if (fromUrl.view !== viewRef.current) setCurrentView(fromUrl.view)
     if (fromUrl.title) {
       if (!s.isDetailDrawerOpen) s.openDetailDrawer(fromUrl.title)
+    } else if (fromUrl.list) {
+      if (!s.selectedListId) s.openListDetail(fromUrl.list)
     } else if (fromUrl.add) {
       if (!s.isAddTitleOpen) s.openAddTitle()
     }
@@ -57,6 +60,11 @@ export function useNavigationSync({
       } else if (s.isDetailDrawerOpen) {
         s.closeDetailDrawer()
       }
+      if (fromUrl.list) {
+        if (s.selectedListId !== fromUrl.list) s.openListDetail(fromUrl.list)
+      } else if (s.selectedListId) {
+        s.closeListDetail()
+      }
       if (fromUrl.add) {
         if (!s.isAddTitleOpen) s.openAddTitle()
       } else if (s.isAddTitleOpen) {
@@ -64,7 +72,7 @@ export function useNavigationSync({
       }
       // A pop consumed one of our pushed entries (if any).
       if (pushDepth.current > 0) pushDepth.current -= 1
-      prevRef.current = { view: fromUrl.view, title: fromUrl.title, add: fromUrl.add }
+      prevRef.current = { view: fromUrl.view, title: fromUrl.title, list: fromUrl.list, add: fromUrl.add }
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
@@ -93,6 +101,7 @@ export function useNavigationSync({
     const sameAsUrl =
       currentNav.view === desired.view &&
       currentNav.title === desired.title &&
+      currentNav.list === desired.list &&
       currentNav.add === desired.add &&
       (urlPreserved.friend ?? null) === (friendId ?? null)
     if (sameAsUrl) {
@@ -102,8 +111,8 @@ export function useNavigationSync({
 
     const prev = prevRef.current
     const nextUrl = serializeNav(desired, preserved)
-    const wasModal = prev ? !!prev.title || prev.add : false
-    const isModal = !!desired.title || desired.add
+    const wasModal = prev ? !!prev.title || !!prev.list || prev.add : false
+    const isModal = !!desired.title || !!desired.list || desired.add
 
     if (prev === null) {
       // Defensive: normalize without adding history.
@@ -130,5 +139,5 @@ export function useNavigationSync({
     }
     prevRef.current = desired
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [desired.view, desired.title, desired.add, friendId])
+  }, [desired.view, desired.title, desired.list, desired.add, friendId])
 }

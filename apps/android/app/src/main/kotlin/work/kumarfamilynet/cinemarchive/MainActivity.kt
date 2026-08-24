@@ -37,10 +37,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -98,6 +100,7 @@ import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
+import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.feature.auth.LoginRoute
@@ -106,6 +109,7 @@ import work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerRoute
 import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
 import work.kumarfamilynet.cinemarchive.feature.library.TitleDetailRoute
+import work.kumarfamilynet.cinemarchive.feature.lists.ListsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.DeveloperSettingsRoute
@@ -145,6 +149,7 @@ class MainActivity : ComponentActivity() {
         val ledgerLayoutRepository = (application as CinemArchiveApplication).ledgerLayoutRepository
         val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
         val outingsRepository = (application as CinemArchiveApplication).outingsRepository
+        val listsRepository = (application as CinemArchiveApplication).listsRepository
         val authRepository = (application as CinemArchiveApplication).authRepository
         val librarySyncRepository = (application as CinemArchiveApplication).librarySyncRepository
         val appUpdateRepository = (application as CinemArchiveApplication).appUpdateRepository
@@ -192,6 +197,7 @@ class MainActivity : ComponentActivity() {
                                 ledgerLayoutRepository,
                                 preferencesRepository,
                                 outingsRepository,
+                                listsRepository,
                                 authRepository,
                                 librarySyncRepository,
                                 appUpdateRepository,
@@ -295,7 +301,7 @@ private fun DebugBuildBanner(isDebugBuild: Boolean) {
     }
 }
 
-private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER }
+private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER, LISTS }
 
 private sealed interface Overlay {
     data class Detail(val titleId: String) : Overlay
@@ -335,6 +341,7 @@ private fun CinemArchiveApp(
     ledgerLayoutRepository: LedgerLayoutRepository,
     preferencesRepository: PreferencesRepository,
     outingsRepository: OutingsRepository,
+    listsRepository: ListsRepository,
     authRepository: AuthRepository,
     librarySyncRepository: LibrarySyncRepository,
     appUpdateRepository: AppUpdateRepository,
@@ -484,6 +491,9 @@ private fun CinemArchiveApp(
                 ),
                 NavDestination(Tab.UP_NEXT, "Up Next", Icons.Outlined.PlayArrow, Icons.Filled.PlayArrow),
                 NavDestination(Tab.LEDGER, "Ledger", Icons.Outlined.Insights, Icons.Filled.Insights),
+                // Bookmarks, not the ViewList glyph Library swaps to in list-view-mode above —
+                // the two tabs sitting side by side with the same icon would be confusing.
+                NavDestination(Tab.LISTS, "Lists", Icons.Outlined.Bookmarks, Icons.Filled.Bookmarks),
             )
 
             @Composable
@@ -531,10 +541,18 @@ private fun CinemArchiveApp(
                                 profileInitial = profileInitial,
                                 isWideLayout = useNavigationRail,
                             )
+                            Tab.LISTS -> ListsRoute(
+                                listsRepository,
+                                repository,
+                                onTitleClick = { overlay = Overlay.Detail(it) },
+                                onOpenProfile = openProfile,
+                                profileInitial = profileInitial,
+                                onFabExpandedChange = { fabExpanded = it },
+                            )
                         }
                     }
 
-                    if (tab != Tab.LEDGER && tab != Tab.DISCOVER) {
+                    if (tab != Tab.LEDGER && tab != Tab.DISCOVER && tab != Tab.LISTS) {
                         ExpressivePillFab(
                             label = "New Title",
                             expanded = fabExpanded,
@@ -544,6 +562,11 @@ private fun CinemArchiveApp(
                                 .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
                         )
                     }
+                    // Lists has its own "+ New list" entry points inline (ListsRoute's header
+                    // button and empty state) rather than a shared FAB — unlike "New Title",
+                    // creating a list needs only a name, not a multi-step add flow, so a
+                    // dedicated FAB here would be a second, redundant affordance for the same
+                    // one-field action.
                 }
             }
 
@@ -675,6 +698,7 @@ private fun CinemArchiveApp(
                 is Overlay.Detail -> TitleDetailRoute(
                     repository,
                     outingsRepository,
+                    listsRepository,
                     current.titleId,
                     onBack = closeOverlay,
                     onRequestNotificationPermission = requestNotificationPermission,

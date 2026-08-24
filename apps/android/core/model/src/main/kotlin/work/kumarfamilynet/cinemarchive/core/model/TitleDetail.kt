@@ -26,6 +26,8 @@ data class TitleDetail(
     /** The soonest active (scheduled, not yet ended) outing for this title, if any — drives
      *  the drawer's scheduled banner. Null once completed/cancelled/missed. */
     val scheduledOuting: CinemaOuting? = null,
+    /** "I want to see this in theaters" (issue #205) — see [LibraryTitle.interestedInTheaters]. */
+    val interestedInTheaters: Boolean = false,
 )
 
 data class SeasonDetail(

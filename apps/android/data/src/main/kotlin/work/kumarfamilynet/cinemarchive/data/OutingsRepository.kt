@@ -22,6 +22,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingTransition
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
+import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 
 /**
  * Owns [CinemaOuting] CRUD and the local completion engine — the Android analogue of the web
@@ -162,6 +163,43 @@ class OutingsRepository(
         cinemaOutingDao.upsert(updated)
         enqueueOutingMutation(updated)
         rearmAlarm()
+    }
+
+    /** Attaches a captured ticket photo (GitHub #219) to an outing, plus whatever barcode
+     *  [work.kumarfamilynet.cinemarchive.core.designsystem.decodeTicketBarcode] managed to read
+     *  off it. [barcodePayload]/[barcodeFormat] are null when nothing decoded — the photo is
+     *  still saved as the visual proof-of-ticket, TicketScreen just has no code to render for
+     *  it. Overwrites any previous capture on this outing (one ticket photo at a time). */
+    suspend fun saveTicketCapture(
+        outingId: String,
+        imagePath: String,
+        barcodePayload: String?,
+        barcodeFormat: TicketBarcodeFormat?,
+    ) {
+        val existing = cinemaOutingDao.getById(outingId) ?: return
+        val updated = existing.copy(
+            ticketImagePath = imagePath,
+            ticketBarcodePayload = barcodePayload,
+            ticketBarcodeFormat = barcodeFormat?.name,
+            updatedAt = Instant.now().toString(),
+        )
+        cinemaOutingDao.upsert(updated)
+        enqueueOutingMutation(updated)
+    }
+
+    /** Removes a captured ticket photo/barcode, e.g. before re-capturing or if it was added by
+     *  mistake. Does not touch [CinemaOutingEntity.bookingRef] — that's a separately-entered
+     *  field, not part of the capture. */
+    suspend fun clearTicketCapture(outingId: String) {
+        val existing = cinemaOutingDao.getById(outingId) ?: return
+        val updated = existing.copy(
+            ticketImagePath = null,
+            ticketBarcodePayload = null,
+            ticketBarcodeFormat = null,
+            updatedAt = Instant.now().toString(),
+        )
+        cinemaOutingDao.upsert(updated)
+        enqueueOutingMutation(updated)
     }
 
     /** Cancels a still-scheduled outing (before the show ends) — kept as a row for history,
@@ -350,6 +388,9 @@ class OutingsRepository(
                 put("seatRow", entity.seatRow ?: JSONObject.NULL)
                 put("seats", JSONArray(entity.seats))
                 put("bookingRef", entity.bookingRef ?: JSONObject.NULL)
+                put("ticketImagePath", entity.ticketImagePath ?: JSONObject.NULL)
+                put("ticketBarcodePayload", entity.ticketBarcodePayload ?: JSONObject.NULL)
+                put("ticketBarcodeFormat", entity.ticketBarcodeFormat ?: JSONObject.NULL)
                 put("notes", entity.notes ?: JSONObject.NULL)
                 put("status", entity.status)
                 put("previousStatus", entity.previousStatus ?: JSONObject.NULL)
@@ -378,6 +419,9 @@ internal fun CinemaOutingEntity.toDomain(): CinemaOuting = CinemaOuting(
     seatRow = seatRow,
     seats = seats,
     bookingRef = bookingRef,
+    ticketImagePath = ticketImagePath,
+    ticketBarcodePayload = ticketBarcodePayload,
+    ticketBarcodeFormat = ticketBarcodeFormat?.let { runCatching { TicketBarcodeFormat.valueOf(it) }.getOrNull() },
     notes = notes,
     status = runCatching { OutingStatus.valueOf(status) }.getOrDefault(OutingStatus.SCHEDULED),
     previousStatus = previousStatus?.let { runCatching { LibraryStatus.valueOf(it) }.getOrNull() },

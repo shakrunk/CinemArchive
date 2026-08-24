@@ -20,6 +20,10 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
+import work.kumarfamilynet.cinemarchive.core.database.ListDao
+import work.kumarfamilynet.cinemarchive.core.database.ListEntity
+import work.kumarfamilynet.cinemarchive.core.database.ListItemDao
+import work.kumarfamilynet.cinemarchive.core.database.ListItemEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
@@ -68,8 +72,13 @@ private const val PAGE_SIZE = 500
  * `SQLiteConstraintException` and crashed before the page's cursor was persisted, so a stuck
  * install already retries the same page from scratch once the fix ships, no forced resync
  * needed.
+ *
+ * 6: the `list`/`list_item` arms (supabase/migrations/20260821000000_lists.sql) — the new
+ * Lists feature. Both are brand-new entity types with no pre-existing rows, so there's no real
+ * "stuck behind an old watermark" backlog the way title_cast/title_crew had; bumped anyway to
+ * keep this constant's history a complete audit trail per its own stated policy.
  */
-private const val SYNC_SCHEMA_VERSION = 5
+private const val SYNC_SCHEMA_VERSION = 6
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -100,6 +109,8 @@ class LibrarySyncRepository(
     private val cinemaOutingDao: CinemaOutingDao,
     private val titleCastDao: TitleCastDao,
     private val titleCrewDao: TitleCrewDao,
+    private val listDao: ListDao,
+    private val listItemDao: ListItemDao,
 ) {
     private val dataStore = context.librarySyncDataStore
     private val cursorKey = stringPreferencesKey("last_synced_at")
@@ -156,6 +167,10 @@ class LibrarySyncRepository(
      * that depends only on `titles`, which is fully applied by the time [flush] runs — then
      * re-resolves episodes against those newly-applied seasons, then re-checks the
      * episode-children against those newly-applied episodes.
+     *
+     * `list_item` is the one entity with *two* independent parents (its `list` and its
+     * `title`) rather than one — novel among the cases above, closest analog is `episode`'s
+     * single indirect dependency. It's held back until both have landed.
      */
     private inner class DeferredRows {
         private val seasons = mutableListOf<SeasonEntity>()
@@ -167,6 +182,7 @@ class LibrarySyncRepository(
         private val watchEvents = mutableListOf<EpisodeWatchEventEntity>()
         private val ratings = mutableListOf<EpisodeRatingEntity>()
         private val reviews = mutableListOf<EpisodeReviewEntity>()
+        private val listItems = mutableListOf<ListItemEntity>()
 
         suspend fun addSeason(row: SeasonEntity) {
             if (titleDao.getById(row.titleId) != null) seasonDao.upsertAll(listOf(row)) else seasons += row
@@ -205,6 +221,14 @@ class LibrarySyncRepository(
             if (episodeDao.getById(row.episodeId) != null) reviewDao.upsertAll(listOf(row)) else reviews += row
         }
 
+        suspend fun addListItem(row: ListItemEntity) {
+            if (listDao.getById(row.listId) != null && titleDao.getById(row.titleId) != null) {
+                listItemDao.upsertAll(listOf(row))
+            } else {
+                listItems += row
+            }
+        }
+
         /** Drops a held-back row that a later page went on to tombstone, so [flush] can't
          *  resurrect it after the delete already ran. */
         fun forget(entityType: String, entityId: String) {
@@ -218,6 +242,7 @@ class LibrarySyncRepository(
                 "episode_watch_event" -> watchEvents.removeAll { it.id == entityId }
                 "episode_rating" -> ratings.removeAll { it.id == entityId }
                 "episode_review" -> reviews.removeAll { it.id == entityId }
+                "list_item" -> listItems.removeAll { it.id == entityId }
             }
         }
 
@@ -237,6 +262,8 @@ class LibrarySyncRepository(
             watchEventDao.upsertAll(watchEvents.filter { episodeDao.getById(it.episodeId) != null })
             ratingDao.upsertAll(ratings.filter { episodeDao.getById(it.episodeId) != null })
             reviewDao.upsertAll(reviews.filter { episodeDao.getById(it.episodeId) != null })
+
+            listItemDao.upsertAll(listItems.filter { listDao.getById(it.listId) != null && titleDao.getById(it.titleId) != null })
         }
     }
 
@@ -264,6 +291,8 @@ class LibrarySyncRepository(
         byType["episode_rating"]?.forEach { deferred.addRating(it.payload().toRatingEntity()) }
         byType["episode_review"]?.forEach { deferred.addReview(it.payload().toReviewEntity()) }
         byType["cinema_outing"]?.forEach { deferred.addCinemaOuting(it.payload().toCinemaOutingEntity()) }
+        byType["list"]?.forEach { listDao.upsertAll(listOf(it.payload().toListEntity())) }
+        byType["list_item"]?.forEach { deferred.addListItem(it.payload().toListItemEntity()) }
 
         byType["tombstone"]?.forEach { row ->
             val entityId = row.getString("entity_id")
@@ -279,6 +308,8 @@ class LibrarySyncRepository(
                 "cinema_outing" -> cinemaOutingDao.deleteById(entityId)
                 "title_cast" -> titleCastDao.deleteById(entityId)
                 "title_crew" -> titleCrewDao.deleteById(entityId)
+                "list" -> listDao.deleteById(entityId)
+                "list_item" -> listItemDao.deleteById(entityId)
             }
             deferred.forget(entityType, entityId)
         }
@@ -417,6 +448,9 @@ class LibrarySyncRepository(
         seatRow = optStringOrNull("seatRow"),
         seats = optJSONArray("seats").toStringList(),
         bookingRef = optStringOrNull("bookingRef"),
+        ticketImagePath = optStringOrNull("ticketImagePath"),
+        ticketBarcodePayload = optStringOrNull("ticketBarcodePayload"),
+        ticketBarcodeFormat = optStringOrNull("ticketBarcodeFormat"),
         notes = optStringOrNull("notes"),
         status = getString("status").uppercase(),
         previousStatus = optStringOrNull("previousStatus")?.uppercase(),
@@ -444,5 +478,22 @@ class LibrarySyncRepository(
         episodeId = getString("episodeId"),
         reviewText = getString("reviewText"),
         reviewedAt = getString("reviewedAt"),
+    )
+
+    private fun JSONObject.toListEntity() = ListEntity(
+        id = getString("id"),
+        name = getString("name"),
+        description = optStringOrNull("description"),
+        createdAt = getString("createdAt"),
+        updatedAt = getString("updatedAt"),
+    )
+
+    private fun JSONObject.toListItemEntity() = ListItemEntity(
+        id = getString("id"),
+        listId = getString("listId"),
+        titleId = getString("titleId"),
+        position = optIntOrNull("position"),
+        addedAt = getString("addedAt"),
+        updatedAt = getString("updatedAt"),
     )
 }

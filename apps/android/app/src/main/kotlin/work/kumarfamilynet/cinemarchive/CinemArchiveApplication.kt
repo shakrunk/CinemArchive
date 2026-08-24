@@ -26,6 +26,7 @@ import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
+import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.MutationOutbox
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
@@ -90,6 +91,16 @@ class CinemArchiveApplication : Application() {
             cinemaOutingDao = database.cinemaOutingDao(),
             titleCastDao = database.titleCastDao(),
             titleCrewDao = database.titleCrewDao(),
+            listDao = database.listDao(),
+            listItemDao = database.listItemDao(),
+        )
+    }
+
+    val listsRepository: ListsRepository by lazy {
+        ListsRepository(
+            listDao = database.listDao(),
+            listItemDao = database.listItemDao(),
+            outbox = outbox,
         )
     }
 
@@ -105,6 +116,7 @@ class CinemArchiveApplication : Application() {
             cinemaOutingDao = database.cinemaOutingDao(),
             titleCastDao = database.titleCastDao(),
             titleCrewDao = database.titleCrewDao(),
+            theaterInterestDao = database.theaterInterestDao(),
             outbox = outbox,
             episodeMetadataFetcher = discoverRepository,
         )

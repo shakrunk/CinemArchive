@@ -20,6 +20,8 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
+import work.kumarfamilynet.cinemarchive.core.database.TheaterInterestDao
+import work.kumarfamilynet.cinemarchive.core.database.TheaterInterestEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
@@ -39,6 +41,7 @@ import work.kumarfamilynet.cinemarchive.core.model.OutingStatus
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.UpNextBoard
+import work.kumarfamilynet.cinemarchive.core.model.UpNextOnThisDay
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
@@ -78,6 +81,7 @@ class LibraryRepository(
     private val cinemaOutingDao: CinemaOutingDao,
     private val titleCastDao: TitleCastDao,
     private val titleCrewDao: TitleCrewDao,
+    private val theaterInterestDao: TheaterInterestDao,
     private val outbox: MutationOutbox,
     private val episodeMetadataFetcher: EpisodeMetadataFetcher,
 ) {
@@ -233,9 +237,11 @@ class LibraryRepository(
         titleDao.observeLibrary(),
         cinemaOutingDao.observeAllOutings(),
         titleDao.observeLastInteractions(),
-    ) { rows, outings, interactions ->
+        theaterInterestDao.observeAll(),
+    ) { rows, outings, interactions, theaterInterest ->
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings.map { it.toDomain() })
         val lastInteractionByTitle = interactions.associate { it.titleId to it.lastInteractionAt }
+        val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
         rows.map { row ->
             LibraryTitle(
                 id = row.id,
@@ -251,6 +257,7 @@ class LibraryRepository(
                 releaseDate = row.releaseDate,
                 genres = row.genres,
                 lastInteractionAt = lastInteractionByTitle[row.id],
+                interestedInTheaters = row.id in interestedTitleIds,
             )
         }
     }
@@ -290,9 +297,11 @@ class LibraryRepository(
             ::UpNextCoreSources,
         ),
         combine(episodeDao.observeAllEpisodes(), watchEventDao.observeAllWatchEvents(), ::UpNextEpisodeSources),
-    ) { core, episodeSources ->
+        theaterInterestDao.observeAll(),
+    ) { core, episodeSources, theaterInterest ->
         val (titles, seasons, outingRows, viewingRows) = core
         val (episodes, watchEvents) = episodeSources
+        val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
         val now = Instant.now()
         val outings = outingRows.map { it.toDomain() }
         val titlesById = titles.associateBy { it.id }
@@ -345,6 +354,7 @@ class LibraryRepository(
                     network = row.network,
                     rating = row.rating,
                     releaseDate = row.releaseDate,
+                    interestedInTheaters = row.id in interestedTitleIds,
                 )
             }
         val onTheMarquee = CinemaOutingRules.marqueeEntries(outings, now).mapNotNull { outing ->
@@ -355,7 +365,21 @@ class LibraryRepository(
             val title = titlesById[outing.titleId] ?: return@mapNotNull null
             UpNextOuting(outing, title.title, title.posterUrl)
         }
-        UpNextBoard(watching, watchlist, onTheMarquee, freshFromTheLobby)
+        val nowYear = now.atZone(java.time.ZoneId.systemDefault()).year
+        val onThisDay = CinemaOutingRules.onThisDay(outings, now).mapNotNull { outing ->
+            val title = titlesById[outing.titleId] ?: return@mapNotNull null
+            val outingYear = runCatching { Instant.parse(outing.showtime).atZone(java.time.ZoneId.systemDefault()).year }.getOrNull() ?: return@mapNotNull null
+            val viewing = outing.completedViewingId?.let(viewingsById::get)
+            UpNextOnThisDay(
+                outing = outing,
+                titleName = title.title,
+                posterUrl = title.posterUrl,
+                yearsAgo = nowYear - outingYear,
+                rating = viewing?.rating,
+                notes = viewing?.notes,
+            )
+        }
+        UpNextBoard(watching, watchlist, onTheMarquee, freshFromTheLobby, onThisDay)
     }
 
     /** Marks the next unwatched episode of [titleId] as watched (season/episode order) —
@@ -386,7 +410,8 @@ class LibraryRepository(
             episodeAggregate,
             viewingDao.observeViewings(titleId),
             cinemaOutingDao.observeOutingsForTitle(titleId),
-        ) { title, aggregate, viewings, outingRows ->
+            theaterInterestDao.observeIsInterested(titleId),
+        ) { title, aggregate, viewings, outingRows, isInterested ->
             if (title == null) return@combine null
 
             val watchCountByEpisode = aggregate.watchCounts.associate { it.episodeId to it.watchCount }
@@ -459,7 +484,17 @@ class LibraryRepository(
                 scheduledOuting = outingRows.map { it.toDomain() }
                     .filter { it.status == OutingStatus.SCHEDULED }
                     .minByOrNull { it.showtime },
+                interestedInTheaters = isInterested,
             )
+        }
+    }
+
+    /** Toggles "I want to see this in theaters" (issue #205) for [titleId]. */
+    suspend fun setTheaterInterest(titleId: String, interested: Boolean) {
+        if (interested) {
+            theaterInterestDao.upsert(TheaterInterestEntity(titleId, Instant.now().toString()))
+        } else {
+            theaterInterestDao.deleteByTitleId(titleId)
         }
     }
 

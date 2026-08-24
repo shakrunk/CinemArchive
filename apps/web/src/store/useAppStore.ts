@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mockTitles, type Title, type Viewing, type CinemaOuting, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
@@ -26,6 +26,8 @@ import {
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
   deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
   fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
+  fetchLists, fetchListMemberships, insertListToDb, updateListInDb, deleteListFromDb,
+  addTitleToListInDb, removeTitleFromListInDb,
   fetchLedgerLayout, saveLedgerLayout,
   fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
   deleteNotification,
@@ -182,6 +184,11 @@ interface UISlice {
   isAddTitleOpen: boolean
   isDetailDrawerOpen: boolean
   isRefreshMetadataOpen: boolean
+  // The list currently open in detail view (Lists.tsx), synced to ?list=<id> —
+  // mirrors selectedTitleId/isDetailDrawerOpen's role for the title drawer, but
+  // as a single nullable id since there's no easter-egg-style reason to keep it
+  // around after close.
+  selectedListId: string | null
   isSharedView: boolean
   isCommandPaletteOpen: boolean
   // A top-level view requested by a component that can't reach App's currentView
@@ -223,6 +230,8 @@ interface UISlice {
   closeAddTitle: () => void
   openDetailDrawer: (id: string) => void
   closeDetailDrawer: () => void
+  openListDetail: (id: string) => void
+  closeListDetail: () => void
   openRefreshMetadata: () => void
   closeRefreshMetadata: () => void
   setIsSharedView: (isSharedView: boolean) => void
@@ -283,6 +292,24 @@ interface PinsSlice {
   pinnedModes: Record<string, 'bw' | 'color'>
   setPinnedMode: (titleId: string, easterEggKey: string, variant: 'bw' | 'color' | null) => void
   loadPinnedModes: () => Promise<void>
+}
+
+// User-created custom title lists. Private-only: owner-only RLS, loaded with the
+// library (never fetched for shared/friend viewers, same convention as PinsSlice
+// and OutingsSlice).
+interface ListsSlice {
+  lists: List[]
+  // listId -> Set<titleId>. A Set gives O(1) membership checks for the
+  // AddToListSheet chip picker; not persisted (see partialize below — Set
+  // doesn't survive JSON.stringify/parse), re-derived by loadLists() instead.
+  listMemberships: Record<string, Set<string>>
+  loadLists: () => Promise<void>
+  createList: (name: string, description?: string | null) => List
+  renameList: (id: string, patch: { name?: string; description?: string | null }) => void
+  deleteList: (id: string) => void
+  addTitleToList: (listId: string, titleId: string) => void
+  removeTitleFromList: (listId: string, titleId: string) => void
+  listsForTitle: (titleId: string) => List[]
 }
 
 // Cinema Outings ("I've got tickets") — see
@@ -549,7 +576,7 @@ function swapAdjacent<T>(list: T[], idx: number, direction: 'up' | 'down'): T[] 
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
-type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice & OutingsSlice
+type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice & OutingsSlice & ListsSlice
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 2
@@ -890,6 +917,7 @@ export const useAppStore = create<AppStore>()(
   selectedTitleId: null,
   isAddTitleOpen: false,
   isDetailDrawerOpen: false,
+  selectedListId: null,
   preselectedResult: null,
 
   setViewMode: (viewMode) => set({ viewMode }),
@@ -1030,6 +1058,9 @@ export const useAppStore = create<AppStore>()(
   // browseByStudio DO null it because navigating away is a hard context switch.
   closeDetailDrawer: () =>
     set({ isDetailDrawerOpen: false, isRefreshMetadataOpen: false }),
+
+  openListDetail: (id) => set({ selectedListId: id }),
+  closeListDetail: () => set({ selectedListId: null }),
 
   isRefreshMetadataOpen: false,
   openRefreshMetadata: () => set({ isRefreshMetadataOpen: true }),
@@ -1211,6 +1242,7 @@ export const useAppStore = create<AppStore>()(
       // Reconciliation trigger: app load, right after the library lands
       // (plan §4.3) — completes anything that finished while the app was closed.
       void get().reconcileOutings()
+      void get().loadLists()
     } catch (err) {
       console.error('Failed to load user library from DB:', err)
       set({ libraryLoadError: "Couldn't load your library — check your connection." })
@@ -1322,6 +1354,85 @@ export const useAppStore = create<AppStore>()(
     }
     set({ pinnedModes })
   },
+
+  // ── Lists ──────────────────────────────────────────────────
+  lists: [],
+  listMemberships: {},
+
+  loadLists: async () => {
+    const user = get().user
+    if (!user) return
+    const [lists, memberships] = await Promise.all([fetchLists(user.id), fetchListMemberships(user.id)])
+    const listMemberships: Record<string, Set<string>> = {}
+    for (const [listId, titleIds] of Object.entries(memberships)) listMemberships[listId] = new Set(titleIds)
+    set({ lists, listMemberships })
+  },
+
+  createList: (name, description = null) => {
+    const now = new Date().toISOString()
+    const list: List = { id: crypto.randomUUID(), name, description, createdAt: now, updatedAt: now }
+    set((s) => ({ lists: [list, ...s.lists] }))
+    const user = get().user
+    if (user) {
+      syncToDb(get, 'Failed to sync new list to DB:', () => insertListToDb(user.id, list),
+        `Couldn't save "${name}" — check your connection.`)
+    }
+    return list
+  },
+
+  renameList: (id, patch) =>
+    set((s) => {
+      const lists = s.lists.map((l) => (l.id === id ? { ...l, ...patch, updatedAt: new Date().toISOString() } : l))
+      const user = s.user
+      if (user) {
+        syncToDb(get, 'Failed to sync renamed list to DB:', () => updateListInDb(user.id, id, patch),
+          "Couldn't save changes — check your connection.")
+      }
+      return { lists }
+    }),
+
+  deleteList: (id) =>
+    set((s) => {
+      const lists = s.lists.filter((l) => l.id !== id)
+      const listMemberships = { ...s.listMemberships }
+      delete listMemberships[id]
+      const user = s.user
+      if (user) {
+        syncToDb(get, 'Failed to sync deleted list from DB:', () => deleteListFromDb(user.id, id),
+          "Couldn't remove list — check your connection.")
+      }
+      return { lists, listMemberships }
+    }),
+
+  addTitleToList: (listId, titleId) =>
+    set((s) => {
+      const current = s.listMemberships[listId] ?? new Set<string>()
+      if (current.has(titleId)) return {}
+      const listMemberships = { ...s.listMemberships, [listId]: new Set(current).add(titleId) }
+      const user = s.user
+      if (user) {
+        syncToDb(get, 'Failed to sync list membership to DB:', () => addTitleToListInDb(user.id, listId, titleId),
+          "Couldn't add to list — check your connection.")
+      }
+      return { listMemberships }
+    }),
+
+  removeTitleFromList: (listId, titleId) =>
+    set((s) => {
+      const current = s.listMemberships[listId]
+      if (!current?.has(titleId)) return {}
+      const next = new Set(current)
+      next.delete(titleId)
+      const listMemberships = { ...s.listMemberships, [listId]: next }
+      const user = s.user
+      if (user) {
+        syncToDb(get, 'Failed to sync list membership removal to DB:', () => removeTitleFromListInDb(user.id, listId, titleId),
+          "Couldn't remove from list — check your connection.")
+      }
+      return { listMemberships }
+    }),
+
+  listsForTitle: (titleId) => get().lists.filter((l) => get().listMemberships[l.id]?.has(titleId)),
 
   // ── Cinema Outings ("I've got tickets") ─────────────────────
   outings: [],
@@ -1575,6 +1686,11 @@ export const useAppStore = create<AppStore>()(
       partialize: (s) => ({
         titles: s.viewerContext.kind === 'friend' ? [] : s.titles,
         outings: s.viewerContext.kind === 'friend' ? [] : s.outings,
+        // listMemberships is deliberately NOT persisted — it's a
+        // Record<string, Set<string>> and Set doesn't survive
+        // JSON.stringify/parse through this middleware; loadLists() re-derives
+        // it every session instead.
+        lists: s.viewerContext.kind === 'friend' ? [] : s.lists,
         filters: s.filters,
         viewMode: s.viewMode,
         gridSize: s.gridSize,
@@ -1599,6 +1715,15 @@ export const useAppStore = create<AppStore>()(
         }
         // Older persisted payloads may lack newer filter keys — backfill them.
         state.filters = { ...defaultFilters, ...state.filters }
+        // Backfill any NavItemId a user's persisted navPrefs.order predates
+        // (e.g. 'lists') — append missing ids at the end rather than resetting
+        // the whole array, so a user's existing customization/reordering
+        // survives. Without this, a returning user would never see a newly
+        // added nav tab.
+        const missingNavItems = DEFAULT_NAV_ORDER.filter((id) => !state.navPrefs.order.includes(id))
+        if (missingNavItems.length > 0) {
+          state.navPrefs = { ...state.navPrefs, order: [...state.navPrefs.order, ...missingNavItems] }
+        }
         // One-time migration: the default sort used to be 'addedAt'. Flip
         // still-on-default users over to the new 'lastInteraction' default
         // without touching anyone who has since picked a different sort.

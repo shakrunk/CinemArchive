@@ -137,6 +137,19 @@ export interface PhysicalMediaItem {
   notes?: string    // packaging, region, condition…
 }
 
+/** A user-created custom list of titles (see schema.sql `lists`/`list_items`).
+ *  Private-only, orthogonal to `WatchStatus` — a title's list memberships have
+ *  no bearing on whether it's watched/watchlist/watching/dropped. Membership
+ *  itself isn't modeled as a client type: the store keeps it as
+ *  `Record<listId, Set<titleId>>` (see useAppStore's ListsSlice). */
+export interface List {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Title {
   id: string
   tmdbId: number

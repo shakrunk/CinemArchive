@@ -106,6 +106,7 @@ dependencies {
     implementation(project(":feature:auth"))
     implementation(project(":feature:discover"))
     implementation(project(":feature:upnext"))
+    implementation(project(":feature:lists"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)

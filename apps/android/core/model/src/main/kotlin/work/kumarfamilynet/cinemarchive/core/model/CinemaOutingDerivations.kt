@@ -78,5 +78,22 @@ object CinemaOutingRules {
     fun titleIdsWithScheduledOuting(outings: List<CinemaOuting>): Set<String> =
         outings.filter { it.status == OutingStatus.SCHEDULED }.map { it.titleId }.toSet()
 
+    /** "On this day" memory-lane entries (issue #218): completed outings whose showtime falls
+     *  on today's month/day in a prior year, most recent match first. [zone] defaults to the
+     *  device's zone, same rationale as [countdownLabel] — purely a display grouping, not a
+     *  stored fact. A trip completed earlier *this* year doesn't qualify: "on this day" means
+     *  an anniversary, not something that just happened. */
+    fun onThisDay(outings: List<CinemaOuting>, now: Instant, zone: ZoneId = ZoneId.systemDefault()): List<CinemaOuting> {
+        val today = ZonedDateTime.ofInstant(now, zone).toLocalDate()
+        return outings
+            .filter { it.status == OutingStatus.COMPLETED }
+            .filter { outing ->
+                val showtimeDate = runCatching { ZonedDateTime.ofInstant(Instant.parse(outing.showtime), zone).toLocalDate() }
+                    .getOrNull() ?: return@filter false
+                showtimeDate.year < today.year && showtimeDate.month == today.month && showtimeDate.dayOfMonth == today.dayOfMonth
+            }
+            .sortedByDescending { Instant.parse(it.showtime) }
+    }
+
     private const val FOLLOW_UP_WINDOW_SECONDS = 14L * 24 * 60 * 60
 }

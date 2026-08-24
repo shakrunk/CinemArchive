@@ -41,6 +41,7 @@ import work.kumarfamilynet.cinemarchive.core.model.OutingStatus
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.UpNextBoard
+import work.kumarfamilynet.cinemarchive.core.model.UpNextOnThisDay
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
@@ -364,7 +365,21 @@ class LibraryRepository(
             val title = titlesById[outing.titleId] ?: return@mapNotNull null
             UpNextOuting(outing, title.title, title.posterUrl)
         }
-        UpNextBoard(watching, watchlist, onTheMarquee, freshFromTheLobby)
+        val nowYear = now.atZone(java.time.ZoneId.systemDefault()).year
+        val onThisDay = CinemaOutingRules.onThisDay(outings, now).mapNotNull { outing ->
+            val title = titlesById[outing.titleId] ?: return@mapNotNull null
+            val outingYear = runCatching { Instant.parse(outing.showtime).atZone(java.time.ZoneId.systemDefault()).year }.getOrNull() ?: return@mapNotNull null
+            val viewing = outing.completedViewingId?.let(viewingsById::get)
+            UpNextOnThisDay(
+                outing = outing,
+                titleName = title.title,
+                posterUrl = title.posterUrl,
+                yearsAgo = nowYear - outingYear,
+                rating = viewing?.rating,
+                notes = viewing?.notes,
+            )
+        }
+        UpNextBoard(watching, watchlist, onTheMarquee, freshFromTheLobby, onThisDay)
     }
 
     /** Marks the next unwatched episode of [titleId] as watched (season/episode order) —

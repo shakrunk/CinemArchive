@@ -26,10 +26,24 @@ data class UpNextOuting(
     val posterUrl: String?,
 )
 
+/** One "on this day" memory-lane card's presentation-ready shape (issue #218,
+ *  see [CinemaOutingRules.onThisDay]). [rating]/[notes] come from the outing's linked
+ *  [Viewing], if it still exists and carries either. */
+data class UpNextOnThisDay(
+    val outing: CinemaOuting,
+    val titleName: String,
+    val posterUrl: String?,
+    val yearsAgo: Int,
+    val rating: Double? = null,
+    val notes: String? = null,
+)
+
 data class UpNextBoard(
     val watching: List<UpNextWatching>,
     val watchlist: List<LibraryTitle>,
     val onTheMarquee: List<UpNextOuting> = emptyList(),
     /** Completed outings still awaiting "how was it?" — the "Fresh from the lobby" cards. */
     val freshFromTheLobby: List<UpNextOuting> = emptyList(),
+    /** Past outings that happened on this same month/day in an earlier year. */
+    val onThisDay: List<UpNextOnThisDay> = emptyList(),
 )

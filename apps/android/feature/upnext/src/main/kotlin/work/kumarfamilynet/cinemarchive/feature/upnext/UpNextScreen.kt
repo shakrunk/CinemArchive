@@ -80,6 +80,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.seating
 import work.kumarfamilynet.cinemarchive.core.model.UpNextBoard
+import work.kumarfamilynet.cinemarchive.core.model.UpNextOnThisDay
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
@@ -268,7 +269,29 @@ private fun UpNextScreen(
                 }
             }
 
-            if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty()) {
+            if (board.onThisDay.isNotEmpty()) {
+                item {
+                    ReadingWidthColumn {
+                        Text(
+                            "ON THIS DAY",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                        )
+                    }
+                }
+            }
+            itemsIndexed(board.onThisDay, key = { _, it -> "on-this-day-${it.outing.id}" }) { index, entry ->
+                ReadingWidthColumn {
+                    OnThisDayCard(
+                        entry,
+                        shape = groupShape(index, board.onThisDay.size),
+                        onOpen = { onTitleClick(entry.outing.titleId) },
+                    )
+                }
+            }
+
+            if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
                 item {
                     ReadingWidthColumn {
                         Text(
@@ -384,6 +407,59 @@ private fun FreshFromTheLobbyCard(entry: UpNextOuting, shape: Shape, onOpen: () 
             Text("FRESH FROM THE LOBBY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
             Text(entry.titleName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onTertiaryContainer)
             Text("How was it?", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onTertiaryContainer)
+        }
+    }
+}
+
+/** A memory-lane card for a completed outing that happened on this month/day in a prior year
+ *  (issue #218) — venue/companions from the outing itself, rating/notes from its linked
+ *  viewing when either survived ("didn't make it" reverts delete the viewing, and a plain
+ *  rewatch can leave notes/rating both null). */
+@Composable
+private fun OnThisDayCard(entry: UpNextOnThisDay, shape: Shape, onOpen: () -> Unit) {
+    val outing = entry.outing
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onOpen)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        PosterSurface(
+            tint = tintForKey(outing.id),
+            imageUrl = entry.posterUrl,
+            modifier = Modifier.size(width = 56.dp, height = 80.dp),
+            aspectRatio = 56f / 80f,
+            cornerRadius = 14.dp,
+        )
+        Column {
+            Text(
+                if (entry.yearsAgo == 1) "1 YEAR AGO TODAY" else "${entry.yearsAgo} YEARS AGO TODAY",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(entry.titleName, style = MaterialTheme.typography.titleMedium)
+            val details = listOfNotNull(
+                outing.venue,
+                outing.companions.takeIf { it.isNotEmpty() }?.let { "with ${it.joinToString(" & ")}" },
+                entry.rating?.let { "★ %.1f".format(it) },
+            ).joinToString(" · ")
+            if (details.isNotBlank()) {
+                Text(details, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            entry.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                Text(
+                    "“$notes”",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }

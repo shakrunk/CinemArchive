@@ -18,6 +18,8 @@ number is chosen.
 - Android: a "want to see in theaters" flag on movie title details — a lighter-weight signal
   than scheduling an outing. Once a flagged movie's release date passes with no outing booked
   yet, its Up Next watchlist card turns into a prompt to schedule one (#205).
+- Android: an "on this day" memory-lane card on Up Next, surfacing a past cinema outing (venue,
+  companions, rating, notes) that happened on today's month/day in a prior year (#218).
 
 ### Fixed
 

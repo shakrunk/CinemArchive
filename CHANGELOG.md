@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.1] - 2026-08-23
+
 ### Fixed
 
 - Web: the Discover page's "Because You Watched" and "More Starring" reels now respect the

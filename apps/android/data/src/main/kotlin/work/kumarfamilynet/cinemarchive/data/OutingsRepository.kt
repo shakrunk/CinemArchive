@@ -165,6 +165,43 @@ class OutingsRepository(
         rearmAlarm()
     }
 
+    /** Attaches a captured ticket photo (GitHub #219) to an outing, plus whatever barcode
+     *  [work.kumarfamilynet.cinemarchive.core.designsystem.decodeTicketBarcode] managed to read
+     *  off it. [barcodePayload]/[barcodeFormat] are null when nothing decoded — the photo is
+     *  still saved as the visual proof-of-ticket, TicketScreen just has no code to render for
+     *  it. Overwrites any previous capture on this outing (one ticket photo at a time). */
+    suspend fun saveTicketCapture(
+        outingId: String,
+        imagePath: String,
+        barcodePayload: String?,
+        barcodeFormat: TicketBarcodeFormat?,
+    ) {
+        val existing = cinemaOutingDao.getById(outingId) ?: return
+        val updated = existing.copy(
+            ticketImagePath = imagePath,
+            ticketBarcodePayload = barcodePayload,
+            ticketBarcodeFormat = barcodeFormat?.name,
+            updatedAt = Instant.now().toString(),
+        )
+        cinemaOutingDao.upsert(updated)
+        enqueueOutingMutation(updated)
+    }
+
+    /** Removes a captured ticket photo/barcode, e.g. before re-capturing or if it was added by
+     *  mistake. Does not touch [CinemaOutingEntity.bookingRef] — that's a separately-entered
+     *  field, not part of the capture. */
+    suspend fun clearTicketCapture(outingId: String) {
+        val existing = cinemaOutingDao.getById(outingId) ?: return
+        val updated = existing.copy(
+            ticketImagePath = null,
+            ticketBarcodePayload = null,
+            ticketBarcodeFormat = null,
+            updatedAt = Instant.now().toString(),
+        )
+        cinemaOutingDao.upsert(updated)
+        enqueueOutingMutation(updated)
+    }
+
     /** Cancels a still-scheduled outing (before the show ends) — kept as a row for history,
      *  never transitions to completed. No-op for an outing that's already completed/missed/
      *  cancelled. */

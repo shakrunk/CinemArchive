@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Android: ticket photo capture — pick a photo of a real cinema ticket from an outing's edit
+  sheet, decode whatever barcode is printed on it (QR, CODE_128, PDF_417, and more), and show
+  the actual captured ticket at the door instead of a re-encoded QR of the booking reference
+  (which isn't guaranteed to be scannable for a non-QR ticket) (#219).
+
 ### Fixed
 
 - Web: Discover page's Both/Movies/TV Shows type filter now actually changes the reel when a

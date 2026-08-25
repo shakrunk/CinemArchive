@@ -104,3 +104,7 @@
 ## 2026-08-23 - [Download ICS Accessibility]
 **Learning:** Icon-with-text buttons in utility menus (like the '.ics' download button in OutingScheduleSheet) may still need aria-labels if the visible text ('Download .ics') is too brief or technical to fully explain the button's action to screen reader users (e.g., 'Download ICS file for calendar').
 **Action:** When auditing icon buttons, also review buttons with very short or technical text labels to ensure they provide sufficient context for screen reader users, adding a descriptive aria-label when necessary.
+
+## 2026-08-25 - Missing Focus States on Discover Action Buttons
+**Learning:** Found several buttons in `Discover.tsx` (Carousel pause button, empty state clear search button, view more button, and carousel scroll buttons) that were missing proper focus rings, making them inaccessible to keyboard users.
+**Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60' (and rounded-sm or rounded-full) to these buttons to ensure consistent and accessible keyboard navigation.

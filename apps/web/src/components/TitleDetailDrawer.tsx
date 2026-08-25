@@ -414,6 +414,10 @@ function ViewingTimeline({
   const outings = useAppStore((s) => s.outings)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // ⚡ Bolt: Precompute an O(1) Map for outing lookups during the render loop
+  const outingsMap = useMemo(() => new Map(outings.map((o) => [o.id, o])), [outings])
+
   if (viewings.length === 0) {
     return (
       <div className="text-center py-6 text-muted-foreground text-sm font-sans flex flex-col items-center gap-3">
@@ -442,7 +446,7 @@ function ViewingTimeline({
           .sort((a, b) => viewingTime(b) - viewingTime(a))
           .map((v) => {
             const formattedDate = v.date ? fmtDate(v.date) : 'Before CinemArchive'
-            const outing = v.outingId ? outings.find((o) => o.id === v.outingId) : undefined
+            const outing = v.outingId ? outingsMap.get(v.outingId) : undefined
             return (
             <div key={v.id} className="relative">
               <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />

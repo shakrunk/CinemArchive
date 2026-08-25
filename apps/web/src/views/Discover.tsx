@@ -499,7 +499,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
           <button
             onClick={() => scrollByPage(-1)}
             aria-label="Scroll left"
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
+            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
           >
             <ChevronLeft className="w-4 h-4 text-paper" />
@@ -507,7 +507,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
           <button
             onClick={() => scrollByPage(1)}
             aria-label="Scroll right"
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10"
+            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
           >
             <ChevronRight className="w-4 h-4 text-paper" />
@@ -531,7 +531,7 @@ function CarouselPauseButton({ paused, onToggle }: { paused: boolean; onToggle: 
       aria-pressed={paused}
       aria-label={paused ? 'Resume carousel auto-scroll' : 'Pause carousel auto-scroll'}
       className={cn(
-        'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider rounded-full border px-2.5 py-1 transition-colors',
+        'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider rounded-full border px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
         paused
           ? 'text-amber border-amber/40'
           : 'text-paper-faint hover:text-paper hover:border-amber/40',
@@ -673,7 +673,7 @@ function DiscoverEmptyState({
       {onClearSearch && (
         <button
           onClick={onClearSearch}
-          className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto"
+          className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <X className="w-3.5 h-3.5" />
           Clear search
@@ -1654,7 +1654,7 @@ export function Discover() {
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50 rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               >
                 {loadingMore ? 'Loading…' : 'View more'}
                 <ChevronRight className="w-3.5 h-3.5" />

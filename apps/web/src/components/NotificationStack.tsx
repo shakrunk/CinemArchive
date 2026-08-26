@@ -88,7 +88,7 @@ function NotificationCard({
       <button
         onClick={onDismiss}
         className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
-        aria-label="Dismiss"
+        aria-label="Dismiss notification"
       >
         <X className="w-3.5 h-3.5" />
       </button>

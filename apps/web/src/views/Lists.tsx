@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ListChecks, Plus, Trash2, ArrowLeft, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { Button } from 'src/components/ui/button'
@@ -46,7 +46,8 @@ function NewListForm() {
 function ListCard({ list, onOpen }: { list: List; onOpen: () => void }) {
   const titles = useAppStore((s) => s.titles)
   const memberIds = useAppStore((s) => s.listMemberships[list.id])
-  const memberTitles = titles.filter((t) => memberIds?.has(t.id))
+  // ⚡ Bolt: Memoize expensive O(N) array filtering to prevent unnecessary calculations on every render
+  const memberTitles = useMemo(() => titles.filter((t) => memberIds?.has(t.id)), [titles, memberIds])
 
   return (
     <button
@@ -110,7 +111,8 @@ function ListsGrid({ onOpen }: { onOpen: (id: string) => void }) {
 function ListDetail({ list, onBack }: { list: List; onBack: () => void }) {
   const titles = useAppStore((s) => s.titles)
   const memberIds = useAppStore((s) => s.listMemberships[list.id])
-  const memberTitles = titles.filter((t) => memberIds?.has(t.id))
+  // ⚡ Bolt: Memoize expensive O(N) array filtering to prevent unnecessary calculations on every render
+  const memberTitles = useMemo(() => titles.filter((t) => memberIds?.has(t.id)), [titles, memberIds])
   const removeTitleFromList = useAppStore((s) => s.removeTitleFromList)
   const deleteList = useAppStore((s) => s.deleteList)
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)

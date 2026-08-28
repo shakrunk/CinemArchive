@@ -62,3 +62,7 @@
 ## 2024-03-24 - O(N*M) lookups in render loops
 **Learning:** Checking for month labels inside a `weeks.map(...)` array iteration via `monthLabels.find(...)` during render creates an O(N*M) calculation.
 **Action:** When optimizing React render loops, replace nested array lookups (e.g., `.some()` or `.find()` inside a `.map()`) with O(1) `Set` or `Map` lookups, precomputing the hash map in a `useMemo` hook to avoid O(N*M) complexity.
+
+## 2024-03-24 - O(N) array filtering in List rendering loops
+**Learning:** Filtering arrays (like `titles`) directly inside rendering loops (like `ListCard` and `ListDetail`) without memoization causes expensive O(N) calculations on every render, especially when the child components are frequently re-rendered by parent updates.
+**Action:** When filtering arrays from global state within React components, always wrap the `.filter()` operation in a `useMemo` hook to prevent redundant O(N) calculations and improve rendering performance.

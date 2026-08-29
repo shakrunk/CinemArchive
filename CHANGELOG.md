@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: opening any title's detail drawer from the Library crashed the entire app to a blank
+  page. `ListsCard` selected `s.listsForTitle(titleId)` directly as a Zustand selector, and
+  that store method allocates a fresh filtered array on every call — `useSyncExternalStore`
+  never saw two consecutive snapshots as equal, so it re-rendered forever until React's
+  "Maximum update depth exceeded" guard tore down the whole tree, leaving only the page's
+  background visible.
+
 ## [1.29.1] - 2026-08-23
 
 ### Fixed

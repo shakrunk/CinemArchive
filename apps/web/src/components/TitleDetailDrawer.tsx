@@ -609,7 +609,16 @@ function StatusCard({
 
 // Lists is private-only — never rendered for a shared/friend viewer (isSharedView).
 function ListsCard({ titleId, onOpenPicker }: { titleId: string; onOpenPicker: () => void }) {
-  const lists = useAppStore((s) => s.listsForTitle(titleId))
+  // Atomic selectors + local useMemo, not `s.listsForTitle(titleId)` directly as the selector —
+  // that store method allocates a fresh array every call, so useSyncExternalStore's snapshot
+  // comparison never sees it as equal and re-renders forever ("Maximum update depth exceeded",
+  // which takes the whole app down since nothing catches it).
+  const allLists = useAppStore((s) => s.lists)
+  const listMemberships = useAppStore((s) => s.listMemberships)
+  const lists = useMemo(
+    () => allLists.filter((l) => listMemberships[l.id]?.has(titleId)),
+    [allLists, listMemberships, titleId]
+  )
   return (
     <SectionCard
       title="Lists"

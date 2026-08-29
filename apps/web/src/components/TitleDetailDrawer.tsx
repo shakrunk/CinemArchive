@@ -1810,8 +1810,10 @@ export function TitleDetailDrawer() {
 
   // Scrollable drawer body — own Lenis instance since the page-level one is `window`-scoped
   // and already suspended while this dialog holds the scroll lock (see useSmoothScroll.ts).
-  const scrollBodyRef = useRef<HTMLDivElement>(null)
-  useScopedSmoothScroll(scrollBodyRef, isDetailDrawerOpen)
+  // A callback-ref-backed state, not a plain useRef: the hook needs to re-run exactly when
+  // this node mounts into the Dialog's portal, which a stable ref-object identity can't signal.
+  const [scrollBodyEl, setScrollBodyEl] = useState<HTMLDivElement | null>(null)
+  useScopedSmoothScroll(scrollBodyEl, isDetailDrawerOpen)
 
   // When a TV show is opened and episode metadata is missing, fetch season details
   // from TMDB and hydrate them in-place, then persist to DB. Handles two cases:
@@ -2069,7 +2071,7 @@ export function TitleDetailDrawer() {
         />
       )}
 
-      <div ref={scrollBodyRef} className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
+      <div ref={setScrollBodyEl} className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
         {/* Hero: cinematic backdrop (stored or fetched) or blurred-poster fallback */}
         {(title.backdropUrl || heroBackdropUrl) ? (
           <HeroBackdrop

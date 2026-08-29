@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect } from 'react'
 import Lenis from 'lenis'
 import 'lenis/dist/lenis.css'
 import { prefersReducedMotion } from './motion'
@@ -58,12 +58,17 @@ export function useSmoothScroll(): void {
  * `Dialog`/`Sheet` holds the scroll lock, so there's no double-smoothing to guard
  * against here — this element just needs its own instance since it isn't `window`.
  *
- * `enabled` gates creation (e.g. only while the drawer is actually open) — pass
- * `true` once the ref is guaranteed to be attached.
+ * Takes the DOM node itself, not a `RefObject` — pass state from a callback ref
+ * (`useState<HTMLElement | null>`), not `someRef.current`. A plain object ref's
+ * identity never changes, so an effect keyed on `[ref, enabled]` can fire while
+ * `ref.current` is still null (e.g. the node hasn't mounted into a Radix Dialog's
+ * portal yet) and then never re-fire once it does, silently never creating an
+ * instance. Keying on the node itself re-runs the effect exactly when it mounts.
+ *
+ * `enabled` additionally gates creation (e.g. only while the drawer is open).
  */
-export function useScopedSmoothScroll(ref: RefObject<HTMLElement | null>, enabled: boolean): void {
+export function useScopedSmoothScroll(el: HTMLElement | null, enabled: boolean): void {
   useEffect(() => {
-    const el = ref.current
     if (!enabled || !el || prefersReducedMotion()) return
 
     const lenis = new Lenis({
@@ -85,5 +90,5 @@ export function useScopedSmoothScroll(ref: RefObject<HTMLElement | null>, enable
       cancelAnimationFrame(frameId)
       lenis.destroy()
     }
-  }, [ref, enabled])
+  }, [el, enabled])
 }

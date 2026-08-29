@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.2] - 2026-08-29
+
 ### Fixed
 
 - Web: opening any title's detail drawer from the Library crashed the entire app to a blank

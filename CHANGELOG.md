@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.3] - 2026-08-29
+
 ### Fixed
 
 - Web: scrolling inside the title detail drawer was frozen. `useScopedSmoothScroll` keyed its

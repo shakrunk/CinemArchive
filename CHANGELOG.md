@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: scrolling inside the title detail drawer was frozen. `useScopedSmoothScroll` keyed its
+  effect on `[ref, enabled]`, and a plain object ref's identity never changes — the effect
+  could fire while `ref.current` was still null (the div hadn't mounted into the Dialog's
+  portal yet) and then never re-fire once it did, so no Lenis instance was ever attached and
+  nothing intercepted the drawer's own scroll. The hook now takes the DOM node itself (via a
+  callback-ref-backed `useState`), so it re-runs exactly when the node mounts.
+
 ## [1.29.2] - 2026-08-29
 
 ### Fixed

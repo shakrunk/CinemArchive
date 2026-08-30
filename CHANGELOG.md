@@ -15,6 +15,13 @@ number is chosen.
   when the mouse is off to its side — the table's horizontal-scroll wrapper was opting out of
   the smooth-scroll library for both axes instead of just the horizontal one.
 
+### Changed
+
+- Web: smooth scroll now responds instantly to wheel input instead of feeling delayed —
+  switched Lenis from a per-tick easing tween (`duration`/`easing`) to frame-proportional
+  `lerp`, which is what it recommends for continuous wheel scrolling; deceleration into the
+  stop is unchanged.
+
 ## [1.29.4] - 2026-08-30
 
 ### Changed

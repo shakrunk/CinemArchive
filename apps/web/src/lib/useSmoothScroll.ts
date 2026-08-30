@@ -20,8 +20,7 @@ export function useSmoothScroll(): void {
     if (prefersReducedMotion()) return
 
     const lenis = new Lenis({
-      duration: 1.1,
-      easing: (t: number) => 1 - Math.pow(1 - t, 3),
+      lerp: 0.12,
       syncTouch: false,
     })
 
@@ -74,8 +73,7 @@ export function useScopedSmoothScroll(el: HTMLElement | null, enabled: boolean):
     const lenis = new Lenis({
       wrapper: el,
       content: el,
-      duration: 1.1,
-      easing: (t: number) => 1 - Math.pow(1 - t, 3),
+      lerp: 0.12,
       syncTouch: false,
     })
 

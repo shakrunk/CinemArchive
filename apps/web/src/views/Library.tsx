@@ -9,19 +9,23 @@ import { EmptyState } from 'src/components/ui/empty-state'
 import { cn, languageName, staggerDelays } from 'src/lib/utils'
 import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import { buildRecommendationPrompt } from 'src/lib/recommendationPrompt'
+import { POSTER_GRID_DENSITY } from 'src/lib/posterGridDensity'
+import { VirtualPosterWall } from 'src/components/ui/virtual-poster-wall'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode, GridSize } from 'src/store/useAppStore'
 import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Poster wall density ─────────────────────────────────────────────────────
 
-// `min` is the narrowest an auto-fill column may get; `cols` is the explicit
-// column count below the 640px breakpoint, where auto-fill would otherwise
-// collapse to a single very wide poster.
+// `min`/`cols` come from POSTER_GRID_DENSITY (shared with the virtualized grid's
+// own layout math — see that module) — `min` is the narrowest an auto-fill
+// column may get; `cols` is the explicit column count below the 640px
+// breakpoint, where auto-fill would otherwise collapse to a single very wide
+// poster.
 const GRID_SIZES: Record<GridSize, { min: string; cols: number; label: string; Icon: typeof LayoutGrid }> = {
-  compact: { min: '130px', cols: 3, label: 'Compact posters', Icon: Grid3x3 },
-  default: { min: '180px', cols: 2, label: 'Default posters', Icon: Grid2x2 },
-  large: { min: '260px', cols: 1, label: 'Large posters', Icon: Square },
+  compact: { min: `${POSTER_GRID_DENSITY.compact.minPx}px`, cols: POSTER_GRID_DENSITY.compact.cols, label: 'Compact posters', Icon: Grid3x3 },
+  default: { min: `${POSTER_GRID_DENSITY.default.minPx}px`, cols: POSTER_GRID_DENSITY.default.cols, label: 'Default posters', Icon: Grid2x2 },
+  large: { min: `${POSTER_GRID_DENSITY.large.minPx}px`, cols: POSTER_GRID_DENSITY.large.cols, label: 'Large posters', Icon: Square },
 }
 
 const GRID_SIZE_ORDER: GridSize[] = ['compact', 'default', 'large']
@@ -772,9 +776,14 @@ export function Library() {
       {/* Content */}
       <div className="animate-view-in">
         {filters.groupByFranchise ? (
+          // Franchise sections interleave headers with grids too small to be
+          // worth windowing — stays on plain PosterWall (see VirtualPosterWall's
+          // own comment for why only the flat path below is virtualized).
           <FranchiseSections titles={filteredTitles} viewMode={viewMode} />
         ) : viewMode === 'grid' ? (
-          <PosterWall titles={filteredTitles} />
+          filteredTitles.length === 0 ? <LibraryEmptyState /> : (
+            <VirtualPosterWall titles={filteredTitles} gridSize={gridSize} />
+          )
         ) : (
           <LedgerList titles={filteredTitles} />
         )}

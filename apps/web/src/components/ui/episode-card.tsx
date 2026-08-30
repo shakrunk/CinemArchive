@@ -112,7 +112,7 @@ export function EpisodeCard({
             type="button"
             onClick={handleQuickWatch}
             aria-label={watched ? 'Mark as watched again' : 'Mark as watched'}
-            className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus:outline-none"
+            className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
               background: watched ? 'rgba(233,178,102,0.22)' : 'rgba(0,0,0,0.55)',
               border: watched ? '1px solid rgba(233,178,102,0.4)' : '1px solid transparent',
@@ -309,11 +309,11 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                       <div className="flex gap-2 mt-0.5">
                         <button
                           onClick={() => { deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id); setPendingDeleteWeId(null) }}
-                          className="font-mono transition-opacity hover:opacity-80"
+                          className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                           style={{ color: 'var(--ember)', fontSize: '10px' }}
                           aria-label="Confirm delete watch event"
                         >Delete</button>
-                        <button onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80" style={{ color: 'var(--paper-faint)', fontSize: '10px' }} aria-label="Cancel delete watch event">Cancel</button>
+                        <button onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: '10px' }} aria-label="Cancel delete watch event">Cancel</button>
                       </div>
                     </div>
                   ) : (
@@ -409,7 +409,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
         ) : (
           <button
             onClick={() => { if (showSaved) return; setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10), prePlatform: false })); setShowForm(true) }}
-            className="flex items-center gap-1.5 text-xs font-mono transition-colors"
+            className="flex items-center gap-1.5 text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             style={{ color: showSaved ? 'var(--amber)' : 'var(--amber-deep)' }}
             onMouseEnter={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber)' }}
             onMouseLeave={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber-deep)' }}

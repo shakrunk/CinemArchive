@@ -92,3 +92,19 @@
 **Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm' to unstyled text buttons that were missing proper accessibility focus indicators.
 \n## 2026-07-25 - Actionable Empty States in Search Panels\n**Learning:** Search panels in this application (like ShareOutingPanel and SendRecommendationPanel) frequently display dead-end empty states ("No results") without providing a quick recovery path to clear the active query.\n**Action:** Whenever implementing or modifying search-driven lists that can result in an empty state, always include an actionable "Clear search" button (with proper `aria-label` and `focus-visible` styling) to allow users to quickly reset their state and continue their workflow.
 \n## 2026-07-28 - Focus States on Add Title Workflow Buttons\n**Learning:** The `AddTitleWorkflow` component had several interactive elements (decrease/increase buttons, toggle complete, remove tag, etc.) that were missing visual focus indicators, making them difficult to use for keyboard-only users.\n**Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full' (or 'rounded-sm') to interactive elements within custom workflows to ensure consistent and accessible keyboard navigation.
+
+## 2026-07-28 - Focus States on Transient Notification Dismiss Buttons
+**Learning:** Icon-only dismiss buttons in transient notifications (like the 'how was it' prompt in UpNext) can easily be missed for focus ring application because they appear conditionally. Without explicit focus states, they remain effectively invisible to keyboard navigation users.
+**Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60' to the absolute-positioned dismiss button in transient prompts to ensure keyboard discoverability.
+
+## 2026-08-01 - Keyboard Focus Rings on Reusable Icon Buttons
+**Learning:** Found a reusable UI component (`IconBtn` in `trailer-row.tsx`) that was explicitly hiding focus rings with `focus:outline-none`, breaking keyboard accessibility for the trailer media controls. Standard practice in this app requires explicit visible focus rings for interactive elements.
+**Action:** When creating or modifying reusable button components, always ensure `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60` (or `ring-1`) is applied instead of just `focus:outline-none` so that keyboard users have visual feedback during navigation.
+
+## 2026-08-23 - [Download ICS Accessibility]
+**Learning:** Icon-with-text buttons in utility menus (like the '.ics' download button in OutingScheduleSheet) may still need aria-labels if the visible text ('Download .ics') is too brief or technical to fully explain the button's action to screen reader users (e.g., 'Download ICS file for calendar').
+**Action:** When auditing icon buttons, also review buttons with very short or technical text labels to ensure they provide sufficient context for screen reader users, adding a descriptive aria-label when necessary.
+
+## 2026-08-25 - Missing Focus States on Discover Action Buttons
+**Learning:** Found several buttons in `Discover.tsx` (Carousel pause button, empty state clear search button, view more button, and carousel scroll buttons) that were missing proper focus rings, making them inaccessible to keyboard users.
+**Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60' (and rounded-sm or rounded-full) to these buttons to ensure consistent and accessible keyboard navigation.

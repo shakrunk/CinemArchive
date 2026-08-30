@@ -64,7 +64,7 @@ function IconBtn({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="focus:outline-none transition-colors"
+      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm transition-colors"
       style={{ color: amber ? 'var(--amber)' : 'var(--paper-faint)', lineHeight: 0 }}
       onMouseEnter={(e) => { if (!amber) e.currentTarget.style.color = 'var(--paper)' }}
       onMouseLeave={(e) => { if (!amber) e.currentTarget.style.color = 'var(--paper-faint)' }}

@@ -31,13 +31,19 @@ export function CompanionInput({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // ⚡ Bolt: Replace nested O(N*M) lookups with O(1) Set lookup
+  const companionNames = useMemo(
+    () => new Set(companions.map((c) => c.name.toLowerCase())),
+    [companions]
+  )
+
   const filtered = suggestions
-    .filter((s) => !companions.some((c) => c.name.toLowerCase() === s.name.toLowerCase()))
+    .filter((s) => !companionNames.has(s.name.toLowerCase()))
     .filter((s) => !input.trim() || s.name.toLowerCase().includes(input.trim().toLowerCase()))
     .slice(0, 6)
 
   function addCompanion(c: Companion) {
-    if (companions.some((x) => x.name.toLowerCase() === c.name.toLowerCase())) return
+    if (companionNames.has(c.name.toLowerCase())) return
     onChange([...companions, c])
     setInput('')
   }
@@ -657,6 +663,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
         </Button>
         <button
           onClick={handleDownloadIcs}
+          aria-label="Download ICS file for calendar"
           className="flex items-center gap-1.5 text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >
           <Download className="w-3.5 h-3.5" />

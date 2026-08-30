@@ -28,6 +28,10 @@ number is chosen.
   post-show log, command palette, keyboard shortcuts help) is now code-split and fetched on
   first use instead of shipping in the single main bundle. The main entry chunk drops from
   578KB to ~110KB (34KB gzip); the rest loads on demand.
+- Web: the library's poster grid (grid view, not grouped by franchise) is now windowed —
+  only the rows near the viewport are ever in the DOM, instead of every title in the filtered
+  set at once. Scales to large libraries without the per-poster DOM/paint cost growing with
+  every title added.
 
 ## [1.29.3] - 2026-08-29
 

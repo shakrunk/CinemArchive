@@ -975,6 +975,14 @@
   .upnext-grid > * {
     animation: poster-in 0.48s var(--ease) var(--poster-delay, 0ms) both;
   }
+  /* VirtualPosterWall marks rows mounted after its own first commit (i.e. ones
+     that scrolled into view rather than being part of the initial paint) so
+     they don't replay this entrance animation every time they're windowed
+     back into the DOM. Higher specificity than the rule above, no !important
+     needed. */
+  .poster-wall--virtual .poster.poster--no-enter {
+    animation: none;
+  }
 
   /* ── Poster (typographic / image face with sheen) ── */
   .poster {

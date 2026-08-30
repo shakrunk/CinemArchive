@@ -17,6 +17,9 @@ number is chosen.
 
 ### Changed
 
+- Web: library poster grid no longer overlays a redundant title over posters that already
+  carry it in the artwork — the editorial title text is now shown only as a fallback for
+  titles with no poster image; the Discover grid's caption-style overlay is unchanged.
 - Web: smooth scroll now responds instantly to wheel input instead of feeling delayed —
   switched Lenis from a per-tick easing tween (`duration`/`easing`) to frame-proportional
   `lerp`, which is what it recommends for continuous wheel scrolling; deceleration into the

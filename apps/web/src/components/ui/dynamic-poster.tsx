@@ -145,8 +145,13 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
         {/* body */}
         {rich ? (
           <div className="relative z-[2] mt-auto">
-            <h3 className="poster__title text-[clamp(18px,2vw,24px)]">{title.title}</h3>
-            <div className="mt-2 flex items-center gap-2 font-mono text-[11px] text-white/70">
+            {/* Poster art already carries the title (logo/typography baked into the
+                image) — an overlay title here is only useful as a fallback for
+                titles with no poster, so skip it once an image is present. */}
+            {!hasImage && (
+              <h3 className="poster__title text-[clamp(18px,2vw,24px)]">{title.title}</h3>
+            )}
+            <div className={cn('flex items-center gap-2 font-mono text-[11px] text-white/70', hasImage ? 'mt-0' : 'mt-2')}>
               <span>{title.year}</span>
               {title.runtime ? (
                 <>

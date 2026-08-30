@@ -9,6 +9,45 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.4] - 2026-08-30
+
+### Changed
+
+- Web: poster images now request a TMDB size matched to their actual on-screen width
+  (`w185`/`w342`/`w500` via `srcSet`) instead of always the largest stored size, and the hero
+  backdrop banner no longer upgrades images to TMDB's `original` resolution — both were
+  shipping several times more image data than the layout ever displays. Added a `preconnect`
+  for `image.tmdb.org` alongside the existing font preconnects.
+- Web: typing in the library search box no longer re-filters and re-sorts the whole library
+  on every keystroke — the input stays instantly responsive while the actual filtering is
+  debounced ~180ms behind it.
+- Web: the film-grain/projector-beam/dust atmosphere layers now pause their infinite CSS
+  animations while the tab is backgrounded, instead of running (and, for the grain layer,
+  forcing continuous recomposite via `mix-blend-mode`) for the whole session regardless of
+  visibility.
+- Web: every view (Library, Ledger, Discover, Lists, Profile, Friends, Up Next) and every
+  on-demand modal/sheet (Add Title, title detail, refresh metadata, cinema outing scheduling,
+  post-show log, command palette, keyboard shortcuts help) is now code-split and fetched on
+  first use instead of shipping in the single main bundle. The main entry chunk drops from
+  578KB to ~110KB (34KB gzip); the rest loads on demand.
+- Web: the library's poster grid (grid view, not grouped by franchise) is now windowed —
+  only the rows near the viewport are ever in the DOM, instead of every title in the filtered
+  set at once. Scales to large libraries without the per-poster DOM/paint cost growing with
+  every title added.
+- Web: replaced several O(N×M) nested array lookups with O(1) Set/Map lookups — library
+  filtering by genre/tag/network/decade/language, the cinema-outing companion picker, the
+  title detail drawer's viewing timeline, and the Ledger's activity heatmap month labels.
+  Reduces render cost on large libraries; behavior is unchanged.
+- Web: the Lists view's per-list member-title filtering is now memoized instead of
+  recomputing on every render.
+
+### Fixed
+
+- Web: added missing accessible labels/focus indicators — the notification dismiss button,
+  the cinema-outing `.ics` download button, Discover's action buttons, episode card buttons,
+  the Up Next dismiss-prompt button, and the trailer row's media controls all now expose a
+  proper ARIA label or visible focus ring for keyboard/screen-reader use.
+
 ## [1.29.3] - 2026-08-29
 
 ### Fixed

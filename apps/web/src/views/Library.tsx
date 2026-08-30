@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check, Grid3x3, Grid2x2, Square } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -9,22 +9,33 @@ import { EmptyState } from 'src/components/ui/empty-state'
 import { cn, languageName, staggerDelays } from 'src/lib/utils'
 import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import { buildRecommendationPrompt } from 'src/lib/recommendationPrompt'
+import { POSTER_GRID_DENSITY } from 'src/lib/posterGridDensity'
+import { VirtualPosterWall } from 'src/components/ui/virtual-poster-wall'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode, GridSize } from 'src/store/useAppStore'
 import { Eyebrow } from 'src/components/ui/typography'
 
 // ─── Poster wall density ─────────────────────────────────────────────────────
 
-// `min` is the narrowest an auto-fill column may get; `cols` is the explicit
-// column count below the 640px breakpoint, where auto-fill would otherwise
-// collapse to a single very wide poster.
+// `min`/`cols` come from POSTER_GRID_DENSITY (shared with the virtualized grid's
+// own layout math — see that module) — `min` is the narrowest an auto-fill
+// column may get; `cols` is the explicit column count below the 640px
+// breakpoint, where auto-fill would otherwise collapse to a single very wide
+// poster.
 const GRID_SIZES: Record<GridSize, { min: string; cols: number; label: string; Icon: typeof LayoutGrid }> = {
-  compact: { min: '130px', cols: 3, label: 'Compact posters', Icon: Grid3x3 },
-  default: { min: '180px', cols: 2, label: 'Default posters', Icon: Grid2x2 },
-  large: { min: '260px', cols: 1, label: 'Large posters', Icon: Square },
+  compact: { min: `${POSTER_GRID_DENSITY.compact.minPx}px`, cols: POSTER_GRID_DENSITY.compact.cols, label: 'Compact posters', Icon: Grid3x3 },
+  default: { min: `${POSTER_GRID_DENSITY.default.minPx}px`, cols: POSTER_GRID_DENSITY.default.cols, label: 'Default posters', Icon: Grid2x2 },
+  large: { min: `${POSTER_GRID_DENSITY.large.minPx}px`, cols: POSTER_GRID_DENSITY.large.cols, label: 'Large posters', Icon: Square },
 }
 
 const GRID_SIZE_ORDER: GridSize[] = ['compact', 'default', 'large']
+
+// Committing every keystroke straight to the store re-filters and re-sorts the
+// whole library synchronously (see applyFiltersToTitles), then re-renders the
+// full unvirtualized poster wall — the app's worst input-latency path on a
+// large library. The input below stays locally controlled for zero-delay
+// typing feel; only the store commit (and the resulting re-filter) is debounced.
+const SEARCH_DEBOUNCE_MS = 180
 
 // ─── Status colors for the ledger list ───────────────────────────────────────
 
@@ -339,6 +350,10 @@ function PosterWall({ titles }: { titles: Title[] }) {
           hasScheduledOuting={scheduledTitleIds.has(title.id)}
           onClick={() => openDetailDrawer(title.id)}
           style={{ ['--poster-delay' as string]: `${delays[i]}ms` }}
+          // Grid columns are `minmax(density.min, 1fr)` with auto-fill, so
+          // rendered width tracks close to the density's min (see index.css
+          // .poster-wall) — a good-enough `sizes` hint without measuring layout.
+          sizes={density.min}
         />
       ))}
     </div>
@@ -516,6 +531,37 @@ export function Library() {
   const { copiedId, copy } = useCopyFeedback()
   const copied = copiedId === 'rec-prompt'
 
+  // Locally-controlled search text, debounced into the store (see
+  // SEARCH_DEBOUNCE_MS above). Re-synced whenever filters.search changes from
+  // outside this component — the clear button below, resetFilters, or a
+  // Ledger panel's "search this actor/director" jump — so those still apply
+  // immediately rather than waiting on a stale debounce timer.
+  const [searchInput, setSearchInput] = useState(filters.search)
+  // Tracks the store value `searchInput` was last synced from, so an external
+  // change (see comment above) can be adjusted for during render rather than
+  // via an effect — React's documented pattern for this, avoiding an extra
+  // commit round-trip for what's otherwise a same-render value swap.
+  const [syncedSearch, setSyncedSearch] = useState(filters.search)
+  if (filters.search !== syncedSearch) {
+    setSyncedSearch(filters.search)
+    setSearchInput(filters.search)
+  }
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(searchDebounceRef.current), [])
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value)
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => setFilter('search', value), SEARCH_DEBOUNCE_MS)
+  }
+
+  function clearSearch() {
+    clearTimeout(searchDebounceRef.current)
+    setSearchInput('')
+    setFilter('search', '')
+  }
+
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.type !== 'all') count++
@@ -544,16 +590,16 @@ export function Library() {
         <div className="search-field flex-1 min-w-[220px] max-w-[460px]">
           <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" aria-hidden="true" />
           <input
-            value={filters.search}
-            onChange={(e) => setFilter('search', e.target.value)}
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search title, director, genre…"
             aria-label="Search"
             autoComplete="off"
             spellCheck={false}
           />
-          {filters.search && (
+          {searchInput && (
             <button
-              onClick={() => setFilter('search', '')}
+              onClick={clearSearch}
               className="text-paper-faint hover:text-ember"
               aria-label="Clear search"
             >
@@ -730,9 +776,14 @@ export function Library() {
       {/* Content */}
       <div className="animate-view-in">
         {filters.groupByFranchise ? (
+          // Franchise sections interleave headers with grids too small to be
+          // worth windowing — stays on plain PosterWall (see VirtualPosterWall's
+          // own comment for why only the flat path below is virtualized).
           <FranchiseSections titles={filteredTitles} viewMode={viewMode} />
         ) : viewMode === 'grid' ? (
-          <PosterWall titles={filteredTitles} />
+          filteredTitles.length === 0 ? <LibraryEmptyState /> : (
+            <VirtualPosterWall titles={filteredTitles} gridSize={gridSize} />
+          )
         ) : (
           <LedgerList titles={filteredTitles} />
         )}

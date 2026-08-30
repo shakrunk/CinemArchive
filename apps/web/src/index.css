@@ -425,6 +425,17 @@
     animation: drift 26s linear infinite;
   }
 
+  /* These three run infinite animations for the whole session, and .grain's
+     mix-blend-mode forces the browser to keep recompositing everything under
+     it every frame. Pointless (and pure battery/CPU cost) while the tab isn't
+     visible — useTabVisibility (App.tsx) toggles this class from a
+     visibilitychange listener. */
+  body.is-tab-hidden .grain,
+  body.is-tab-hidden .projector-beam,
+  body.is-tab-hidden .dust {
+    animation-play-state: paused;
+  }
+
   /* ── Reel rail: instead of dissolving the carousel edge (which just reads as a
      rendering glitch against bright poster art), an opaque scrim deliberately
      covers the last sliver of the row, and a perforated amber rail — literally a
@@ -963,6 +974,14 @@
   .discover-grid .discover-card,
   .upnext-grid > * {
     animation: poster-in 0.48s var(--ease) var(--poster-delay, 0ms) both;
+  }
+  /* VirtualPosterWall marks rows mounted after its own first commit (i.e. ones
+     that scrolled into view rather than being part of the initial paint) so
+     they don't replay this entrance animation every time they're windowed
+     back into the DOM. Higher specificity than the rule above, no !important
+     needed. */
+  .poster-wall--virtual .poster.poster--no-enter {
+    animation: none;
   }
 
   /* ── Poster (typographic / image face with sheen) ── */

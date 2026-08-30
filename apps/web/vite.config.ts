@@ -40,7 +40,10 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'tmdb-images',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              // 3x the entries since the poster grid now requests up to 3 srcset
+              // variants per title (w185/w342/w500) instead of always just w500 —
+              // keeps the same effective per-poster cache coverage as before.
+              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {
@@ -73,9 +76,13 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'react'
           }
-          if (id.includes('node_modules/@radix-ui')) {
-            return 'radix'
-          }
+          // No forced 'radix' chunk: now that most Radix-touching UI lives
+          // behind the lazy views/modals below, a manual chunk here gets
+          // treated as vendor-critical and modulepreloaded on first load —
+          // exactly the eager fetch code-splitting is meant to avoid. Left
+          // alone, the bundler still automatically shares @radix-ui code
+          // across whichever lazy chunks use it, without preloading it
+          // for chunks that don't.
         },
       },
     },

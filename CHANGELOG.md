@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: library list view now scrolls with the page anywhere over the ledger table, not only
+  when the mouse is off to its side — the table's horizontal-scroll wrapper was opting out of
+  the smooth-scroll library for both axes instead of just the horizontal one.
+
 ## [1.29.4] - 2026-08-30
 
 ### Changed

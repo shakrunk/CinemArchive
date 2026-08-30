@@ -16,6 +16,9 @@ number is chosen.
   backdrop banner no longer upgrades images to TMDB's `original` resolution — both were
   shipping several times more image data than the layout ever displays. Added a `preconnect`
   for `image.tmdb.org` alongside the existing font preconnects.
+- Web: typing in the library search box no longer re-filters and re-sorts the whole library
+  on every keystroke — the input stays instantly responsive while the actual filtering is
+  debounced ~180ms behind it.
 
 ## [1.29.3] - 2026-08-29
 

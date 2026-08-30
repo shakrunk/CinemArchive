@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check, Grid3x3, Grid2x2, Square } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -25,6 +25,13 @@ const GRID_SIZES: Record<GridSize, { min: string; cols: number; label: string; I
 }
 
 const GRID_SIZE_ORDER: GridSize[] = ['compact', 'default', 'large']
+
+// Committing every keystroke straight to the store re-filters and re-sorts the
+// whole library synchronously (see applyFiltersToTitles), then re-renders the
+// full unvirtualized poster wall — the app's worst input-latency path on a
+// large library. The input below stays locally controlled for zero-delay
+// typing feel; only the store commit (and the resulting re-filter) is debounced.
+const SEARCH_DEBOUNCE_MS = 180
 
 // ─── Status colors for the ledger list ───────────────────────────────────────
 
@@ -520,6 +527,37 @@ export function Library() {
   const { copiedId, copy } = useCopyFeedback()
   const copied = copiedId === 'rec-prompt'
 
+  // Locally-controlled search text, debounced into the store (see
+  // SEARCH_DEBOUNCE_MS above). Re-synced whenever filters.search changes from
+  // outside this component — the clear button below, resetFilters, or a
+  // Ledger panel's "search this actor/director" jump — so those still apply
+  // immediately rather than waiting on a stale debounce timer.
+  const [searchInput, setSearchInput] = useState(filters.search)
+  // Tracks the store value `searchInput` was last synced from, so an external
+  // change (see comment above) can be adjusted for during render rather than
+  // via an effect — React's documented pattern for this, avoiding an extra
+  // commit round-trip for what's otherwise a same-render value swap.
+  const [syncedSearch, setSyncedSearch] = useState(filters.search)
+  if (filters.search !== syncedSearch) {
+    setSyncedSearch(filters.search)
+    setSearchInput(filters.search)
+  }
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(searchDebounceRef.current), [])
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value)
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => setFilter('search', value), SEARCH_DEBOUNCE_MS)
+  }
+
+  function clearSearch() {
+    clearTimeout(searchDebounceRef.current)
+    setSearchInput('')
+    setFilter('search', '')
+  }
+
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (filters.type !== 'all') count++
@@ -548,16 +586,16 @@ export function Library() {
         <div className="search-field flex-1 min-w-[220px] max-w-[460px]">
           <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" aria-hidden="true" />
           <input
-            value={filters.search}
-            onChange={(e) => setFilter('search', e.target.value)}
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search title, director, genre…"
             aria-label="Search"
             autoComplete="off"
             spellCheck={false}
           />
-          {filters.search && (
+          {searchInput && (
             <button
-              onClick={() => setFilter('search', '')}
+              onClick={clearSearch}
               className="text-paper-faint hover:text-ember"
               aria-label="Clear search"
             >

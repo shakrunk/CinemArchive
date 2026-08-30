@@ -3,8 +3,9 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 
 interface HeroBackdropProps {
   title: Title
-  /** Best-rated backdrop from the images endpoint at original resolution. Falls
-   *  back to the stored title.backdropUrl (upgraded to original) when absent. */
+  /** Best-rated backdrop from the images endpoint, capped at `w1280` (see
+   *  `fetchTitleImages`). Falls back to the stored `title.backdropUrl`
+   *  (also stored at `w1280`) when absent. */
   backdropOverride?: string
   onPosterClick: () => void
   /** Anchored to the banner's top-right corner (offset left of the modal's
@@ -13,14 +14,11 @@ interface HeroBackdropProps {
   children: React.ReactNode
 }
 
-/** Rewrite any stored TMDB size segment to `original` for full-resolution display. */
-function hiResBackdrop(url?: string): string | undefined {
-  if (!url) return url
-  return url.replace(/\/t\/p\/(w\d+|original)\//, '/t/p/original/')
-}
-
 export function HeroBackdrop({ title, backdropOverride, onPosterClick, topRight, children }: HeroBackdropProps) {
-  const backdropSrc = backdropOverride ?? hiResBackdrop(title.backdropUrl)
+  // Both sources are already capped at `w1280` — this banner never renders
+  // wider than ~1000px, so `original` (often 1920px+) bought nothing but
+  // bytes. Upgrading either source further here would undo that cap.
+  const backdropSrc = backdropOverride ?? title.backdropUrl
 
   return (
     <div className="relative overflow-hidden shrink-0">

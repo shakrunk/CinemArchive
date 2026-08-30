@@ -75,6 +75,30 @@ export interface SeasonFetchResult {
 const TMDB_IMG = 'https://image.tmdb.org/t/p'
 const TMDB_IMG_W185 = 'https://image.tmdb.org/t/p/w185'
 
+/** Rewrite a stored TMDB image URL's size segment (`w<N>` or `original`) to a
+ *  different one. Used to request a smaller poster for a small on-screen slot
+ *  than whatever size it was written to the DB at, without touching storage. */
+export function tmdbImageAtSize(url: string | undefined, size: string): string | undefined {
+  if (!url) return url
+  return url.replace(/\/t\/p\/(w\d+|original)\//, `/t/p/${size}/`)
+}
+
+/** Poster `srcset` widths, smallest to largest, and the matching TMDB size
+ *  segment each is fetched at. `w500` is the size posters are stored at
+ *  (`MOCK_RESULTS`/write paths below) — the smaller entries let the grid
+ *  request less than that when a poster renders far smaller than 500px. */
+export const POSTER_SRCSET_SIZES: { width: number; size: string }[] = [
+  { width: 185, size: 'w185' },
+  { width: 342, size: 'w342' },
+  { width: 500, size: 'w500' },
+]
+
+/** Build a poster `srcSet` string from a stored (`w500`) poster URL. */
+export function posterSrcSet(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  return POSTER_SRCSET_SIZES.map(({ width, size }) => `${tmdbImageAtSize(url, size)} ${width}w`).join(', ')
+}
+
 /** Episode-still base URL, shared by consumers that build `stillUrl` fields
  *  from raw TMDB episode payloads (AddTitleWorkflow, RefreshMetadataModal,
  *  TitleDetailDrawer, episode-card.tsx). */
@@ -847,9 +871,13 @@ export async function fetchTitleImages(tmdbId: number, type: MediaType): Promise
     const logo = englishLogos[0] ?? allLogos.filter((l) => l.iso_639_1 === null)[0]
     const logoUrl = logo ? `${TMDB_IMG}/original${logo.file_path}` : null
 
-    // Backdrop — take the first available image.
+    // Backdrop — take the first available image. Capped at w1280 (not
+    // `original`, which is often 1920px+): the hero banner this feeds never
+    // renders wider than ~1000px, and it's the same cap already used for
+    // title.backdropUrl at write time — this stays consistent with that
+    // stored fallback rather than silently outsizing it.
     const backdrop = ((data?.backdrops ?? []) as any[]).find((b) => b.file_path)
-    const backdropUrl = backdrop ? `${TMDB_IMG}/original${backdrop.file_path}` : null
+    const backdropUrl = backdrop ? `${TMDB_IMG}/w1280${backdrop.file_path}` : null
 
     return { logoUrl, backdropUrl }
   } catch (e) {

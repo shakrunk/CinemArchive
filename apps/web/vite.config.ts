@@ -40,7 +40,10 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'tmdb-images',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              // 3x the entries since the poster grid now requests up to 3 srcset
+              // variants per title (w185/w342/w500) instead of always just w500 —
+              // keeps the same effective per-poster cache coverage as before.
+              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {

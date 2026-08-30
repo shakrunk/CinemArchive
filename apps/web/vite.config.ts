@@ -76,9 +76,13 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'react'
           }
-          if (id.includes('node_modules/@radix-ui')) {
-            return 'radix'
-          }
+          // No forced 'radix' chunk: now that most Radix-touching UI lives
+          // behind the lazy views/modals below, a manual chunk here gets
+          // treated as vendor-critical and modulepreloaded on first load —
+          // exactly the eager fetch code-splitting is meant to avoid. Left
+          // alone, the bundler still automatically shares @radix-ui code
+          // across whichever lazy chunks use it, without preloading it
+          // for chunks that don't.
         },
       },
     },

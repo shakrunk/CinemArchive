@@ -1,33 +1,68 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
+import { Loader2 } from 'lucide-react'
 import { TopBar } from 'src/components/TopBar'
 import { BottomNav } from 'src/components/BottomNav'
-import { AddTitleWorkflow } from 'src/components/AddTitleWorkflow'
-import { UpNext } from 'src/views/UpNext'
-import { Library } from 'src/views/Library'
-import { Ledger } from 'src/views/Ledger'
-import { Discover } from 'src/views/Discover'
-import { Lists } from 'src/views/Lists'
-import { Profile } from 'src/views/Profile'
-import { Friends } from 'src/views/Friends'
-import { TitleDetailDrawer } from 'src/components/TitleDetailDrawer'
-import { RefreshMetadataModal } from 'src/components/RefreshMetadataModal'
-import { OutingScheduleSheet } from 'src/components/OutingScheduleSheet'
-import { PostShowSheet } from 'src/components/PostShowSheet'
 import { isSupabaseConfigured, onAuthStateChange, listFriendships } from 'src/lib/auth'
 import { useAppStore, useVisibleNavItems } from 'src/store/useAppStore'
 import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
 import { useOutingReconciler } from 'src/lib/useOutingReconciler'
+import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
-import { AppCommandPalette } from 'src/components/AppCommandPalette'
-import { KeyboardShortcutsHelp } from 'src/components/KeyboardShortcutsHelp'
 import { NotificationStack } from 'src/components/NotificationStack'
 import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 import { useSmoothScroll } from 'src/lib/useSmoothScroll'
 import { useTabVisibility } from 'src/lib/useTabVisibility'
+
+// Code-split everything that isn't part of the unauthenticated landing path
+// (LandingScreen + ProfileModal stay eagerly bundled — that's the actual
+// first-paint route for a new visitor). Only one of the seven views below is
+// ever rendered at a time (see `currentView === '…' &&` below), so lazy
+// imports mean a page load only fetches the JS for the view actually shown,
+// not all seven.
+const UpNext = lazy(() => import('src/views/UpNext').then((m) => ({ default: m.UpNext })))
+const Library = lazy(() => import('src/views/Library').then((m) => ({ default: m.Library })))
+const Ledger = lazy(() => import('src/views/Ledger').then((m) => ({ default: m.Ledger })))
+const Discover = lazy(() => import('src/views/Discover').then((m) => ({ default: m.Discover })))
+const Lists = lazy(() => import('src/views/Lists').then((m) => ({ default: m.Lists })))
+const Profile = lazy(() => import('src/views/Profile').then((m) => ({ default: m.Profile })))
+const Friends = lazy(() => import('src/views/Friends').then((m) => ({ default: m.Friends })))
+
+// These modals/sheets are unconditionally rendered (they manage their own
+// open/closed *visual* state internally, reading their store flag) rather
+// than JSX-gated like the views above — so lazy-loading them alone would
+// still fetch every chunk on first authed render regardless of whether
+// they're ever opened. Each is instead only *mounted* once its flag has been
+// true at least once (`useEverTrue`), deferring the fetch to first open, then
+// left mounted so a later close still has a component to animate out.
+//
+// Verified this doesn't cost the entrance transition on that first open:
+// Radix's `Presence` (`present: forceMount || context.open`) never renders
+// `Dialog.Content` into the DOM at all while closed, so a cold first open
+// already popped in directly at `data-state="open"` with nothing to
+// transition from, identically whether the outer component existed
+// beforehand or not (confirmed against a production preview build).
+const AddTitleWorkflow = lazy(() => import('src/components/AddTitleWorkflow').then((m) => ({ default: m.AddTitleWorkflow })))
+const TitleDetailDrawer = lazy(() => import('src/components/TitleDetailDrawer').then((m) => ({ default: m.TitleDetailDrawer })))
+const RefreshMetadataModal = lazy(() => import('src/components/RefreshMetadataModal').then((m) => ({ default: m.RefreshMetadataModal })))
+const OutingScheduleSheet = lazy(() => import('src/components/OutingScheduleSheet').then((m) => ({ default: m.OutingScheduleSheet })))
+const PostShowSheet = lazy(() => import('src/components/PostShowSheet').then((m) => ({ default: m.PostShowSheet })))
+const AppCommandPalette = lazy(() => import('src/components/AppCommandPalette').then((m) => ({ default: m.AppCommandPalette })))
+const KeyboardShortcutsHelp = lazy(() => import('src/components/KeyboardShortcutsHelp').then((m) => ({ default: m.KeyboardShortcutsHelp })))
+
+// Suspense fallback for a view swap — the app's existing spinner convention
+// (see e.g. ProfileModal), sized to sit quietly in the content area rather
+// than jumping the layout.
+function ViewLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-6 h-6 text-paper-faint animate-spin" aria-hidden="true" />
+    </div>
+  )
+}
 
 // Shared pill style for the accessibility toolbar's controls — subdued at rest
 // so the amber focus state marks which of the revealed pills is active.
@@ -63,8 +98,20 @@ export default function App() {
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const isRefreshMetadataOpen = useAppStore((s) => s.isRefreshMetadataOpen)
+  const isOutingScheduleOpen = useAppStore((s) => s.isOutingScheduleOpen)
+  const isPostShowSheetOpen = useAppStore((s) => s.isPostShowSheetOpen)
 
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
+
+  // Each lazy modal/sheet mounts (and so fetches its chunk) the first time
+  // its flag goes true, then stays mounted — see the lazy() comments above.
+  const addTitleEverOpened = useEverTrue(isAddTitleOpen)
+  const detailDrawerEverOpened = useEverTrue(isDetailDrawerOpen)
+  const refreshMetadataEverOpened = useEverTrue(isRefreshMetadataOpen)
+  const outingScheduleEverOpened = useEverTrue(isOutingScheduleOpen)
+  const postShowSheetEverOpened = useEverTrue(isPostShowSheetOpen)
+  const commandPaletteEverOpened = useEverTrue(isCommandPaletteOpen)
+  const keyboardHelpEverOpened = useEverTrue(isKeyboardHelpOpen)
 
   // A component without access to currentView (e.g. the detail drawer's
   // browse-by-person) requests a view change via the store. We consume it in a
@@ -237,25 +284,49 @@ export default function App() {
           />
 
           <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
-            {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
-            {currentView === 'library' && <Library />}
-            {currentView === 'ledger' && <Ledger />}
-            {currentView === 'discover' && <Discover />}
-            {currentView === 'lists' && <Lists />}
-            {currentView === 'profile' && <Profile />}
-            {currentView === 'friends' && <Friends />}
+            <Suspense fallback={<ViewLoadingFallback />}>
+              {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
+              {currentView === 'library' && <Library />}
+              {currentView === 'ledger' && <Ledger />}
+              {currentView === 'discover' && <Discover />}
+              {currentView === 'lists' && <Lists />}
+              {currentView === 'profile' && <Profile />}
+              {currentView === 'friends' && <Friends />}
+            </Suspense>
           </main>
 
           <BottomNav currentView={currentView} onViewChange={setCurrentView} />
-          <AddTitleWorkflow />
-          <TitleDetailDrawer />
-          <RefreshMetadataModal />
-          <OutingScheduleSheet />
-          <PostShowSheet />
+          {/* Mounted (and so fetched) once each has been opened at least once —
+              see the useEverTrue calls above — then left mounted so a closing
+              one still has a component in the tree to animate out. A null
+              Suspense fallback is fine: these chunks are small, and it's the
+              sheet/modal's own transition doing the animating, not this
+              boundary. */}
+          {addTitleEverOpened && (
+            <Suspense fallback={null}><AddTitleWorkflow /></Suspense>
+          )}
+          {detailDrawerEverOpened && (
+            <Suspense fallback={null}><TitleDetailDrawer /></Suspense>
+          )}
+          {refreshMetadataEverOpened && (
+            <Suspense fallback={null}><RefreshMetadataModal /></Suspense>
+          )}
+          {outingScheduleEverOpened && (
+            <Suspense fallback={null}><OutingScheduleSheet /></Suspense>
+          )}
+          {postShowSheetEverOpened && (
+            <Suspense fallback={null}><PostShowSheet /></Suspense>
+          )}
         </>
       )}
-      <AppCommandPalette onNavigate={setCurrentView} />
-      <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onClose={() => setIsKeyboardHelpOpen(false)} />
+      {commandPaletteEverOpened && (
+        <Suspense fallback={null}><AppCommandPalette onNavigate={setCurrentView} /></Suspense>
+      )}
+      {keyboardHelpEverOpened && (
+        <Suspense fallback={null}>
+          <KeyboardShortcutsHelp open={isKeyboardHelpOpen} onClose={() => setIsKeyboardHelpOpen(false)} />
+        </Suspense>
+      )}
       <NotificationStack />
       <PWAUpdateToast />
     </div>

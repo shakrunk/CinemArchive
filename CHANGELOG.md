@@ -23,6 +23,11 @@ number is chosen.
   animations while the tab is backgrounded, instead of running (and, for the grain layer,
   forcing continuous recomposite via `mix-blend-mode`) for the whole session regardless of
   visibility.
+- Web: every view (Library, Ledger, Discover, Lists, Profile, Friends, Up Next) and every
+  on-demand modal/sheet (Add Title, title detail, refresh metadata, cinema outing scheduling,
+  post-show log, command palette, keyboard shortcuts help) is now code-split and fetched on
+  first use instead of shipping in the single main bundle. The main entry chunk drops from
+  578KB to ~110KB (34KB gzip); the rest loads on demand.
 
 ## [1.29.3] - 2026-08-29
 

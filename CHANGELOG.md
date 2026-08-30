@@ -9,6 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Web: poster images now request a TMDB size matched to their actual on-screen width
+  (`w185`/`w342`/`w500` via `srcSet`) instead of always the largest stored size, and the hero
+  backdrop banner no longer upgrades images to TMDB's `original` resolution — both were
+  shipping several times more image data than the layout ever displays. Added a `preconnect`
+  for `image.tmdb.org` alongside the existing font preconnects.
+
 ## [1.29.3] - 2026-08-29
 
 ### Fixed

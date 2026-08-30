@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { cn, fmtRuntime } from 'src/lib/utils'
+import { posterSrcSet } from 'src/lib/media'
 import type { Title, WatchStatus } from 'src/store/mockData'
 
 interface DynamicPosterProps {
@@ -15,6 +16,12 @@ interface DynamicPosterProps {
    *  (plan §4.6) — the library poster wall's "tickets are visible at a
    *  glance" affordance. Clears the moment the outing completes/cancels. */
   hasScheduledOuting?: boolean
+  /** `sizes` attribute for the poster `srcSet` — how wide this poster
+   *  actually renders in its caller's layout, so the browser can pick the
+   *  smallest adequate TMDB size instead of always fetching `w500`. Defaults
+   *  to a small-thumbnail estimate matching this component's other callers
+   *  (detail-drawer/up-next/add-title thumbnails, all well under 150px). */
+  sizes?: string
 }
 
 /* Moody, cinematic tints keyed off the title — never neon. */
@@ -70,7 +77,7 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export function DynamicPoster({ title, className, style, onClick, rich = false, hideBadges = false, hasScheduledOuting = false }: DynamicPosterProps) {
+export function DynamicPoster({ title, className, style, onClick, rich = false, hideBadges = false, hasScheduledOuting = false, sizes = '144px' }: DynamicPosterProps) {
   const hasImage = Boolean(title.posterUrl)
   const tint = useMemo(() => TINTS[hashString(title.title) % TINTS.length], [title.title])
   const badge = STATUS_BADGE[title.status]
@@ -97,7 +104,14 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
       aria-label={onClick ? title.title : undefined}
     >
       {hasImage && (
-        <img className="poster__img" src={title.posterUrl} alt={title.title} loading="lazy" />
+        <img
+          className="poster__img"
+          src={title.posterUrl}
+          srcSet={posterSrcSet(title.posterUrl)}
+          sizes={sizes}
+          alt={title.title}
+          loading="lazy"
+        />
       )}
 
       {hasScheduledOuting && (

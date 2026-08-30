@@ -339,6 +339,10 @@ function PosterWall({ titles }: { titles: Title[] }) {
           hasScheduledOuting={scheduledTitleIds.has(title.id)}
           onClick={() => openDetailDrawer(title.id)}
           style={{ ['--poster-delay' as string]: `${delays[i]}ms` }}
+          // Grid columns are `minmax(density.min, 1fr)` with auto-fill, so
+          // rendered width tracks close to the density's min (see index.css
+          // .poster-wall) — a good-enough `sizes` hint without measuring layout.
+          sizes={density.min}
         />
       ))}
     </div>

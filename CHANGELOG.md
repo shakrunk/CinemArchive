@@ -19,6 +19,10 @@ number is chosen.
 - Web: typing in the library search box no longer re-filters and re-sorts the whole library
   on every keystroke — the input stays instantly responsive while the actual filtering is
   debounced ~180ms behind it.
+- Web: the film-grain/projector-beam/dust atmosphere layers now pause their infinite CSS
+  animations while the tab is backgrounded, instead of running (and, for the grain layer,
+  forcing continuous recomposite via `mix-blend-mode`) for the whole session regardless of
+  visibility.
 
 ## [1.29.3] - 2026-08-29
 

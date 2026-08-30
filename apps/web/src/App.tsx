@@ -27,6 +27,7 @@ import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 import { useSmoothScroll } from 'src/lib/useSmoothScroll'
+import { useTabVisibility } from 'src/lib/useTabVisibility'
 
 // Shared pill style for the accessibility toolbar's controls — subdued at rest
 // so the amber focus state marks which of the revealed pills is active.
@@ -42,6 +43,7 @@ export default function App() {
   useNavigationSync({ currentView, setCurrentView })
   useOutingReconciler()
   useSmoothScroll()
+  useTabVisibility()
 
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   // Start true when Supabase isn't configured (no auth needed) so we never

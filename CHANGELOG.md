@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.4] - 2026-08-30
+
 ### Changed
 
 - Web: poster images now request a TMDB size matched to their actual on-screen width
@@ -32,6 +34,19 @@ number is chosen.
   only the rows near the viewport are ever in the DOM, instead of every title in the filtered
   set at once. Scales to large libraries without the per-poster DOM/paint cost growing with
   every title added.
+- Web: replaced several O(N×M) nested array lookups with O(1) Set/Map lookups — library
+  filtering by genre/tag/network/decade/language, the cinema-outing companion picker, the
+  title detail drawer's viewing timeline, and the Ledger's activity heatmap month labels.
+  Reduces render cost on large libraries; behavior is unchanged.
+- Web: the Lists view's per-list member-title filtering is now memoized instead of
+  recomputing on every render.
+
+### Fixed
+
+- Web: added missing accessible labels/focus indicators — the notification dismiss button,
+  the cinema-outing `.ics` download button, Discover's action buttons, episode card buttons,
+  the Up Next dismiss-prompt button, and the trailer row's media controls all now expose a
+  proper ARIA label or visible focus ring for keyboard/screen-reader use.
 
 ## [1.29.3] - 2026-08-29
 

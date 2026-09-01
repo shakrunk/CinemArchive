@@ -66,3 +66,6 @@
 ## 2024-03-24 - O(N) array filtering in List rendering loops
 **Learning:** Filtering arrays (like `titles`) directly inside rendering loops (like `ListCard` and `ListDetail`) without memoization causes expensive O(N) calculations on every render, especially when the child components are frequently re-rendered by parent updates.
 **Action:** When filtering arrays from global state within React components, always wrap the `.filter()` operation in a `useMemo` hook to prevent redundant O(N) calculations and improve rendering performance.
+## 2024-05-18 - Memoizing Store Functions with WeakMap
+**Learning:** Functions called iteratively during derived state recalculation (like `titleLastInteractionAt` running inside `applyFiltersToTitles` sort logic) can cause severe performance bottlenecks, executing O(N*M) times where N is the collection size and M is the nested properties depth.
+**Action:** Since Zustand state entities (like `Title` objects) are immutable and receive new references upon update, a module-scoped `WeakMap<Title, number>` cache provides an extremely efficient, memory-safe O(1) lookup that survives React render cycles and only recalculates for objects that actually changed.

@@ -415,6 +415,7 @@ function timeOf(dateStr: string | undefined): number {
   return dateStr ? new Date(dateStr).getTime() : -Infinity
 }
 
+// ⚡ Bolt: Cache expensive derived calculation with a WeakMap to prevent O(N*M) redundant computations
 const lastInteractionCache = new WeakMap<Title, number>()
 
 /** Most recent user interaction with a title: added, (re)watched, or — for

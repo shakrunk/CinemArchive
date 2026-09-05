@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.29.5] - 2026-09-05
+
 ### Fixed
 
 - Web: the title detail drawer can now be scrolled all the way to the bottom after its

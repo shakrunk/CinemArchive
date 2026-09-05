@@ -11,6 +11,9 @@ number is chosen.
 
 ### Fixed
 
+- Web: the title detail drawer can now be scrolled all the way to the bottom after its
+  content grows (e.g. expanding the cast and crew section) — the drawer's smooth scroll was
+  keeping the scroll limit it measured when the drawer opened.
 - Web: library list view now scrolls with the page anywhere over the ledger table, not only
   when the mouse is off to its side — the table's horizontal-scroll wrapper was opting out of
   the smooth-scroll library for both axes instead of just the horizontal one.

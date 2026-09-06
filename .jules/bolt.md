@@ -72,3 +72,7 @@
 ## 2024-05-18 - Memoizing Store Functions with WeakMap
 **Learning:** Functions called iteratively during derived state recalculation (like `titleLastInteractionAt` running inside `applyFiltersToTitles` sort logic) can cause severe performance bottlenecks, executing O(N*M) times where N is the collection size and M is the nested properties depth.
 **Action:** Since Zustand state entities (like `Title` objects) are immutable and receive new references upon update, a module-scoped `WeakMap<Title, number>` cache provides an extremely efficient, memory-safe O(1) lookup that survives React render cycles and only recalculates for objects that actually changed.
+
+## 2024-11-20 - Memoizing Options Props in Re-rendered Views
+**Learning:** React elements passed as props, such as inline array `.map(...)` logic into component properties (e.g. `options={titles.map(...)}`) create brand new array and object references upon every single render cycle of the parent component.
+**Action:** When creating inline maps over derived state, ALWAYS wrap them in `useMemo` hooks (e.g. `const options = useMemo(() => titles.map(...), [titles])`) to guarantee referential equality across render cycles, avoiding expensive reallocation and potential downstream re-renders.

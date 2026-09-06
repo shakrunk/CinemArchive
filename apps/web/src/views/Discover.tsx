@@ -1149,6 +1149,9 @@ export function Discover() {
   // Basis defaults to the first library title unless the user picked one explicitly
   const becauseWatchedId = becauseWatchedOverrideId ?? (titles.length > 0 ? titles[0].id : null)
 
+  // ⚡ Bolt: Memoize expensive O(N) array mapping to prevent unnecessary object allocations on every render
+  const becauseWatchedOptions = useMemo(() => titles.map((t) => ({ id: t.id, label: t.title })), [titles])
+
   const castOptions = useMemo(() => {
     const seen = new Map<number, string>()
     for (const t of titles) {
@@ -1161,6 +1164,9 @@ export function Discover() {
 
   // Basis defaults to the first known cast member unless the user picked one explicitly
   const moreStarringPersonId = moreStarringOverridePersonId ?? (castOptions.length > 0 ? castOptions[0].id : null)
+
+  // ⚡ Bolt: Memoize expensive O(N) array mapping to prevent unnecessary object allocations on every render
+  const moreStarringOptions = useMemo(() => castOptions.map((c) => ({ id: String(c.id), label: c.name })), [castOptions])
 
   // Derived rather than tracked separately: loading exactly while we have a basis whose
   // credits haven't landed yet (mirrors DiscoverDetailModal's `hydrating` derivation above).
@@ -1728,7 +1734,7 @@ export function Discover() {
             <div className="flex flex-wrap items-center gap-2.5 mb-3">
               <h2 className="font-serif text-lg font-semibold text-paper">Because You Watched</h2>
               <TasteDropdown
-                options={titles.map((t) => ({ id: t.id, label: t.title }))}
+                options={becauseWatchedOptions}
                 value={becauseWatchedId}
                 onChange={setBecauseWatchedOverrideId}
                 ariaLabel="Choose a title to base recommendations on"
@@ -1769,7 +1775,7 @@ export function Discover() {
             <div className="flex flex-wrap items-center gap-2.5 mb-3">
               <h2 className="font-serif text-lg font-semibold text-paper">More Starring</h2>
               <TasteDropdown
-                options={castOptions.map((c) => ({ id: String(c.id), label: c.name }))}
+                options={moreStarringOptions}
                 value={moreStarringPersonId != null ? String(moreStarringPersonId) : null}
                 onChange={(id) => setMoreStarringOverridePersonId(Number(id))}
                 ariaLabel="Choose an actor to see more of their titles"

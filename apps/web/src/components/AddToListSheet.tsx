@@ -97,6 +97,7 @@ export function AddToListSheet({ titleId, titleName, onClose }: AddToListSheetPr
             />
             <Button
               type="submit"
+              aria-label="Create list"
               disabled={!newListName.trim()}
               className="h-9 shrink-0 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium px-3"
             >

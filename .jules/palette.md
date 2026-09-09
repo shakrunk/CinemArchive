@@ -112,3 +112,7 @@
 ## 2026-09-02 - Generic Text Button ARIA Labels
 **Learning:** Text-only buttons with generic labels (like "Not now", "Save", "Cancel") often lack sufficient context for screen reader users, even if they have text.
 **Action:** When adding confirmation or dismissal buttons with generic text, ALWAYS add descriptive `aria-label` attributes (e.g., `aria-label="Cancel logging watch event"`) that include the visible text and clarify the specific action to satisfy WCAG 2.5.3 (Label in Name).
+
+## 2024-09-09 - Ensure focus states on clear/close icon buttons
+**Learning:** Contextual "clear search" or "clear filter" icon buttons within search inputs or tag pills often lack focus states natively, making them inaccessible to keyboard users navigating through complex filter or search components.
+**Action:** Always check inline icon buttons, particularly those for "clear" or "close" actions, and explicitly add `focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60` (along with `rounded-sm` or `rounded-full` as appropriate) to ensure keyboard navigation visibility.

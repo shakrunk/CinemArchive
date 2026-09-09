@@ -600,7 +600,7 @@ export function Library() {
           {searchInput && (
             <button
               onClick={clearSearch}
-              className="text-paper-faint hover:text-ember"
+              className="text-paper-faint hover:text-ember rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               aria-label="Clear search"
             >
               <X className="w-[15px] h-[15px]" aria-hidden="true" />
@@ -720,7 +720,7 @@ export function Library() {
             <button
               onClick={() => setFilter('person', null)}
               aria-label={`Clear ${filters.person.name} filter`}
-              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -740,7 +740,7 @@ export function Library() {
             <button
               onClick={() => setFilter('languages', [])}
               aria-label="Clear language filter"
-              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -759,7 +759,7 @@ export function Library() {
             <button
               onClick={() => setFilter('studio', null)}
               aria-label={`Clear ${filters.studio} studio filter`}
-              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors"
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" />
             </button>

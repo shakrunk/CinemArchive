@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: nested panels and menus now receive their own wheel scrolling instead of
+  scrolling the page behind them, including the Ledger widget palette and details
+  editor. The same fix applies to scrollable content inside the title drawer.
+
 ## [1.29.5] - 2026-09-05
 
 ### Fixed

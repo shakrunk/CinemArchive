@@ -22,6 +22,8 @@ export function useSmoothScroll(): void {
     const lenis = new Lenis({
       lerp: 0.12,
       syncTouch: false,
+      // Let overflowing panels, menus, and sheets consume their own wheel input.
+      allowNestedScroll: true,
     })
 
     let frameId: number
@@ -81,6 +83,7 @@ export function useScopedSmoothScroll(el: HTMLElement | null, enabled: boolean):
       content: el,
       lerp: 0.12,
       syncTouch: false,
+      allowNestedScroll: true,
     })
 
     let frameId: number

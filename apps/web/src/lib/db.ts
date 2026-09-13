@@ -13,6 +13,7 @@ import type {
   MediaType,
 } from '../store/mockData'
 import { normalizeLedgerWidgets, type LedgerWidget } from './ledgerPanels'
+import { normalizeCompanions } from '../store/companions'
 
 // Throws (after logging) when a Supabase call reports an error — the same
 // three-line shape this file used to repeat at every call site.
@@ -32,6 +33,7 @@ function watchTime(date: string | null | undefined): number {
 }
 
 export function mapDbViewingToLocal(row: any): Viewing {
+  const companions = normalizeCompanions(row.companions)
   return {
     id: row.id,
     titleId: row.title_id,
@@ -39,7 +41,7 @@ export function mapDbViewingToLocal(row: any): Viewing {
     rating: row.rating ? parseFloat(row.rating) : undefined,
     notes: row.notes || undefined,
     venue: row.venue || undefined,
-    companions: Array.isArray(row.companions) && row.companions.length > 0 ? row.companions : undefined,
+    companions: companions.length > 0 ? companions : undefined,
     outingId: row.outing_id || undefined,
   }
 }
@@ -53,7 +55,7 @@ export function mapDbOutingToLocal(row: any): CinemaOuting {
     runtimeMinutes: row.runtime_minutes,
     endsAt: row.ends_at,
     venue: row.venue || undefined,
-    companions: Array.isArray(row.companions) ? row.companions : [],
+    companions: normalizeCompanions(row.companions),
     format: row.format || undefined,
     ticketPrice: row.ticket_price != null ? parseFloat(row.ticket_price) : undefined,
     seat: row.seat || undefined,

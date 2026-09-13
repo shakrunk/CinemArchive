@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.30.1] - 2026-09-13
+
+### Fixed
+
+- Web: opening the Ledger no longer crashes when cinema companions were saved
+  as plain names by Android. Normalize companion data from the database, browser
+  cache, and imports so title details and outing forms also support both formats,
+  preserving valid names and friend links.
+
 ## [1.30.0] - 2026-09-13
 
 ### Added

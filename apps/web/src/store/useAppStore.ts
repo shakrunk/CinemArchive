@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
+import { normalizeCompanions } from './companions'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
@@ -1711,6 +1712,18 @@ export const useAppStore = create<AppStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
+        // Existing caches may contain Android's plain companion names. Repair
+        // them before any editor or dashboard reads the web object shape.
+        state.titles = state.titles.map((title) => ({
+          ...title,
+          viewings: title.viewings.map((viewing) => ({
+            ...viewing,
+            companions: viewing.companions == null ? undefined : normalizeCompanions(viewing.companions),
+          })),
+        }))
+        state.outings = state.outings.map((outing) => ({
+          ...outing, companions: normalizeCompanions(outing.companions),
+        }))
         // Older persisted payloads predate themeMode entirely — preserve their
         // persisted theme as an explicit choice rather than opting them into
         // live system-tracking they never asked for.

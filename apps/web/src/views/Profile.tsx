@@ -79,7 +79,7 @@ function AuthModeTabs({ mode, onChange }: { mode: 'signin' | 'signup'; onChange:
           aria-selected={mode === m}
           onClick={() => onChange(m)}
           className={cn(
-            'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors',
+            'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
             mode === m
               ? 'border-amber/50 bg-amber/10 text-amber'
               : 'border-border bg-secondary/20 text-muted-foreground hover:border-amber/25'
@@ -513,7 +513,7 @@ function AppearanceSection() {
               disabled={locked}
               onClick={() => choose(value)}
               className={cn(
-                'text-left rounded-lg border p-4 transition-colors',
+                'text-left rounded-lg border p-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
                 locked && 'opacity-50 cursor-not-allowed',
                 !locked && theme === value && 'border-amber/50 bg-amber/10',
                 !locked && theme !== value && 'border-border bg-secondary/20 hover:border-amber/25',
@@ -662,7 +662,7 @@ function NavigationSection() {
                 onPointerCancel={endDrag}
                 onKeyDown={(e) => handleGripKeyDown(e, id)}
                 aria-label={`Reorder ${NAV_ITEM_LABELS[id]} — drag, or use arrow keys`}
-                className="text-paper-faint hover:text-amber cursor-grab active:cursor-grabbing -my-1 p-1 rounded"
+                className="text-paper-faint hover:text-amber cursor-grab active:cursor-grabbing -my-1 p-1 rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                 style={{ touchAction: 'none' }}
               >
                 <GripVertical className="w-4 h-4" />
@@ -675,7 +675,7 @@ function NavigationSection() {
                 aria-pressed={!hidden}
                 aria-label={hidden ? `Show ${NAV_ITEM_LABELS[id]} in navigation` : `Hide ${NAV_ITEM_LABELS[id]} from navigation`}
                 className={cn(
-                  'icon-btn w-8 h-8 border rounded-md flex items-center justify-center shrink-0',
+                  'icon-btn w-8 h-8 border rounded-md flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
                   hidden
                     ? 'text-muted-foreground border-border'
                     : 'text-amber border-amber/30 bg-amber/5'
@@ -896,7 +896,7 @@ function SharingSection() {
           <button
             type="button"
             onClick={() => setShowRevoked((v) => !v)}
-            className="text-muted-foreground hover:text-paper transition-colors"
+            className="text-muted-foreground hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             <Eyebrow size="lg" tone="inherit" font="sans">
               {showRevoked ? 'Hide' : 'Show'} revoked links ({revokedKeys.length})

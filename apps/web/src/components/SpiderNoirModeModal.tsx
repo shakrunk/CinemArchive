@@ -115,6 +115,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
 
       <button
         onClick={onSkip}
+        aria-label="Not now, skip choosing a color mode"
         style={{
           marginTop: '24px',
           fontFamily: 'var(--mono)',

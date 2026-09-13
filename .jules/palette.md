@@ -108,3 +108,14 @@
 ## 2026-08-25 - Missing Focus States on Discover Action Buttons
 **Learning:** Found several buttons in `Discover.tsx` (Carousel pause button, empty state clear search button, view more button, and carousel scroll buttons) that were missing proper focus rings, making them inaccessible to keyboard users.
 **Action:** Applied 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60' (and rounded-sm or rounded-full) to these buttons to ensure consistent and accessible keyboard navigation.
+
+## 2026-09-02 - Generic Text Button ARIA Labels
+**Learning:** Text-only buttons with generic labels (like "Not now", "Save", "Cancel") often lack sufficient context for screen reader users, even if they have text.
+**Action:** When adding confirmation or dismissal buttons with generic text, ALWAYS add descriptive `aria-label` attributes (e.g., `aria-label="Cancel logging watch event"`) that include the visible text and clarify the specific action to satisfy WCAG 2.5.3 (Label in Name).
+
+## 2024-09-09 - Ensure focus states on clear/close icon buttons
+**Learning:** Contextual "clear search" or "clear filter" icon buttons within search inputs or tag pills often lack focus states natively, making them inaccessible to keyboard users navigating through complex filter or search components.
+**Action:** Always check inline icon buttons, particularly those for "clear" or "close" actions, and explicitly add `focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60` (along with `rounded-sm` or `rounded-full` as appropriate) to ensure keyboard navigation visibility.
+## 2024-05-18 - [EmptyState Accessibility and Robustness]
+**Learning:** Found that generic presentation components like `EmptyState` can lack explicit `aria-hidden` tags on their purely decorative icons and sometimes lack explicit `type="button"` declarations for their CTA elements. This isn't immediately obvious when reviewing the visual output, but represents an accessibility and robustness flaw, particularly when these components might be reused inside unknown parent forms.
+**Action:** Always verify that generic, highly reusable presentational components explicitly hide their decorative icons from screen readers (`aria-hidden="true"`) and that standalone CTA buttons explicitly declare `type="button"` to prevent unintended default `submit` behavior.

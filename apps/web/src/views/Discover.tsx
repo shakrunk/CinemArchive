@@ -1149,6 +1149,9 @@ export function Discover() {
   // Basis defaults to the first library title unless the user picked one explicitly
   const becauseWatchedId = becauseWatchedOverrideId ?? (titles.length > 0 ? titles[0].id : null)
 
+  // ⚡ Bolt: Memoize expensive O(N) array mapping to prevent unnecessary object allocations on every render
+  const becauseWatchedOptions = useMemo(() => titles.map((t) => ({ id: t.id, label: t.title })), [titles])
+
   const castOptions = useMemo(() => {
     const seen = new Map<number, string>()
     for (const t of titles) {
@@ -1161,6 +1164,9 @@ export function Discover() {
 
   // Basis defaults to the first known cast member unless the user picked one explicitly
   const moreStarringPersonId = moreStarringOverridePersonId ?? (castOptions.length > 0 ? castOptions[0].id : null)
+
+  // ⚡ Bolt: Memoize expensive O(N) array mapping to prevent unnecessary object allocations on every render
+  const moreStarringOptions = useMemo(() => castOptions.map((c) => ({ id: String(c.id), label: c.name })), [castOptions])
 
   // Derived rather than tracked separately: loading exactly while we have a basis whose
   // credits haven't landed yet (mirrors DiscoverDetailModal's `hydrating` derivation above).
@@ -1516,7 +1522,7 @@ export function Discover() {
             <button
               onClick={clearSearch}
               aria-label="Clear search"
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1564,7 +1570,7 @@ export function Discover() {
                 <div>
                   <button
                     onClick={() => setGenresExpanded((v) => !v)}
-                    className="w-full flex items-center justify-between text-paper-faint mb-2"
+                    className="w-full flex items-center justify-between text-paper-faint mb-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                   >
                     <Eyebrow size="md" tone="inherit">Genres</Eyebrow>
                     <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !genresExpanded && '-rotate-90')} />
@@ -1575,7 +1581,7 @@ export function Discover() {
                         onClick={() => handleGenreSelect(null)}
                         role="radio"
                         aria-checked={selectedGenreId === null}
-                        className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors"
+                        className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                       >
                         <span
                           className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
@@ -1591,7 +1597,7 @@ export function Discover() {
                           onClick={() => handleGenreSelect(genre.id)}
                           role="radio"
                           aria-checked={selectedGenreId === genre.id}
-                          className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors"
+                          className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <span
                             className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
@@ -1622,7 +1628,7 @@ export function Discover() {
             key={id}
             onClick={() => handleTypeChange(id)}
             className={cn(
-              'pb-1.5 border-b-2 font-serif text-lg transition-colors',
+              'pb-1.5 border-b-2 font-serif text-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm',
               filterType === id
                 ? 'text-amber-bright border-amber font-semibold'
                 : 'text-paper-faint border-transparent hover:text-paper'
@@ -1642,7 +1648,7 @@ export function Discover() {
               <button
                 onClick={clearSearch}
                 aria-label="Back to search"
-                className="text-paper-faint hover:text-paper transition-colors"
+                className="text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
@@ -1728,7 +1734,7 @@ export function Discover() {
             <div className="flex flex-wrap items-center gap-2.5 mb-3">
               <h2 className="font-serif text-lg font-semibold text-paper">Because You Watched</h2>
               <TasteDropdown
-                options={titles.map((t) => ({ id: t.id, label: t.title }))}
+                options={becauseWatchedOptions}
                 value={becauseWatchedId}
                 onChange={setBecauseWatchedOverrideId}
                 ariaLabel="Choose a title to base recommendations on"
@@ -1769,7 +1775,7 @@ export function Discover() {
             <div className="flex flex-wrap items-center gap-2.5 mb-3">
               <h2 className="font-serif text-lg font-semibold text-paper">More Starring</h2>
               <TasteDropdown
-                options={castOptions.map((c) => ({ id: String(c.id), label: c.name }))}
+                options={moreStarringOptions}
                 value={moreStarringPersonId != null ? String(moreStarringPersonId) : null}
                 onChange={(id) => setMoreStarringOverridePersonId(Number(id))}
                 ariaLabel="Choose an actor to see more of their titles"

@@ -415,12 +415,19 @@ function timeOf(dateStr: string | undefined): number {
   return dateStr ? new Date(dateStr).getTime() : -Infinity
 }
 
+// ⚡ Bolt: Cache expensive derived calculation with a WeakMap to prevent O(N*M) redundant computations
+const lastInteractionCache = new WeakMap<Title, number>()
+
 /** Most recent user interaction with a title: added, (re)watched, or — for
  *  TV — any per-episode watch/rating/review event. Deliberately excludes
  *  `titles.updated_at` (bumped by bulk metadata refresh on every title, which
  *  would collapse this into "everything touched just now") and sharing
  *  (no per-title timestamp exists for that in the data model). */
 export function titleLastInteractionAt(title: Title): number {
+  if (lastInteractionCache.has(title)) {
+    return lastInteractionCache.get(title)!
+  }
+
   let latest = timeOf(title.addedAt)
   for (const v of title.viewings) {
     latest = Math.max(latest, timeOf(v.date))
@@ -432,6 +439,8 @@ export function titleLastInteractionAt(title: Title): number {
       for (const rv of ep.reviews) latest = Math.max(latest, timeOf(rv.reviewedAt))
     }
   }
+
+  lastInteractionCache.set(title, latest)
   return latest
 }
 

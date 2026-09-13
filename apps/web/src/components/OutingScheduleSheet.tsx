@@ -669,7 +669,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
           <Download className="w-3.5 h-3.5" />
           Download .ics
         </button>
-        <button onClick={onClose} className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mt-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm">
+        <button onClick={onClose} className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mt-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Not now, skip sharing or downloading plans">
           Not now
         </button>
       </div>

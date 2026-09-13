@@ -1,4 +1,5 @@
 import type { CinemaOuting, Title } from '../store/mockData'
+import { normalizeCompanions } from '../store/companions'
 
 interface ExportEnvelope {
   version: number
@@ -67,7 +68,10 @@ export async function parseImportFile(file: File): Promise<ImportResult> {
         if (v.id) viewingIdMap.set(v.id, newViewingId)
         // outingId is remapped in a second pass below, once regenerated
         // outing IDs exist.
-        return { ...v, id: newViewingId, titleId: newTitleId }
+        return {
+          ...v, id: newViewingId, titleId: newTitleId,
+          companions: v.companions == null ? undefined : normalizeCompanions(v.companions),
+        }
       }),
     } as Title
   })
@@ -78,6 +82,7 @@ export async function parseImportFile(file: File): Promise<ImportResult> {
     if (o.id) outingIdMap.set(o.id, newOutingId)
     return {
       ...o,
+      companions: normalizeCompanions(o.companions),
       id: newOutingId,
       titleId: titleIdMap.get(o.titleId) ?? o.titleId,
       completedViewingId: o.completedViewingId ? viewingIdMap.get(o.completedViewingId) : undefined,

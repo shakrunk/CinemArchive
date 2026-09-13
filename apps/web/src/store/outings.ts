@@ -1,5 +1,6 @@
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type MediaType, type Title, type Viewing } from './mockData'
 import type { FriendshipView } from '../lib/auth'
+import { normalizeCompanions } from './companions'
 
 // Pure, unit-testable derivations for Cinema Outings ("I've got tickets") —
 // modeled on upNext.ts. See docs/superpowers/plans/2026-07-11-cinema-outings.md
@@ -177,10 +178,10 @@ export function companionSuggestions(
 ): Companion[] {
   const timestamped: Array<{ companion: Companion; ts: string }> = []
   for (const o of outings) {
-    for (const c of o.companions) timestamped.push({ companion: c, ts: o.showtime })
+    for (const c of normalizeCompanions(o.companions)) timestamped.push({ companion: c, ts: o.showtime })
   }
   for (const v of viewings) {
-    for (const c of v.companions ?? []) timestamped.push({ companion: c, ts: v.date ?? '' })
+    for (const c of normalizeCompanions(v.companions)) timestamped.push({ companion: c, ts: v.date ?? '' })
   }
   timestamped.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
 
@@ -206,7 +207,7 @@ export function companionSuggestions(
  *  stub, the .ics DESCRIPTION, and the out-of-app share snippet. Empty input
  *  yields ''. */
 export function formatCompanions(companions: Companion[]): string {
-  const names = companions.map((c) => c.name).filter((n) => n.trim())
+  const names = normalizeCompanions(companions).map((c) => c.name)
   if (names.length === 0) return ''
   if (names.length === 1) return names[0]
   return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`
@@ -370,7 +371,7 @@ export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now 
         }
       }
 
-      for (const c of v.companions ?? []) {
+      for (const c of normalizeCompanions(v.companions)) {
         const name = c.name.trim()
         if (name) companionCounts.set(name, (companionCounts.get(name) ?? 0) + 1)
       }

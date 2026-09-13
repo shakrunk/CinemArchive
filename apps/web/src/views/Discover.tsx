@@ -3,16 +3,15 @@ import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, Chevr
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import {
-  searchMedia, fetchTrending, fetchDiscover, fetchMediaDetails, fetchTitleImages,
+  searchMedia, fetchTrending, fetchDiscover,
   searchPersons, fetchPersonCredits, searchCompanies, fetchCompanyTitles, fetchRecommendations,
   MOVIE_GENRES, TV_GENRES,
   type SearchResult, type PersonResult, type CompanyResult,
 } from 'src/lib/media'
 import type { MediaType } from 'src/store/mockData'
-import { cn, fmtRuntime, staggerDelays } from 'src/lib/utils'
+import { cn, staggerDelays } from 'src/lib/utils'
 import { usePrefersReducedMotionRef } from 'src/lib/motion'
-import { CinemaModal } from 'src/components/ui/cinema-modal'
-import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
+import { DiscoverDetailModal } from 'src/components/DiscoverDetailModal'
 import { Chip } from 'src/components/ui/chip'
 import { useClickOutside } from 'src/lib/useClickOutside'
 import { Eyebrow } from 'src/components/ui/typography'
@@ -791,290 +790,6 @@ function CompanyPicker({ companies, onSelect }: CompanyPickerProps) {
 
 // ─── Detail modal ─────────────────────────────────────────────────────────────
 
-interface DiscoverDetailModalProps {
-  result: SearchResult | null
-  isOwned: boolean
-  isSharedView: boolean
-  onClose: () => void
-  onAdd: (result: SearchResult) => void
-}
-
-function DiscoverDetailModal({ result, isOwned, isSharedView, onClose, onAdd }: DiscoverDetailModalProps) {
-  const [details, setDetails] = useState<SearchResult | null>(null)
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [loadedTmdbId, setLoadedTmdbId] = useState<number | null | undefined>(undefined)
-
-  // Reset stale details/logo the moment the result identity changes, rather than in an
-  // effect — this is React's documented "adjusting state when a prop changes" pattern.
-  if ((result?.tmdbId ?? null) !== loadedTmdbId) {
-    setLoadedTmdbId(result?.tmdbId ?? null)
-    setDetails(null)
-    setLogoUrl(null)
-  }
-
-  // Derived rather than tracked separately: we're hydrating exactly while a result is open
-  // and its details haven't landed yet (details is reset to null above on every identity change).
-  const hydrating = !!result && details === null
-
-  useEffect(() => {
-    if (!result) return
-    fetchMediaDetails(result)
-      .then(({ result: r }) => setDetails(r))
-      .catch(() => setDetails(result))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result?.tmdbId])
-
-  useEffect(() => {
-    if (!result?.tmdbId) return
-    let cancelled = false
-    fetchTitleImages(result.tmdbId, result.type).then(({ logoUrl: logo }) => {
-      if (!cancelled) setLogoUrl(logo)
-    })
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result?.tmdbId])
-
-  const data = details ?? result
-  if (!data) return null
-
-  function handleAdd() {
-    onClose()
-    onAdd(data!)
-  }
-
-  const hasScores = data.imdbId != null
-  const hasBackdrop = !!data.backdropUrl
-
-  return (
-    <CinemaModal
-      open={!!result}
-      onClose={onClose}
-      title={data.title}
-      description={data.synopsis}
-      maxWidth="sm:max-w-2xl"
-    >
-      <div className="overflow-y-auto max-h-[90vh]">
-        {/* Backdrop */}
-        {hasBackdrop ? (
-          <div className="relative aspect-[16/8] overflow-hidden shrink-0">
-            <img
-              src={data.backdropUrl}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 w-full h-full object-cover object-center"
-              style={{
-                maskImage: 'linear-gradient(to bottom, #000 0%, #000 63%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 63%, transparent 100%)',
-              }}
-            />
-            <div
-              className="absolute inset-0"
-              style={{
-                background: 'linear-gradient(to bottom, hsl(var(--card) / 0.05) 0%, hsl(var(--card) / 0.3) 45%, hsl(var(--card) / 0.75) 68%, hsl(var(--card)) 88%)',
-              }}
-            />
-          </div>
-        ) : (
-          <div className="h-14" />
-        )}
-
-        {/* Content */}
-        <div className={cn('px-5 pb-6', hasBackdrop ? '-mt-20 relative z-10' : 'pt-2')}>
-          {/* Poster + title */}
-          <div className="flex gap-4 items-end mb-4">
-            <div
-              className="w-24 shrink-0 rounded-lg overflow-hidden shadow-xl border"
-              style={{ borderColor: 'var(--line)' }}
-            >
-              {data.posterUrl ? (
-                <img src={data.posterUrl} alt={data.title} className="w-full aspect-[2/3] object-cover" />
-              ) : (
-                <div className="aspect-[2/3] flex items-center justify-center" style={{ background: 'var(--inset)' }}>
-                  {data.type === 'tv'
-                    ? <Tv className="w-6 h-6 text-paper-faint opacity-30" />
-                    : <Film className="w-6 h-6 text-paper-faint opacity-30" />}
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 min-w-0 pb-1">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={data.title}
-                  className="object-contain object-left max-h-20 max-w-[90%] drop-shadow-lg mb-1.5"
-                />
-              ) : (
-                <h2 className="font-serif text-xl font-semibold text-paper leading-tight mb-1.5">
-                  {data.title}
-                </h2>
-              )}
-              <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                <span className="font-mono text-xs text-paper-faint">
-                  {data.year > 0 ? data.year : ''}
-                  {data.runtime ? ` · ${fmtRuntime(data.runtime)}` : ''}
-                  {data.type === 'tv' && data.seasonCount
-                    ? ` · ${data.seasonCount} season${data.seasonCount !== 1 ? 's' : ''}`
-                    : ''}
-                </span>
-                {data.contentRating && (
-                  <span
-                    className="font-mono text-[9px] px-1.5 py-0.5 rounded border text-paper-faint"
-                    style={{ borderColor: 'var(--line)' }}
-                  >
-                    {data.contentRating}
-                  </span>
-                )}
-                <span
-                  className="font-mono text-[9px] px-1.5 py-0.5 rounded"
-                  style={{ background: 'var(--inset)', color: 'var(--paper-faint)' }}
-                >
-                  {data.type === 'tv' ? 'TV' : 'Movie'}
-                </span>
-              </div>
-              {data.director && (
-                <p className="font-mono text-[11px] text-paper-faint">
-                  {data.type === 'tv' ? 'Created by ' : 'Dir. '}{data.director}
-                </p>
-              )}
-              {data.network && (
-                <p className="font-mono text-[11px] text-amber/70 mt-0.5">{data.network}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Genres */}
-          {data.genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {data.genres.map((g) => (
-                <span
-                  key={g}
-                  className="font-mono text-[10px] px-2 py-0.5 rounded-full border text-paper-faint"
-                  style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
-                >
-                  {g}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Synopsis */}
-          {hydrating && !data.synopsis ? (
-            <div className="space-y-1.5 mb-4">
-              <div className="h-3 rounded animate-pulse w-full" style={{ background: 'var(--inset)' }} />
-              <div className="h-3 rounded animate-pulse w-5/6" style={{ background: 'var(--inset)' }} />
-              <div className="h-3 rounded animate-pulse w-4/6" style={{ background: 'var(--inset)' }} />
-            </div>
-          ) : data.synopsis ? (
-            <p className="font-sans text-sm text-paper/75 leading-relaxed mb-4">{data.synopsis}</p>
-          ) : null}
-
-          {/* Scores */}
-          {hydrating && !hasScores ? (
-            <div className="flex gap-2 mb-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-8 w-20 rounded animate-pulse" style={{ background: 'var(--inset)' }} />
-              ))}
-            </div>
-          ) : hasScores ? (
-            <div className="mb-4">
-              <ReviewBadges
-                imdb={data.imdbRating}
-                rt={data.rtScore}
-                meta={data.metacriticScore}
-                awardsCount={data.awardsCount}
-                bechdelOutcome={data.bechdelOutcome}
-                bechdelScore={data.bechdelScore}
-              />
-            </div>
-          ) : null}
-
-          {/* Cast */}
-          {hydrating && !data.cast ? (
-            <div className="mb-5">
-              <Eyebrow as="h3" size="md" className="mb-2">Cast</Eyebrow>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-5 px-5" data-lenis-prevent>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div
-                    key={i}
-                    className="shrink-0 w-[88px] rounded-lg overflow-hidden animate-pulse"
-                    style={{ border: '1px solid var(--line)' }}
-                  >
-                    <div
-                      className="w-full flex items-center justify-center"
-                      style={{ background: 'hsl(var(--card))', aspectRatio: '2/3' }}
-                    >
-                      <User className="w-10 h-10" style={{ color: 'var(--line)' }} />
-                    </div>
-                    <div className="p-1.5 space-y-1.5" style={{ background: 'var(--inset)' }}>
-                      <div className="h-2.5 rounded" style={{ background: 'var(--line)', width: '80%' }} />
-                      <div className="h-2 rounded" style={{ background: 'var(--line)', width: '55%' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : data.cast && data.cast.length > 0 ? (
-            <div className="mb-5">
-              <Eyebrow as="h3" size="md" className="mb-2">Cast</Eyebrow>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none -mx-5 px-5" data-lenis-prevent>
-                {data.cast.slice(0, 10).map((c) => (
-                  <div
-                    key={c.tmdbPersonId}
-                    className="shrink-0 w-[88px] rounded-lg overflow-hidden"
-                    style={{ border: '1px solid var(--line)', background: 'var(--inset)' }}
-                  >
-                    <div className="overflow-hidden" style={{ aspectRatio: '2/3' }}>
-                      {c.profileUrl ? (
-                        <img src={c.profileUrl} alt={c.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center" style={{ background: 'hsl(var(--card))' }}>
-                          <span className="font-serif text-2xl" style={{ color: 'var(--paper-faint)', opacity: 0.4 }}>
-                            {c.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-1.5">
-                      <p className="font-sans font-semibold text-[11px] leading-tight line-clamp-2" style={{ color: 'var(--paper)' }}>
-                        {c.name}
-                      </p>
-                      <p className="font-mono text-[9px] line-clamp-1 mt-0.5" style={{ color: 'var(--paper-faint)', opacity: c.character ? 0.6 : 0 }}>
-                        {c.character || ' '}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* External links */}
-          <div className="mb-5">
-            <ExternalLinks media={data} />
-          </div>
-
-          {/* Add / In Library */}
-          {isOwned ? (
-            <div className="flex items-center gap-2 text-amber font-mono text-sm py-2.5">
-              <Check className="w-4 h-4" />
-              Already in your library
-            </div>
-          ) : !isSharedView ? (
-            <button
-              onClick={handleAdd}
-              className="w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors btn-amber mt-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add to Library
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </CinemaModal>
-  )
-}
-
 // ─── Discover view ────────────────────────────────────────────────────────────
 
 export function Discover() {
@@ -1817,6 +1532,10 @@ export function Discover() {
         isSharedView={isSharedView}
         onClose={() => setSelectedResult(null)}
         onAdd={openAddTitlePreselected}
+        onBrowsePerson={(person) => {
+          handleSearchModeChange('people')
+          void handlePersonSelect({ id: person.tmdbPersonId, name: person.name, profileUrl: person.profileUrl, knownFor: '' })
+        }}
       />
     </div>
   )

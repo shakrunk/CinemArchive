@@ -20,9 +20,10 @@ export function useSmoothScroll(): void {
     if (prefersReducedMotion()) return
 
     const lenis = new Lenis({
-      duration: 1.1,
-      easing: (t: number) => 1 - Math.pow(1 - t, 3),
+      lerp: 0.12,
       syncTouch: false,
+      // Let overflowing panels, menus, and sheets consume their own wheel input.
+      allowNestedScroll: true,
     })
 
     let frameId: number
@@ -66,6 +67,12 @@ export function useSmoothScroll(): void {
  * instance. Keying on the node itself re-runs the effect exactly when it mounts.
  *
  * `enabled` additionally gates creation (e.g. only while the drawer is open).
+ *
+ * Because `wrapper` and `content` are the same node here, Lenis's own `ResizeObserver`
+ * never fires when the content grows: the scroll container's border box is fixed
+ * (`flex-1`), only its `scrollHeight` changes. Lenis would then keep the scroll limit it
+ * measured on mount, so expanding a section (e.g. "show full cast") left the extra height
+ * unreachable. We therefore observe the container's children ourselves and re-measure.
  */
 export function useScopedSmoothScroll(el: HTMLElement | null, enabled: boolean): void {
   useEffect(() => {
@@ -74,9 +81,9 @@ export function useScopedSmoothScroll(el: HTMLElement | null, enabled: boolean):
     const lenis = new Lenis({
       wrapper: el,
       content: el,
-      duration: 1.1,
-      easing: (t: number) => 1 - Math.pow(1 - t, 3),
+      lerp: 0.12,
       syncTouch: false,
+      allowNestedScroll: true,
     })
 
     let frameId: number
@@ -86,7 +93,22 @@ export function useScopedSmoothScroll(el: HTMLElement | null, enabled: boolean):
     }
     frameId = requestAnimationFrame(raf)
 
+    // Re-measure whenever the content's height changes. `ResizeObserver` only reports the
+    // boxes of the nodes it observes, so watch every element child; a `MutationObserver`
+    // keeps that set in sync as children mount/unmount.
+    const resizeObserver = new ResizeObserver(() => lenis.resize())
+    const observeChildren = () => {
+      resizeObserver.disconnect()
+      for (const child of Array.from(el.children)) resizeObserver.observe(child)
+      lenis.resize()
+    }
+    observeChildren()
+    const mutationObserver = new MutationObserver(observeChildren)
+    mutationObserver.observe(el, { childList: true })
+
     return () => {
+      mutationObserver.disconnect()
+      resizeObserver.disconnect()
       cancelAnimationFrame(frameId)
       lenis.destroy()
     }

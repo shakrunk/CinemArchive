@@ -9,6 +9,44 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-09-13
+
+### Added
+
+- Web: Discover title previews now include trailers, streaming/rental/purchase
+  options, expandable cast and crew, and release/language/franchise details. Cast
+  members open their filmographies in Discover; Add to Library stays visible while
+  scrolling, and desktop previews can expand to full page.
+
+### Fixed
+
+- Web: nested panels and menus now receive their own wheel scrolling instead of
+  scrolling the page behind them, including the Ledger widget palette and details
+  editor. The same fix applies to scrollable content inside the title drawer.
+- Web: switching Discover titles cannot show stale metadata from the previous
+  selection, and Escape closes a trailer without also closing its title preview.
+
+## [1.29.5] - 2026-09-05
+
+### Fixed
+
+- Web: the title detail drawer can now be scrolled all the way to the bottom after its
+  content grows (e.g. expanding the cast and crew section) — the drawer's smooth scroll was
+  keeping the scroll limit it measured when the drawer opened.
+- Web: library list view now scrolls with the page anywhere over the ledger table, not only
+  when the mouse is off to its side — the table's horizontal-scroll wrapper was opting out of
+  the smooth-scroll library for both axes instead of just the horizontal one.
+
+### Changed
+
+- Web: library poster grid no longer overlays a redundant title over posters that already
+  carry it in the artwork — the editorial title text is now shown only as a fallback for
+  titles with no poster image; the Discover grid's caption-style overlay is unchanged.
+- Web: smooth scroll now responds instantly to wheel input instead of feeling delayed —
+  switched Lenis from a per-tick easing tween (`duration`/`easing`) to frame-proportional
+  `lerp`, which is what it recommends for continuous wheel scrolling; deceleration into the
+  stop is unchanged.
+
 ## [1.29.4] - 2026-08-30
 
 ### Changed

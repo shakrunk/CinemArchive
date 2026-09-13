@@ -369,7 +369,7 @@ function LedgerList({ titles }: { titles: Title[] }) {
   return (
     <div
       className="rounded-xl overflow-x-auto"
-      data-lenis-prevent
+      data-lenis-prevent-horizontal
       style={{
         border: '1px solid var(--line)',
         background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))',

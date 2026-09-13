@@ -72,6 +72,29 @@ function ProviderRow({ label, providers }: { label: string; providers: WatchProv
   )
 }
 
+/** Provider information shared by saved titles and Discover previews. */
+export function WatchProviderListings({ providers }: { providers: WatchProviders }) {
+  const streaming = [...providers.flatrate, ...providers.free, ...providers.ads]
+  return (
+    <div className="space-y-2">
+      <ProviderRow label="Stream" providers={streaming} />
+      <ProviderRow label="Rent" providers={providers.rent} />
+      <ProviderRow label="Buy" providers={providers.buy} />
+      {providers.link && (
+        <a
+          href={providers.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block font-mono transition-colors hover:text-amber"
+          style={{ fontSize: '9px', color: 'var(--paper-faint)' }}
+        >
+          Streaming data provided by JustWatch
+        </a>
+      )}
+    </div>
+  )
+}
+
 // ─── Home Collection (KP-002) — owned-locally source row ────────────────────
 
 function HomeCollectionRow() {
@@ -327,24 +350,7 @@ export function WatchProvidersSection({
       )}
 
       <div className="space-y-2">
-        {hasTmdbData && (
-          <>
-            <ProviderRow label="Stream" providers={streaming} />
-            <ProviderRow label="Rent" providers={rent} />
-            <ProviderRow label="Buy" providers={buy} />
-          </>
-        )}
-        {hasTmdbData && providers?.link && (
-          <a
-            href={providers.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block font-mono transition-colors hover:text-amber"
-            style={{ fontSize: '9px', color: 'var(--paper-faint)' }}
-          >
-            Streaming data provided by JustWatch
-          </a>
-        )}
+        {hasTmdbData && providers && <WatchProviderListings providers={providers} />}
         {!isSharedView && (
           <button
             type="button"

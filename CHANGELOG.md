@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-09-13
+
 ### Added
 
 - Web: Discover title previews now include trailers, streaming/rental/purchase

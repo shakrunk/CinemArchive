@@ -224,15 +224,21 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (e.key === 'Escape') { onClose(); return }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+        return
+      }
       if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) onPrev()
       if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) onNext()
       if (e.key === ' ' || e.key === 'k') { e.preventDefault(); togglePlay() }
       if (e.key === 'm') toggleMute()
       if (e.key === 'f') toggleFullscreen()
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    // Handle Escape before the containing Radix title dialog sees it.
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose, onPrev, onNext, togglePlay, toggleMute, toggleFullscreen])
 
   // Scrubber — click and drag

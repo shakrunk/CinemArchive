@@ -9,6 +9,17 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: finish library virtualization for list view and franchise grouping,
+  preserving keyboard traversal, wrapped titles, responsive poster density,
+  and one-time poster entrances. Mobile list rows give title text more room.
+- Web: cap historical and overridden title backdrops at TMDB's `w1280` size.
+- Web: pending library search input no longer overwrites a search set elsewhere
+  in the app while the debounce timer is running.
+- Docs: restore the UI consistency audit and reconcile both audits with their
+  completed implementations, including the stale eyebrow-label backlog item.
+
 ## [1.30.1] - 2026-09-13
 
 ### Fixed

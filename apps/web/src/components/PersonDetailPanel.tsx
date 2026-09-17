@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
 import { Film, Tv } from 'lucide-react'
-import { useAppStore } from 'src/store/useAppStore'
+import { useAppStore, titleHasPerson } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { ModalCloseButton } from 'src/components/ui/modal-close-button'
 import { Eyebrow } from 'src/components/ui/typography'
-import type { CastMember, CrewMember } from 'src/store/mockData'
 
 export interface PersonDetailTarget {
   tmdbPersonId: number
@@ -27,12 +26,7 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
 
   // ⚡ Bolt: Memoize expensive O(N*M) library-wide search to prevent lag during hover/focus state changes
   const personTitles = useMemo(() => {
-    return titles.filter((t) => {
-      if (t.cast?.some((m: CastMember) => m.tmdbPersonId === person.tmdbPersonId)) return true
-      if (t.crew?.some((m: CrewMember) => m.tmdbPersonId === person.tmdbPersonId)) return true
-      if (t.seasons?.some((s) => s.cast?.some((m: CastMember) => m.tmdbPersonId === person.tmdbPersonId))) return true
-      return false
-    })
+    return titles.filter((t) => titleHasPerson(t, person.tmdbPersonId))
   }, [titles, person.tmdbPersonId])
 
   function handleBrowse() {

@@ -14,6 +14,8 @@ number is chosen.
 - Web: start every Add Title session with a fresh form and search, including
   rapid reopening and closing through browser navigation. Old requests cannot
   restore the previous title or overwrite newer search results.
+- Web: keep command-palette Enter selection valid when library results change,
+  and follow keyboard focus when tabbing to a title.
 
 ## [1.30.2] - 2026-09-19
 

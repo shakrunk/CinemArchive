@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.30.2] - 2026-09-19
+
 ### Fixed
 
 - Web: finish library virtualization for list view and franchise grouping,
@@ -19,6 +21,11 @@ number is chosen.
   in the app while the debounce timer is running.
 - Docs: restore the UI consistency audit and reconcile both audits with their
   completed implementations, including the stale eyebrow-label backlog item.
+- Database: skip shared-library permission lookups for owner rows to prevent
+  library loads from hitting the statement timeout.
+- Web: avoid repeated library reloads on auth refresh, share overlapping loads,
+  and update one retry notification instead of stacking duplicate warnings.
+  Successful loads clear the warning; stale requests cannot replace another view.
 
 ## [1.30.1] - 2026-09-13
 

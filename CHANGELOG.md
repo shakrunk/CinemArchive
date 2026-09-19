@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.30.3] - 2026-09-19
+
 ### Fixed
 
 - Web: start every Add Title session with a fresh form and search, including

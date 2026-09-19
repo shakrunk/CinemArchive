@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, SlidersHorizontal, X, Film, User, Building2, Languages, LayoutGrid, List, Sparkles, Check, Grid3x3, Grid2x2, Square } from 'lucide-react'
 import { useAppStore, useAllGenres, useAllNetworks, useAllDecades, useAllTags, useAllLanguages } from 'src/store/useAppStore'
-import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { Slider } from 'src/components/ui/slider'
 import { BottomSheet } from 'src/components/ui/bottom-sheet'
 import { Chip } from 'src/components/ui/chip'
 import { EmptyState } from 'src/components/ui/empty-state'
-import { cn, languageName, staggerDelays } from 'src/lib/utils'
+import { cn, languageName } from 'src/lib/utils'
 import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import { buildRecommendationPrompt } from 'src/lib/recommendationPrompt'
 import { POSTER_GRID_DENSITY } from 'src/lib/posterGridDensity'
 import { VirtualPosterWall } from 'src/components/ui/virtual-poster-wall'
+import { VirtualLedgerList } from 'src/components/ui/virtual-ledger-list'
 import type { Title, WatchStatus, MediaType } from 'src/store/mockData'
 import type { SortField, SortDir, ViewMode, GridSize } from 'src/store/useAppStore'
 import { Eyebrow } from 'src/components/ui/typography'
@@ -36,15 +36,6 @@ const GRID_SIZE_ORDER: GridSize[] = ['compact', 'default', 'large']
 // large library. The input below stays locally controlled for zero-delay
 // typing feel; only the store commit (and the resulting re-filter) is debounced.
 const SEARCH_DEBOUNCE_MS = 180
-
-// ─── Status colors for the ledger list ───────────────────────────────────────
-
-const STATUS_DOT: Record<WatchStatus, string> = {
-  watched: 'bg-amber',
-  watchlist: 'bg-moon',
-  watching: 'bg-amber-bright',
-  dropped: 'bg-ember',
-}
 
 // ─── Filter Panel ────────────────────────────────────────────────────────────
 
@@ -313,143 +304,12 @@ function LibraryEmptyState() {
   )
 }
 
-// ─── Poster Wall ─────────────────────────────────────────────────────────────
-
-function PosterWall({ titles }: { titles: Title[] }) {
-  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-  const outings = useAppStore((s) => s.outings)
-  const gridSize = useAppStore((s) => s.gridSize)
-
-  // Plan §4.6: a small amber 🎟 corner badge on movies with a scheduled cinema
-  // outing, clearing the moment it completes/cancels (those statuses aren't
-  // 'scheduled', so they simply drop out of this set).
-  const scheduledTitleIds = useMemo(
-    () => new Set(outings.filter((o) => o.status === 'scheduled').map((o) => o.titleId)),
-    [outings]
-  )
-
-  const delays = useMemo(() => staggerDelays(titles.length), [titles.length])
-
-  if (titles.length === 0) return <LibraryEmptyState />
-
-  const density = GRID_SIZES[gridSize]
-
-  return (
-    <div
-      className="poster-wall"
-      style={{
-        ['--poster-min' as string]: density.min,
-        ['--poster-cols' as string]: density.cols,
-      }}
-    >
-      {titles.map((title, i) => (
-        <DynamicPoster
-          key={title.id}
-          title={title}
-          rich
-          hasScheduledOuting={scheduledTitleIds.has(title.id)}
-          onClick={() => openDetailDrawer(title.id)}
-          style={{ ['--poster-delay' as string]: `${delays[i]}ms` }}
-          // Grid columns are `minmax(density.min, 1fr)` with auto-fill, so
-          // rendered width tracks close to the density's min (see index.css
-          // .poster-wall) — a good-enough `sizes` hint without measuring layout.
-          sizes={density.min}
-        />
-      ))}
-    </div>
-  )
-}
-
-// ─── Ledger List ─────────────────────────────────────────────────────────────
-
-function LedgerList({ titles }: { titles: Title[] }) {
-  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
-  if (titles.length === 0) return <LibraryEmptyState />
-
-  return (
-    <div
-      className="rounded-xl overflow-x-auto"
-      data-lenis-prevent-horizontal
-      style={{
-        border: '1px solid var(--line)',
-        background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))',
-      }}
-    >
-      <table className="w-full border-collapse sm:min-w-[640px]">
-        <thead>
-          <tr>
-            {['No.', 'Title', 'Year', 'Status', 'Rating'].map((h, i) => (
-              <th
-                key={h}
-                className={cn(
-                  'text-left px-4 py-3.5 font-mono text-[10px] tracking-[0.14em] uppercase font-medium text-paper-faint whitespace-nowrap',
-                  i === 2 && 'hidden sm:table-cell'
-                )}
-                style={{ borderBottom: '1px solid var(--line-2)', background: 'var(--inset)' }}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {titles.map((title, idx) => (
-            <tr
-              key={title.id}
-              onClick={() => openDetailDrawer(title.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openDetailDrawer(title.id)
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-label={`View details for ${title.title}`}
-              className="cursor-pointer transition-colors hover:bg-[rgba(233,178,102,0.06)] focus:outline-none focus-visible:bg-[rgba(233,178,102,0.1)]"
-              style={{ borderBottom: '1px solid var(--line)' }}
-            >
-              <td className="px-4 py-3 font-mono text-[11px] text-paper-faint w-[52px]">
-                {String(idx + 1).padStart(2, '0')}
-              </td>
-              <td className="px-4 py-3">
-                <div className="font-serif text-[17px] font-medium text-paper" style={{ fontVariationSettings: '"opsz" 30' }}>
-                  {title.title}
-                </div>
-                {title.director && (
-                  <div className="font-sans text-xs text-paper-faint truncate max-w-[260px]">{title.director}</div>
-                )}
-              </td>
-              <td className="hidden sm:table-cell px-4 py-3 font-mono text-xs text-paper-dim">{title.year}</td>
-              <td className="px-4 py-3">
-                <Eyebrow as="span" size="md" tone="dim" className="inline-flex items-center gap-1.5">
-                  <span aria-hidden="true" className={cn('w-[7px] h-[7px] rounded-full', STATUS_DOT[title.status])} />
-                  {title.status}
-                </Eyebrow>
-              </td>
-              <td className="px-4 py-3 font-mono text-sm text-amber whitespace-nowrap">
-                {title.rating ? `★ ${title.rating}` : '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 // ─── Franchise Grouping ──────────────────────────────────────────────────────
 
 interface FranchiseGroup {
   key: string
   name: string | null  // null = the trailing non-franchise remainder
   titles: Title[]
-}
-
-// TMDB collection names read like "The Lord of the Rings Collection" — trim
-// the suffix for a cleaner section header.
-function franchiseDisplayName(name: string): string {
-  return name.replace(/\s+Collection$/i, '')
 }
 
 // Sections appear in order of each franchise's first title under the active
@@ -487,32 +347,12 @@ function buildFranchiseGroups(titles: Title[]): FranchiseGroup[] {
 
 function FranchiseSections({ titles, viewMode }: { titles: Title[]; viewMode: ViewMode }) {
   const groups = useMemo(() => buildFranchiseGroups(titles), [titles])
-
+  const gridSize = useAppStore(s => s.gridSize)
   if (titles.length === 0) return <LibraryEmptyState />
-
-  // Nothing in the current view belongs to a franchise — render flat.
-  if (groups.length === 1 && groups[0].name === null) {
-    return viewMode === 'grid' ? <PosterWall titles={titles} /> : <LedgerList titles={titles} />
-  }
-
-  return (
-    <div className="space-y-10">
-      {groups.map((g) => (
-        <section key={g.key} aria-label={g.name ? franchiseDisplayName(g.name) : 'Standalone titles'}>
-          <div className="flex items-baseline gap-3 mb-4">
-            <h3 className="font-serif text-xl font-light text-paper whitespace-nowrap">
-              {g.name ? franchiseDisplayName(g.name) : 'Standalone'}
-            </h3>
-            <span className="font-mono text-[11px] tracking-[0.06em] text-paper-faint whitespace-nowrap">
-              {g.titles.length} title{g.titles.length !== 1 ? 's' : ''}
-            </span>
-            <div className="flex-1 h-px self-center" style={{ background: 'var(--line)' }} />
-          </div>
-          {viewMode === 'grid' ? <PosterWall titles={g.titles} /> : <LedgerList titles={g.titles} />}
-        </section>
-      ))}
-    </div>
-  )
+  const sections = groups.length === 1 && groups[0].name === null ? undefined : groups
+  return viewMode === 'grid'
+    ? <VirtualPosterWall titles={titles} gridSize={gridSize} sections={sections} />
+    : <VirtualLedgerList titles={titles} sections={sections} />
 }
 
 // ─── Library View ─────────────────────────────────────────────────────────────
@@ -548,7 +388,16 @@ export function Library() {
   }
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(searchDebounceRef.current), [])
+  useEffect(() => {
+    // An external search wins over any typing still waiting to be committed.
+    const unsubscribe = useAppStore.subscribe((state, previous) => {
+      if (state.filters.search !== previous.filters.search) clearTimeout(searchDebounceRef.current)
+    })
+    return () => {
+      unsubscribe()
+      clearTimeout(searchDebounceRef.current)
+    }
+  }, [])
 
   function handleSearchChange(value: string) {
     setSearchInput(value)
@@ -776,16 +625,13 @@ export function Library() {
       {/* Content */}
       <div className="animate-view-in">
         {filters.groupByFranchise ? (
-          // Franchise sections interleave headers with grids too small to be
-          // worth windowing — stays on plain PosterWall (see VirtualPosterWall's
-          // own comment for why only the flat path below is virtualized).
           <FranchiseSections titles={filteredTitles} viewMode={viewMode} />
         ) : viewMode === 'grid' ? (
           filteredTitles.length === 0 ? <LibraryEmptyState /> : (
             <VirtualPosterWall titles={filteredTitles} gridSize={gridSize} />
           )
         ) : (
-          <LedgerList titles={filteredTitles} />
+          filteredTitles.length === 0 ? <LibraryEmptyState /> : <VirtualLedgerList titles={filteredTitles} />
         )}
       </div>
 

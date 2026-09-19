@@ -8,7 +8,11 @@ This document tracks known issues, technical debt, and usability improvements fo
 
 | ID     | Issue                                                                                                                        | Impacted Codebase |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------| ------------------ |
-| KP-058 | The "eyebrow" kicker label (e.g. *Cast*, *Genres*, *Status*) is hand-rolled at ~38 call sites instead of routing through the existing `SubsectionLabel`/`StatLabel` components in `typography.tsx`, so font family (mono vs. sans), size (8px–12px), tracking (0.06em–0.42em), and color token (`text-paper-dim` / `text-paper-faint` / `text-muted-foreground`) all drift independently per file. | [typography.tsx](../apps/web/src/components/ui/typography.tsx) and call sites across `apps/web/src/views/` and `apps/web/src/components/` |
+| — | No open web UI audit findings; see the [consistency audit](ui-consistency-audit.md) and [performance audit](web-perf-audit.md) for completion evidence. | Web app |
+
+**Resolved KP-058:** The shared `Eyebrow` component and label migration shipped
+in `ae5cd05`. The 2026-09-14 audit follow-through verified this implementation
+and closed this stale backlog entry.
 
 ### Android app (2026-07-23)
 

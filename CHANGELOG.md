@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: start every Add Title session with a fresh form and search, including
+  rapid reopening and closing through browser navigation. Old requests cannot
+  restore the previous title or overwrite newer search results.
+
 ## [1.30.2] - 2026-09-19
 
 ### Fixed

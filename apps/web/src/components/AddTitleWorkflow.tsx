@@ -18,9 +18,16 @@ function useDebouncedSearch(delay = 400) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestRef = useRef(0)
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    requestRef.current += 1
+  }, [])
 
   const search = useCallback((query: string) => {
     if (timerRef.current) clearTimeout(timerRef.current)
+    const request = ++requestRef.current
     if (!query.trim()) {
       setResults([])
       setLoading(false)
@@ -29,12 +36,13 @@ function useDebouncedSearch(delay = 400) {
     setLoading(true)
     timerRef.current = setTimeout(async () => {
       try {
-        setResults(await searchMedia(query))
+        const nextResults = await searchMedia(query)
+        if (request === requestRef.current) setResults(nextResults)
       } catch (err) {
         console.error('Error during media search:', err)
-        setResults([])
+        if (request === requestRef.current) setResults([])
       } finally {
-        setLoading(false)
+        if (request === requestRef.current) setLoading(false)
       }
     }, delay)
   }, [delay])
@@ -308,9 +316,31 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 // ─── AddTitleWorkflow Component ───────────────────────────────────────────────
 
 export function AddTitleWorkflow() {
-  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
   const closeAddTitle = useAppStore((s) => s.closeAddTitle)
+  const [session, setSession] = useState({ open: isAddTitleOpen, id: 0 })
+  // Keep the modal mounted for its exit animation, but reset the entire form
+  // on every new opening, including one before that animation has finished.
+  if (session.open !== isAddTitleOpen) {
+    setSession({ open: isAddTitleOpen, id: session.id + (isAddTitleOpen ? 1 : 0) })
+  }
+
+  return (
+    <CinemaModal
+      open={isAddTitleOpen}
+      onClose={closeAddTitle}
+      maxWidth="sm:max-w-lg"
+      title="Add to Library"
+      description="Search for a movie or series and log your viewing details."
+    >
+      <AddTitleForm key={session.id} />
+    </CinemaModal>
+  )
+}
+
+function AddTitleForm() {
+  const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const handleClose = useAppStore((s) => s.closeAddTitle)
   const addTitle = useAppStore((s) => s.addTitle)
   const preselectedResult = useAppStore((s) => s.preselectedResult)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
@@ -443,25 +473,7 @@ export function AddTitleWorkflow() {
     handleClose()
   }
 
-  function handleClose() {
-    closeAddTitle()
-    setTimeout(() => {
-      setStep('search')
-      setQuery('')
-      setSelected(null)
-      setLog(DEFAULT_LOG)
-      setSavedMovieId(null)
-    }, 300)
-  }
-
   return (
-    <CinemaModal
-      open={isAddTitleOpen}
-      onClose={handleClose}
-      maxWidth="sm:max-w-lg"
-      title="Add to Library"
-      description="Search for a movie or series and log your viewing details."
-    >
       <div className="overflow-y-auto flex-1 scrollbar-thin px-6 py-6">
         <h2 className="font-serif text-xl font-light text-foreground mb-5">Add to Library</h2>
         {step !== 'success' && <StepIndicator step={step} />}
@@ -502,6 +514,7 @@ export function AddTitleWorkflow() {
                   <button
                     onClick={() => {
                       setQuery('')
+                      search('')
                     }}
                     aria-label="Clear search"
                     className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -743,6 +756,5 @@ export function AddTitleWorkflow() {
         </div>
       )}
       </div>
-    </CinemaModal>
   )
 }

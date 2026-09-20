@@ -307,13 +307,13 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                     <div>
                       <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>Remove?</div>
                       <div className="flex gap-2 mt-0.5">
-                        <button
+                        <button type="button"
                           onClick={() => { deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id); setPendingDeleteWeId(null) }}
                           className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                           style={{ color: 'var(--ember)', fontSize: '10px' }}
                           aria-label="Confirm delete watch event"
                         >Delete</button>
-                        <button onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: '10px' }} aria-label="Cancel delete watch event">Cancel</button>
+                        <button type="button" onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: '10px' }} aria-label="Cancel delete watch event">Cancel</button>
                       </div>
                     </div>
                   ) : (
@@ -324,7 +324,7 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
                         {we.notes && <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>"{we.notes}"</div>}
                       </div>
                       {!isSharedView && (
-                        <button onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', flexShrink: 0, marginTop: '1px' }} className="opacity-[0.45] hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Delete watch event" title="Delete watch event">
+                        <button type="button" onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', flexShrink: 0, marginTop: '1px' }} className="opacity-[0.45] hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Delete watch event" title="Delete watch event">
                           <Trash2 className="w-2.5 h-2.5" />
                         </button>
                       )}
@@ -402,12 +402,12 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
               <textarea aria-label="Episode review" value={log.reviewText} onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))} placeholder="Your thoughts on this episode…" rows={2} className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40" style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }} />
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSubmit} aria-label="Save watch event and log" disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()} className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ background: 'var(--amber)', color: '#1a0e06' }}>Save</button>
-              <button onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }} aria-label="Cancel logging watch event" className="h-8 px-3 rounded-md text-xs font-sans border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}>Cancel</button>
+              <button type="button" onClick={handleSubmit} aria-label="Save watch event and log" disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()} className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ background: 'var(--amber)', color: '#1a0e06' }}>Save</button>
+              <button type="button" onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }} aria-label="Cancel logging watch event" className="h-8 px-3 rounded-md text-xs font-sans border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}>Cancel</button>
             </div>
           </div>
         ) : (
-          <button
+          <button type="button"
             onClick={() => { if (showSaved) return; setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10), prePlatform: false })); setShowForm(true) }}
             className="flex items-center gap-1.5 text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             style={{ color: showSaved ? 'var(--amber)' : 'var(--amber-deep)' }}

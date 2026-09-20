@@ -119,3 +119,7 @@
 ## 2024-05-18 - [EmptyState Accessibility and Robustness]
 **Learning:** Found that generic presentation components like `EmptyState` can lack explicit `aria-hidden` tags on their purely decorative icons and sometimes lack explicit `type="button"` declarations for their CTA elements. This isn't immediately obvious when reviewing the visual output, but represents an accessibility and robustness flaw, particularly when these components might be reused inside unknown parent forms.
 **Action:** Always verify that generic, highly reusable presentational components explicitly hide their decorative icons from screen readers (`aria-hidden="true"`) and that standalone CTA buttons explicitly declare `type="button"` to prevent unintended default `submit` behavior.
+
+## 2026-09-20 - Explicit button types for accessibility and robustness
+**Learning:** Found that `<button>` elements used inside components like logging forms or utility panels often omit the `type="button"` attribute. Because the default HTML behavior for `<button>` is `type="submit"`, these buttons can accidentally trigger native form submissions if they are later composed within a `<form>` element, causing unexpected page reloads or broken state. This is especially true for standalone Call-to-Action buttons (like "Save" or "Cancel").
+**Action:** Always explicitly declare `type="button"` on `<button>` elements that are not intended to submit forms, ensuring they trigger only their bound JavaScript `onClick` handlers and preventing unintended default behavior.

@@ -165,7 +165,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
         <div className="flex flex-col items-center gap-2 py-4">
           <p className="font-sans text-xs text-muted-foreground italic">No comments yet.</p>
           {user && (
-            <button
+            <button type="button"
               onClick={() => textareaRef.current?.focus()}
               className="text-xs font-medium text-amber hover:text-amber/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 px-2 py-1 rounded"
             >
@@ -182,7 +182,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
                   {commentAuthorName(c)}
                 </span>
                 {c.authorId === user?.id && (
-                  <button
+                  <button type="button"
                     onClick={() => handleDelete(c.id)}
                     aria-label={`Delete comment: "${c.body.slice(0, 20)}${c.body.length > 20 ? '...' : ''}"`}
                     title="Delete comment"

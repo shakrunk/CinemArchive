@@ -31,7 +31,7 @@ function NavTab({
   Icon: LucideIcon
 }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
@@ -122,7 +122,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         })}
 
         {!isSharedView && (
-          <button onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-md" aria-label="Add Title">
+          <button type="button" onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-md" aria-label="Add Title">
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
               style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}

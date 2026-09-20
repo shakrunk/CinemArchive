@@ -162,7 +162,7 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
         <div className="text-center py-10 text-muted-foreground text-sm font-sans flex flex-col items-center gap-3">
           {query ? `No movies match "${query}".` : 'Nothing on your watchlist yet — search for a movie above.'}
           {query && (
-            <button
+            <button type="button"
               onClick={() => {
                 setQuery('')
               }}
@@ -182,7 +182,7 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
             </Eyebrow>
           )}
           {results.map((t) => (
-            <button
+            <button type="button"
               key={t.id}
               onClick={() => onPick(t.id)}
               className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -661,7 +661,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
           <Share2 className="w-4 h-4 mr-2" />
           Share plans
         </Button>
-        <button
+        <button type="button"
           onClick={handleDownloadIcs}
           aria-label="Download ICS file for calendar"
           className="flex items-center gap-1.5 text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
@@ -669,7 +669,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
           <Download className="w-3.5 h-3.5" />
           Download .ics
         </button>
-        <button onClick={onClose} className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mt-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Not now, skip sharing or downloading plans">
+        <button type="button" onClick={onClose} className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mt-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Not now, skip sharing or downloading plans">
           Not now
         </button>
       </div>

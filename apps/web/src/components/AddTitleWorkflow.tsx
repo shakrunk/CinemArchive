@@ -511,7 +511,7 @@ function AddTitleForm() {
                     <Search className="w-6 h-6 text-muted-foreground/40" />
                   </div>
                   <div>No results for "{query}"</div>
-                  <button
+                  <button type="button"
                     onClick={() => {
                       setQuery('')
                       search('')
@@ -528,7 +528,7 @@ function AddTitleForm() {
               {results.length > 0 && (
                 <div className="space-y-2">
                   {results.map((r) => (
-                    <button
+                    <button type="button"
                       key={r.tmdbId}
                       onClick={() => selectResult(r)}
                       className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -570,7 +570,7 @@ function AddTitleForm() {
       {/* Step 2: Log Form */}
       {step === 'log' && selected && (
         <div className="space-y-6">
-          <button
+          <button type="button"
             onClick={() => setStep('search')}
             className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
@@ -611,7 +611,7 @@ function AddTitleForm() {
             </Eyebrow>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPTIONS.map((opt) => (
-                <button
+                <button type="button"
                   key={opt.value}
                   onClick={() => setLog((l) => ({ ...l, status: opt.value }))}
                   className={cn(
@@ -677,7 +677,7 @@ function AddTitleForm() {
                 <Eyebrow as="p" size="xl" tone="muted" font="sans">
                   Season Progress
                 </Eyebrow>
-                <button
+                <button type="button"
                   onClick={() => {
                     setLog((l) => ({
                       ...l,
@@ -743,7 +743,7 @@ function AddTitleForm() {
           </div>
           <p className="font-serif text-lg text-foreground">Added "{selected.title}" to your watchlist.</p>
           <div className="flex flex-col gap-2 items-center pt-2">
-            <button
+            <button type="button"
               onClick={handleGotTickets}
               className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >

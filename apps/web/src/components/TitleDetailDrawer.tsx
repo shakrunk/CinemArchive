@@ -424,7 +424,7 @@ function ViewingTimeline({
       <div className="text-center py-6 text-muted-foreground text-sm font-sans flex flex-col items-center gap-3">
         <div>No viewings logged yet</div>
         {!isSharedView && onLogViewing && (
-          <button
+          <button type="button"
             onClick={onLogViewing}
             aria-label="Log first viewing"
             className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -458,7 +458,7 @@ function ViewingTimeline({
                       Remove this viewing?
                     </span>
                     <div className="flex items-center gap-3">
-                      <button
+                      <button type="button"
                         onClick={() => {
                           onDeleteViewing?.(v.id)
                           setPendingDeleteId(null)
@@ -469,7 +469,7 @@ function ViewingTimeline({
                       >
                         Delete forever
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setPendingDeleteId(null)}
                         className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--paper-faint)' }}
@@ -492,7 +492,7 @@ function ViewingTimeline({
                           <span className="font-mono text-xs text-amber">★ {v.rating}</span>
                         )}
                         {!isSharedView && (
-                          <button
+                          <button type="button"
                             onClick={() => setEditingId(editingId === v.id ? null : v.id)}
                             style={{ color: 'var(--paper-faint)', opacity: 0.45 }}
                             onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
@@ -504,7 +504,7 @@ function ViewingTimeline({
                           </button>
                         )}
                         {!isSharedView && onDeleteViewing && (
-                          <button
+                          <button type="button"
                             onClick={() => setPendingDeleteId(v.id)}
                             style={{ color: 'var(--paper-faint)', opacity: 0.45 }}
                             onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
@@ -628,7 +628,7 @@ function ListsCard({ titleId, onOpenPicker }: { titleId: string; onOpenPicker: (
     <SectionCard
       title="Lists"
       action={
-        <button
+        <button type="button"
           onClick={onOpenPicker}
           className="font-mono text-xs text-amber hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
         >
@@ -748,7 +748,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           Mark {count} episode{count === 1 ? '' : 's'} as watched (no date)?
         </span>
         <div className="flex items-center gap-3">
-          <button
+          <button type="button"
             onClick={() => {
               markPrePlatformWatched(titleId, scope === 'season' ? season?.seasonNumber : undefined)
               setConfirmPrePlatform(null)
@@ -758,7 +758,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           >
             Confirm
           </button>
-          <button
+          <button type="button"
             onClick={() => setConfirmPrePlatform(null)}
             className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
             style={{ color: 'var(--paper-faint)' }}
@@ -769,7 +769,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
         </div>
       </div>
     ) : (
-      <button
+      <button type="button"
         onClick={() => setConfirmPrePlatform(scope)}
         className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber"
       >
@@ -830,7 +830,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
             const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
             const seasonAvg = avgSeasonRating(s)
             return (
-              <button
+              <button type="button"
                 key={s.seasonNumber}
                 onClick={() => handleSeasonChange(s.seasonNumber)}
                 aria-label={`Season ${s.seasonNumber}`}
@@ -1087,7 +1087,7 @@ function DrawerTagEditor({
           />
         )}
         {!editing && (
-          <button
+          <button type="button"
             aria-label="Add tag"
             onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
             className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -1195,7 +1195,7 @@ function FranchiseSection({
             const isCurrent = p.tmdbId === currentTmdbId
             const isWatched = libTitle?.status === 'watched'
             return (
-              <button
+              <button type="button"
                 key={p.tmdbId}
                 onClick={() => {
                   if (isCurrent) return
@@ -1277,7 +1277,7 @@ function OutingBanner({ title }: { title: Title }) {
   if (!outing && pendingFollowUp) {
     return (
       <div className="px-4 sm:px-6 pt-4 pb-4">
-        <button
+        <button type="button"
           onClick={() => openPostShowSheet(pendingFollowUp.id)}
           className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
         >
@@ -1311,30 +1311,30 @@ function OutingBanner({ title }: { title: Title }) {
         {confirmingCancel ? (
           <span className="flex items-center gap-2 ml-auto">
             <span className="font-mono text-xs text-muted-foreground">Cancel these tickets?</span>
-            <button onClick={() => cancelOuting(outing.id)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
+            <button type="button" onClick={() => cancelOuting(outing.id)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
               Yes
             </button>
-            <button onClick={() => setConfirmingCancel(false)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
+            <button type="button" onClick={() => setConfirmingCancel(false)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
               No
             </button>
           </span>
         ) : (
           <span className="flex items-center gap-3 ml-auto">
-            <button
+            <button type="button"
               onClick={() => setSharePanelOpen(true)}
               className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
               aria-label="Share these tickets"
             >
               Share
             </button>
-            <button
+            <button type="button"
               onClick={() => openOutingSchedule(title.id, outing.id)}
               className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
               aria-label="Edit these tickets"
             >
               Edit
             </button>
-            <button
+            <button type="button"
               onClick={() => setConfirmingCancel(true)}
               className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
               aria-label="Cancel these tickets"
@@ -2067,7 +2067,7 @@ export function TitleDetailDrawer() {
                 action={!showLogForm && !isSharedView ? (
                     <div className="flex items-center gap-3">
                       {(title.status === 'watchlist' || title.status === 'watching') && (
-                        <button
+                        <button type="button"
                           onClick={() => openOutingSchedule(title.id)}
                           className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                         >
@@ -2075,7 +2075,7 @@ export function TitleDetailDrawer() {
                           I've got tickets
                         </button>
                       )}
-                      <button
+                      <button type="button"
                         onClick={() => setShowLogForm(true)}
                         className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
@@ -2202,7 +2202,7 @@ export function TitleDetailDrawer() {
                     Remove from library forever?
                   </span>
                   <div className="flex items-center gap-3">
-                    <button
+                    <button type="button"
                       onClick={handleDelete}
                       className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--ember)' }}
@@ -2210,7 +2210,7 @@ export function TitleDetailDrawer() {
                     >
                       Delete forever
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => setPendingDeleteTitle(false)}
                       className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--paper-faint)' }}
@@ -2222,7 +2222,7 @@ export function TitleDetailDrawer() {
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
+                  <button type="button"
                     onClick={openRefreshMetadata}
                     className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
@@ -2230,7 +2230,7 @@ export function TitleDetailDrawer() {
                     Refresh poster &amp; metadata
                   </button>
                   {title.type === 'movie' && (title.status === 'watched' || title.status === 'dropped') && (
-                    <button
+                    <button type="button"
                       onClick={() => openOutingSchedule(title.id)}
                       className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                     >
@@ -2239,7 +2239,7 @@ export function TitleDetailDrawer() {
                     </button>
                   )}
                   {user && (
-                    <button
+                    <button type="button"
                       onClick={() => setSendPanelOpen(true)}
                       className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                     >
@@ -2247,7 +2247,7 @@ export function TitleDetailDrawer() {
                       Send to a friend
                     </button>
                   )}
-                  <button
+                  <button type="button"
                     onClick={() => setPendingDeleteTitle(true)}
                     className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ember/60"
                   >

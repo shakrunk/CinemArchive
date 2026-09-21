@@ -123,7 +123,7 @@ function PostShowBody({
       </Button>
 
       {showDidntMakeIt && (
-        <button
+        <button type="button"
           onClick={handleDidntMakeIt}
           className="w-full text-center font-mono text-xs text-muted-foreground hover:text-ember transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >

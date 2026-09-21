@@ -50,7 +50,7 @@ export function CinemaModal({
             </DialogPrimitive.Description>
           )}
           {onToggleExpand && (
-            <button
+            <button type="button"
               onClick={onToggleExpand}
               className="absolute right-14 top-4 z-20 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm hidden sm:flex items-center justify-center text-white/70 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-amber/50"
               aria-label={expanded ? "Collapse to drawer" : "Expand to full page"}

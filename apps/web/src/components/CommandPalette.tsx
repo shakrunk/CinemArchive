@@ -108,7 +108,7 @@ function CommandPaletteBody({
           <div className="command-empty flex flex-col items-center gap-3 py-6">
             <div>No matches. Try a different search.</div>
             {query.length > 0 && (
-              <button
+              <button type="button"
                 onClick={() => {
                   setQuery('')
                   setActiveId(null)
@@ -123,7 +123,7 @@ function CommandPaletteBody({
           </div>
         ) : (
           results.map((cmd, idx) => (
-            <button
+            <button type="button"
               key={cmd.id}
               id={`cmd-${cmd.id}`}
               data-idx={idx}

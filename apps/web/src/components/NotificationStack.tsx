@@ -75,7 +75,7 @@ function NotificationCard({
           <p className="font-sans text-[10px] text-muted-foreground mt-1">Still failing — try again later.</p>
         )}
         {notification.retry && (
-          <button
+          <button type="button"
             onClick={handleRetry}
             disabled={retrying}
             className="mt-2 font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 flex items-center gap-1 disabled:opacity-50 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
@@ -85,7 +85,7 @@ function NotificationCard({
           </button>
         )}
       </div>
-      <button
+      <button type="button"
         onClick={onDismiss}
         className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         aria-label="Dismiss notification"

@@ -230,7 +230,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                         aria-label="Dismiss notification"
                         className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3 h-3" aria-hidden="true" />
                       </button>
                     </div>
                     {sharePayload && (

@@ -222,7 +222,7 @@ function PhysicalMediaShelf({
               <Check className="w-4 h-4" />
             </button>
             <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </span>
         )}
@@ -335,7 +335,7 @@ export function WatchProvidersSection({
             <Check className="w-4 h-4" />
           </button>
           <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       )}

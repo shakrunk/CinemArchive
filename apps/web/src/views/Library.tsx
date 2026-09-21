@@ -550,7 +550,7 @@ export function Library() {
       </div>
 
       {/* Status chips (mobile) */}
-      <div className="flex md:hidden gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1" data-lenis-prevent>
+      <div className="flex md:hidden gap-1.5 overflow-x-auto scrollbar-none mb-4 -mx-1 px-1">
         {STATUS_OPTIONS.map((opt) => (
           <Chip key={opt.value} active={filters.status === opt.value} onClick={() => setFilter('status', opt.value)} className="shrink-0">
             {opt.label}

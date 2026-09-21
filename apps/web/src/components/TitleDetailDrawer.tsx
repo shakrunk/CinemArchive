@@ -824,7 +824,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
 
       {/* Smart season selector */}
       {seasons.length <= 3 ? (
-        <div className="flex gap-2 overflow-x-auto scrollbar-none" data-lenis-prevent>
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
           {seasons.map((s) => {
             const watched = episodesWatchedInSeason(s)
             const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
@@ -898,7 +898,6 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
               ref={carouselRef}
               onScroll={handleCarouselScroll}
               className="flex gap-3 overflow-x-auto scrollbar-none pb-1"
-              data-lenis-prevent
             >
               {season.episodes!.map((ep) => (
                 <EpisodeCard
@@ -950,7 +949,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <Eyebrow as="div" className="mb-2">
             Season {season.seasonNumber} Cast
           </Eyebrow>
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6" data-lenis-prevent>
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
             {season.cast.map((member) => (
               <button
                 key={member.tmdbPersonId}
@@ -1189,7 +1188,7 @@ function FranchiseSection({
           ))}
         </div>
       ) : (
-        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none" data-lenis-prevent>
+        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
           {parts.map((p) => {
             const libTitle = p.tmdbId != null ? libraryByTmdbId.get(p.tmdbId) : undefined
             const isCurrent = p.tmdbId === currentTmdbId

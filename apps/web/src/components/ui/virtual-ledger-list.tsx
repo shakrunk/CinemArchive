@@ -35,7 +35,7 @@ export function VirtualLedgerList({ titles, sections }: { titles: Title[]; secti
   const spacer = (height: number) => height > 0.5 ? <tr aria-hidden="true"><td colSpan={columns.length} style={{ height, padding: 0, border: 0 }} /></tr> : null
 
   return (
-    <div ref={ref} className="rounded-xl overflow-x-auto" data-lenis-prevent-horizontal
+    <div ref={ref} className="rounded-xl overflow-x-auto"
       style={{ border: '1px solid var(--line)', background: 'linear-gradient(180deg, var(--ink-1), rgba(17,13,11,0.4))' }}
       onFocusCapture={event => {
         const index = (event.target as HTMLElement).closest<HTMLElement>('[data-index]')?.dataset.index

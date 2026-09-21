@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.30.4] - 2026-09-21
+
 ### Fixed
 
 - Web: keep vertical page and title-drawer scrolling moving when the pointer

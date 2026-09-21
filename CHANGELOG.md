@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: keep vertical page and title-drawer scrolling moving when the pointer
+  crosses horizontal episode, cast, trailer, provider, and other scrolling rows.
+  Sideways scrolling remains available without trapping the parent scroll area.
+
 ## [1.30.3] - 2026-09-19
 
 ### Fixed

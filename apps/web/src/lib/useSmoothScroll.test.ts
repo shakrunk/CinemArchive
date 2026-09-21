@@ -1,5 +1,7 @@
-import { cleanup, renderHook } from '@testing-library/react'
+import { createElement } from 'react'
+import { cleanup, render, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { WatchProviderListings } from '../components/ui/watch-providers'
 import { useScopedSmoothScroll, useSmoothScroll } from './useSmoothScroll'
 
 // Keep Lenis real: assert who owns a wheel event, not its constructor options.
@@ -34,8 +36,8 @@ function scrollArea(parent: HTMLElement, overflowing = true) {
   return { area, child }
 }
 
-function wheel(target: HTMLElement, deltaY = 100) {
-  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY })
+function wheel(target: HTMLElement, deltaY = 100, deltaX = 0) {
+  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY, deltaX })
   target.dispatchEvent(event)
   return event.defaultPrevented
 }
@@ -70,5 +72,36 @@ describe.each(['page', 'drawer'] as const)('%s smooth scrolling', (scope) => {
     area.scrollTop = 800
     expect(wheel(child)).toBe(true)
     expect(wheel(child, -100)).toBe(false)
+  })
+
+  it.each([0, 400, 800])('keeps vertical scrolling over a horizontal row at offset %i', (scrollLeft) => {
+    const wrapper = mount()
+    const { getByTitle } = render(createElement(WatchProviderListings, {
+      providers: {
+        flatrate: [{ providerId: 1, name: 'Test provider', logoUrl: '' }],
+        free: [], ads: [], rent: [], buy: [], link: '',
+      },
+    }), { container: wrapper })
+    const child = getByTitle('Test provider')
+    const area = child.parentElement!
+    // jsdom has no layout or Tailwind styles; supply the row's browser dimensions.
+    Object.assign(area.style, {
+      overflowX: 'auto', overflowY: 'auto',
+      overscrollBehaviorX: 'auto', overscrollBehaviorY: 'auto',
+    })
+    Object.defineProperties(area, {
+      clientWidth: { value: 200 }, scrollWidth: { value: 1000 },
+      clientHeight: { value: 40 }, scrollHeight: { value: 40 },
+    })
+    area.scrollLeft = scrollLeft
+
+    expect(wheel(wrapper)).toBe(true)
+    expect(wheel(child)).toBe(true)
+    expect(wheel(child, -100)).toBe(true)
+    expect(wheel(child, 100, 5)).toBe(true)
+    expect(wheel(child, 0, 100)).toBe(false)
+    expect(wheel(child, 0, -100)).toBe(false)
+    if (scrollLeft < 800) expect(wheel(child, 5, 100)).toBe(false)
+    if (scrollLeft > 0) expect(wheel(child, -5, -100)).toBe(false)
   })
 })

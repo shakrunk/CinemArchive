@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-09-22
+
 ### Added
 
 - Web and Android: Critical Record now offers normalized personal ratings with

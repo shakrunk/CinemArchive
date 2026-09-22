@@ -1,6 +1,6 @@
 // ─── Rating distribution histogram ────────────────────────────────────────────
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, ratingColorVar, toPercent } from 'src/lib/utils'
 import { deriveRatingDistribution } from 'src/store/ledgerDerive'
@@ -13,6 +13,7 @@ import {
 import { Panel, PanelEmpty } from '../PanelShell'
 import { renderStarLabel } from '../labels'
 import { Eyebrow } from 'src/components/ui/typography'
+import { RatingStandards } from './RatingStandards'
 
 export function RatingDistribution({
   className,
@@ -23,6 +24,7 @@ export function RatingDistribution({
   settings?: LedgerWidgetSettings
   width?: LedgerPanelWidth
 }) {
+  const [view, setView] = useState<'distribution' | 'normalized'>('distribution')
   const titles = useAppStore((s) => s.titles)
   const setFilter = useAppStore((s) => s.setFilter)
   const requestView = useAppStore((s) => s.requestView)
@@ -51,10 +53,25 @@ export function RatingDistribution({
   return (
     <Panel
       title={settings?.title || 'Critical record'}
-      hint={`rating distribution · ${avgRating.toFixed(1)} avg${describeLedgerSettings(settings)}`}
+      hint={`${view === 'normalized' ? 'personal rating standards' : `rating distribution · ${avgRating.toFixed(1)} avg`}${describeLedgerSettings(settings)}`}
       className={className}
     >
-      {total === 0 ? (
+      <div className="mb-3 flex shrink-0 gap-2" role="group" aria-label="Rating view">
+        {(['distribution', 'normalized'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={view === mode}
+            onClick={() => setView(mode)}
+            className={cn('rounded border px-2 py-1 text-xs transition-colors', view === mode
+              ? 'border-amber/40 bg-amber/10 text-amber'
+              : 'border-[var(--line)] text-paper-faint hover:text-paper')}
+          >
+            {mode === 'distribution' ? 'Distribution' : 'Normalized'}
+          </button>
+        ))}
+      </div>
+      {view === 'normalized' ? <RatingStandards scope={settings?.scope} /> : total === 0 ? (
         <PanelEmpty message="No ratings yet" />
       ) : (
         <div

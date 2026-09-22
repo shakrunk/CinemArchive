@@ -137,6 +137,31 @@ Unlike traditional trackers, CinemArchive lets you:
 | `/src/lib/ledgerPanels.ts` | Panel type definitions + layout helpers |
 | `/src/store/useAppStore.ts` | `ledger` slice (widgets, widgetSettings) |
 
+### Personal Rating Normalization (Web and Android)
+
+In **Critical Record → Normalized**, compare each current title rating against all
+available rated titles or against titles of the same media type (films/series).
+The table shows original stars, a personal z-score, and an empirical percentile rank.
+Search finds titles without changing the baseline; the widget's Films/Series scope
+also only filters the displayed rows. Click a title to open its detail drawer.
+
+- Z-score: `(rating − mean) / population standard deviation`.
+- Percentile rank: `100 × (ratings below + half of tied ratings) / baseline count`.
+- One observation per title, including zero and fractional ratings; missing,
+  non-finite, and out-of-range ratings are excluded. Rewatches are not extra votes.
+- Fewer than two ratings or zero spread gives an unavailable z-score. Baselines
+  with fewer than five titles are labeled as small samples (a display heuristic,
+  not a statistical confidence threshold).
+- Shared/friend views use only the currently available owner's library, which
+  may be partial. These are descriptive scores, not predictions or Bayesian estimates.
+- Original ratings are unchanged. The view and baseline selectors are temporary
+  panel state. Android uses expandable rows within its naturally sized cards.
+
+Source: `apps/web/src/store/ratingNormalization.ts` and
+`apps/web/src/views/ledger/panels/RatingStandards.tsx`. Focused checks:
+`npm run test -- src/store/ratingNormalization.test.ts src/views/ledger/panels/RatingDistribution.test.tsx`
+from `apps/web`.
+
 ### Custom CSS Visuals
 
 No Recharts or other charting library. Instead, custom CSS classes and inline styles:

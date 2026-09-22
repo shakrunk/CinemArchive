@@ -537,6 +537,7 @@ private fun CinemArchiveApp(
                             Tab.LEDGER -> LedgerRoute(
                                 ledgerRepository,
                                 ledgerLayoutRepository,
+                                onTitleClick = { overlay = Overlay.Detail(it) },
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 isWideLayout = useNavigationRail,

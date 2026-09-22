@@ -9,6 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- Web and Android: Critical Record now offers normalized personal ratings with
+  z-scores and percentile ranks, using either the full library or separate film
+  and series baselines. Search rated titles and open their details without
+  changing the baseline or original star ratings. Small samples and ratings
+  with no variation are explained consistently on both clients.
+
 ## [1.30.4] - 2026-09-21
 
 ### Fixed

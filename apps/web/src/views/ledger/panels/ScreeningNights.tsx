@@ -44,13 +44,12 @@ export function ScreeningNights({
   }, [titles, settingsKey])
 
   const maxCount = maxOrOne(counts)
-  const radarPoints = counts
-    .map((count, index) => {
-      const angle = -Math.PI / 2 + (index * Math.PI * 2) / 7
-      const radius = 24 + (count / maxCount) * 64
-      return `${100 + Math.cos(angle) * radius},${100 + Math.sin(angle) * radius}`
-    })
-    .join(' ')
+  const radarPointsArray = counts.map((count, index) => {
+    const angle = -Math.PI / 2 + (index * Math.PI * 2) / 7
+    const radius = 24 + (count / maxCount) * 64
+    return [100 + Math.cos(angle) * radius, 100 + Math.sin(angle) * radius]
+  })
+  const radarPoints = radarPointsArray.map(([x, y]) => `${x},${y}`).join(' ')
   const guidePoints = [0.33, 0.66, 1].map((scale) =>
     DAY_LABELS.map((_, index) => {
       const angle = -Math.PI / 2 + (index * Math.PI * 2) / 7
@@ -114,7 +113,7 @@ export function ScreeningNights({
                 strokeWidth="2"
               />
               {counts.map((count, index) => {
-                const [x, y] = radarPoints.split(' ')[index].split(',').map(Number)
+                const [x, y] = radarPointsArray[index]
                 return (
                   <circle
                     key={index}

@@ -11,6 +11,12 @@ number is chosen.
 
 ## [1.31.0] - 2026-09-22
 
+### Fixed
+
+- Web: a full or blocked browser cache no longer reports a successful metadata
+  refresh as a fetch failure. Keep updates and online sync working, show a
+  separate offline-cache notice, and retry cache writes on subsequent changes.
+
 ### Added
 
 - Web and Android: Critical Record now offers normalized personal ratings with

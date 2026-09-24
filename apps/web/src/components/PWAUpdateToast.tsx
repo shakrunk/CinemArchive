@@ -35,7 +35,7 @@ export function PWAUpdateToast() {
           className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           aria-label="Dismiss"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>
     </div>

@@ -1069,7 +1069,7 @@ function DrawerTagEditor({
               aria-label={`Remove tag ${t}`}
               title={`Remove tag ${t}`}
             >
-              <X className="w-2.5 h-2.5" />
+              <X className="w-2.5 h-2.5" aria-hidden="true" />
             </button>
           </span>
         ))}

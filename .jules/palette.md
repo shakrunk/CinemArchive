@@ -123,3 +123,7 @@
 ## 2026-09-20 - Explicit button types for accessibility and robustness
 **Learning:** Found that `<button>` elements used inside components like logging forms or utility panels often omit the `type="button"` attribute. Because the default HTML behavior for `<button>` is `type="submit"`, these buttons can accidentally trigger native form submissions if they are later composed within a `<form>` element, causing unexpected page reloads or broken state. This is especially true for standalone Call-to-Action buttons (like "Save" or "Cancel").
 **Action:** Always explicitly declare `type="button"` on `<button>` elements that are not intended to submit forms, ensuring they trigger only their bound JavaScript `onClick` handlers and preventing unintended default behavior.
+
+## 2026-09-21 - Decorative Icon Accessibility
+**Learning:** Found multiple instances where the "X" (Close/Clear) icons inside dismiss and clear buttons were not explicitly hidden from screen readers. Even when the parent button has an `aria-label` or visible text, decorative icons without `aria-hidden="true"` can cause redundant or confusing announcements for screen reader users.
+**Action:** Always ensure that purely decorative icons (like `<X />` inside a clear search button) explicitly include `aria-hidden="true"` so they are properly ignored by assistive technologies.

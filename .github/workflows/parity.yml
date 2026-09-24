@@ -1,0 +1,32 @@
+name: Parity
+
+# Fails a pull request when a single-client feat/fix commit doesn't declare what happens on the
+# other client. See scripts/check-parity.mjs and CONTRIBUTING.md#cross-client-parity.
+
+on:
+  pull_request:
+    branches: [dev, main]
+    # `edited` re-runs the check after a Parity-Override line is added to the PR body.
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check cross-client parity declarations
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-parity.mjs "$BASE_SHA" "$HEAD_SHA"

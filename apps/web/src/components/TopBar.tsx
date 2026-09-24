@@ -135,7 +135,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             >
               <Users className="w-[15px] h-[15px]" />
               <span className="hidden sm:inline font-sans text-[12px] truncate max-w-[140px]">{friendView.displayName}</span>
-              <X className="w-[13px] h-[13px]" />
+              <X className="w-[13px] h-[13px]" aria-hidden="true" />
             </button>
           ) : viewerContext.kind === 'shared-link' ? (
             <button type="button"
@@ -146,7 +146,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             >
               <Eye className="w-[15px] h-[15px]" />
               <span className="hidden sm:inline font-sans text-[12px]">Shared view</span>
-              <X className="w-[13px] h-[13px]" />
+              <X className="w-[13px] h-[13px]" aria-hidden="true" />
             </button>
           ) : (
             isSupabaseConfigured && !isSharedView && (

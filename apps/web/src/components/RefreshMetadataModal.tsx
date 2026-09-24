@@ -167,7 +167,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                     aria-label="Clear search"
                     className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
                     Clear search
                   </button>
                 </div>

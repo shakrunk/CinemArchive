@@ -80,3 +80,7 @@
 ## 2024-03-24 - Avoid string parsing in render loops
 **Learning:** Parsing strings (e.g. `radarPoints.split(' ')[index].split(',').map(Number)`) inside array rendering loops (e.g. `.map()`) introduces unnecessary string allocation and processing overhead on every render.
 **Action:** Precalculate complex data structures like coordinate arrays before rendering to avoid repetitive parsing inside JSX iteration.
+
+## 2024-06-25 - Replace O(N^2) Nested Loops with Hash Map Lookups
+**Learning:** Using `Array.prototype.find()` inside an `Array.prototype.map()` iteration creates an O(N*M) nested loop, which drastically slows down performance when processing large arrays (such as matching episodes during metadata refreshes).
+**Action:** Always precompute a hash map (`Map`) from the array being searched outside the main loop, and replace `.find()` with `.get()` to achieve O(N + M) time complexity.

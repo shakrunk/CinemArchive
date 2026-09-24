@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import { normalizeCompanions } from './companions'
+import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
@@ -644,6 +645,16 @@ if (typeof document !== 'undefined') {
     if (document.visibilityState === 'hidden' && ledgerSaveTimer !== undefined) flushLedgerLayoutSave()
   })
 }
+
+const browserCacheStorage = createBrowserCacheStorage(() => localStorage, (error) => {
+  console.warn('Browser offline cache unavailable:', error)
+  // Hydration may encounter blocked storage while the store is still being
+  // constructed; defer notification until initialization/current mutation ends.
+  queueMicrotask(() => useAppStore.getState().pushNotification({
+    dedupeKey: 'browser-cache-unavailable',
+    message: "Couldn't update this browser's offline cache. Changes are still in this tab, but may not survive a reload. Signed-in changes can still sync online.",
+  }))
+})
 
 export const useAppStore = create<AppStore>()(
   persist(
@@ -1731,7 +1742,7 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'cinemarchive-library',
       version: PERSIST_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => browserCacheStorage),
       // Only the source of truth is persisted; derived state (filteredTitles,
       // stats) and transient UI flags are recomputed/reset on load. While
       // browsing a friend's library, `titles` holds THEIR data — never persist
@@ -1792,11 +1803,11 @@ export const useAppStore = create<AppStore>()(
         // One-time migration: the default sort used to be 'addedAt'. Flip
         // still-on-default users over to the new 'lastInteraction' default
         // without touching anyone who has since picked a different sort.
-        if (typeof localStorage !== 'undefined' && !localStorage.getItem(SORT_DEFAULT_MIGRATION_KEY)) {
+        if (!browserCacheStorage.getItem(SORT_DEFAULT_MIGRATION_KEY)) {
           if (state.filters.sortField === 'addedAt') {
             state.filters.sortField = 'lastInteraction'
           }
-          localStorage.setItem(SORT_DEFAULT_MIGRATION_KEY, '1')
+          browserCacheStorage.setItem(SORT_DEFAULT_MIGRATION_KEY, '1')
         }
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)

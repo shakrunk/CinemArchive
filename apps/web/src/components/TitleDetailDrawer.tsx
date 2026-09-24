@@ -1069,7 +1069,7 @@ function DrawerTagEditor({
               aria-label={`Remove tag ${t}`}
               title={`Remove tag ${t}`}
             >
-              <X className="w-2.5 h-2.5" />
+              <X className="w-2.5 h-2.5" aria-hidden="true" />
             </button>
           </span>
         ))}
@@ -1636,8 +1636,9 @@ export function TitleDetailDrawer() {
               : s
           )
         } else {
+          const tmdbEpMap = new Map(tmdbEps.map((e) => [e.episode_number, e]))
           updatedEpisodes = existingEpisodes.map((ep) => {
-            const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
+            const tmdbEp = tmdbEpMap.get(ep.episodeNumber)
             if (!tmdbEp) return ep
             const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
               .filter((c) => EP_CREW_JOBS_BF.has(c.job))

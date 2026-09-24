@@ -9,6 +9,22 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-09-22
+
+### Fixed
+
+- Web: a full or blocked browser cache no longer reports a successful metadata
+  refresh as a fetch failure. Keep updates and online sync working, show a
+  separate offline-cache notice, and retry cache writes on subsequent changes.
+
+### Added
+
+- Web and Android: Critical Record now offers normalized personal ratings with
+  z-scores and percentile ranks, using either the full library or separate film
+  and series baselines. Search rated titles and open their details without
+  changing the baseline or original star ratings. Small samples and ratings
+  with no variation are explained consistently on both clients.
+
 ## [1.30.4] - 2026-09-21
 
 ### Fixed

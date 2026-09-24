@@ -1,0 +1,58 @@
+name: Parity gap
+description: A feature or fix that shipped on one client and still needs to land on the other.
+title: "[Parity]: "
+labels: ["parity-gap"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reference this issue from the shipping commit's `Parity: #<number>` trailer. Domain-level status still lives in [docs/android-parity-matrix.md](../../docs/android-parity-matrix.md); this issue tracks one concrete change.
+
+  - type: dropdown
+    id: missing_on
+    attributes:
+      label: Missing on
+      options:
+        - Android app (shipped on web)
+        - Web app (shipped on Android)
+    validations:
+      required: true
+
+  - type: input
+    id: source
+    attributes:
+      label: Shipped in
+      description: Commit SHA or PR where it landed on the first client.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain
+      description: Matches the rows of the parity matrix.
+      options:
+        - Authentication
+        - Library
+        - Title detail
+        - Episode tracking
+        - Discover/add
+        - Up Next
+        - Ledger
+        - Cinema outings
+        - Sharing
+        - Friends and social
+        - Notifications
+        - Lists
+        - Preferences and themes
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Behavior to port
+      description: What the user can do on the shipping client that they can't on the other. Point at the source files.
+    validations:
+      required: true

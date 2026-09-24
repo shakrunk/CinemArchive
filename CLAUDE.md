@@ -60,6 +60,17 @@ Before committing, check `git diff --stat` to confirm the diff matches the inten
 
 ---
 
+## Cross-client parity
+
+Every `feat`/`fix`/breaking commit that changes shipped source in only one client (`apps/web/src/`,
+or an Android `src/main/`) must end with a `Parity:` trailer — `Parity: #<issue>` when the other
+client needs the change (open a `parity-gap` issue from `.github/ISSUE_TEMPLATE/parity_gap.yml`
+first), or `Parity: n/a: <reason>` when it doesn't. Decide which before committing; ask the user if
+it's unclear. `.github/workflows/parity.yml` fails PRs otherwise (details in `CONTRIBUTING.md` →
+Cross-client parity); run `npm run check:parity` from the repo root to check locally.
+
+---
+
 ## Branching & Release
 
 When targeting a version-bump or release PR, target `main` (not `dev`) if commits already exist in dev; confirm branch topology before opening the PR.

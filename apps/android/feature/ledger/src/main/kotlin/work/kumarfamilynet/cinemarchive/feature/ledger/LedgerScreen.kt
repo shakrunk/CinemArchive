@@ -202,6 +202,7 @@ fun LedgerRoute(
     repository: LedgerRepository,
     layoutRepository: LedgerLayoutRepository,
     onOpenProfile: () -> Unit,
+    onTitleClick: (String) -> Unit,
     profileInitial: String = "C",
     isWideLayout: Boolean = false,
 ) {
@@ -219,6 +220,7 @@ fun LedgerRoute(
         onToggleExpanded = viewModel::toggleExpanded,
         onLayoutChange = viewModel::updateLayout,
         onOpenProfile = onOpenProfile,
+        onTitleClick = onTitleClick,
         profileInitial = profileInitial,
         isWideLayout = isWideLayout,
     )
@@ -235,6 +237,7 @@ fun LedgerScreen(
     onToggleExpanded: (String) -> Unit = {},
     onLayoutChange: (List<LedgerWidgetConfig>) -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    onTitleClick: (String) -> Unit = {},
     profileInitial: String = "C",
     // Sourced from MainActivity's own top-level window-width measurement (the same one that
     // decides bottom-nav-vs-rail) rather than re-measuring this screen's own content pane —
@@ -298,6 +301,7 @@ fun LedgerScreen(
                 layout = layout,
                 expandedWidgets = expandedWidgets,
                 onToggleExpanded = onToggleExpanded,
+                onTitleClick = onTitleClick,
                 isWideLayout = isWideLayout,
                 viewedDisplayName = viewedDisplayName,
             )
@@ -345,6 +349,7 @@ private fun LedgerBoardContent(
     layout: List<LedgerWidgetConfig>,
     expandedWidgets: Set<String>,
     onToggleExpanded: (String) -> Unit,
+    onTitleClick: (String) -> Unit,
     isWideLayout: Boolean,
     viewedDisplayName: String? = null,
 ) {
@@ -392,6 +397,7 @@ private fun LedgerBoardContent(
                             board = boards[config.id],
                             expanded = config.id in expandedWidgets,
                             onToggleExpanded = { onToggleExpanded(config.id) },
+                            onTitleClick = onTitleClick,
                             modifier = Modifier.weight(config.width.spanOf12().toFloat()),
                         )
                     }
@@ -406,6 +412,7 @@ private fun LedgerBoardContent(
                     board = boards[config.id],
                     expanded = config.id in expandedWidgets,
                     onToggleExpanded = { onToggleExpanded(config.id) },
+                    onTitleClick = onTitleClick,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -443,6 +450,7 @@ private fun WidgetCard(
     board: LedgerBoard?,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
+    onTitleClick: (String) -> Unit,
     modifier: Modifier,
 ) {
     if (board == null) return
@@ -455,7 +463,7 @@ private fun WidgetCard(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            WidgetContent(config, board, PanelDisclosure(expanded, onToggleExpanded))
+            WidgetContent(config, board, PanelDisclosure(expanded, onToggleExpanded), onTitleClick)
         }
     }
 }
@@ -465,6 +473,7 @@ private fun ColumnScope.WidgetContent(
     config: LedgerWidgetConfig,
     board: LedgerBoard,
     disclosure: PanelDisclosure,
+    onTitleClick: (String) -> Unit = {},
 ) {
     val title = headerFor(config, PANEL_LABELS[config.panel] ?: config.panel.raw)
     when (config.panel) {
@@ -547,7 +556,10 @@ private fun ColumnScope.WidgetContent(
                 }
             }
         }
-        LedgerWidgetId.RATINGS -> RatingsPanel(title, board.ratingBuckets.applyTopN(config))
+        LedgerWidgetId.RATINGS -> RatingsPanel(
+            title, board.ratingBuckets.applyTopN(config), board.ratingTitles,
+            effectiveLedgerSettings(config.panel, config.settings).scope, disclosure, onTitleClick,
+        )
         LedgerWidgetId.GENRES -> GenresPanel(title, board.genres.applyTopN(config), disclosure)
         LedgerWidgetId.AUTEURS -> CategorySection(
             title, "The directors who turn up most across your library",

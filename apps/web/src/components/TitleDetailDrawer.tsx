@@ -1636,8 +1636,9 @@ export function TitleDetailDrawer() {
               : s
           )
         } else {
+          const tmdbEpMap = new Map(tmdbEps.map((e) => [e.episode_number, e]))
           updatedEpisodes = existingEpisodes.map((ep) => {
-            const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
+            const tmdbEp = tmdbEpMap.get(ep.episodeNumber)
             if (!tmdbEp) return ep
             const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
               .filter((c) => EP_CREW_JOBS_BF.has(c.job))

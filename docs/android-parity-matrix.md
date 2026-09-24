@@ -1,5 +1,7 @@
 # Android parity matrix
 
+> Individual gaps in either direction (web → Android and Android → web) are tracked as GitHub issues labelled `parity-gap`, referenced from each shipping commit's `Parity:` trailer and enforced by `.github/workflows/parity.yml`. This matrix stays the domain-level summary — see `CONTRIBUTING.md` → Cross-client parity.
+
 This is the versioned contract index for the native Android client. The web app remains the behavioral source of truth. A row may move to **ready** only when its API shape, RLS expectation, Android route, and executable test fixture are linked here.
 
 | Domain | Android release behavior | Web sources | Backend/API dependency | Android surface | Required verification | Status |

@@ -92,6 +92,35 @@ updating the affected [`docs/android-contracts/`](docs/android-contracts/) docum
 [parity matrix](docs/android-parity-matrix.md) row so Android's gap is visible rather than discovered
 later. Documented gaps are fine; undocumented divergence is not.
 
+### Cross-client parity
+
+Features and fixes drift between clients when nobody decides, at ship time, what the other client
+should do. So every `feat` or `fix` commit (or breaking change) that touches shipped source in only
+one client — `apps/web/src/` or an Android `src/main/` — must carry a `Parity:` trailer:
+
+```text
+feat(web): bring rich title previews to Discover
+
+Parity: #312
+```
+
+- `Parity: #<issue>` — the other client needs this; the gap is tracked in a
+  [Parity gap](.github/ISSUE_TEMPLATE/parity_gap.yml) issue (label `parity-gap`). This works in both
+  directions: Android-first features get a web gap issue the same way.
+- `Parity: n/a: <reason>` — no counterpart is needed (a web-only layout bug, an Android-only system
+  integration, ...). The reason is required.
+
+Commits that change both clients, and commits that touch neither (backend, docs, CI), need nothing.
+
+The [Parity workflow](.github/workflows/parity.yml) enforces this on every pull request into `dev`
+or `main`, including the `dev` → `main` release PR. A commit already pushed without a trailer can be
+declared from the PR body instead: `Parity-Override: <sha> #<issue>` or
+`Parity-Override: <sha> n/a: <reason>`. Run `npm run check:parity` from the repo root (defaults to
+`origin/main..HEAD`) to see what it will flag before pushing.
+
+Open `parity-gap` issues are the working backlog for closing the gap; when a domain's overall status
+changes, update its [parity matrix](docs/android-parity-matrix.md) row too.
+
 ## Dependencies
 
 Do not revert a dependency migration as a suspected supply-chain issue without verifying against the
@@ -100,6 +129,6 @@ official package registry first. An unfamiliar name or a package rename is not e
 ## Pull requests
 
 Describe what changed and why, say how you verified it, and flag any migration, RLS change, or parity
-row that moved. Issues use [templates](.github/ISSUE_TEMPLATE/) — blank issues are disabled.
+row that moved. The [PR template](.github/pull_request_template.md) prompts for each of these. Issues use [templates](.github/ISSUE_TEMPLATE/) — blank issues are disabled.
 
 Security problems: **do not open a public issue.** See [SECURITY.md](SECURITY.md).

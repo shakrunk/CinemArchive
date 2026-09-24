@@ -52,7 +52,7 @@ body:
       description: If this only applies to one client today, should the other client track it as a parity gap?
       options:
         - N/A — backend or single-client-only feature
-        - Yes — add to the parity matrix once implemented
+        - Yes — open a parity-gap issue for the other client once implemented
         - Not sure
     validations:
       required: false

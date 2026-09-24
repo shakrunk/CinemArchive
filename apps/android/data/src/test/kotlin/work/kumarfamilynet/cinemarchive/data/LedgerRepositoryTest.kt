@@ -222,8 +222,8 @@ private object LedgerFixture {
     /** [crewRows] is overridable so The Auteurs can be exercised against an empty
      *  `title_crew` mirror, which is what every synced-down library looked like before
      *  supabase/migrations/20260726000000_sync_cast_crew_and_scores.sql (#177). */
-    fun repository(crewRows: List<TitleCrewEntity> = crew, titleRows: List<TitleEntity> = titles) = LedgerRepository(
-        titleDao = FakeTitleDao(titleRows),
+    fun repository(crewRows: List<TitleCrewEntity> = crew) = LedgerRepository(
+        titleDao = FakeTitleDao(titles),
         viewingDao = FakeViewingDao(viewings),
         titleCastDao = FakeTitleCastDao(cast),
         titleCrewDao = FakeTitleCrewDao(crewRows),
@@ -243,22 +243,6 @@ private object LedgerFixture {
  *  to [LedgerFixture]'s fixed 2026 dates would silently stop asserting anything once those
  *  dates age out of the trailing window. */
 class LedgerRepositoryTest {
-    @Test
-    fun `rating widget scope preserves the full normalization baseline`() = runTest {
-        val titles = LedgerFixture.titles.map { it.copy(rating = if (it.type == "TV") 5.0 else 1.0) }
-        val layout = listOf(LedgerWidgetConfig(
-            id = "ratings", panel = LedgerWidgetId.RATINGS, width = LedgerWidgetWidth.FULL,
-            settings = LedgerWidgetSettings(scope = "movies"),
-        ))
-        val board = LedgerFixture.repository(titleRows = titles).observeLedgerBoards(flowOf(layout)).first().getValue("ratings")
-        assertEquals(2, board.ratingBuckets.sumOf { it.count })
-        assertEquals(3, board.ratingTitles.size)
-        val normalized = work.kumarfamilynet.cinemarchive.core.model.deriveRatingNormalization(board.ratingTitles, scope = "movies")
-        assertEquals(3, normalized.groups.single().count)
-        assertEquals(2, normalized.rows.size)
-        assertTrue(normalized.rows.all { it.zScore!! < 0 })
-    }
-
 
     @Test
     fun `Feature Lengths buckets both movies into 120-150 min`() = runTest {

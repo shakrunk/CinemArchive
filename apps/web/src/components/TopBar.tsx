@@ -90,7 +90,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             const label = NAV_LABELS[id]
             const Icon = resolveNavIcon(id, viewMode)
             return (
-              <button type="button"
+              <button
                 key={id}
                 aria-current={currentView === id ? 'page' : undefined}
                 onClick={() => onViewChange(id)}
@@ -108,7 +108,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
         <div className="flex items-center gap-2 ml-auto shrink-0">
           {!showAccountMenu && <ThemeModeToggle />}
 
-          <button type="button"
+          <button
             onClick={openCommandPalette}
             aria-label="Search (open command palette)"
             className="icon-btn h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center gap-2 px-2.5 sm:px-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -127,7 +127,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           </button>
 
           {friendView ? (
-            <button type="button"
+            <button
               onClick={exitFriendView}
               className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               aria-label={`Exit ${friendView.displayName}'s library`}
@@ -135,10 +135,10 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             >
               <Users className="w-[15px] h-[15px]" />
               <span className="hidden sm:inline font-sans text-[12px] truncate max-w-[140px]">{friendView.displayName}</span>
-              <X className="w-[13px] h-[13px]" aria-hidden="true" />
+              <X className="w-[13px] h-[13px]" />
             </button>
           ) : viewerContext.kind === 'shared-link' ? (
-            <button type="button"
+            <button
               onClick={handleExitSharedLink}
               className="icon-btn h-9 border rounded-md text-amber border-amber/30 bg-amber/5 hover:bg-amber/10 transition-colors flex items-center gap-1.5 px-2.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               aria-label="Exit shared view"
@@ -146,7 +146,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
             >
               <Eye className="w-[15px] h-[15px]" />
               <span className="hidden sm:inline font-sans text-[12px]">Shared view</span>
-              <X className="w-[13px] h-[13px]" aria-hidden="true" />
+              <X className="w-[13px] h-[13px]" />
             </button>
           ) : (
             isSupabaseConfigured && !isSharedView && (
@@ -155,7 +155,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
                 {showAccountMenu ? (
                   <AccountMenu currentView={currentView} onNavigate={onViewChange} />
                 ) : (
-                  <button type="button"
+                  <button
                     onClick={import.meta.env.DEV ? () => setUser(DEV_MOCK_USER) : onProfileClick}
                     className="icon-btn h-9 border rounded-md text-paper-faint border-[var(--line)] hover:text-amber hover:border-amber/30 transition-colors flex items-center gap-1.5 px-2.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                     aria-label="Sign in"
@@ -170,7 +170,7 @@ export function TopBar({ currentView, onViewChange, onProfileClick }: TopBarProp
           )}
 
           {!isSharedView && (
-            <button type="button"
+            <button
               onClick={openAddTitle}
               aria-label="Add Title"
               className="btn-amber hidden sm:inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-bold"

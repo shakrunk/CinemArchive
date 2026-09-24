@@ -129,7 +129,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                   This title isn't linked to TMDB yet — search below to link it.
                 </p>
               )}
-              <button type="button"
+              <button
                 onClick={startSearch}
                 className="w-full text-xs font-mono text-muted-foreground hover:text-amber transition-colors py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
@@ -160,14 +160,14 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
               {!searching && typedResults.length === 0 && query.trim().length > 1 && (
                 <div className="text-center py-6 text-muted-foreground text-sm flex flex-col items-center gap-3">
                   <div>No results for "{query}"</div>
-                  <button type="button"
+                  <button
                     onClick={() => {
                       setQuery('')
                     }}
                     aria-label="Clear search"
                     className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
-                    <X className="w-3.5 h-3.5" aria-hidden="true" />
+                    <X className="w-3.5 h-3.5" />
                     Clear search
                   </button>
                 </div>
@@ -178,7 +178,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                   {typedResults.map((r) => {
                     const isCurrent = r.tmdbId === title.tmdbId
                     return (
-                      <button type="button"
+                      <button
                         key={r.tmdbId}
                         onClick={() => applyFrom(r)}
                         className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left"
@@ -201,7 +201,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                 </div>
               )}
 
-              <button type="button"
+              <button
                 onClick={() => setShowSearch(false)}
                 className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >

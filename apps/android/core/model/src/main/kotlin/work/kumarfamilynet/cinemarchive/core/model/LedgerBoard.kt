@@ -74,6 +74,4 @@ data class LedgerBoard(
     val stillRolling: List<LedgerProgressEntry>,
     /** At the Movies: cinema-trip aggregates (see [LedgerMoviegoingStats]). */
     val moviegoing: LedgerMoviegoingStats,
-    /** Unscoped current title ratings: scope/search must not recalibrate normalization. */
-    val ratingTitles: List<RatingObservation> = emptyList(),
 )

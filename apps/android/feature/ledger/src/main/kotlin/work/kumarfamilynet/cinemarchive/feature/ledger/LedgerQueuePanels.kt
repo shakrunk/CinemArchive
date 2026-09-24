@@ -36,7 +36,7 @@ import kotlin.math.roundToInt
  * - [AttractionsPanel] (Coming Attractions) — a part-to-whole backlog bar plus a *running*
  *   total, because a watchlist's real question is "how much have I signed up for", which a
  *   list of names answers nowhere.
- * - [RatingDistributionContent] (Critical Record) — a distribution with its centre of gravity flagged,
+ * - [RatingsPanel] (Critical Record) — a distribution with its centre of gravity flagged,
  *   because ten fixed ordinal buckets carry their meaning in their shape.
  */
 
@@ -223,7 +223,8 @@ private const val RATING_STEP = 0.5
  * short enough not to need it.
  */
 @Composable
-internal fun ColumnScope.RatingDistributionContent(buckets: List<LedgerCategoryCount>) {
+internal fun ColumnScope.RatingsPanel(title: String, buckets: List<LedgerCategoryCount>) {
+    PanelHeading(title, "How your ratings fall, five stars down to half a star")
     val total = buckets.sumOf { it.count }
     if (buckets.isEmpty() || total == 0) {
         PanelEmpty("No ratings logged yet.")

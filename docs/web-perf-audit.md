@@ -1,32 +1,5 @@
 # Web App Performance Audit
 
-## Completion review — 2026-09-14
-
-All actionable findings below are implemented. The original observations are
-retained as historical evidence, rather than a description of the current app.
-The [UI consistency audit](ui-consistency-audit.md) is also complete.
-
-| Finding | Current status and evidence |
-| --- | --- |
-| 1 — Code splitting | Complete: `App.tsx` lazy-loads views and overlays, retaining mounted overlays for exit transitions. |
-| 2 — Nested library fetch | Withdrawn proposal, not an outstanding UI fix. The original summary/detail split was disproved by the audit itself. A future server-side rollup design is separate database architecture work; full data remains available for default sorting and person/cast search. |
-| 3 — Responsive posters | Complete: `DynamicPoster` uses TMDB `srcSet`; virtual grids supply measured widths. The image cache budget is 600 entries. |
-| 4 — Backdrop cap | Complete: new media uses `w1280`; `HeroBackdrop` now also caps historical/imported URLs and explicit overrides when rendering. |
-| 5 — Image preconnect | Complete: `index.html` preconnects to `image.tmdb.org` without `crossorigin`. |
-| 6 — Library virtualization | Complete: flat and franchise-grouped poster grids and ledger lists use a single window across their rows and headings. Variable-height list rows support wrapping, density changes discard stale measurements, and document offsets follow layout changes. Focused rows and neighbouring rows stay mounted for Tab traversal. Poster entrances do not replay after scrolling away and back. |
-| 7 — Background animation work | Complete: `useTabVisibility` pauses atmospheric animations when hidden; reduced-motion rules remain in place. The optional grain-blend visual change was not needed. |
-| 8 — Search responsiveness | Complete: Library input is locally controlled with a 180 ms debounce. External search changes cancel pending typing commits, preventing stale input from overwriting a Ledger/person search. |
-
-Verification: typecheck, lint, production build, and the Vitest suite. Browser
-checks use a 1,000-title local fixture with 100 franchises plus a 300-title
-standalone remainder, at desktop and phone widths. Checks cover bounded DOM
-counts, grouping, filter results, wrapping, keyboard traversal beyond the first
-window, scrolling, and density/viewport changes. The list exposes persistent
-column headers to assistive technology even when visual header rows are outside
-the window; the detail action is a native button inside a native table row.
-
-## Original audit
-
 Static audit of `apps/web` (build output + source read) as of `v1.12.0`. No functional or
 visual change implied by any item below — these are all "same behavior, less work" fixes.
 Ranked by expected impact on load time / interaction smoothness for a real library (hundreds

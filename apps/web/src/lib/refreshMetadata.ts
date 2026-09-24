@@ -122,9 +122,8 @@ export async function fetchRefreshedTitlePatch(
           }
         })
       } else {
-        const tmdbEpMap = new Map(tmdbEps.map((e) => [e.episode_number, e]))
         updatedEpisodes = existingEpisodes.map((ep) => {
-          const tmdbEp = tmdbEpMap.get(ep.episodeNumber)
+          const tmdbEp = tmdbEps.find((e) => e.episode_number === ep.episodeNumber)
           if (!tmdbEp) return ep
           const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
             .filter((c) => EP_CREW_JOBS.has(c.job))

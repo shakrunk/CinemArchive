@@ -38,33 +38,27 @@ function CommandPaletteBody({
   onRun: (cmd: Command) => void
 }) {
   const [query, setQuery] = useState('')
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [active, setActive] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
   const results = useMemo(() => rankCommands(commands, query, 8), [commands, query])
-  // Library updates can remove or reorder results while the palette is open.
-  // Keep selection by identity, falling back to the first available command.
-  const active = Math.max(0, results.findIndex((cmd) => cmd.id === activeId))
 
   // Keep the active row scrolled into view (no setState — safe in an effect).
   useEffect(() => {
     const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${active}"]`)
     el?.scrollIntoView({ block: 'nearest' })
-  }, [active, results])
+  }, [active])
 
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.nativeEvent.isComposing) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveId(results[(active + 1) % results.length]?.id ?? null)
+      setActive((i) => (results.length ? (i + 1) % results.length : 0))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveId(results[(active - 1 + results.length) % results.length]?.id ?? null)
+      setActive((i) => (results.length ? (i - 1 + results.length) % results.length : 0))
     } else if (e.key === 'Enter') {
-      // Leave native activation of auxiliary buttons (such as Clear) alone.
-      if (e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'option') return
       e.preventDefault()
       const cmd = results[active]
       if (cmd) onRun(cmd)
@@ -80,7 +74,7 @@ function CommandPaletteBody({
           autoFocus
           aria-label="Search command palette"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setActiveId(null) }}
+          onChange={(e) => { setQuery(e.target.value); setActive(0) }}
           placeholder="Search titles, jump to a view, add a title…"
           className="command-input"
           autoComplete="off"
@@ -93,7 +87,7 @@ function CommandPaletteBody({
         {query && (
           <button
             type="button"
-            onClick={() => { setQuery(''); setActiveId(null); inputRef.current?.focus() }}
+            onClick={() => { setQuery(''); setActive(0); inputRef.current?.focus() }}
             className="text-paper-faint hover:text-ember mr-2 rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             aria-label="Clear search"
           >
@@ -108,10 +102,10 @@ function CommandPaletteBody({
           <div className="command-empty flex flex-col items-center gap-3 py-6">
             <div>No matches. Try a different search.</div>
             {query.length > 0 && (
-              <button type="button"
+              <button
                 onClick={() => {
                   setQuery('')
-                  setActiveId(null)
+                  setActive(0)
                 }}
                 className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                 aria-label="Clear search"
@@ -123,14 +117,13 @@ function CommandPaletteBody({
           </div>
         ) : (
           results.map((cmd, idx) => (
-            <button type="button"
+            <button
               key={cmd.id}
               id={`cmd-${cmd.id}`}
               data-idx={idx}
               role="option"
               aria-selected={idx === active}
-              onMouseEnter={() => setActiveId(cmd.id)}
-              onFocus={() => setActiveId(cmd.id)}
+              onMouseEnter={() => setActive(idx)}
               onClick={() => onRun(cmd)}
               className={cn('command-item', idx === active && 'is-active')}
             >

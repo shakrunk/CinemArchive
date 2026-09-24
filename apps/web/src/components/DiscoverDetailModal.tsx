@@ -271,7 +271,7 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
               Already in your library
             </div>
           ) : !isSharedView ? (
-            <button type="button"
+            <button
               onClick={handleAdd}
               className="w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors btn-amber mt-2"
             >

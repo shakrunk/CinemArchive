@@ -1,6 +1,5 @@
 import type { Title } from 'src/store/mockData'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
-import { tmdbImageAtSize } from 'src/lib/media'
 
 interface HeroBackdropProps {
   title: Title
@@ -16,9 +15,10 @@ interface HeroBackdropProps {
 }
 
 export function HeroBackdrop({ title, backdropOverride, onPosterClick, topRight, children }: HeroBackdropProps) {
-  // Enforce the cap on reads too: imported libraries and previously cached
-  // titles can still contain original-resolution URLs.
-  const backdropSrc = tmdbImageAtSize(backdropOverride ?? title.backdropUrl, 'w1280')
+  // Both sources are already capped at `w1280` — this banner never renders
+  // wider than ~1000px, so `original` (often 1920px+) bought nothing but
+  // bytes. Upgrading either source further here would undo that cap.
+  const backdropSrc = backdropOverride ?? title.backdropUrl
 
   return (
     <div className="relative overflow-hidden shrink-0">

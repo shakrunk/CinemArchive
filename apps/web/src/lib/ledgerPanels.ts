@@ -75,7 +75,7 @@ export const LEDGER_PANEL_DESCRIPTIONS: Record<LedgerPanelId, string> = {
   activity: '52-week screening heatmap',
   encores: 'Most-rewatched titles',
   run: 'Monthly screening trend',
-  ratings: 'Rating distribution, personal z-scores & percentile ranks',
+  ratings: 'Rating distribution donut',
   genres: 'Top genres as marquee bubbles',
   decades: 'Titles by release decade',
   auteurs: 'Most-watched directors',

@@ -95,30 +95,6 @@ Two consistency notes Android must replicate exactly, not "fix":
 | `attractions` | Coming Attractions | `status==='watchlist'`, `type`, `runtime`, `genres` | `hoursOwed` sums movie runtimes only — TV excluded from the estimate |
 | `moviegoing` | At the Movies | `viewings[].{venue,companions,outingId}` + `CinemaOuting[]` | See §3 — the one widget reaching outside the core four domain tables |
 
-### Critical Record: normalized ratings (web and Android)
-
-The Normalized view shows current stars, personal z-scores, and empirical percentile
-ranks, with All rated titles or Same media type baselines. Both clients use population
-standard deviation and `100 × (count below + half of tied ratings) / count` for rank.
-Each title counts once. Valid ratings include zero and fractional values in [0, 5];
-missing, non-finite, and out-of-range values are excluded. A z-score is unavailable
-with fewer than two ratings or SD ≤ 1e-12. Counts below five carry a small-sample
-label (a display heuristic, not a confidence threshold).
-
-Baselines use the full available library, even for a Films/Series-scoped widget.
-Scope and search filter only result rows. Android retains these unscoped observations
-in `LedgerBoard.ratingTitles`, independently of the scoped distribution buckets.
-Results sort by descending z-score (unavailable last), percentile, then title;
-both clients show up to 50 matches and support search across all rated titles.
-Tapping a result opens the existing title detail surface. Android collapses additional
-rows using the standard panel disclosure; web scrolls within its fixed-height card.
-The selectors are transient UI state and original ratings are never modified.
-
-Implementation: web `ratingNormalization.ts`; Android core model
-`RatingNormalization.kt`, data `LedgerRepository.kt`, and Ledger
-`RatingStandardsPanel.kt`. Matching numerical examples are covered on both clients,
-including ties, zero/fractional ratings, constant baselines, and scope invariance.
-
 ## 3. RLS authorization matrix
 
 `user_prefs` (schema.sql:959) is the only table Ledger itself introduces:

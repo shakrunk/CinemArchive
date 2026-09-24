@@ -154,7 +154,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
 
         {/* Out-of-app: copy/system-share snippet + .ics (plan §4.10) */}
         <div className="px-5 pb-4 shrink-0 flex gap-2">
-          <button type="button"
+          <button
             onClick={handleCopyOrShare}
             disabled={copying}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 font-mono text-xs transition-colors hover:text-amber disabled:opacity-60"
@@ -163,7 +163,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
             {copying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
             Copy / share text
           </button>
-          <button type="button"
+          <button
             onClick={handleDownloadIcs}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 font-mono text-xs transition-colors hover:text-amber"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
@@ -212,7 +212,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
               <p className="font-sans text-xs" style={{ color: 'var(--paper-faint)' }}>
                 Couldn't load your friends.
               </p>
-              <button type="button"
+              <button
                 onClick={loadFriends}
                 className="flex items-center gap-1.5 font-mono text-xs transition-colors"
                 style={{ color: 'var(--amber)' }}
@@ -229,14 +229,14 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
             <div className="py-6 px-5 text-center font-sans text-xs italic flex flex-col items-center gap-3" style={{ color: 'var(--paper-faint)' }}>
               <div>No friends match "{search}".</div>
               {search && (
-                <button type="button"
+                <button
                   onClick={() => {
                     setSearch('')
                   }}
                   aria-label="Clear search"
                   className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
                 >
-                  <X className="w-3.5 h-3.5" aria-hidden="true" />
+                  <X className="w-3.5 h-3.5" />
                   Clear search
                 </button>
               )}

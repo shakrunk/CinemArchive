@@ -24,18 +24,18 @@ export function PWAUpdateToast() {
         <p className="font-sans text-xs text-paper leading-normal">
           A new version of CinemArchive is available.
         </p>
-        <button type="button"
+        <button
           onClick={() => updateServiceWorker(true)}
           className="font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 transition-opacity shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >
           Reload
         </button>
-        <button type="button"
+        <button
           onClick={() => setNeedRefresh(false)}
           className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           aria-label="Dismiss"
         >
-          <X className="w-3.5 h-3.5" aria-hidden="true" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

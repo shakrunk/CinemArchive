@@ -46,6 +46,7 @@ function ProviderRow({ label, providers }: { label: string; providers: WatchProv
         onScroll={updateEdges}
         className="flex gap-2 overflow-x-auto scrollbar-thin pb-1"
         style={{ maskImage: edgeMask, WebkitMaskImage: edgeMask }}
+        data-lenis-prevent
       >
         {providers.map((p) => (
           <div
@@ -169,7 +170,7 @@ function PhysicalMediaShelf({
               <span style={{ color: 'var(--paper-faint)' }}>· {item.edition}</span>
             )}
             {!isSharedView && (
-              <button type="button"
+              <button
                 onClick={() => onChange(items.filter((i) => i.id !== item.id))}
                 aria-label={`Remove ${item.format}${item.edition ? ` (${item.edition})` : ''} from shelf`}
                 className="ml-0.5 text-paper-faint hover:text-ember transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -181,7 +182,7 @@ function PhysicalMediaShelf({
         ))}
 
         {!isSharedView && !adding && (
-          <button type="button"
+          <button
             onClick={() => setAdding(true)}
             className="inline-flex items-center gap-1 h-8 rounded-md px-2.5 font-mono text-[11px] text-amber/60 hover:text-amber border border-dashed transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ borderColor: 'var(--line)' }}
@@ -217,11 +218,11 @@ function PhysicalMediaShelf({
               className="h-8 w-36 rounded-md px-2 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-amber/40"
               style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
             />
-            <button type="button" onClick={commitAdd} aria-label="Add physical copy" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+            <button onClick={commitAdd} aria-label="Add physical copy" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
               <Check className="w-4 h-4" />
             </button>
-            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
-              <X className="w-4 h-4" aria-hidden="true" />
+            <button onClick={() => setAdding(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+              <X className="w-4 h-4" />
             </button>
           </span>
         )}
@@ -305,7 +306,7 @@ export function WatchProvidersSection({
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <SubsectionLabel className="mb-0">Where to Watch</SubsectionLabel>
         {!isSharedView && !editing && (
-          <button type="button"
+          <button
             onClick={() => { setDraft(customUrl ?? ''); setEditing(true) }}
             className="text-xs font-mono text-amber/50 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1 flex items-center gap-1"
           >
@@ -330,11 +331,11 @@ export function WatchProvidersSection({
             className="flex-1 rounded-md px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber/40"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           />
-          <button type="button" onClick={commit} aria-label="Save custom watch link" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+          <button onClick={commit} aria-label="Save custom watch link" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
             <Check className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
-            <X className="w-4 h-4" aria-hidden="true" />
+          <button onClick={() => setEditing(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}

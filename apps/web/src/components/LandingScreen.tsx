@@ -39,7 +39,7 @@ export function LandingScreen({ onSignIn }: Props) {
         </p>
 
         {/* CTA */}
-        <button type="button"
+        <button
           onClick={onSignIn}
           className="mt-1 px-8 py-3 rounded-md bg-amber text-[color:var(--on-amber)] font-sans text-sm font-semibold tracking-wide hover:bg-amber/90 transition-colors"
         >

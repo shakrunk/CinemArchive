@@ -22,8 +22,7 @@ export function useSmoothScroll(): void {
     const lenis = new Lenis({
       lerp: 0.12,
       syncTouch: false,
-      // Delegate by gesture axis. Horizontal rows must not use data-lenis-prevent:
-      // it also blocks vertical handoff via Lenis's overscroll containment CSS.
+      // Let overflowing panels, menus, and sheets consume their own wheel input.
       allowNestedScroll: true,
     })
 

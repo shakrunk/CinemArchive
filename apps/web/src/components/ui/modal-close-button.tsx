@@ -28,7 +28,7 @@ export const ModalCloseButton = forwardRef<HTMLButtonElement, ModalCloseButtonPr
         )}
         {...props}
       >
-        <X className="w-4 h-4" aria-hidden="true" />
+        <X className="w-4 h-4" />
       </button>
     )
   },

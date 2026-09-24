@@ -93,7 +93,7 @@ export function ChoiceCard({
   children: ReactNode
 }) {
   return (
-    <button type="button"
+    <button
       aria-label={ariaLabel}
       onClick={onClick}
       className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"

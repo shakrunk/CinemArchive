@@ -403,20 +403,52 @@ const defaultFilters: LibraryFilters = {
 // True when the person (by TMDB id) appears anywhere in a title's credits:
 // title cast/crew, any season's cast, or any episode's crew. Mirrored by
 // scripts/verify-person-logic.mjs.
+const titlePersonIdsCache = new WeakMap<Title, Set<number>>()
+
 export function titleHasPerson(title: Title, personId: number): boolean {
-  if (title.cast?.some((c) => c.tmdbPersonId === personId)) return true
-  if (title.crew?.some((c) => c.tmdbPersonId === personId)) return true
-  for (const season of title.seasons ?? []) {
-    if (season.cast?.some((c) => c.tmdbPersonId === personId)) return true
-    for (const ep of season.episodes ?? []) {
-      if (ep.crew?.some((c) => c.tmdbPersonId === personId)) return true
+  let personIds = titlePersonIdsCache.get(title)
+  if (!personIds) {
+    personIds = new Set<number>()
+    title.cast?.forEach((c) => personIds!.add(c.tmdbPersonId))
+    title.crew?.forEach((c) => personIds!.add(c.tmdbPersonId))
+    for (const season of title.seasons ?? []) {
+      season.cast?.forEach((c) => personIds!.add(c.tmdbPersonId))
+      for (const ep of season.episodes ?? []) {
+        ep.crew?.forEach((c) => personIds!.add(c.tmdbPersonId))
+      }
     }
+    titlePersonIdsCache.set(title, personIds)
   }
-  return false
+  return personIds.has(personId)
 }
 
 function timeOf(dateStr: string | undefined): number {
   return dateStr ? new Date(dateStr).getTime() : -Infinity
+}
+
+interface TitleSearchIndex {
+  title: string
+  director: string | undefined
+  genres: string[]
+  tags: string[]
+  cast: string[]
+}
+
+const titleSearchCache = new WeakMap<Title, TitleSearchIndex>()
+
+function getTitleSearch(t: Title): TitleSearchIndex {
+  let index = titleSearchCache.get(t)
+  if (!index) {
+    index = {
+      title: t.title.toLowerCase(),
+      director: t.director?.toLowerCase(),
+      genres: t.genres.map((g) => g.toLowerCase()),
+      tags: t.tags.map((tag) => tag.toLowerCase()),
+      cast: t.cast?.map((c) => c.name.toLowerCase()) || [],
+    }
+    titleSearchCache.set(t, index)
+  }
+  return index
 }
 
 // ⚡ Bolt: Cache expensive derived calculation with a WeakMap to prevent O(N*M) redundant computations
@@ -453,14 +485,16 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
 
   if (filters.search.trim()) {
     const q = filters.search.toLowerCase()
-    result = result.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.director?.toLowerCase().includes(q) ||
-        t.genres.some((g) => g.toLowerCase().includes(q)) ||
-        t.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-        t.cast?.some((c) => c.name.toLowerCase().includes(q))
-    )
+    result = result.filter((t) => {
+      const idx = getTitleSearch(t)
+      return (
+        idx.title.includes(q) ||
+        idx.director?.includes(q) ||
+        idx.genres.some((g) => g.includes(q)) ||
+        idx.tags.some((tag) => tag.includes(q)) ||
+        idx.cast.some((c) => c.includes(q))
+      )
+    })
   }
 
   if (filters.type !== 'all') {

@@ -421,7 +421,9 @@ create policy "titles: owner full access"
 -- "shared key read" / "friend read" policy pair.
 create policy "titles: shared/friend read"
   on titles for select
-  using (can_view_title(user_id, genres, status));
+  using (case when user_id = (select auth.uid()) then false else
+    can_view_title(user_id, genres, status)
+  end);
 
 -- -----------------------------------------------------------
 -- SEASONS policies
@@ -434,13 +436,13 @@ create policy "seasons: owner full access"
 
 create policy "seasons: shared/friend read"
   on seasons for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = seasons.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 -- -----------------------------------------------------------
 -- VIEWINGS policies
@@ -453,13 +455,13 @@ create policy "viewings: owner full access"
 
 create policy "viewings: shared/friend read"
   on viewings for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = viewings.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 -- -----------------------------------------------------------
 -- EPISODES / EPISODE_WATCH_EVENTS / EPISODE_RATINGS / EPISODE_REVIEWS policies
@@ -473,13 +475,13 @@ create policy "episodes: owner full access"
 
 create policy "episodes: shared/friend read"
   on episodes for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = episodes.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 create policy "episode_watch_events: owner full access"
   on episode_watch_events for all
@@ -488,14 +490,14 @@ create policy "episode_watch_events: owner full access"
 
 create policy "episode_watch_events: shared/friend read"
   on episode_watch_events for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from episodes e
       join titles t on t.id = e.title_id
       where e.id = episode_watch_events.episode_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 create policy "episode_ratings: owner full access"
   on episode_ratings for all
@@ -504,14 +506,14 @@ create policy "episode_ratings: owner full access"
 
 create policy "episode_ratings: shared/friend read"
   on episode_ratings for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from episodes e
       join titles t on t.id = e.title_id
       where e.id = episode_ratings.episode_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 create policy "episode_reviews: owner full access"
   on episode_reviews for all
@@ -520,14 +522,14 @@ create policy "episode_reviews: owner full access"
 
 create policy "episode_reviews: shared/friend read"
   on episode_reviews for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from episodes e
       join titles t on t.id = e.title_id
       where e.id = episode_reviews.episode_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 -- -----------------------------------------------------------
 -- TITLE_CAST / TITLE_CREW / SEASON_CAST / EPISODE_CREW policies
@@ -538,52 +540,52 @@ create policy "title_cast: owner full access"
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "title_cast: shared/friend read"
   on title_cast for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = title_cast.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 create policy "title_crew: owner full access"
   on title_crew for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "title_crew: shared/friend read"
   on title_crew for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = title_crew.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 create policy "season_cast: owner full access"
   on season_cast for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "season_cast: shared/friend read"
   on season_cast for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = season_cast.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 create policy "episode_crew: owner full access"
   on episode_crew for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "episode_crew: shared/friend read"
   on episode_crew for select
-  using (
+  using (case when user_id = (select auth.uid()) then false else
     exists (
       select 1 from titles t
       where t.id = episode_crew.title_id
         and can_view_title(t.user_id, t.genres, t.status)
     )
-  );
+  end);
 
 -- -----------------------------------------------------------
 -- SHARED_ACCESS_KEYS policies

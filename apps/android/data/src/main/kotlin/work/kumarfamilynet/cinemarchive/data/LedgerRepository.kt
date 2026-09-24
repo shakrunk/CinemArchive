@@ -45,6 +45,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerWeeklyActivity
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetConfig
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.RatingObservation
 import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
 import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
 
@@ -170,7 +171,7 @@ class LedgerRepository(
             } else {
                 null
             }
-            val board = cache.getOrPut(scope to rangeStart) { buildBoard(sources.scopedTo(scope, rangeStart)) }
+            val board = cache.getOrPut(scope to rangeStart) { buildBoard(sources.scopedTo(scope, rangeStart), sources.titles) }
             widget.id to board
         }
     }
@@ -235,7 +236,7 @@ class LedgerRepository(
         val episodes: List<EpisodeEntity>,
     )
 
-    private fun buildBoard(s: LedgerSources): LedgerBoard {
+    private fun buildBoard(s: LedgerSources, ratingTitles: List<TitleEntity> = s.titles): LedgerBoard {
         val titles = s.titles
         val viewings = s.viewings
         val titleById = titles.associateBy { it.id }
@@ -279,6 +280,7 @@ class LedgerRepository(
             encores = encores(viewings, titleById),
             monthlyRun = monthlyRun(viewings),
             ratingBuckets = ratingBuckets(titles),
+            ratingTitles = ratingTitles.map { RatingObservation(it.id, it.title, MediaType.valueOf(it.type), it.rating) },
             genres = tally(titles.flatMap { it.genres }),
             auteurs = auteurs(titles, s.crew),
             ensemble = tally(s.cast.filter { it.castOrder < 5 }.map { it.name }),

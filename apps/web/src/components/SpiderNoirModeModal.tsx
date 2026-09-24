@@ -113,7 +113,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
         </ChoiceCard>
       </div>
 
-      <button
+      <button type="button"
         onClick={onSkip}
         aria-label="Not now, skip choosing a color mode"
         style={{

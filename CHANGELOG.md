@@ -9,6 +9,58 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-09-22
+
+### Fixed
+
+- Web: a full or blocked browser cache no longer reports a successful metadata
+  refresh as a fetch failure. Keep updates and online sync working, show a
+  separate offline-cache notice, and retry cache writes on subsequent changes.
+
+### Added
+
+- Web and Android: Critical Record now offers normalized personal ratings with
+  z-scores and percentile ranks, using either the full library or separate film
+  and series baselines. Search rated titles and open their details without
+  changing the baseline or original star ratings. Small samples and ratings
+  with no variation are explained consistently on both clients.
+
+## [1.30.4] - 2026-09-21
+
+### Fixed
+
+- Web: keep vertical page and title-drawer scrolling moving when the pointer
+  crosses horizontal episode, cast, trailer, provider, and other scrolling rows.
+  Sideways scrolling remains available without trapping the parent scroll area.
+
+## [1.30.3] - 2026-09-19
+
+### Fixed
+
+- Web: start every Add Title session with a fresh form and search, including
+  rapid reopening and closing through browser navigation. Old requests cannot
+  restore the previous title or overwrite newer search results.
+- Web: keep command-palette Enter selection valid when library results change,
+  and follow keyboard focus when tabbing to a title.
+
+## [1.30.2] - 2026-09-19
+
+### Fixed
+
+- Web: finish library virtualization for list view and franchise grouping,
+  preserving keyboard traversal, wrapped titles, responsive poster density,
+  and one-time poster entrances. Mobile list rows give title text more room.
+- Web: cap historical and overridden title backdrops at TMDB's `w1280` size.
+- Web: pending library search input no longer overwrites a search set elsewhere
+  in the app while the debounce timer is running.
+- Docs: restore the UI consistency audit and reconcile both audits with their
+  completed implementations, including the stale eyebrow-label backlog item.
+- Database: skip shared-library permission lookups for owner rows to prevent
+  library loads from hitting the statement timeout.
+- Web: avoid repeated library reloads on auth refresh, share overlapping loads,
+  and update one retry notification instead of stacking duplicate warnings.
+  Successful loads clear the warning; stale requests cannot replace another view.
+
 ## [1.30.1] - 2026-09-13
 
 ### Fixed

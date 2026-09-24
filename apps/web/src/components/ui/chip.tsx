@@ -13,7 +13,7 @@ export function Chip({
   className?: string
 }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       className={cn('chip', active && 'is-active', 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60', className)}
     >

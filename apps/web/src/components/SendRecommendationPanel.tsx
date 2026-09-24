@@ -211,7 +211,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
               <p className="font-sans text-xs" style={{ color: 'var(--paper-faint)' }}>
                 Couldn't load your friends.
               </p>
-              <button
+              <button type="button"
                 onClick={loadFriends}
                 className="flex items-center gap-1.5 font-mono text-xs transition-colors"
                 style={{ color: 'var(--amber)' }}
@@ -228,14 +228,14 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
             <div className="py-6 px-5 text-center font-sans text-xs italic flex flex-col items-center gap-3" style={{ color: 'var(--paper-faint)' }}>
               <div>No friends match "{search}".</div>
               {search && (
-                <button
+                <button type="button"
                   onClick={() => {
                     setSearch('')
                   }}
                   aria-label="Clear search"
                   className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                   Clear search
                 </button>
               )}

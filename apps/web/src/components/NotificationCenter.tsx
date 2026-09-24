@@ -146,7 +146,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
 
   return (
     <div className="relative" ref={containerRef}>
-      <button
+      <button type="button"
         onClick={handleToggle}
         aria-label={unreadNotificationCount > 0 ? `Notifications — ${unreadNotificationCount} unread` : 'Notifications'}
         aria-expanded={open}
@@ -177,7 +177,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
             <Eyebrow as="span" size="xl" tone="muted" font="sans">Notifications</Eyebrow>
             {unreadNotificationCount > 0 && (
-              <button
+              <button type="button"
                 onClick={() => markAllNotificationsSeen()}
                 className="font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
@@ -206,7 +206,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                     style={{ background: n.readAt ? 'transparent' : 'rgb(var(--amber-rgb) / 0.06)' }}
                   >
                     <div className="relative flex items-start">
-                      <button
+                      <button type="button"
                         role="menuitem"
                         onClick={() => handleItemClick(n)}
                         className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30 focus-visible:outline-none focus-visible:bg-secondary/50"
@@ -222,7 +222,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                         </div>
                         {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0 mt-1.5" aria-hidden="true" />}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           void deleteNotificationItem(n.id)
@@ -230,19 +230,19 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                         aria-label="Dismiss notification"
                         className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3 h-3" aria-hidden="true" />
                       </button>
                     </div>
                     {sharePayload && (
                       <div className="flex gap-3 pl-[34px] pr-4 pb-2.5 -mt-1">
-                        <button
+                        <button type="button"
                           onClick={() => handleGotTicketsToo(n)}
                           className="flex items-center gap-1 font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <Ticket className="w-3 h-3" />
                           I've got tickets too
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => handleAddSharedToCalendar(n)}
                           className="flex items-center gap-1 font-mono text-[10px] text-paper-faint hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >

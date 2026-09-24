@@ -18,9 +18,16 @@ function useDebouncedSearch(delay = 400) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestRef = useRef(0)
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    requestRef.current += 1
+  }, [])
 
   const search = useCallback((query: string) => {
     if (timerRef.current) clearTimeout(timerRef.current)
+    const request = ++requestRef.current
     if (!query.trim()) {
       setResults([])
       setLoading(false)
@@ -29,12 +36,13 @@ function useDebouncedSearch(delay = 400) {
     setLoading(true)
     timerRef.current = setTimeout(async () => {
       try {
-        setResults(await searchMedia(query))
+        const nextResults = await searchMedia(query)
+        if (request === requestRef.current) setResults(nextResults)
       } catch (err) {
         console.error('Error during media search:', err)
-        setResults([])
+        if (request === requestRef.current) setResults([])
       } finally {
-        setLoading(false)
+        if (request === requestRef.current) setLoading(false)
       }
     }, delay)
   }, [delay])
@@ -256,7 +264,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
             className="hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
             aria-label={`Remove tag ${tag}`}
           >
-            <X className="w-2.5 h-2.5" />
+            <X className="w-2.5 h-2.5" aria-hidden="true" />
           </button>
         </span>
       ))}
@@ -308,9 +316,31 @@ const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
 // ─── AddTitleWorkflow Component ───────────────────────────────────────────────
 
 export function AddTitleWorkflow() {
-  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
   const closeAddTitle = useAppStore((s) => s.closeAddTitle)
+  const [session, setSession] = useState({ open: isAddTitleOpen, id: 0 })
+  // Keep the modal mounted for its exit animation, but reset the entire form
+  // on every new opening, including one before that animation has finished.
+  if (session.open !== isAddTitleOpen) {
+    setSession({ open: isAddTitleOpen, id: session.id + (isAddTitleOpen ? 1 : 0) })
+  }
+
+  return (
+    <CinemaModal
+      open={isAddTitleOpen}
+      onClose={closeAddTitle}
+      maxWidth="sm:max-w-lg"
+      title="Add to Library"
+      description="Search for a movie or series and log your viewing details."
+    >
+      <AddTitleForm key={session.id} />
+    </CinemaModal>
+  )
+}
+
+function AddTitleForm() {
+  const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
+  const handleClose = useAppStore((s) => s.closeAddTitle)
   const addTitle = useAppStore((s) => s.addTitle)
   const preselectedResult = useAppStore((s) => s.preselectedResult)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
@@ -443,25 +473,7 @@ export function AddTitleWorkflow() {
     handleClose()
   }
 
-  function handleClose() {
-    closeAddTitle()
-    setTimeout(() => {
-      setStep('search')
-      setQuery('')
-      setSelected(null)
-      setLog(DEFAULT_LOG)
-      setSavedMovieId(null)
-    }, 300)
-  }
-
   return (
-    <CinemaModal
-      open={isAddTitleOpen}
-      onClose={handleClose}
-      maxWidth="sm:max-w-lg"
-      title="Add to Library"
-      description="Search for a movie or series and log your viewing details."
-    >
       <div className="overflow-y-auto flex-1 scrollbar-thin px-6 py-6">
         <h2 className="font-serif text-xl font-light text-foreground mb-5">Add to Library</h2>
         {step !== 'success' && <StepIndicator step={step} />}
@@ -499,14 +511,15 @@ export function AddTitleWorkflow() {
                     <Search className="w-6 h-6 text-muted-foreground/40" />
                   </div>
                   <div>No results for "{query}"</div>
-                  <button
+                  <button type="button"
                     onClick={() => {
                       setQuery('')
+                      search('')
                     }}
                     aria-label="Clear search"
                     className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
                     Clear search
                   </button>
                 </div>
@@ -515,7 +528,7 @@ export function AddTitleWorkflow() {
               {results.length > 0 && (
                 <div className="space-y-2">
                   {results.map((r) => (
-                    <button
+                    <button type="button"
                       key={r.tmdbId}
                       onClick={() => selectResult(r)}
                       className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
@@ -557,7 +570,7 @@ export function AddTitleWorkflow() {
       {/* Step 2: Log Form */}
       {step === 'log' && selected && (
         <div className="space-y-6">
-          <button
+          <button type="button"
             onClick={() => setStep('search')}
             className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
@@ -598,7 +611,7 @@ export function AddTitleWorkflow() {
             </Eyebrow>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPTIONS.map((opt) => (
-                <button
+                <button type="button"
                   key={opt.value}
                   onClick={() => setLog((l) => ({ ...l, status: opt.value }))}
                   className={cn(
@@ -664,7 +677,7 @@ export function AddTitleWorkflow() {
                 <Eyebrow as="p" size="xl" tone="muted" font="sans">
                   Season Progress
                 </Eyebrow>
-                <button
+                <button type="button"
                   onClick={() => {
                     setLog((l) => ({
                       ...l,
@@ -730,7 +743,7 @@ export function AddTitleWorkflow() {
           </div>
           <p className="font-serif text-lg text-foreground">Added "{selected.title}" to your watchlist.</p>
           <div className="flex flex-col gap-2 items-center pt-2">
-            <button
+            <button type="button"
               onClick={handleGotTickets}
               className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
@@ -743,6 +756,5 @@ export function AddTitleWorkflow() {
         </div>
       )}
       </div>
-    </CinemaModal>
   )
 }

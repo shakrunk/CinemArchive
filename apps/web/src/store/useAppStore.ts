@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
 import { normalizeCompanions } from './companions'
+import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
@@ -99,6 +100,8 @@ export interface PersonRef {
 /** A persistent notification. kind defaults to 'error'. */
 export interface AppNotification {
   id: string
+  /** Repeated reports of one operation update its existing notification. */
+  dedupeKey?: string
   message: string
   kind?: 'error' | 'tip'
   /** Auto-dismiss after this many ms (tips only). */
@@ -644,6 +647,8 @@ let ledgerSaveGet: (() => AppStore) | null = null
 // current for a friend's comment/reaction/request arriving mid-session.
 const NOTIFICATION_POLL_MS = 45_000
 let notificationPollTimer: number | undefined
+let ownerLibraryRequest: { userId: string; promise: Promise<void> } | undefined
+const LIBRARY_ERROR_KEY = 'owner-library-load'
 
 function flushLedgerLayoutSave() {
   window.clearTimeout(ledgerSaveTimer)
@@ -674,6 +679,16 @@ if (typeof document !== 'undefined') {
     if (document.visibilityState === 'hidden' && ledgerSaveTimer !== undefined) flushLedgerLayoutSave()
   })
 }
+
+const browserCacheStorage = createBrowserCacheStorage(() => localStorage, (error) => {
+  console.warn('Browser offline cache unavailable:', error)
+  // Hydration may encounter blocked storage while the store is still being
+  // constructed; defer notification until initialization/current mutation ends.
+  queueMicrotask(() => useAppStore.getState().pushNotification({
+    dedupeKey: 'browser-cache-unavailable',
+    message: "Couldn't update this browser's offline cache. Changes are still in this tab, but may not survive a reload. Signed-in changes can still sync online.",
+  }))
+})
 
 export const useAppStore = create<AppStore>()(
   persist(
@@ -1149,9 +1164,16 @@ export const useAppStore = create<AppStore>()(
   notifications: [],
 
   pushNotification: (n) =>
-    set((s) => ({
-      notifications: [{ ...n, id: crypto.randomUUID() }, ...s.notifications].slice(0, 5),
-    })),
+    set((s) => {
+      const existing = n.dedupeKey
+        ? s.notifications.find((item) => item.dedupeKey === n.dedupeKey)
+        : undefined
+      return {
+        notifications: existing
+          ? s.notifications.map((item) => item.id === existing.id ? { ...n, id: existing.id } : item)
+          : [{ ...n, id: crypto.randomUUID() }, ...s.notifications].slice(0, 5),
+      }
+    }),
 
   dismissNotification: (id) =>
     set((s) => ({
@@ -1234,7 +1256,16 @@ export const useAppStore = create<AppStore>()(
   viewerContext: { kind: 'owner' },
 
   setUser: (user) => {
+    const previousUserId = get().user?.id
     set({ user })
+    // SIGNED_IN on tab focus and TOKEN_REFRESHED don't change library ownership.
+    if (user && user.id === previousUserId) return
+    ownerLibraryRequest = undefined
+    set((s) => ({
+      loadingUser: false,
+      libraryLoadError: null,
+      notifications: s.notifications.filter((n) => n.dedupeKey !== LIBRARY_ERROR_KEY),
+    }))
     window.clearInterval(notificationPollTimer)
     notificationPollTimer = undefined
     if (user && isDevMockUser(user)) {
@@ -1259,47 +1290,69 @@ export const useAppStore = create<AppStore>()(
 
   loadUserLibrary: async () => {
     const user = get().user
-    if (!user) return
+    if (!user || get().isSharedView) return
+    if (ownerLibraryRequest?.userId === user.id) return ownerLibraryRequest.promise
+    const request = { userId: user.id, promise: Promise.resolve() }
+    ownerLibraryRequest = request
+    const isCurrent = () => ownerLibraryRequest === request &&
+      get().user?.id === user.id && !get().isSharedView
     set({ loadingUser: true, libraryLoadError: null })
-    try {
-      // Outings ride along with the owner's own library fetch (rule §9 —
-      // owner-private; never fetched for shared/friend views).
-      const { titles: dbTitles, outings: dbOutings } = await fetchUserLibrary(user.id)
-      // The synced board layout rides along with the library fetch. Server
-      // wins; a user who has never synced adopts their local board once.
-      void fetchLedgerLayout(user.id)
-        .then((widgets) => {
-          if (get().isSharedView || get().viewerContext.kind === 'friend') return
-          if (widgets) set({ ledgerPrefs: { widgets } })
-          else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
+    request.promise = (async () => {
+      try {
+        // Outings ride along with the owner's own library fetch (rule §9 —
+        // owner-private; never fetched for shared/friend views).
+        const { titles: dbTitles, outings: dbOutings } = await fetchUserLibrary(user.id)
+        if (!isCurrent()) return
+        set((s) => ({
+          notifications: s.notifications.filter((n) => n.dedupeKey !== LIBRARY_ERROR_KEY),
+        }))
+        // The synced board layout rides along with the library fetch. Server
+        // wins; a user who has never synced adopts their local board once.
+        void fetchLedgerLayout(user.id)
+          .then((widgets) => {
+            if (get().user?.id !== user.id || get().isSharedView || get().viewerContext.kind === 'friend') return
+            if (widgets) set({ ledgerPrefs: { widgets } })
+            else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
+          })
+          .catch((err) => console.error('Failed to load synced Ledger layout:', err))
+        // Guard: if we have local titles but DB returned empty, the session auth
+        // may not have fully propagated — skip the wipe rather than hiding data.
+        const currentTitles = get().titles
+        const hasRealLocalData = currentTitles.some((t) => !t.id.startsWith('mt-'))
+        if (dbTitles.length === 0 && hasRealLocalData) {
+          console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
+          return
+        }
+        set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), outings: dbOutings }))
+        // Reconciliation trigger: app load, right after the library lands
+        // (plan §4.3) — completes anything that finished while the app was closed.
+        void get().reconcileOutings()
+        void get().loadLists()
+      } catch (err) {
+        if (!isCurrent()) return
+        console.error('Failed to load user library from DB:', err)
+        const message = (err as { code?: string })?.code === '57014'
+          ? "Loading your library timed out — please retry."
+          : "Couldn't load your library — please retry."
+        set({ libraryLoadError: message })
+        get().pushNotification({
+          dedupeKey: LIBRARY_ERROR_KEY,
+          message,
+          retry: async () => {
+            await get().loadUserLibrary()
+            if (get().libraryLoadError) throw new Error(get().libraryLoadError!)
+          },
         })
-        .catch((err) => console.error('Failed to load synced Ledger layout:', err))
-      // Guard: if we have local titles but DB returned empty, the session auth
-      // may not have fully propagated — skip the wipe rather than hiding data.
-      const currentTitles = get().titles
-      const hasRealLocalData = currentTitles.some((t) => !t.id.startsWith('mt-'))
-      if (dbTitles.length === 0 && hasRealLocalData) {
-        console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
-        return
+      } finally {
+        if (isCurrent()) set({ loadingUser: false })
+        if (ownerLibraryRequest === request) ownerLibraryRequest = undefined
       }
-      set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), outings: dbOutings }))
-      // Reconciliation trigger: app load, right after the library lands
-      // (plan §4.3) — completes anything that finished while the app was closed.
-      void get().reconcileOutings()
-      void get().loadLists()
-    } catch (err) {
-      console.error('Failed to load user library from DB:', err)
-      set({ libraryLoadError: "Couldn't load your library — check your connection." })
-      get().pushNotification({
-        message: "Couldn't load your library — check your connection.",
-        retry: () => get().loadUserLibrary(),
-      })
-    } finally {
-      set({ loadingUser: false })
-    }
+    })()
+    return request.promise
   },
 
   loadSharedLibrary: async (token) => {
+    ownerLibraryRequest = undefined
     set({ loadingUser: true, isSharedView: true, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null })
     try {
       const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
@@ -1323,6 +1376,7 @@ export const useAppStore = create<AppStore>()(
   // (TitleDetailDrawer, episode-card, Discover, etc.) — viewerContext just adds
   // who's being viewed, for the exit affordance and heading text.
   loadFriendLibrary: async (friendUserId, displayName) => {
+    ownerLibraryRequest = undefined
     set({
       loadingUser: true,
       isSharedView: true,
@@ -1722,7 +1776,7 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'cinemarchive-library',
       version: PERSIST_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => browserCacheStorage),
       // Only the source of truth is persisted; derived state (filteredTitles,
       // stats) and transient UI flags are recomputed/reset on load. While
       // browsing a friend's library, `titles` holds THEIR data — never persist
@@ -1783,11 +1837,11 @@ export const useAppStore = create<AppStore>()(
         // One-time migration: the default sort used to be 'addedAt'. Flip
         // still-on-default users over to the new 'lastInteraction' default
         // without touching anyone who has since picked a different sort.
-        if (typeof localStorage !== 'undefined' && !localStorage.getItem(SORT_DEFAULT_MIGRATION_KEY)) {
+        if (!browserCacheStorage.getItem(SORT_DEFAULT_MIGRATION_KEY)) {
           if (state.filters.sortField === 'addedAt') {
             state.filters.sortField = 'lastInteraction'
           }
-          localStorage.setItem(SORT_DEFAULT_MIGRATION_KEY, '1')
+          browserCacheStorage.setItem(SORT_DEFAULT_MIGRATION_KEY, '1')
         }
         state.filteredTitles = applyFiltersToTitles(state.titles, state.filters)
         state.stats = computeLedgerStats(state.titles)

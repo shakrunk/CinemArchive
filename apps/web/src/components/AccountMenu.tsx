@@ -39,7 +39,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
 
   return (
     <div className="relative" ref={containerRef}>
-      <button
+      <button type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Account menu"
         aria-expanded={open}
@@ -65,7 +65,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
 
           <div className="h-px my-1" style={{ background: 'var(--line)' }} />
 
-          <button
+          <button type="button"
             role="menuitem"
             aria-current={currentView === 'friends' ? 'page' : undefined}
             onClick={() => go('friends')}
@@ -78,7 +78,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
             Friends
           </button>
 
-          <button
+          <button type="button"
             role="menuitem"
             aria-current={currentView === 'profile' ? 'page' : undefined}
             onClick={() => go('profile')}
@@ -93,7 +93,7 @@ export function AccountMenu({ currentView, onNavigate }: AccountMenuProps) {
 
           <div className="h-px my-1" style={{ background: 'var(--line)' }} />
 
-          <button
+          <button type="button"
             role="menuitem"
             onClick={handleSignOut}
             className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 font-sans text-[13px] text-paper-dim hover:text-ember hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"

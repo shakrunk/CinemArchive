@@ -113,7 +113,7 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
 
         {/* Browse action */}
         <div className="px-5 py-4" style={{ borderTop: '1px solid var(--line)' }}>
-          <button
+          <button type="button"
             onClick={handleBrowse}
             className="w-full py-2 rounded-lg font-mono text-sm transition-colors"
             style={{

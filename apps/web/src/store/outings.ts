@@ -113,13 +113,20 @@ export interface MarqueeEntry {
   presentation: OutingPresentation
 }
 
+/** Cache for title lookups by ID to prevent O(N) recreations during computeMarqueeEntries. */
+const titleByIdCache = new WeakMap<Title[], Map<string, Title>>()
+
 /** "On the Marquee" (plan §4.5): scheduled/now-showing outings plus
  *  completed ones still awaiting follow-up, sorted so the most time-sensitive
  *  card leads — scheduled/now-showing by soonest showtime, then completed
  *  follow-ups by most-recently-ended. Movies whose title has been deleted
  *  out from under the outing are silently skipped. */
 export function computeMarqueeEntries(outings: CinemaOuting[], titles: Title[], now: Date): MarqueeEntry[] {
-  const titleById = new Map(titles.map((t) => [t.id, t]))
+  let titleById = titleByIdCache.get(titles)
+  if (!titleById) {
+    titleById = new Map(titles.map((t) => [t.id, t]))
+    titleByIdCache.set(titles, titleById)
+  }
   const entries: MarqueeEntry[] = []
 
   for (const outing of outings) {

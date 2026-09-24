@@ -6,9 +6,12 @@ name: CodeQL
 # was later dropped from coverage entirely. This workflow builds it explicitly
 # so the Android/Kotlin code is actually scanned.
 
+# Push runs are main only: its analysis is the baseline that the Security tab's
+# alerts and every pull request's alert diff are measured against, so it can't
+# be skipped. Commits on dev are scanned by the dev -> main pull request instead.
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
     branches: [main, dev]
   schedule:

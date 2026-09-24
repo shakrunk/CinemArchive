@@ -5,8 +5,10 @@ on:
     paths:
       - "apps/android/**"
       - ".github/workflows/android.yml"
+  # Push runs cover direct commits to dev only. Everything reaching main has
+  # already passed this job on its pull request, so re-running it there is waste.
   push:
-    branches: [dev, main]
+    branches: [dev]
     paths:
       - "apps/android/**"
       - ".github/workflows/android.yml"

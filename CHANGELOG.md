@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: the Discover page's Both / Movies / TV Shows tabs draw a straight
+  underline again instead of one with curled-up ends.
+
 ## [1.31.1] - 2026-09-24
 
 ### Fixed

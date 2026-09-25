@@ -80,7 +80,7 @@ export function RatingStandards({ scope = 'all' }: { scope?: LedgerScope }) {
               {matches.slice(0, 50).map((row) => (
                 <tr key={row.title.id}>
                   <td className="py-1">
-                    <button type="button" onClick={() => openDetailDrawer(row.title.id)} className={`${LIST_ROW_HOVER} w-full truncate text-paper`} title={row.title.title}>
+                    <button type="button" onClick={() => openDetailDrawer(row.title.id)} className={`${LIST_ROW_HOVER} w-full truncate text-paper focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm`} title={row.title.title}>
                       {row.title.title}
                     </button>
                   </td>

@@ -176,7 +176,7 @@ function ListDetail({ list, onBack }: { list: List; onBack: () => void }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {memberTitles.map((t) => (
             <div key={t.id} className="group relative">
-              <button onClick={() => openDetailDrawer(t.id)} className="block w-full text-left">
+              <button onClick={() => openDetailDrawer(t.id)} className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg">
                 <img
                   src={t.posterUrl || undefined}
                   alt={t.title}

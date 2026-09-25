@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: large libraries no longer overflow the browser's offline cache and
+  trigger the "Couldn't update this browser's offline cache" notice. The cache
+  now omits display-only metadata (episode synopses, stills and crew, credit
+  portraits); the full library still loads from your account on sign-in.
+
 ## [1.31.0] - 2026-09-22
 
 ### Fixed

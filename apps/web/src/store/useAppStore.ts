@@ -5,6 +5,7 @@ import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, typ
 import { computeLedgerStats } from './ledgerStats'
 import { normalizeCompanions } from './companions'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
+import { toCachedTitle } from './libraryCache'
 import { nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
@@ -1780,9 +1781,10 @@ export const useAppStore = create<AppStore>()(
       // Only the source of truth is persisted; derived state (filteredTitles,
       // stats) and transient UI flags are recomputed/reset on load. While
       // browsing a friend's library, `titles` holds THEIR data — never persist
-      // that to the viewer's localStorage.
+      // that to the viewer's localStorage. Titles are cached slim (see
+      // toCachedTitle) to stay under the browser's storage quota.
       partialize: (s) => ({
-        titles: s.viewerContext.kind === 'friend' ? [] : s.titles,
+        titles: s.viewerContext.kind === 'friend' ? [] : s.titles.map(toCachedTitle),
         outings: s.viewerContext.kind === 'friend' ? [] : s.outings,
         // listMemberships is deliberately NOT persisted — it's a
         // Record<string, Set<string>> and Set doesn't survive

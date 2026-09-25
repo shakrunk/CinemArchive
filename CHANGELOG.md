@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-09-24
+
 ### Fixed
 
 - Web: large libraries no longer overflow the browser's offline cache and

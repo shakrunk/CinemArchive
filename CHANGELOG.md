@@ -9,6 +9,20 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-09-25
+
+### Added
+
+- A show's detail view now calls out its next scheduled episode and the date it
+  airs, and unaired episodes in the episode list read "Airs <date>" instead of
+  just a year (web) or a raw date (Android). Tapping the callout jumps to that
+  episode's season (and, on web, selects the episode).
+
+### Fixed
+
+- Web: the Discover page's Both / Movies / TV Shows tabs draw a straight
+  underline again instead of one with curled-up ends.
+
 ## [1.31.1] - 2026-09-24
 
 ### Fixed

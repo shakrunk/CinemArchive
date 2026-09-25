@@ -19,6 +19,7 @@ import {
   totalEpisodeCount,
   getUnlockedModes,
   getEarnedModes,
+  nextScheduledEpisode,
 } from 'src/store/episodeUtils'
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
@@ -697,6 +698,7 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
   const totalWatched = totalEpisodesWatched(seasons)
   const totalCount = totalEpisodeCount(seasons)
   const seriesAvg = avgSeriesRating(seasons)
+  const nextScheduled = nextScheduledEpisode(seasons)
 
   const CARD_WIDTH = 252 // 240px card + 12px gap
 
@@ -728,9 +730,34 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
     return () => clearTimeout(t)
   }, [selectedSeason])
 
+  // Keep the selected card visible — a jump from the next-episode banner or the
+  // series graph can land on a card scrolled out of the carousel. Horizontal
+  // only, so the drawer itself doesn't move.
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el || !selectedEpId) return
+    const card = el.querySelector<HTMLElement>(`[data-episode-id="${selectedEpId}"]`)
+    if (!card) return
+    const cardLeft = card.offsetLeft - el.offsetLeft
+    if (cardLeft < el.scrollLeft || cardLeft + card.offsetWidth > el.scrollLeft + el.clientWidth) {
+      el.scrollTo({ left: cardLeft, behavior: 'smooth' })
+    }
+  }, [selectedEpId])
+
   function handleSeasonChange(seasonNumber: number) {
     setSelectedSeason(seasonNumber)
     setConfirmPrePlatform(null)
+  }
+
+  // Jump to an episode: same season selects it directly; otherwise the
+  // season-change effect picks it up from the ref once the carousel resets.
+  function jumpToEpisode(seasonNumber: number, episodeId: string) {
+    if (seasonNumber === selectedSeason) {
+      setSelectedEpId(episodeId)
+      return
+    }
+    graphClickEpIdRef.current = episodeId
+    handleSeasonChange(seasonNumber)
   }
 
   const seriesUnwatched = unwatchedEpisodeCount(seasons)
@@ -800,6 +827,31 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
           <Eyebrow as="div" className="mt-0.5">Seasons</Eyebrow>
         </div>
       </div>
+
+      {/* Next scheduled (not yet aired) episode */}
+      {nextScheduled && (
+        <button
+          type="button"
+          onClick={() => jumpToEpisode(nextScheduled.season.seasonNumber, nextScheduled.episode.id)}
+          aria-label={`Next episode, season ${nextScheduled.season.seasonNumber} episode ${nextScheduled.episode.episodeNumber}, airs ${fmtReleaseDate(nextScheduled.episode.airDate!)}`}
+          className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left border border-[var(--line)] transition-colors hover:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+          style={{ background: 'var(--inset)' }}
+        >
+          <Clock className="w-4 h-4 shrink-0" style={{ color: 'var(--amber)' }} />
+          <div className="min-w-0 flex-1">
+            <Eyebrow as="div">Next episode</Eyebrow>
+            <div className="font-sans text-sm truncate" style={{ color: 'var(--paper)' }}>
+              <span className="font-mono text-xs mr-1.5" style={{ color: 'var(--amber)' }}>
+                S{nextScheduled.season.seasonNumber} E{nextScheduled.episode.episodeNumber}
+              </span>
+              {nextScheduled.episode.episodeName ?? `Episode ${nextScheduled.episode.episodeNumber}`}
+            </div>
+          </div>
+          <div className="font-mono text-xs shrink-0 text-right" style={{ color: 'var(--amber)' }}>
+            Airs {fmtReleaseDate(nextScheduled.episode.airDate!)}
+          </div>
+        </button>
+      )}
 
       {/* Bulk pre-platform mark: series scope */}
       {renderPrePlatformMark('series')}

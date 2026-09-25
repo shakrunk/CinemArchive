@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Eye, Check, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
-import { avgEpisodeRating } from 'src/store/episodeUtils'
+import { avgEpisodeRating, isUnaired } from 'src/store/episodeUtils'
 import { StarRating } from 'src/components/ui/star-rating'
 import { Eyebrow } from 'src/components/ui/typography'
 import { Input } from 'src/components/ui/input'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
-import { cn, fmtDate, fmtDateTime, fmtRuntime } from 'src/lib/utils'
+import { cn, fmtDate, fmtDateTime, fmtReleaseDate, fmtRuntime } from 'src/lib/utils'
 import { TMDB_STILL_BASE } from 'src/lib/media'
 import type { Episode, Season } from 'src/store/mockData'
 
@@ -64,6 +64,7 @@ export function EpisodeCard({
   }
 
   const stillSrc = stillSrcFor(episode)
+  const unaired = isUnaired(episode)
 
   return (
     <div
@@ -72,6 +73,7 @@ export function EpisodeCard({
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       aria-expanded={isSelected}
+      data-episode-id={episode.id}
       aria-label={`${episode.episodeName ?? `Episode ${episode.episodeNumber}`} — click to ${isSelected ? 'collapse' : 'expand'} details`}
       className={cn(
         'group shrink-0 w-[240px] text-left rounded-lg overflow-hidden border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 cursor-pointer',
@@ -142,7 +144,12 @@ export function EpisodeCard({
         >
           {episode.episodeName ?? `Episode ${episode.episodeNumber}`}
         </div>
-        {(episode.airDate || episode.runtime) && (
+        {unaired ? (
+          <div className="font-mono" style={{ fontSize: '10px', color: 'var(--amber)' }}>
+            Airs {fmtReleaseDate(episode.airDate!)}
+            {episode.runtime ? ` · ${fmtRuntime(episode.runtime)}` : ''}
+          </div>
+        ) : (episode.airDate || episode.runtime) && (
           <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
             {episode.airDate ? new Date(episode.airDate).getFullYear() : ''}
             {episode.airDate && episode.runtime ? ' · ' : ''}

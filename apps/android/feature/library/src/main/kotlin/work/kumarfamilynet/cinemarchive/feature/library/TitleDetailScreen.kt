@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.LocalMovies
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -57,6 +58,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Instant
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -75,11 +78,14 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.ScheduledEpisode
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
+import work.kumarfamilynet.cinemarchive.core.model.isUnaired
+import work.kumarfamilynet.cinemarchive.core.model.nextScheduledEpisode
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
@@ -519,6 +525,17 @@ fun TitleDetailScreen(
                         )
                     }
                 }
+                detail.seasons.nextScheduledEpisode()?.let { next ->
+                    item {
+                        ReadingWidthColumn {
+                            NextEpisodeBanner(
+                                next,
+                                onClick = { selectedSeasonNumber = next.season.seasonNumber },
+                                modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 10.dp),
+                            )
+                        }
+                    }
+                }
                 item {
                     ReadingWidthColumn {
                         SeasonSelector(
@@ -712,6 +729,52 @@ private fun DetailHero(detail: TitleDetail, onBack: () -> Unit) {
     }
 }
 
+/** Next scheduled (not yet aired) episode — mirrors the web drawer's "Next episode" callout in
+ *  `TVSeriesSection`. Tapping it switches to that episode's season. */
+@Composable
+private fun NextEpisodeBanner(next: ScheduledEpisode, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val episode = next.episode
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(14.dp)) {
+            Icon(
+                Icons.Filled.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                Text(
+                    "Next episode",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "S${next.season.seasonNumber} E${episode.episodeNumber}" +
+                        (episode.episodeName?.let { " · $it" } ?: ""),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                "Airs ${formatAirDate(episode.airDate!!)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/** Parses the plain YYYY-MM-DD as a local date (not an instant) so no timezone shift can push
+ *  it a day off — same format as the web app's `fmtReleaseDate` ("Oct 2, 2026"). */
+private fun formatAirDate(iso: String): String =
+    runCatching { LocalDate.parse(iso).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)) }
+        .getOrDefault(iso)
+
 /** Horizontally scrollable season tabs — the same underlying "pick one of N" interaction as the
  *  web app's season pills/dropdown (`TVSeriesSection`), but a single scrollable-chip idiom
  *  regardless of season count instead of switching UI shape past three seasons. */
@@ -786,12 +849,14 @@ private fun EpisodeRow(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val meta = listOfNotNull(episode.airDate, episode.runtime?.let { "$it min" }).joinToString(" · ")
+                    val unaired = episode.isUnaired()
+                    val airLabel = episode.airDate?.let { if (unaired) "Airs ${formatAirDate(it)}" else it }
+                    val meta = listOfNotNull(airLabel, episode.runtime?.let { "$it min" }).joinToString(" · ")
                     if (meta.isNotBlank()) {
                         Text(
                             meta,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (unaired) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp),
                         )
                     }

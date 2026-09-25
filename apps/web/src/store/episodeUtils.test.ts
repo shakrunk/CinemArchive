@@ -8,6 +8,9 @@ import {
   totalEpisodeCount,
   watchedMinutesInSeason,
   nextUnwatchedEpisode,
+  nextScheduledEpisode,
+  isUnaired,
+  localTodayYmd,
   allWatchEvents,
   getUnlockedModes,
   getEarnedModes,
@@ -137,6 +140,57 @@ describe('nextUnwatchedEpisode', () => {
     const result = nextUnwatchedEpisode(seasons)
     expect(result?.season.seasonNumber).toBe(1)
     expect(result?.episode).toBe(s1e2)
+  })
+})
+
+describe('localTodayYmd', () => {
+  it('formats the local calendar date as YYYY-MM-DD', () => {
+    expect(localTodayYmd(new Date(2026, 0, 5, 23, 30))).toBe('2026-01-05')
+  })
+})
+
+describe('isUnaired', () => {
+  it('is true only for a known air date after today', () => {
+    expect(isUnaired(makeEpisode({ airDate: '2026-10-01' }), '2026-09-25')).toBe(true)
+    expect(isUnaired(makeEpisode({ airDate: '2026-09-25' }), '2026-09-25')).toBe(false)
+    expect(isUnaired(makeEpisode({ airDate: '2026-09-01' }), '2026-09-25')).toBe(false)
+    expect(isUnaired(makeEpisode(), '2026-09-25')).toBe(false)
+  })
+})
+
+describe('nextScheduledEpisode', () => {
+  const today = '2026-09-25'
+
+  it('returns null when nothing is scheduled after today', () => {
+    const seasons = [
+      makeSeason({
+        seasonNumber: 1,
+        episodes: [makeEpisode({ airDate: '2026-09-18' }), makeEpisode({ episodeNumber: 2 })],
+      }),
+    ]
+    expect(nextScheduledEpisode(seasons, today)).toBeNull()
+  })
+
+  it('finds the earliest future episode in season → episode order, skipping undated ones', () => {
+    const s2e3 = makeEpisode({ episodeNumber: 3, airDate: '2026-10-02' })
+    const seasons = [
+      makeSeason({
+        seasonNumber: 3,
+        episodes: [makeEpisode({ episodeNumber: 1, airDate: '2027-01-01' })],
+      }),
+      makeSeason({
+        seasonNumber: 2,
+        episodes: [
+          makeEpisode({ episodeNumber: 4, airDate: '2026-10-09' }),
+          s2e3,
+          makeEpisode({ episodeNumber: 2 }),
+          makeEpisode({ episodeNumber: 1, airDate: '2026-09-25' }),
+        ],
+      }),
+    ]
+    const result = nextScheduledEpisode(seasons, today)
+    expect(result?.season.seasonNumber).toBe(2)
+    expect(result?.episode).toBe(s2e3)
   })
 })
 

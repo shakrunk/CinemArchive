@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-09-25
+
 ### Added
 
 - A show's detail view now calls out its next scheduled episode and the date it

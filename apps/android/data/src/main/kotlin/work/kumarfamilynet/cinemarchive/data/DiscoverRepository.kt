@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
 import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
@@ -119,6 +120,22 @@ class DiscoverRepository(
                     client.invokeFunction("media-proxy", "action=season&id=$tmdbId&season=$seasonNumber", accessToken()),
                 )
             }.getOrDefault(emptyList())
+        }
+
+    /** Per-episode cast for the title detail screen — the web app's `fetchEpisodeCast`. Fetched
+     *  on demand when an episode's cast is opened rather than at add-time, since TMDB bills it
+     *  per episode and nothing else in the app reads it. */
+    override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int): EpisodeCast =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                parseEpisodeCredits(
+                    client.invokeFunction(
+                        "media-proxy",
+                        "action=episode_credits&id=$tmdbId&season=$seasonNumber&episode=$episodeNumber",
+                        accessToken(),
+                    ),
+                )
+            }.getOrDefault(EpisodeCast.EMPTY)
         }
 
     /** Discover browsing deliberately works signed-out, so the anon key backstops the bearer

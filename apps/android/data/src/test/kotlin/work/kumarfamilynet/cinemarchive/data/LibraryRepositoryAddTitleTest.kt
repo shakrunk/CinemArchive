@@ -145,6 +145,7 @@ private object NoEpisodeReviewsDao : EpisodeReviewDao {
 // so this stays unimplemented same as the other "not exercised by addTitle" fakes above.
 private object NoEpisodeMetadataFetcher : EpisodeMetadataFetcher {
     override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = throw UnsupportedOperationException()
+    override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = throw UnsupportedOperationException()
 }
 
 private object NoTheaterInterestDao : TheaterInterestDao {

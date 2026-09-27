@@ -258,6 +258,36 @@ class MediaProxyParsingTest {
     }
 
     @Test
+    fun `episode credits split regulars from guests, ordered and de-duplicated`() {
+        val body = """
+            {
+              "cast": [
+                {"id": 84497, "name": "Aaron Paul", "character": "Jesse Pinkman", "order": 1, "profile_path": null},
+                {"id": 17419, "name": "Bryan Cranston", "character": "Walter White", "order": 0, "profile_path": "/bc.jpg"}
+              ],
+              "guest_stars": [
+                {"id": 1, "name": "Guest One", "character": "Tuco", "order": 5},
+                {"id": 1, "name": "Guest One", "character": "Tuco (voice)", "order": 9},
+                {"id": 2, "character": "Unnamed"}
+              ]
+            }
+        """.trimIndent()
+
+        val credits = parseEpisodeCredits(body)
+
+        assertEquals(listOf("Bryan Cranston", "Aaron Paul"), credits.cast.map { it.name })
+        assertEquals("https://image.tmdb.org/t/p/w185/bc.jpg", credits.cast.first().profileUrl)
+        assertNull(credits.cast[1].profileUrl)
+        assertEquals(listOf(1), credits.guestStars.map { it.tmdbPersonId })
+        assertEquals("Tuco", credits.guestStars.single().characterName)
+    }
+
+    @Test
+    fun `episode credits tolerate an empty payload`() {
+        assertTrue(parseEpisodeCredits("{}").isEmpty)
+    }
+
+    @Test
     fun `critic scores treat N-A as absent`() {
         val scores = parseCriticScores("""{"imdbRating": "N/A", "Metascore": "N/A", "Ratings": []}""")
 

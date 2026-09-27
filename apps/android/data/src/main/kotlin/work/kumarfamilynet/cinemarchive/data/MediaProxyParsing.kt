@@ -2,6 +2,8 @@ package work.kumarfamilynet.cinemarchive.data
 
 import org.json.JSONArray
 import org.json.JSONObject
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCastMember
 import work.kumarfamilynet.cinemarchive.core.model.MediaCredit
 import work.kumarfamilynet.cinemarchive.core.model.MediaCrewCredit
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
@@ -26,6 +28,7 @@ import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 private const val TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w500"
 private const val TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
 private const val TMDB_STILL_BASE = "https://image.tmdb.org/t/p/w300"
+private const val TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w185"
 
 /** Title-level crew jobs worth keeping, matching `TITLE_CREW_JOBS` in the web app's
  *  `fetchMediaDetails`. TMDB's full crew list runs to hundreds of rows for a big production. */
@@ -229,6 +232,28 @@ internal fun parseSeasonEpisodes(body: String): List<MediaEpisode> =
             )
         }
         .sortedBy { it.episodeNumber }
+
+/** Maps one `action=episode_credits` payload: `cast` holds the series regulars who appear in
+ *  the episode, `guest_stars` that episode's guests. Both are ordered by billing and
+ *  de-duplicated by person (TMDB bills an actor once per role), matching [parseCast]. */
+internal fun parseEpisodeCredits(body: String): EpisodeCast {
+    val data = JSONObject(body)
+    fun parse(key: String): List<EpisodeCastMember> =
+        data.optJSONArray(key).objects()
+            .mapNotNull { entry ->
+                val name = entry.stringOrNull("name") ?: return@mapNotNull null
+                entry.optInt("order", Int.MAX_VALUE) to EpisodeCastMember(
+                    tmdbPersonId = entry.optInt("id"),
+                    name = name,
+                    characterName = entry.stringOrNull("character"),
+                    profileUrl = entry.stringOrNull("profile_path")?.let { "$TMDB_PROFILE_BASE$it" },
+                )
+            }
+            .sortedBy { it.first }
+            .map { it.second }
+            .distinctBy { it.tmdbPersonId }
+    return EpisodeCast(cast = parse("cast"), guestStars = parse("guest_stars"))
+}
 
 // ─── OMDb ratings ────────────────────────────────────────────────────────────
 

@@ -24,6 +24,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalMovies
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
@@ -49,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -60,8 +64,12 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.AddToListSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
@@ -75,6 +83,8 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCastMember
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
@@ -118,6 +128,11 @@ class TitleDetailViewModel(
     val venueNotes = outingsRepository.observeVenueNotes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+    // Per-episode cast, keyed by episode id. A present key with a null value means the fetch is
+    // in flight; a result is kept for the screen's lifetime so re-expanding doesn't refetch.
+    private val _episodeCast = MutableStateFlow<Map<String, EpisodeCast?>>(emptyMap())
+    val episodeCast: StateFlow<Map<String, EpisodeCast?>> = _episodeCast.asStateFlow()
+
     init {
         // Fire-and-forget, same as the web app's drawer-open effect: fills in episode
         // synopsis/stills for whichever seasons are missing them, independent of whether this
@@ -128,6 +143,17 @@ class TitleDetailViewModel(
     /** Optimistic local write + queued remote push — see LibraryRepository.logEpisodeWatched. */
     fun onMarkWatched(episodeId: String) {
         viewModelScope.launch { repository.logEpisodeWatched(episodeId, LocalDate.now().toString()) }
+    }
+
+    /** Loads an episode's cast the first time its cast section is opened — see
+     *  LibraryRepository.fetchEpisodeCast. */
+    fun onLoadEpisodeCast(episodeId: String, seasonNumber: Int, episodeNumber: Int) {
+        if (episodeId in _episodeCast.value) return
+        _episodeCast.update { it + (episodeId to null) }
+        viewModelScope.launch {
+            val cast = repository.fetchEpisodeCast(titleId, seasonNumber, episodeNumber)
+            _episodeCast.update { it + (episodeId to cast) }
+        }
     }
 
     fun onRateEpisode(episodeId: String, rating: Double) {
@@ -263,6 +289,7 @@ fun TitleDetailRoute(
     val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
     val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
     val listOptions by viewModel.listOptions.collectAsStateWithLifecycle()
+    val episodeCast by viewModel.episodeCast.collectAsStateWithLifecycle()
     var showAddToListSheet by rememberSaveable { mutableStateOf(false) }
     if (showAddToListSheet && detail != null) {
         AddToListSheet(
@@ -299,6 +326,8 @@ fun TitleDetailRoute(
         onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
         listOptions = listOptions,
         onOpenAddToList = { showAddToListSheet = true },
+        episodeCast = episodeCast,
+        onLoadEpisodeCast = viewModel::onLoadEpisodeCast,
     )
 }
 
@@ -330,6 +359,8 @@ fun TitleDetailScreen(
     onRemoveTitle: () -> Unit = {},
     listOptions: List<ListMembershipOption> = emptyList(),
     onOpenAddToList: () -> Unit = {},
+    episodeCast: Map<String, EpisodeCast?> = emptyMap(),
+    onLoadEpisodeCast: (String, Int, Int) -> Unit = { _, _, _ -> },
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -556,6 +587,8 @@ fun TitleDetailScreen(
                             onMarkWatched,
                             onRateEpisode,
                             onSubmitReview,
+                            cast = episodeCast[episode.id],
+                            onShowCast = { onLoadEpisodeCast(episode.id, selectedSeason.seasonNumber, episode.episodeNumber) },
                             modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
                         )
                     }
@@ -809,9 +842,12 @@ private fun EpisodeRow(
     onMarkWatched: (String) -> Unit,
     onRateEpisode: (String, Double) -> Unit,
     onSubmitReview: (String, String) -> Unit,
+    cast: EpisodeCast?,
+    onShowCast: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val watched = episode.watchCount > 0
+    var castExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
     var reviewExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
     var reviewText by rememberSaveable(episode.id) { mutableStateOf("") }
     var synopsisExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
@@ -906,6 +942,23 @@ private fun EpisodeRow(
                 }
                 TextButton(onClick = { reviewExpanded = !reviewExpanded }) { Text("Review") }
             }
+            TextButton(
+                onClick = {
+                    castExpanded = !castExpanded
+                    if (castExpanded) onShowCast()
+                },
+                contentPadding = PaddingValues(horizontal = 12.dp),
+            ) {
+                Text(if (castExpanded) "Hide cast" else "Cast")
+                Icon(
+                    if (castExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.padding(start = 2.dp).size(18.dp),
+                )
+            }
+            if (castExpanded) {
+                EpisodeCastSection(cast, modifier = Modifier.padding(top = 4.dp))
+            }
             if (reviewExpanded) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
@@ -922,6 +975,90 @@ private fun EpisodeRow(
                         },
                         enabled = reviewText.isNotBlank(),
                     ) { Text("Submit") }
+                }
+            }
+        }
+    }
+}
+
+/** The expanded cast of one episode: series regulars, then guest stars, each a horizontal row
+ *  of headshots — the web app's `EpisodeCastSection`. A null [cast] means it's still loading. */
+@Composable
+private fun EpisodeCastSection(cast: EpisodeCast?, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        when {
+            cast == null -> CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier.padding(start = 12.dp).size(20.dp),
+            )
+            cast.isEmpty -> Text(
+                "No cast listed for this episode.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            else -> {
+                if (cast.cast.isNotEmpty()) EpisodeCastRow("Episode cast", cast.cast)
+                if (cast.guestStars.isNotEmpty()) EpisodeCastRow("Guest stars", cast.guestStars)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
+    Column {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(members, key = EpisodeCastMember::tmdbPersonId) { member ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(72.dp),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(tintForKey(member.tmdbPersonId.toString())),
+                    ) {
+                        Text(
+                            member.name.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                        )
+                        member.profileUrl?.let { url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = member.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                    Text(
+                        member.name,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    member.characterName?.let { character ->
+                        Text(
+                            character,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }

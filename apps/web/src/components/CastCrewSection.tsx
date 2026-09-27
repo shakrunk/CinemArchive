@@ -14,7 +14,7 @@ const CREW_DISPLAY: Array<{ jobs: string[]; label: string }> = [
   { jobs: ['Original Music Composer'],                     label: 'Composer' },
 ]
 
-function CastCard({
+export function CastCard({
   member,
   onPersonClick,
 }: {

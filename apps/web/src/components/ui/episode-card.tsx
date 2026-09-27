@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Eye, Check, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { avgEpisodeRating, isUnaired } from 'src/store/episodeUtils'
@@ -6,9 +6,11 @@ import { StarRating } from 'src/components/ui/star-rating'
 import { Eyebrow } from 'src/components/ui/typography'
 import { Input } from 'src/components/ui/input'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
+import { CastCard } from 'src/components/CastCrewSection'
+import type { PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import { cn, fmtDate, fmtDateTime, fmtReleaseDate, fmtRuntime } from 'src/lib/utils'
-import { TMDB_STILL_BASE } from 'src/lib/media'
-import type { Episode, Season } from 'src/store/mockData'
+import { TMDB_STILL_BASE, fetchEpisodeCast, type EpisodeCast } from 'src/lib/media'
+import type { CastMember, Episode, Season } from 'src/store/mockData'
 
 function stillSrcFor(episode: Episode): string | null {
   if (!episode.stillUrl) return null
@@ -169,6 +171,77 @@ export function EpisodeCard({
   )
 }
 
+// ─── EpisodeCastSection ──────────────────────────────────────────────────────
+// Per-episode cast, fetched on demand from TMDB when the panel opens (not stored).
+
+function EpisodeCastRow({
+  label,
+  members,
+  onPersonClick,
+}: {
+  label: string
+  members: CastMember[]
+  onPersonClick: (person: PersonDetailTarget) => void
+}) {
+  return (
+    <div>
+      <Eyebrow as="div" className="mb-1.5">{label}</Eyebrow>
+      <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1">
+        {members.map((member) => (
+          <CastCard key={member.tmdbPersonId} member={member} onPersonClick={onPersonClick} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EpisodeCastSection({
+  tmdbId,
+  seasonNumber,
+  episodeNumber,
+  onPersonClick,
+}: {
+  tmdbId: number
+  seasonNumber: number
+  episodeNumber: number
+  onPersonClick: (person: PersonDetailTarget) => void
+}) {
+  const key = `${tmdbId}:${seasonNumber}:${episodeNumber}`
+  const [loaded, setLoaded] = useState<{ key: string; credits: EpisodeCast } | null>(null)
+
+  useEffect(() => {
+    if (tmdbId <= 0) return
+    let cancelled = false
+    fetchEpisodeCast(tmdbId, seasonNumber, episodeNumber).then((credits) => {
+      if (!cancelled) setLoaded({ key: `${tmdbId}:${seasonNumber}:${episodeNumber}`, credits })
+    })
+    return () => { cancelled = true }
+  }, [tmdbId, seasonNumber, episodeNumber])
+
+  if (tmdbId <= 0) return null
+  // Ignore a result still in state from the previously selected episode.
+  const credits = loaded?.key === key ? loaded.credits : null
+  if (!credits) {
+    return (
+      <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+        Loading cast…
+      </div>
+    )
+  }
+  if (credits.cast.length === 0 && credits.guestStars.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      {credits.cast.length > 0 && (
+        <EpisodeCastRow label="Episode Cast" members={credits.cast} onPersonClick={onPersonClick} />
+      )}
+      {credits.guestStars.length > 0 && (
+        <EpisodeCastRow label="Guest Stars" members={credits.guestStars} onPersonClick={onPersonClick} />
+      )}
+    </div>
+  )
+}
+
 // ─── EpisodePanel ─────────────────────────────────────────────────────────────
 // Extracted from TitleDetailDrawer.tsx — full logging panel shown below the carousel.
 
@@ -194,14 +267,17 @@ export interface EpisodePanelProps {
   episode: Episode
   season: Season
   titleId: string
+  /** TMDB id of the series — used to fetch the episode's cast. */
+  tmdbId: number
   isSharedView: boolean
   isSpiderNoir: boolean
+  onPersonClick: (person: PersonDetailTarget) => void
   /** Called when the user picks a Spider-Noir colour mode while logging. Lets the
    *  drawer reflect the freshly-chosen mode immediately (web overlay + theme). */
   onColorModeSelected?: (mode: 'bw' | 'color') => void
 }
 
-export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderNoir, onColorModeSelected }: EpisodePanelProps) {
+export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: EpisodePanelProps) {
   const logEpisode = useAppStore((s) => s.logEpisode)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
   const [pendingDeleteWeId, setPendingDeleteWeId] = useState<string | null>(null)
@@ -299,6 +375,13 @@ export function EpisodePanel({ episode, season, titleId, isSharedView, isSpiderN
           )}
         </div>
       )}
+
+      <EpisodeCastSection
+        tmdbId={tmdbId}
+        seasonNumber={season.seasonNumber}
+        episodeNumber={episode.episodeNumber}
+        onPersonClick={onPersonClick}
+      />
 
       {/* History: watch events / ratings / reviews */}
       {(episode.watchEvents.length > 0 || episode.ratings.length > 0 || episode.reviews.length > 0) && (

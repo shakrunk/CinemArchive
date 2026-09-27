@@ -665,6 +665,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 interface TVSeriesSectionProps {
   titleId: string
+  tmdbId: number
   seasons: Season[]
   isSharedView: boolean
   isSpiderNoir: boolean
@@ -681,7 +682,7 @@ function unwatchedEpisodeCount(seasons: Season[]): number {
   )
 }
 
-function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
+function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
   const markPrePlatformWatched = useAppStore((s) => s.markPrePlatformWatched)
   const [confirmPrePlatform, setConfirmPrePlatform] = useState<'series' | 'season' | null>(null)
   const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
@@ -986,8 +987,10 @@ function TVSeriesSection({ titleId, seasons, isSharedView, isSpiderNoir, onPerso
                 episode={selectedEp}
                 season={season}
                 titleId={titleId}
+                tmdbId={tmdbId}
                 isSharedView={isSharedView}
                 isSpiderNoir={isSpiderNoir}
+                onPersonClick={onPersonClick}
                 onColorModeSelected={onColorModeSelected}
               />
             </div>
@@ -2100,6 +2103,7 @@ export function TitleDetailDrawer() {
             <SectionCard title="Season & Episodes" className="lg:col-start-1">
               <TVSeriesSection
                 titleId={title.id}
+                tmdbId={title.tmdbId}
                 seasons={title.seasons}
                 isSharedView={isSharedView}
                 isSpiderNoir={title.tmdbId === SPIDER_NOIR_TMDB_ID}

@@ -33,6 +33,7 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.AddTitleRequest
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
@@ -552,6 +553,14 @@ class LibraryRepository(
                 },
             )
         }
+    }
+
+    /** One episode's cast, looked up by the local title's TMDB id. Display-only and never
+     *  persisted; empty for a missing or non-TV title, or on any fetch failure. */
+    suspend fun fetchEpisodeCast(titleId: String, seasonNumber: Int, episodeNumber: Int): EpisodeCast {
+        val title = titleDao.getById(titleId) ?: return EpisodeCast.EMPTY
+        if (MediaType.valueOf(title.type) != MediaType.TV) return EpisodeCast.EMPTY
+        return episodeMetadataFetcher.fetchEpisodeCast(title.tmdbId, seasonNumber, episodeNumber)
     }
 
     /** Rates the outing's auto-logged viewing (the post-show sheet's ★ control) and, matching

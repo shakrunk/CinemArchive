@@ -167,6 +167,7 @@ private class FakeFetcher(private val bySeason: Map<Pair<Int, Int>, List<MediaEp
         calledSeasons += seasonNumber
         return bySeason[tmdbId to seasonNumber].orEmpty()
     }
+    override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = throw UnsupportedOperationException()
 }
 
 private object ThrowingSeasonDao : SeasonDao {
@@ -187,6 +188,7 @@ private object ThrowingEpisodeDao : EpisodeDao {
 
 private object ThrowingFetcher : EpisodeMetadataFetcher {
     override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = throw UnsupportedOperationException()
+    override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = throw UnsupportedOperationException()
 }
 
 private object NoWatchEventsDao2 : EpisodeWatchEventDao {

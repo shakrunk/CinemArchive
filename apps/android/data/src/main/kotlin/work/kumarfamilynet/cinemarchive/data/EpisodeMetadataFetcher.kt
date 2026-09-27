@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 
 /**
@@ -13,4 +14,8 @@ interface EpisodeMetadataFetcher {
     /** Episode rows for one season, or empty on any failure — degrades the same way
      *  [DiscoverRepository.fetchDetails]'s own per-season calls do. */
     suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int): List<MediaEpisode>
+
+    /** One episode's cast (regulars + guest stars), or [EpisodeCast.EMPTY] on any failure.
+     *  Display-only — never persisted. */
+    suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int): EpisodeCast
 }

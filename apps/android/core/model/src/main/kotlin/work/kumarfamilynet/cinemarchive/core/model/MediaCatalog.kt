@@ -99,6 +99,28 @@ data class MediaEpisode(
     val stillUrl: String? = null,
 )
 
+/** One person credited on a single episode — the `action=episode_credits` payload. Unlike
+ *  [MediaCredit] this is never persisted, so it carries the profile photo for display. */
+data class EpisodeCastMember(
+    val tmdbPersonId: Int,
+    val name: String,
+    val characterName: String?,
+    val profileUrl: String?,
+)
+
+/** An episode's cast, split the way TMDB bills it: series regulars appearing in the episode,
+ *  and that episode's guest stars. Fetched on demand, mirroring the web app's `fetchEpisodeCast`. */
+data class EpisodeCast(
+    val cast: List<EpisodeCastMember>,
+    val guestStars: List<EpisodeCastMember>,
+) {
+    val isEmpty: Boolean get() = cast.isEmpty() && guestStars.isEmpty()
+
+    companion object {
+        val EMPTY = EpisodeCast(emptyList(), emptyList())
+    }
+}
+
 data class MediaCredit(
     val tmdbPersonId: Int,
     val name: String,

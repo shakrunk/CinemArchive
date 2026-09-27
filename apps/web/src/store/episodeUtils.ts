@@ -68,6 +68,34 @@ export function nextUnwatchedEpisode(
   return null
 }
 
+/** Today's date as local YYYY-MM-DD — the format TMDB uses for `air_date`,
+ *  so the two compare correctly as strings. */
+export function localTodayYmd(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/** True when the episode has a known air date that is still in the future. */
+export function isUnaired(episode: Episode, today: string = localTodayYmd()): boolean {
+  return !!episode.airDate && episode.airDate > today
+}
+
+/** Earliest (ascending season → episode) episode with a known air date after
+ *  `today` — the next scheduled broadcast. Episodes without an air date are
+ *  skipped: TMDB lists placeholder episodes with no date that aren't scheduled. */
+export function nextScheduledEpisode(
+  seasons: Season[],
+  today: string = localTodayYmd()
+): { season: Season; episode: Episode } | null {
+  const orderedSeasons = [...seasons].sort((a, b) => a.seasonNumber - b.seasonNumber)
+  for (const season of orderedSeasons) {
+    const orderedEpisodes = [...(season.episodes ?? [])].sort((a, b) => a.episodeNumber - b.episodeNumber)
+    for (const episode of orderedEpisodes) {
+      if (isUnaired(episode, today)) return { season, episode }
+    }
+  }
+  return null
+}
+
 // ─── Cross-title episode watch-event traversal ───────────────────────────────
 
 /** Every watch event across all of a title's seasons/episodes, in season →

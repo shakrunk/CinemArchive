@@ -1343,7 +1343,7 @@ export function Discover() {
             key={id}
             onClick={() => handleTypeChange(id)}
             className={cn(
-              'pb-1.5 border-b-2 font-serif text-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm',
+              'pb-1.5 border-b-2 font-serif text-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
               filterType === id
                 ? 'text-amber-bright border-amber font-semibold'
                 : 'text-paper-faint border-transparent hover:text-paper'

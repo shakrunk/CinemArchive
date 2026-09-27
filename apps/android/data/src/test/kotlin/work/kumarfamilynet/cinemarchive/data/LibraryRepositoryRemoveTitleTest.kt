@@ -203,4 +203,5 @@ private object NoTheaterInterestDaoRm : TheaterInterestDao {
 
 private object NoEpisodeMetadataFetcher2 : EpisodeMetadataFetcher {
     override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = throw UnsupportedOperationException()
+    override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = throw UnsupportedOperationException()
 }

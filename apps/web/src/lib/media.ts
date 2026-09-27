@@ -433,6 +433,36 @@ export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): 
   }
 }
 
+export interface EpisodeCast {
+  /** Series regulars credited in this episode. */
+  cast: CastMember[]
+  /** Guest stars credited in this episode. */
+  guestStars: CastMember[]
+}
+
+/**
+ * Fetch the per-episode cast (regulars + guest stars) from TMDB. Not persisted —
+ * fetched on demand when an episode is opened. Returns empty lists when Supabase
+ * isn't configured or the call fails.
+ */
+export async function fetchEpisodeCast(tmdbId: number, seasonNumber: number, episodeNumber: number): Promise<EpisodeCast> {
+  if (!(isSupabaseConfigured && supabase)) return { cast: [], guestStars: [] }
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      `media-proxy?action=episode_credits&id=${tmdbId}&season=${seasonNumber}&episode=${episodeNumber}`
+    )
+    if (error) throw error
+    return {
+      cast: mapTmdbCast(data?.cast ?? []),
+      guestStars: mapTmdbCast(data?.guest_stars ?? []),
+    }
+  } catch (e) {
+    console.error(`Error fetching episode credits for tmdbId ${tmdbId} S${seasonNumber}E${episodeNumber}:`, e)
+    return { cast: [], guestStars: [] }
+  }
+}
+
 export interface TitleVideo {
   key: string
   name: string

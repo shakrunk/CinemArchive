@@ -90,6 +90,13 @@ async function getTMDBSeasonDetails(tmdbId: number, seasonNumber: number) {
   return cachedFetch(`tmdb:season:v3:${tmdbId}:${seasonNumber}`, url)
 }
 
+async function getTMDBEpisodeCredits(tmdbId: number, seasonNumber: number, episodeNumber: number) {
+  // Per-episode credits: `cast` is the series regulars who appear in this episode,
+  // `guest_stars` the one-off/recurring guests. Season payloads only carry guests.
+  const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/credits?api_key=${TMDB_API_KEY}&language=en-US`
+  return cachedFetch(`tmdb:episode_credits:${tmdbId}:${seasonNumber}:${episodeNumber}`, url)
+}
+
 async function getOMDbRatings(imdbId: string) {
   const url = `${OMDB_BASE}/?apikey=${OMDB_API_KEY}&i=${imdbId}&tomatoes=true`
   return cachedFetch(`omdb:${imdbId}`, url)
@@ -279,6 +286,15 @@ Deno.serve(async (req: Request) => {
         const seasonNum = parseInt(url.searchParams.get('season') ?? '0', 10)
         if (!id || !seasonNum) throw new Error('Missing id or season parameter')
         result = await getTMDBSeasonDetails(id, seasonNum)
+        break
+      }
+      case 'episode_credits': {
+        const id = parseInt(url.searchParams.get('id') ?? '0', 10)
+        // Season 0 (specials) is valid here, so only reject a missing/NaN value.
+        const seasonNum = parseInt(url.searchParams.get('season') ?? '', 10)
+        const episodeNum = parseInt(url.searchParams.get('episode') ?? '0', 10)
+        if (!id || Number.isNaN(seasonNum) || !episodeNum) throw new Error('Missing id, season or episode parameter')
+        result = await getTMDBEpisodeCredits(id, seasonNum, episodeNum)
         break
       }
       case 'ratings': {

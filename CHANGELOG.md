@@ -9,15 +9,7 @@ number is chosen.
 
 ## [Unreleased]
 
-### Added
-
-- A TV episode's cast can now be viewed from the show's detail view: the series
-  regulars appearing in that episode plus its guest stars, with character names
-  and headshots. On web it appears in the episode panel when an episode is
-  selected (tap a person for their details); on Android, expand an episode's
-  Cast section.
-
-## [1.32.0] - 2026-09-25
+## [1.32.0] - 2026-09-26
 
 ### Added
 
@@ -25,6 +17,11 @@ number is chosen.
   airs, and unaired episodes in the episode list read "Airs <date>" instead of
   just a year (web) or a raw date (Android). Tapping the callout jumps to that
   episode's season (and, on web, selects the episode).
+- A TV episode's cast can now be viewed from the show's detail view: the series
+  regulars appearing in that episode plus its guest stars, with character names
+  and headshots. On web it appears in the episode panel when an episode is
+  selected (tap a person for their details); on Android, expand an episode's
+  Cast section.
 
 ### Fixed
 

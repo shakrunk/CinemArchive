@@ -127,3 +127,7 @@
 ## 2026-09-21 - Decorative Icon Accessibility
 **Learning:** Found multiple instances where the "X" (Close/Clear) icons inside dismiss and clear buttons were not explicitly hidden from screen readers. Even when the parent button has an `aria-label` or visible text, decorative icons without `aria-hidden="true"` can cause redundant or confusing announcements for screen reader users.
 **Action:** Always ensure that purely decorative icons (like `<X />` inside a clear search button) explicitly include `aria-hidden="true"` so they are properly ignored by assistive technologies.
+
+## 2025-02-15 - Specific ARIA Labels for Contextual Cancel Buttons
+**Learning:** Generic 'Cancel' aria-labels on buttons (like cancelling an edit or add operation) lack sufficient context for screen reader users, especially when multiple such actions might exist across a complex UI.
+**Action:** Always provide explicit, specific aria-labels for contextual confirmation or cancel buttons (e.g., 'Cancel adding physical copy' instead of just 'Cancel').

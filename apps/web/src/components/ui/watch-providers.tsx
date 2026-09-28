@@ -220,7 +220,7 @@ function PhysicalMediaShelf({
             <button type="button" onClick={commitAdd} aria-label="Add physical copy" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
               <Check className="w-4 h-4" />
             </button>
-            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel adding physical copy" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </span>
@@ -333,7 +333,7 @@ export function WatchProvidersSection({
           <button type="button" onClick={commit} aria-label="Save custom watch link" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
             <Check className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+          <button type="button" onClick={() => setEditing(false)} aria-label="Cancel setting custom watch link" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>

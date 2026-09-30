@@ -674,7 +674,7 @@ function DiscoverEmptyState({
           onClick={onClearSearch}
           className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-3.5 h-3.5" aria-hidden="true" />
           Clear search
         </button>
       )}
@@ -1239,7 +1239,7 @@ export function Discover() {
               aria-label="Clear search"
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
           )}
         </div>

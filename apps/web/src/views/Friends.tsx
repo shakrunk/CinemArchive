@@ -232,7 +232,7 @@ function FriendsSection() {
                     title="Cancel request"
                     aria-label="Cancel friend request"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
                   </Button>
                 )}
                 {f.status === 'accepted' && (
@@ -481,7 +481,7 @@ function InboxSection() {
                   title="Dismiss"
                   aria-label="Dismiss recommendation"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </Button>
               </div>
             )

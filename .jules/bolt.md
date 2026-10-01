@@ -92,3 +92,7 @@
 ## 2024-05-18 - Caching Map recreations with WeakMap
 **Learning:** Recreating a Map from an array on every call of a frequently-executed function can be an expensive O(N) operation that leads to unnecessary overhead and garbage collection, especially during React renders or derived state computations.
 **Action:** Use a module-level `WeakMap`, keyed by the source array reference, to cache and reuse the computed Map instance. This reduces time complexity from O(N) per call to O(1) after the initial creation, drastically improving performance while avoiding memory leaks.
+
+## 2026-11-20 - O(N log N) Date parsing inside sort loop
+**Learning:** Instantiating `new Date(dateString)` or running date parsing directly inside the array `.sort()` comparator incurs an unnecessary O(N log N) overhead, which drastically slows down sorting operations across large arrays of objects.
+**Action:** When sorting arrays of objects by date strings, avoid parsing dates in the comparator. Instead, precompute the numeric timestamps into a `Map` outside the sort loop to achieve O(N) extraction complexity.

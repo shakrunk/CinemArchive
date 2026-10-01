@@ -562,6 +562,11 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
       ? new Map(result.map((t) => [t.id, titleLastInteractionAt(t)]))
       : null
 
+  const addedAtById =
+    filters.sortField === 'addedAt'
+      ? new Map(result.map((t) => [t.id, new Date(t.addedAt).getTime()]))
+      : null
+
   result.sort((a, b) => {
     let comparison = 0
     switch (filters.sortField) {
@@ -575,7 +580,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
         comparison = (a.rating ?? 0) - (b.rating ?? 0)
         break
       case 'addedAt':
-        comparison = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
+        comparison = (addedAtById!.get(a.id) ?? 0) - (addedAtById!.get(b.id) ?? 0)
         break
       case 'lastInteraction':
         comparison = (lastInteractionById!.get(a.id) ?? 0) - (lastInteractionById!.get(b.id) ?? 0)

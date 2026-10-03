@@ -557,6 +557,11 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
   // Precomputed once per sort pass — titleLastInteractionAt walks every
   // episode's watch/rating/review events, so calling it per-comparison
   // would redo that work O(n log n) times instead of O(n).
+  // ⚡ Bolt: Precompute addedAt timestamps to avoid O(N log N) date parsing inside the sort loop.
+  const addedAtById =
+    filters.sortField === 'addedAt'
+      ? new Map(result.map((t) => [t.id, new Date(t.addedAt).getTime()]))
+      : null
   const lastInteractionById =
     filters.sortField === 'lastInteraction'
       ? new Map(result.map((t) => [t.id, titleLastInteractionAt(t)]))
@@ -575,7 +580,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
         comparison = (a.rating ?? 0) - (b.rating ?? 0)
         break
       case 'addedAt':
-        comparison = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
+        comparison = (addedAtById!.get(a.id) ?? 0) - (addedAtById!.get(b.id) ?? 0)
         break
       case 'lastInteraction':
         comparison = (lastInteractionById!.get(a.id) ?? 0) - (lastInteractionById!.get(b.id) ?? 0)

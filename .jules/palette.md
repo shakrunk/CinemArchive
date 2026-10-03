@@ -127,3 +127,7 @@
 ## 2026-09-21 - Decorative Icon Accessibility
 **Learning:** Found multiple instances where the "X" (Close/Clear) icons inside dismiss and clear buttons were not explicitly hidden from screen readers. Even when the parent button has an `aria-label` or visible text, decorative icons without `aria-hidden="true"` can cause redundant or confusing announcements for screen reader users.
 **Action:** Always ensure that purely decorative icons (like `<X />` inside a clear search button) explicitly include `aria-hidden="true"` so they are properly ignored by assistive technologies.
+
+## 2024-10-04 - Focus States and Button Types in Dropdown Menus
+**Learning:** Inner `menuitem` buttons and custom dropdown triggers (like "More options" or "Add to calendar" in ticket cards) often lack explicit `focus-visible` states and `type="button"` attributes. Without these, keyboard users cannot navigate the menus visually, and standard default submit behavior could cause unintended form submissions if wrapped in a form context.
+**Action:** Always verify that contextual dropdown triggers and the inner `menuitem` options include `focus-visible:outline-none focus-visible:bg-secondary/30` (or similar ring utilities) and explicitly declare `type="button"`.

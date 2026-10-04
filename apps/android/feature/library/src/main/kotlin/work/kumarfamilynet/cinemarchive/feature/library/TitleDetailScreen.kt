@@ -95,7 +95,10 @@ import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.core.model.isUnaired
+import work.kumarfamilynet.cinemarchive.core.model.mainSeasons
 import work.kumarfamilynet.cinemarchive.core.model.nextScheduledEpisode
+import work.kumarfamilynet.cinemarchive.core.model.orderedForDisplay
+import work.kumarfamilynet.cinemarchive.core.model.seasonShortLabel
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
@@ -369,7 +372,7 @@ fun TitleDetailScreen(
     // Keyed on the title id (not just rememberSaveable) so navigating from one series' detail
     // screen straight to another's doesn't carry over a season number that may not exist there.
     var selectedSeasonNumber by rememberSaveable(detail?.id) {
-        mutableStateOf(detail?.seasons?.firstOrNull()?.seasonNumber ?: 0)
+        mutableStateOf(detail?.seasons?.orderedForDisplay()?.firstOrNull()?.seasonNumber ?: 1)
     }
 
     if (showScheduleSheet || editingOuting != null) {
@@ -511,8 +514,10 @@ fun TitleDetailScreen(
                     }
 
                     if (detail.seasons.isNotEmpty()) {
-                        val totalEpisodes = detail.seasons.sumOf { it.episodeCount }
-                        val watchedEpisodes = detail.seasons.sumOf { it.episodesWatched }
+                        // Series progress covers the main seasons only — see Specials.kt.
+                        val seriesSeasons = detail.seasons.mainSeasons()
+                        val totalEpisodes = seriesSeasons.sumOf { it.episodeCount }
+                        val watchedEpisodes = seriesSeasons.sumOf { it.episodesWatched }
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = MaterialTheme.colorScheme.surfaceContainer,
@@ -570,7 +575,7 @@ fun TitleDetailScreen(
                 item {
                     ReadingWidthColumn {
                         SeasonSelector(
-                            seasons = detail.seasons,
+                            seasons = detail.seasons.orderedForDisplay(),
                             selectedSeasonNumber = selectedSeasonNumber,
                             onSelect = { selectedSeasonNumber = it },
                         )
@@ -579,7 +584,7 @@ fun TitleDetailScreen(
                 item { Box(modifier = Modifier.height(14.dp)) }
 
                 val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
-                    ?: detail.seasons.first()
+                    ?: detail.seasons.orderedForDisplay().first()
                 items(selectedSeason.episodes, key = EpisodeDetail::id) { episode ->
                     ReadingWidthColumn {
                         EpisodeRow(
@@ -700,7 +705,9 @@ private fun metaLine(detail: TitleDetail): String = listOfNotNull(
     detail.year?.toString(),
     detail.director ?: detail.network,
     if (detail.type == MediaType.TV) {
-        "${detail.seasons.size} season${if (detail.seasons.size == 1) "" else "s"}"
+        // Specials aren't counted as a season.
+        val seasonCount = detail.seasons.mainSeasons().size
+        "$seasonCount season${if (seasonCount == 1) "" else "s"}"
     } else {
         detail.runtime?.let { "$it min" }
     },
@@ -786,7 +793,7 @@ private fun NextEpisodeBanner(next: ScheduledEpisode, onClick: () -> Unit, modif
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "S${next.season.seasonNumber} E${episode.episodeNumber}" +
+                    "${seasonShortLabel(next.season.seasonNumber)} E${episode.episodeNumber}" +
                         (episode.episodeName?.let { " · $it" } ?: ""),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
@@ -826,7 +833,7 @@ private fun SeasonSelector(
             FilterChip(
                 selected = season.seasonNumber == selectedSeasonNumber,
                 onClick = { onSelect(season.seasonNumber) },
-                label = { Text("S${season.seasonNumber} · $pct%") },
+                label = { Text("${seasonShortLabel(season.seasonNumber)} · $pct%") },
             )
         }
     }

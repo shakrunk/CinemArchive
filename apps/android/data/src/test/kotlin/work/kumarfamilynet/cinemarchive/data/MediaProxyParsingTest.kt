@@ -165,15 +165,26 @@ class MediaProxyParsingTest {
         assertEquals(listOf("Creator" to "Vince Gilligan"), details.crew.map { it.job to it.name })
     }
 
-    /** Season 0 is TMDB's "Specials" bucket; counting it would inflate every episode total
-     *  relative to the same series added on the web. */
+    /** Season 0 is TMDB's "Specials" bucket: kept so it can be logged, but sorted after the
+     *  main seasons (rollups exclude it separately — see Specials.kt). */
     @Test
-    fun `seasons drop specials and sort by number`() {
+    fun `seasons keep specials last and sort main seasons by number`() {
         val seasons = parseDetails(tvDetails, MediaType.TV, tvFallback).seasons
 
+        assertEquals(listOf(1, 2, 0), seasons.map { it.seasonNumber })
+        assertEquals(listOf(7, 13, 5), seasons.map { it.episodeCount })
+        assertEquals(listOf(2008, 2009, 2009), seasons.map { it.airYear })
+    }
+
+    @Test
+    fun `seasons drop a specials bucket with no episodes`() {
+        val empty = tvDetails.replace(
+            """{"season_number": 0, "episode_count": 5""",
+            """{"season_number": 0, "episode_count": 0""",
+        )
+        val seasons = parseDetails(empty, MediaType.TV, tvFallback).seasons
+
         assertEquals(listOf(1, 2), seasons.map { it.seasonNumber })
-        assertEquals(listOf(7, 13), seasons.map { it.episodeCount })
-        assertEquals(listOf(2008, 2009), seasons.map { it.airYear })
     }
 
     @Test

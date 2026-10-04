@@ -48,6 +48,7 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.RatingObservation
 import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
 import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
+import work.kumarfamilynet.cinemarchive.core.model.isSpecialsSeason
 
 private val ISO_LANGUAGE_NAMES = mapOf(
     "en" to "English", "es" to "Spanish", "fr" to "French", "de" to "German",
@@ -513,8 +514,11 @@ class LedgerRepository(
         episodes: List<EpisodeEntity>,
         watchEvents: List<EpisodeWatchEventEntity>,
     ): List<LedgerProgressEntry> {
-        val seasonsByTitle = seasons.groupBy { it.titleId }
-        val episodesByTitle = episodes.groupBy { it.titleId }
+        // Specials (season 0) are excluded from progress — see Specials.kt.
+        val mainSeasons = seasons.filterNot { isSpecialsSeason(it.seasonNumber) }
+        val mainSeasonIds = mainSeasons.map { it.id }.toSet()
+        val seasonsByTitle = mainSeasons.groupBy { it.titleId }
+        val episodesByTitle = episodes.filter { it.seasonId in mainSeasonIds }.groupBy { it.titleId }
         val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
         return titles.filter { it.type == MediaType.TV.name }.mapNotNull { title ->
             val titleSeasons = seasonsByTitle[title.id] ?: emptyList()

@@ -2,8 +2,9 @@
 // modal and the library-wide bulk refresh in Profile settings.
 
 import { fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
-import type { Title, Episode, EpisodeCrew } from 'src/store/mockData'
+import { insertSeasonsInDb, upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
+import { SPECIALS_SEASON_NUMBER, isSpecialsSeason } from 'src/store/episodeUtils'
+import type { Title, Season, Episode, EpisodeCrew } from 'src/store/mockData'
 
 /** Project an existing library Title back into a SearchResult so it can be
  *  re-hydrated through the same detail-fetch path as a fresh search pick. */
@@ -44,7 +45,7 @@ export async function fetchRefreshedTitlePatch(
   base: SearchResult,
   userId: string | undefined
 ): Promise<Partial<Title>> {
-  const { result } = await fetchMediaDetails(base)
+  const { result, tmdbSeasons } = await fetchMediaDetails(base)
   const patch: Partial<Title> = {
     tmdbId: result.tmdbId,
     title: result.title,
@@ -76,8 +77,17 @@ export async function fetchRefreshedTitlePatch(
 
   // For TV shows, also refresh episode metadata for all seasons
   if (result.type === 'tv' && title.seasons && title.seasons.length > 0) {
+    // Backfill Specials (TMDB season 0) for series added before they were
+    // tracked: start from an empty shell and let the episode fetch below fill
+    // it in, exactly like a stored season that has no episode rows yet.
+    const tmdbHasSpecials = tmdbSeasons.some((s) => s.season_number === SPECIALS_SEASON_NUMBER && s.episode_count > 0)
+    const specialsShell: Season | null = tmdbHasSpecials && !title.seasons.some(isSpecialsSeason)
+      ? { id: crypto.randomUUID(), seasonNumber: SPECIALS_SEASON_NUMBER, episodeCount: 0, episodesWatched: 0, episodes: [] }
+      : null
+    const seasonsToRefresh = specialsShell ? [...title.seasons, specialsShell] : title.seasons
+
     const settled = await Promise.allSettled(
-      title.seasons.map((s) =>
+      seasonsToRefresh.map((s) =>
         fetchSeasonDetails(result.tmdbId, s.seasonNumber).then(({ episodes, cast }) => ({
           season: s,
           tmdbEps: episodes,
@@ -90,7 +100,7 @@ export async function fetchRefreshedTitlePatch(
     const allEpisodeCrew: Array<{ episodeId: string; crew: EpisodeCrew[] }> = []
     const allSeasonCast: Array<{ seasonId: string; cast: NonNullable<Title['cast']> }> = []
 
-    const updatedSeasons = title.seasons.map((s) => {
+    const refreshedSeasons = seasonsToRefresh.map((s) => {
       const match = settled.find(
         (r) => r.status === 'fulfilled' && r.value.season.seasonNumber === s.seasonNumber
       )
@@ -171,9 +181,23 @@ export async function fetchRefreshedTitlePatch(
       }
     })
 
+    // A Specials shell TMDB returned no episodes for is dropped, not stored empty.
+    const addedSeasons = refreshedSeasons.filter((s) => s.id === specialsShell?.id && (s.episodes?.length ?? 0) > 0)
+    const updatedSeasons = refreshedSeasons.filter((s) => s.id !== specialsShell?.id || addedSeasons.length > 0)
+
     patch.seasons = updatedSeasons
 
     if (userId) {
+      // Awaited, not fire-and-forget: the row must exist (with this client id)
+      // before season-cast rows reference it, and before the caller's
+      // updateTitle upserts seasons by (title_id, season_number) without an id.
+      if (addedSeasons.length > 0) {
+        try {
+          await insertSeasonsInDb(userId, title.id, addedSeasons)
+        } catch (e) {
+          console.error('Season insert during refresh failed:', e)
+        }
+      }
       if (allEpisodeUpdates.length > 0) {
         upsertEpisodeMetadataInDb(userId, title.id, allEpisodeUpdates).catch((e) =>
           console.error('Episode metadata refresh DB write failed:', e)

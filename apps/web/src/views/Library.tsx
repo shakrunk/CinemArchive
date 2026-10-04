@@ -332,10 +332,18 @@ function buildFranchiseGroups(titles: Title[]): FranchiseGroup[] {
     }
   }
 
-  const releaseTime = (t: Title) =>
-    t.releaseDate ? new Date(t.releaseDate).getTime() : new Date(t.year, 0, 1).getTime()
+  // ⚡ Bolt: Precompute timestamps to avoid O(N log N) date parsing during sort
+  const releaseTimeCache = new Map<Title, number>()
+  const getReleaseTime = (t: Title) => {
+    let time = releaseTimeCache.get(t)
+    if (time === undefined) {
+      time = t.releaseDate ? new Date(t.releaseDate).getTime() : new Date(t.year, 0, 1).getTime()
+      releaseTimeCache.set(t, time)
+    }
+    return time
+  }
   for (const group of groups.values()) {
-    group.titles.sort((a, b) => releaseTime(a) - releaseTime(b))
+    group.titles.sort((a, b) => getReleaseTime(a) - getReleaseTime(b))
   }
 
   const result = [...groups.values()]

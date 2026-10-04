@@ -283,8 +283,9 @@ Deno.serve(async (req: Request) => {
       }
       case 'season': {
         const id = parseInt(url.searchParams.get('id') ?? '0', 10)
-        const seasonNum = parseInt(url.searchParams.get('season') ?? '0', 10)
-        if (!id || !seasonNum) throw new Error('Missing id or season parameter')
+        // Season 0 (specials) is valid, so only reject a missing/NaN value.
+        const seasonNum = parseInt(url.searchParams.get('season') ?? '', 10)
+        if (!id || Number.isNaN(seasonNum)) throw new Error('Missing id or season parameter')
         result = await getTMDBSeasonDetails(id, seasonNum)
         break
       }

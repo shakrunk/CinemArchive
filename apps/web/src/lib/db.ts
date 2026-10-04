@@ -7,6 +7,7 @@ import type {
   EpisodeCrew,
   List,
   OutingStatus,
+  Season,
   Title,
   Viewing,
   WatchStatus,
@@ -997,6 +998,28 @@ export async function insertPrePlatformWatchEventsToDb(
     }))
   )
   unwrap(error, 'Error inserting pre-platform watch events:')
+}
+
+/** Inserts season rows a metadata refresh discovered (e.g. a series' Specials),
+ *  keeping their client-generated ids so season-cast rows written against those
+ *  ids satisfy the foreign key. `updateTitleInDb`'s season upsert can't do this:
+ *  it omits `id`, so a fresh row would get a server-generated one. */
+export async function insertSeasonsInDb(userId: string, titleId: string, seasons: Season[]): Promise<void> {
+  if (!supabase || seasons.length === 0) return
+
+  const { error } = await supabase.from('seasons').insert(
+    seasons.map((s) => ({
+      id: s.id,
+      title_id: titleId,
+      user_id: userId,
+      season_number: s.seasonNumber,
+      episode_count: s.episodeCount,
+      episodes_watched: s.episodesWatched,
+      air_year: s.airYear,
+    }))
+  )
+
+  unwrap(error, 'Error inserting seasons:')
 }
 
 export async function upsertEpisodeMetadataInDb(

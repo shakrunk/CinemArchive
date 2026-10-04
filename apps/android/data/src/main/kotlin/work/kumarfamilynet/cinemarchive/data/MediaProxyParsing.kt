@@ -12,6 +12,8 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.MediaSeason
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
+import work.kumarfamilynet.cinemarchive.core.model.isSpecials
+import work.kumarfamilynet.cinemarchive.core.model.isSpecialsSeason
 
 /**
  * TMDB JSON → domain mapping for every `media-proxy` action this client calls.
@@ -198,21 +200,23 @@ internal fun parseCrew(data: JSONObject, type: MediaType): List<MediaCrewCredit>
     return crew
 }
 
-/** Season 0 is TMDB's "Specials" bucket — excluded here exactly as `buildSeasons` excludes it
- *  in the web app, so episode totals match across clients. */
+/** Season 0 is TMDB's "Specials" bucket. It is kept (when TMDB lists any episodes for it) so
+ *  it can be shown and logged, but sorted last and left out of series rollups — see
+ *  Specials.kt and `buildSeasons` in the web app. */
 internal fun parseSeasons(data: JSONObject, type: MediaType): List<MediaSeason> {
     if (type != MediaType.TV) return emptyList()
     return data.optJSONArray("seasons").objects()
         .mapNotNull { season ->
             val number = season.intOrNull("season_number") ?: return@mapNotNull null
-            if (number <= 0) return@mapNotNull null
+            if (number < 0) return@mapNotNull null
+            if (isSpecialsSeason(number) && season.optInt("episode_count", 0) <= 0) return@mapNotNull null
             MediaSeason(
                 seasonNumber = number,
                 episodeCount = season.optInt("episode_count", 0),
                 airYear = season.stringOrNull("air_date").yearOrNull(),
             )
         }
-        .sortedBy { it.seasonNumber }
+        .sortedWith(compareBy({ it.isSpecials }, { it.seasonNumber }))
 }
 
 /** Maps one `action=season` payload into the episode rows for that season. Still images are

@@ -131,3 +131,7 @@
 ## 2024-10-04 - Focus States and Button Types in Dropdown Menus
 **Learning:** Inner `menuitem` buttons and custom dropdown triggers (like "More options" or "Add to calendar" in ticket cards) often lack explicit `focus-visible` states and `type="button"` attributes. Without these, keyboard users cannot navigate the menus visually, and standard default submit behavior could cause unintended form submissions if wrapped in a form context.
 **Action:** Always verify that contextual dropdown triggers and the inner `menuitem` options include `focus-visible:outline-none focus-visible:bg-secondary/30` (or similar ring utilities) and explicitly declare `type="button"`.
+
+## 2025-02-15 - Specific ARIA Labels for Contextual Cancel Buttons
+**Learning:** Generic 'Cancel' aria-labels on buttons (like cancelling an edit or add operation) lack sufficient context for screen reader users, especially when multiple such actions might exist across a complex UI.
+**Action:** Always provide explicit, specific aria-labels for contextual confirmation or cancel buttons (e.g., 'Cancel adding physical copy' instead of just 'Cancel').

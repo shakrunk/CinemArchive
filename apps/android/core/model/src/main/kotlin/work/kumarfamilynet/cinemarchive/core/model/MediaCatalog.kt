@@ -76,7 +76,8 @@ data class MediaDetails(
     val metacriticScore: Int? = null,
     val cast: List<MediaCredit> = emptyList(),
     val crew: List<MediaCrewCredit> = emptyList(),
-    /** Empty for movies. Season 0 (TMDB "Specials") is filtered out, matching the web app. */
+    /** Empty for movies. Includes season 0 (TMDB "Specials") only when it has episodes,
+     *  matching the web app — see Specials.kt. */
     val seasons: List<MediaSeason> = emptyList(),
 )
 

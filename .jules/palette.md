@@ -132,6 +132,10 @@
 **Learning:** Inner `menuitem` buttons and custom dropdown triggers (like "More options" or "Add to calendar" in ticket cards) often lack explicit `focus-visible` states and `type="button"` attributes. Without these, keyboard users cannot navigate the menus visually, and standard default submit behavior could cause unintended form submissions if wrapped in a form context.
 **Action:** Always verify that contextual dropdown triggers and the inner `menuitem` options include `focus-visible:outline-none focus-visible:bg-secondary/30` (or similar ring utilities) and explicitly declare `type="button"`.
 
+## 2024-09-27 - Hide Decorative Icons from Screen Readers
+**Learning:** Decorative icons (like the X icon for "Close" or "Clear") placed inside buttons alongside visible text and `aria-label` attributes must be explicitly hidden from screen readers. Otherwise, screen readers may redundantly announce the icon's generic name ("X" or "Close") in addition to the button's intended label, causing confusion.
+**Action:** Always add `aria-hidden="true"` to purely decorative icons (e.g., `<X aria-hidden="true" />`) when they are used inside labeled buttons.
+
 ## 2025-02-15 - Specific ARIA Labels for Contextual Cancel Buttons
 **Learning:** Generic 'Cancel' aria-labels on buttons (like cancelling an edit or add operation) lack sufficient context for screen reader users, especially when multiple such actions might exist across a complex UI.
 **Action:** Always provide explicit, specific aria-labels for contextual confirmation or cancel buttons (e.g., 'Cancel adding physical copy' instead of just 'Cancel').

@@ -390,7 +390,10 @@ class LibraryRepository(
      *  match the season's full episodeCount, so "no more unwatched rows" isn't a safe proxy
      *  for "season complete". */
     suspend fun advanceNextEpisode(titleId: String, watchedAt: String?) {
+        val seasonNumberById = seasonDao.observeSeasons(titleId).first().associate { it.id to it.seasonNumber }
+        // EpisodeDao orders by seasonId (a UUID), so re-sort by the season's number.
         val episodes = episodeDao.observeEpisodes(titleId).first()
+            .sortedWith(compareBy({ seasonNumberById[it.seasonId] ?: Int.MAX_VALUE }, { it.episodeNumber }))
         val watchCounts = watchEventDao.observeWatchCounts(titleId).first().associate { it.episodeId to it.watchCount }
         val next = episodes.firstOrNull { (watchCounts[it.id] ?: 0) <= 0 } ?: return
         logEpisodeWatched(next.id, watchedAt)

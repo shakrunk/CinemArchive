@@ -9,6 +9,11 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Android: "Mark episode watched" on Up Next now marks the episode the card
+  shows as next, instead of one from an arbitrary season.
+
 ## [1.32.0] - 2026-09-26
 
 ### Added

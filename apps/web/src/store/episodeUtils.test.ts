@@ -14,6 +14,11 @@ import {
   allWatchEvents,
   getUnlockedModes,
   getEarnedModes,
+  isSpecialsSeason,
+  mainSeasons,
+  orderSeasonsForDisplay,
+  seasonLabel,
+  seasonShortLabel,
 } from './episodeUtils'
 import { makeEpisode, makeRating, makeSeason, makeWatchEvent } from '@/test/fixtures'
 import type { Title } from './mockData'
@@ -253,5 +258,64 @@ describe('getUnlockedModes / getEarnedModes', () => {
 
   it('returns an empty set when the title has no episodes', () => {
     expect(getEarnedModes(makeTitle([makeSeason()]))).toEqual(new Set())
+  })
+})
+
+describe('Specials (season 0)', () => {
+  const specialsEp = makeEpisode({ episodeNumber: 1, watchEvents: [], ratings: [makeRating(1)] })
+  const specials = makeSeason({ seasonNumber: 0, episodeCount: 3, episodesWatched: 1, episodes: [specialsEp] })
+  const s1 = makeSeason({
+    seasonNumber: 1,
+    episodeCount: 2,
+    episodesWatched: 0,
+    episodes: [
+      makeEpisode({ episodeNumber: 1, watchEvents: [makeWatchEvent()], ratings: [makeRating(5)] }),
+      makeEpisode({ episodeNumber: 2, watchEvents: [makeWatchEvent()] }),
+    ],
+  })
+
+  it('identifies and filters out the Specials season', () => {
+    expect(isSpecialsSeason(specials)).toBe(true)
+    expect(isSpecialsSeason(s1)).toBe(false)
+    expect(mainSeasons([specials, s1])).toEqual([s1])
+  })
+
+  it('orders Specials after the main seasons for display', () => {
+    const s2 = makeSeason({ seasonNumber: 2 })
+    expect(orderSeasonsForDisplay([s2, specials, s1]).map((s) => s.seasonNumber)).toEqual([1, 2, 0])
+  })
+
+  it('labels Specials distinctly', () => {
+    expect(seasonLabel(0)).toBe('Specials')
+    expect(seasonLabel(3)).toBe('Season 3')
+    expect(seasonShortLabel(0)).toBe('SP')
+    expect(seasonShortLabel(3)).toBe('S3')
+  })
+
+  it('excludes Specials from series progress totals', () => {
+    expect(totalEpisodeCount([specials, s1])).toBe(2)
+    expect(totalEpisodesWatched([specials, s1])).toBe(2)
+  })
+
+  it('does not surface an unwatched special as the next episode', () => {
+    expect(nextUnwatchedEpisode([specials, s1])).toBeNull()
+  })
+
+  it('does not surface an upcoming special as the next scheduled episode', () => {
+    const upcoming = makeSeason({ seasonNumber: 0, episodes: [makeEpisode({ airDate: '2099-01-01' })] })
+    expect(nextScheduledEpisode([upcoming, s1], '2026-01-01')).toBeNull()
+  })
+
+  it('excludes Specials from the series rating', () => {
+    expect(avgSeriesRating([specials, s1])).toBe(5)
+  })
+
+  it('does not require Specials for an earned colour mode', () => {
+    const bw = makeWatchEvent({ colorMode: 'bw' })
+    const title = makeTitle([
+      makeSeason({ seasonNumber: 0, episodes: [makeEpisode({ watchEvents: [] })] }),
+      makeSeason({ seasonNumber: 1, episodes: [makeEpisode({ watchEvents: [bw] })] }),
+    ])
+    expect(getEarnedModes(title).has('bw')).toBe(true)
   })
 })

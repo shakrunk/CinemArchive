@@ -6,7 +6,7 @@ import { computeLedgerStats } from './ledgerStats'
 import { normalizeCompanions } from './companions'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { toCachedTitle } from './libraryCache'
-import { nextUnwatchedEpisode } from './episodeUtils'
+import { isSpecialsSeason, nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
 import type { User } from '@supabase/supabase-js'
@@ -872,6 +872,9 @@ export const useAppStore = create<AppStore>()(
         if (t.id !== titleId) return t
         const seasons = (t.seasons ?? []).map((season) => {
           if (seasonNumber !== undefined && season.seasonNumber !== seasonNumber) return season
+          // Whole-series scope covers the main seasons; Specials are only
+          // marked when targeted directly.
+          if (seasonNumber === undefined && isSpecialsSeason(season)) return season
           if (!season.episodes) return season
           const episodes = season.episodes.map((ep) => {
             if (ep.watchEvents.length > 0) return ep

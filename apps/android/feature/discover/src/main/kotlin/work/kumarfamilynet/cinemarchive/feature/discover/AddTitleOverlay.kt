@@ -50,6 +50,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.isSpecials
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 
@@ -454,14 +455,18 @@ private fun CenteredNotice(content: @Composable androidx.compose.foundation.layo
 private fun MediaSearchResult.metaLine(): String =
     listOfNotNull(year?.toString(), if (type == MediaType.TV) "TV Series" else "Movie").joinToString(" · ")
 
-private fun MediaDetails.metaLine(): String = listOfNotNull(
-    year?.toString(),
-    if (type == MediaType.TV) "TV Series" else "Movie",
-    contentRating,
-    when {
-        type == MediaType.TV && seasons.isNotEmpty() ->
-            "${seasons.size} season${if (seasons.size == 1) "" else "s"}"
-        runtime != null -> "${runtime}m"
-        else -> null
-    },
-).joinToString(" · ")
+private fun MediaDetails.metaLine(): String {
+    // Specials aren't counted as a season, matching the title detail stat.
+    val seasonCount = seasons.count { !it.isSpecials }
+    return listOfNotNull(
+        year?.toString(),
+        if (type == MediaType.TV) "TV Series" else "Movie",
+        contentRating,
+        when {
+            type == MediaType.TV && seasonCount > 0 ->
+                "$seasonCount season${if (seasonCount == 1) "" else "s"}"
+            runtime != null -> "${runtime}m"
+            else -> null
+        },
+    ).joinToString(" · ")
+}

@@ -17,9 +17,10 @@ data class ScheduledEpisode(val season: SeasonDetail, val episode: EpisodeDetail
 
 /** Earliest (ascending season → episode) episode with a known air date after [today] — the
  *  next scheduled broadcast. Undated episodes are skipped: TMDB lists placeholders with no
- *  date that aren't actually scheduled. */
+ *  date that aren't actually scheduled. Specials are skipped, as for every series-level
+ *  rollup (see Specials.kt). */
 fun List<SeasonDetail>.nextScheduledEpisode(today: LocalDate = LocalDate.now()): ScheduledEpisode? {
-    for (season in sortedBy { it.seasonNumber }) {
+    for (season in mainSeasons().sortedBy { it.seasonNumber }) {
         val episode = season.episodes.sortedBy { it.episodeNumber }.firstOrNull { it.isUnaired(today) }
         if (episode != null) return ScheduledEpisode(season, episode)
     }

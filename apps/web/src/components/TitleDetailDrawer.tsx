@@ -20,6 +20,10 @@ import {
   getUnlockedModes,
   getEarnedModes,
   nextScheduledEpisode,
+  mainSeasons,
+  orderSeasonsForDisplay,
+  seasonLabel,
+  seasonShortLabel,
 } from 'src/store/episodeUtils'
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
@@ -685,7 +689,11 @@ function unwatchedEpisodeCount(seasons: Season[]): number {
 function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
   const markPrePlatformWatched = useAppStore((s) => s.markPrePlatformWatched)
   const [confirmPrePlatform, setConfirmPrePlatform] = useState<'series' | 'season' | null>(null)
-  const [selectedSeason, setSelectedSeason] = useState(seasons[0]?.seasonNumber ?? 1)
+  // Main seasons ascending, Specials last; series-level rollups use the main
+  // seasons only (see the Specials note in episodeUtils).
+  const orderedSeasons = orderSeasonsForDisplay(seasons)
+  const seriesSeasons = mainSeasons(seasons)
+  const [selectedSeason, setSelectedSeason] = useState(orderedSeasons[0]?.seasonNumber ?? 1)
   const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -761,7 +769,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
     handleSeasonChange(seasonNumber)
   }
 
-  const seriesUnwatched = unwatchedEpisodeCount(seasons)
+  const seriesUnwatched = unwatchedEpisodeCount(seriesSeasons)
   const seasonUnwatched = season ? unwatchedEpisodeCount([season]) : 0
 
   function renderPrePlatformMark(scope: 'series' | 'season') {
@@ -769,7 +777,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
     if (isSharedView || count === 0) return null
     const label = scope === 'series'
       ? 'Watched entire series before joining'
-      : `Watched season ${season?.seasonNumber} before joining`
+      : `Watched ${season ? seasonLabel(season.seasonNumber).toLowerCase() : 'season'} before joining`
     return confirmPrePlatform === scope ? (
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
@@ -824,7 +832,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
           <Eyebrow as="div" className="mt-0.5">Avg Rating</Eyebrow>
         </div>
         <div className="rounded-lg px-3 py-1.5 text-center" style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}>
-          <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>{seasons.length}</div>
+          <div className="font-serif text-xl" style={{ color: 'var(--paper)', fontVariationSettings: '"opsz" 30' }}>{seriesSeasons.length}</div>
           <Eyebrow as="div" className="mt-0.5">Seasons</Eyebrow>
         </div>
       </div>
@@ -858,13 +866,13 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
       {renderPrePlatformMark('series')}
 
       {/* Series Graph heatmap */}
-      {seasons.some(hasEpisodes) && (
+      {seriesSeasons.some(hasEpisodes) && (
         <div>
           <Eyebrow as="h4" size="md" className="mb-3">
             Series Graph
           </Eyebrow>
           <SeriesGraph
-            seasons={seasons}
+            seasons={seriesSeasons}
             onCellClick={(seasonNumber, episodeNumber) => {
               const targetSeason = seasons.find((s) => s.seasonNumber === seasonNumber)
               const ep = targetSeason?.episodes?.find((e) => e.episodeNumber === episodeNumber)
@@ -876,9 +884,9 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
       )}
 
       {/* Smart season selector */}
-      {seasons.length <= 3 ? (
+      {orderedSeasons.length <= 3 ? (
         <div className="flex gap-2 overflow-x-auto scrollbar-none">
-          {seasons.map((s) => {
+          {orderedSeasons.map((s) => {
             const watched = episodesWatchedInSeason(s)
             const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
             const seasonAvg = avgSeasonRating(s)
@@ -886,7 +894,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
               <button type="button"
                 key={s.seasonNumber}
                 onClick={() => handleSeasonChange(s.seasonNumber)}
-                aria-label={`Season ${s.seasonNumber}`}
+                aria-label={seasonLabel(s.seasonNumber)}
                 aria-current={selectedSeason === s.seasonNumber ? 'true' : undefined}
                 className={cn(
                   'shrink-0 px-3.5 py-2.5 rounded-lg text-left transition-all border',
@@ -896,7 +904,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                 )}
               >
                 <div className="font-mono" style={{ fontSize: '13px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
-                  S{s.seasonNumber}
+                  {seasonShortLabel(s.seasonNumber)}
                 </div>
                 <div className="font-mono" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>
                   {pct}%{seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}
@@ -913,13 +921,13 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
           className="font-mono text-sm rounded-lg px-3 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60"
           style={{ color: 'var(--amber)' }}
         >
-          {seasons.map((s) => {
+          {orderedSeasons.map((s) => {
             const watched = episodesWatchedInSeason(s)
             const pct = s.episodeCount > 0 ? Math.round((watched / s.episodeCount) * 100) : 0
             const seasonAvg = avgSeasonRating(s)
             return (
               <option key={s.seasonNumber} value={s.seasonNumber}>
-                {`Season ${s.seasonNumber} · ${pct}%${seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}`}
+                {`${seasonLabel(s.seasonNumber)} · ${pct}%${seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}`}
               </option>
             )
           })}
@@ -1002,7 +1010,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
       {season?.cast && season.cast.length > 0 && (
         <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
           <Eyebrow as="div" className="mb-2">
-            Season {season.seasonNumber} Cast
+            {seasonLabel(season.seasonNumber)} Cast
           </Eyebrow>
           <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
             {season.cast.map((member) => (
@@ -1043,7 +1051,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
         const pct = season.episodeCount > 0 ? (season.episodesWatched / season.episodeCount) * 100 : 0
         return (
           <div className="flex items-center gap-3 px-2 py-3">
-            <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">S{season.seasonNumber}</span>
+            <span className="font-mono text-xs text-muted-foreground w-8 shrink-0">{seasonShortLabel(season.seasonNumber)}</span>
             <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
               <div className="h-full bg-amber rounded-full transition-all" style={{ width: `${pct}%` }} />
             </div>

@@ -8,7 +8,8 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { PosterThumb } from 'src/components/ui/poster-thumb'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
-import type { Title, WatchStatus, Season, CastMember, EpisodeCrew } from 'src/store/mockData'
+import type { Title, WatchStatus, Season, Episode, CastMember, EpisodeCrew } from 'src/store/mockData'
+import { SPECIALS_SEASON_NUMBER, isSpecialsSeason, seasonLabel } from 'src/store/episodeUtils'
 import { searchMedia, fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult, type RawTmdbSeason, type RawTmdbEpisode } from 'src/lib/media'
 import { Eyebrow } from 'src/components/ui/typography'
 
@@ -56,6 +57,27 @@ function useDebouncedSearch(delay = 400) {
 // Episode counts and metadata come from TMDB when available.
 const EP_CREW_JOBS = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
 
+function buildEpisode(epNum: number, tmdbEp: RawTmdbEpisode | undefined): Episode {
+  const epCrew: EpisodeCrew[] = (tmdbEp?.crew ?? [])
+    .filter((c) => EP_CREW_JOBS.has(c.job))
+    .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
+  return {
+    id: crypto.randomUUID(),
+    episodeNumber: epNum,
+    episodeName: tmdbEp?.name || undefined,
+    airDate: tmdbEp?.air_date || undefined,
+    runtime: tmdbEp?.runtime || undefined,
+    synopsis: tmdbEp?.overview || undefined,
+    stillUrl: tmdbEp?.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+    director: epCrew.find((c) => c.job === 'Director')?.name,
+    writers: epCrew.filter((c) => ['Writer', 'Teleplay', 'Story'].includes(c.job)).map((c) => c.name),
+    crew: epCrew.length > 0 ? epCrew : undefined,
+    watchEvents: [],
+    ratings: [],
+    reviews: [],
+  }
+}
+
 function buildSeasons(
   result: SearchResult,
   tmdbSeasons: RawTmdbSeason[],
@@ -63,7 +85,7 @@ function buildSeasons(
   seasonCastBySeason?: Map<number, CastMember[]>
 ): Season[] {
   if (result.type !== 'tv' || !result.seasonCount) return []
-  return Array.from({ length: result.seasonCount }, (_, i) => {
+  const seasons: Season[] = Array.from({ length: result.seasonCount }, (_, i) => {
     const seasonNum = i + 1
     const tmdbSeason = tmdbSeasons.find((s) => s.season_number === seasonNum)
     const epCount = tmdbSeason?.episode_count || 10
@@ -74,30 +96,30 @@ function buildSeasons(
       episodeCount: epCount,
       episodesWatched: 0,
       cast: seasonCastBySeason?.get(seasonNum),
-      episodes: Array.from({ length: epCount }, (_, j) => {
-        const epNum = j + 1
-        const tmdbEp = tmdbEpisodes.find((e) => e.episode_number === epNum)
-        const epCrew: EpisodeCrew[] = (tmdbEp?.crew ?? [])
-          .filter((c) => EP_CREW_JOBS.has(c.job))
-          .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
-        return {
-          id: crypto.randomUUID(),
-          episodeNumber: epNum,
-          episodeName: tmdbEp?.name || undefined,
-          airDate: tmdbEp?.air_date || undefined,
-          runtime: tmdbEp?.runtime || undefined,
-          synopsis: tmdbEp?.overview || undefined,
-          stillUrl: tmdbEp?.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
-          director: epCrew.find((c) => c.job === 'Director')?.name,
-          writers: epCrew.filter((c) => ['Writer', 'Teleplay', 'Story'].includes(c.job)).map((c) => c.name),
-          crew: epCrew.length > 0 ? epCrew : undefined,
-          watchEvents: [],
-          ratings: [],
-          reviews: [],
-        }
-      }),
+      episodes: Array.from({ length: epCount }, (_, j) =>
+        buildEpisode(j + 1, tmdbEpisodes.find((e) => e.episode_number === j + 1))
+      ),
     }
   })
+
+  // Specials (TMDB season 0) are only added when TMDB actually lists episodes
+  // for them — no placeholder count, unlike the main seasons above. Episodes
+  // keep TMDB's own numbering, which isn't guaranteed to be contiguous.
+  const specialEpisodes = episodesBySeason?.get(SPECIALS_SEASON_NUMBER) ?? []
+  if (specialEpisodes.length > 0) {
+    const episodes = [...specialEpisodes]
+      .sort((a, b) => a.episode_number - b.episode_number)
+      .map((e) => buildEpisode(e.episode_number, e))
+    seasons.push({
+      id: crypto.randomUUID(),
+      seasonNumber: SPECIALS_SEASON_NUMBER,
+      episodeCount: episodes.length,
+      episodesWatched: 0,
+      cast: seasonCastBySeason?.get(SPECIALS_SEASON_NUMBER),
+      episodes,
+    })
+  }
+  return seasons
 }
 
 // ─── TV Season Editor ─────────────────────────────────────────────────────────
@@ -131,7 +153,7 @@ function SeasonEditor({ seasons, onChange }: SeasonEditorProps) {
         return (
           <div key={s.id} className="flex items-center gap-3 bg-secondary/40 rounded-lg px-3 py-2">
             <span className="font-mono text-xs text-muted-foreground w-12 shrink-0">
-              Season {s.seasonNumber}
+              {seasonLabel(s.seasonNumber)}
             </span>
             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
@@ -146,19 +168,19 @@ function SeasonEditor({ seasons, onChange }: SeasonEditorProps) {
               <button
                 type="button"
                 onClick={() => toggleEpisodes(i, -1)}
-                aria-label={`Decrease episodes watched for season ${s.seasonNumber}`}
+                aria-label={`Decrease episodes watched for ${seasonLabel(s.seasonNumber).toLowerCase()}`}
                 className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               >−</button>
               <button
                 type="button"
                 onClick={() => toggleEpisodes(i, 1)}
-                aria-label={`Increase episodes watched for season ${s.seasonNumber}`}
+                aria-label={`Increase episodes watched for ${seasonLabel(s.seasonNumber).toLowerCase()}`}
                 className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
               >+</button>
               <button
                 type="button"
                 onClick={() => markSeasonComplete(i)}
-                aria-label={complete ? `Mark season ${s.seasonNumber} incomplete` : `Mark season ${s.seasonNumber} complete`}
+                aria-label={complete ? `Mark ${seasonLabel(s.seasonNumber).toLowerCase()} incomplete` : `Mark ${seasonLabel(s.seasonNumber).toLowerCase()} complete`}
                 className={cn(
                   'w-5 h-5 rounded flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
                   complete ? 'bg-amber/20 text-amber' : 'bg-secondary text-muted-foreground hover:text-amber'
@@ -365,15 +387,14 @@ function AddTitleForm() {
       const seasonCastBySeason = new Map<number, CastMember[]>()
       if (detailed.type === 'tv' && detailed.tmdbId && tmdbSeasons.length > 0) {
         const settled = await Promise.allSettled(
-          tmdbSeasons
-            .filter((s) => s.season_number > 0)
-            .map((s) =>
-              fetchSeasonDetails(detailed.tmdbId, s.season_number).then(({ episodes, cast }) => ({
-                seasonNumber: s.season_number,
-                episodes,
-                cast,
-              }))
-            )
+          // Includes season 0 (Specials) — buildSeasons adds it when it has episodes.
+          tmdbSeasons.map((s) =>
+            fetchSeasonDetails(detailed.tmdbId, s.season_number).then(({ episodes, cast }) => ({
+              seasonNumber: s.season_number,
+              episodes,
+              cast,
+            }))
+          )
         )
         episodesBySeason = new Map()
         for (const r of settled) {
@@ -681,7 +702,7 @@ function AddTitleForm() {
                   onClick={() => {
                     setLog((l) => ({
                       ...l,
-                      seasons: l.seasons.map((s) => ({ ...s, episodesWatched: s.episodeCount })),
+                      seasons: l.seasons.map((s) => (isSpecialsSeason(s) ? s : { ...s, episodesWatched: s.episodeCount })),
                     }))
                   }}
                   className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"

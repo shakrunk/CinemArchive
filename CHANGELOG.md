@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-10-04
+
 ### Added
 
 - TV specials (TMDB's "Specials" season — OVAs, feature-length finales and other

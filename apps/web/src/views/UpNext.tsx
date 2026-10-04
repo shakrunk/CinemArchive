@@ -424,18 +424,20 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={handleAddToCalendar}
-                  className="flex items-center gap-1.5 font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+                  className="flex items-center gap-1.5 font-mono text-xs text-amber/80 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                 >
                   <CalendarPlus className="w-3.5 h-3.5" />
                   Add to calendar
                 </button>
                 <div className="relative" ref={menuRef}>
                   <button
+                    type="button"
                     onClick={() => setMenuOpen((v) => !v)}
                     aria-label={`More options for ${title.title}'s tickets`}
                     aria-expanded={menuOpen}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-paper-faint hover:text-amber transition-colors"
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-paper-faint hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -450,32 +452,35 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                       }}
                     >
                       <button
+                        type="button"
                         role="menuitem"
                         onClick={() => {
                           setMenuOpen(false)
                           setSharePanelOpen(true)
                         }}
-                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors"
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
                       >
                         Share plans
                       </button>
                       <button
+                        type="button"
                         role="menuitem"
                         onClick={() => {
                           setMenuOpen(false)
                           openOutingSchedule(title.id, outing.id)
                         }}
-                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors"
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
                       >
                         Edit tickets
                       </button>
                       <button
+                        type="button"
                         role="menuitem"
                         onClick={() => {
                           setMenuOpen(false)
                           setConfirmingCancel(true)
                         }}
-                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-ember transition-colors"
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-ember transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
                       >
                         Cancel outing
                       </button>

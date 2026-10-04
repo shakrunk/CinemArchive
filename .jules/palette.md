@@ -128,6 +128,14 @@
 **Learning:** Found multiple instances where the "X" (Close/Clear) icons inside dismiss and clear buttons were not explicitly hidden from screen readers. Even when the parent button has an `aria-label` or visible text, decorative icons without `aria-hidden="true"` can cause redundant or confusing announcements for screen reader users.
 **Action:** Always ensure that purely decorative icons (like `<X />` inside a clear search button) explicitly include `aria-hidden="true"` so they are properly ignored by assistive technologies.
 
+## 2024-05-18 - [EmptyState Accessibility and Robustness]
+**Learning:** Found that generic presentation components like `EmptyState` can lack explicit `aria-hidden` tags on their purely decorative icons and sometimes lack explicit `type="button"` declarations for their CTA elements. This isn't immediately obvious when reviewing the visual output, but represents an accessibility and robustness flaw, particularly when these components might be reused inside unknown parent forms.
+**Action:** Always verify that generic, highly reusable presentational components explicitly hide their decorative icons from screen readers (`aria-hidden="true"`) and that standalone CTA buttons explicitly declare `type="button"` to prevent unintended default `submit` behavior.
+
+## 2024-09-21 - Decorative Icon Accessibility
+**Learning:** Found multiple instances where the "X" (Close/Clear) icons inside dismiss and clear buttons were not explicitly hidden from screen readers. Even when the parent button has an `aria-label` or visible text, decorative icons without `aria-hidden="true"` can cause redundant or confusing announcements for screen reader users.
+**Action:** Always ensure that purely decorative icons (like `<X />` inside a clear search button) explicitly include `aria-hidden="true"` so they are properly ignored by assistive technologies.
+
 ## 2024-10-04 - Focus States and Button Types in Dropdown Menus
 **Learning:** Inner `menuitem` buttons and custom dropdown triggers (like "More options" or "Add to calendar" in ticket cards) often lack explicit `focus-visible` states and `type="button"` attributes. Without these, keyboard users cannot navigate the menus visually, and standard default submit behavior could cause unintended form submissions if wrapped in a form context.
 **Action:** Always verify that contextual dropdown triggers and the inner `menuitem` options include `focus-visible:outline-none focus-visible:bg-secondary/30` (or similar ring utilities) and explicitly declare `type="button"`.

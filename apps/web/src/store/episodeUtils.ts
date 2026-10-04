@@ -1,5 +1,42 @@
 import type { Episode, EpisodeWatchEvent, Season, Title } from './mockData'
 
+// ─── Specials (TMDB season 0) ────────────────────────────────────────────────
+//
+// TMDB files a series' specials, OVAs and feature-length one-offs under season
+// 0. They are shown and loggable like any season, but every series-level
+// rollup — progress, completion, Up Next, next air date, series rating and the
+// season count — is computed over the main seasons only, so a show with dozens
+// of extras can still be finished.
+
+export const SPECIALS_SEASON_NUMBER = 0
+
+export function isSpecialsSeason(season: Pick<Season, 'seasonNumber'>): boolean {
+  return season.seasonNumber === SPECIALS_SEASON_NUMBER
+}
+
+/** Every season except Specials. */
+export function mainSeasons<S extends Pick<Season, 'seasonNumber'>>(seasons: S[]): S[] {
+  return seasons.filter((s) => !isSpecialsSeason(s))
+}
+
+/** Display order: main seasons ascending, then Specials last. */
+export function orderSeasonsForDisplay<S extends Pick<Season, 'seasonNumber'>>(seasons: S[]): S[] {
+  return [...seasons].sort((a, b) => {
+    if (isSpecialsSeason(a) !== isSpecialsSeason(b)) return isSpecialsSeason(a) ? 1 : -1
+    return a.seasonNumber - b.seasonNumber
+  })
+}
+
+/** "Season 3" / "Specials". */
+export function seasonLabel(seasonNumber: number): string {
+  return seasonNumber === SPECIALS_SEASON_NUMBER ? 'Specials' : `Season ${seasonNumber}`
+}
+
+/** "S3" / "SP" — compact prefix for episode codes and season pills. */
+export function seasonShortLabel(seasonNumber: number): string {
+  return seasonNumber === SPECIALS_SEASON_NUMBER ? 'SP' : `S${seasonNumber}`
+}
+
 // ─── Canonical rating helpers — single source of truth for all rollups ───────
 
 export function avgEpisodeRating(episode: Episode): number | null {
@@ -17,7 +54,7 @@ export function avgSeasonRating(season: Season): number | null {
 }
 
 export function avgSeriesRating(seasons: Season[]): number | null {
-  const rated = seasons
+  const rated = mainSeasons(seasons)
     .map(avgSeasonRating)
     .filter((r): r is number => r !== null)
   if (rated.length === 0) return null
@@ -33,12 +70,14 @@ export function episodesWatchedInSeason(season: Season): number {
   return season.episodesWatched
 }
 
+/** Series progress numerator — Specials excluded. */
 export function totalEpisodesWatched(seasons: Season[]): number {
-  return seasons.reduce((sum, s) => sum + episodesWatchedInSeason(s), 0)
+  return mainSeasons(seasons).reduce((sum, s) => sum + episodesWatchedInSeason(s), 0)
 }
 
+/** Series progress denominator — Specials excluded. */
 export function totalEpisodeCount(seasons: Season[]): number {
-  return seasons.reduce((sum, s) => sum + s.episodeCount, 0)
+  return mainSeasons(seasons).reduce((sum, s) => sum + s.episodeCount, 0)
 }
 
 // ─── Runtime helpers ─────────────────────────────────────────────────────────
@@ -53,11 +92,11 @@ export function watchedMinutesInSeason(season: Season): number {
 // ─── Up Next: next unwatched episode ─────────────────────────────────────────
 
 /** First episode (ascending season → episode) with no watch events. Seasons
- *  lacking an `episodes[]` array (coarse-only progress) are skipped. */
+ *  lacking an `episodes[]` array (coarse-only progress) and Specials are skipped. */
 export function nextUnwatchedEpisode(
   seasons: Season[]
 ): { season: Season; episode: Episode } | null {
-  const orderedSeasons = [...seasons].sort((a, b) => a.seasonNumber - b.seasonNumber)
+  const orderedSeasons = mainSeasons(seasons).sort((a, b) => a.seasonNumber - b.seasonNumber)
   for (const season of orderedSeasons) {
     if (!season.episodes || season.episodes.length === 0) continue
     const orderedEpisodes = [...season.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber)
@@ -81,12 +120,13 @@ export function isUnaired(episode: Episode, today: string = localTodayYmd()): bo
 
 /** Earliest (ascending season → episode) episode with a known air date after
  *  `today` — the next scheduled broadcast. Episodes without an air date are
- *  skipped: TMDB lists placeholder episodes with no date that aren't scheduled. */
+ *  skipped: TMDB lists placeholder episodes with no date that aren't scheduled.
+ *  Specials are skipped too, as for every series-level rollup. */
 export function nextScheduledEpisode(
   seasons: Season[],
   today: string = localTodayYmd()
 ): { season: Season; episode: Episode } | null {
-  const orderedSeasons = [...seasons].sort((a, b) => a.seasonNumber - b.seasonNumber)
+  const orderedSeasons = mainSeasons(seasons).sort((a, b) => a.seasonNumber - b.seasonNumber)
   for (const season of orderedSeasons) {
     const orderedEpisodes = [...(season.episodes ?? [])].sort((a, b) => a.episodeNumber - b.episodeNumber)
     for (const episode of orderedEpisodes) {
@@ -120,9 +160,9 @@ export function getUnlockedModes(title: Title): Set<'bw' | 'color'> {
   return modes
 }
 
-/** Modes where every episode has at least one watch event in that mode. */
+/** Modes where every main-season episode has at least one watch event in that mode. */
 export function getEarnedModes(title: Title): Set<'bw' | 'color'> {
-  const allEps = (title.seasons ?? []).flatMap((s) => s.episodes ?? [])
+  const allEps = mainSeasons(title.seasons ?? []).flatMap((s) => s.episodes ?? [])
   if (allEps.length === 0) return new Set()
   const earned = new Set<'bw' | 'color'>()
   for (const mode of ['bw', 'color'] as const) {

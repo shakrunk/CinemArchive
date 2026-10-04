@@ -6,7 +6,7 @@ import { computeLedgerStats } from './ledgerStats'
 import { normalizeCompanions } from './companions'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { toCachedTitle } from './libraryCache'
-import { nextUnwatchedEpisode } from './episodeUtils'
+import { isSpecialsSeason, nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
 import type { User } from '@supabase/supabase-js'
@@ -557,6 +557,11 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
   // Precomputed once per sort pass — titleLastInteractionAt walks every
   // episode's watch/rating/review events, so calling it per-comparison
   // would redo that work O(n log n) times instead of O(n).
+  // ⚡ Bolt: Precompute addedAt timestamps to avoid O(N log N) date parsing inside the sort loop.
+  const addedAtById =
+    filters.sortField === 'addedAt'
+      ? new Map(result.map((t) => [t.id, new Date(t.addedAt).getTime()]))
+      : null
   const lastInteractionById =
     filters.sortField === 'lastInteraction'
       ? new Map(result.map((t) => [t.id, titleLastInteractionAt(t)]))
@@ -575,7 +580,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
         comparison = (a.rating ?? 0) - (b.rating ?? 0)
         break
       case 'addedAt':
-        comparison = new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
+        comparison = (addedAtById!.get(a.id) ?? 0) - (addedAtById!.get(b.id) ?? 0)
         break
       case 'lastInteraction':
         comparison = (lastInteractionById!.get(a.id) ?? 0) - (lastInteractionById!.get(b.id) ?? 0)
@@ -872,6 +877,9 @@ export const useAppStore = create<AppStore>()(
         if (t.id !== titleId) return t
         const seasons = (t.seasons ?? []).map((season) => {
           if (seasonNumber !== undefined && season.seasonNumber !== seasonNumber) return season
+          // Whole-series scope covers the main seasons; Specials are only
+          // marked when targeted directly.
+          if (seasonNumber === undefined && isSpecialsSeason(season)) return season
           if (!season.episodes) return season
           const episodes = season.episodes.map((ep) => {
             if (ep.watchEvents.length > 0) return ep

@@ -60,11 +60,11 @@ function CardFrame({
         ...(delayMs !== undefined ? { ['--poster-delay' as string]: `${delayMs}ms` } : {}),
       }}
     >
-      <button onClick={onOpen} className="w-16 sm:w-20 shrink-0" aria-label={`Open ${title.title}`}>
+      <button onClick={onOpen} className="w-16 sm:w-20 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm" aria-label={`Open ${title.title}`}>
         <DynamicPoster title={title} hideBadges />
       </button>
       <div className="flex-1 min-w-0 flex flex-col">
-        <button onClick={onOpen} className="text-left">
+        <button onClick={onOpen} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm">
           <h3
             className="font-serif text-lg sm:text-xl font-medium text-paper truncate"
             style={{ fontVariationSettings: '"opsz" 30' }}

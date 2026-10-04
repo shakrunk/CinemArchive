@@ -11,6 +11,7 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
+import work.kumarfamilynet.cinemarchive.core.model.isSpecials
 
 /**
  * The app's read-only window onto TMDB/OMDb, through the `media-proxy` Edge Function
@@ -93,7 +94,13 @@ class DiscoverRepository(
                             ),
                         )
                     }.getOrDefault(emptyList())
-                    season.copy(episodes = episodes)
+                    if (season.isSpecials) {
+                        // Specials keep TMDB's own (possibly non-contiguous) numbering and
+                        // count only the episodes TMDB actually returned — see buildSeasons.
+                        season.copy(episodes = episodes, episodeCount = episodes.size)
+                    } else {
+                        season.copy(episodes = episodes)
+                    }
                 }
             }
             val critics = scores.await()
@@ -101,7 +108,9 @@ class DiscoverRepository(
                 imdbRating = critics?.imdbRating,
                 rtScore = critics?.rtScore,
                 metacriticScore = critics?.metacriticScore,
-                seasons = seasons.map { it.await() },
+                // A Specials season whose episode fetch came back empty is dropped rather
+                // than stored as an empty shell.
+                seasons = seasons.map { it.await() }.filterNot { it.isSpecials && it.episodes.isEmpty() },
             )
         }
     }

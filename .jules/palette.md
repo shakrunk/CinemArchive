@@ -131,3 +131,7 @@
 ## 2024-09-27 - Hide Decorative Icons from Screen Readers
 **Learning:** Decorative icons (like the X icon for "Close" or "Clear") placed inside buttons alongside visible text and `aria-label` attributes must be explicitly hidden from screen readers. Otherwise, screen readers may redundantly announce the icon's generic name ("X" or "Close") in addition to the button's intended label, causing confusion.
 **Action:** Always add `aria-hidden="true"` to purely decorative icons (e.g., `<X aria-hidden="true" />`) when they are used inside labeled buttons.
+
+## 2025-02-15 - Specific ARIA Labels for Contextual Cancel Buttons
+**Learning:** Generic 'Cancel' aria-labels on buttons (like cancelling an edit or add operation) lack sufficient context for screen reader users, especially when multiple such actions might exist across a complex UI.
+**Action:** Always provide explicit, specific aria-labels for contextual confirmation or cancel buttons (e.g., 'Cancel adding physical copy' instead of just 'Cancel').

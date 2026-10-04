@@ -9,6 +9,16 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- TV specials (TMDB's "Specials" season — OVAs, feature-length finales and other
+  one-offs) now appear as a Specials season after the main seasons, so they can
+  be browsed, logged, rated and reviewed. They stay out of series progress,
+  completion, Up Next, the next-episode callout, the series rating and the
+  season count, so a show can still be finished without them. Shows already in
+  the library pick up their specials when their metadata is refreshed on the
+  web (single title or library-wide), and sync to Android from there.
+
 ### Fixed
 
 - Android: "Mark episode watched" on Up Next now marks the episode the card

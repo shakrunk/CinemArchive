@@ -46,6 +46,7 @@ import work.kumarfamilynet.cinemarchive.core.model.UpNextOnThisDay
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
+import work.kumarfamilynet.cinemarchive.core.model.isSpecialsSeason
 
 private data class EpisodeAggregate(
     val seasons: List<SeasonEntity>,
@@ -309,10 +310,13 @@ class LibraryRepository(
         val viewingsById = viewingRows.associate { it.id to Viewing(it.id, it.date, it.rating, it.notes, it.venue, it.companions, it.outingId) }
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings)
 
-        val seasonById = seasons.associateBy { it.id }
+        // Specials (season 0) never count toward progress or the next episode — see
+        // Specials.kt — so both the season totals and the episode rows are main-season only.
+        val mainSeasons = seasons.filterNot { isSpecialsSeason(it.seasonNumber) }
+        val seasonById = mainSeasons.associateBy { it.id }
         val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
-        val episodesByTitle = episodes.groupBy { it.titleId }
-        val totalsByTitle = seasons.groupBy { it.titleId }.mapValues { (_, rows) ->
+        val episodesByTitle = episodes.filter { it.seasonId in seasonById }.groupBy { it.titleId }
+        val totalsByTitle = mainSeasons.groupBy { it.titleId }.mapValues { (_, rows) ->
             rows.sumOf { it.episodeCount } to rows.sumOf { it.episodesWatched }
         }
         val watching = titles
@@ -383,17 +387,21 @@ class LibraryRepository(
         UpNextBoard(watching, watchlist, onTheMarquee, freshFromTheLobby, onThisDay)
     }
 
-    /** Marks the next unwatched episode of [titleId] as watched (season/episode order) —
-     *  the Up Next screen's "Mark episode watched" action. Deliberately doesn't flip the
+    /** Marks the next unwatched episode of [titleId] as watched (season/episode order, main
+     *  seasons only — the same episode [observeUpNext] shows as next) — the Up Next screen's
+     *  "Mark episode watched" action. Deliberately doesn't flip the
      *  title's status: no other episode action in the app does (status is a manual, separate
      *  choice via the status chips), and the locally cached episode rows aren't guaranteed to
      *  match the season's full episodeCount, so "no more unwatched rows" isn't a safe proxy
      *  for "season complete". */
     suspend fun advanceNextEpisode(titleId: String, watchedAt: String?) {
-        val seasonNumberById = seasonDao.observeSeasons(titleId).first().associate { it.id to it.seasonNumber }
+        val seasonNumberById = seasonDao.observeSeasons(titleId).first()
+            .filterNot { isSpecialsSeason(it.seasonNumber) }
+            .associate { it.id to it.seasonNumber }
         // EpisodeDao orders by seasonId (a UUID), so re-sort by the season's number.
         val episodes = episodeDao.observeEpisodes(titleId).first()
-            .sortedWith(compareBy({ seasonNumberById[it.seasonId] ?: Int.MAX_VALUE }, { it.episodeNumber }))
+            .filter { it.seasonId in seasonNumberById }
+            .sortedWith(compareBy({ seasonNumberById.getValue(it.seasonId) }, { it.episodeNumber }))
         val watchCounts = watchEventDao.observeWatchCounts(titleId).first().associate { it.episodeId to it.watchCount }
         val next = episodes.firstOrNull { (watchCounts[it.id] ?: 0) <= 0 } ?: return
         logEpisodeWatched(next.id, watchedAt)

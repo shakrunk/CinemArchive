@@ -96,3 +96,7 @@
 ## 2024-10-03 - O(N log N) Date Parsing in Array.prototype.sort
 **Learning:** Instantiating `new Date(dateString)` or running date parsing directly inside the `.sort()` comparator for arrays of objects containing date strings incurs a severe O(N log N) overhead, leading to poor sort performance on large arrays.
 **Action:** When sorting arrays by date properties, always precompute the numeric timestamps (e.g., using `new Date().getTime()`) into a `Map` before the sort loop to achieve O(N) extraction complexity, referencing the precomputed values inside the comparator.
+
+## 2024-11-21 - [O(N*M) Array Iteration in Global Search and Lookups]
+**Learning:** Calling `.toLowerCase()` on strings and nested array filtering operations inside global search filter loops (like `applyFiltersToTitles`) causes extreme object allocation overhead and CPU strain, leading to typing latency. Similarly, recursively scanning arrays for `personId` creates extreme bottlenecking during UI events like hover.
+**Action:** Use a module-scoped `WeakMap<Title, ...>` to cache the expensive computations (like the flattened, lowercased search index string or a `Set<number>` of associated Person IDs). Because Zustand entities are immutable, `WeakMap` ensures these derived properties are calculated exactly once per object reference and safely garbage collected when the object changes, transforming O(N*M) lookups into instantaneous O(1) cache hits.

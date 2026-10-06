@@ -14,6 +14,9 @@ number is chosen.
 - The Ledger's "Still rolling" panel on the web now reflects the episodes you've
   actually logged. It previously read a stored per-season count that episode
   logging never updated, so a series' progress could stay stuck after a reload.
+- The Ledger's hours-watched total on the web no longer counts films still on
+  the watchlist or dropped — only films you've watched add their runtime,
+  matching the Android app.
 
 ## [1.33.0] - 2026-10-04
 

@@ -52,8 +52,10 @@ the identical clamps**, so a malformed or legacy payload degrades the same way o
 platforms rather than crashing one and silently repairing on the other.
 
 All 20 widgets are pure functions over already-synced `Title[]` (the same shape
-`library.md`/`title-detail.md` document, including denormalized `seasons[].episodesWatched`
-rollups — not recomputed from watch events) plus, for one widget, `CinemaOuting[]`. No
+`library.md`/`title-detail.md` document) plus, for one widget, `CinemaOuting[]`. The
+denormalized `seasons[].episodesWatched` column is never written back when episodes are
+logged, so no widget trusts it where episode-level data exists — Still Rolling counts
+watched episodes from their watch events instead. No
 widget calls a DB/RPC directly; everything is `useMemo`'d client-side aggregation.
 
 Two consistency notes Android must replicate exactly, not "fix":
@@ -91,7 +93,7 @@ Two consistency notes Android must replicate exactly, not "fix":
 | `trajectory` | Shifting Standards | `Title.rating`, `viewings[].date`, `addedAt` | Title lands in the quarter of its first *dated* viewing, falling back to `addedAt` if none |
 | `revivals` | Premieres & Revivals | `viewings[]` (chronological, all) | Undated viewings sort first so a dated rewatch of a pre-platform title still counts as a revival; only dated viewings render into a month bucket |
 | `timewarp` | The Revival House | `year`, `viewings[].date` | Age = viewing year − release year, floored at 0; 5 fixed buckets |
-| `progress` | Still Rolling | `type==='tv'`, `status`, `seasons[].{episodeCount,episodesWatched}` | Included if `status==='watching'` **or** partial progress, even if status says otherwise |
+| `progress` | Still Rolling | `type==='tv'`, `status`, `seasons[].episodeCount`, episode `watchEvents` | Watched = main-season episodes with ≥1 watch event (Specials excluded); falls back to `seasons[].episodesWatched` only for seasons without episode-level data. Included if `status==='watching'` **or** partial progress, even if status says otherwise |
 | `attractions` | Coming Attractions | `status==='watchlist'`, `type`, `runtime`, `genres` | `hoursOwed` sums movie runtimes only — TV excluded from the estimate |
 | `moviegoing` | At the Movies | `viewings[].{venue,companions,outingId}` + `CinemaOuting[]` | See §3 — the one widget reaching outside the core four domain tables |
 

@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Ledger's "Still rolling" panel on the web now reflects the episodes you've
+  actually logged. It previously read a stored per-season count that episode
+  logging never updated, so a series' progress could stay stuck after a reload.
+
 ## [1.33.0] - 2026-10-04
 
 ### Added

@@ -11,7 +11,7 @@
 import type { Title } from './mockData'
 import type { LedgerPanelId, LedgerTimeRange, LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { effectiveLedgerSettings } from 'src/lib/ledgerPanels'
-import { allWatchEvents, mainSeasons } from './episodeUtils'
+import { allWatchEvents, totalEpisodeCount, totalEpisodesWatched } from './episodeUtils'
 
 // ─── Scope & time-range helpers ──────────────────────────────────────────────
 
@@ -366,9 +366,11 @@ export function deriveProgress(titles: Title[], settings?: LedgerWidgetSettings)
   const rows: SeriesProgress[] = []
   for (const t of scoped) {
     if (t.type !== 'tv') continue
-    const seasons = mainSeasons(t.seasons ?? [])
-    const total = seasons.reduce((sum, s) => sum + s.episodeCount, 0)
-    const watched = seasons.reduce((sum, s) => sum + s.episodesWatched, 0)
+    // Count from per-episode watch events, not the stored seasons.episodes_watched
+    // column — episode logging never writes that column back, so it goes stale.
+    const seasons = t.seasons ?? []
+    const total = totalEpisodeCount(seasons)
+    const watched = totalEpisodesWatched(seasons)
     const partial = total > 0 && watched > 0 && watched < total
     if (t.status !== 'watching' && !partial) continue
     rows.push({

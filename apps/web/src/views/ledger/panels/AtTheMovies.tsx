@@ -80,7 +80,7 @@ export function AtTheMovies({
                   {stats.venues.slice(0, MAX_VENUES_SHOWN).map((v, i) => (
                     <li key={v.venue} className="flex items-center gap-2">
                       <RowTitle className="min-w-0 flex-1 truncate">{v.venue}</RowTitle>
-                      <span className="h-[6px] w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--wash)]">
+                      <span className="h-[6px] w-16 shrink-0 overflow-hidden rounded-sm bg-(--wash)">
                         <span className="block h-full rounded-sm bar-fill" style={rankBarFill(v.count / maxVenueCount, i === 0, i * 70)} />
                       </span>
                       <span className="w-5 shrink-0 text-right font-mono text-[10px] text-paper-faint">{v.count}</span>
@@ -95,7 +95,7 @@ export function AtTheMovies({
                 <div>
                   <Eyebrow as="p" className="mb-2">Usual companion</Eyebrow>
                   <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--wash)] font-serif text-[10px] text-paper-dim">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--wash) font-serif text-[10px] text-paper-dim">
                       {getInitials(stats.topCompanion.name)}
                     </span>
                     <RowTitle className="min-w-0 truncate">{stats.topCompanion.name}</RowTitle>

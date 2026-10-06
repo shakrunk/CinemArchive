@@ -53,7 +53,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
       aria-label={`View details for ${result.title}`}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(result) } }}
     >
-      <div className="relative aspect-[2/3] overflow-hidden film-frame__window transition-transform duration-200 group-hover:scale-[1.015]">
+      <div className="relative aspect-2/3 overflow-hidden film-frame__window transition-transform duration-200 group-hover:scale-[1.015]">
         {result.posterUrl && !imgError ? (
           <img
             src={result.posterUrl}
@@ -75,9 +75,9 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
         {/* Base gradient + frame label — always visible, like a printed frame caption.
             Fixed dark tones (not theme-swapping void/paper), so the scrim stays legible
             over poster art in light mode too — mirrors .poster.has-img in index.css. */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080503] via-[#080503]/55 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#080503] via-[#080503]/55 to-transparent" />
         {/* Stronger scrim on hover, for contrast under the action row */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080503] via-[#080503]/85 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#080503] via-[#080503]/85 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         <div className="absolute inset-0 flex flex-col justify-end p-2.5">
           <p className="font-serif text-[13px] font-semibold text-[rgb(var(--ivory))] leading-snug line-clamp-2 mb-0.5">
             {result.title}
@@ -104,7 +104,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
                   In your library
                 </div>
               ) : !isSharedView ? (
-                <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-[1500ms] pt-2">
+                <div className="flex items-center gap-0 group-hover:gap-1.5 transition-all duration-300 delay-1500 pt-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); onAdd(result) }}
                     aria-label={`Add ${result.title} to library`}
@@ -116,7 +116,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
 
                   {/* Details hint — expands after a long hover, with tooltip */}
                   <div
-                    className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-[1500ms]"
+                    className="relative group/detail shrink-0 w-0 group-hover:w-[30px] opacity-0 group-hover:opacity-100 transition-all duration-300 delay-1500"
                   >
                     {/* Tooltip — always visible once the wrapper fades in */}
                     <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
@@ -166,7 +166,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
             style={{ background: 'var(--amber)' }}
             title="Already in your library"
           >
-            <Check className="w-[11px] h-[11px] text-[color:var(--on-amber)]" strokeWidth={3} />
+            <Check className="w-[11px] h-[11px] text-(--on-amber)" strokeWidth={3} />
           </div>
         )}
       </div>
@@ -498,7 +498,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
           <button
             onClick={() => scrollByPage(-1)}
             aria-label="Scroll left"
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
           >
             <ChevronLeft className="w-4 h-4 text-paper" />
@@ -506,7 +506,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
           <button
             onClick={() => scrollByPage(1)}
             aria-label="Scroll right"
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity shadow-lg z-10 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ background: 'rgb(var(--void-rgb) / 0.85)', border: '1px solid var(--line)' }}
           >
             <ChevronRight className="w-4 h-4 text-paper" />
@@ -530,7 +530,7 @@ function CarouselPauseButton({ paused, onToggle }: { paused: boolean; onToggle: 
       aria-pressed={paused}
       aria-label={paused ? 'Resume carousel auto-scroll' : 'Pause carousel auto-scroll'}
       className={cn(
-        'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider rounded-full border px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+        'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider rounded-full border px-2.5 py-1 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
         paused
           ? 'text-amber border-amber/40'
           : 'text-paper-faint hover:text-paper hover:border-amber/40',
@@ -613,7 +613,7 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
                   onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
                   placeholder="Filter…"
                   aria-label={`Filter options for ${ariaLabel}`}
-                  className="w-full h-7 pl-7 pr-2 rounded border text-[12px] font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-1 focus:ring-amber/30"
+                  className="w-full h-7 pl-7 pr-2 rounded border text-[12px] font-sans text-paper placeholder:text-paper-faint focus:outline-hidden focus:ring-1 focus:ring-amber/30"
                   style={{ background: 'var(--inset)', borderColor: 'var(--line)' }}
                 />
               </div>
@@ -638,7 +638,7 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
                     'w-full text-left px-3 py-1.5 text-[13px] font-sans truncate transition-colors',
                     o.id === value
                       ? 'text-amber-bright bg-amber/15'
-                      : 'text-paper-faint hover:text-paper hover:bg-[color:var(--inset-strong)]'
+                      : 'text-paper-faint hover:text-paper hover:bg-(--inset-strong)'
                   )}
                 >
                   {o.label}
@@ -672,7 +672,7 @@ function DiscoverEmptyState({
       {onClearSearch && (
         <button
           onClick={onClearSearch}
-          className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <X className="w-3.5 h-3.5" aria-hidden="true" />
           Clear search
@@ -693,7 +693,7 @@ function DiscoverSkeleton() {
         <div className="discover-grid flex">
           {Array.from({ length: 10 }, (_, i) => (
             <div key={i} className="film-frame shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]">
-              <div className="film-frame__window aspect-[2/3]">
+              <div className="film-frame__window aspect-2/3">
                 <div className="w-full h-full rounded-[1px] animate-pulse" style={{ background: 'var(--inset)' }} />
               </div>
               <div className="film-frame__caption px-1.5 py-1.5">
@@ -1227,7 +1227,7 @@ export function Discover() {
                 else inputRef.current?.blur()
               }
             }}
-            className="w-full h-12 pl-11 pr-10 rounded-xl border text-base font-sans text-paper placeholder:text-paper-faint focus:outline-none focus:ring-2 focus:ring-amber/30 transition-all duration-150"
+            className="w-full h-12 pl-11 pr-10 rounded-xl border text-base font-sans text-paper placeholder:text-paper-faint focus:outline-hidden focus:ring-2 focus:ring-amber/30 transition-all duration-150"
             style={{
               background: 'var(--inset)',
               borderColor: isSearchFocused ? 'rgba(233,178,102,0.35)' : 'var(--line)',
@@ -1237,7 +1237,7 @@ export function Discover() {
             <button
               onClick={clearSearch}
               aria-label="Clear search"
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-paper-faint hover:text-paper transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -1254,7 +1254,7 @@ export function Discover() {
               'w-12 h-12 rounded-xl border flex items-center justify-center transition-colors',
               filtersOpen || searchMode !== 'titles' || selectedGenreId !== null
                 ? 'text-amber border-amber/40 bg-amber/10'
-                : 'text-paper-faint border-[var(--line)] hover:text-paper'
+                : 'text-paper-faint border-(--line) hover:text-paper'
             )}
             style={{ background: filtersOpen ? undefined : 'var(--inset)' }}
           >
@@ -1285,7 +1285,7 @@ export function Discover() {
                 <div>
                   <button
                     onClick={() => setGenresExpanded((v) => !v)}
-                    className="w-full flex items-center justify-between text-paper-faint mb-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                    className="w-full flex items-center justify-between text-paper-faint mb-2 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                   >
                     <Eyebrow size="md" tone="inherit">Genres</Eyebrow>
                     <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', !genresExpanded && '-rotate-90')} />
@@ -1296,7 +1296,7 @@ export function Discover() {
                         onClick={() => handleGenreSelect(null)}
                         role="radio"
                         aria-checked={selectedGenreId === null}
-                        className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                        className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                       >
                         <span
                           className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
@@ -1312,7 +1312,7 @@ export function Discover() {
                           onClick={() => handleGenreSelect(genre.id)}
                           role="radio"
                           aria-checked={selectedGenreId === genre.id}
-                          className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                          className="w-full flex items-center gap-2 py-1 text-left text-[13px] font-sans text-paper-faint hover:text-paper transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <span
                             className="w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center"
@@ -1343,7 +1343,7 @@ export function Discover() {
             key={id}
             onClick={() => handleTypeChange(id)}
             className={cn(
-              'pb-1.5 border-b-2 font-serif text-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+              'pb-1.5 border-b-2 font-serif text-lg transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
               filterType === id
                 ? 'text-amber-bright border-amber font-semibold'
                 : 'text-paper-faint border-transparent hover:text-paper'
@@ -1363,7 +1363,7 @@ export function Discover() {
               <button
                 onClick={clearSearch}
                 aria-label="Back to search"
-                className="text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                className="text-paper-faint hover:text-paper transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
@@ -1375,7 +1375,7 @@ export function Discover() {
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50 rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="flex items-center gap-1 text-xs font-mono text-paper-faint hover:text-amber transition-colors disabled:opacity-50 rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               >
                 {loadingMore ? 'Loading…' : 'View more'}
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1463,7 +1463,7 @@ export function Discover() {
             {becauseWatchedLoading ? (
               <div className="flex gap-3 overflow-hidden">
                 {Array.from({ length: 6 }, (_, i) => (
-                  <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
+                  <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-2/3 rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
                 ))}
               </div>
             ) : visibleBecauseWatchedResults.length > 0 ? (
@@ -1504,7 +1504,7 @@ export function Discover() {
             {moreStarringLoading ? (
               <div className="flex gap-3 overflow-hidden">
                 {Array.from({ length: 6 }, (_, i) => (
-                  <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
+                  <div key={i} className="shrink-0 w-[38vw] sm:w-[170px] md:w-[185px] aspect-2/3 rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
                 ))}
               </div>
             ) : visibleMoreStarringResults.length > 0 ? (

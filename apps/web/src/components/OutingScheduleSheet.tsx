@@ -83,7 +83,7 @@ export function CompanionInput({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onChange(companions.filter((x) => x.name !== c.name)) }}
-              className="hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
+              className="hover:text-amber-bright transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
               aria-label={`Remove ${c.name}`}
             >
               <X className="w-2.5 h-2.5" aria-hidden="true" />
@@ -99,7 +99,7 @@ export function CompanionInput({
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder={companions.length === 0 ? "Who's coming? Enter or comma to add" : ''}
-          className="flex-1 min-w-[120px] bg-transparent text-sm font-sans text-foreground placeholder:text-muted-foreground focus:outline-none"
+          className="flex-1 min-w-[120px] bg-transparent text-sm font-sans text-foreground placeholder:text-muted-foreground focus:outline-hidden"
         />
       </div>
       {showSuggestions && filtered.length > 0 && (
@@ -110,7 +110,7 @@ export function CompanionInput({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => addCompanion(s)}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-secondary/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-secondary/60 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
               <span
                 className={cn(
@@ -167,7 +167,7 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
                 setQuery('')
               }}
               aria-label="Clear search"
-              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
               Clear search
@@ -185,7 +185,7 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
             <button type="button"
               key={t.id}
               onClick={() => onPick(t.id)}
-              className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <PosterThumb src={t.posterUrl} alt={t.title} type={t.type} />
               <div className="flex-1 min-w-0">
@@ -473,7 +473,7 @@ function OutingForm({
               type="button"
               onClick={() => patch({ format: form.format === f ? '' : f })}
               className={cn(
-                'px-3 py-1.5 rounded-md text-xs font-sans border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+                'px-3 py-1.5 rounded-md text-xs font-sans border transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
                 form.format === f
                   ? 'bg-amber/20 border-amber/50 text-amber'
                   : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
@@ -519,7 +519,7 @@ function OutingForm({
             <button
               type="button"
               onClick={() => { selectTitle(title.id); openRefreshMetadata() }}
-              className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors mt-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+              className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors mt-1.5 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
               <RefreshCw className="w-3 h-3" />
               No runtime on file — refresh metadata
@@ -622,11 +622,11 @@ function OutingForm({
           onChange={(e) => patch({ notes: e.target.value })}
           rows={2}
           placeholder="Anything else worth remembering…"
-          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
         />
       </div>
 
-      <Button type="submit" className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium">
+      <Button type="submit" className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium">
         <Ticket className="w-4 h-4 mr-2" />
         {isPast ? 'Log this outing' : editingOuting ? 'Save changes' : 'Get tickets'}
       </Button>
@@ -656,7 +656,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
       <div className="flex flex-col gap-2 items-center pt-2">
         <Button
           onClick={() => setSharePanelOpen(true)}
-          className="w-full max-w-[220px] bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+          className="w-full max-w-[220px] bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
         >
           <Share2 className="w-4 h-4 mr-2" />
           Share plans
@@ -664,12 +664,12 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
         <button type="button"
           onClick={handleDownloadIcs}
           aria-label="Download ICS file for calendar"
-          className="flex items-center gap-1.5 text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+          className="flex items-center gap-1.5 text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >
           <Download className="w-3.5 h-3.5" />
           Download .ics
         </button>
-        <button type="button" onClick={onClose} className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mt-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Not now, skip sharing or downloading plans">
+        <button type="button" onClick={onClose} className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors mt-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Not now, skip sharing or downloading plans">
           Not now
         </button>
       </div>

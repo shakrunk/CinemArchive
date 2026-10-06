@@ -125,7 +125,7 @@ export function GenreBars({
                     }}
                   >
                     <span
-                      className="font-serif font-medium leading-tight px-1.5 line-clamp-2 break-words max-w-full"
+                      className="font-serif font-medium leading-tight px-1.5 line-clamp-2 wrap-break-word max-w-full"
                       style={{ fontSize: `${8 + t * 4}px`, color: i === 0 ? 'var(--on-amber)' : 'var(--paper)' }}
                     >
                       {g.genre}
@@ -152,11 +152,11 @@ export function GenreBars({
                 <button
                   key={g.genre}
                   onClick={() => onSelect(g.genre)}
-                  className="w-full flex-1 min-h-0 flex items-center gap-3 px-1.5 rounded-md transition-colors hover:bg-[var(--wash)] cursor-pointer group"
+                  className="w-full flex-1 min-h-0 flex items-center gap-3 px-1.5 rounded-md transition-colors hover:bg-(--wash) cursor-pointer group"
                 >
                   <span className="font-mono text-[10px] text-amber-deep w-4 shrink-0">{String(i + 1).padStart(2, '0')}</span>
                   <RowTitle className="truncate flex-1 min-w-0 text-left">{g.genre}</RowTitle>
-                  <span className="flex-[1.4] h-[10px] rounded-sm bg-[var(--wash)] overflow-hidden shrink-0">
+                  <span className="flex-[1.4] h-[10px] rounded-sm bg-(--wash) overflow-hidden shrink-0">
                     <span className="block h-full rounded-sm bar-fill" style={rankBarFill(g.count / maxCount, i === 0, i * 70)} />
                   </span>
                   <span className="font-mono text-[11px] text-paper-dim w-6 text-right shrink-0">{g.count}</span>

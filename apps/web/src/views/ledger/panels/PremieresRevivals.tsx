@@ -69,7 +69,7 @@ export function PremieresRevivals({ className, settings, width = 'md' }: { class
                 />
               </div>
               {/* Center axis */}
-              <div className="w-full h-px shrink-0 bg-[var(--line-2)]" />
+              <div className="w-full h-px shrink-0 bg-(--line-2)" />
               {/* Revivals hang down from the axis */}
               <div className="w-full flex items-start justify-center" style={{ height: halfHeight }}>
                 <div

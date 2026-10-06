@@ -35,7 +35,7 @@ function NavTab({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex flex-col items-center gap-1 px-3 pt-3 pb-1 relative transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 focus-visible:z-10 rounded-md',
+        'flex flex-col items-center gap-1 px-3 pt-3 pb-1 relative transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 focus-visible:z-10 rounded-md',
         active ? 'text-amber' : 'text-paper-faint'
       )}
     >
@@ -102,7 +102,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
 
   return (
     <nav
-      className="fixed inset-x-0 z-[200] sm:hidden border-t"
+      className="fixed inset-x-0 z-200 sm:hidden border-t"
       style={{
         bottom: 'var(--vv-bottom, 0px)',
         borderColor: 'var(--line)',
@@ -122,12 +122,12 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
         })}
 
         {!isSharedView && (
-          <button type="button" onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-md" aria-label="Add Title">
+          <button type="button" onClick={openAddTitle} className="flex flex-col items-center gap-0.5 px-3 py-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-md" aria-label="Add Title">
             <div
               className="w-11 h-11 rounded-full flex items-center justify-center -mt-6 amber-glow transition-transform active:scale-95"
               style={{ background: 'linear-gradient(180deg, var(--amber-bright), var(--amber))' }}
             >
-              <Plus className="w-5 h-5 text-[color:var(--on-amber)]" strokeWidth={2.5} />
+              <Plus className="w-5 h-5 text-(--on-amber)" strokeWidth={2.5} />
             </div>
             <span className="text-[11px] font-sans text-paper-faint mt-0.5">Add</span>
           </button>

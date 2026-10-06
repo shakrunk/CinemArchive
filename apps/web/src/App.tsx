@@ -67,7 +67,7 @@ function ViewLoadingFallback() {
 // Shared pill style for the accessibility toolbar's controls — subdued at rest
 // so the amber focus state marks which of the revealed pills is active.
 const A11Y_PILL =
-  'px-4 py-2 rounded-md font-sans text-sm font-medium text-paper bg-secondary/60 transition-colors focus:outline-none focus-visible:bg-amber focus-visible:text-[color:var(--on-amber)]'
+  'px-4 py-2 rounded-md font-sans text-sm font-medium text-paper bg-secondary/60 transition-colors focus:outline-hidden focus-visible:bg-amber focus-visible:text-(--on-amber)'
 
 export default function App() {
   // Smart landing unless the URL already names a view (deep link / refresh).
@@ -253,7 +253,7 @@ export default function App() {
           Both stay in the tab order the whole time. */}
       <nav
         aria-label="Accessibility shortcuts"
-        className="absolute top-3 left-3 z-[300] flex items-center gap-1.5 p-1.5 rounded-lg border border-amber/30 bg-card shadow-lg -translate-y-[200%] opacity-0 pointer-events-none transition-[transform,opacity] duration-150 focus-within:translate-y-0 focus-within:opacity-100 focus-within:pointer-events-auto"
+        className="absolute top-3 left-3 z-300 flex items-center gap-1.5 p-1.5 rounded-lg border border-amber/30 bg-card shadow-lg translate-y-[-200%] opacity-0 pointer-events-none transition-[transform,opacity] duration-150 focus-within:translate-y-0 focus-within:opacity-100 focus-within:pointer-events-auto"
       >
         <a href="#main-content" className={A11Y_PILL}>
           Skip to content

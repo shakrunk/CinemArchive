@@ -178,7 +178,7 @@ export function Ledger() {
               'shrink-0 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 mt-1 text-xs font-sans border transition-colors',
               editing
                 ? 'border-amber/40 bg-amber/10 text-amber'
-                : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-[var(--line-2)]'
+                : 'border-(--line) text-paper-faint hover:text-paper hover:border-(--line-2)'
             )}
           >
             {editing ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
@@ -203,7 +203,7 @@ export function Ledger() {
                 onClick={() => setEditing(true)}
                 className={cn(
                   SECONDARY_AMBER_BUTTON,
-                  'mt-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60'
+                  'mt-2 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60'
                 )}
               >
                 Edit layout
@@ -324,7 +324,7 @@ export function Ledger() {
                 type="button"
                 onClick={() => setPaletteHidden(false)}
                 aria-label="Show widget palette"
-                className="hidden lg:flex fixed left-0 top-28 z-40 items-center gap-1.5 rounded-r-md border border-l-0 border-[var(--line)] py-2.5 pl-1.5 pr-2 text-paper-faint hover:text-amber transition-colors"
+                className="hidden lg:flex fixed left-0 top-28 z-40 items-center gap-1.5 rounded-r-md border border-l-0 border-(--line) py-2.5 pl-1.5 pr-2 text-paper-faint hover:text-amber transition-colors"
                 style={floatingPanelStyle}
               >
                 <PanelLeftOpen className="w-4 h-4" />
@@ -336,7 +336,7 @@ export function Ledger() {
               <div
                 ref={paletteContainerRef}
                 tabIndex={-1}
-                className="hidden lg:flex fixed left-4 xl:left-6 top-24 bottom-6 w-[280px] z-40 outline-none"
+                className="hidden lg:flex fixed left-4 xl:left-6 top-24 bottom-6 w-[280px] z-40 outline-hidden"
               >
                 <WidgetPalette
                   className="flex-1 min-h-0"
@@ -362,7 +362,7 @@ export function Ledger() {
                   type="button"
                   onClick={() => setDetailsHidden(false)}
                   aria-label="Show widget details"
-                  className="hidden lg:flex fixed right-0 top-28 z-40 items-center gap-1.5 rounded-l-md border border-r-0 border-[var(--line)] py-2.5 pl-2 pr-1.5 text-paper-faint hover:text-amber transition-colors"
+                  className="hidden lg:flex fixed right-0 top-28 z-40 items-center gap-1.5 rounded-l-md border border-r-0 border-(--line) py-2.5 pl-2 pr-1.5 text-paper-faint hover:text-amber transition-colors"
                   style={floatingPanelStyle}
                 >
                   <span className="font-mono text-[9px] tracking-[0.16em] uppercase [writing-mode:vertical-rl]">
@@ -390,14 +390,14 @@ export function Ledger() {
                     : setPaletteHidden(false)
                 }
                 aria-label="Show layout editor panel"
-                className="lg:hidden fixed right-3 bottom-20 z-[210] inline-flex items-center gap-1.5 rounded-md border border-[var(--line)] px-3 py-2 font-mono text-[10px] tracking-[0.14em] uppercase text-amber"
+                className="lg:hidden fixed right-3 bottom-20 z-210 inline-flex items-center gap-1.5 rounded-md border border-(--line) px-3 py-2 font-mono text-[10px] tracking-[0.14em] uppercase text-amber"
                 style={floatingPanelStyle}
               >
                 <ChevronUp className="w-3.5 h-3.5" />
                 {selectedId && widgetById(selectedId) ? 'Details' : 'Widgets'}
               </button>
             ) : (
-              <div className="lg:hidden fixed inset-x-3 bottom-20 z-[210] flex max-h-[min(62vh,520px)] pb-[env(safe-area-inset-bottom)]">
+              <div className="lg:hidden fixed inset-x-3 bottom-20 z-210 flex max-h-[min(62vh,520px)] pb-[env(safe-area-inset-bottom)]">
                 {selectedId && widgetById(selectedId) ? (
                   <WidgetDetails
                     className="flex-1"
@@ -425,7 +425,7 @@ export function Ledger() {
             {/* Drag ghost following the pointer while adding from the palette */}
             {paletteGhost && (
               <div
-                className="fixed z-[220] pointer-events-none -translate-x-1/2 -translate-y-1/2"
+                className="fixed z-220 pointer-events-none -translate-x-1/2 -translate-y-1/2"
                 style={{ left: paletteGhost.x, top: paletteGhost.y }}
               >
                 <span

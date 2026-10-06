@@ -23,7 +23,7 @@ const WidgetPreview = memo(function WidgetPreview({ panel }: { panel: LedgerPane
   return (
     <div
       aria-hidden
-      className="relative h-[96px] overflow-hidden rounded-md border border-[var(--line)] pointer-events-none select-none bg-[var(--ink-2)]"
+      className="relative h-[96px] overflow-hidden rounded-md border border-(--line) pointer-events-none select-none bg-(--ink-2)"
     >
       <div className="absolute top-0 left-0 w-[600px] origin-top-left" style={{ transform: 'scale(0.4)' }}>
         <Component />
@@ -65,7 +65,7 @@ export function WidgetPalette({
   return (
     <aside
       aria-label="Widget palette"
-      className={cn('rounded-xl border border-[var(--line)] p-3.5 flex flex-col gap-3 min-h-0', className)}
+      className={cn('rounded-xl border border-(--line) p-3.5 flex flex-col gap-3 min-h-0', className)}
       style={floatingPanelStyle}
     >
       <header className="flex items-center justify-between gap-2 shrink-0">
@@ -124,7 +124,7 @@ export function WidgetPalette({
                     </span>
                   </span>
                   {count > 0 && <span className="font-mono text-[9px] text-amber-deep shrink-0">×{count}</span>}
-                  <span className="w-5 h-5 shrink-0 rounded-md border border-[var(--line)] flex items-center justify-center text-paper-faint group-hover:text-amber group-hover:border-amber/30 transition-colors">
+                  <span className="w-5 h-5 shrink-0 rounded-md border border-(--line) flex items-center justify-center text-paper-faint group-hover:text-amber group-hover:border-amber/30 transition-colors">
                     <Plus className="w-3 h-3" />
                   </span>
                 </span>

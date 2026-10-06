@@ -296,7 +296,7 @@ function ViewingEditForm({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
         />
       </div>
 
@@ -394,7 +394,7 @@ function ViewingEditForm({
       )}
 
       <div className="flex gap-2">
-        <Button type="submit" className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium">
+        <Button type="submit" className="flex-1 bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium">
           Save changes
         </Button>
         <Button type="button" variant="outline" onClick={onClose}>
@@ -432,7 +432,7 @@ function ViewingTimeline({
           <button type="button"
             onClick={onLogViewing}
             aria-label="Log first viewing"
-            className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             <Plus className="w-3.5 h-3.5" />
             Log first viewing
@@ -455,7 +455,7 @@ function ViewingTimeline({
             const outing = v.outingId ? outingsMap.get(v.outingId) : undefined
             return (
             <div key={v.id} className="relative">
-              <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />
+              <div className="absolute left-[-18px] top-1 w-3 h-3 rounded-full bg-amber/70 border-2 border-void" />
               <div className="bg-secondary/50 rounded-lg p-3">
                 {pendingDeleteId === v.id ? (
                   <div className="flex items-center justify-between">
@@ -468,7 +468,7 @@ function ViewingTimeline({
                           onDeleteViewing?.(v.id)
                           setPendingDeleteId(null)
                         }}
-                        className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
+                        className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--ember)' }}
                         aria-label={`Delete forever: viewing from ${formattedDate}`}
                       >
@@ -476,7 +476,7 @@ function ViewingTimeline({
                       </button>
                       <button type="button"
                         onClick={() => setPendingDeleteId(null)}
-                        className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
+                        className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                         style={{ color: 'var(--paper-faint)' }}
                         aria-label={`Cancel deleting viewing from ${formattedDate}`}
                       >
@@ -597,7 +597,7 @@ function StatusCard({
           disabled={isSharedView}
           aria-label="Title status"
           className={cn(
-            'appearance-none font-sans text-sm rounded-lg pl-3 pr-9 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60',
+            'appearance-none font-sans text-sm rounded-lg pl-3 pr-9 py-2 bg-secondary border border-amber/30 focus:outline-hidden focus:border-amber/60',
             isSharedView && 'opacity-60 cursor-default'
           )}
           style={{ color: 'var(--amber)' }}
@@ -635,7 +635,7 @@ function ListsCard({ titleId, onOpenPicker }: { titleId: string; onOpenPicker: (
       action={
         <button type="button"
           onClick={onOpenPicker}
-          className="font-mono text-xs text-amber hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
+          className="font-mono text-xs text-amber hover:underline focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
         >
           {lists.length > 0 ? 'Edit' : 'Add to list'}
         </button>
@@ -658,7 +658,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
       <Eyebrow as="dt" size="xl" tone="muted" className="shrink-0">{label}</Eyebrow>
-      <dd className="font-sans text-sm text-foreground text-right min-w-0 break-words">{value}</dd>
+      <dd className="font-sans text-sm text-foreground text-right min-w-0 wrap-break-word">{value}</dd>
     </div>
   )
 }
@@ -796,7 +796,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
           </button>
           <button type="button"
             onClick={() => setConfirmPrePlatform(null)}
-            className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
+            className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
             style={{ color: 'var(--paper-faint)' }}
             aria-label="Cancel marking as watched before joining"
           >
@@ -843,7 +843,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
           type="button"
           onClick={() => jumpToEpisode(nextScheduled.season.seasonNumber, nextScheduled.episode.id)}
           aria-label={`Next episode, season ${nextScheduled.season.seasonNumber} episode ${nextScheduled.episode.episodeNumber}, airs ${fmtReleaseDate(nextScheduled.episode.airDate!)}`}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left border border-[var(--line)] transition-colors hover:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+          className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left border border-(--line) transition-colors hover:border-amber/40 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
           style={{ background: 'var(--inset)' }}
         >
           <Clock className="w-4 h-4 shrink-0" style={{ color: 'var(--amber)' }} />
@@ -900,7 +900,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                   'shrink-0 px-3.5 py-2.5 rounded-lg text-left transition-all border',
                   selectedSeason === s.seasonNumber
                     ? 'border-amber/40 bg-amber/10'
-                    : 'border-transparent hover:border-[var(--line)] hover:bg-[var(--wash)]'
+                    : 'border-transparent hover:border-(--line) hover:bg-(--wash)'
                 )}
               >
                 <div className="font-mono" style={{ fontSize: '13px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
@@ -918,7 +918,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
           value={selectedSeason}
           onChange={(e) => handleSeasonChange(parseInt(e.target.value, 10))}
           aria-label="Select season"
-          className="font-mono text-sm rounded-lg px-3 py-2 bg-secondary border border-amber/30 focus:outline-none focus:border-amber/60"
+          className="font-mono text-sm rounded-lg px-3 py-2 bg-secondary border border-amber/30 focus:outline-hidden focus:border-amber/60"
           style={{ color: 'var(--amber)' }}
         >
           {orderedSeasons.map((s) => {
@@ -947,7 +947,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                 type="button"
                 onClick={() => scrollCarousel('left')}
                 aria-label="Scroll episodes left"
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 -translate-x-2 rounded-full p-1.5 transition-opacity hover:opacity-100 opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 -translate-x-2 rounded-full p-1.5 transition-opacity hover:opacity-100 opacity-80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
                 style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
               >
                 <ChevronLeft className="w-4 h-4" style={{ color: 'var(--paper)' }} />
@@ -980,7 +980,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                 type="button"
                 onClick={() => scrollCarousel('right')}
                 aria-label="Scroll episodes right"
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 translate-x-2 rounded-full p-1.5 transition-opacity hover:opacity-100 opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 translate-x-2 rounded-full p-1.5 transition-opacity hover:opacity-100 opacity-80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
                 style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
               >
                 <ChevronRight className="w-4 h-4" style={{ color: 'var(--paper)' }} />
@@ -1019,10 +1019,10 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                 type="button"
                 onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
                 aria-label={`View details for ${member.name}`}
-                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
+                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
                 style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
               >
-                <div className="aspect-[2/3] overflow-hidden">
+                <div className="aspect-2/3 overflow-hidden">
                   {member.profileUrl ? (
                     <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
@@ -1128,7 +1128,7 @@ function DrawerTagEditor({
             <button
               type="button"
               onClick={() => removeTag(t)}
-              className="hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
+              className="hover:text-amber-bright transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
               aria-label={`Remove tag ${t}`}
               title={`Remove tag ${t}`}
             >
@@ -1145,14 +1145,14 @@ function DrawerTagEditor({
             onBlur={() => { commit(); setEditing(false) }}
             placeholder="tag name…"
             aria-label="New tag name"
-            className="px-2 py-0.5 rounded-full bg-secondary border border-amber/30 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber/60 w-28"
+            className="px-2 py-0.5 rounded-full bg-secondary border border-amber/30 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:border-amber/60 w-28"
           />
         )}
         {!editing && (
           <button type="button"
             aria-label="Add tag"
             onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-amber/20 font-mono text-xs text-muted-foreground hover:border-amber/40 hover:text-amber/70 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             <Tag className="w-2.5 h-2.5" /> add tag
           </button>
@@ -1247,7 +1247,7 @@ function FranchiseSection({
       {loading ? (
         <div className="flex gap-2.5 overflow-hidden">
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="shrink-0 w-[84px] aspect-[2/3] rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
+            <div key={i} className="shrink-0 w-[84px] aspect-2/3 rounded-lg animate-pulse" style={{ background: 'var(--inset)' }} />
           ))}
         </div>
       ) : (
@@ -1273,15 +1273,15 @@ function FranchiseSection({
                       : isSharedView ? p.title : `${p.title} — add to library`
                 }
                 className={cn(
-                  'shrink-0 w-[84px] text-left group focus-visible:outline-none',
+                  'shrink-0 w-[84px] text-left group focus-visible:outline-hidden',
                   isCurrent ? 'cursor-default' : 'cursor-pointer'
                 )}
               >
                 <div
                   className={cn(
-                    'relative aspect-[2/3] rounded-lg overflow-hidden border transition-transform',
+                    'relative aspect-2/3 rounded-lg overflow-hidden border transition-transform',
                     !isCurrent && 'group-hover:scale-[1.03] group-focus-visible:ring-1 group-focus-visible:ring-amber/60',
-                    isCurrent ? 'border-amber/60' : 'border-[var(--line)]'
+                    isCurrent ? 'border-amber/60' : 'border-(--line)'
                   )}
                   style={{ background: 'var(--inset)' }}
                 >
@@ -1298,7 +1298,7 @@ function FranchiseSection({
                       style={{ background: 'var(--amber)' }}
                       title="Watched"
                     >
-                      <Check className="w-2.5 h-2.5 text-[color:var(--on-amber)]" strokeWidth={3} />
+                      <Check className="w-2.5 h-2.5 text-(--on-amber)" strokeWidth={3} />
                     </span>
                   )}
                   {!libTitle && !isSharedView && (
@@ -1341,7 +1341,7 @@ function OutingBanner({ title }: { title: Title }) {
       <div className="px-4 sm:px-6 pt-4 pb-4">
         <button type="button"
           onClick={() => openPostShowSheet(pendingFollowUp.id)}
-          className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06] hover:bg-amber/[0.1] transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          className="w-full flex items-center gap-2 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/6 hover:bg-amber/10 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <Clapperboard className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
           <span className="font-mono text-xs text-amber">{title.title} just let out — how was it?</span>
@@ -1365,7 +1365,7 @@ function OutingBanner({ title }: { title: Title }) {
   return (
     <div className="px-4 sm:px-6 pt-4 pb-4">
       <div
-        className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/[0.06]"
+        className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg px-3 py-2.5 border border-amber/25 bg-amber/6"
         aria-label={`Scheduled cinema outing: ${summary}`}
       >
         <Ticket className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
@@ -1373,10 +1373,10 @@ function OutingBanner({ title }: { title: Title }) {
         {confirmingCancel ? (
           <span className="flex items-center gap-2 ml-auto">
             <span className="font-mono text-xs text-muted-foreground">Cancel these tickets?</span>
-            <button type="button" onClick={() => cancelOuting(outing.id)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
+            <button type="button" onClick={() => cancelOuting(outing.id)} className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs" style={{ color: 'var(--ember)' }} aria-label="Yes, cancel these tickets">
               Yes
             </button>
-            <button type="button" onClick={() => setConfirmingCancel(false)} className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
+            <button type="button" onClick={() => setConfirmingCancel(false)} className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="No, keep these tickets">
               No
             </button>
           </span>
@@ -1384,21 +1384,21 @@ function OutingBanner({ title }: { title: Title }) {
           <span className="flex items-center gap-3 ml-auto">
             <button type="button"
               onClick={() => setSharePanelOpen(true)}
-              className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
               aria-label="Share these tickets"
             >
               Share
             </button>
             <button type="button"
               onClick={() => openOutingSchedule(title.id, outing.id)}
-              className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
+              className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-amber/80 hover:text-amber transition-colors"
               aria-label="Edit these tickets"
             >
               Edit
             </button>
             <button type="button"
               onClick={() => setConfirmingCancel(true)}
-              className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
+              className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs text-muted-foreground hover:text-ember transition-colors"
               aria-label="Cancel these tickets"
             >
               Cancel
@@ -1850,7 +1850,7 @@ export function TitleDetailDrawer() {
       description={title.synopsis ?? `Details and viewing history for ${title.title}.`}
       expanded
     >
-      {/* Poster lightbox — rendered above the dialog content via z-[215] */}
+      {/* Poster lightbox — rendered above the dialog content via z-215 */}
       {posterLightboxOpen && title.posterUrl && (
         <PosterLightbox
           src={title.posterUrl}
@@ -1943,7 +1943,7 @@ export function TitleDetailDrawer() {
               <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
             )}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-sm border border-white/10">
+              <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-xs border border-white/10">
                 <StarRating
                   value={title.rating ?? 0}
                   size="sm"
@@ -1977,7 +1977,7 @@ export function TitleDetailDrawer() {
                     type="button"
                     onClick={() => setPosterLightboxOpen(true)}
                     aria-label={`View full poster for ${title.title}`}
-                    className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                    className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
                     title="View full poster"
                   >
                     <DynamicPoster title={title} hideBadges />
@@ -2031,7 +2031,7 @@ export function TitleDetailDrawer() {
                   <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
                 )}
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-sm border border-white/10">
+                  <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-xs border border-white/10">
                     <StarRating
                       value={title.rating ?? 0}
                       size="sm"
@@ -2133,7 +2133,7 @@ export function TitleDetailDrawer() {
                       {(title.status === 'watchlist' || title.status === 'watching') && (
                         <button type="button"
                           onClick={() => openOutingSchedule(title.id)}
-                          className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                          className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                         >
                           <Ticket className="w-3.5 h-3.5" />
                           I've got tickets
@@ -2141,7 +2141,7 @@ export function TitleDetailDrawer() {
                       )}
                       <button type="button"
                         onClick={() => setShowLogForm(true)}
-                        className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                        className="flex items-center gap-1 text-xs font-mono text-amber/70 hover:text-amber transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Log a viewing
@@ -2202,12 +2202,12 @@ export function TitleDetailDrawer() {
                         onChange={(e) => setLogNotes(e.target.value)}
                         placeholder="Your thoughts…"
                         rows={2}
-                        className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+                        className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
                       />
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+                        className="flex-1 bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
                         onClick={handleSaveViewing}
                         disabled={showMovieSaved}
                       >
@@ -2268,7 +2268,7 @@ export function TitleDetailDrawer() {
                   <div className="flex items-center gap-3">
                     <button type="button"
                       onClick={handleDelete}
-                      className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
+                      className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--ember)' }}
                       aria-label="Delete forever: title from library"
                     >
@@ -2276,7 +2276,7 @@ export function TitleDetailDrawer() {
                     </button>
                     <button type="button"
                       onClick={() => setPendingDeleteTitle(false)}
-                      className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
+                      className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
                       style={{ color: 'var(--paper-faint)' }}
                       aria-label="Cancel deleting title from library"
                     >
@@ -2288,7 +2288,7 @@ export function TitleDetailDrawer() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button"
                     onClick={openRefreshMetadata}
-                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Refresh poster &amp; metadata
@@ -2296,7 +2296,7 @@ export function TitleDetailDrawer() {
                   {title.type === 'movie' && (title.status === 'watched' || title.status === 'dropped') && (
                     <button type="button"
                       onClick={() => openOutingSchedule(title.id)}
-                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                     >
                       <Ticket className="w-3.5 h-3.5" />
                       Plan a cinema trip
@@ -2305,7 +2305,7 @@ export function TitleDetailDrawer() {
                   {user && (
                     <button type="button"
                       onClick={() => setSendPanelOpen(true)}
-                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                     >
                       <Send className="w-3.5 h-3.5" />
                       Send to a friend
@@ -2313,7 +2313,7 @@ export function TitleDetailDrawer() {
                   )}
                   <button type="button"
                     onClick={() => setPendingDeleteTitle(true)}
-                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ember/60"
+                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ember/60"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Remove from library

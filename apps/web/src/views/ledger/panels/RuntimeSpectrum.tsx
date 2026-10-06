@@ -48,7 +48,7 @@ export function RuntimeSpectrum({ className, settings, width = 'md' }: { classNa
                 <RowTitle className="block leading-tight">{b.label}</RowTitle>
                 <span className="font-mono text-[9px] text-paper-faint">{b.range}</span>
               </div>
-              <div className={width === 'sm' ? 'col-span-2 h-[14px] rounded-sm bg-[var(--wash)] overflow-hidden' : 'flex-1 h-[16px] rounded-sm bg-[var(--wash)] overflow-hidden'}>
+              <div className={width === 'sm' ? 'col-span-2 h-[14px] rounded-sm bg-(--wash) overflow-hidden' : 'flex-1 h-[16px] rounded-sm bg-(--wash) overflow-hidden'}>
                 <div
                   className="h-full rounded-sm bar-fill"
                   style={rankBarFill(b.count / maxCount, true, i * 80)}

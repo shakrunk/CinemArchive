@@ -25,7 +25,7 @@ export function HeroBackdrop({ title, backdropOverride, onPosterClick, topRight,
       {/* Backdrop at its natural aspect ratio so the full art — and every
           character in the frame — stays visible, rather than cropping to a band.
           The poster + title overlay its faded lower portion. */}
-      <div className="relative w-full overflow-hidden aspect-[16/8]">
+      <div className="relative w-full overflow-hidden aspect-16/8">
         {backdropSrc && (
           <img
             src={backdropSrc}
@@ -60,7 +60,7 @@ export function HeroBackdrop({ title, backdropOverride, onPosterClick, topRight,
                 type="button"
                 onClick={onPosterClick}
                 aria-label={`View full poster for ${title.title}`}
-                className="block w-full rounded-lg overflow-hidden shadow-2xl transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                className="block w-full rounded-lg overflow-hidden shadow-2xl transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
               >
                 <DynamicPoster title={title} hideBadges />
               </button>

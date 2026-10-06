@@ -28,7 +28,7 @@ export function RatingStandards({ scope = 'all' }: { scope?: LedgerScope }) {
         <select
           value={baseline}
           onChange={(event) => setBaseline(event.target.value as RatingBaseline)}
-          className="min-w-0 rounded border border-[var(--line)] bg-[var(--ink-2)] px-2 py-1 text-paper focus-visible:outline-amber"
+          className="min-w-0 rounded border border-(--line) bg-(--ink-2) px-2 py-1 text-paper focus-visible:outline-amber"
         >
           <option value="all">All rated titles</option>
           <option value="media">Same media type</option>
@@ -64,7 +64,7 @@ export function RatingStandards({ scope = 'all' }: { scope?: LedgerScope }) {
             placeholder="Find a rated title…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full rounded border border-[var(--line)] bg-[var(--ink-2)] px-2 py-1.5 text-xs text-paper placeholder:text-paper-faint focus-visible:outline-amber"
+            className="w-full rounded border border-(--line) bg-(--ink-2) px-2 py-1.5 text-xs text-paper placeholder:text-paper-faint focus-visible:outline-amber"
           />
           <table className="w-full table-fixed text-xs">
             <caption className="sr-only">Personal rating normalization, highest z-score first</caption>
@@ -80,7 +80,7 @@ export function RatingStandards({ scope = 'all' }: { scope?: LedgerScope }) {
               {matches.slice(0, 50).map((row) => (
                 <tr key={row.title.id}>
                   <td className="py-1">
-                    <button type="button" onClick={() => openDetailDrawer(row.title.id)} className={`${LIST_ROW_HOVER} w-full truncate text-paper focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm`} title={row.title.title}>
+                    <button type="button" onClick={() => openDetailDrawer(row.title.id)} className={`${LIST_ROW_HOVER} w-full truncate text-paper focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm`} title={row.title.title}>
                       {row.title.title}
                     </button>
                   </td>

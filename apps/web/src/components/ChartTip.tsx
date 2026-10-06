@@ -73,7 +73,7 @@ export function useChartTip() {
     ? createPortal(
         <div
           role="tooltip"
-          className="fixed z-[300] pointer-events-none -translate-x-1/2 -translate-y-full rounded-md border border-[var(--line)] px-2.5 py-1.5 animate-[chart-tip-in_80ms_ease-out]"
+          className="fixed z-300 pointer-events-none -translate-x-1/2 -translate-y-full rounded-md border border-(--line) px-2.5 py-1.5 animate-[chart-tip-in_80ms_ease-out]"
           style={{
             left: tip.x,
             top: tip.y,

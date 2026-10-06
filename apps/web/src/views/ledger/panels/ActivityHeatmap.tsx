@@ -128,7 +128,7 @@ export function ActivityHeatmap({
                   key={cell.date}
                   className={cn(
                     'rounded-[2px] transition-opacity',
-                    cell.count > 0 ? 'bg-amber' : 'bg-[var(--wash)]',
+                    cell.count > 0 ? 'bg-amber' : 'bg-(--wash)',
                     cell.date === todayStr && 'ring-1 ring-amber-bright/60',
                   )}
                   style={{

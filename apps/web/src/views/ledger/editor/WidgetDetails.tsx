@@ -85,7 +85,7 @@ export function WidgetDetails({
             aria-label="Deselect widget"
             className="w-6 h-6 rounded-md text-paper-faint hover:text-paper flex items-center justify-center"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>

@@ -23,8 +23,10 @@ export function computeLedgerStats(titles: Title[]): LedgerStats {
     totalSeries: series.length,
     totalViewings: viewings.length,
     avgRating,
+    // Films count once, and only when watched — a watchlisted or dropped film
+    // hasn't been sat through. Series count the runtime of each watched episode.
     totalMinutes: titles.reduce((sum, t) => {
-      if (t.type === 'movie') return sum + (t.runtime ?? 0)
+      if (t.type === 'movie') return t.status === 'watched' ? sum + (t.runtime ?? 0) : sum
       return sum + (t.seasons ?? []).reduce((s, season) => s + watchedMinutesInSeason(season), 0)
     }, 0),
     topGenres: deriveTopGenres(titles),

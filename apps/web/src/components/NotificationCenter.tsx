@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { Bell, UserPlus, UserCheck, Eye, Send, MessageCircle, Smile, X, Ticket, Clapperboard, CalendarPlus } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { findPendingFollowUpOuting, parseOutingSharePayload, formatOutingShareSnapshotLine } from 'src/store/outings'
 import { buildOutingIcsFromSharePayload, outingIcsFilename, downloadIcsFile } from 'src/lib/ics'
@@ -61,33 +60,18 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
-  const {
-    notificationInbox,
-    unreadNotificationCount,
-    loadNotificationInbox,
-    markOneNotificationRead,
-    markAllNotificationsSeen,
-    deleteNotificationItem,
-    openDetailDrawer,
-    openPostShowSheet,
-    openOutingSchedule,
-    resolveSharedOutingTitle,
-    outings,
-  } = useAppStore(
-    useShallow((s) => ({
-      notificationInbox: s.notificationInbox,
-      unreadNotificationCount: s.unreadNotificationCount,
-      loadNotificationInbox: s.loadNotificationInbox,
-      markOneNotificationRead: s.markOneNotificationRead,
-      markAllNotificationsSeen: s.markAllNotificationsSeen,
-      deleteNotificationItem: s.deleteNotificationItem,
-      openDetailDrawer: s.openDetailDrawer,
-      openPostShowSheet: s.openPostShowSheet,
-      openOutingSchedule: s.openOutingSchedule,
-      resolveSharedOutingTitle: s.resolveSharedOutingTitle,
-      outings: s.outings,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const notificationInbox = useAppStore((s) => s.notificationInbox)
+  const unreadNotificationCount = useAppStore((s) => s.unreadNotificationCount)
+  const loadNotificationInbox = useAppStore((s) => s.loadNotificationInbox)
+  const markOneNotificationRead = useAppStore((s) => s.markOneNotificationRead)
+  const markAllNotificationsSeen = useAppStore((s) => s.markAllNotificationsSeen)
+  const deleteNotificationItem = useAppStore((s) => s.deleteNotificationItem)
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openPostShowSheet = useAppStore((s) => s.openPostShowSheet)
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const resolveSharedOutingTitle = useAppStore((s) => s.resolveSharedOutingTitle)
+  const outings = useAppStore((s) => s.outings)
 
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)

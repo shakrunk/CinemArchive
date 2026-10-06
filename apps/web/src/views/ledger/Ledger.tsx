@@ -4,7 +4,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useShallow } from 'zustand/react/shallow'
 import { Pencil, Check, ChevronUp, PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
@@ -33,32 +32,17 @@ export function Ledger() {
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const {
-    ownWidgets,
-    viewedLedgerWidgets,
-    addLedgerWidget,
-    resetLedgerPrefs,
-    friendView,
-    isSharedView,
-    loadingUser,
-    libraryLoadError,
-    titlesEmpty,
-    loadUserLibrary,
-  } = useAppStore(
-    useShallow((s) => ({
-      ownWidgets: s.ledgerPrefs.widgets,
-      viewedLedgerWidgets: s.viewedLedgerWidgets,
-      addLedgerWidget: s.addLedgerWidget,
-      resetLedgerPrefs: s.resetLedgerPrefs,
-      friendView: s.viewerContext.kind === 'friend' ? s.viewerContext : null,
-      isSharedView: s.isSharedView,
-      loadingUser: s.loadingUser,
-      libraryLoadError: s.libraryLoadError,
-      titlesEmpty: s.titles.length === 0,
-      loadUserLibrary: s.loadUserLibrary,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const ownWidgets = useAppStore((s) => s.ledgerPrefs.widgets)
+  const viewedLedgerWidgets = useAppStore((s) => s.viewedLedgerWidgets)
+  const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
+  const resetLedgerPrefs = useAppStore((s) => s.resetLedgerPrefs)
+  const friendView = useAppStore((s) => s.viewerContext.kind === 'friend' ? s.viewerContext : null)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const loadingUser = useAppStore((s) => s.loadingUser)
+  const libraryLoadError = useAppStore((s) => s.libraryLoadError)
+  const titlesEmpty = useAppStore((s) => s.titles.length === 0)
+  const loadUserLibrary = useAppStore((s) => s.loadUserLibrary)
   const canEdit = !friendView && !isSharedView
   // Shared/friend views render the owner's synced board arrangement, falling
   // back to the default board when they never synced one. Editing is disabled

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
   Download, Upload, Eye, EyeOff, Settings2,
@@ -206,13 +205,10 @@ function SignInCard() {
 }
 
 function AccountSection({ profile }: { profile: MyProfile | null }) {
-  const { user, setUser, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      user: s.user,
-      setUser: s.setUser,
-      isSharedView: s.isSharedView,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const user = useAppStore((s) => s.user)
+  const setUser = useAppStore((s) => s.setUser)
+  const isSharedView = useAppStore((s) => s.isSharedView)
 
   async function handleSignOut() {
     try {
@@ -442,15 +438,12 @@ function SecuritySection() {
 // ─── Appearance ───────────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { theme, themeMode, setTheme, unlockedThemes, titles } = useAppStore(
-    useShallow((s) => ({
-      theme: s.theme,
-      themeMode: s.themeMode,
-      setTheme: s.setTheme,
-      unlockedThemes: s.unlockedThemes,
-      titles: s.titles,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const theme = useAppStore((s) => s.theme)
+  const themeMode = useAppStore((s) => s.themeMode)
+  const setTheme = useAppStore((s) => s.setTheme)
+  const unlockedThemes = useAppStore((s) => s.unlockedThemes)
+  const titles = useAppStore((s) => s.titles)
 
   function choose(next: Theme) {
     if (next === theme) return
@@ -552,15 +545,12 @@ interface NavDragMeta {
 }
 
 function NavigationSection() {
-  const { navPrefs, moveNavItem, reorderNav, toggleNavItemHidden, setNavCompact } = useAppStore(
-    useShallow((s) => ({
-      navPrefs: s.navPrefs,
-      moveNavItem: s.moveNavItem,
-      reorderNav: s.reorderNav,
-      toggleNavItemHidden: s.toggleNavItemHidden,
-      setNavCompact: s.setNavCompact,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const navPrefs = useAppStore((s) => s.navPrefs)
+  const moveNavItem = useAppStore((s) => s.moveNavItem)
+  const reorderNav = useAppStore((s) => s.reorderNav)
+  const toggleNavItemHidden = useAppStore((s) => s.toggleNavItemHidden)
+  const setNavCompact = useAppStore((s) => s.setNavCompact)
 
   const order = navPrefs.order
   const itemRefs = useRef(new Map<NavItemId, HTMLDivElement>())
@@ -1059,9 +1049,12 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
 // ─── Data & portability ───────────────────────────────────────────────────────
 
 function DataSection() {
-  const { user, titles, setTitles, outings, setOutings } = useAppStore(
-    useShallow((s) => ({ user: s.user, titles: s.titles, setTitles: s.setTitles, outings: s.outings, setOutings: s.setOutings }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const user = useAppStore((s) => s.user)
+  const titles = useAppStore((s) => s.titles)
+  const setTitles = useAppStore((s) => s.setTitles)
+  const outings = useAppStore((s) => s.outings)
+  const setOutings = useAppStore((s) => s.setOutings)
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1239,9 +1232,10 @@ function DataSection() {
 // ─── Maintenance ────────────────────────────────────────────────────────────
 
 function MaintenanceSection() {
-  const { user, titles, updateTitle } = useAppStore(
-    useShallow((s) => ({ user: s.user, titles: s.titles, updateTitle: s.updateTitle }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const user = useAppStore((s) => s.user)
+  const titles = useAppStore((s) => s.titles)
+  const updateTitle = useAppStore((s) => s.updateTitle)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [message, setMessage] = useState<Message | null>(null)

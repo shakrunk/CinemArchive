@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Play, Pause, type LucideIcon } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import {
   searchMedia, fetchTrending, fetchDiscover,
@@ -793,13 +792,10 @@ function CompanyPicker({ companies, onSelect }: CompanyPickerProps) {
 // ─── Discover view ────────────────────────────────────────────────────────────
 
 export function Discover() {
-  const { titles, isSharedView, openAddTitlePreselected } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      isSharedView: s.isSharedView,
-      openAddTitlePreselected: s.openAddTitlePreselected,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const titles = useAppStore((s) => s.titles)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const openAddTitlePreselected = useAppStore((s) => s.openAddTitlePreselected)
 
   // ── Core ──
   const [query, setQuery] = useState('')

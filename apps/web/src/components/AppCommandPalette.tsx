@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import { CommandPalette } from 'src/components/CommandPalette'
 import type { AppView } from 'src/lib/navigation'
@@ -11,29 +10,16 @@ interface AppCommandPaletteProps {
 
 export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
   // ⚡ Bolt: Isolate title subscription to prevent root App re-renders
-  const {
-    titles,
-    isSharedView,
-    user,
-    isCommandPaletteOpen,
-    closeCommandPalette,
-    openAddTitle,
-    openDetailDrawer,
-    openOutingSchedule,
-    setViewMode
-  } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      isSharedView: s.isSharedView,
-      user: s.user,
-      isCommandPaletteOpen: s.isCommandPaletteOpen,
-      closeCommandPalette: s.closeCommandPalette,
-      openAddTitle: s.openAddTitle,
-      openDetailDrawer: s.openDetailDrawer,
-      openOutingSchedule: s.openOutingSchedule,
-      setViewMode: s.setViewMode,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const titles = useAppStore((s) => s.titles)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const user = useAppStore((s) => s.user)
+  const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
+  const closeCommandPalette = useAppStore((s) => s.closeCommandPalette)
+  const openAddTitle = useAppStore((s) => s.openAddTitle)
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
+  const setViewMode = useAppStore((s) => s.setViewMode)
 
   // Build the command list + an id→handler map. Title commands open the drawer
   // (which, via useNavigationSync, becomes a back-button-closable history entry).

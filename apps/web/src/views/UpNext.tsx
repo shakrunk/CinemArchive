@@ -12,7 +12,6 @@ import {
   Star,
   X,
 } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -548,9 +547,10 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   // Owner-only data (plan §4.5: "not rendered in shared/friend views") — the
   // marquee is skipped entirely in a shared/friend session rather than
   // trusting `outings` to already be empty there.
-  const { outings, titles, isSharedView } = useAppStore(
-    useShallow((s) => ({ outings: s.outings, titles: s.titles, isSharedView: s.isSharedView }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const outings = useAppStore((s) => s.outings)
+  const titles = useAppStore((s) => s.titles)
+  const isSharedView = useAppStore((s) => s.isSharedView)
 
   // A single shared "now" tick for the whole section (not per-card timers) —
   // countdown labels re-derive once a minute; completion itself is driven by

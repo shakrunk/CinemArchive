@@ -147,7 +147,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                   <Button
                     type="submit"
                     disabled={loadingAuth}
-                    className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+                    className="flex-1 bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
                   >
                     {loadingAuth ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -153,7 +153,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
             aria-label="Note to include with this recommendation"
             rows={2}
             maxLength={NOTE_MAX_LEN}
-            className="w-full rounded-md px-3 py-2 text-sm font-sans resize-none focus:outline-none"
+            className="w-full rounded-md px-3 py-2 text-sm font-sans resize-none focus:outline-hidden"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           />
           <div className="text-right font-mono mt-1" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
@@ -174,7 +174,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
             onChange={(e) => setWatchUrl(e.target.value)}
             placeholder="https://…"
             aria-label="Where-to-watch link to include with this recommendation"
-            className="w-full rounded-md px-3 py-2 text-sm font-sans focus:outline-none"
+            className="w-full rounded-md px-3 py-2 text-sm font-sans focus:outline-hidden"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           />
         </div>
@@ -192,7 +192,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter friends…"
                 aria-label="Filter friends by name"
-                className="w-full rounded-md pl-8 pr-3 py-1.5 text-sm font-sans focus:outline-none"
+                className="w-full rounded-md pl-8 pr-3 py-1.5 text-sm font-sans focus:outline-hidden"
                 style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
               />
             </div>
@@ -233,7 +233,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
                     setSearch('')
                   }}
                   aria-label="Clear search"
-                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
+                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
                 >
                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                   Clear search
@@ -253,7 +253,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
                     onClick={() => handleSend(f)}
                     disabled={state === 'sending'}
                     className={cn(
-                      'w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-none focus-visible:bg-[var(--wash)] disabled:cursor-default',
+                      'w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-hidden focus-visible:bg-(--wash) disabled:cursor-default',
                       wasThere && 'opacity-60'
                     )}
                     style={{ background: 'transparent' }}

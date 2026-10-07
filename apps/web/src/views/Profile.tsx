@@ -79,7 +79,7 @@ function AuthModeTabs({ mode, onChange }: { mode: 'signin' | 'signup'; onChange:
           aria-selected={mode === m}
           onClick={() => onChange(m)}
           className={cn(
-            'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+            'rounded-lg border py-2.5 font-sans text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
             mode === m
               ? 'border-amber/50 bg-amber/10 text-amber'
               : 'border-border bg-secondary/20 text-muted-foreground hover:border-amber/25'
@@ -171,7 +171,7 @@ function SignInCard() {
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+              className="flex-1 bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
             >
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
               Send Magic Link
@@ -385,7 +385,7 @@ function IdentitySection({
         <Button
           type="submit"
           disabled={saving || !dirty}
-          className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium disabled:opacity-40"
+          className="bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium disabled:opacity-40"
         >
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
           Save Changes
@@ -513,7 +513,7 @@ function AppearanceSection() {
               disabled={locked}
               onClick={() => choose(value)}
               className={cn(
-                'text-left rounded-lg border p-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+                'text-left rounded-lg border p-4 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
                 locked && 'opacity-50 cursor-not-allowed',
                 !locked && theme === value && 'border-amber/50 bg-amber/10',
                 !locked && theme !== value && 'border-border bg-secondary/20 hover:border-amber/25',
@@ -662,7 +662,7 @@ function NavigationSection() {
                 onPointerCancel={endDrag}
                 onKeyDown={(e) => handleGripKeyDown(e, id)}
                 aria-label={`Reorder ${NAV_ITEM_LABELS[id]} — drag, or use arrow keys`}
-                className="text-paper-faint hover:text-amber cursor-grab active:cursor-grabbing -my-1 p-1 rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="text-paper-faint hover:text-amber cursor-grab active:cursor-grabbing -my-1 p-1 rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                 style={{ touchAction: 'none' }}
               >
                 <GripVertical className="w-4 h-4" />
@@ -675,7 +675,7 @@ function NavigationSection() {
                 aria-pressed={!hidden}
                 aria-label={hidden ? `Show ${NAV_ITEM_LABELS[id]} in navigation` : `Hide ${NAV_ITEM_LABELS[id]} from navigation`}
                 className={cn(
-                  'icon-btn w-8 h-8 border rounded-md flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+                  'icon-btn w-8 h-8 border rounded-md flex items-center justify-center shrink-0 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
                   hidden
                     ? 'text-muted-foreground border-border'
                     : 'text-amber border-amber/30 bg-amber/5'
@@ -825,7 +825,7 @@ function SharingSection() {
           type="submit"
           disabled={generating || atCap}
           title={atCap ? `Limit of ${MAX_ACTIVE_SHARED_KEYS} active links reached — revoke one to create another.` : undefined}
-          className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] shrink-0"
+          className="bg-amber hover:bg-amber-muted text-(--on-amber) shrink-0"
           aria-label="Generate shared link"
         >
           {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -896,7 +896,7 @@ function SharingSection() {
           <button
             type="button"
             onClick={() => setShowRevoked((v) => !v)}
-            className="text-muted-foreground hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="text-muted-foreground hover:text-paper transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
           >
             <Eyebrow size="lg" tone="inherit" font="sans">
               {showRevoked ? 'Hide' : 'Show'} revoked links ({revokedKeys.length})
@@ -999,7 +999,7 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
       <Button
         onClick={handleGenerate}
         disabled={generating || atCap}
-        className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium w-fit gap-1.5"
+        className="bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium w-fit gap-1.5"
         title={atCap ? "You've used both of your invites" : undefined}
       >
         {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -1400,10 +1400,10 @@ function ArchiveGlance() {
   ]
 
   return (
-    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-[var(--line)]">
+    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-(--line)">
       {items.map((item, i) => (
         <div key={item.sub} className="flex items-stretch shrink-0">
-          {i > 0 && <div className="w-px bg-[var(--line-2)] mx-6 sm:mx-8 self-stretch" />}
+          {i > 0 && <div className="w-px bg-(--line-2) mx-6 sm:mx-8 self-stretch" />}
           <div className="flex flex-col">
             <div className="stat-num text-[clamp(22px,2.6vw,34px)]">{item.value}</div>
             <Eyebrow as="div" size="md" className="mt-1.5 whitespace-nowrap">

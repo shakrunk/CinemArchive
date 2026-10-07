@@ -23,7 +23,7 @@ export const ModalCloseButton = forwardRef<HTMLButtonElement, ModalCloseButtonPr
         title={ariaLabel}
         className={cn(
           'icon-btn absolute right-4 top-4 z-20 flex items-center justify-center w-8 h-8 rounded-full',
-          variant === 'scrim' && 'bg-black/60 backdrop-blur-sm text-white/70 hover:bg-black/60 hover:text-white',
+          variant === 'scrim' && 'bg-black/60 backdrop-blur-xs text-white/70 hover:bg-black/60 hover:text-white',
           className,
         )}
         {...props}

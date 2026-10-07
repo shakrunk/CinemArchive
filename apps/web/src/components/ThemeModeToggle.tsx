@@ -45,7 +45,7 @@ export function ThemeModeToggle({ className, size = 'default' }: ThemeModeToggle
             title={label}
             onClick={(e) => chooseThemeMode(value, { clientX: e.clientX, clientY: e.clientY })}
             className={cn(
-              'flex items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+              'flex items-center justify-center rounded transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
               compact ? 'w-6 h-6' : 'w-7 h-7',
               active ? 'bg-amber/15 text-amber' : 'text-paper-dim hover:text-amber hover:bg-secondary/30'
             )}

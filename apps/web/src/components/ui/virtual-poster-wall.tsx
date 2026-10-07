@@ -80,7 +80,7 @@ export function VirtualPosterWall({ titles, gridSize, sections }: { titles: Titl
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start - offset}px)` }}>
             {row.kind === 'heading' ? (
               <div className="flex items-baseline gap-3 pb-4" style={{ paddingTop: row.first ? 0 : 40 }}>
-                <h3 className="font-serif text-xl font-light text-paper min-w-0 break-words">{sectionName(row.section)}</h3>
+                <h3 className="font-serif text-xl font-light text-paper min-w-0 wrap-break-word">{sectionName(row.section)}</h3>
                 <span className="font-mono text-[11px] text-paper-faint whitespace-nowrap">{row.section.titles.length} title{row.section.titles.length !== 1 ? 's' : ''}</span>
                 <div className="flex-1 h-px self-center" style={{ background: 'var(--line)' }} />
               </div>

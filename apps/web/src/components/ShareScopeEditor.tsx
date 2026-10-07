@@ -163,7 +163,7 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+                className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
               >
                 {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Save

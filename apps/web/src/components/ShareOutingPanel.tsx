@@ -193,7 +193,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter friends…"
                 aria-label="Filter friends by name"
-                className="w-full rounded-md pl-8 pr-3 py-1.5 text-sm font-sans focus:outline-none"
+                className="w-full rounded-md pl-8 pr-3 py-1.5 text-sm font-sans focus:outline-hidden"
                 style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
               />
             </div>
@@ -234,7 +234,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                     setSearch('')
                   }}
                   aria-label="Clear search"
-                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
+                  className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 not-italic"
                 >
                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                   Clear search
@@ -252,7 +252,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                     type="button"
                     onClick={() => handleShareToFriend(f)}
                     disabled={state === 'sending'}
-                    className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-none focus-visible:bg-[var(--wash)] disabled:cursor-default"
+                    className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-hidden focus-visible:bg-(--wash) disabled:cursor-default"
                     style={{ background: 'transparent' }}
                     onMouseEnter={(e) => { if (state !== 'sending') e.currentTarget.style.background = 'var(--wash)' }}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}

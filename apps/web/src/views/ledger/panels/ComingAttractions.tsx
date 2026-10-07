@@ -50,7 +50,7 @@ export function ComingAttractions({
           </Eyebrow>
         </div>
 
-        {isSplit && <div className="w-px self-stretch bg-[var(--line-2)]" />}
+        {isSplit && <div className="w-px self-stretch bg-(--line-2)" />}
 
         <div className={cn('flex flex-col min-w-0', !isSplit && 'contents')}>
           {queue.hoursOwed > 0 && (
@@ -65,7 +65,7 @@ export function ComingAttractions({
               {queue.topGenres.map((g) => (
                 <span
                   key={g.genre}
-                  className="rounded-full border border-[var(--line-2)] px-2.5 py-1 font-mono text-[10px] text-paper-dim"
+                  className="rounded-full border border-(--line-2) px-2.5 py-1 font-mono text-[10px] text-paper-dim"
                 >
                   {g.genre} · {g.count}
                 </span>

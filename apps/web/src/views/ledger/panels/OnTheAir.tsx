@@ -46,7 +46,7 @@ export function OnTheAir({ className, settings, width = 'md' }: { className?: st
               <RowTitle className={cn('truncate shrink-0 group-hover:underline decoration-amber/40', width === 'sm' ? 'w-[42%]' : 'w-[36%]')}>
                 {n.network}
               </RowTitle>
-              <span className="flex-1 h-[12px] rounded-sm bg-[var(--wash)] overflow-hidden">
+              <span className="flex-1 h-[12px] rounded-sm bg-(--wash) overflow-hidden">
                 <span
                   className="block h-full rounded-sm bar-fill"
                   style={rankBarFill(n.count / maxCount, i === 0, i * 70)}

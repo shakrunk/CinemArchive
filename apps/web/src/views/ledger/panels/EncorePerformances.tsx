@@ -40,7 +40,7 @@ export function EncorePerformances({
           {encores.map((t, i) => (
             <li
               key={t.id}
-              className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-[var(--wash)]"
+              className="grid items-center gap-3 px-1.5 py-2.5 rounded-md transition-colors hover:bg-(--wash)"
               style={{ gridTemplateColumns: width === 'sm' ? '22px minmax(0, 1fr) auto' : '26px minmax(0, 1fr) auto' }}
             >
               <RankBadge rank={i + 1} />

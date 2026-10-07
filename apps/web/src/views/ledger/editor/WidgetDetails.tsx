@@ -26,7 +26,7 @@ const segmentBtnClass = (active: boolean) =>
     'rounded-md border py-1.5 px-1 font-mono text-[10px] transition-colors',
     active
       ? 'border-amber/40 bg-amber/10 text-amber'
-      : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-[var(--line-2)]',
+      : 'border-(--line) text-paper-faint hover:text-paper hover:border-(--line-2)',
   )
 
 export function WidgetDetails({
@@ -58,7 +58,7 @@ export function WidgetDetails({
   return (
     <aside
       aria-label="Widget details"
-      className={cn('rounded-xl border border-[var(--line)] p-4 flex flex-col gap-3.5 overflow-y-auto min-h-0 scrollbar-thin', className)}
+      className={cn('rounded-xl border border-(--line) p-4 flex flex-col gap-3.5 overflow-y-auto min-h-0 scrollbar-thin', className)}
       style={floatingPanelStyle}
     >
       <div className="flex items-start justify-between gap-2">
@@ -103,7 +103,7 @@ export function WidgetDetails({
                 'rounded-md border py-1.5 font-mono text-[10px] transition-colors',
                 selected.width === w
                   ? 'border-amber/40 bg-amber/10 text-amber'
-                  : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-[var(--line-2)]',
+                  : 'border-(--line) text-paper-faint hover:text-paper hover:border-(--line-2)',
               )}
             >
               {LEDGER_PANEL_WIDTH_LABELS[w]}
@@ -223,7 +223,7 @@ export function WidgetDetails({
               // An empty input restores the panel's default title.
               setLedgerWidgetSettings(selected.id, { title: value.trim() ? value : undefined })
             }}
-            className="w-full rounded-md border border-[var(--line)] bg-transparent px-2.5 py-1.5 font-mono text-[12px] text-paper placeholder:text-paper-faint focus:border-amber/40 focus:outline-none transition-colors"
+            className="w-full rounded-md border border-(--line) bg-transparent px-2.5 py-1.5 font-mono text-[12px] text-paper placeholder:text-paper-faint focus:border-amber/40 focus:outline-hidden transition-colors"
           />
         </div>
       )}

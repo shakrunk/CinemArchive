@@ -62,7 +62,7 @@ export function VirtualLedgerList({ titles, sections }: { titles: Title[]; secti
                   {row.kind === 'heading' ? (
                     <th colSpan={columns.length} scope="rowgroup" className="text-left px-3 sm:px-4 pb-4" style={{ paddingTop: row.first ? 16 : 40 }}>
                       <div className="flex items-baseline gap-3">
-                        <h3 className="font-serif text-xl font-light text-paper min-w-0 break-words">{sectionName(row.section)}</h3>
+                        <h3 className="font-serif text-xl font-light text-paper min-w-0 wrap-break-word">{sectionName(row.section)}</h3>
                         <span className="font-mono text-[11px] font-normal text-paper-faint whitespace-nowrap">{row.section.titles.length} title{row.section.titles.length !== 1 ? 's' : ''}</span>
                       </div>
                     </th>
@@ -77,7 +77,7 @@ export function VirtualLedgerList({ titles, sections }: { titles: Title[]; secti
                       <td headers={`${headerId}-Title`} className="px-2 sm:px-4 py-3">
                         <button type="button" onClick={event => { event.stopPropagation(); openDetailDrawer(row.title.id) }}
                           aria-label={`View details for ${row.title.title}`}
-                          className="text-left w-full rounded font-serif text-[17px] font-medium text-paper break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                          className="text-left w-full rounded font-serif text-[17px] font-medium text-paper wrap-break-word focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
                           style={{ fontVariationSettings: '"opsz" 30' }}>{row.title.title}</button>
                         {row.title.director && <div className="font-sans text-xs text-paper-faint truncate">{row.title.director}</div>}
                       </td>

@@ -42,7 +42,7 @@ export function TheRevivalHouse({ className, settings, width = 'md' }: { classNa
   return (
     <Panel title={panelTitle} hint={hint} className={className}>
       {/* Proportional spectrum strip */}
-      <div className={`flex rounded-lg overflow-hidden border border-[var(--line)] ${width === 'sm' ? 'h-12' : width === 'full' ? 'h-20' : 'h-14'}`}>
+      <div className={`flex rounded-lg overflow-hidden border border-(--line) ${width === 'sm' ? 'h-12' : width === 'full' ? 'h-20' : 'h-14'}`}>
         {buckets.map(
           (b, i) =>
             b.count > 0 && (

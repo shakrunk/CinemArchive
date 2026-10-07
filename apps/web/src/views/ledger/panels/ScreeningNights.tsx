@@ -168,7 +168,7 @@ export function ScreeningNights({
                 </div>
               </div>
               {width !== 'md' && (
-                <div className="flex h-[132px] items-end gap-2 border-b border-[var(--line-2)]">
+                <div className="flex h-[132px] items-end gap-2 border-b border-(--line-2)">
                   {counts.map((count, day) => (
                     <div key={day} className="flex h-full flex-1 flex-col justify-end gap-1">
                       <span className="text-center font-mono text-[9px] text-paper-faint">

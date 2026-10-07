@@ -110,13 +110,13 @@ function PostShowBody({
           onBlur={handleNoteBlur}
           rows={2}
           placeholder="IMAX sandworms…"
-          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+          className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
         />
       </div>
 
       <Button
         onClick={handleRecommend}
-        className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+        className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
       >
         <Send className="w-4 h-4 mr-2" />
         Recommend to friends
@@ -125,7 +125,7 @@ function PostShowBody({
       {showDidntMakeIt && (
         <button type="button"
           onClick={handleDidntMakeIt}
-          className="w-full text-center font-mono text-xs text-muted-foreground hover:text-ember transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+          className="w-full text-center font-mono text-xs text-muted-foreground hover:text-ember transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         >
           Didn't make it after all?
         </button>

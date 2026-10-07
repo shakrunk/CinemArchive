@@ -260,10 +260,10 @@ function FilterPanel({ open, onClose, activeFilterCount }: FilterPanelProps) {
         <button
           onClick={resetFilters}
           className={cn(
-            'w-full py-2.5 rounded-lg text-sm font-sans border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+            'w-full py-2.5 rounded-lg text-sm font-sans border transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
             activeFilterCount > 0
               ? 'border-amber/30 text-amber hover:bg-amber/10 hover:border-amber/50'
-              : 'border-[var(--line)] text-paper-faint/60 cursor-default'
+              : 'border-(--line) text-paper-faint/60 cursor-default'
           )}
           disabled={activeFilterCount === 0}
         >
@@ -457,7 +457,7 @@ export function Library() {
           {searchInput && (
             <button
               onClick={clearSearch}
-              className="text-paper-faint hover:text-ember rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="text-paper-faint hover:text-ember rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               aria-label="Clear search"
             >
               <X className="w-[15px] h-[15px]" aria-hidden="true" />
@@ -483,7 +483,7 @@ export function Library() {
         {/* Poster density — only meaningful for the grid, so it hides with it. */}
         {viewMode === 'grid' && (
           <div
-            className="flex items-center gap-0.5 seg !p-1"
+            className="flex items-center gap-0.5 seg p-1!"
             role="group"
             aria-label="Poster size"
           >
@@ -493,7 +493,7 @@ export function Library() {
                 <button
                   key={size}
                   onClick={() => setGridSize(size)}
-                  className={cn('icon-btn w-8 h-8', gridSize === size && '!text-amber-bright bg-amber/12')}
+                  className={cn('icon-btn w-8 h-8', gridSize === size && 'text-amber-bright! bg-amber/12')}
                   aria-label={label}
                   aria-pressed={gridSize === size}
                   title={label}
@@ -505,10 +505,10 @@ export function Library() {
           </div>
         )}
 
-        <div className="hidden sm:flex items-center gap-0.5 seg !p-1">
+        <div className="hidden sm:flex items-center gap-0.5 seg p-1!">
           <button
             onClick={() => setViewMode('grid')}
-            className={cn('icon-btn w-8 h-8', viewMode === 'grid' && '!text-amber-bright bg-amber/12')}
+            className={cn('icon-btn w-8 h-8', viewMode === 'grid' && 'text-amber-bright! bg-amber/12')}
             aria-label="Poster wall"
             title="Poster wall"
           >
@@ -516,7 +516,7 @@ export function Library() {
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={cn('icon-btn w-8 h-8', viewMode === 'list' && '!text-amber-bright bg-amber/12')}
+            className={cn('icon-btn w-8 h-8', viewMode === 'list' && 'text-amber-bright! bg-amber/12')}
             aria-label="Ledger list"
             title="Ledger list"
           >
@@ -528,7 +528,7 @@ export function Library() {
           onClick={() => copy(buildRecommendationPrompt(titles), 'rec-prompt')}
           className={cn(
             'icon-btn h-11 px-3.5 gap-2 border text-sm',
-            copied ? '!text-amber !border-amber/40' : 'border-[var(--line)] text-paper-dim'
+            copied ? 'text-amber! border-amber/40!' : 'border-(--line) text-paper-dim'
           )}
           style={{ background: 'var(--inset)' }}
           title="Copy a recommendation prompt for an LLM"
@@ -542,7 +542,7 @@ export function Library() {
           onClick={() => setFilterOpen(true)}
           className={cn(
             'icon-btn h-11 px-3.5 gap-2 border text-sm',
-            activeFilterCount > 0 ? '!text-amber !border-amber/40' : 'border-[var(--line)] text-paper-dim'
+            activeFilterCount > 0 ? 'text-amber! border-amber/40!' : 'border-(--line) text-paper-dim'
           )}
           style={{ background: 'var(--inset)' }}
           aria-label={activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Filters'}
@@ -550,7 +550,7 @@ export function Library() {
           <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
           <span className="hidden sm:inline">Filters</span>
           {activeFilterCount > 0 && (
-            <span className="bg-amber text-[color:var(--on-amber)] font-mono text-[11px] rounded-full w-[18px] h-[18px] flex items-center justify-center">
+            <span className="bg-amber text-(--on-amber) font-mono text-[11px] rounded-full w-[18px] h-[18px] flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}
@@ -577,7 +577,7 @@ export function Library() {
             <button
               onClick={() => setFilter('person', null)}
               aria-label={`Clear ${filters.person.name} filter`}
-              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -597,7 +597,7 @@ export function Library() {
             <button
               onClick={() => setFilter('languages', [])}
               aria-label="Clear language filter"
-              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -616,7 +616,7 @@ export function Library() {
             <button
               onClick={() => setFilter('studio', null)}
               aria-label={`Clear ${filters.studio} studio filter`}
-              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="rounded-full p-0.5 hover:bg-amber/20 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>

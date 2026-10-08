@@ -36,12 +36,21 @@ internal fun viewingWireValues(fields: JSONObject): JSONObject = JSONObject().ap
 internal fun viewingCommandPayload(id: String, titleId: String, action: String, fields: JSONObject,
     baseline: String?, predecessor: String?): JSONObject {
     UUID.fromString(id); UUID.fromString(titleId)
-    require(action in setOf("update", "delete") && (baseline != null) != (predecessor != null))
+    require(action in setOf("insert", "update", "delete"))
+    require(if (action == "insert") baseline == null && predecessor == null else (baseline != null) != (predecessor != null))
     val operation = JSONObject().put("table", "viewings").put("action", action).put("key", JSONObject().put("id", id))
     if (action == "delete") require(fields.length() == 0)
-    else { require(fields.length() > 0); operation.put("values", viewingWireValues(fields)) }
+    else {
+        require(fields.length() > 0)
+        val values = viewingWireValues(fields)
+        if (action == "insert") {
+            require(fields.keys().asSequence().toSet() == viewingColumns.keys) { "A new viewing must retain its complete original intent." }
+            values.put("title_id", titleId).put("outing_id", JSONObject.NULL)
+        }
+        operation.put("values", values)
+    }
     if (predecessor != null) { UUID.fromString(predecessor); operation.put("expectedOperationId", predecessor) }
-    else { Instant.parse(baseline); operation.put("expectedUpdatedAt", baseline) }
+    else if (action != "insert") { Instant.parse(baseline); operation.put("expectedUpdatedAt", baseline) }
     return JSONObject().put("id", id).put("titleId", titleId).put("fields", JSONObject(fields.toString()))
         .put(VIEWING_COMMAND_DATA, JSONObject().put("version", 2).put("operations", JSONArray().put(operation)))
 }
@@ -51,6 +60,7 @@ internal fun viewingCommandOperations(entry: OutboxEntity): JSONArray {
     val payload = JSONObject(entry.payloadJson)
     require(payload.getString("id") == entry.entityId)
     val command = payload.getJSONObject(VIEWING_COMMAND_DATA)
+    require(command.keys().asSequence().toSet() == setOf("version", "operations"))
     require(command.getInt("version") == 2)
     val operations = command.getJSONArray("operations")
     require(operations.length() == 1)

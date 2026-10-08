@@ -38,6 +38,7 @@ class SupabaseRemoteMutationWriter(
                 "episode_review" -> upsertReview(payload)
                 "episode_metadata" -> patchEpisodeMetadata(payload)
                 "viewing" -> when (entry.operation) {
+                    VIEWING_COMMAND -> ViewingCommandTransport(client, sessionProvider).push(entry)
                     "update" -> patchViewing(payload)
                     "delete" -> deleteViewing(payload)
                     else -> upsertViewing(payload)

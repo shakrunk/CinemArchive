@@ -105,6 +105,7 @@ class AppAccountRuntime(
                 "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
                 "list_item" -> work.kumarfamilynet.cinemarchive.data.ListMembershipApplier(database, ownerId).apply(entry, receipt)
                 "cinema_outing" -> work.kumarfamilynet.cinemarchive.data.OutingCommandApplier(database, ownerId).apply(entry, receipt)
+                "viewing" -> work.kumarfamilynet.cinemarchive.data.ViewingCommandApplier(database, ownerId).apply(entry, receipt)
                 else -> error("No canonical receipt handler for ${entry.entityType}")
             }
         },

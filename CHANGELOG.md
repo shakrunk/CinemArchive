@@ -11,6 +11,8 @@ number is chosen.
 
 ### Fixed
 
+- Social comments and reactions now require an authenticated owner or a friend allowed by the title sharing scope; fixed a failing comments query and anonymous reaction exposure.
+
 - Web: sign-in now accurately offers email links; removed incomplete passkey controls that could report authentication or registration without completing either flow.
 
 - Shared library links now fetch their authorized title graph and Ledger layout in each request, avoiding session-token failures with pooled database connections.

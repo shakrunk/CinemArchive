@@ -259,30 +259,33 @@ export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[
   }
 }
 
-/** Shared-token view returns the titles plus the owner's user id (looked up
- *  directly from the key, independent of whether the owner has any titles)
- *  so the owner's synced prefs can be read too. */
+/** Each request validates its own token and returns scoped data and the board.
+ * No connection-local token or follow-up private preferences read is needed. */
 export async function fetchSharedLibrary(
   token: string
-): Promise<{ titles: Title[]; ownerUserId: string | null }> {
-  if (!supabase) return { titles: [], ownerUserId: null }
-
-  const { error: rpcError } = await supabase.rpc('set_shared_token', { token })
-  unwrap(rpcError, 'Error setting shared token RPC:')
-
-  const [{ data, error }, { data: ownerUserId, error: ownerError }] = await Promise.all([
-    supabase
-      .from('titles')
-      .select(TITLE_SELECT),
-    supabase.rpc('shared_key_owner', { token_val: token }),
-  ])
-
-  unwrap(error, 'Error fetching shared library:')
-  if (ownerError) console.error('Error resolving shared link owner:', ownerError)
-
-  return {
-    titles: (data || []).map(mapDbTitleToLocal),
-    ownerUserId: (ownerUserId as string | null) ?? null,
+): Promise<{ titles: Title[]; ownerUserId: string; ledgerWidgets: LedgerWidget[] | null }> {
+  if (!supabase) throw new Error('Shared libraries are not configured.')
+  const titles = new Map<string, Title>()
+  let ownerUserId: string | undefined
+  let offset = 0
+  for (;;) {
+    const { data, error } = await supabase.rpc('get_shared_library', { p_token: token, p_offset: offset, p_limit: 100 })
+    unwrap(error, 'Error fetching shared library:')
+    if (!data || typeof data.ownerUserId !== 'string' || !Array.isArray(data.titles) ||
+      typeof data.hasMore !== 'boolean' || !('ledgerLayout' in data) || data.titles.length > 100) {
+      throw new Error('Invalid shared library response.')
+    }
+    if (ownerUserId !== undefined && ownerUserId !== data.ownerUserId) throw new Error('Shared library owner changed during loading.')
+    ownerUserId = data.ownerUserId
+    const ledgerWidgets = data.ledgerLayout === null ? null : normalizeLedgerWidgets(data.ledgerLayout)
+    const previousSize = titles.size
+    for (const row of data.titles) {
+      if (!row || typeof row.id !== 'string' || row.user_id !== ownerUserId) throw new Error('Invalid shared library title owner.')
+      titles.set(row.id, mapDbTitleToLocal(row))
+    }
+    if (!data.hasMore) return { titles: [...titles.values()], ownerUserId: ownerUserId!, ledgerWidgets }
+    if (data.titles.length === 0 || titles.size === previousSize) throw new Error('Shared library pagination did not advance.')
+    offset += data.titles.length
   }
 }
 

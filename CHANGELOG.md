@@ -11,6 +11,7 @@ number is chosen.
 
 ### Fixed
 
+- Shared library links now fetch their authorized title graph and Ledger layout in each request, avoiding session-token failures with pooled database connections.
 - Android: local libraries, pending changes, sync jobs, and outing notifications now stay with their signed-in account; legacy device data can be recovered explicitly with crash-safe receipts.
 - Android: Discover now searches the remote catalog beyond trending titles. Both clients now distinguish movie and TV ownership when TMDB IDs overlap, preserving the correct add actions and recommendations.
 - Android: Up Next ordering, mixed season progress, episode average ratings, and Ledger history/date-range calculations now match the web app.

@@ -84,16 +84,13 @@ export function onAuthStateChange(callback: (user: User | null) => void) {
 
 // ─── Shared Access Key helpers ───────────────────────────────────────────────
 
-/** Set the shared token for the current Supabase session (enables read-only RLS). */
-export function setSharedToken(token: string) {
-  return getClient().rpc('set_shared_token', { token })
-}
-
 /** Create a new shared access key for the authenticated user. */
 export async function createSharedKey(label?: string, expiresAt?: Date) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not signed in.')
   const { data, error } = await getClient()
     .from('shared_access_keys')
-    .insert({ label, expires_at: expiresAt?.toISOString() })
+    .insert({ user_id: user.id, label, expires_at: expiresAt?.toISOString() })
     .select()
     .single()
   if (error) throw error

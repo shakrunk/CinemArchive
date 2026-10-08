@@ -1441,16 +1441,9 @@ export const useAppStore = create<AppStore>()(
       offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
       viewedLedgerWidgets: null, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null }))
     try {
-      const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
+      const { titles: dbTitles, ledgerWidgets } = await fetchSharedLibrary(token)
       if (libraryGeneration !== generation) return
-      set((s) => withDerivedTitles(dbTitles, s.filters))
-      // Show the owner's board arrangement (falls back to the default board
-      // when they never synced one). Never written into the viewer's prefs.
-      if (ownerUserId) {
-        void fetchLedgerLayout(ownerUserId)
-          .then((widgets) => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: widgets }) })
-          .catch(() => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: null }) })
-      }
+      set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), viewedLedgerWidgets: ledgerWidgets }))
     } catch (err) {
       if (libraryGeneration !== generation) return
       console.error('Failed to load shared library from DB:', err)

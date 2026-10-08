@@ -2,6 +2,8 @@ import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from './auth'
 import { collectRowRevisions } from './offline/preconditions'
 import type { DeliveryContext } from './offline/coordinator'
+import type { FriendshipView } from './auth'
+import { assertSharedOutingSnapshot, type SharedOutingSnapshot } from './outingSharing'
 import type {
   CastMember,
   CinemaOuting,
@@ -1374,13 +1376,35 @@ export async function completeDueOutings(tz: string, context?: DeliveryContext):
 // One-way plan-sharing snapshot (plan §4.10) — pushes a copy of the outing's
 // details into each recipient's inbox; never a read grant on the outing
 // itself. Requires accepted friendship, enforced by the RPC, not the client.
-export async function shareOutingPlans(outingId: string, recipientIds: string[]): Promise<void> {
-  if (!supabase) return
-  const { error } = await supabase.rpc('share_outing_plans', {
+async function outingShareToken(context: DeliveryContext): Promise<string> {
+  if (!supabase) throw new Error('Sign in to share your plans')
+  const { data, error } = await supabase.auth.getSession()
+  if (error || !data.session || data.session.user.id !== context.scope.userId || !context.isCurrent()) throw new Error('Library account changed')
+  return data.session.access_token
+}
+
+export async function listOutingShareFriends(context: DeliveryContext): Promise<FriendshipView[]> {
+  const token = await outingShareToken(context)
+  const { data, error } = await supabase!.rpc('list_friendships')
+    .setHeader('Authorization', `Bearer ${token}`).abortSignal(context.signal)
+  if (!context.isCurrent()) throw new Error('Library account changed')
+  unwrap(error, 'Error loading outing share friends:')
+  return (data ?? []).filter((friend: FriendshipView) => friend.status === 'accepted')
+}
+
+export async function shareOutingPlans(outingId: string, recipientIds: string[], operationId: string, context: DeliveryContext, assertReady: () => Promise<void>): Promise<SharedOutingSnapshot> {
+  const token = await outingShareToken(context)
+  await assertReady()
+  if (!context.isCurrent()) throw new Error('Library account changed')
+  const { data, error } = await supabase!.rpc('share_outing_plans', {
     p_outing_id: outingId,
     p_recipient_ids: recipientIds,
-  })
+    p_operation_id: operationId,
+  }).setHeader('Authorization', `Bearer ${token}`).abortSignal(context.signal)
+  if (!context.isCurrent()) throw new Error('Library account changed')
   unwrap(error, 'Error sharing outing plans:')
+  assertSharedOutingSnapshot(data)
+  return data
 }
 
 // ─── User Title Pins ──────────────────────────────────────────────────────────

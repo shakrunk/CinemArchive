@@ -39,6 +39,63 @@ afterEach(async () => {
 })
 
 describe('owner offline coordinator', () => {
+  it('blocks sharing a pending title but allows an unrelated pending list', async () => {
+    const { coordinator, store } = setup()
+    await coordinator.activate(owner)
+    await store.replaceBase(owner, snapshot())
+    const work = vi.fn(async () => 'sent')
+    const fetchBase = vi.fn(async () => snapshot())
+    const pending = await coordinator.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'not synced' } })
+    await expect(coordinator.runSyncedRemote([`title:${title.id}`], work, fetchBase)).rejects.toThrow('Sync this title')
+    expect(fetchBase).not.toHaveBeenCalled()
+    await coordinator.discard(pending.id)
+    await coordinator.submit({ kind: 'list.create', list: { id: 'unrelated', name: 'List', description: null, createdAt: title.addedAt, updatedAt: title.addedAt } })
+    await expect(coordinator.runSyncedRemote([`title:${title.id}`], work, fetchBase)).resolves.toBe('sent')
+    expect(work).toHaveBeenCalledOnce()
+    expect(fetchBase).toHaveBeenCalledOnce() // no fallible post-send refresh
+  })
+
+  it('rechecks cross-tab pending edits arriving while the share snapshot loads', async () => {
+    const { coordinator, store } = setup()
+    await coordinator.activate(owner)
+    await store.replaceBase(owner, snapshot())
+    const entered = deferred<void>(), response = deferred<OfflineSnapshot>()
+    const work = vi.fn(async () => 'sent')
+    const sending = coordinator.runSyncedRemote([`title:${title.id}`], work, () => { entered.resolve(); return response.promise })
+    const rejected = expect(sending).rejects.toThrow('Sync this title')
+    await entered.promise
+    await coordinator.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'new edit' } })
+    response.resolve(snapshot())
+    await rejected
+    expect(work).not.toHaveBeenCalled()
+  })
+
+  it('supplies refreshed data and rechecks pending writes immediately before dispatch', async () => {
+    const { coordinator, store } = setup()
+    await coordinator.activate(owner)
+    await store.replaceBase(owner, snapshot())
+    const dispatch = vi.fn()
+    await expect(coordinator.runSyncedRemote([`title:${title.id}`], async (fresh, _context, assertReady) => {
+      expect(fresh.titles[0].title).toBe('Renamed remotely')
+      await coordinator.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'racing edit' } })
+      await assertReady()
+      dispatch()
+    }, async () => ({ ...snapshot(), titles: [{ ...title, title: 'Renamed remotely' }] }))).rejects.toThrow('Sync this title')
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('suppresses a share result after account switching', async () => {
+    const { coordinator } = setup()
+    await coordinator.activate(owner)
+    const entered = deferred<void>(), response = deferred<string>()
+    const sending = coordinator.runSyncedRemote([], () => { entered.resolve(); return response.promise }, async () => snapshot())
+    const rejected = expect(sending).rejects.toThrow('account changed')
+    await entered.promise
+    await coordinator.activate({ ...owner, userId: 'other-owner' })
+    response.resolve('sent')
+    await rejected
+  })
+
   it('publishes optimism only after durable commit and restores it on activation', async () => {
     const { store, coordinator, onState } = setup()
     await coordinator.activate(owner)

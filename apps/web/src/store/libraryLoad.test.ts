@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@supabase/supabase-js'
 import { useAppStore } from './useAppStore'
-import { fetchUserLibrary } from '../lib/db'
-import { title } from '../lib/offline/fixtures.test-support'
+import { fetchUserLibrary, shareOutingPlans } from '../lib/db'
+import { outing, title } from '../lib/offline/fixtures.test-support'
+import type { SharedOutingSnapshot } from '../lib/outingSharing'
 
-vi.mock('../lib/offlineRpc', () => ({ createLibraryCommandDelivery: () => vi.fn() }))
+vi.mock('../lib/offlineRpc', async (original) => ({ ...await original<typeof import('../lib/offlineRpc')>(), createLibraryCommandDelivery: () => vi.fn() }))
 vi.mock('./offlineLibrary', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./offlineLibrary')>()
   const { IDBFactory } = await import('fake-indexeddb')
@@ -28,6 +29,7 @@ vi.mock('../lib/db', async (importOriginal) => ({
   fetchLists: vi.fn().mockResolvedValue([]),
   fetchListMemberships: vi.fn().mockResolvedValue({}),
   fetchUnreadNotificationCount: vi.fn().mockResolvedValue(0),
+  shareOutingPlans: vi.fn(),
 }))
 
 const user = { id: 'owner' } as User
@@ -49,6 +51,31 @@ afterEach(() => {
 })
 
 describe('owner library loading', () => {
+  it('does not share a stale server plan while a durable local title edit is pending', async () => {
+    const upcoming = { ...outing, endsAt: '2099-01-01T20:00:00Z' }
+    fetchLibrary.mockResolvedValue({ titles: [title], outings: [upcoming] })
+    useAppStore.getState().setUser({ id: 'share-pending-owner' } as User)
+    await useAppStore.getState().loadUserLibrary()
+    await useAppStore.getState().updateTitle(title.id, { notes: 'Pending title edit' })
+    await expect(useAppStore.getState().shareOutingPlans(outing.id, ['friend'], 'operation')).rejects.toThrow('Sync this title')
+    expect(shareOutingPlans).not.toHaveBeenCalled()
+  })
+
+  it('checks the refreshed outing before dispatch and returns the actual receipt snapshot', async () => {
+    const upcoming = { ...outing, endsAt: '2099-01-01T20:00:00Z' }
+    fetchLibrary.mockResolvedValue({ titles: [title], outings: [upcoming] })
+    useAppStore.getState().setUser({ id: 'share-current-owner' } as User)
+    await useAppStore.getState().loadUserLibrary()
+    fetchLibrary.mockResolvedValue({ titles: [title], outings: [{ ...upcoming, status: 'cancelled' }] })
+    await expect(useAppStore.getState().shareOutingPlans(outing.id, ['friend'], 'operation')).rejects.toThrow('upcoming scheduled')
+    expect(shareOutingPlans).not.toHaveBeenCalled()
+    fetchLibrary.mockResolvedValue({ titles: [title], outings: [upcoming] })
+    const receipt = { title: 'Originally sent plan' } as SharedOutingSnapshot
+    vi.mocked(shareOutingPlans).mockResolvedValue(receipt)
+    expect(await useAppStore.getState().shareOutingPlans(outing.id, ['friend', 'friend'], 'operation')).toEqual(receipt)
+    expect(shareOutingPlans).toHaveBeenCalledWith(outing.id, ['friend'], 'operation', expect.objectContaining({ scope: expect.objectContaining({ userId: 'share-current-owner' }) }), expect.any(Function))
+  })
+
   it('clears private state synchronously when switching accounts', async () => {
     fetchLibrary.mockResolvedValue({ titles: [], outings: [] })
     useAppStore.setState({ titles: [title], lists: [{ id: 'private', name: 'Private', description: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' }],

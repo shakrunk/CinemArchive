@@ -1,5 +1,6 @@
 import { createCommand, sameScope, scopeKey, type Mutation, type OfflineScope, type PendingCommand } from './commands'
 import { replayPending } from './replay'
+import { mutationEntities } from './entities'
 import type { OfflineSnapshot } from './snapshot'
 import { IndexedDbOfflineStore, type OfflineRead } from './storage'
 
@@ -153,6 +154,39 @@ export class OfflineCoordinator {
       if (!this.current(session)) return
       this.publish(session, await this.options.store.replaceBase(session.scope, base))
       return this.current(session) ? result : undefined
+    })
+  }
+
+  /** User-triggered remote effects use a fresh owner snapshot under the delivery
+   * lock. Unlike reconciliation there is no fallible refresh AFTER the effect:
+   * a successful send must not be presented as failed because a later read fails.
+   * Recheck relevant pending writes after refresh and immediately before dispatch. */
+  async runSyncedRemote<T>(keys: readonly string[], work: (snapshot: OfflineSnapshot, context: DeliveryContext, assertReady: () => Promise<void>) => Promise<T>, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>): Promise<T> {
+    const session = this.capture()
+    return this.lock(`cinemarchive-offline:${scopeKey(session.scope)}`, async () => {
+      const assertOwner = async () => {
+        if (!this.current(session) || !await this.options.isAuthenticated(session.scope) || !this.current(session)) throw new Error('Library account changed')
+      }
+      const readReady = async () => {
+        await assertOwner()
+        const read = await this.options.store.read(session.scope)
+        if (!this.current(session)) throw new Error('Library account changed')
+        this.publish(session, read)
+        const snapshot = replayPending(read.document.base, read.document.commands)
+        if (read.quarantined.length || read.document.commands.some((command) => {
+          const entities = mutationEntities(command.mutation, snapshot)
+          return keys.some((key) => entities.has(key))
+        })) throw new Error('Sync this title and outing before sharing your plans. Resolve any pending changes, then retry.')
+        return snapshot
+      }
+      await readReady()
+      const base = await fetchBase(this.context(session))
+      await assertOwner()
+      this.publish(session, await this.options.store.replaceBase(session.scope, base))
+      const snapshot = await readReady()
+      const result = await work(snapshot, this.context(session), async () => { await readReady() })
+      if (!this.current(session)) throw new Error('Library account changed')
+      return result
     })
   }
 

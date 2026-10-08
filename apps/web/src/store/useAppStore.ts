@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import type { SharedOutingSnapshot } from '../lib/outingSharing'
 import { computeLedgerStats } from './ledgerStats'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
@@ -313,7 +314,7 @@ interface OutingsSlice {
   // Edit/reschedule — recomputes endsAt from the merged showtime/previews/runtime.
   // Soft-cancel (plan §4.2): kept as a history row, hidden from all surfaces.
   // Stamps follow_up_dismissed_at — called both on an explicit ✕ and after rating.
-  shareOutingPlans: (outingId: string, recipientIds: string[]) => Promise<void>
+  shareOutingPlans: (outingId: string, recipientIds: string[], operationId: string) => Promise<SharedOutingSnapshot>
   // "I've got tickets too" resolution (plan §4.10/§5.16) — if the shared
   // payload's tmdb_id isn't already in the library, adds it to the watchlist
   // first (same match-by-tmdbId+type resolution the recommendation inbox
@@ -1188,12 +1189,26 @@ export const useAppStore = create<AppStore>()(
   },
   closePostShowSheet: () => set({ isPostShowSheetOpen: false, postShowOutingId: null }),
 
-  shareOutingPlans: async (outingId, recipientIds) => {
+  shareOutingPlans: async (outingId, recipientIds, operationId) => {
+    const generation = libraryGeneration
+    const ownerId = get().user?.id
+    const current = () => generation === libraryGeneration && get().user?.id === ownerId && !get().isSharedView && get().viewerContext.kind === 'owner'
     try {
-      await shareOutingPlansRpc(outingId, recipientIds)
+      if (!ownerId || !current()) throw new Error('Sign in to your own library to share plans')
+      await localWriteTail.catch(() => {})
+      await libraryHydration
+      if (!current()) throw new Error('Library account changed')
+      const outing = get().outings.find((row) => row.id === outingId)
+      if (!outing) throw new Error('This outing is no longer in your library')
+      return await libraryRuntime.runSyncedRemote([`outing:${outingId}`, `title:${outing.titleId}`], async (snapshot, context, assertReady) => {
+        const latest = snapshot.outings.find((row) => row.id === outingId)
+        if (!current()) throw new Error('Library account changed')
+        if (!latest || !snapshot.titles.some((row) => row.id === latest.titleId)) throw new Error('This outing is no longer in your library')
+        if (latest.status !== 'scheduled' || !(Date.parse(latest.endsAt) > Date.now())) throw new Error('Only upcoming scheduled outings can be shared')
+        return shareOutingPlansRpc(outingId, [...new Set(recipientIds)], operationId, context, assertReady)
+      })
     } catch (err) {
-      console.error('Failed to share outing plans:', err)
-      get().pushNotification({ message: "Couldn't share your plans — check your connection." })
+      if (current()) get().pushNotification({ message: err instanceof Error ? err.message : "Sharing was not confirmed. Retry to check the same send." })
       throw err
     }
   },

@@ -140,6 +140,9 @@ export class OfflineLibraryRuntime {
   runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>): Promise<T | undefined> {
     return this.coordinator.runIdleRemote(work, this.options.fetchBase ?? fetchOwnerSnapshot)
   }
+  runSyncedRemote<T>(keys: readonly string[], work: (snapshot: OfflineSnapshot, context: DeliveryContext, assertReady: () => Promise<void>) => Promise<T>): Promise<T> {
+    return this.coordinator.runSyncedRemote(keys, work, this.options.fetchBase ?? fetchOwnerSnapshot)
+  }
   reload(): Promise<void> { return this.coordinator.reload() }
   flush(): Promise<void> { return this.coordinator.flush() }
   submit(mutation: Mutation, options?: Parameters<OfflineCoordinator['submit']>[1]): Promise<PendingCommand> {

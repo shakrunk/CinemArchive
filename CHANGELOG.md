@@ -20,6 +20,7 @@ number is chosen.
 
 ### Added
 
+- Android: movie viewing history now supports creating, editing, and deleting individual viewings, including dates or pre-platform watches, half-star ratings, notes, venues, and companion names; offline retries preserve edit/delete order.
 - Android: profile identity editing, invite redemption and management, notification inbox, and Friends screens for relationships, recommendations, activity, and read-only libraries.
 - Web: Appearance now offers Android's four text sizes and bundled Lexend font, with a live preview, apply/cancel/reset controls, and device-local preferences that work offline.
 - Web: Up Next now shows private On This Day cinema memories with the original venue, companions, rating, and notes, matching Android.

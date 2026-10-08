@@ -52,8 +52,8 @@ class MutationOutbox(
         )
     }
 
-    /** Attempts to push every pending mutation once, oldest first. Safe to call repeatedly
-     *  (on launch, on reconnect, on a timer) — entries that fail simply stay queued. A
+    /** Pushes pending mutations in enqueue order, stopping at the first retry. Safe to call
+     *  repeatedly (on launch, on reconnect, on a timer) — failed entries stay queued. A
      *  [PushResult.Conflict] resolves immediately (the server payload wins by construction,
      *  see [PushResult.Conflict]'s kdoc) rather than staying queued for another retry. */
     suspend fun flush() = flushMutex.withLock {
@@ -61,7 +61,12 @@ class MutationOutbox(
         for (entry in queue) {
             when (val result = remoteWriter.push(entry)) {
                 is PushResult.Success -> outboxDao.remove(entry.id)
-                is PushResult.Retry -> outboxDao.recordFailure(entry.id, result.reason)
+                is PushResult.Retry -> {
+                    outboxDao.recordFailure(entry.id, result.reason)
+                    // Later edits/deletes can depend on this create. Letting them overtake
+                    // a failed create can resurrect a deleted viewing on the next retry.
+                    break
+                }
                 is PushResult.Conflict -> {
                     // Reconcile the projection and drop the entry atomically: the rejected edit
                     // is replaced by the server's row, never left half-applied or silently retried.
@@ -70,9 +75,8 @@ class MutationOutbox(
                         // A later offline edit to the same entity is still queued: put it back on
                         // top of the server row so it isn't rolled back out of the projection.
                         val key = pendingKey(entry.entityType, entry.entityId)
-                        val later = queue.filter {
-                            it.id != entry.id && it.createdAt >= entry.createdAt && pendingKey(it.entityType, it.entityId) == key
-                        }
+                        val later = queue.dropWhile { it.id != entry.id }.drop(1)
+                            .filter { pendingKey(it.entityType, it.entityId) == key }
                         if (later.isNotEmpty()) {
                             conflictHandler.rebasePending(entry.entityType, entry.entityId, later.map { JSONObject(it.payloadJson) })
                         }

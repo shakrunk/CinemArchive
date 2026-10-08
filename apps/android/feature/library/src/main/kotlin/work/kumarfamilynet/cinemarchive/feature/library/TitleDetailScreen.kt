@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,6 +72,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import work.kumarfamilynet.cinemarchive.core.designsystem.AddToListSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
@@ -94,6 +96,7 @@ import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
+import work.kumarfamilynet.cinemarchive.core.model.ViewingDraft
 import work.kumarfamilynet.cinemarchive.core.model.isUnaired
 import work.kumarfamilynet.cinemarchive.core.model.mainSeasons
 import work.kumarfamilynet.cinemarchive.core.model.nextScheduledEpisode
@@ -167,9 +170,9 @@ class TitleDetailViewModel(
         viewModelScope.launch { repository.logEpisodeReview(episodeId, reviewText, Instant.now().toString()) }
     }
 
-    fun onLogViewing() {
-        viewModelScope.launch { repository.logViewing(titleId, LocalDate.now().toString()) }
-    }
+    suspend fun saveViewing(draft: ViewingDraft, isNew: Boolean) = repository.saveViewing(titleId, draft, isNew)
+
+    suspend fun deleteViewing(viewingId: String) = repository.deleteViewing(titleId, viewingId)
 
     fun onChangeStatus(status: LibraryStatus) {
         viewModelScope.launch { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
@@ -309,7 +312,8 @@ fun TitleDetailRoute(
         onMarkWatched = viewModel::onMarkWatched,
         onRateEpisode = viewModel::onRateEpisode,
         onSubmitReview = viewModel::onSubmitReview,
-        onLogViewing = viewModel::onLogViewing,
+        onSaveViewing = viewModel::saveViewing,
+        onDeleteViewing = viewModel::deleteViewing,
         onChangeStatus = viewModel::onChangeStatus,
         onToggleTheaterInterest = viewModel::onToggleTheaterInterest,
         onRateTitle = viewModel::onRateTitle,
@@ -342,7 +346,8 @@ fun TitleDetailScreen(
     onMarkWatched: (String) -> Unit = {},
     onRateEpisode: (String, Double) -> Unit = { _, _ -> },
     onSubmitReview: (String, String) -> Unit = { _, _ -> },
-    onLogViewing: () -> Unit = {},
+    onSaveViewing: suspend (ViewingDraft, Boolean) -> Unit = { _, _ -> },
+    onDeleteViewing: suspend (String) -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
     onToggleTheaterInterest: (Boolean) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
@@ -368,6 +373,12 @@ fun TitleDetailScreen(
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
     var postShowViewing by remember { mutableStateOf<Viewing?>(null) }
+    var showViewingEditor by remember { mutableStateOf(false) }
+    var editingViewing by remember { mutableStateOf<Viewing?>(null) }
+    var deletingViewing by remember { mutableStateOf<Viewing?>(null) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
+    val historyScope = rememberCoroutineScope()
     var showRemoveConfirm by rememberSaveable { mutableStateOf(false) }
     // Keyed on the title id (not just rememberSaveable) so navigating from one series' detail
     // screen straight to another's doesn't carry over a season number that may not exist there.
@@ -608,7 +619,7 @@ fun TitleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Viewing history", style = MaterialTheme.typography.titleMedium)
-                        TextButton(onClick = onLogViewing) { Text("Log a viewing") }
+                        TextButton(onClick = { editingViewing = null; showViewingEditor = true }) { Text("Log a viewing") }
                     }
                 }
             }
@@ -617,6 +628,8 @@ fun TitleDetailScreen(
                     ViewingRow(
                         viewing,
                         onRateClick = { postShowViewing = viewing },
+                        onEditClick = { editingViewing = viewing; showViewingEditor = true },
+                        onDeleteClick = { deletingViewing = viewing; deleteError = null },
                         modifier = Modifier.padding(horizontal = 22.dp),
                     )
                 }
@@ -681,6 +694,34 @@ fun TitleDetailScreen(
                 postShowViewing = null
             },
             onDismiss = { postShowViewing = null },
+        )
+    }
+
+    if (showViewingEditor) {
+        ViewingEditorSheet(editingViewing, onSaveViewing, onDismiss = { showViewingEditor = false; editingViewing = null })
+    }
+    deletingViewing?.let { viewing ->
+        AlertDialog(
+            onDismissRequest = { if (!deleting) deletingViewing = null },
+            title = { Text("Delete this viewing?") },
+            text = { Text(deleteError ?: "Remove the viewing from ${viewing.date ?: "before joining"}? Other viewings stay in your history.") },
+            dismissButton = { TextButton(enabled = !deleting, onClick = { deletingViewing = null }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(enabled = !deleting, onClick = {
+                    deleting = true
+                    deleteError = null
+                    historyScope.launch {
+                        try {
+                            onDeleteViewing(viewing.id)
+                            deletingViewing = null
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            deleteError = e.message ?: "Couldn't delete viewing. Try again."
+                        } finally { deleting = false }
+                    }
+                }) { Text(if (deleting) "Deleting…" else "Delete viewing", color = MaterialTheme.colorScheme.error) }
+            },
         )
     }
 
@@ -1073,7 +1114,7 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
 }
 
 @Composable
-private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, onEditClick: () -> Unit, onDeleteClick: () -> Unit, modifier: Modifier = Modifier) {
     // Ticket stub — degrades gracefully when only one of venue/companions is present (web
     // plan §13's polish checklist), and only shows for outing-linked viewings.
     val stub = listOfNotNull(
@@ -1095,11 +1136,16 @@ private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, modifier: Modi
             }
         }
         viewing.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (isTicketStub) {
+        viewing.rating?.let { Text("$it / 5", style = MaterialTheme.typography.bodyMedium) }
+        if (stub.isNotBlank()) {
             Text(stub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
         if (viewing.outingId != null && viewing.rating == null) {
             TextButton(onClick = onRateClick, modifier = Modifier.padding(top = 2.dp)) { Text("How was it?") }
+        }
+        Row {
+            TextButton(onClick = onEditClick) { Text("Edit viewing") }
+            TextButton(onClick = onDeleteClick) { Text("Delete viewing", color = MaterialTheme.colorScheme.error) }
         }
     }
 }

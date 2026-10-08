@@ -35,8 +35,12 @@ class SupabaseRemoteMutationWriter(
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
                 "episode_metadata" -> patchEpisodeMetadata(payload)
-                "viewing" -> if (entry.operation == "update") patchViewing(payload) else upsertViewing(payload)
-                "cinema_outing" -> upsertOuting(payload)
+                "viewing" -> when (entry.operation) {
+                    "update" -> patchViewing(payload)
+                    "delete" -> deleteViewing(payload)
+                    else -> upsertViewing(payload)
+                }
+                "cinema_outing" -> if (entry.operation == "update") patchOuting(payload) else upsertOuting(payload)
                 "list" -> when (entry.operation) {
                     "delete" -> deleteList(payload)
                     else -> upsertList(payload)
@@ -245,9 +249,8 @@ class SupabaseRemoteMutationWriter(
      * [upsertViewing] path can't serve them: it requires a full row, so these payloads threw
      * on the missing key and requeued forever instead of ever reaching the server.
      *
-     * Unconditional, unlike [pushTitleUpdate]: a viewing has no client-side `updatedAt` to
-     * arbitrate on (the column exists server-side but is trigger-maintained), and the web app
-     * has no competing writer for these two fields.
+     * Also accepts the history editor's date, venue and companion changes. A viewing has no
+     * client-side `updatedAt`; updates use the same unconditional PATCH semantics as web.
      */
     private fun patchViewing(payload: JSONObject): PushResult {
         val session = sessionProvider()
@@ -255,8 +258,27 @@ class SupabaseRemoteMutationWriter(
         val body = JSONObject()
         if (payload.has("rating")) body.putNullable("rating", payload, "rating")
         if (payload.has("notes")) body.putNullable("notes", payload, "notes")
+        if (payload.has("date")) body.putNullable("viewed_at", payload, "date")
+        if (payload.has("venue")) body.putNullable("venue", payload, "venue")
+        if (payload.has("companions")) body.put("companions", payload.getJSONArray("companions").viewingCompanions())
         if (body.length() == 0) return PushResult.Success
-        client.patchWithFilter("viewings", "id=eq.$id", session.accessToken, body.toString())
+        client.patchWithFilter("viewings", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    private fun deleteViewing(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        client.delete("viewings", "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken)
+        return PushResult.Success
+    }
+
+    private fun patchOuting(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val body = JSONObject()
+            .putNullable("completed_viewing_id", payload, "completedViewingId")
+            .putNullable("follow_up_dismissed_at", payload, "followUpDismissedAt")
+            .put("updated_at", payload.getString("updatedAt"))
+        client.patchWithFilter("cinema_outings", "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken, body.toString())
         return PushResult.Success
     }
 
@@ -283,7 +305,12 @@ class SupabaseRemoteMutationWriter(
             .put("id", payload.getString("id"))
             .put("title_id", payload.getString("titleId"))
             .put("user_id", session.userId)
-            .put("viewed_at", payload.opt("date").takeUnless { it == JSONObject.NULL })
+            .putNullable("viewed_at", payload, "date")
+        for (key in listOf("rating", "notes", "venue")) {
+            if (payload.has(key)) body.putNullable(key, payload, key)
+        }
+        if (payload.has("companions")) body.put("companions", payload.getJSONArray("companions").viewingCompanions())
+        if (payload.has("outingId")) body.putNullable("outing_id", payload, "outingId")
         client.upsert("viewings", session.accessToken, body.toString())
         return PushResult.Success
     }
@@ -373,6 +400,14 @@ class SupabaseRemoteMutationWriter(
  *  as "leave this column alone" rather than "set it to null". */
 private fun JSONObject.putNullable(column: String, source: JSONObject, key: String): JSONObject =
     put(column, source.opt(key).takeUnless { it == null || it == JSONObject.NULL } ?: JSONObject.NULL)
+
+/** Older queued outing completions store names; web and Postgres use companion objects. */
+private fun JSONArray.viewingCompanions(): JSONArray = JSONArray().also { result ->
+    for (index in 0 until length()) {
+        val value = get(index)
+        result.put(if (value is String) JSONObject().put("name", value) else value)
+    }
+}
 
 /** Maps a payload's nested array into a PostgREST bulk-insert body, or null when there's
  *  nothing to send — an empty array would be a pointless round trip. */

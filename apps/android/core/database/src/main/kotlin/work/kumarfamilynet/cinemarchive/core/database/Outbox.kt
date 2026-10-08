@@ -32,10 +32,11 @@ interface OutboxDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun enqueue(entry: OutboxEntity)
 
-    @Query("SELECT * FROM mutation_outbox ORDER BY createdAt")
+    // SQLite insertion order survives equal timestamps and a device clock moving backwards.
+    @Query("SELECT * FROM mutation_outbox ORDER BY rowid")
     fun observePending(): Flow<List<OutboxEntity>>
 
-    @Query("SELECT * FROM mutation_outbox ORDER BY createdAt")
+    @Query("SELECT * FROM mutation_outbox ORDER BY rowid")
     suspend fun getPending(): List<OutboxEntity>
 
     @Query("DELETE FROM mutation_outbox WHERE id = :id")

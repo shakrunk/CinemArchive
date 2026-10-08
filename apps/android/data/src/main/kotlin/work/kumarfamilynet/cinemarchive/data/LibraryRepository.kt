@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
+import org.json.JSONArray
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
@@ -709,6 +710,67 @@ class LibraryRepository(
                     put("date", date ?: JSONObject.NULL)
                 },
             )
+        }
+    }
+
+    /** Edits retain their id and outing link. Every local write and queue entry commits together. */
+    suspend fun saveViewing(titleId: String, draft: work.kumarfamilynet.cinemarchive.core.model.ViewingDraft, isNew: Boolean) {
+        outbox.atomically {
+            requireNotNull(titleDao.getById(titleId)) { "Title is no longer in your library" }
+            val existing = viewingDao.getById(draft.id)
+            require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title" }
+            check(isNew || existing != null) { "Viewing was removed. Reopen the history to continue." }
+            val viewing = ViewingEntity(
+                id = draft.id, titleId = titleId, date = draft.date, rating = draft.rating,
+                notes = draft.notes, venue = draft.venue, companions = draft.companions,
+                outingId = existing?.outingId,
+            )
+            viewingDao.upsert(viewing)
+            outbox.enqueue("viewing", draft.id, if (existing == null) "upsert" else "update", JSONObject().apply {
+                put("id", draft.id)
+                put("titleId", titleId)
+                put("date", draft.date ?: JSONObject.NULL)
+                put("rating", draft.rating ?: JSONObject.NULL)
+                put("notes", draft.notes ?: JSONObject.NULL)
+                put("venue", draft.venue ?: JSONObject.NULL)
+                // The local mirror stores names only. Preserve remote friend links when unchanged.
+                if (existing == null || existing.companions != draft.companions) {
+                    put("companions", JSONArray().apply { draft.companions.forEach { put(JSONObject().put("name", it)) } })
+                }
+            })
+            val now = Instant.now().toString()
+            if (isNew || draft.rating != null) {
+                if (isNew) titleDao.updateStatus(titleId, LibraryStatus.WATCHED.name, now)
+                draft.rating?.let { titleDao.updateRating(titleId, it, now) }
+                // One title patch: separate patches with the same timestamp would conflict.
+                outbox.enqueue("title", titleId, "update", JSONObject().apply {
+                    put("id", titleId)
+                    put("updatedAt", now)
+                    if (isNew) put("status", LibraryStatus.WATCHED.name)
+                    draft.rating?.let { put("rating", it) }
+                })
+            }
+        }
+    }
+
+    /** Removing one event leaves other rewatches and title status/rating intact. */
+    suspend fun deleteViewing(titleId: String, viewingId: String) {
+        outbox.atomically {
+            val existing = viewingDao.getById(viewingId) ?: return@atomically
+            require(existing.titleId == titleId) { "Viewing belongs to another title" }
+            val now = Instant.now().toString()
+            cinemaOutingDao.observeOutingsForTitle(titleId).first()
+                .filter { it.completedViewingId == viewingId }.forEach { outing ->
+                    cinemaOutingDao.upsert(outing.copy(completedViewingId = null, followUpDismissedAt = now, updatedAt = now))
+                    outbox.enqueue("cinema_outing", outing.id, "update", JSONObject().apply {
+                        put("id", outing.id)
+                        put("completedViewingId", JSONObject.NULL)
+                        put("followUpDismissedAt", now)
+                        put("updatedAt", now)
+                    })
+                }
+            viewingDao.deleteById(viewingId)
+            outbox.enqueue("viewing", viewingId, "delete", JSONObject().put("id", viewingId))
         }
     }
 

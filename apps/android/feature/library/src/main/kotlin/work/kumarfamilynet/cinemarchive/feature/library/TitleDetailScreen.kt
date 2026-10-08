@@ -88,6 +88,7 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCastMember
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.ScheduledEpisode
@@ -146,10 +147,9 @@ class TitleDetailViewModel(
         viewModelScope.launch { repository.backfillEpisodeMetadata(titleId) }
     }
 
-    /** Optimistic local write + queued remote push — see LibraryRepository.logEpisodeWatched. */
-    fun onMarkWatched(episodeId: String) {
-        viewModelScope.launch { repository.logEpisodeWatched(episodeId, LocalDate.now().toString()) }
-    }
+    suspend fun saveEpisodeLog(episodeId: String, draft: EpisodeLogDraft) = repository.saveEpisodeLog(episodeId, draft)
+
+    suspend fun deleteEpisodeWatch(episodeId: String, eventId: String) = repository.deleteEpisodeWatchEvent(episodeId, eventId)
 
     /** Loads an episode's cast the first time its cast section is opened — see
      *  LibraryRepository.fetchEpisodeCast. */
@@ -160,14 +160,6 @@ class TitleDetailViewModel(
             val cast = repository.fetchEpisodeCast(titleId, seasonNumber, episodeNumber)
             _episodeCast.update { it + (episodeId to cast) }
         }
-    }
-
-    fun onRateEpisode(episodeId: String, rating: Double) {
-        viewModelScope.launch { repository.logEpisodeRating(episodeId, rating, Instant.now().toString()) }
-    }
-
-    fun onSubmitReview(episodeId: String, reviewText: String) {
-        viewModelScope.launch { repository.logEpisodeReview(episodeId, reviewText, Instant.now().toString()) }
     }
 
     suspend fun saveViewing(draft: ViewingDraft, isNew: Boolean) = repository.saveViewing(titleId, draft, isNew)
@@ -309,9 +301,8 @@ fun TitleDetailRoute(
     TitleDetailScreen(
         detail,
         onBack,
-        onMarkWatched = viewModel::onMarkWatched,
-        onRateEpisode = viewModel::onRateEpisode,
-        onSubmitReview = viewModel::onSubmitReview,
+        onSaveEpisodeLog = viewModel::saveEpisodeLog,
+        onDeleteEpisodeWatch = viewModel::deleteEpisodeWatch,
         onSaveViewing = viewModel::saveViewing,
         onDeleteViewing = viewModel::deleteViewing,
         onChangeStatus = viewModel::onChangeStatus,
@@ -343,9 +334,8 @@ fun TitleDetailRoute(
 fun TitleDetailScreen(
     detail: TitleDetail?,
     onBack: () -> Unit,
-    onMarkWatched: (String) -> Unit = {},
-    onRateEpisode: (String, Double) -> Unit = { _, _ -> },
-    onSubmitReview: (String, String) -> Unit = { _, _ -> },
+    onSaveEpisodeLog: suspend (String, EpisodeLogDraft) -> Unit = { _, _ -> },
+    onDeleteEpisodeWatch: suspend (String, String) -> Unit = { _, _ -> },
     onSaveViewing: suspend (ViewingDraft, Boolean) -> Unit = { _, _ -> },
     onDeleteViewing: suspend (String) -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
@@ -600,9 +590,8 @@ fun TitleDetailScreen(
                     ReadingWidthColumn {
                         EpisodeRow(
                             episode,
-                            onMarkWatched,
-                            onRateEpisode,
-                            onSubmitReview,
+                            onSaveEpisodeLog,
+                            onDeleteEpisodeWatch,
                             cast = episodeCast[episode.id],
                             onShowCast = { onLoadEpisodeCast(episode.id, selectedSeason.seasonNumber, episode.episodeNumber) },
                             modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
@@ -887,17 +876,14 @@ private fun SeasonSelector(
 @Composable
 private fun EpisodeRow(
     episode: EpisodeDetail,
-    onMarkWatched: (String) -> Unit,
-    onRateEpisode: (String, Double) -> Unit,
-    onSubmitReview: (String, String) -> Unit,
+    onSaveEpisodeLog: suspend (String, EpisodeLogDraft) -> Unit,
+    onDeleteEpisodeWatch: suspend (String, String) -> Unit,
     cast: EpisodeCast?,
     onShowCast: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val watched = episode.watchCount > 0
     var castExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
-    var reviewExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
-    var reviewText by rememberSaveable(episode.id) { mutableStateOf("") }
     var synopsisExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
 
     Surface(
@@ -966,30 +952,7 @@ private fun EpisodeRow(
                         .clickable { synopsisExpanded = !synopsisExpanded },
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp),
-            ) {
-                if (!watched) {
-                    TextButton(onClick = { onMarkWatched(episode.id) }) {
-                        Text("Mark watched")
-                    }
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                for (star in 1..5) {
-                    val filled = star <= (episode.averageRating ?: 0.0)
-                    Icon(
-                        if (filled) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        contentDescription = "Rate $star star${if (star == 1) "" else "s"}",
-                        tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clickable { onRateEpisode(episode.id, star.toDouble()) }
-                            .padding(2.dp)
-                            .size(18.dp),
-                    )
-                }
-                TextButton(onClick = { reviewExpanded = !reviewExpanded }) { Text("Review") }
-            }
+            EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch)
             TextButton(
                 onClick = {
                     castExpanded = !castExpanded
@@ -1006,24 +969,6 @@ private fun EpisodeRow(
             }
             if (castExpanded) {
                 EpisodeCastSection(cast, modifier = Modifier.padding(top = 4.dp))
-            }
-            if (reviewExpanded) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = reviewText,
-                        onValueChange = { reviewText = it },
-                        modifier = Modifier.weight(1f),
-                        label = { Text("Your review") },
-                    )
-                    TextButton(
-                        onClick = {
-                            onSubmitReview(episode.id, reviewText)
-                            reviewText = ""
-                            reviewExpanded = false
-                        },
-                        enabled = reviewText.isNotBlank(),
-                    ) { Text("Submit") }
-                }
             }
         }
     }

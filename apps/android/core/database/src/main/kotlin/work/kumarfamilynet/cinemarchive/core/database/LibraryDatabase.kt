@@ -27,7 +27,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TheaterInterestEntity::class,
         LegacyRestoreReceiptEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -149,6 +149,12 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE episode_watch_events ADD COLUMN notes TEXT")
+            }
+        }
+
         /** [name] is the SQLite file name. Per-account runtimes pass an owner-derived name (see
          *  AccountRuntime) so two accounts never share a file; the legacy global
          *  `cinemarchive.db` ([LEGACY_DATABASE_NAME]) is never opened by an active runtime. */
@@ -157,7 +163,7 @@ abstract class LibraryDatabase : RoomDatabase() {
             LibraryDatabase::class.java,
             name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
@@ -178,7 +184,7 @@ abstract class LibraryDatabase : RoomDatabase() {
          */
         fun createForRecovery(context: Context, name: String): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, name)
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                 .build()
     }
 }

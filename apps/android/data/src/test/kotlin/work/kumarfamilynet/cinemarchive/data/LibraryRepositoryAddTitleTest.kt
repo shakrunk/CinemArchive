@@ -137,6 +137,7 @@ private object NoEpisodeRatingsDao : EpisodeRatingDao {
 }
 
 private object NoEpisodeReviewsDao : EpisodeReviewDao {
+    override fun observeReviews(titleId: String): Flow<List<EpisodeReviewEntity>> = throw UnsupportedOperationException()
     override suspend fun upsertAll(reviews: List<EpisodeReviewEntity>) = throw UnsupportedOperationException()
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }

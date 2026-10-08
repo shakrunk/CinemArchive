@@ -116,6 +116,7 @@ data class EpisodeWatchEventEntity(
     @PrimaryKey val id: String,
     val episodeId: String,
     val watchedAt: String?, // null = watched before joining the platform
+    val notes: String? = null,
 )
 
 /** Independent rating log — deliberately not 1:1 with watch events. */

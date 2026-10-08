@@ -16,7 +16,6 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewEntity
-import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchCount
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
@@ -35,6 +34,10 @@ import work.kumarfamilynet.cinemarchive.core.model.AddTitleRequest
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatch
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeRating
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeReview
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
@@ -51,8 +54,9 @@ import work.kumarfamilynet.cinemarchive.core.model.isSpecialsSeason
 private data class EpisodeAggregate(
     val seasons: List<SeasonEntity>,
     val episodes: List<EpisodeEntity>,
-    val watchCounts: List<EpisodeWatchCount>,
+    val watchEvents: List<EpisodeWatchEventEntity>,
     val ratings: List<EpisodeRatingEntity>,
+    val reviews: List<EpisodeReviewEntity>,
 )
 
 private data class UpNextCoreSources(
@@ -435,10 +439,11 @@ class LibraryRepository(
         val episodeAggregate = combine(
             seasonDao.observeSeasons(titleId),
             episodeDao.observeEpisodes(titleId),
-            watchEventDao.observeWatchCounts(titleId),
+            watchEventDao.observeAllWatchEvents(),
             ratingDao.observeRatings(titleId),
-        ) { seasons, episodes, watchCounts, ratings ->
-            EpisodeAggregate(seasons, episodes, watchCounts, ratings)
+            reviewDao.observeReviews(titleId),
+        ) { seasons, episodes, watches, ratings, reviews ->
+            EpisodeAggregate(seasons, episodes, watches, ratings, reviews)
         }
 
         return combine(
@@ -450,7 +455,9 @@ class LibraryRepository(
         ) { title, aggregate, viewings, outingRows, isInterested ->
             if (title == null) return@combine null
 
-            val watchCountByEpisode = aggregate.watchCounts.associate { it.episodeId to it.watchCount }
+            val watchesByEpisode = aggregate.watchEvents.groupBy { it.episodeId }
+            val watchCountByEpisode = watchesByEpisode.mapValues { it.value.size }
+            val reviewsByEpisode = aggregate.reviews.groupBy { it.episodeId }
             // Episode cards summarize every rating, matching web avgEpisodeRating.
             val ratingsByEpisode = aggregate.ratings.groupBy { it.episodeId }
             val averageRatingByEpisode = ratingsByEpisode
@@ -501,6 +508,11 @@ class LibraryRepository(
                                 averageRating = averageRatingByEpisode[episode.id],
                                 synopsis = episode.synopsis,
                                 stillUrl = episode.stillUrl,
+                                watchEvents = watchesByEpisode[episode.id].orEmpty()
+                                    .sortedWith(compareByDescending<EpisodeWatchEventEntity> { it.watchedAt }.thenBy { it.id })
+                                    .map { EpisodeWatch(it.id, it.watchedAt, it.notes) },
+                                ratings = ratingsByEpisode[episode.id].orEmpty().map { EpisodeRating(it.id, it.rating, it.ratedAt) },
+                                reviews = reviewsByEpisode[episode.id].orEmpty().map { EpisodeReview(it.id, it.reviewText, it.reviewedAt) },
                             )
                         },
                     )
@@ -631,6 +643,46 @@ class LibraryRepository(
                 operation = "update",
                 payload = JSONObject().apply { put("id", viewingId); put("notes", notes) },
             )
+        }
+    }
+
+    /** One form submission may create independent watch, rating and review rows. */
+    suspend fun saveEpisodeLog(episodeId: String, draft: EpisodeLogDraft) {
+        outbox.atomically {
+            requireNotNull(episodeDao.getById(episodeId)) { "Episode is no longer in your library" }
+            if (draft.includeWatch) {
+                val existing = watchEventDao.observeAllWatchEvents().first().find { it.id == draft.watchEventId }
+                require(existing == null || existing.episodeId == episodeId) { "Watch belongs to another episode" }
+                watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(draft.watchEventId, episodeId, draft.watchedAt, draft.watchNotes)))
+                outbox.enqueue("episode_watch_event", draft.watchEventId, "upsert", JSONObject().apply {
+                    put("id", draft.watchEventId); put("episodeId", episodeId)
+                    put("watchedAt", draft.watchedAt ?: JSONObject.NULL)
+                    put("notes", draft.watchNotes ?: JSONObject.NULL)
+                })
+            }
+            draft.rating?.let { rating ->
+                ratingDao.upsertAll(listOf(EpisodeRatingEntity(draft.ratingId, episodeId, rating, draft.recordedAt)))
+                outbox.enqueue("episode_rating", draft.ratingId, "upsert", JSONObject().apply {
+                    put("id", draft.ratingId); put("episodeId", episodeId)
+                    put("rating", rating); put("ratedAt", draft.recordedAt)
+                })
+            }
+            draft.reviewText?.takeIf { it.isNotBlank() }?.let { review ->
+                reviewDao.upsertAll(listOf(EpisodeReviewEntity(draft.reviewId, episodeId, review, draft.recordedAt)))
+                outbox.enqueue("episode_review", draft.reviewId, "upsert", JSONObject().apply {
+                    put("id", draft.reviewId); put("episodeId", episodeId)
+                    put("reviewText", review); put("reviewedAt", draft.recordedAt)
+                })
+            }
+        }
+    }
+
+    suspend fun deleteEpisodeWatchEvent(episodeId: String, eventId: String) {
+        outbox.atomically {
+            val event = watchEventDao.observeAllWatchEvents().first().find { it.id == eventId } ?: return@atomically
+            require(event.episodeId == episodeId) { "Watch belongs to another episode" }
+            watchEventDao.deleteById(eventId)
+            outbox.enqueue("episode_watch_event", eventId, "delete", JSONObject().put("id", eventId))
         }
     }
 

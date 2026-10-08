@@ -10,7 +10,7 @@
     "lint:ci": "eslint . --max-warnings 48",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:db": "node --test scripts/library-command.test.mjs scripts/shared-library-rpc.test.mjs",
+    "test:db": "node --test scripts/library-command.test.mjs scripts/shared-library-rpc.test.mjs scripts/episode-watch-notes-sync.test.mjs",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
     "test:ui": "vitest --ui"

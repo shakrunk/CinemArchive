@@ -21,6 +21,7 @@ number is chosen.
 
 ### Added
 
+- Android: episode detail now logs dated or pre-platform rewatches with watch notes and independent half-star ratings and reviews, shows their histories, and deletes individual watches without removing ratings or reviews.
 - Android: movie viewing history now supports creating, editing, and deleting individual viewings, including dates or pre-platform watches, half-star ratings, notes, venues, and companion names; offline retries preserve edit/delete order.
 - Android: profile identity editing, invite redemption and management, notification inbox, and Friends screens for relationships, recommendations, activity, and read-only libraries.
 - Web: Appearance now offers Android's four text sizes and bundled Lexend font, with a live preview, apply/cancel/reset controls, and device-local preferences that work offline.

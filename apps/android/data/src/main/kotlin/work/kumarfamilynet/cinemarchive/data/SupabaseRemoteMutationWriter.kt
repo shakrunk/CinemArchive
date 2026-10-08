@@ -31,7 +31,7 @@ class SupabaseRemoteMutationWriter(
                     "delete" -> deleteTitle(payload)
                     else -> pushTitleUpdate(payload)
                 }
-                "episode_watch_event" -> upsertWatchEvent(payload)
+                "episode_watch_event" -> if (entry.operation == "delete") deleteWatchEvent(payload) else upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
                 "episode_metadata" -> patchEpisodeMetadata(payload)
@@ -214,8 +214,15 @@ class SupabaseRemoteMutationWriter(
             .put("id", payload.getString("id"))
             .put("episode_id", payload.getString("episodeId"))
             .put("user_id", session.userId)
-            .put("watched_at", payload.opt("watchedAt").takeUnless { it == JSONObject.NULL })
+            .putNullable("watched_at", payload, "watchedAt")
+        if (payload.has("notes")) body.putNullable("notes", payload, "notes")
         client.upsert("episode_watch_events", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    private fun deleteWatchEvent(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        client.delete("episode_watch_events", "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken)
         return PushResult.Success
     }
 

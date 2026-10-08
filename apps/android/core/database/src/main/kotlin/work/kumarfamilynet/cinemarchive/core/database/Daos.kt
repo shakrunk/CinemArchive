@@ -230,6 +230,9 @@ interface EpisodeRatingDao {
 
 @Dao
 interface EpisodeReviewDao {
+    @Query("SELECT * FROM episode_reviews WHERE episodeId IN (SELECT id FROM episodes WHERE titleId = :titleId) ORDER BY reviewedAt DESC")
+    fun observeReviews(titleId: String): Flow<List<EpisodeReviewEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(reviews: List<EpisodeReviewEntity>)
 

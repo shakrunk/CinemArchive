@@ -2,6 +2,9 @@ package work.kumarfamilynet.cinemarchive.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
@@ -19,6 +22,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -92,7 +96,9 @@ class TransactionalRuntimeTest {
 
     /** Answers `sync_library_changes` with one scripted page of rows (empty after that). */
     private class SyncHttp(var pages: ArrayDeque<JSONArray>) {
+        val requests = mutableListOf<JSONObject>()
         val client: OkHttpClient = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
+            requests += JSONObject(Buffer().also { chain.request().body!!.writeTo(it) }.readUtf8())
             val body = (pages.removeFirstOrNull() ?: JSONArray()).toString()
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("ok")
                 .body(body.toResponseBody("application/json".toMediaType())).build()
@@ -107,8 +113,10 @@ class TransactionalRuntimeTest {
                 .put("status", status).put("addedAt", "2026-01-01T00:00:00Z").put("updatedAt", updatedAt),
         )
 
-    private fun syncRepository(db: LibraryDatabase, outbox: MutationOutbox, http: SyncHttp, file: File) = LibrarySyncRepository(
-        dataStore = PreferenceDataStoreFactory.create(scope = scope) { file },
+    private fun syncRepository(db: LibraryDatabase, outbox: MutationOutbox, http: SyncHttp, file: File,
+        preferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>? = null,
+    ) = LibrarySyncRepository(
+        dataStore = preferences ?: PreferenceDataStoreFactory.create(scope = scope) { file },
         client = SupabaseRestClient("https://x.supabase.co", "anon", http.client),
         authRepository = SessionSource { SupabaseSession("tok", "user-a") },
         titleDao = db.titleDao(), seasonDao = db.seasonDao(), episodeDao = db.episodeDao(),
@@ -234,5 +242,34 @@ class TransactionalRuntimeTest {
 
         handler.applyRemote("title", "t2", JSONObject().put("status", "dropped").put("updatedAt", "2026-03-01T00:00:00Z"))
         assertEquals("absent key says nothing about rating", 2.0, db.titleDao().getById("t2")?.rating!!, 0.0)
+    }
+
+    @Test fun notesUpgradeResyncsFromEpochWithoutOverwritingPendingLogsOrResurrectingDeletes() = runTest {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("t1")))
+        db.seasonDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonEntity("s", "t1", 1, 1, 0, null)))
+        db.episodeDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity("ep", "t1", "s", 1, null, null, null)))
+        db.episodeWatchEventDao().upsertAll(listOf(
+            work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity("pending", "ep", null, "Local note"),
+            work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity("deleted", "ep", null, "Delete me"),
+        ))
+        val outbox = outbox(db, ScriptedWriter { PushResult.Retry("offline") })
+        outbox.enqueue("episode_watch_event", "pending", "upsert", JSONObject().put("id", "pending"))
+        libraryRepository(db, outbox).deleteEpisodeWatchEvent("ep", "deleted")
+        val page = JSONArray()
+        for (id in listOf("existing", "pending", "deleted")) page.put(JSONObject()
+            .put("entity_type", "episode_watch_event").put("entity_id", id).put("updated_at", "2026-01-01T00:00:00Z")
+            .put("payload", JSONObject().put("id", id).put("episodeId", "ep").put("watchedAt", JSONObject.NULL).put("notes", "Server note")))
+        val http = SyncHttp(ArrayDeque(listOf(page)))
+        val file = tmpFile("notes-sync")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 6; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
+        syncRepository(db, outbox, http, file, prefs).syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+        assertEquals(7, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        val events = db.episodeWatchEventDao().observeAllWatchEvents().first().associateBy { it.id }
+        assertEquals("Server note", events.getValue("existing").notes)
+        assertEquals("Local note", events.getValue("pending").notes)
+        assertTrue("pending deletion stays deleted", "deleted" !in events)
     }
 }

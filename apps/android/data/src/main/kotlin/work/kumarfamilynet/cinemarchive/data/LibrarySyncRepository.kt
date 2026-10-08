@@ -81,7 +81,8 @@ private const val PAGE_SIZE = 500
  * "stuck behind an old watermark" backlog the way title_cast/title_crew had; bumped anyway to
  * keep this constant's history a complete audit trail per its own stated policy.
  */
-private const val SYNC_SCHEMA_VERSION = 6
+// 7: episode watch notes. Re-read existing events while preserving queued local edits/deletes.
+private const val SYNC_SCHEMA_VERSION = 7
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -494,6 +495,7 @@ class LibrarySyncRepository(
         id = getString("id"),
         episodeId = getString("episodeId"),
         watchedAt = optStringOrNull("watchedAt"),
+        notes = optStringOrNull("notes"),
     )
 
     private fun JSONObject.toRatingEntity() = EpisodeRatingEntity(

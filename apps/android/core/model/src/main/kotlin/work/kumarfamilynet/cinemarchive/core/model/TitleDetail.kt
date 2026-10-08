@@ -51,7 +51,14 @@ data class EpisodeDetail(
     val stillUrl: String? = null,
     /** Mean of all logged ratings, matching the web episode card. */
     val averageRating: Double? = latestRating,
+    val watchEvents: List<EpisodeWatch> = emptyList(),
+    val ratings: List<EpisodeRating> = emptyList(),
+    val reviews: List<EpisodeReview> = emptyList(),
 )
+
+data class EpisodeWatch(val id: String, val watchedAt: String?, val notes: String? = null)
+data class EpisodeRating(val id: String, val rating: Double, val ratedAt: String)
+data class EpisodeReview(val id: String, val reviewText: String, val reviewedAt: String)
 
 data class Viewing(
     val id: String,

@@ -29,6 +29,7 @@ class SupabaseRemoteMutationWriter(
                 "title_credits" -> pushCreditRefresh(entry, payload)
                 "title_catalog" -> EpisodeCatalogFillTransport(client, sessionProvider).push(entry)
                 "title" -> when (entry.operation) {
+                    TITLE_METADATA_COMMAND, "review" -> TitleMetadataTransport(client, SessionSource(sessionProvider)).push(entry)
                     "insert" -> insertTitle(payload)
                     "delete" -> deleteTitle(payload)
                     else -> pushTitleUpdate(payload)

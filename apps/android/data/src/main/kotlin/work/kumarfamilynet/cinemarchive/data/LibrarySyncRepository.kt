@@ -147,11 +147,22 @@ class LibrarySyncRepository(
      *  `NetworkOnMainThreadException`. */
     suspend fun syncNow() = withContext(Dispatchers.IO) { syncMutex.withLock { syncLocked() } }
 
+    /** Recovery can remove protection without a push. Commit replay before that removal,
+     * serialized with pulls so a concurrent page cannot advance past the retained epoch. */
+    suspend fun withDurableReplay(action: suspend () -> Unit) = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            val session = checkNotNull(authRepository.currentSession()) { "This sign-in has ended" }
+            dataStore.edit { it[cursorKey] = EPOCH }
+            check(authRepository.currentSession()?.userId == session.userId) { "This sign-in has ended" }
+            action()
+        }
+    }
+
     private suspend fun syncLocked() {
         val session = authRepository.currentSession() ?: return
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
-        // rows/tombstones skipped while credits or natural-key memberships were protected.
-        if (pendingKeys().any { it.startsWith("title_credits:") || it.startsWith("title_catalog:") || it.startsWith("list_membership:") }) {
+        // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
+        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:").any(key::startsWith) }) {
             dataStore.edit { it[cursorKey] = EPOCH }
         }
         // Push first (best effort — offline just leaves entries queued and protected below).

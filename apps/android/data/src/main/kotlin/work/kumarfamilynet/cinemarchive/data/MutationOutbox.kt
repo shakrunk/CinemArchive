@@ -123,6 +123,9 @@ class MutationOutbox(
         addAll(membershipProtectionKeys(entries))
         entries.forEach { entry ->
             add(pendingKey(entry.entityType, entry.entityId))
+            if (entry.entityType == "title" && runCatching { JSONObject(entry.payloadJson).has(TITLE_METADATA_DATA) }.getOrDefault(false)) {
+                add("title_metadata:${entry.entityId}")
+            }
             if (entry.entityType == "title_credits") {
                 val payload = JSONObject(entry.payloadJson)
                 payload.optJSONArray("protectedKeys")?.let { keys -> (0 until keys.length()).forEach { add(keys.getString(it)) } }

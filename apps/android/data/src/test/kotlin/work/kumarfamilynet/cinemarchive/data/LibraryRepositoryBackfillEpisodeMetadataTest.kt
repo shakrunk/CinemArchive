@@ -258,6 +258,7 @@ private class RecordingOutboxDao2 : OutboxDao {
     override suspend fun getPending(): List<OutboxEntity> = entries
     override suspend fun remove(id: String) { entries.removeAll { it.id == id } }
     override suspend fun markForReview(id: String, reason: String): Int = error("Not used by this fixture")
+    override suspend fun replaceReviewedTitle(oldId: String, originalPayload: String, newId: String, newOperation: String, newPayload: String): Int = error("Not used by this fixture")
 
     override suspend fun recordFailure(id: String, error: String?) = Unit
 }

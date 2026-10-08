@@ -90,6 +90,7 @@ class TransactionalRuntimeTest {
         titleCrewDao = db.titleCrewDao(), theaterInterestDao = db.theaterInterestDao(), outbox = outbox,
         episodeMetadataFetcher = NoMetadata,
         personCreditsDao = db.personCreditsDao(),
+        mutationOwnerId = "10000000-0000-4000-8000-000000000001",
     )
 
     private fun outbox(db: LibraryDatabase, writer: RemoteMutationWriter) =
@@ -172,6 +173,69 @@ class TransactionalRuntimeTest {
         verifyAckBeforeProcessInterruption("title_catalog")
     }
 
+    @Test fun titleMetadataAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {
+        verifyAckBeforeProcessInterruption("title_metadata")
+    }
+
+    @Test fun listMembershipAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {
+        verifyAckBeforeProcessInterruption("list_membership")
+    }
+
+    @Test fun discardingMetadataPersistsReplayBeforeRemovingProtectionForOldTombstone() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(TitleMetadataFixture.entity().copy(tags = listOf("Saved"))))
+        val queue = outbox(db, ScriptedWriter { error("Never dispatch a review draft") })
+        queue.enqueue("title", TitleMetadataFixture.title, "review",
+            titleMetadataPayload(TitleMetadataFixture.owner, TitleMetadataFixture.title, TitleMetadataFixture.patch("Saved"), null, null))
+        val file = tmpFile("discard-replay")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 9; it[cursor] = "2026-10-08T00:00:00Z" }
+        val tombstone = creditRow("tombstone", TitleMetadataFixture.title, JSONObject().put("entityType", "title"))
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray().put(tombstone))))
+        val sync = syncRepository(db, queue, http, file, prefs)
+        val recovery = TitleMetadataRepository(db, queue, TitleMetadataFixture.owner,
+            SessionSource { SupabaseSession("token", TitleMetadataFixture.owner) }, object : TitleMetadataRemote {
+                override suspend fun current(titleId: String): JSONObject? = null
+                override suspend fun push(entry: OutboxEntity) = error("No push")
+            }, synchronize = sync::syncNow, replayBoundary = { action -> sync.withDurableReplay {
+                assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+                assertEquals(1, queue.pendingEntries().size)
+                action()
+            } })
+        recovery.discard(recovery.compare(TitleMetadataFixture.title))
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+        // A new sync instance after interruption still replays the previously skipped deletion.
+        syncRepository(db, queue, http, file, prefs).syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+        assertNull(db.titleDao().getById(TitleMetadataFixture.title))
+    }
+
+    @Test fun metadataRecoveryRetryUsesSerializedSyncAndRewindsBeforeNetwork() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(TitleMetadataFixture.entity()))
+        val file = tmpFile("metadata-retry")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 9; it[cursor] = "2026-10-08T00:00:00Z" }
+        val queue = outbox(db, ScriptedWriter { PushResult.Success })
+        TitleMetadataFixture.library(db, queue).updateTitleTags(TitleMetadataFixture.title, listOf("Saved"))
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray())))
+        val sync = syncRepository(db, queue, http, file, prefs, pushPending = {
+            assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+            queue.flush()
+        })
+        val recovery = TitleMetadataRepository(db, queue, TitleMetadataFixture.owner,
+            SessionSource { SupabaseSession("token", TitleMetadataFixture.owner) }, object : TitleMetadataRemote {
+                override suspend fun current(titleId: String) = error("Not a comparison")
+                override suspend fun push(entry: OutboxEntity) = error("Use outbox")
+            }, synchronize = sync::syncNow, replayBoundary = sync::withDurableReplay)
+        recovery.retrySync()
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+    }
+
     private suspend fun verifyAckBeforeProcessInterruption(entityType: String) {
         val db = memoryDb()
         db.titleDao().upsertAll(listOf(title("show")))
@@ -185,7 +249,14 @@ class TransactionalRuntimeTest {
                 return PushResult.Success
             }
         })
-        queue.enqueue(entityType, "show", if (entityType == "title_catalog") "ensure" else "refresh", JSONObject())
+        when (entityType) {
+            "title_metadata" -> queue.enqueue("title", "show", TITLE_METADATA_COMMAND,
+                titleMetadataPayload(TitleMetadataFixture.owner, "show", TitleMetadataFixture.patch("Saved"), TitleMetadataFixture.baseline, null))
+            "list_membership" -> queue.enqueue("list_item", "40000000-0000-4000-8000-000000000001", MEMBERSHIP_COMMAND,
+                membershipPayload("40000000-0000-4000-8000-000000000001", "50000000-0000-4000-8000-000000000001",
+                    TitleMetadataFixture.title, true, TitleMetadataFixture.baseline))
+            else -> queue.enqueue(entityType, "show", if (entityType == "title_catalog") "ensure" else "refresh", JSONObject())
+        }
         val http = SyncHttp(ArrayDeque(listOf(JSONArray().put(creditRow("title_cast", "cast", JSONObject()
             .put("titleId", "show").put("tmdbPersonId", 42).put("name", "Unchanged old credit").put("castOrder", 0))))))
         val interrupted = syncRepository(db, queue, http, file, prefs, pushPending = {
@@ -333,11 +404,10 @@ class TransactionalRuntimeTest {
         db.titleDao().upsertAll(listOf(title("t1", "WATCHLIST")))
         val conflict = JSONObject().put("id", "t1").put("status", "watched").put("rating", 4.5).put("updatedAt", "2026-03-01T00:00:00Z")
         val outbox = outbox(db, ScriptedWriter { PushResult.Conflict(conflict) })
-        val repo = libraryRepository(db, outbox)
         val notices = mutableListOf<ConflictNotice>()
         val collector = CoroutineScope(Dispatchers.Unconfined).launch { outbox.conflicts.collect { notices += it } }
 
-        repo.updateTitleStatus("t1", LibraryStatus.DROPPED, "2026-02-01T00:00:00Z")
+        legacyTitleStatus(db, outbox, "t1", LibraryStatus.DROPPED, "2026-02-01T00:00:00Z")
         outbox.flush()
 
         val row = db.titleDao().getById("t1")!!
@@ -355,12 +425,19 @@ class TransactionalRuntimeTest {
         var calls = 0
         val writer = ScriptedWriter { if (calls++ == 0) PushResult.Conflict(conflict) else PushResult.Retry("offline") }
         val outbox = outbox(db, writer)
-        val repo = libraryRepository(db, outbox)
-        repo.updateTitleStatus("t1", LibraryStatus.DROPPED, "2026-02-01T00:00:00Z")   // will conflict
-        repo.updateTitleStatus("t1", LibraryStatus.WATCHING, "2026-02-02T00:00:00Z")  // newer offline edit
+        legacyTitleStatus(db, outbox, "t1", LibraryStatus.DROPPED, "2026-02-01T00:00:00Z")
+        legacyTitleStatus(db, outbox, "t1", LibraryStatus.WATCHING, "2026-02-02T00:00:00Z")
         outbox.flush()
         assertEquals("newer offline edit stays on top of the server row", "WATCHING", db.titleDao().getById("t1")?.status)
         assertEquals("only the conflicted entry was dropped", 1, db.outboxDao().getPending().size)
+    }
+
+    /** Previously persisted LWW commands retain their original reconciliation behavior. */
+    private suspend fun legacyTitleStatus(db: LibraryDatabase, outbox: MutationOutbox, id: String, status: LibraryStatus, timestamp: String) {
+        outbox.atomically {
+            db.titleDao().updateStatus(id, status.name, timestamp)
+            outbox.enqueue("title", id, "update", JSONObject().put("id", id).put("status", status.name).put("updatedAt", timestamp))
+        }
     }
 
     @Test fun serverRowWithNoRatingClearsTheLocalRatingButAbsentFieldLeavesItAlone() = runTest {

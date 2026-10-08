@@ -797,6 +797,7 @@ private fun CinemArchiveApp(
                             legacyLoadStatus = runtime::legacyStatus,
                             legacyRestore = runtime::restoreLegacy,
                             outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+                            titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
                             selectedCategory = activeCategory,
                         )
                     }
@@ -862,6 +863,7 @@ private fun CinemArchiveApp(
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refresh(current.titleId) },
                     catalogExtrasSource = runtime.catalogExtrasRepository,
+                    titleMetadataRecovery = runtime.titleMetadataRepository,
                     socialContent = { detail ->
                         work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(titleSocialSource, runtime.ownerId, detail)
                     },
@@ -900,6 +902,7 @@ private fun CinemArchiveApp(
                     legacyLoadStatus = runtime::legacyStatus,
                     legacyRestore = runtime::restoreLegacy,
                     outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+                    titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
                 )
                 Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
                 Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)

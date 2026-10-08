@@ -16,9 +16,9 @@ import work.kumarfamilynet.cinemarchive.core.model.catalogDetailRows
 /** Stored catalog information remains available offline and exposes no editing controls. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun CatalogDetailsSection(detail: TitleDetail) {
+internal fun CatalogDetailsSection(detail: TitleDetail, showTags: Boolean = true) {
     val rows = detail.catalogDetailRows()
-    val tags = detail.tags.filter { it.isNotBlank() }
+    val tags = if (showTags) detail.tags.filter { it.isNotBlank() } else emptyList()
     if (rows.isEmpty() && tags.isEmpty()) return
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth().testTag("catalog-details")) {

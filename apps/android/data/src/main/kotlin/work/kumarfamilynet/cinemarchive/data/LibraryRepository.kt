@@ -102,6 +102,7 @@ class LibraryRepository(
     private val outbox: MutationOutbox,
     private val episodeMetadataFetcher: EpisodeMetadataFetcher,
     private val personCreditsDao: PersonCreditsDao,
+    private val mutationOwnerId: String? = null,
 ) {
     /**
      * Adds a catalog result to the library: an optimistic Room write of everything the title
@@ -907,41 +908,28 @@ class LibraryRepository(
         }
     }
 
-    /** Changes [titleId]'s status — an in-place update, not an append-only log, so the
-     *  outbox operation is "update" rather than "upsert". [updatedAt] feeds the
-     *  last-write-wins conflict resolution designed in docs/android-sync-contract.md §4.2,
-     *  so it must reflect when this change was made, not be left stale. */
-    suspend fun updateTitleStatus(titleId: String, status: LibraryStatus, updatedAt: String) {
-        outbox.atomically {
-            titleDao.updateStatus(titleId, status.name, updatedAt)
-            outbox.enqueue(
-                entityType = "title",
-                entityId = titleId,
-                operation = "update",
-                payload = JSONObject().apply {
-                    put("id", titleId)
-                    put("status", status.name)
-                    put("updatedAt", updatedAt)
-                },
-            )
-        }
-    }
+    /** Future title edits use exact server revisions/receipt predecessors; legacy timestamps are not CAS inputs. */
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun updateTitleStatus(titleId: String, status: LibraryStatus, updatedAt: String) =
+        updateTitleMetadata(titleId, JSONObject().put("status", status.name.lowercase()))
 
     /** Sets [titleId]'s own rating (distinct from per-episode ratings) — same in-place
      *  update contract as [updateTitleStatus]. */
-    suspend fun updateTitleRating(titleId: String, rating: Double, updatedAt: String) {
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun updateTitleRating(titleId: String, rating: Double, updatedAt: String) =
+        updateTitleMetadata(titleId, JSONObject().put("rating", rating))
+
+    suspend fun updateTitleTags(titleId: String, tags: List<String>) =
+        updateTitleMetadata(titleId, JSONObject().put("tags", org.json.JSONArray(tags)))
+
+    private suspend fun updateTitleMetadata(titleId: String, patch: JSONObject) {
+        val ownerId = checkNotNull(mutationOwnerId) { "Title edits require an account runtime." }
         outbox.atomically {
-            titleDao.updateRating(titleId, rating, updatedAt)
-            outbox.enqueue(
-                entityType = "title",
-                entityId = titleId,
-                operation = "update",
-                payload = JSONObject().apply {
-                    put("id", titleId)
-                    put("rating", rating)
-                    put("updatedAt", updatedAt)
-                },
-            )
+            val previous = checkNotNull(titleDao.getById(titleId)) { "This title was removed." }
+            val next = previous.withTitleMetadata(patch)
+            if (next == previous) return@atomically
+            titleDao.upsertAll(listOf(next))
+            outbox.enqueueTitleMetadata(previous, patch, ownerId)
         }
     }
 }

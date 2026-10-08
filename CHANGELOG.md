@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android title details now support editing tags, with durable status/rating changes and explicit comparison and recovery for saved edits.
 - The shared sync feed now includes saved watch links, physical collections, content ratings and critic/accolade metadata for Android clients that support those fields.
 - Android list membership changes now use the list-and-title identity, reconcile concurrent additions, and preserve later removals across retries.
 - Android outing changes now preserve the causal order of pending guarded ticket changes and retain uncertain ticket confirmations for retry.

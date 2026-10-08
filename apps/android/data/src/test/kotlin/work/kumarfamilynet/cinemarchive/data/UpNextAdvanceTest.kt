@@ -31,6 +31,7 @@ class UpNextAdvanceTest {
             override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = EpisodeCast.EMPTY
         },
         personCreditsDao = db.personCreditsDao(),
+        mutationOwnerId = TitleMetadataFixture.owner,
     )
     @Before fun setUp() = runBlocking {
         db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext<Context>(), LibraryDatabase::class.java).allowMainThreadQueries().build()
@@ -85,7 +86,10 @@ class UpNextAdvanceTest {
         assertTrue(db.episodeWatchEventDao().observeAllWatchEvents().first().none { it.episodeId == "special" })
         repo.markSeriesWatched("title")
         assertEquals("WATCHED", db.titleDao().getById("title")!!.status)
-        assertEquals("WATCHED", JSONObject(db.outboxDao().getPending().last().payloadJson).getString("status"))
+        val command = db.outboxDao().getPending().last()
+        assertEquals(TITLE_METADATA_COMMAND, command.operation)
+        assertEquals("watched", titleMetadataPatch(command, TitleMetadataFixture.owner).getString("status"))
+        assertEquals("2026-01-01T00:00:00Z", titleMetadataOperation(command, TitleMetadataFixture.owner).getString("expectedUpdatedAt"))
     }
 
     @Test fun exactUndoPreservesConcurrentRewatchAndIndependentRatingReview() = runBlocking {

@@ -101,6 +101,7 @@ class AppAccountRuntime(
         appliedHandler = work.kumarfamilynet.cinemarchive.data.AppliedMutationHandler { entry, receipt ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             when (entry.entityType) {
+                "title" -> work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
                 "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
                 "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
                 "list_item" -> work.kumarfamilynet.cinemarchive.data.ListMembershipApplier(database, ownerId).apply(entry, receipt)
@@ -122,6 +123,11 @@ class AppAccountRuntime(
 
     val accountRepository = AccountRepository(client, session::currentSession)
     val catalogExtrasRepository = work.kumarfamilynet.cinemarchive.data.CatalogExtrasRepository(client, session)
+    val titleMetadataRepository = work.kumarfamilynet.cinemarchive.data.TitleMetadataRepository(
+        database, outbox, ownerId, session, work.kumarfamilynet.cinemarchive.data.TitleMetadataTransport(client, session),
+        synchronize = { librarySyncRepository.syncNow() },
+        replayBoundary = { action -> librarySyncRepository.withDurableReplay(action) },
+    )
     val notificationsRepository = NotificationsRepository(client, session::currentSession)
     val friendsRepository = FriendsRepository(client, session::currentSession)
     val sharingRepository = work.kumarfamilynet.cinemarchive.data.SharingRepository(
@@ -173,6 +179,7 @@ class AppAccountRuntime(
         outbox = outbox,
         episodeMetadataFetcher = discoverRepository,
         personCreditsDao = database.personCreditsDao(),
+        mutationOwnerId = ownerId,
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)

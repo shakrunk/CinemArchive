@@ -48,4 +48,8 @@ interface OutboxDao {
     /** Preserve SQLite rowid/FIFO order while pausing an intent for explicit user review. */
     @Query("UPDATE mutation_outbox SET operation = 'review', lastError = :reason WHERE id = :id")
     suspend fun markForReview(id: String, reason: String): Int
+
+    /** Explicit reviewed replacement gets a fresh operation ID without changing FIFO rowid. */
+    @Query("UPDATE mutation_outbox SET id = :newId, operation = :newOperation, payloadJson = :newPayload, attemptCount = 0, lastError = NULL WHERE id = :oldId AND entityType = 'title' AND operation = 'review' AND payloadJson = :originalPayload")
+    suspend fun replaceReviewedTitle(oldId: String, originalPayload: String, newId: String, newOperation: String, newPayload: String): Int
 }

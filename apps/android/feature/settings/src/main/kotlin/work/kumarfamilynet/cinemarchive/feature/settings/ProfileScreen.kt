@@ -86,6 +86,7 @@ fun ProfileRoute(
     // the only feedback needed before the screen it names takes over.
     selectedCategory: SettingsCategory? = null,
     outingRecovery: (@Composable () -> Unit)? = null,
+    titleChangesContent: (@Composable () -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -121,6 +122,7 @@ fun ProfileRoute(
         onSignOut = authRepository::signOut,
         selectedCategory = selectedCategory,
         outingRecovery = outingRecovery,
+        titleChangesContent = titleChangesContent,
     )
 }
 
@@ -184,6 +186,7 @@ private fun ProfileScreen(
     onSignOut: () -> Unit,
     selectedCategory: SettingsCategory? = null,
     outingRecovery: (@Composable () -> Unit)? = null,
+    titleChangesContent: (@Composable () -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -371,6 +374,7 @@ private fun ProfileScreen(
                 ReadingWidthColumn {
                     if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
                     if (signedInEmail != null) outingRecovery?.invoke()
+                    if (signedInEmail != null) titleChangesContent?.invoke()
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

@@ -117,6 +117,17 @@ class TitleDetailViewModel(
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
 ) : ViewModel() {
     val catalogExtras = catalogExtrasSource?.let { CatalogExtrasController(it, viewModelScope) }
+    private val _titleEditError = MutableStateFlow<String?>(null)
+    val titleEditError = _titleEditError.asStateFlow()
+    private fun editTitle(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            _titleEditError.value = null
+            try { block() }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { _titleEditError.value = "Couldn't save this title change. Try again." }
+        }
+    }
+    suspend fun saveTags(tags: List<String>) = repository.updateTitleTags(titleId, tags)
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -170,7 +181,7 @@ class TitleDetailViewModel(
     suspend fun deleteViewing(viewingId: String) = repository.deleteViewing(titleId, viewingId)
 
     fun onChangeStatus(status: LibraryStatus) {
-        viewModelScope.launch { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
+        editTitle { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
     }
 
     /** "I want to see this in theaters" (GitHub #205). */
@@ -179,7 +190,7 @@ class TitleDetailViewModel(
     }
 
     fun onRateTitle(rating: Double) {
-        viewModelScope.launch { repository.updateTitleRating(titleId, rating, Instant.now().toString()) }
+        editTitle { repository.updateTitleRating(titleId, rating, Instant.now().toString()) }
     }
 
     fun onScheduleOuting(
@@ -288,10 +299,12 @@ fun TitleDetailRoute(
     onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
     onRefreshCredits: (suspend () -> Boolean)? = null,
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
+    titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
 ) {
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
+    val titleEditError by viewModel.titleEditError.collectAsStateWithLifecycle()
     val languageTag = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].toLanguageTag()
     val catalogKey = detail?.let { current -> current.tmdbId?.takeIf { it > 0 }?.let {
             work.kumarfamilynet.cinemarchive.core.model.CatalogExtrasKey(it, current.type,
@@ -353,6 +366,9 @@ fun TitleDetailRoute(
         catalogExtrasState = catalogExtrasState,
         onRetryVideos = { viewModel.catalogExtras?.retryVideos() },
         onRetryProviders = { viewModel.catalogExtras?.retryProviders() },
+        onSaveTags = viewModel::saveTags,
+        titleEditError = titleEditError,
+        titleMetadataRecovery = titleMetadataRecovery,
     )
 }
 
@@ -394,6 +410,9 @@ fun TitleDetailScreen(
     catalogExtrasState: CatalogExtrasState? = null,
     onRetryVideos: () -> Unit = {},
     onRetryProviders: () -> Unit = {},
+    onSaveTags: (suspend (List<String>) -> Unit)? = null,
+    titleEditError: String? = null,
+    titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -590,7 +609,18 @@ fun TitleDetailScreen(
 
             item(key = "catalog-details") {
                 ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
-                    CatalogDetailsSection(detail)
+                    CatalogDetailsSection(detail, showTags = onSaveTags == null)
+                }
+            }
+            if (onSaveTags != null || titleEditError != null || titleMetadataRecovery != null) {
+                item(key = "title-metadata-edits") {
+                    ReadingWidthColumn(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            onSaveTags?.let { TitleTagsEditor(detail.id, detail.tags, it) }
+                            titleEditError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            titleMetadataRecovery?.let { TitleMetadataRecoveryPanel(it, detail.id) }
+                        }
+                    }
                 }
             }
             if (catalogExtrasState?.key != null) {

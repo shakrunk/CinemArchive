@@ -14,6 +14,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
-    exclude: ['node_modules', 'dist', 'e2e'],
+    // SQL suites use node:test with real embedded PostgreSQL, not jsdom.
+    exclude: ['node_modules', 'dist', 'e2e', 'scripts/**'],
   },
 })

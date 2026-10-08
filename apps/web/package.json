@@ -10,6 +10,7 @@
     "lint:ci": "eslint . --max-warnings 48",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:db": "node scripts/library-command.test.mjs",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
     "test:ui": "vitest --ui"
@@ -33,6 +34,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

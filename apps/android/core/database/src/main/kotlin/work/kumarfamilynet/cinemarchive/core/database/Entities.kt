@@ -190,6 +190,8 @@ data class ViewingEntity(
     // Feeds the Ledger "At the Movies" widget (docs/android-contracts/ledger.md §2/§3).
     val companions: List<String> = emptyList(),
     val outingId: String? = null,
+    // Null means no server revision is known; local timestamps must never become CAS baselines.
+    val updatedAt: String? = null,
 )
 
 /**

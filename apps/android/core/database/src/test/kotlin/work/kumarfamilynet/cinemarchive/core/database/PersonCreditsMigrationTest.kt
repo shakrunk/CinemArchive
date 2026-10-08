@@ -22,9 +22,20 @@ class PersonCreditsMigrationTest {
         val fixture = builder().build()
         try {
             val old = fixture.openHelper.writableDatabase
+            old.execSQL("DROP TABLE viewing_completion_aliases")
+            old.execSQL("DROP TABLE viewings")
             old.execSQL("DROP TABLE season_cast")
             old.execSQL("DROP TABLE episode_crew")
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/14.json").readText()).getJSONObject("database")
+            val entities = schema.getJSONArray("entities")
+            for (index in 0 until entities.length()) {
+                val entity = entities.getJSONObject(index)
+                if (entity.getString("tableName") != "viewings") continue
+                fun String.tableSql() = replace("\${TABLE_NAME}", "viewings")
+                old.execSQL(entity.getString("createSql").tableSql())
+                val indices = entity.getJSONArray("indices")
+                for (i in 0 until indices.length()) old.execSQL(indices.getJSONObject(i).getString("createSql").tableSql())
+            }
             val setup = schema.getJSONArray("setupQueries")
             for (i in 0 until setup.length()) old.execSQL(setup.getString(i))
             old.execSQL("INSERT INTO titles (id,tmdbId,type,title,genres,status,addedAt,updatedAt,tags,studios,collectionId,collectionName) VALUES ('title',42,'TV','A show','','WATCHING','2026-01-01','2026-01-01','favorite','Studio',7,'Saga')")
@@ -35,7 +46,7 @@ class PersonCreditsMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 14
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_14_15).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_14_15, LibraryDatabase.MIGRATION_15_16).build()
         try {
             assertEquals(listOf("favorite"), upgraded.titleDao().getById("title")!!.tags)
             assertEquals("A memory", upgraded.episodeWatchEventDao().observeAllWatchEvents().first().single().notes)

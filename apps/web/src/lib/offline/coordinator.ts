@@ -1,6 +1,7 @@
 import { createCommand, sameScope, scopeKey, type Mutation, type OfflineScope, type PendingCommand } from './commands'
 import { replayPending } from './replay'
 import { mutationEntities } from './entities'
+import type { TicketCapture } from '../tickets/types'
 import type { OfflineSnapshot } from './snapshot'
 import { IndexedDbOfflineStore, type OfflineRead } from './storage'
 
@@ -113,6 +114,22 @@ export class OfflineCoordinator {
     const read = await this.options.store.append(command)
     this.publish(session, read)
     return read.document.commands.find((entry) => entry.id === command.id)!
+  }
+
+  async attachTicket(outingId: string, capture: TicketCapture, blob: Blob, id = crypto.randomUUID()): Promise<PendingCommand> {
+    const session = this.capture()
+    const read = await this.options.store.attachTicket(session.scope, outingId, capture, blob, { id })
+    this.publish(session, read)
+    if (!this.current(session)) throw new Error('The ticket was saved for the previous account; the account has now changed')
+    return read.document.commands.find((command) => command.id === id)!
+  }
+
+  async detachTicket(outingId: string, id = crypto.randomUUID()): Promise<PendingCommand> {
+    const session = this.capture()
+    const read = await this.options.store.detachTicket(session.scope, outingId, { id })
+    this.publish(session, read)
+    if (!this.current(session)) throw new Error('The ticket change was saved for the previous account; the account has now changed')
+    return read.document.commands.find((command) => command.id === id)!
   }
 
   /** Re-read after another tab's broadcast/storage event. No network needed. */

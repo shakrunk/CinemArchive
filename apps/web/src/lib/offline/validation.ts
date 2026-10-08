@@ -1,6 +1,8 @@
 import type { Mutation, OfflineScope, PendingCommand } from './commands'
 import type { OfflineSnapshot } from './snapshot'
 import { mutationRows } from './preconditions'
+import { isTicketAttachment, isTicketId, isValidTicketMutation, ticketObjectKey } from '../tickets/validation'
+import { isTicketMutation } from '../tickets/types'
 
 type Check = (value: unknown) => boolean
 type Fields = Record<string, Check>
@@ -68,6 +70,9 @@ const outingOptional: Fields = {
   previousStatus: status, completedViewingId: id, followUpDismissedAt: timestamp,
 }
 const outing = shape({ id, titleId: id, createdAt: timestamp, ...outingRequired }, outingOptional)
+const outingSnapshot = shape({ id, titleId: id, createdAt: timestamp, ...outingRequired }, {
+  ...outingOptional, ticketAttachment: isTicketAttachment, ticketManaged: boolean, ticketImagePath: text, ticketBarcodePayload: text, ticketBarcodeFormat: text,
+})
 const list = shape({ id, name: text, description: nullable(text), createdAt: timestamp, updatedAt: timestamp })
 // Keep panel IDs as strings so stored boards survive new panel releases. The UI's
 // normalizer owns which panels can currently render, not the durable journal.
@@ -105,7 +110,7 @@ function isLeaf(value: unknown): boolean {
   return record(value) && typeof value.kind === 'string' && Object.hasOwn(checks, value.kind) && checks[value.kind](value)
 }
 export function assertMutation(value: unknown): asserts value is Mutation {
-  const valid = isLeaf(value) || (record(value) && value.kind === 'batch' &&
+  const valid = isLeaf(value) || isValidTicketMutation(value) || (record(value) && value.kind === 'batch' &&
     shape({ kind: text, mutations: (v) => Array.isArray(v) && v.length > 0 && v.length <= 10_000 && v.every(isLeaf) })(value))
   if (!valid) throw new Error('Invalid or unsupported offline mutation')
 }
@@ -121,6 +126,10 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     preconditions: array(precondition),
   })(value)) throw new Error('Invalid or unsupported offline command')
   const command = value as PendingCommand
+  if (isTicketMutation(command.mutation)) {
+    if (!isTicketId(command.id) || command.baseRevision || command.preconditions?.length) throw new Error('Ticket commands use attachment CAS, not row revision guards')
+    if (command.mutation.kind === 'ticket.attach' && command.mutation.attachment.objectKey !== ticketObjectKey(command.scope, command.mutation.attachment.id)) throw new Error('Ticket attachment belongs to another owner')
+  }
   const rows = mutationRows(command.mutation)
   const guarded = new Set<string>()
   for (const condition of command.preconditions ?? []) {
@@ -132,7 +141,7 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
   }
 }
 export function assertSnapshot(value: unknown): asserts value is OfflineSnapshot {
-  if (!shape({ titles: array(title), outings: array(outing), lists: array(list),
+  if (!shape({ titles: array(title), outings: array(outingSnapshot), lists: array(list),
     listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
   }, { rowRevisions: dictionary(timestamp) })(value)) throw new Error('Invalid or unsupported offline snapshot')
 }

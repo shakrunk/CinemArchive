@@ -9,7 +9,7 @@ test.beforeEach(async ({ context, page }) => {
   await page.evaluate(async () => {
     const scope = { projectId: 'unconfigured-local', userId: 'anonymous-local-only' }
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('cinemarchive-anonymous-v1', 1)
+      const request = indexedDB.open('cinemarchive-anonymous-v1')
       request.onupgradeneeded = () => {
         request.result.createObjectStore('owners')
         request.result.createObjectStore('quarantine', { keyPath: 'id' }).createIndex('scopeKey', 'scopeKey')

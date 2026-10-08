@@ -7,6 +7,7 @@ import type { Mutation, OutingPatch, TrackingMutation, ViewingPatch } from '../l
 import type { OutingSharePayload } from './outings'
 import { localDateStr } from './outings'
 import type { SyncOutcome } from '../lib/sync/core'
+import { isTicketMutation, TICKET_OUTING_FIELDS } from '../lib/tickets/types'
 
 export interface LibraryActionState {
   titles: Title[]; outings: CinemaOuting[]; lists: List[]
@@ -16,7 +17,11 @@ export interface LibraryActionState {
 }
 export type LibraryWrite = <T>(prepare: (state: LibraryActionState) => { mutation: Mutation | null; result: T }) => Promise<T>
 type EpisodeLog = { watchedAt?: string; prePlatform?: boolean; watchNotes?: string; rating?: number; reviewText?: string; colorMode?: 'bw' | 'color' }
-const leaves = (mutation: Mutation | null): TrackingMutation[] => !mutation ? [] : mutation.kind === 'batch' ? mutation.mutations : [mutation]
+const leaves = (mutation: Mutation | null): TrackingMutation[] => {
+  if (!mutation) return []
+  if (isTicketMutation(mutation)) throw new Error('Ticket changes cannot be combined with library commands')
+  return mutation.kind === 'batch' ? mutation.mutations : [mutation]
+}
 
 /** Every action builds a typed, immutable journal payload against the latest
  * projection inside the store's serialized local-write boundary. */
@@ -141,11 +146,12 @@ export function createLibraryActions(write: LibraryWrite, afterOutingRevert?: (o
     addOuting: (outing: CinemaOuting) => save(() => ({ kind: 'outing.create', outing })),
     setOutings: (values: CinemaOuting[]) => save((state) => compound([
       ...values.map((outing): TrackingMutation => state.outings.some((row) => row.id === outing.id)
-        ? { kind: 'outing.patch', outingId: outing.id, patch: explicitPatch(Object.fromEntries(Object.entries(outing).filter(([key]) => !['id', 'titleId', 'createdAt'].includes(key)))) as OutingPatch }
+        ? { kind: 'outing.patch', outingId: outing.id, patch: explicitPatch(Object.fromEntries(Object.entries(outing).filter(([key]) => !['id', 'titleId', 'createdAt', ...TICKET_OUTING_FIELDS].includes(key)))) as OutingPatch }
         : { kind: 'outing.create', outing }),
       ...state.outings.filter((old) => !values.some((value) => value.id === old.id)).map((old): TrackingMutation => ({ kind: 'outing.delete', outingId: old.id })),
     ])),
     updateOuting: (outingId: string, patch: Partial<CinemaOuting>) => save((state) => {
+      if (TICKET_OUTING_FIELDS.some((key) => Object.hasOwn(patch, key))) throw new Error('Use the ticket attachment controls to change a ticket')
       const existing = state.outings.find((outing) => outing.id === outingId)
       if (!existing) throw new Error('This outing no longer exists')
       const merged = { ...existing, ...patch }

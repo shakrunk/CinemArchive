@@ -3,6 +3,8 @@ import type { CastMember, CrewMember, Episode, EpisodeCrew, Season } from '../st
 import { sameScope, type PendingCommand, type TrackingMutation } from './offline/commands'
 import type { DeliveryContext, DeliveryResult } from './offline/coordinator'
 import type { OfflineSnapshot } from './offline/snapshot'
+import { isTicketMutation } from './tickets/types'
+import { assertCommand } from './offline/validation'
 
 export interface LibraryOperation {
   table: string
@@ -85,6 +87,7 @@ function seasonOperations(titleId: string, season: Season, recordedAt: string, r
 
 /** Pure mapping: retry uses exactly the same IDs, payload and recorded timestamps. */
 export function libraryOperations(command: PendingCommand): LibraryOperation[] {
+  if (isTicketMutation(command.mutation)) throw new Error('Ticket commands require their dedicated delivery adapter')
   const leaf = (mutation: TrackingMutation): LibraryOperation[] => {
     switch (mutation.kind) {
       case 'title.create': {
@@ -147,6 +150,7 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
 /** Run before durable admission as well as delivery. Reserve room for the
  * per-row revision guards that IndexedDB captures during its transaction. */
 export function assertDeliverableCommand(command: PendingCommand): void {
+  if (isTicketMutation(command.mutation)) { assertCommand(command); return }
   const operations = libraryOperations(command)
   // Pretty JSON conservatively covers PostgreSQL jsonb's spaces, including
   // separators inside large nested values that occupy only one operation.
@@ -163,8 +167,9 @@ export function classifyLibraryError(status: number, code: string | undefined, m
   return {kind:'failed',message}
 }
 
-export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContext)=>Promise<OfflineSnapshot>) {
+export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContext)=>Promise<OfflineSnapshot>, deliverTicket?: (command: PendingCommand, context: DeliveryContext) => Promise<DeliveryResult>) {
   return async (command: PendingCommand, context: DeliveryContext): Promise<DeliveryResult> => {
+    if (isTicketMutation(command.mutation)) return deliverTicket ? deliverTicket(command, context) : { kind: 'failed', message: 'Ticket attachment sync is not configured. Your saved photo remains on this device.' }
     const project=import.meta.env.VITE_SUPABASE_URL as string | undefined
     const key=import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
     if (!supabase || !project || !key) return {kind:'failed',message:'Library sync is not configured.'}

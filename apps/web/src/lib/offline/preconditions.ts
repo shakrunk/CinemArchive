@@ -42,6 +42,9 @@ export function mutationRows(mutation: Mutation): Row[] {
       case 'viewing.patch': case 'viewing.delete': return [{ table: 'viewings', id: leaf.viewingId, guard: true }]
       case 'outing.create': return [{ table: 'cinema_outings', id: leaf.outing.id, guard: false }]
       case 'outing.patch': case 'outing.delete': return [{ table: 'cinema_outings', id: leaf.outingId, guard: true }]
+      // Ticket CAS is independent of ordinary outing fields, but a following
+      // generic patch must use the ticket operation's canonical row receipt.
+      case 'ticket.attach': case 'ticket.detach': return [{ table: 'cinema_outings', id: leaf.outingId, guard: false }]
       case 'list.create': return [{ table: 'lists', id: leaf.list.id, guard: false }]
       case 'list.patch': case 'list.delete': return [{ table: 'lists', id: leaf.listId, guard: true }]
       default: return []

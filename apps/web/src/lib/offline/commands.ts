@@ -1,6 +1,7 @@
 import type { CinemaOuting, Episode, EpisodeRating, EpisodeReview, EpisodeWatchEvent, List, Season, Title, Viewing } from '../../store/mockData'
 import type { LedgerWidget } from '../ledgerPanels'
 import { assertCommand, assertMutation, assertScope } from './validation'
+import type { TicketMutation, TicketOutingField } from '../tickets/types'
 
 /** Project identity must be the configured Supabase project/URL, never an access token. */
 export interface OfflineScope { projectId: string; userId: string }
@@ -10,7 +11,7 @@ export const OFFLINE_VERSION = 1 as const
 export type FieldPatch<T> = { [K in keyof T]?: T[K] | (undefined extends T[K] ? null : never) }
 export type TitlePatch = FieldPatch<Omit<Title, 'id' | 'viewings' | 'seasons' | 'addedAt'>>
 export type ViewingPatch = FieldPatch<Omit<Viewing, 'id' | 'titleId'>>
-export type OutingPatch = FieldPatch<Omit<CinemaOuting, 'id' | 'titleId' | 'createdAt'>>
+export type OutingPatch = FieldPatch<Omit<CinemaOuting, 'id' | 'titleId' | 'createdAt' | TicketOutingField>>
 
 export type TrackingMutation =
   | { kind: 'title.create'; title: Title }
@@ -37,7 +38,7 @@ export type TrackingMutation =
 
 /** A compound user action is one journal record and one delivery hook invocation.
  * The remote writer must supply transactional semantics for compound actions. */
-export type Mutation = TrackingMutation | { kind: 'batch'; mutations: TrackingMutation[] }
+export type Mutation = TrackingMutation | TicketMutation | { kind: 'batch'; mutations: TrackingMutation[] }
 
 export type RevisionTable = 'titles' | 'lists' | 'cinema_outings' | 'seasons' | 'episodes' | 'viewings' | 'episode_watch_events' | 'episode_ratings' | 'episode_reviews'
 export type RowPrecondition = { table: RevisionTable; id: string } & ({ updatedAt: string; afterCommandId?: never } | { afterCommandId: string; updatedAt?: never })

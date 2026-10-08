@@ -1,6 +1,7 @@
 import type { Episode, Season, Title } from '../../store/mockData'
 import type { Mutation, PendingCommand, TrackingMutation } from './commands'
 import type { OfflineSnapshot } from './snapshot'
+import type { TicketMutation } from '../tickets/types'
 
 function put<T extends { id: string }>(rows: T[], row: T): T[] {
   return rows.some((r) => r.id === row.id) ? rows.map((r) => r.id === row.id ? row : r) : [...rows, row]
@@ -80,7 +81,7 @@ function episode(state: OfflineSnapshot, titleId: string, episodeId: string, cha
   }) }))
 }
 
-function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation): OfflineSnapshot {
+function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMutation): OfflineSnapshot {
   switch (mutation.kind) {
     case 'title.create':
       return state.titles.some((t) => t.id === mutation.title.id)
@@ -114,6 +115,8 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation): OfflineS
     case 'outing.create': return state.outings.some((o) => o.id === mutation.outing.id) ? state : { ...state, outings: [mutation.outing, ...state.outings] }
     case 'outing.patch': return { ...state, outings: state.outings.map((o) => o.id === mutation.outingId ? fields(o, mutation.patch) : o) }
     case 'outing.delete': return { ...state, outings: state.outings.filter((o) => o.id !== mutation.outingId) }
+    case 'ticket.attach': return { ...state, outings: state.outings.map((o) => o.id === mutation.outingId ? { ...o, ticketAttachment: mutation.attachment, ticketManaged: true } : o) }
+    case 'ticket.detach': return { ...state, outings: state.outings.map((o) => o.id === mutation.outingId ? fields(o, { ticketAttachment: null, ticketManaged: true }) : o) }
     case 'list.create': return state.lists.some((l) => l.id === mutation.list.id) ? state : { ...state, lists: [mutation.list, ...state.lists] }
     // description=null is a required nullable model field, not property removal.
     case 'list.patch': return { ...state, lists: state.lists.map((l) => l.id === mutation.listId ? { ...l, ...mutation.patch, updatedAt: mutation.updatedAt } : l) }

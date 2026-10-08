@@ -101,6 +101,13 @@ export interface Companion {
  *  scheduled → completed | missed | cancelled (see plan §4.2). Movies only
  *  in v1. Owner-private — never fetched in shared/friend views. */
 export interface CinemaOuting {
+  /** Managed exclusively by the ticket attachment journal. */
+  ticketAttachment?: import('../lib/tickets/types').TicketAttachment
+  ticketManaged?: boolean
+  /** Legacy recovery only: never interpret a synced local path as a browser URL. */
+  ticketImagePath?: string
+  ticketBarcodePayload?: string
+  ticketBarcodeFormat?: string
   id: string
   titleId: string
   showtime: string            // ISO datetime (absolute instant)

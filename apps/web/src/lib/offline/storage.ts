@@ -1,13 +1,16 @@
-import { OFFLINE_VERSION, omitUndefined, sameScope, scopeKey, type Mutation, type OfflineScope, type PendingCommand } from './commands'
+import { createCommand, OFFLINE_VERSION, omitUndefined, sameScope, scopeKey, type Mutation, type OfflineScope, type PendingCommand } from './commands'
 import { applyMutation } from './replay'
 import { replayPending } from './replay'
 import { mutationEntities } from './entities'
 import { capturePreconditions } from './preconditions'
 import { emptySnapshot, type OfflineSnapshot } from './snapshot'
 import { assertCommand, assertMutation, assertSnapshot } from './validation'
+import { isTicketMutation, type TicketAttachment, type TicketBlobRecord, type TicketCapture } from '../tickets/types'
+import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObjectKey } from '../tickets/validation'
 
 const DOCUMENTS = 'owners'
 const QUARANTINE = 'quarantine'
+const TICKET_BLOBS = 'ticketBlobs'
 export const OFFLINE_DATABASE = 'cinemarchive-offline-v1'
 
 export interface OwnerDocument {
@@ -43,6 +46,9 @@ function validateDocument(raw: unknown, scope: OfflineScope): asserts raw is Own
     throw new Error('Invalid offline owner record counters')
   }
   assertSnapshot(d.base)
+  for (const outing of d.base.outings) {
+    if (outing.ticketAttachment && outing.ticketAttachment.objectKey !== ticketObjectKey(scope, outing.ticketAttachment.id)) throw new Error('Stored ticket belongs to another owner')
+  }
   const ids = new Set<string>()
   let previous = 0
   for (const command of d.commands) {
@@ -54,6 +60,27 @@ function validateDocument(raw: unknown, scope: OfflineScope): asserts raw is Own
     previous = command.sequence
   }
 }
+
+function appendToDocument(d: OwnerDocument, command: PendingCommand): void {
+  const existing = d.commands.find((c) => c.id === command.id)
+  if (existing) {
+    if (JSON.stringify(existing.mutation) !== JSON.stringify(command.mutation) || command.dependsOn.some((id) => !existing.dependsOn.includes(id)) ||
+        (command.preconditions && JSON.stringify(existing.preconditions) !== JSON.stringify(command.preconditions))) throw new Error('An operation ID cannot be reused for a different command')
+    return
+  }
+  if (command.dependsOn.some((id) => !d.commands.some((c) => c.id === id))) throw new Error('Unknown command dependency')
+  const projection = replayPending(d.base, d.commands)
+  const entities = mutationEntities(command.mutation, projection)
+  const prerequisites = new Set<string>()
+  for (const key of entities) {
+    const prior = [...d.commands].reverse().find((pending) => mutationEntities(pending.mutation, projection).has(key))
+    if (prior) prerequisites.add(prior.id)
+  }
+  const preconditions = command.preconditions ?? capturePreconditions(command.mutation, d.base, d.commands)
+  d.commands.push({ ...command, ...(preconditions.length ? { preconditions } : {}),
+    dependsOn: [...new Set([...command.dependsOn, ...prerequisites])], sequence: d.nextSequence++, state: 'pending', attempts: 0, nextAttemptAt: 0 })
+}
+const ticketBlobKey = (scope: OfflineScope, attachmentId: string) => JSON.stringify([scope.projectId, scope.userId, attachmentId])
 
 /** The owner base and journal are one IndexedDB record. Each read/modify/write
  * uses one transaction, so two tabs cannot overwrite each other's appends and
@@ -72,11 +99,12 @@ export class IndexedDbOfflineStore {
         reject(new OfflineStorageError('Browser offline storage is unavailable', error)); return
       }
       if (!factory) { reject(new OfflineStorageError('Browser offline storage is unavailable')); return }
-      const request = factory.open(this.options.databaseName ?? OFFLINE_DATABASE, 1)
+      const request = factory.open(this.options.databaseName ?? OFFLINE_DATABASE, 2)
       let abandoned = false
       request.onupgradeneeded = () => {
         const db = request.result
         if (!db.objectStoreNames.contains(DOCUMENTS)) db.createObjectStore(DOCUMENTS)
+        if (!db.objectStoreNames.contains(TICKET_BLOBS)) db.createObjectStore(TICKET_BLOBS)
         if (!db.objectStoreNames.contains(QUARANTINE)) {
           db.createObjectStore(QUARANTINE, { keyPath: 'id' }).createIndex('scopeKey', 'scopeKey')
         }
@@ -102,11 +130,11 @@ export class IndexedDbOfflineStore {
     if (pending) (await pending).close()
   }
 
-  private async transact(scope: OfflineScope, change?: (document: OwnerDocument) => void): Promise<OfflineRead> {
+  private async transact(scope: OfflineScope, change?: (document: OwnerDocument, tx: IDBTransaction) => void): Promise<OfflineRead> {
     const key = scopeKey(scope)
     const db = await this.open()
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([DOCUMENTS, QUARANTINE], 'readwrite')
+      const tx = db.transaction([DOCUMENTS, QUARANTINE, TICKET_BLOBS], 'readwrite')
       const owners = tx.objectStore(DOCUMENTS)
       const quarantine = tx.objectStore(QUARANTINE)
       let result: OfflineRead | undefined
@@ -128,7 +156,7 @@ export class IndexedDbOfflineStore {
           }
           document ??= emptyDocument(scope)
           if (change) {
-            change(document)
+            change(document, tx)
             document.revision++
             validateDocument(document, scope)
             owners.put(document, key)
@@ -165,31 +193,79 @@ export class IndexedDbOfflineStore {
 
   append(command: PendingCommand): Promise<OfflineRead> {
     assertCommand(command)
+    if (isTicketMutation(command.mutation)) throw new Error('Ticket changes require the atomic ticket storage API')
     const captured: PendingCommand = JSON.parse(JSON.stringify(command))
-    return this.transact(captured.scope, (d) => {
-      const command = captured
-      const existing = d.commands.find((c) => c.id === command.id)
+    return this.transact(captured.scope, (d) => appendToDocument(d, captured))
+  }
+
+  async attachTicket(scope: OfflineScope, outingId: string, capture: TicketCapture, blob: Blob, options: { id?: string; localOnly?: boolean } = {}): Promise<OfflineRead> {
+    scope = { ...scope }
+    options = { ...options }
+    const attachment: TicketAttachment = JSON.parse(JSON.stringify({ ...capture, objectKey: ticketObjectKey(scope, capture.id) }))
+    await assertTicketBytes(blob, attachment)
+    return this.changeTicket(scope, outingId, { attachment, blob }, options)
+  }
+
+  detachTicket(scope: OfflineScope, outingId: string, options: { id?: string; localOnly?: boolean } = {}): Promise<OfflineRead> {
+    return this.changeTicket(scope, outingId, undefined, options)
+  }
+
+  private changeTicket(scope: OfflineScope, outingId: string, capture: { attachment: TicketAttachment; blob: Blob } | undefined, options: { id?: string; localOnly?: boolean }): Promise<OfflineRead> {
+    scope = { ...scope }
+    const operationId = options.id ?? crypto.randomUUID()
+    const localOnly = options.localOnly === true
+    const createdAt = new Date().toISOString()
+    return this.transact(scope, (document, tx) => {
+      const projection = replayPending(document.base, document.commands)
+      const outing = projection.outings.find((row) => row.id === outingId)
+      if (!outing) throw new Error('This outing no longer exists')
+      const existing = document.commands.find((command) => command.id === operationId)
       if (existing) {
-        if (JSON.stringify(existing.mutation) !== JSON.stringify(command.mutation) || command.dependsOn.some((id) => !existing.dependsOn.includes(id)) ||
-            (command.preconditions && JSON.stringify(existing.preconditions) !== JSON.stringify(command.preconditions))) {
-          throw new Error('An operation ID cannot be reused for a different command')
-        }
+        const previous = existing.mutation
+        if (!isTicketMutation(previous) || previous.outingId !== outingId ||
+            (capture ? previous.kind !== 'ticket.attach' || !sameTicketAttachment(previous.attachment, capture.attachment) : previous.kind !== 'ticket.detach')) throw new Error('An operation ID cannot be reused for a different ticket')
         return
       }
-      // A dependency must already exist in this owner's journal. Once it is
-      // acknowledged it is removed from dependent commands atomically below.
-      if (command.dependsOn.some((id) => !d.commands.some((c) => c.id === id))) throw new Error('Unknown command dependency')
-      const projection = replayPending(d.base, d.commands)
-      const entities = mutationEntities(command.mutation, projection)
-      const prerequisites = new Set<string>()
-      for (const key of entities) {
-        const prior = [...d.commands].reverse().find((pending) => mutationEntities(pending.mutation, projection).has(key))
-        if (prior) prerequisites.add(prior.id)
+      const expectedAttachmentId = outing.ticketAttachment?.id ?? null
+      const mutation = capture ? { kind: 'ticket.attach' as const, outingId, expectedAttachmentId, attachment: capture.attachment }
+        : { kind: 'ticket.detach' as const, outingId, expectedAttachmentId }
+      const command = createCommand(scope, mutation, { id: operationId, createdAt })
+      if (capture) {
+        const records = tx.objectStore(TICKET_BLOBS)
+        const key = ticketBlobKey(scope, capture.attachment.id)
+        const lookup = records.get(key)
+        lookup.onsuccess = () => {
+          try {
+            const old = lookup.result as TicketBlobRecord | undefined
+            if (old) {
+              if (!old.scope || !sameScope(old.scope, scope) || old.outingId !== outingId || !isTicketAttachment(old.attachment) || !sameTicketAttachment(old.attachment, capture.attachment)) tx.abort()
+              return
+            }
+            records.add({ scope: { ...scope }, outingId, attachmentId: capture.attachment.id, attachment: capture.attachment, blob: capture.blob,
+              sha256: capture.attachment.sha256, byteLength: capture.blob.size, mimeType: capture.attachment.mimeType, createdAt, source: 'capture' } satisfies TicketBlobRecord, key)
+          } catch { tx.abort() }
+        }
       }
-      const preconditions = command.preconditions ?? capturePreconditions(command.mutation, d.base, d.commands)
-      d.commands.push({ ...command, ...(preconditions.length ? { preconditions } : {}),
-        dependsOn: [...new Set([...command.dependsOn, ...prerequisites])],
-        sequence: d.nextSequence++, state: 'pending', attempts: 0, nextAttemptAt: 0 })
+      if (localOnly) document.base = applyMutation(document.base, mutation)
+      else appendToDocument(document, command)
+    })
+  }
+
+  async readTicketBlob(scope: OfflineScope, attachmentId: string): Promise<TicketBlobRecord | null> {
+    scopeKey(scope)
+    const db = await this.open()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(TICKET_BLOBS, 'readonly')
+      const request = tx.objectStore(TICKET_BLOBS).get(ticketBlobKey(scope, attachmentId))
+      let record: TicketBlobRecord | null = null
+      request.onsuccess = () => {
+        const value = request.result as TicketBlobRecord | undefined
+        if (value && (!value.scope || !sameScope(value.scope, scope) || value.attachmentId !== attachmentId)) { tx.abort(); return }
+        record = value ?? null
+      }
+      tx.oncomplete = () => resolve(record)
+      tx.onabort = () => reject(new OfflineStorageError('Could not read this owner’s ticket photo', tx.error))
+      tx.onerror = () => reject(new OfflineStorageError('Could not read this owner’s ticket photo', tx.error))
     })
   }
 
@@ -205,6 +281,7 @@ export class IndexedDbOfflineStore {
   applyLocal(scope: OfflineScope, mutation: Mutation): Promise<OfflineRead> {
     const captured = omitUndefined(mutation)
     assertMutation(captured)
+    if (isTicketMutation(captured)) throw new Error('Ticket changes require the atomic ticket storage API')
     return this.transact(scope, (d) => { d.base = applyMutation(d.base, captured) })
   }
 

@@ -6,6 +6,7 @@ import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
 import type { Mutation, PendingCommand } from '../lib/offline/commands'
 import { createCommand } from '../lib/offline/commands'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
+import type { TicketCapture } from '../lib/tickets/types'
 
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
 export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
@@ -145,6 +146,32 @@ export class OfflineLibraryRuntime {
   }
   reload(): Promise<void> { return this.coordinator.reload() }
   flush(): Promise<void> { return this.coordinator.flush() }
+  async attachTicket(outingId: string, capture: TicketCapture, blob: Blob, id = crypto.randomUUID()): Promise<void> {
+    const generation = this.generation
+    if (this.ownerId) await this.coordinator.attachTicket(outingId, capture, blob, id)
+    else {
+      if (!this.ready) throw new Error('Local library is not ready')
+      const read = await this.anonymous.attachTicket(this.anonymousScope, outingId, capture, blob, { id, localOnly: true })
+      if (generation !== this.generation) throw new Error('Library account changed')
+      this.options.onSnapshot(read.document.base)
+    }
+    if (generation !== this.generation) throw new Error('Library account changed')
+    this.channel?.postMessage({ kind: 'changed' })
+    this.wake()
+  }
+  async detachTicket(outingId: string, id = crypto.randomUUID()): Promise<void> {
+    const generation = this.generation
+    if (this.ownerId) await this.coordinator.detachTicket(outingId, id)
+    else {
+      if (!this.ready) throw new Error('Local library is not ready')
+      const read = await this.anonymous.detachTicket(this.anonymousScope, outingId, { id, localOnly: true })
+      if (generation !== this.generation) throw new Error('Library account changed')
+      this.options.onSnapshot(read.document.base)
+    }
+    if (generation !== this.generation) throw new Error('Library account changed')
+    this.channel?.postMessage({ kind: 'changed' })
+    this.wake()
+  }
   submit(mutation: Mutation, options?: Parameters<OfflineCoordinator['submit']>[1]): Promise<PendingCommand> {
     return this.coordinator.submit(mutation, options).then((command) => {
       this.channel?.postMessage({ kind: 'changed' })

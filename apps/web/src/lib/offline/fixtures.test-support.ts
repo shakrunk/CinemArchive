@@ -26,7 +26,7 @@ export function deferred<T>() {
 /** Corrupt persisted bytes without bypassing the real IndexedDB transaction. */
 export function writeRawOwner(factory: IDBFactory, databaseName: string, raw: unknown): Promise<void> {
   return new Promise((resolve, reject) => {
-    const request = factory.open(databaseName, 1)
+    const request = factory.open(databaseName)
     request.onerror = () => reject(request.error)
     request.onsuccess = () => {
       const connection = request.result

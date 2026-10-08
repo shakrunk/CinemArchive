@@ -19,7 +19,7 @@ test('compact chart widgets expose complete keyboard-readable data and restore f
     }
     const scope = { projectId: 'unconfigured-local', userId: 'anonymous-local-only' }
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('cinemarchive-anonymous-v1', 1)
+      const request = indexedDB.open('cinemarchive-anonymous-v1')
       request.onupgradeneeded = () => {
         request.result.createObjectStore('owners')
         request.result.createObjectStore('quarantine', { keyPath: 'id' }).createIndex('scopeKey', 'scopeKey')

@@ -25,6 +25,8 @@ number is chosen.
 
 ### Added
 
+- Web: library edits, episode logs, viewings, outings, lists, imports, and Ledger changes now save durably on the device before confirming success, with account-isolated retries, conflict recovery, and multi-tab synchronization.
+
 - Library imports can sync larger TV histories atomically and retain provider identities without partially creating a title.
 
 - Android: shared links now open scoped, read-only libraries and Ledger statistics without signing in; owners can create, restrict, and revoke links from Profile.

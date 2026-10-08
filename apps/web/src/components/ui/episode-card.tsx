@@ -1,5 +1,6 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { scaledTextSize } from 'src/lib/textScale'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Eye, Check, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { avgEpisodeRating, isUnaired } from 'src/store/episodeUtils'
@@ -287,6 +288,7 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
   const [showSaved, setShowSaved] = useState(false)
   const [pendingLog, setPendingLog] = useState<EpLogState | null>(null)
   const [showNoirModal, setShowNoirModal] = useState(false)
+  const saving = useRef(false)
 
   const avg = avgEpisodeRating(episode)
   const watched = episode.watchEvents.length > 0
@@ -294,20 +296,24 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
   const hasReviews = episode.reviews.length > 0
   const histCols = [watched, hasRatings, hasReviews].filter(Boolean).length
 
-  function doSave(epLog: EpLogState, colorMode?: 'bw' | 'color') {
-    if (!epLog.includeWatch && epLog.rating === 0 && !epLog.reviewText.trim()) return
-    logEpisode(titleId, season.seasonNumber, episode.episodeNumber, {
+  async function doSave(epLog: EpLogState, colorMode?: 'bw' | 'color') {
+    if (saving.current || (!epLog.includeWatch && epLog.rating === 0 && !epLog.reviewText.trim())) return false
+    saving.current = true
+    const saved = await saveSucceeded(logEpisode(titleId, season.seasonNumber, episode.episodeNumber, {
       watchedAt: epLog.includeWatch && !epLog.prePlatform ? epLog.watchedAt : undefined,
       prePlatform: epLog.includeWatch && epLog.prePlatform ? true : undefined,
       watchNotes: epLog.includeWatch ? epLog.watchNotes : undefined,
       rating: epLog.rating > 0 ? epLog.rating : undefined,
       reviewText: epLog.reviewText.trim() || undefined,
       colorMode,
-    })
+    }))
+    saving.current = false
+    if (!saved) return false
     setLog(EMPTY_EP_LOG)
     setShowForm(false)
     setShowSaved(true)
     setTimeout(() => setShowSaved(false), 1500)
+    return true
   }
 
   function handleSubmit() {
@@ -321,9 +327,9 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
     }
   }
 
-  function handleNoirSelect(mode: 'bw' | 'color') {
+  async function handleNoirSelect(mode: 'bw' | 'color') {
     setShowNoirModal(false)
-    if (pendingLog) doSave(pendingLog, mode)
+    if (!pendingLog || !await doSave(pendingLog, mode)) return
     setPendingLog(null)
     // Surface the chosen mode to the drawer so the web overlay + theme fire
     // immediately on the first log, without needing a close/reopen.
@@ -399,7 +405,7 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
                       <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}>Remove?</div>
                       <div className="flex gap-2 mt-0.5">
                         <button type="button"
-                          onClick={() => { deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id); setPendingDeleteWeId(null) }}
+                          onClick={async () => { if (await saveSucceeded(deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id))) setPendingDeleteWeId(null) }}
                           className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                           style={{ color: 'var(--ember)', fontSize: scaledTextSize('10px') }}
                           aria-label="Confirm delete watch event"

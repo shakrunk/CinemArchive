@@ -1,6 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from './auth'
 import { collectRowRevisions } from './offline/preconditions'
+import type { DeliveryContext } from './offline/coordinator'
 import type {
   CastMember,
   CinemaOuting,
@@ -1357,9 +1358,15 @@ function mapDbOutingCompletionToLocal(row: any): OutingCompletionResult {
 // (validated server-side against pg_timezone_names, falling back to UTC);
 // only the viewing's calendar date needs it, since showtime/endsAt are
 // already absolute instants.
-export async function completeDueOutings(tz: string): Promise<OutingCompletionResult[]> {
+export async function completeDueOutings(tz: string, context?: DeliveryContext): Promise<OutingCompletionResult[]> {
   if (!supabase) return []
-  const { data, error } = await supabase.rpc('complete_due_outings', { p_tz: tz })
+  let request = supabase.rpc('complete_due_outings', { p_tz: tz })
+  if (context) {
+    const { data, error } = await supabase.auth.getSession()
+    if (error || !data.session || data.session.user.id !== context.scope.userId || !context.isCurrent()) throw new Error('Library owner changed before outing reconciliation')
+    request = request.setHeader('Authorization', `Bearer ${data.session.access_token}`).abortSignal(context.signal)
+  }
+  const { data, error } = await request
   unwrap(error, 'Error completing due outings:')
   return (data || []).map(mapDbOutingCompletionToLocal)
 }

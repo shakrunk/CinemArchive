@@ -1,3 +1,4 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { useEffect, useState, useMemo } from 'react'
 import { ListChecks, Plus, Trash2, ArrowLeft, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
@@ -13,11 +14,11 @@ function NewListForm() {
   const createList = useAppStore((s) => s.createList)
   const [name, setName] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    createList(trimmed)
+    if (!await saveSucceeded(createList(trimmed))) return
     setName('')
   }
 
@@ -142,8 +143,7 @@ function ListDetail({ list, onBack }: { list: List; onBack: () => void }) {
             <span className="font-sans text-xs text-muted-foreground">Delete this list?</span>
             <Button
               onClick={() => {
-                deleteList(list.id)
-                onBack()
+                void saveSucceeded(deleteList(list.id)).then((saved) => { if (saved) onBack() })
               }}
               className="h-8 bg-ember hover:bg-ember/80 text-white font-sans text-xs px-3"
             >

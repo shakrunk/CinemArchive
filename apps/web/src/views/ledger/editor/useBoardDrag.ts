@@ -4,7 +4,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
-import type { LedgerPanelId } from 'src/lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth } from 'src/lib/ledgerPanels'
 import { LEDGER_PANEL_WIDTH_SPANS, nearestPanelWidth } from 'src/lib/ledgerPanels'
 
 /** Which side edge a resize drag started from. Heights are standardized, so
@@ -17,6 +17,7 @@ interface ResizeMeta {
   startX: number
   startSpan: number
   colWidth: number
+  lastWidth: LedgerPanelWidth
 }
 
 interface DragMeta {
@@ -77,6 +78,38 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
   const reorderLedgerWidgets = useAppStore((s) => s.reorderLedgerWidgets)
   const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
   const setLedgerWidgetWidth = useAppStore((s) => s.setLedgerWidgetWidth)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const pendingPointerSave = useRef(false)
+  const pointerSaves = useRef<Array<{ gesture: object; work: () => Promise<void> }>>([])
+
+  // Coalesce pointer moves while IndexedDB commits. Every queued calculation
+  // reads the latest published board; the final pointer target is retained.
+  function savePointerChange(gesture: object, work: () => Promise<void>) {
+    const owner = useAppStore.getState().user?.id
+    const viewer = useAppStore.getState().viewerContext
+    const guarded = async () => {
+      const current = useAppStore.getState()
+      if (current.user?.id !== owner || current.viewerContext !== viewer || current.isSharedView) return
+      await work()
+    }
+    const last = pointerSaves.current.at(-1)
+    if (last?.gesture === gesture) last.work = guarded
+    else pointerSaves.current.push({ gesture, work: guarded })
+    if (pendingPointerSave.current) return
+    pendingPointerSave.current = true
+    setSaveError(null)
+    void (async () => {
+      try {
+        while (pointerSaves.current.length) {
+          await pointerSaves.current.shift()!.work()
+        }
+      } catch (caught) {
+        pointerSaves.current = []
+        flipRectsRef.current = null
+        setSaveError(caught instanceof Error ? caught.message : 'Could not save board changes. Try again.')
+      } finally { pendingPointerSave.current = false }
+    })()
+  }
 
   const itemRefs = useRef(new Map<string, HTMLDivElement>())
   const gridRef = useRef<HTMLDivElement>(null)
@@ -114,6 +147,8 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
   // right before triggering the store update that will move things; the
   // layout effect below then measures the after-state and plays the delta.
   const flipRectsRef = useRef<Map<string, DOMRect> | null>(null)
+
+  function clearFlipRects() { flipRectsRef.current = null }
 
   function captureFlipRects() {
     const rects = new Map<string, DOMRect>()
@@ -209,17 +244,17 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
         // slides the other panels around it, and re-anchors the held panel's
         // transform to its new slot. Read the order from the store: with
         // rapid pointermoves the `widgets` closure can be a render behind.
-        captureFlipRects()
-        const ids = useAppStore.getState().ledgerPrefs.widgets.map((w) => w.id)
-        const from = ids.indexOf(drag.id)
-        const to = ids.indexOf(hit)
-        if (from !== -1 && to !== -1 && from !== to) {
-          ids.splice(from, 1)
-          ids.splice(to, 0, drag.id)
-          reorderLedgerWidgets(ids)
-        } else {
-          flipRectsRef.current = null
-        }
+        savePointerChange(drag, async () => {
+          const ids = useAppStore.getState().ledgerPrefs.widgets.map((w) => w.id)
+          const from = ids.indexOf(drag.id)
+          const to = ids.indexOf(hit)
+          if (from !== -1 && to !== -1 && from !== to) {
+            captureFlipRects()
+            ids.splice(from, 1)
+            ids.splice(to, 0, drag.id)
+            await reorderLedgerWidgets(ids)
+          }
+        })
       }
     }
   }
@@ -261,6 +296,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
       startX: e.clientX,
       startSpan: LEDGER_PANEL_WIDTH_SPANS[widget.width],
       colWidth: gridWidth > 0 ? gridWidth / 12 : 100,
+      lastWidth: widget.width,
     }
     selectWidget(id)
     setResizingId(id)
@@ -274,9 +310,12 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     const dir = r.edge === 'w' ? -1 : 1
     const span = r.startSpan + (dir * (e.clientX - r.startX)) / r.colWidth
     const width = nearestPanelWidth(span)
-    if (width !== widgetById(r.id)?.width) {
-      captureFlipRects()
-      setLedgerWidgetWidth(r.id, width)
+    if (width !== r.lastWidth) {
+      r.lastWidth = width
+      savePointerChange(r, async () => {
+        captureFlipRects()
+        await setLedgerWidgetWidth(r.id, width)
+      })
     }
   }
 
@@ -330,7 +369,7 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     setPaletteOverId(hit)
   }
 
-  function handlePaletteItemPointerEnd(e: React.PointerEvent<HTMLDivElement>) {
+  async function handlePaletteItemPointerEnd(e: React.PointerEvent<HTMLDivElement>) {
     const drag = paletteDragRef.current
     paletteDragRef.current = null
     if (!drag) return
@@ -339,23 +378,28 @@ export function useBoardDrag({ selectWidget }: { selectWidget: (id: string | nul
     paletteOverRef.current = null
     setPaletteGhost(null)
     setPaletteOverId(null)
-    if (!drag.active) {
-      // A plain tap/click adds to the end of the board.
-      selectWidget(addLedgerWidget(drag.panel))
-      return
+    if (e.type === 'pointercancel' || (drag.active && !over)) return
+    setSaveError(null)
+    try {
+      captureFlipRects()
+      const newId = await addLedgerWidget(drag.panel)
+      // Select only after durable insertion. A later reorder failure leaves the
+      // saved widget selected at the end of the board, available for retry.
+      selectWidget(newId)
+      if (drag.active && over && over !== 'end') {
+        const ids = useAppStore.getState().ledgerPrefs.widgets.map((w) => w.id).filter((id) => id !== newId)
+        const index = ids.indexOf(over)
+        ids.splice(index < 0 ? ids.length : index, 0, newId)
+        await reorderLedgerWidgets(ids)
+      }
+    } catch (caught) {
+      clearFlipRects()
+      setSaveError(caught instanceof Error ? caught.message : 'Could not save board changes. Try again.')
     }
-    if (!over) return // dropped outside the board — cancel
-    captureFlipRects()
-    const newId = addLedgerWidget(drag.panel)
-    if (over !== 'end') {
-      const ids = widgets.map((w) => w.id)
-      ids.splice(ids.indexOf(over), 0, newId)
-      reorderLedgerWidgets(ids)
-    }
-    selectWidget(newId)
   }
 
   return {
+    saveError,
     itemRefs,
     gridRef,
     boardRef,

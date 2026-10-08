@@ -11,6 +11,7 @@ import { useOutingReconciler } from 'src/lib/useOutingReconciler'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
 import { NotificationStack } from 'src/components/NotificationStack'
+import { LibrarySyncStatus } from 'src/components/LibrarySyncStatus'
 import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
@@ -91,6 +92,7 @@ export default function App() {
   const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
   const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
   const user = useAppStore((s) => s.user)
+  const librarySession = useAppStore((s) => s.librarySession)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
   const closeCommandPalette = useAppStore((s) => s.closeCommandPalette)
@@ -289,6 +291,7 @@ export default function App() {
           />
 
           <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
+            <LibrarySyncStatus key={librarySession} />
             <Suspense fallback={<ViewLoadingFallback />}>
               {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
               {currentView === 'library' && <Library />}
@@ -308,19 +311,19 @@ export default function App() {
               sheet/modal's own transition doing the animating, not this
               boundary. */}
           {addTitleEverOpened && (
-            <Suspense fallback={null}><AddTitleWorkflow /></Suspense>
+            <Suspense fallback={null}><AddTitleWorkflow key={librarySession} /></Suspense>
           )}
           {detailDrawerEverOpened && (
-            <Suspense fallback={null}><TitleDetailDrawer /></Suspense>
+            <Suspense fallback={null}><TitleDetailDrawer key={librarySession} /></Suspense>
           )}
           {refreshMetadataEverOpened && (
-            <Suspense fallback={null}><RefreshMetadataModal /></Suspense>
+            <Suspense fallback={null}><RefreshMetadataModal key={librarySession} /></Suspense>
           )}
           {outingScheduleEverOpened && (
-            <Suspense fallback={null}><OutingScheduleSheet /></Suspense>
+            <Suspense fallback={null}><OutingScheduleSheet key={librarySession} /></Suspense>
           )}
           {postShowSheetEverOpened && (
-            <Suspense fallback={null}><PostShowSheet /></Suspense>
+            <Suspense fallback={null}><PostShowSheet key={librarySession} /></Suspense>
           )}
         </>
       )}

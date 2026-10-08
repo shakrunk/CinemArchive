@@ -56,4 +56,25 @@ describe('UI command conversion', () => {
     before.seasons![0].episodes![0].reviews = [{ id: 'review', reviewedAt: stamp, reviewText: 'Keep this' }]
     expect(() => titlePatchCommand(before, { seasons: title.seasons })).toThrow('cannot be replaced')
   })
+
+  it('metadata refresh preserves logs added after the fetch began', () => {
+    const current = structuredClone(title)
+    current.seasons![0].episodes![0].watchEvents.push({ id: 'concurrent-watch' })
+    const fetched = structuredClone(title.seasons!)
+    fetched[0].episodes![0].episodeName = 'Refreshed'
+    const mutation = titlePatchCommand(current, { seasons: fetched }, { metadataOnly: true })!
+    const result = applyMutation({ ...snapshot(), titles: [current] }, mutation)
+    expect(result.titles[0].seasons![0].episodes![0]).toMatchObject({ episodeName: 'Refreshed', watchEvents: [{ id: 'concurrent-watch' }] })
+  })
+
+  it('backfilled episode rows retain older coarse watch progress as dateless history', () => {
+    const current = { ...title, seasons: [{ id: 'coarse', seasonNumber: 1, episodeCount: 2, episodesWatched: 1 }] }
+    const fetched = [{ ...current.seasons[0], episodes: [1, 2].map((episodeNumber) => ({ id: `ep-${episodeNumber}`, episodeNumber, watchEvents: [], ratings: [], reviews: [] })) }]
+    const mutation = titlePatchCommand(current, { seasons: fetched }, { metadataOnly: true })!
+    const result = applyMutation({ ...snapshot(), titles: [current] }, mutation)
+    expect(result.titles[0].seasons![0].episodesWatched).toBe(1)
+    expect(result.titles[0].seasons![0].episodes![0].watchEvents).toHaveLength(1)
+    expect(result.titles[0].seasons![0].episodes![0].watchEvents[0].watchedAt).toBeUndefined()
+    expect(applyMutation(result, mutation)).toEqual(result)
+  })
 })

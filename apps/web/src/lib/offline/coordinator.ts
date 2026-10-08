@@ -41,8 +41,8 @@ interface CoordinatorOptions {
 /** Serializes delivery and refresh across tabs, while append transactions remain
  * available during slow network work. Every fetched base is replayed with the
  * latest journal; no acknowledgement can race an older fetch under this lock.
- * This foundation deliberately delivers FIFO and stops at a failed head. It
- * never sends a later edit ahead of an earlier failed edit to the same entity. */
+ * Dependencies preserve enqueue order for related records. A failed title
+ * must not block an unrelated title, list, or board from reaching the server. */
 export class OfflineCoordinator {
   private active: Session | undefined
   private generation = 0
@@ -136,6 +136,26 @@ export class OfflineCoordinator {
     if (this.current(session)) await this.flush()
   }
 
+  /** Server-maintained changes (for example due outings) share the delivery
+   * lock. Recheck the durable journal here: another tab may have appended work
+   * since the UI last reported an empty queue. New local edits during the
+   * request remain journaled and are replayed over the refreshed base. */
+  async runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>): Promise<T | undefined> {
+    const session = this.capture()
+    return this.lock(`cinemarchive-offline:${scopeKey(session.scope)}`, async () => {
+      if (!this.current(session) || !await this.options.isAuthenticated(session.scope) || !this.current(session)) return
+      const read = await this.options.store.read(session.scope)
+      this.publish(session, read)
+      if (!this.current(session) || read.document.commands.length || read.quarantined.length) return
+      const result = await work(this.context(session))
+      if (!this.current(session)) return
+      const base = await fetchBase(this.context(session))
+      if (!this.current(session)) return
+      this.publish(session, await this.options.store.replaceBase(session.scope, base))
+      return this.current(session) ? result : undefined
+    })
+  }
+
   async discard(commandId: string): Promise<void> {
     const session = this.capture()
     this.publish(session, await this.options.store.discard(session.scope, commandId))
@@ -152,6 +172,8 @@ export class OfflineCoordinator {
   async flush(): Promise<void> {
     const session = this.capture()
     await this.lock(`cinemarchive-offline:${scopeKey(session.scope)}`, async () => {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = undefined
       while (this.current(session)) {
         if (!await this.options.isAuthenticated(session.scope) || !this.current(session)) return
         const read = await this.options.store.read(session.scope)
@@ -160,9 +182,13 @@ export class OfflineCoordinator {
         // Corrupt work may include a prerequisite of a valid command. Require
         // recovery before making any remote writes for this owner.
         if (read.quarantined.length > 0) return
-        const command = read.document.commands[0]
-        if (!command || command.state !== 'pending' || command.dependsOn.length > 0) return
-        if (command.nextAttemptAt > this.now()) { this.schedule(session, command.nextAttemptAt - this.now()); return }
+        const ready = read.document.commands.filter((entry) => entry.state === 'pending' && entry.dependsOn.length === 0)
+        const command = ready.find((entry) => entry.nextAttemptAt <= this.now())
+        if (!command) {
+          const nextAttempt = Math.min(...ready.map((entry) => entry.nextAttemptAt))
+          if (Number.isFinite(nextAttempt)) this.schedule(session, nextAttempt - this.now())
+          return
+        }
         if (!sameScope(command.scope, session.scope)) throw new Error('Offline command scope mismatch')
         let result: DeliveryResult
         try { result = await this.options.deliver(command, this.context(session)) } catch (error) {
@@ -180,13 +206,12 @@ export class OfflineCoordinator {
           this.publish(session, await this.options.store.recordFailure(session.scope, command.id, {
             state: 'pending', message: result.message, nextAttemptAt: this.now() + Math.ceil(Math.max(1, delay)),
           }))
-          if (this.current(session)) this.schedule(session, delay)
-          return
+          continue // Related work waits on this receipt; unrelated work may proceed.
         }
         this.publish(session, await this.options.store.recordFailure(session.scope, command.id, {
           state: result.kind === 'auth' ? 'pending' : result.kind, message: result.message,
         }))
-        return // Auth resumes on auth/reconnect events, never a tight timer loop.
+        if (result.kind === 'auth') return // Resume on auth/reconnect, never a tight timer loop.
       }
     })
   }

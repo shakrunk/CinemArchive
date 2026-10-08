@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCommand } from './offline/commands'
-import { classifyLibraryError, createLibraryCommandDelivery, libraryOperations } from './offlineRpc'
+import { assertDeliverableCommand, classifyLibraryError, createLibraryCommandDelivery, libraryOperations } from './offlineRpc'
+import { title } from './offline/fixtures.test-support'
 import type { DeliveryContext } from './offline/coordinator'
 import type { OfflineSnapshot } from './offline/snapshot'
 
@@ -19,6 +20,20 @@ beforeEach(()=>{
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks()})
 
 describe('atomic command payloads',()=>{
+  it('keeps imported provenance an immutable natural identity', () => {
+    const pending = createCommand(scope, { kind: 'external.link', titleId: 'title', provider: 'letterboxd', externalId: 'film-42' })
+    expect(libraryOperations(pending)).toEqual([{ table: 'external_title_links', action: 'insert', key: { provider: 'letterboxd', external_id: 'film-42' }, values: { title_id: 'title' } }])
+  })
+  it('admits large title graphs above the previous limit and rejects oversized work before saving', () => {
+    const pending = createCommand(scope, { kind: 'title.create', title: { ...title, cast: Array.from({ length: 2100 }, (_, i) => ({ tmdbPersonId: i + 1, name: 'Actor', order: i })) } })
+    expect(libraryOperations(pending).length).toBeGreaterThan(2048)
+    expect(() => assertDeliverableCommand(pending)).not.toThrow()
+    const oversized = { ...pending, mutation: { kind: 'title.patch' as const, titleId: title.id, patch: { notes: 'x'.repeat(16 * 1024 * 1024) } } }
+    expect(() => assertDeliverableCommand(oversized)).toThrow('more data')
+    const nested = { ...pending, mutation: { kind: 'title.patch' as const, titleId: title.id, patch: { genres: Array.from({ length: 50_000 }, () => 'x'.repeat(330)) } } }
+    expect(new TextEncoder().encode(JSON.stringify(libraryOperations(nested))).byteLength).toBeLessThan(16 * 1024 * 1024)
+    expect(() => assertDeliverableCommand(nested)).toThrow('more data')
+  })
   it('maps compound row guards and predecessor receipts without mutating journal payloads', () => {
     const pending = createCommand(scope, { kind: 'batch', mutations: [
       { kind: 'title.patch', titleId: 'title', patch: { notes: 'second edit' } },

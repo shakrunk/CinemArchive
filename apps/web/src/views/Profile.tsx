@@ -30,8 +30,8 @@ import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import { parseLetterboxdCsv, letterboxdToSyncItems } from 'src/lib/letterboxd-import'
 import { resolveSyncItems } from 'src/lib/sync/core'
 import { applySyncOutcome } from 'src/lib/sync/apply'
-import { insertTitleToDb, insertOutingToDb } from 'src/lib/db'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
+import { captureLibrarySession } from 'src/lib/localSave'
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
 import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
@@ -984,7 +984,7 @@ function DataSection() {
   const setTitles = useAppStore((s) => s.setTitles)
   const updateTitle = useAppStore((s) => s.updateTitle)
   const outings = useAppStore((s) => s.outings)
-  const setOutings = useAppStore((s) => s.setOutings)
+  const importLibrary = useAppStore((s) => s.importLibrary)
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -998,6 +998,7 @@ function DataSection() {
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const checkSession = captureLibrarySession()
     const file = e.target.files?.[0]
     if (!file) return
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -1006,25 +1007,15 @@ function DataSection() {
     setMessage(null)
     try {
       const { titles: imported, outings: importedOutings } = await parseImportFile(file)
+      checkSession()
       const existingKeys = new Set(titles.map((t) => `${t.tmdbId}:${t.type}`))
       const newTitles = imported.filter((t) => !existingKeys.has(`${t.tmdbId}:${t.type}`))
       const skipped = imported.length - newTitles.length
 
       if (newTitles.length > 0) {
-        setTitles([...newTitles, ...titles])
-        // Only outings belonging to a title that actually got imported (not
-        // skipped as a duplicate) are kept — matches the newTitles filtering
-        // above and rule §5.13's outing⇄viewing link scope.
-        const newTitleIds = new Set(newTitles.map((t) => t.id))
-        const outingsToInsert = importedOutings.filter((o) => newTitleIds.has(o.titleId))
-        if (outingsToInsert.length > 0) setOutings([...outingsToInsert, ...outings])
-        if (user) {
-          // Outings first: a kept title's viewings may carry an outing_id
-          // back-reference, which needs its cinema_outings row to already
-          // exist before insertTitleToDb writes them (rule §5.13).
-          await Promise.all(outingsToInsert.map((o) => insertOutingToDb(user.id, o)))
-          await Promise.all(newTitles.map((t) => insertTitleToDb(user.id, t)))
-        }
+        const newTitleIds = new Set(newTitles.map((title) => title.id))
+        const outingsToInsert = importedOutings.filter((outing) => newTitleIds.has(outing.titleId))
+        await importLibrary(newTitles, outingsToInsert)
       }
 
       const added = newTitles.length
@@ -1044,6 +1035,7 @@ function DataSection() {
   // watchlist.csv). Each film resolves to TMDB by name+year, so large
   // histories take a while; progress + cancel keep it honest.
   async function handleLetterboxdFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const checkSession = captureLibrarySession()
     const file = e.target.files?.[0]
     if (!file) return
     if (lbFileInputRef.current) lbFileInputRef.current.value = ''
@@ -1065,8 +1057,9 @@ function DataSection() {
       })
       let added = 0
       let updated = 0
+      checkSession()
       if (user) ({ added, updated } = await applySyncOutcome({ userId: user.id, outcome, titles, setTitles, updateTitle }))
-      else if (outcome.inserts.length > 0) { setTitles([...outcome.inserts, ...titles]); added = outcome.inserts.length }
+      else ({ added, updated } = await useAppStore.getState().applySyncOutcome(outcome))
 
       const parts = [`Added ${added} film${added !== 1 ? 's' : ''}`]
       if (updated > 0) parts.push(`updated ${updated}`)
@@ -1162,7 +1155,7 @@ function MaintenanceSection() {
   // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const user = useAppStore((s) => s.user)
   const titles = useAppStore((s) => s.titles)
-  const updateTitle = useAppStore((s) => s.updateTitle)
+  const updateTitle = useAppStore((s) => s.updateTitleMetadata)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [message, setMessage] = useState<Message | null>(null)
@@ -1171,6 +1164,7 @@ function MaintenanceSection() {
   const eligible = titles.filter((t) => t.tmdbId)
 
   async function handleRefreshAll() {
+    const checkSession = captureLibrarySession()
     if (
       !confirm(
         `Refresh metadata for ${eligible.length} title${eligible.length !== 1 ? 's' : ''} from TMDB/OMDb? This re-pulls posters, synopses, and ratings for your whole library and can take a few minutes.`
@@ -1191,7 +1185,8 @@ function MaintenanceSection() {
       if (cancelRef.current) break
       try {
         const patch = await fetchRefreshedTitlePatch(title, titleToSearchResult(title), user?.id)
-        updateTitle(title.id, patch)
+        checkSession()
+        await updateTitle(title.id, patch)
       } catch (err) {
         console.error(`Failed to refresh metadata for "${title.title}":`, err)
         failed.push(title.title)

@@ -4,6 +4,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { useAppStore } from 'src/store/useAppStore'
+import { captureLibrarySession } from 'src/lib/localSave'
 import { getErrorMessage } from 'src/lib/utils'
 import { resolveSyncItems, type SyncItem, type SyncProvider } from 'src/lib/sync/core'
 import {
@@ -53,6 +54,7 @@ export function SyncConnections() {
 
   async function runImport(items: SyncItem[]) {
     if (!user) return
+    const checkSession = captureLibrarySession()
     if (items.length === 0) {
       setMessage({ type: 'success', text: 'Nothing to import — no watched or rated items found.' })
       return
@@ -62,6 +64,7 @@ export function SyncConnections() {
       onProgress: (done, total) => setStatus(`Matching ${done}/${total}…`),
       isCancelled: () => cancelRef.current,
     })
+    checkSession()
     const { added, updated } = await applySyncOutcome({ userId: user.id, outcome, titles, setTitles, updateTitle })
     const parts = [`Added ${added}`, `updated ${updated}`]
     if (outcome.unchanged > 0) parts.push(`${outcome.unchanged} already up to date`)

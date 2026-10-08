@@ -147,6 +147,18 @@ describe('IndexedDB offline journal', () => {
     expect(replayPending(read.document.base, read.document.commands).titles[0].rating).toBe(4)
   })
 
+  it('clears quarantined raw data only after explicit scoped recovery', async () => {
+    const factory = new IDBFactory()
+    const db = store(factory)
+    await db.read(owner)
+    await writeRawOwner(factory, 'offline-test', { version: 999, preserved: true })
+    expect((await db.read(owner)).quarantined).toHaveLength(1)
+    await db.discardQuarantine({ ...owner, userId: 'someone-else' })
+    expect((await db.read(owner)).quarantined).toHaveLength(1)
+    await db.discardQuarantine(owner)
+    expect((await db.read(owner)).quarantined).toEqual([])
+  })
+
   it('rejects missing dependencies, reused IDs, and unsafe prerequisite discard', async () => {
     const db = store()
     const parent = createCommand(owner, { kind: 'title.create', title })

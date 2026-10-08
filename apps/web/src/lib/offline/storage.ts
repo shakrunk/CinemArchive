@@ -148,6 +148,21 @@ export class IndexedDbOfflineStore {
 
   read(scope: OfflineScope): Promise<OfflineRead> { return this.transact(scope) }
 
+  /** Explicit recovery action after exporting/inspecting quarantined data. */
+  async discardQuarantine(scope: OfflineScope): Promise<void> {
+    const db = await this.open()
+    const key = scopeKey(scope)
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(QUARANTINE, 'readwrite')
+      const records = tx.objectStore(QUARANTINE)
+      const request = records.index('scopeKey').getAllKeys(key)
+      request.onsuccess = () => request.result.forEach((id) => records.delete(id))
+      tx.oncomplete = () => resolve()
+      tx.onabort = () => reject(new OfflineStorageError('Could not discard damaged local records', tx.error))
+      tx.onerror = () => reject(new OfflineStorageError('Could not discard damaged local records', tx.error))
+    })
+  }
+
   append(command: PendingCommand): Promise<OfflineRead> {
     assertCommand(command)
     const captured: PendingCommand = JSON.parse(JSON.stringify(command))
@@ -166,10 +181,14 @@ export class IndexedDbOfflineStore {
       if (command.dependsOn.some((id) => !d.commands.some((c) => c.id === id))) throw new Error('Unknown command dependency')
       const projection = replayPending(d.base, d.commands)
       const entities = mutationEntities(command.mutation, projection)
-      const prerequisites = d.commands.filter((pending) => [...mutationEntities(pending.mutation, projection)].some((key) => entities.has(key)))
+      const prerequisites = new Set<string>()
+      for (const key of entities) {
+        const prior = [...d.commands].reverse().find((pending) => mutationEntities(pending.mutation, projection).has(key))
+        if (prior) prerequisites.add(prior.id)
+      }
       const preconditions = command.preconditions ?? capturePreconditions(command.mutation, d.base, d.commands)
       d.commands.push({ ...command, ...(preconditions.length ? { preconditions } : {}),
-        dependsOn: [...new Set([...command.dependsOn, ...prerequisites.map((pending) => pending.id)])],
+        dependsOn: [...new Set([...command.dependsOn, ...prerequisites])],
         sequence: d.nextSequence++, state: 'pending', attempts: 0, nextAttemptAt: 0 })
     })
   }

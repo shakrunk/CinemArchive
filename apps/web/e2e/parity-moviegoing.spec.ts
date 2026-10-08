@@ -3,7 +3,8 @@ import { expect, test } from 'playwright/test'
 test.beforeEach(async ({ context, page }) => {
   await context.route(/^https?:\/\/(?!127\.0\.0\.1:4178(?:\/|$))/, (route) => route.abort())
   page.on('pageerror', (error) => { throw error })
-  await page.addInitScript(() => {
+  await page.goto('/?view=library')
+  await page.evaluate(async () => {
     const now = new Date()
     const anniversary = new Date(now.getFullYear() - 4, now.getMonth(), now.getDate(), 20)
     const outings = Array.from({ length: 10 }, (_, index) => ({
@@ -13,7 +14,7 @@ test.beforeEach(async ({ context, page }) => {
       ticketPrice: index < 5 ? 10 : 20, format: 'IMAX', companions: [{ name: 'Sam' }],
       seats: [], previewsMinutes: 0, runtimeMinutes: 120,
     }))
-    localStorage.setItem('cinemarchive-library', JSON.stringify({
+    const fixture = {
       version: 2,
       state: {
         titles: [{
@@ -28,7 +29,25 @@ test.beforeEach(async ({ context, page }) => {
         outings,
         ledgerPrefs: { widgets: [{ id: 'moviegoing-parity', panel: 'moviegoing', width: 'sm' }] },
       },
-    }))
+    }
+    const scope = { projectId: 'unconfigured-local', userId: 'anonymous-local-only' }
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('cinemarchive-anonymous-v1', 1)
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('owners')
+        request.result.createObjectStore('quarantine', { keyPath: 'id' }).createIndex('scopeKey', 'scopeKey')
+      }
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const db = request.result
+        const tx = db.transaction('owners', 'readwrite')
+        tx.objectStore('owners').put({ version: 1, scope, revision: 1, nextSequence: 1, commands: [], base: {
+          titles: fixture.state.titles, outings: fixture.state.outings, lists: [], listMemberships: {}, pinnedModes: {}, ledgerWidgets: fixture.state.ledgerPrefs.widgets,
+        } }, JSON.stringify([scope.projectId, scope.userId]))
+        tx.oncomplete = () => { db.close(); resolve() }
+        tx.onabort = () => { db.close(); reject(tx.error) }
+      }
+    })
   })
 })
 

@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OfflineCoordinator, type DeliveryResult, type ExclusiveLock, type OfflineCoordinatorState } from './coordinator'
+import { browserExclusiveLock, OfflineCoordinator, type DeliveryResult, type ExclusiveLock, type OfflineCoordinatorState } from './coordinator'
 import { IndexedDbOfflineStore } from './storage'
 import { deferred, owner, snapshot, title, writeRawOwner } from './fixtures.test-support'
 import type { OfflineSnapshot } from './snapshot'
@@ -162,6 +162,95 @@ describe('owner offline coordinator', () => {
     await Promise.all([a.coordinator.flush(), b.coordinator.flush()])
     expect(a.deliver.mock.calls.length + b.deliver.mock.calls.length).toBe(1)
     expect((await a.store.read(owner)).document.commands).toEqual([])
+  })
+
+  it('delivers an independent title after a failed create while retaining its dependent edit', async () => {
+    const { coordinator, store, deliver } = setup({ deliver: async (command) =>
+      command.mutation.kind === 'title.create' && command.mutation.title.id === title.id
+        ? { kind: 'failed', message: 'Invalid title' } : { kind: 'success' } })
+    await coordinator.activate(owner)
+    const failed = await coordinator.submit({ kind: 'title.create', title })
+    const dependent = await coordinator.submit({ kind: 'title.patch', titleId: title.id, patch: { rating: 4 } })
+    const independent = await coordinator.submit({ kind: 'title.create', title: { ...title, id: 'independent', tmdbId: 222 } })
+    await coordinator.flush()
+    expect(deliver.mock.calls.map(([command]) => command.id)).toEqual([failed.id, independent.id])
+    expect((await store.read(owner)).document.commands.map((command) => command.id)).toEqual([failed.id, dependent.id])
+    expect((await store.read(owner)).document.base.titles.map((row) => row.id)).toEqual(['independent'])
+  })
+
+  it('delivers independent work during backoff and resumes related work after its prerequisite succeeds', async () => {
+    let now = 1000
+    const { coordinator, store, deliver } = setup({ now: () => now })
+    deliver.mockResolvedValueOnce({ kind: 'retry', message: 'Busy', retryAfterMs: 10000 })
+    await coordinator.activate(owner)
+    const first = await coordinator.submit({ kind: 'title.create', title })
+    const dependent = await coordinator.submit({ kind: 'title.patch', titleId: title.id, patch: { rating: 4 } })
+    const independent = await coordinator.submit({ kind: 'title.create', title: { ...title, id: 'independent', tmdbId: 222 } })
+    await coordinator.flush()
+    expect(deliver.mock.calls.map(([command]) => command.id)).toEqual([first.id, independent.id])
+    now = 11000
+    await coordinator.flush()
+    expect(deliver.mock.calls.map(([command]) => command.id)).toEqual([first.id, independent.id, first.id, dependent.id])
+    expect((await store.read(owner)).document.commands).toEqual([])
+  })
+
+  it('pauses all work on authentication failure even for independent records', async () => {
+    const { coordinator, store, deliver } = setup({ deliver: async () => ({ kind: 'auth', message: 'Sign in again' }) })
+    await coordinator.activate(owner)
+    await coordinator.submit({ kind: 'title.create', title })
+    await coordinator.submit({ kind: 'title.create', title: { ...title, id: 'independent', tmdbId: 222 } })
+    await coordinator.flush()
+    expect(deliver).toHaveBeenCalledTimes(1)
+    expect((await store.read(owner)).document.commands).toHaveLength(2)
+  })
+
+  it('does not start uncoordinated remote writes when browser locks are unavailable', async () => {
+    vi.stubGlobal('navigator', {})
+    const work = vi.fn()
+    try {
+      await expect(browserExclusiveLock('owner-lock', work)).rejects.toThrow('coordination is unavailable')
+      expect(work).not.toHaveBeenCalled()
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('rechecks the durable queue before idle remote work, including another tab edits', async () => {
+    const factory = new IDBFactory(), lock = mutex()
+    const first = setup({ factory, lock }), second = setup({ factory, lock })
+    await first.coordinator.activate(owner)
+    await second.coordinator.activate(owner)
+    await second.coordinator.submit({ kind: 'title.create', title })
+    const remote = vi.fn(async () => ['completed'])
+    expect(await first.coordinator.runIdleRemote(remote, async () => snapshot())).toBeUndefined()
+    expect(remote).not.toHaveBeenCalled()
+  })
+
+  it('holds the delivery lock through idle reconciliation and preserves edits made during it', async () => {
+    const { coordinator, store, deliver, onState } = setup()
+    await coordinator.activate(owner)
+    await store.replaceBase(owner, snapshot())
+    const entered = deferred<void>(), response = deferred<string[]>()
+    const reconcile = coordinator.runIdleRemote(() => { entered.resolve(); return response.promise }, async () => snapshot())
+    await entered.promise
+    await coordinator.submit({ kind: 'title.patch', titleId: title.id, patch: { rating: 5 } })
+    const flush = coordinator.flush()
+    expect(deliver).not.toHaveBeenCalled()
+    response.resolve(['completed'])
+    expect(await reconcile).toEqual(['completed'])
+    await flush
+    expect(onState.mock.lastCall![0]!.snapshot.titles[0].rating).toBe(5)
+  })
+
+  it('discards old-account reconciliation results before refreshing or notifying', async () => {
+    const { coordinator } = setup()
+    await coordinator.activate(owner)
+    const entered = deferred<void>(), response = deferred<string[]>()
+    const fetchBase = vi.fn(async () => snapshot())
+    const reconcile = coordinator.runIdleRemote(() => { entered.resolve(); return response.promise }, fetchBase)
+    await entered.promise
+    await coordinator.activate({ ...owner, userId: 'next-owner' })
+    response.resolve(['private-completion'])
+    expect(await reconcile).toBeUndefined()
+    expect(fetchBase).not.toHaveBeenCalled()
   })
 
   it('does not publish successful optimism when persistence rejects a submission', async () => {

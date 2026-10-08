@@ -1,3 +1,4 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Ticket, Search, Calendar, Clock, MapPin, Users, Film, X, Share2, Download, RefreshCw } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
@@ -334,8 +335,10 @@ function OutingForm({
     setForm((f) => ({ ...f, ...p }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  const [saving, setSaving] = useState(false)
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (saving) return
     const showtimeIso = new Date(`${form.date}T${form.time}:00`).toISOString()
     const endsAtIso = computeEndsAt(form).toISOString()
     const common = {
@@ -361,7 +364,10 @@ function OutingForm({
       // it") flips it back to 'scheduled' for the next attempt; editing an
       // already-scheduled outing leaves status untouched.
       const patch = editingOuting.status === 'scheduled' ? common : { ...common, status: 'scheduled' as const }
-      updateOuting(editingOuting.id, patch)
+      setSaving(true)
+      const saved = await saveSucceeded(updateOuting(editingOuting.id, patch))
+      setSaving(false)
+      if (!saved) return
       if (nowPast) void reconcileOutings()
       onClose()
       return
@@ -374,7 +380,10 @@ function OutingForm({
       createdAt: new Date().toISOString(),
       ...common,
     }
-    addOuting(outing)
+    setSaving(true)
+    const saved = await saveSucceeded(addOuting(outing))
+    setSaving(false)
+    if (!saved) return
     if (nowPast) {
       void reconcileOutings()
       onClose()

@@ -109,12 +109,13 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
   // title into the recipient's own library (adding it to the watchlist first
   // if it isn't there yet), then opens their own schedule sheet prefilled
   // with the sender's showtime/venue/format — seat is left for them to fill in.
-  function handleGotTicketsToo(n: AppNotificationItem) {
+  async function handleGotTicketsToo(n: AppNotificationItem) {
     const payload = parseOutingSharePayload(n.payload)
     if (!payload) return
     if (!n.readAt) void markOneNotificationRead(n.id)
+    let titleId: string
+    try { titleId = await resolveSharedOutingTitle(payload) } catch { return }
     setOpen(false)
-    const titleId = resolveSharedOutingTitle(payload)
     openOutingSchedule(titleId, undefined, { showtime: payload.showtime, venue: payload.venue, format: payload.format })
   }
 

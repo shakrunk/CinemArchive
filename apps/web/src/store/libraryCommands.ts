@@ -35,7 +35,7 @@ function episodeChanges(titleId: string, before: Episode | undefined, after: Epi
 /** Convert the legacy whole-title editing API to precise row commands. This
  * preserves credits, explicit clears, individual viewing changes, metadata,
  * and new logs without serializing arbitrary write closures or stale arrays. */
-export function titlePatchCommand(title: Title, patch: Partial<Title>): Mutation | null {
+export function titlePatchCommand(title: Title, patch: Partial<Title>, options: { metadataOnly?: boolean } = {}): Mutation | null {
   const { id, addedAt, viewings, seasons, ...fields } = patch
   if (id !== undefined && id !== title.id) throw new Error('A title ID cannot be changed')
   if (addedAt !== undefined && addedAt !== title.addedAt) throw new Error('A title creation time cannot be changed')
@@ -61,8 +61,15 @@ export function titlePatchCommand(title: Title, patch: Partial<Title>): Mutation
       const previous = title.seasons?.find((old) => old.id === season.id)
       if (JSON.stringify(previous) === JSON.stringify(season)) continue
       changes.push({ kind: 'season.put', titleId: title.id, season })
-      for (const episode of season.episodes ?? []) changes.push(...episodeChanges(title.id, previous?.episodes?.find((old) => old.id === episode.id), episode))
-      if (!season.episodes?.length && season.episodesWatched !== (previous?.episodesWatched ?? 0)) {
+      // Upgrading an older coarse count to episode rows must retain its history.
+      // There were no episode identities then: carry the first N as dateless watches.
+      if (options.metadataOnly && previous && !previous.episodes?.length && previous.episodesWatched > 0) {
+        for (const episode of [...(season.episodes ?? [])].sort((a, b) => a.episodeNumber - b.episodeNumber).slice(0, previous.episodesWatched)) {
+          changes.push({ kind: 'episode.log', titleId: title.id, episodeId: episode.id, watchEvent: { id: crypto.randomUUID() } })
+        }
+      }
+      if (!options.metadataOnly) for (const episode of season.episodes ?? []) changes.push(...episodeChanges(title.id, previous?.episodes?.find((old) => old.id === episode.id), episode))
+      if (!options.metadataOnly && !season.episodes?.length && season.episodesWatched !== (previous?.episodesWatched ?? 0)) {
         changes.push({ kind: 'season.progress', titleId: title.id, seasonId: season.id, episodesWatched: season.episodesWatched })
       }
     }

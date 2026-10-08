@@ -100,6 +100,7 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation): OfflineS
     case 'season.progress': return titles(state, mutation.titleId, (t) => ({ ...t,
       seasons: t.seasons?.map((season) => season.id === mutation.seasonId ? { ...season, episodesWatched: mutation.episodesWatched } : season),
     }))
+    case 'external.link': return state // Provenance has no library-facing projection.
     case 'episode.metadata': return episode(state, mutation.titleId, mutation.episodeId, (ep) => fields(ep, mutation.patch))
     case 'episode.log': return episode(state, mutation.titleId, mutation.episodeId, (ep) => ({ ...ep,
       watchEvents: mutation.watchEvent ? put(ep.watchEvents, mutation.watchEvent) : ep.watchEvents,

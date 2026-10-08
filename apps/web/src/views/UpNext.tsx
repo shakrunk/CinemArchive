@@ -1,3 +1,4 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   PlayCircle,
@@ -144,9 +145,9 @@ function LiveCard({
 
   const isSpiderNoir = title.tmdbId === SPIDER_NOIR_TMDB_ID
 
-  function doMarkWatched(colorMode?: 'bw' | 'color') {
+  async function doMarkWatched(colorMode?: 'bw' | 'color') {
     const label = `S${season.seasonNumber} E${episode.episodeNumber}`
-    const result = logNextEpisodeWatch(title.id, colorMode)
+    const result = await logNextEpisodeWatch(title.id, colorMode).catch(() => null)
     if (!result) return
     const undo: PendingUndo = { ...result, label }
     const updated = useAppStore.getState().titles.find((t) => t.id === title.id)
@@ -180,14 +181,14 @@ function LiveCard({
     doMarkWatched()
   }
 
-  function handleUndo() {
+  async function handleUndo() {
     if (!pendingUndo) return
-    deleteEpisodeWatchEvent(
+    if (!await saveSucceeded(deleteEpisodeWatchEvent(
       title.id,
       pendingUndo.seasonNumber,
       pendingUndo.episodeNumber,
       pendingUndo.watchEventId
-    )
+    ))) return
     if (timerRef.current) clearTimeout(timerRef.current)
     setPendingUndo(null)
   }
@@ -272,14 +273,14 @@ function CaughtUpCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on title?.id only, see comment above
   }, [title?.id])
 
-  function handleUndo() {
+  async function handleUndo() {
     if (!title) return
-    deleteEpisodeWatchEvent(title.id, undo.seasonNumber, undo.episodeNumber, undo.watchEventId)
+    if (!await saveSucceeded(deleteEpisodeWatchEvent(title.id, undo.seasonNumber, undo.episodeNumber, undo.watchEventId))) return
     onDismiss(title.id)
   }
-  function handleMarkSeriesWatched() {
+  async function handleMarkSeriesWatched() {
     if (!title) return
-    updateTitle(title.id, { status: 'watched' })
+    if (!await saveSucceeded(updateTitle(title.id, { status: 'watched' }))) return
     onDismiss(title.id)
   }
 

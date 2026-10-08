@@ -18,6 +18,7 @@ import { PANEL_REGISTRY, WIDTH_GRID_CLASSES } from './panelRegistry'
 import { WidgetPalette } from './editor/WidgetPalette'
 import { WidgetDetails } from './editor/WidgetDetails'
 import { useBoardDrag } from './editor/useBoardDrag'
+import { useLedgerSave } from './editor/useLedgerSave'
 import { floatingPanelStyle } from './editor/chrome'
 import { Eyebrow } from 'src/components/ui/typography'
 
@@ -37,6 +38,7 @@ export function Ledger() {
   const viewedLedgerWidgets = useAppStore((s) => s.viewedLedgerWidgets)
   const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
   const resetLedgerPrefs = useAppStore((s) => s.resetLedgerPrefs)
+  const { save: saveBoard, error: boardSaveError } = useLedgerSave()
   const friendView = useAppStore((s) => s.viewerContext.kind === 'friend' ? s.viewerContext : null)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const loadingUser = useAppStore((s) => s.loadingUser)
@@ -97,6 +99,7 @@ export function Ledger() {
   }, [editing])
 
   const {
+    saveError: pointerSaveError,
     itemRefs,
     gridRef,
     boardRef,
@@ -151,6 +154,7 @@ export function Ledger() {
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+      {(boardSaveError || pointerSaveError) && <p role="alert" className="mb-4 text-sm text-destructive">{boardSaveError || pointerSaveError}</p>}
       <div className="flex items-start justify-between gap-4">
         <DashHero />
         {canEdit && (
@@ -327,12 +331,12 @@ export function Ledger() {
                   onItemPointerDown={handlePaletteItemPointerDown}
                   onItemPointerMove={handlePaletteItemPointerMove}
                   onItemPointerEnd={handlePaletteItemPointerEnd}
-                  onItemActivate={(panel) => selectWidget(addLedgerWidget(panel))}
+                  onItemActivate={(panel) => void saveBoard(async () => { selectWidget(await addLedgerWidget(panel)) })}
                   onClose={stopEditing}
-                  onReset={() => {
-                    resetLedgerPrefs()
+                  onReset={() => void saveBoard(async () => {
+                    await resetLedgerPrefs()
                     setSelectedId(null)
-                  }}
+                  })}
                   onHide={() => setPaletteHidden(true)}
                 />
               </div>
@@ -395,12 +399,12 @@ export function Ledger() {
                     onItemPointerDown={handlePaletteItemPointerDown}
                     onItemPointerMove={handlePaletteItemPointerMove}
                     onItemPointerEnd={handlePaletteItemPointerEnd}
-                    onItemActivate={(panel) => selectWidget(addLedgerWidget(panel))}
+                    onItemActivate={(panel) => void saveBoard(async () => { selectWidget(await addLedgerWidget(panel)) })}
                     onClose={stopEditing}
-                    onReset={() => {
-                      resetLedgerPrefs()
+                    onReset={() => void saveBoard(async () => {
+                      await resetLedgerPrefs()
                       setSelectedId(null)
-                    }}
+                    })}
                     onHide={() => setPaletteHidden(true)}
                   />
                 )}

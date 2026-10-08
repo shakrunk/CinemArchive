@@ -123,6 +123,7 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
       case 'membership.set': return [{table:'list_items',action:mutation.present ? 'insert' : 'delete',key:{list_id:mutation.listId,title_id:mutation.titleId},...(mutation.present ? {values:{added_at:command.createdAt}} : {})}]
       case 'pin.set': return [{table:'user_title_pins',action:mutation.variant === null ? 'delete' : 'put',key:{title_id:mutation.titleId,easter_egg_key:mutation.easterEggKey},...(mutation.variant === null ? {} : {values:{pinned_variant:mutation.variant}})}]
       case 'ledger.set': return [{table:'user_prefs',action:'put',key:{},values:{ledger_layout:mutation.widgets}}]
+      case 'external.link': return [{table:'external_title_links',action:'insert',key:{provider:mutation.provider,external_id:mutation.externalId},values:{title_id:mutation.titleId}}]
     }
   }
   const operations=(command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]).flatMap(leaf)
@@ -143,6 +144,18 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
   return operations
 }
 
+/** Run before durable admission as well as delivery. Reserve room for the
+ * per-row revision guards that IndexedDB captures during its transaction. */
+export function assertDeliverableCommand(command: PendingCommand): void {
+  const operations = libraryOperations(command)
+  // Pretty JSON conservatively covers PostgreSQL jsonb's spaces, including
+  // separators inside large nested values that occupy only one operation.
+  const bytes = new TextEncoder().encode(JSON.stringify(operations, null, 2)).byteLength
+  if (!operations.length || operations.length > 50_000 || bytes + operations.length * 128 > 16 * 1024 * 1024) {
+    throw new Error('This title contains more data than can be synced in one change. Export it for recovery and split its history before importing.')
+  }
+}
+
 export function classifyLibraryError(status: number, code: string | undefined, message: string): DeliveryResult {
   if (status===401 || code==='PGRST301' || code==='PGRST302') return {kind:'auth',message}
   if (code==='40001' || code==='23505' || code==='P0002') return {kind:'conflict',message}
@@ -160,7 +173,7 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
     const {data,error}=await supabase.auth.getSession()
     if (error || !data.session || data.session.user.id!==context.scope.userId) return {kind:'auth',message:'Sign in to sync this account.'}
     let operations: LibraryOperation[]
-    try { operations=libraryOperations(command) } catch (error) { return {kind:'failed',message:error instanceof Error ? error.message : 'Invalid command.'} }
+    try { assertDeliverableCommand(command); operations=libraryOperations(command) } catch (error) { return {kind:'failed',message:error instanceof Error ? error.message : 'Invalid command.'} }
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed before sync.'}
     // Capture the owner token: a concurrent account change must never cause the
     // auth client's automatic headers to send this owner's command as another user.

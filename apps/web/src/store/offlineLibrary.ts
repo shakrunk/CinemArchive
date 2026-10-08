@@ -54,6 +54,7 @@ export class OfflineLibraryRuntime {
   private readonly coordinator: OfflineCoordinator
   private readonly options: RuntimeOptions
   private readonly anonymous: IndexedDbOfflineStore
+  private readonly ownerStorage: IndexedDbOfflineStore
   private readonly anonymousScope: { projectId: string; userId: string }
   private ownerId: string | null = null
   private generation = 0
@@ -68,9 +69,10 @@ export class OfflineLibraryRuntime {
   constructor(options: RuntimeOptions) {
     this.options = options
     this.anonymous = options.anonymousStorage ?? new IndexedDbOfflineStore({ databaseName: 'cinemarchive-anonymous-v1' })
+    this.ownerStorage = options.ownerStorage ?? new IndexedDbOfflineStore()
     this.anonymousScope = { projectId: options.projectId, userId: 'anonymous-local-only' }
     this.coordinator = new OfflineCoordinator({
-      store: options.ownerStorage ?? new IndexedDbOfflineStore(),
+      store: this.ownerStorage,
       deliver: options.deliver, lock: options.lock,
       isAuthenticated: async (scope) => {
         if (scope.projectId !== options.projectId) return false
@@ -135,6 +137,9 @@ export class OfflineLibraryRuntime {
   }
 
   refresh(): Promise<void> { return this.coordinator.refresh(this.options.fetchBase ?? fetchOwnerSnapshot) }
+  runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>): Promise<T | undefined> {
+    return this.coordinator.runIdleRemote(work, this.options.fetchBase ?? fetchOwnerSnapshot)
+  }
   reload(): Promise<void> { return this.coordinator.reload() }
   flush(): Promise<void> { return this.coordinator.flush() }
   submit(mutation: Mutation, options?: Parameters<OfflineCoordinator['submit']>[1]): Promise<PendingCommand> {
@@ -206,6 +211,17 @@ export class OfflineLibraryRuntime {
   }
   retry(commandId: string): Promise<void> { return this.coordinator.retry(commandId) }
   discard(commandId: string): Promise<void> { return this.coordinator.discard(commandId) }
+  async discardDamagedCache(): Promise<void> {
+    const ownerId = this.ownerId
+    const generation = this.generation
+    if (ownerId) {
+      await this.ownerStorage.discardQuarantine({ projectId: this.options.projectId, userId: ownerId })
+      if (generation === this.generation && ownerId === this.ownerId) await this.activate(ownerId)
+    } else {
+      await this.anonymous.discardQuarantine(this.anonymousScope)
+      if (generation === this.generation && this.ownerId === null) await this.loadAnonymous()
+    }
+  }
 
   get canReconcile(): boolean { return this.ownerId !== null && this.ready && this.pending === 0 && this.quarantined === 0 }
 }

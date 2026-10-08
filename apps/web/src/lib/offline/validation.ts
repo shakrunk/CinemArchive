@@ -96,6 +96,7 @@ const checks: Record<string, Check> = {
   'membership.set': shape({ kind: text, listId: id, titleId: id, present: boolean }),
   'pin.set': shape({ kind: text, titleId: id, easterEggKey: id, variant: nullable(color) }),
   'ledger.set': shape({ kind: text, widgets: array(widget) }),
+  'external.link': shape({ kind: text, titleId: id, provider: oneOf('letterboxd', 'simkl', 'plex', 'emby'), externalId: id }),
 }
 const revisionTable = oneOf('titles', 'lists', 'cinema_outings', 'seasons', 'episodes', 'viewings', 'episode_watch_events', 'episode_ratings', 'episode_reviews')
 const precondition: Check = (value) => shape({ table: revisionTable, id, updatedAt: timestamp })(value) ||

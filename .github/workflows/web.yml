@@ -32,6 +32,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
+      - name: Test release version encoding
+        working-directory: .
+        run: node --test scripts/release-version.test.mjs
       - run: npm run typecheck
       - run: npm run lint:ci
       - run: npm run test

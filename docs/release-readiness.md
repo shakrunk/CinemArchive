@@ -10,13 +10,14 @@ All ten prerequisite issues (#269–#278) were reviewed. The selected engineerin
 
 | Issue | Implementation in this pass | Still required |
 | --- | --- | --- |
-| [#271](https://github.com/shakrunk/CinemArchive/issues/271) | Web PR validation, reusable pre-deploy validation, web build before migration, job-level Pages permissions, main-only deployment | Protected-branch required checks/reviews, environment approvals, fully pinned release tooling, Android validation before publication, signed-artifact provenance, production smoke and rollback rehearsal |
+| [#271](https://github.com/shakrunk/CinemArchive/issues/271) | Web PR/pre-deploy gates; Android build/lint/unit tests and verified signed APK before migration; checksummed release assets; job-level permissions and main-only deployment | Protected-branch required checks/reviews, environment approvals, fully pinned release tooling, signing-identity attestation/SBOM, production smoke and rollback rehearsal |
 | [#275](https://github.com/shakrunk/CinemArchive/issues/275) | Production-bundle browser regressions and compatibility checklist; command-palette focus restoration | Live auth/invite, backend authorization, cross-client sync, device and accessibility sign-off |
-| [#278](https://github.com/shakrunk/CinemArchive/issues/278) | Explicit typecheck and lint-budget commands; single package-version source; restored RTK entrypoint; corrected CLI graph instructions and rebuilt stale local index | Remaining typing debt, development dependency remediation, Android tooling alignment, generated documentation refresh |
+| [#277](https://github.com/shakrunk/CinemArchive/issues/277) | External synchronous bootstrap scripts; Pages fallback recovery with restricted storage and same-origin redirect validation | CSP/response headers and hosting controls, PWA/social assets, performance/accessibility audits, production smoke tests |
+| [#278](https://github.com/shakrunk/CinemArchive/issues/278) | Explicit typecheck/lint-budget commands; media/ICS typing cleanup reducing warnings from 78 to 48; single package-version source; restored RTK entrypoint; corrected CLI graph instructions and rebuilt stale local index | Remaining typing debt, development dependency remediation, Android tooling alignment, generated documentation refresh |
 
 The remaining issues require private security work (#269), backend contract infrastructure
 (#270), privacy/owner approval (#272), production Android identity/distribution (#273),
-Android scope decisions (#274), production operations (#276), and public web hardening (#277).
+Android scope decisions (#274), and production operations (#276). The rest of public web hardening (#277) also remains required.
 They remain release prerequisites, not optional follow-up work. No issue is closed by this pass.
 
 ## Web gates and deployment order
@@ -39,15 +40,22 @@ It uses a read-only token, pinned action commits, the lockfile, and no productio
 Configure its `Verify web` job as a required status check in repository rules after its
 first successful GitHub run. Adding a workflow alone does not enable branch protection.
 
-`deploy.yml` calls the same validation workflow, builds the production web artifact, then
-applies pending database migrations before deploying that artifact. Only `main` can enter
-this chain, including manual dispatch. Pages and OIDC write permissions belong only to the
-deploy job. A validation/build failure prevents production migration and publication.
+`deploy.yml` calls the same validation workflow and builds the production web artifact.
+It also validates the root package version, then runs Android debug assembly, lint and JVM
+tests, builds a signed release APK and checks it with `apksigner verify`. The APK and its
+SHA-256 checksum are staged as a seven-day workflow artifact. **Both client builds must
+succeed before production database migration**, which precedes Pages deployment.
+Only `main` can enter this chain, including manual dispatch. Pages and OIDC write permissions
+belong only to the deploy job; Android staging uses a read-only repository token.
 
-Release tagging still follows Pages deployment, and the signed Android APK is built after
-tagging. This remains a partial-release risk under #271; these web gates do not establish
-an atomic cross-client release. Edge Functions deploy independently. `db-migrate.yml` is a
-separate manual recovery/operations path, not the only way migrations reach production.
+After Pages deployment, a new version is tagged and published with the already-built APK
+and `SHA256SUMS` in the release creation command. Downloaded checksums are checked again
+before tagging. Existing tags skip publication, but still run all validation and signed-build
+gates before a web deployment. This avoids Android build failures causing partial releases;
+it does not make database, Pages, git and release API updates atomic. API/deployment failures
+can still leave partial publication. See [release operations](release-operations.md) for
+recovery, artifact verification and the remaining sign-off requirements. Edge Functions
+deploy independently. `db-migrate.yml` remains a separate manual recovery/operations path.
 
 ## Browser coverage and compatibility sign-off
 
@@ -61,6 +69,8 @@ The suite exercises deep-link refresh, local list creation/deletion and browser 
 theme persistence/system preference changes, keyboard palette focus, and service-worker
 offline reload with a lazy view. It uses real UI actions rather than exposing a test-only
 store API. Local list tests verify browser persistence, not remote CRUD or authorization.
+The actual Pages 404 document is also tested for route restoration, unavailable session
+storage, and stale external redirects; see [web startup](web-startup.md).
 
 | Target | Automated coverage | Required manual release evidence |
 | --- | --- | --- |
@@ -101,7 +111,7 @@ Their physical-browser offline checks remain release requirements.
 Remaining warnings must stay visible and the budget should decrease with each cleanup.
 A passing lint gate with warnings is not a zero-debt result.
 See [developer tooling](developer-tooling.md) for graph freshness checks and package-version
-ownership. The initial 78-warning baseline remains until the separately assigned typing cleanup lands.
+ownership. The initial baseline was 78 warnings; typing cleanup of `media.ts` and `ics.test.ts` lowered the budget to 48 (see [web tooling debt](web-tooling.md)).
 
 The production dependency audit blocks moderate-or-higher findings. Run full `npm audit`
 when changing tooling and at release review as well: development dependency findings remain
@@ -124,6 +134,22 @@ Verified on Windows with Node 22.23.2 and the committed npm dependency resolutio
 - Cross-client parity declaration passed for the web-only focus fix.
 
 These are local engineering results, not production, Android-device, or final launch approval.
+
+## Follow-up evidence — October 8, 2026
+
+- Web typecheck, lint (48 warnings, zero errors), production build and all 240 unit tests pass.
+- Browser suite: 34 passed, two documented offline-emulation skips, including 12 new
+  Pages fallback checks. An earlier run spanned an overnight host pause and timed out;
+  the completed rerun is the reported evidence. Unit timeouts during overlapping checks
+  also cleared when the unit suite was rerun separately.
+- Android `:app:assembleDebug :app:lintDebug testDebugUnitTest` succeeds locally with
+  the existing Gradle cache (524 tasks, 523 up-to-date). The SDK XML/tool-version warning
+  remains tooling debt; this run does not certify production signing or physical devices.
+- Two Node release-version tests cover stable versions, ordering, collisions and overflow.
+- Actionlint 1.7.12 validates both changed workflows (ShellCheck unavailable); local DAG
+  assertions confirm both client builds precede migration and publication, even for existing tags.
+- The production signing/checksum/publication path still needs hosted CI evidence. No
+  production migration, Pages deploy, release tag, or GitHub Release was performed locally.
 
 ## Documentation maintenance
 

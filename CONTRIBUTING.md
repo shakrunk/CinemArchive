@@ -53,6 +53,10 @@ their reports and failure traces for 14 days.
 ```
 
 That Gradle line is exactly what `.github/workflows/android.yml` runs.
+The main deployment repeats it and verifies the signed release APK before production
+migration. Changes to release-version handling must also pass
+`node --test scripts/release-version.test.mjs` from the repo root (included in the web CI
+gate). See [release operations](docs/release-operations.md) for artifact checks and recovery.
 
 ## Branching
 

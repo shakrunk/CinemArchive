@@ -45,10 +45,13 @@ Run from `apps/android/`:
 ```
 
 CI (`.github/workflows/android.yml`) triggers only on `apps/android/**` or its own workflow
-file changing. The release APK is built and attached to the GitHub Release by
-`.github/workflows/deploy.yml`'s `android` job, reading the same root `package.json` version
-as the web app (`versionCode`/`versionName` computed from it — see the root AGENTS.md's
-Versioning section).
+file changing. On every main deployment, `deploy.yml`'s `android` job also runs these
+debug checks, builds and verifies a signed release APK, and stages it before migration
+or Pages publication. The `release` job attaches the staged APK and SHA-256 checksum
+for a new version. Both clients read the same root `package.json` version
+(`versionCode`/`versionName` computed from it — see the root AGENTS.md's Versioning
+section). See [release operations](../../docs/release-operations.md) for
+version limits, artifact verification and partial-publication recovery.
 
 ## Feature parity with the web app
 

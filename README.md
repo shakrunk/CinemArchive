@@ -83,7 +83,7 @@ Read [`schema.sql`](schema.sql) for the authoritative tables, columns and polici
 
 1. Add a new file under `supabase/migrations/`, named with a UTC timestamp prefix, e.g. `20260701120000_add_favorite_flag.sql`, containing just the `ALTER`/`CREATE`/etc. for the change.
 2. Keep `schema.sql` in sync as the readable canonical copy.
-3. Merge the reviewed release PR into `main`. The deployment workflow validates and builds the web app, applies pending migrations, then publishes the web artifact. The separate **DB Migrate (manual)** workflow (`gh workflow run db-migrate.yml --ref main`) remains available for an explicitly planned operations/recovery run; merging a release normally does not require it.
+3. Merge the reviewed release PR into `main`. The deployment workflow validates and builds both clients (including the signed Android APK), applies pending migrations, then publishes the web artifact. The separate **DB Migrate (manual)** workflow (`gh workflow run db-migrate.yml --ref main`) remains available for an explicitly planned operations/recovery run; merging a release normally does not require it.
 
 The workflow needs these set in **GitHub → Settings → Secrets and variables → Actions (Repository scope)**:
 
@@ -101,7 +101,7 @@ Full workflow, including how migrations reach production and the failure modes: 
 
 ## Deployment & release
 
-`.github/workflows/web.yml` validates every PR into `dev`/`main` with typecheck, a lint warning budget, unit tests, a production dependency audit, build, and browser smoke tests. `.github/workflows/deploy.yml` runs only for `main`: reuses those checks, builds the production web artifact, applies pending Supabase migrations, and publishes to GitHub Pages. It then tags a `vX.Y.Z` GitHub Release from the root `package.json` version and `CHANGELOG.md`, and — for a genuinely new release — builds and attaches a signed Android release APK. Android build failures can still leave a partial release; [release readiness](docs/release-readiness.md) records that and the remaining launch gates. `.github/workflows/deploy-functions.yml` deploys `supabase/functions/**` independently on change. See [AGENTS.md](AGENTS.md#versioning) for versioning/release policy and the wiki's [Deployment & Releases](https://github.com/shakrunk/CinemArchive/wiki/Deployment-and-Releases) for background.
+`.github/workflows/web.yml` validates every PR into `dev`/`main` with typecheck, a lint warning budget, unit tests, a production dependency audit, build, and browser smoke tests. `.github/workflows/deploy.yml` runs only for `main`: reuses those checks, builds the production web artifact and verifies a signed Android APK after Android build/lint/unit tests, then applies pending Supabase migrations and publishes to GitHub Pages. For a new version it tags a `vX.Y.Z` GitHub Release from the root `package.json` and `CHANGELOG.md`, attaching the staged APK and its SHA-256 checksum. Android validation now finishes before any migration/publication. Hosting or release API failures can still leave partial publication; [release operations](docs/release-operations.md) covers artifact verification and recovery, and [release readiness](docs/release-readiness.md) records that and the remaining launch gates. `.github/workflows/deploy-functions.yml` deploys `supabase/functions/**` independently on change. See [AGENTS.md](AGENTS.md#versioning) for versioning/release policy and the wiki's [Deployment & Releases](https://github.com/shakrunk/CinemArchive/wiki/Deployment-and-Releases) for background.
 
 ---
 

@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Outing plan sharing now supports safe retries after an interrupted response and returns the actual delivered plan snapshot.
 
 - Web: title deep links now survive asynchronous local-library startup and reload while keeping account-specific detail drawers isolated.
 

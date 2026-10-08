@@ -49,6 +49,8 @@ before(async () => {
   assert.ok(schema.includes(reversal.trim()))
   const causalReversal = (await readFile(new URL('supabase/migrations/20261008211455_causal_outing_revert.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(causalReversal.trim()))
+  const viewingRevision = (await readFile(new URL('supabase/migrations/20261008213850_outing_completion_viewing_revision.sql', root), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(viewingRevision.trim()))
   await db.exec(schema)
   await db.exec('grant select,update,delete on public.cinema_outings,public.titles,public.viewings to authenticated; grant select on public.notifications to authenticated;')
   for (const id of [owner, other]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@example.test`])
@@ -66,6 +68,105 @@ async function causalRevert(snapshot, outingOperation, viewingOperation = null, 
     outingOperation, viewingOperation,
   ])).rows[0].result
 }
+
+function viewingEffect(snapshot) { return snapshot.rows.find(row => row.table === 'viewings') }
+async function dependentViewing(snapshot, action = 'update', values = { notes: 'Native pending note' }) {
+  return db.query('select apply_library_command($1,$2::jsonb) as result', [randomUUID(), JSON.stringify([{
+    table: 'viewings', action, key: { id: snapshot.canonicalViewingId },
+    ...(action === 'update' ? { values } : {}), expectedOperationId: snapshot.operationId,
+  }])])
+}
+async function installCompletionDefinition(migration) {
+  const sql = await readFile(new URL(`supabase/migrations/${migration}`, root), 'utf8')
+  const start = sql.search(/create (?:or replace )?function cinemarchive_private\.complete_cinema_outing\(/)
+  assert.notEqual(start, -1)
+  const definition = sql.slice(start, sql.indexOf('\n$$;', start) + 4)
+  await as('postgres')
+  await db.exec(definition.replace(/^create function/, 'create or replace function'))
+}
+
+test('completion exposes only its immutable viewing identity and revision as a causal effect', async () => {
+  const outing = await makeOuting(), first = await complete(outing)
+  assert.deepEqual(viewingEffect(first), {
+    table: 'viewings', key: { id: first.canonicalViewingId }, row: {
+      id: first.canonicalViewingId, user_id: owner, title_id: outing.title_id,
+      outing_id: outing.id, updated_at: first.viewing.updated_at,
+    },
+  })
+  await dependentViewing(first)
+  assert.equal((await db.query('select notes from viewings where id=$1', [first.canonicalViewingId])).rows[0].notes, 'Native pending note')
+  const later = await complete(outing)
+  assert.deepEqual(viewingEffect(later), viewingEffect(first))
+  assert.notEqual(later.viewing.updated_at, viewingEffect(later).row.updated_at)
+})
+
+test('web-first completion retains its original baseline when native arrives after newer notes and ratings', async () => {
+  const outing = await makeOuting()
+  const web = (await db.query("select * from complete_due_outings('UTC')")).rows.find(row => row.outing_id === outing.id)
+  const initialVersion = (await db.query('select to_jsonb(v) as row from viewings v where id=$1', [web.viewing_id])).rows[0].row.updated_at
+  await db.query("update viewings set notes='Newer web note',rating=4.5 where id=$1", [web.viewing_id])
+  const native = await complete(outing)
+  assert.equal(native.status, 'already_completed')
+  assert.equal(viewingEffect(native).row.updated_at, initialVersion)
+  assert.equal(native.viewing.notes, 'Newer web note')
+  assert.equal(native.viewing.rating, 4.5)
+  await assert.rejects(dependentViewing(native), { code: '40001' })
+  await assert.rejects(dependentViewing(native, 'delete'), { code: '40001' })
+  assert.equal((await db.query('select notes,rating from viewings where id=$1', [web.viewing_id])).rows[0].notes, 'Newer web note')
+  assert.equal(await countViewings(outing.id), 1)
+})
+
+test('deleted canonical viewing keeps immutable proof but dependent mutation cannot resurrect it', async () => {
+  const outing = await makeOuting(), first = await complete(outing)
+  await db.query('delete from viewings where id=$1', [first.canonicalViewingId])
+  const native = await complete(outing)
+  assert.equal(native.viewing, null)
+  assert.deepEqual(viewingEffect(native), viewingEffect(first))
+  await assert.rejects(dependentViewing(native), { code: '40001' })
+  assert.equal(await countViewings(outing.id), 0)
+  await db.query('delete from cinema_outings where id=$1', [outing.id])
+  const replay = await complete(outing, {
+    operation: native.operationId, provisional: native.request.provisionalViewingId,
+  })
+  assert.equal(replay.outing, null)
+  assert.equal(replay.viewing, null)
+  assert.deepEqual(viewingEffect(replay), viewingEffect(first))
+})
+
+test('new completion notifications identify the exact outing and canonical viewing', async () => {
+  const outing = await makeOuting(), first = await complete(outing)
+  const payload = (await db.query("select payload from notifications where title_id=$1 and type='outing_completed'", [outing.title_id])).rows[0].payload
+  assert.deepEqual(payload, {
+    outingId: outing.id, canonicalViewingId: first.canonicalViewingId,
+    venue: 'Local cinema', companions: ['Legacy name', 'Linked name'],
+  })
+})
+
+test('old accepted receipts and historical metadata never acquire an inferred viewing baseline', async () => {
+  let outing, first, operation, provisional
+  try {
+    await installCompletionDefinition('20261008194606_canonical_outing_completion.sql')
+    outing = await makeOuting()
+    operation = randomUUID(); provisional = randomUUID()
+    first = await complete(outing, { operation, provisional })
+    assert.equal(viewingEffect(first), undefined)
+  } finally {
+    await installCompletionDefinition('20261008213850_outing_completion_viewing_revision.sql')
+  }
+  await as('authenticated', owner)
+  assert.deepEqual(await complete(outing, { operation, provisional }), first)
+  await db.query("update viewings set notes='Historical edit' where id=$1", [provisional])
+  const newAttempt = await complete(outing)
+  assert.equal(newAttempt.status, 'already_completed')
+  assert.equal(viewingEffect(newAttempt), undefined)
+  assert.equal(newAttempt.viewing.notes, 'Historical edit')
+  await assert.rejects(dependentViewing(newAttempt), { code: '40001' })
+  const payload = (await db.query('select payload from notifications where title_id=$1', [outing.title_id])).rows[0].payload
+  assert.equal(payload.outingId, undefined, 'historical notifications are not guessed or backfilled')
+  assert.equal(payload.canonicalViewingId, undefined)
+  await as('postgres')
+  assert.equal((await db.query('select canonical_viewing_version from cinemarchive_private.outing_completions where outing_id=$1', [outing.id])).rows[0].canonical_viewing_version, null)
+})
 
 test('native-first completion uses the stable provisional identity and captured local show date', async () => {
   const outing = await makeOuting(), operation = randomUUID(), provisional = randomUUID()

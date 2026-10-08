@@ -861,6 +861,7 @@ private fun CinemArchiveApp(
                         tab = Tab.LIBRARY
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refresh(current.titleId) },
+                    catalogExtrasSource = runtime.catalogExtrasRepository,
                     socialContent = { detail ->
                         work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(titleSocialSource, runtime.ownerId, detail)
                     },

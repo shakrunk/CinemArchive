@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android title details now show trailers and regional streaming, rental and purchase providers, with separate retry controls.
 - Undoing an outing now preserves newer title notes when the undo did not restore title status and an older title edit is still pending.
 - Web ticket changes retain the outing revision across offline reloads and retries, preserving newer plan edits and offering recovery when an older queued change has no revision proof.
 - Shared ticket commands can guard the outing revision, preventing a ticket upload from hiding a newer plan edit when later changes sync.

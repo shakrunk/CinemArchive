@@ -118,6 +118,7 @@ class AppAccountRuntime(
     private val alarmScheduler = AndroidOutingAlarmScheduler(context, identity.userId)
 
     val accountRepository = AccountRepository(client, session::currentSession)
+    val catalogExtrasRepository = work.kumarfamilynet.cinemarchive.data.CatalogExtrasRepository(client, session)
     val notificationsRepository = NotificationsRepository(client, session::currentSession)
     val friendsRepository = FriendsRepository(client, session::currentSession)
     val sharingRepository = work.kumarfamilynet.cinemarchive.data.SharingRepository(

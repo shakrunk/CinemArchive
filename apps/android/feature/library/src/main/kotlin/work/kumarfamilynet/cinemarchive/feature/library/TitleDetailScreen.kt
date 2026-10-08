@@ -114,7 +114,9 @@ class TitleDetailViewModel(
     private val outingsRepository: OutingsRepository,
     private val listsRepository: ListsRepository,
     private val titleId: String,
+    catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
 ) : ViewModel() {
+    val catalogExtras = catalogExtrasSource?.let { CatalogExtrasController(it, viewModelScope) }
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -285,10 +287,21 @@ fun TitleDetailRoute(
     onShareOutingPlans: ((String) -> Unit)? = null,
     onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
     onRefreshCredits: (suspend () -> Boolean)? = null,
+    catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
 ) {
     val viewModel: TitleDetailViewModel =
-        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
+        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
+    val languageTag = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].toLanguageTag()
+    val catalogKey = detail?.let { current -> current.tmdbId?.takeIf { it > 0 }?.let {
+            work.kumarfamilynet.cinemarchive.core.model.CatalogExtrasKey(it, current.type,
+                work.kumarfamilynet.cinemarchive.core.model.catalogWatchRegion(languageTag))
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(catalogKey) {
+        viewModel.catalogExtras?.select(catalogKey)
+    }
+    val catalogExtrasState = viewModel.catalogExtras?.state?.collectAsStateWithLifecycle()?.value?.takeIf { it.key == catalogKey }
     val venueSuggestions by viewModel.venueSuggestions.collectAsStateWithLifecycle()
     val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
     val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
@@ -337,6 +350,9 @@ fun TitleDetailRoute(
         onShareOutingPlans = onShareOutingPlans,
         onBrowsePerson = onBrowsePerson,
         onRefreshCredits = onRefreshCredits,
+        catalogExtrasState = catalogExtrasState,
+        onRetryVideos = { viewModel.catalogExtras?.retryVideos() },
+        onRetryProviders = { viewModel.catalogExtras?.retryProviders() },
     )
 }
 
@@ -375,6 +391,9 @@ fun TitleDetailScreen(
     onShareOutingPlans: ((String) -> Unit)? = null,
     onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
     onRefreshCredits: (suspend () -> Boolean)? = null,
+    catalogExtrasState: CatalogExtrasState? = null,
+    onRetryVideos: () -> Unit = {},
+    onRetryProviders: () -> Unit = {},
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -572,6 +591,13 @@ fun TitleDetailScreen(
             item(key = "catalog-details") {
                 ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
                     CatalogDetailsSection(detail)
+                }
+            }
+            if (catalogExtrasState?.key != null) {
+                item(key = "catalog-extras") {
+                    ReadingWidthColumn(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                        CatalogExtrasSection(catalogExtrasState, onRetryVideos, onRetryProviders)
+                    }
                 }
             }
 
@@ -1145,8 +1171,9 @@ private class TitleDetailViewModelFactory(
     private val outingsRepository: OutingsRepository,
     private val listsRepository: ListsRepository,
     private val titleId: String,
+    private val catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource?,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        TitleDetailViewModel(repository, outingsRepository, listsRepository, titleId) as T
+        TitleDetailViewModel(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource) as T
 }

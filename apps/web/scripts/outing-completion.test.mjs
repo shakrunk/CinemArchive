@@ -522,3 +522,21 @@ test('five-argument receipts survive the causal reversal migration unchanged', a
   await as('anon', owner)
   await assert.rejects(revert(snapshot), { code: '42501' })
 })
+
+test('reversal cannot lend an unseen title revision to a queued title edit when it did not restore status', async () => {
+  const snapshot = await complete(await makeOuting())
+  await db.query("update titles set status='watched',notes='Newer title notes' where id=$1", [snapshot.title.id])
+  const reversed = await revert(snapshot)
+  assert.equal(reversed.titleStatusRestored, false)
+  const pending = [{ table: 'titles', action: 'update', key: { id: snapshot.title.id },
+    values: { notes: 'Older pending note' }, expectedOperationId: reversed.operationId }]
+  await assert.rejects(db.query('select apply_library_command($1,$2)', [randomUUID(), pending]), { code: '40001' })
+  assert.equal((await db.query('select notes from titles where id=$1', [snapshot.title.id])).rows[0].notes, 'Newer title notes')
+
+  const untouched = await complete(await makeOuting())
+  const restored = await revert(untouched)
+  assert.equal(restored.titleStatusRestored, true)
+  await db.query('select apply_library_command($1,$2)', [randomUUID(), [{ table: 'titles', action: 'update',
+    key: { id: untouched.title.id }, values: { notes: 'Intent after our restored status' }, expectedOperationId: restored.operationId }]])
+  assert.equal((await db.query('select notes from titles where id=$1', [untouched.title.id])).rows[0].notes, 'Intent after our restored status')
+})

@@ -7,7 +7,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "lint:ci": "eslint . --max-warnings 78",
+    "lint:ci": "eslint . --max-warnings 48",
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",

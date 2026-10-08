@@ -23,10 +23,14 @@ Migration `20261008195605_canonical_outing_revert.sql` adds:
 ```text
 revert_cinema_outing(p_outing_id uuid, p_operation_id uuid,
   p_expected_updated_at timestamptz, p_expected_viewing_id uuid,
-  p_expected_viewing_updated_at timestamptz) -> jsonb
+  p_expected_viewing_updated_at timestamptz,
+  p_expected_operation_id uuid default null,
+  p_expected_viewing_operation_id uuid default null) -> jsonb
 ```
 
 Revert compares the outing revision, canonical viewing identity and viewing revision. A newer note/date edit or any rating conflicts rather than being silently deleted. A previously removed event uses a null viewing revision and retains its canonical identity. It restores the prior title status only when the title revision still matches the one produced by completion and no other viewing or completed trip remains, preserving later intentional same-status changes. Older completions without a proven title revision do not restore title status. Legacy completion queues lack sufficient intent and enter explicit recovery rather than being replayed as full-row updates.
+
+Migration `20261008211455_causal_outing_revert.sql` adds the two optional receipt dependencies. For the outing, exactly one of the literal revision or preceding operation UUID is required. For a present viewing, use either its observed revision or its own preceding operation UUID; an absent viewing uses neither. Dependencies must identify the exact owned row in the preceding receipt and cannot refer to the reversal itself. A deleted-row receipt is not a revision. Later edits still conflict, and a rated viewing remains protected even when its rating is in the referenced receipt. The original five-argument calls and their accepted receipts remain compatible.
 
 Both APIs return `status` (`applied`, `conflict`, `missing`, or completion-only `already_completed`), `operationId`, immutable `request`, `outingId`, `canonicalViewingId`, and current `outing`, `viewing`, and `title` objects. The compact title contains `id`, `status`, and `updated_at`. Accepted results retain receipt `rows`; these are original causal versions, not the current graph. Revert also reports `titleStatusRestored`. Fresh current fields, not old receipt rows, govern reconciliation. Applied operation retries are immutable; conflict/missing results are not retained as accepted receipts.
 

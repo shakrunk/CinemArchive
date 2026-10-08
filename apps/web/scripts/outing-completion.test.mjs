@@ -47,11 +47,25 @@ before(async () => {
   assert.ok(schema.includes(migration.trim()))
   const reversal = (await readFile(new URL('supabase/migrations/20261008195605_canonical_outing_revert.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(reversal.trim()))
+  const causalReversal = (await readFile(new URL('supabase/migrations/20261008211455_causal_outing_revert.sql', root), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(causalReversal.trim()))
   await db.exec(schema)
   await db.exec('grant select,update,delete on public.cinema_outings,public.titles,public.viewings to authenticated; grant select on public.notifications to authenticated;')
   for (const id of [owner, other]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@example.test`])
 }, { timeout: 60000 })
 after(async () => db.close())
+
+async function patchReceipt(table, id, values, operation = randomUUID()) {
+  await db.query('select public.apply_library_command($1,$2::jsonb)', [operation, JSON.stringify([{ table, action: 'update', key: { id }, values }])])
+  return operation
+}
+async function causalRevert(snapshot, outingOperation, viewingOperation = null, operation = randomUUID()) {
+  return (await db.query('select public.revert_cinema_outing($1,$2,$3,$4,$5,$6,$7) as result', [
+    snapshot.outing.id, operation, outingOperation ? null : snapshot.outing.updated_at,
+    snapshot.canonicalViewingId, viewingOperation ? null : snapshot.viewing?.updated_at ?? null,
+    outingOperation, viewingOperation,
+  ])).rows[0].result
+}
 
 test('native-first completion uses the stable provisional identity and captured local show date', async () => {
   const outing = await makeOuting(), operation = randomUUID(), provisional = randomUUID()
@@ -279,4 +293,62 @@ test('a causal receipt cannot hide an intervening edit or supply another outing 
   await assert.rejects(db.query('select complete_cinema_outing($1,$2,$3,null,$4,$5)', [unrelated.id, randomUUID(), randomUUID(), 'UTC', prior]), { code: '40001' })
   await assert.rejects(db.query('select complete_cinema_outing($1,$2,$3,null,$4,$5)', [outing.id, randomUUID(), randomUUID(), 'UTC', randomUUID()]), { code: '40001' })
   assert.equal(await countViewings(outing.id), 0)
+})
+
+test('reversal follows exact outing and viewing edit receipts and retries without guessing revisions', async () => {
+  const snapshot = await complete(await makeOuting()), operation = randomUUID()
+  const outingEdit = await patchReceipt('cinema_outings', snapshot.outing.id, { notes: 'Our queued plan edit' })
+  const viewingEdit = await patchReceipt('viewings', snapshot.canonicalViewingId, { notes: 'Our queued viewing edit' })
+  const first = await causalRevert(snapshot, outingEdit, viewingEdit, operation)
+  assert.equal(first.status, 'applied')
+  assert.equal(first.outing.status, 'missed')
+  assert.equal(first.viewing, null)
+  assert.equal(first.request.expectedOperationId, outingEdit)
+  assert.equal(first.request.expectedViewingOperationId, viewingEdit)
+  assert.equal(first.request.expectedUpdatedAt, null)
+  assert.equal(first.request.expectedViewingUpdatedAt, null)
+  assert.deepEqual(await causalRevert(snapshot, outingEdit, viewingEdit, operation), first)
+  await assert.rejects(causalRevert(snapshot, randomUUID(), viewingEdit, operation), { code: '22023' })
+})
+
+test('causal reversal preserves intervening edits and every rated viewing', async () => {
+  const snapshot = await complete(await makeOuting())
+  const outingEdit = await patchReceipt('cinema_outings', snapshot.outing.id, { venue: 'Queued venue' })
+  const viewingEdit = await patchReceipt('viewings', snapshot.canonicalViewingId, { notes: 'Queued note' })
+  await db.query("update viewings set notes='Newer device note' where id=$1", [snapshot.canonicalViewingId])
+  assert.equal((await causalRevert(snapshot, outingEdit, viewingEdit)).status, 'conflict')
+  const rated = await patchReceipt('viewings', snapshot.canonicalViewingId, { rating: 4 })
+  assert.equal((await causalRevert(snapshot, outingEdit, rated)).status, 'conflict')
+  assert.equal(await countViewings(snapshot.outing.id), 1)
+})
+
+test('causal reversal rejects another row, owner, deleted predecessor and ambiguous guards', async () => {
+  const snapshot = await complete(await makeOuting()), unrelated = await complete(await makeOuting())
+  const unrelatedEdit = await patchReceipt('cinema_outings', unrelated.outing.id, { notes: 'Other outing' })
+  await assert.rejects(causalRevert(snapshot, unrelatedEdit), { code: '40001' })
+  const edit = await patchReceipt('cinema_outings', snapshot.outing.id, { notes: 'Owned receipt' })
+  await as('authenticated', other)
+  await assert.rejects(causalRevert(snapshot, edit), { code: '40001' })
+  await as('authenticated', owner)
+  const deletion = randomUUID()
+  await db.query('select apply_library_command($1,$2::jsonb)', [deletion, JSON.stringify([{ table: 'viewings', action: 'delete', key: { id: snapshot.canonicalViewingId } }])])
+  await assert.rejects(causalRevert(snapshot, edit, deletion), { code: '40001' })
+  const id = randomUUID()
+  await assert.rejects(causalRevert(snapshot, id, null, id), { code: '22023' })
+  await assert.rejects(db.query('select revert_cinema_outing($1,$2,$3,$4,$5,$6,$7)', [snapshot.outing.id, randomUUID(), snapshot.outing.updated_at, snapshot.canonicalViewingId, null, edit, null]), { code: '22023' })
+  await assert.rejects(db.query('select revert_cinema_outing($1,$2,$3,$4,$5,$6,$7)', [snapshot.outing.id, randomUUID(), null, snapshot.canonicalViewingId, snapshot.viewing.updated_at, edit, deletion]), { code: '22023' })
+})
+
+test('five-argument receipts survive the causal reversal migration unchanged', async () => {
+  await as('postgres')
+  await db.exec('drop function public.revert_cinema_outing(uuid,uuid,timestamptz,uuid,timestamptz,uuid,uuid); drop function cinemarchive_private.revert_cinema_outing(uuid,uuid,timestamptz,uuid,timestamptz,uuid,uuid);')
+  await db.exec(await readFile(new URL('supabase/migrations/20261008195605_canonical_outing_revert.sql', root), 'utf8'))
+  const snapshot = await complete(await makeOuting()), id = randomUUID()
+  const first = await revert(snapshot, id)
+  await as('postgres')
+  await db.exec(await readFile(new URL('supabase/migrations/20261008211455_causal_outing_revert.sql', root), 'utf8'))
+  await as('authenticated', owner)
+  assert.deepEqual(await revert(snapshot, id), first)
+  await as('anon', owner)
+  await assert.rejects(revert(snapshot), { code: '42501' })
 })

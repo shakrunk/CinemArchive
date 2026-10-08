@@ -230,6 +230,17 @@ class LibraryRepository(
         )
     }
 
+    /** What sync's merge planner needs to know about an existing title — see [planMerge]. */
+    suspend fun syncSnapshot(titleId: String): TitleSyncSnapshot? {
+        val title = titleDao.getById(titleId) ?: return null
+        val dates = viewingDao.observeViewings(titleId).first().mapNotNull { it.date }.toSet()
+        return TitleSyncSnapshot(
+            status = runCatching { LibraryStatus.valueOf(title.status) }.getOrDefault(LibraryStatus.WATCHLIST),
+            rating = title.rating,
+            viewingDates = dates,
+        )
+    }
+
     /** Local row id for an already-owned TMDB title, if any — lets the Add flow show
      *  "In library" and route a tap to the real title-detail screen instead of re-adding. */
     suspend fun findLibraryTitleId(tmdbId: Int, type: MediaType): String? =

@@ -147,6 +147,24 @@ class DiscoverRepository(
             }.getOrDefault(EpisodeCast.EMPTY)
         }
 
+    /**
+     * Resolves an IMDb or TVDB id to a TMDB hit through `media-proxy`'s `find` action — exact,
+     * no fuzzy matching. Used by sync to map Simkl/Plex/Emby items. Returns null when TMDB has
+     * no match; [preferType] orders movie vs TV when an id exists as both.
+     */
+    suspend fun findByExternalId(source: String, externalId: String, preferType: MediaType): MediaSearchResult? =
+        withContext(Dispatchers.IO) {
+            val body = client.invokeFunction(
+                "media-proxy",
+                "action=find&id=${URLEncoder.encode(externalId, "UTF-8")}&source=$source",
+                accessToken(),
+            )
+            val json = org.json.JSONObject(body)
+            val movies = parseSearchPage("""{"results":${json.optJSONArray("movie_results") ?: "[]"}}""", MediaType.MOVIE)
+            val tv = parseSearchPage("""{"results":${json.optJSONArray("tv_results") ?: "[]"}}""", MediaType.TV)
+            (if (preferType == MediaType.TV) tv + movies else movies + tv).firstOrNull()
+        }
+
     /** Discover browsing deliberately works signed-out, so the anon key backstops the bearer
      *  token — the same fallback `supabase-js`'s `functions.invoke` applies. */
     private fun accessToken(): String? = authRepository.currentSession()?.accessToken

@@ -154,6 +154,18 @@ class SupabaseRestClient(
         return execute(request)
     }
 
+    /** POSTs a JSON body to a Supabase Edge Function — used by [SimklApi], whose function takes
+     *  `{ action, ... }` bodies rather than query strings. */
+    fun invokeFunctionPost(name: String, bodyJson: String, accessToken: String?): String {
+        val request = Request.Builder()
+            .url("$baseUrl/functions/v1/$name")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer ${accessToken ?: anonKey}")
+            .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        return execute(request)
+    }
+
     fun get(table: String, filter: String, accessToken: String): String {
         val request = Request.Builder()
             .url("$baseUrl/rest/v1/$table?$filter")

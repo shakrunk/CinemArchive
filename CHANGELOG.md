@@ -11,6 +11,8 @@ number is chosen.
 
 ### Fixed
 
+- Web: title deep links now survive asynchronous local-library startup and reload while keeping account-specific detail drawers isolated.
+
 - Web: viewing and episode calendar dates no longer shift to the previous day in western time zones; timestamps still use local time.
 
 - Android: tags, studios, and franchise metadata now remain available locally after adding or syncing titles; upgrades preserve watch history and pending offline changes.

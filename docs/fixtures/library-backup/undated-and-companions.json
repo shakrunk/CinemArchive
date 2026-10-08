@@ -1,0 +1,46 @@
+{
+  "version": 2,
+  "format": "cinemarchive-library",
+  "exportedAt": "2026-10-08T12:00:00Z",
+  "client": { "platform": "android", "version": "1.2.3" },
+  "titles": [
+    {
+      "id": "t-undated",
+      "tmdbId": 11,
+      "type": "movie",
+      "title": "Before I Joined",
+      "year": 1977,
+      "genres": [],
+      "status": "watched",
+      "tags": [],
+      "addedAt": "2026-10-01",
+      "viewings": [
+        { "id": "v-undated", "titleId": "t-undated", "companions": ["  Robin  ", { "name": "", "friendUserId": "x" }, { "name": "Kit", "friendUserId": "friend-1" }, 7] },
+        { "id": "v-dated", "titleId": "t-undated", "date": "2026-10-02", "rating": 0 }
+      ]
+    },
+    {
+      "id": "t-tv",
+      "tmdbId": 22,
+      "type": "tv",
+      "title": "Undated Episodes",
+      "year": 2001,
+      "genres": ["Comedy"],
+      "status": "watched",
+      "tags": [],
+      "addedAt": "2026-10-01",
+      "seasons": [
+        { "id": "s1", "seasonNumber": 1, "episodeCount": 1, "episodesWatched": 1,
+          "episodes": [ { "id": "e1", "episodeNumber": 1, "watchEvents": [ { "id": "w-undated" }, { "id": "w-dated", "watchedAt": "2026-10-03" } ], "ratings": [], "reviews": [] } ] }
+      ],
+      "viewings": []
+    }
+  ],
+  "outings": [],
+  "lists": [
+    { "id": "l1", "name": "Noir", "description": null, "createdAt": "2026-10-01T00:00:00Z", "updatedAt": "2026-10-01T00:00:00Z",
+      "items": [ { "titleId": "t-undated", "position": 0, "addedAt": "2026-10-01T00:00:00Z" }, { "titleId": "t-undated", "position": 1 }, { "titleId": "missing", "position": 2 } ] }
+  ],
+  "localOnly": { "venueNotes": [{ "venue": "Vue", "notes": "park on level 3" }], "theaterInterest": ["t-undated"] },
+  "futureTopLevel": { "kept": true }
+}

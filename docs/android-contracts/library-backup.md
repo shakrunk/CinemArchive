@@ -1,0 +1,163 @@
+# Library backup / import contract (#323)
+
+Status: **codec verified** (`data/.../LibraryBackupCodec.kt`): 91 JVM cases and 5 instrumented
+cases passed on Android API 36, along with app build and lint. Shared fixtures live in
+`docs/fixtures/library-backup/`. Installed-app export, restore and UI remain *PLANNED*.
+
+The backup is a JSON archive of one account's library, readable and writable by both clients. It is
+**untrusted input on restore** — it may be hand-edited, come from another account, or be hostile.
+
+## Formats
+
+| Format | Shape | Reader | Writer |
+| --- | --- | --- | --- |
+| v1 (web today) | `{version:1, exportedAt:"YYYY-MM-DD", titles:Title[], outings?:CinemaOuting[]}` | both | web (until it adopts v2) |
+| bare array | `Title[]` | both | — |
+| v2 | v1 + `format:"cinemarchive-library"`, `version:2`, ISO-datetime `exportedAt`, `client:{platform,version}`, `lists:List[]`, `localOnly:{venueNotes,theaterInterest}` | both | Android (new); web when it adopts v2 |
+
+* A reader MUST accept v1 and bare arrays, MUST tolerate a missing `outings`/`lists`, and MUST reject
+  `version` greater than it understands (message names the version).
+* Entities are JSON trees. **Unknown fields are preserved verbatim** through parse → encode (lossless
+  document round trip, e.g. web → Android → web, even for fields Room has no column for). Unknown
+  top-level keys are kept in `extra` and never written into the library by a restore.
+* Writers emit sorted keys, 2-space indent, trailing newline. Encoding is canonical **per runtime**; byte identity across Android/JVM is not promised (JSON-equivalence is). Any restore-idempotency hash is `sha256Hex` over the **original input bytes**, never re-encoded JSON.
+
+`List` = `{id, name, description|null, createdAt, updatedAt, items:[{titleId, position?, addedAt?}]}`.
+
+## Identity: archive vs copy
+
+* The **archive** keeps original identities verbatim (it is a faithful snapshot).
+* **Restore as copy** (the only restore mode in this contract) gives every owner-row a fresh id —
+  title, season, episode, episode watch/rating/review, viewing, outing, list — and rewrites every
+  reference through the same maps: `viewing.titleId`, `outing.titleId`, `outing.completedViewingId`,
+  `viewing.outingId`, `list.items[].titleId`. No archive id appears in the restored data.
+* **Ambiguous identities**: if an id appears more than once in a table (title, season, episode, watch, rating, review, viewing, outing, list) EVERY row carrying it is rejected, nothing is bound to it, and rows referencing it are rejected (outings) or have the reference dropped and counted (viewing.outingId, list items). Distinct title ids that share `(tmdbId,type)` are not ambiguous: the later one is skipped with an explicit mapping to the first/existing title.
+* **Completed outings** must reference a viewing nested in the same title; otherwise (or when their title is skipped) they are rejected with a reason. Non-completed outings/list items on a skipped title are re-pointed and counted. Histories of a skipped title are omitted and counted, never silently bound to another title.
+* `physicalMedia[].id` is owner-authored logical identity: preserved in the archive, regenerated in admitted copies (format/edition/notes retained). Ids inside opaque `ext` data are kept verbatim as inert data.
+* **Dedupe** by `(tmdbId, type)` against the library: an existing title is **skipped with a report**
+  (not merged — merge is a later option). Outings and list items that referenced the archive's copy
+  are re-pointed at the existing title.
+
+## Untrusted-input rules (implemented in the codec)
+
+* Never imported, at any nesting level of title/season/episode/viewing/outing/list rows:
+  `ticketAttachment`, `ticketManaged` (managed ticket descriptors/object keys/operation ids are
+  provenance only), `user_id`, `userId`, `ownerUserId`, `owner_user_id`, `outbox`, `receipts`,
+  `aliases`, `operationId`, `operationIds`, `tombstones`, `syncCursor`, `shareToken`, `shareTokens`,
+  `token`. Each removal is counted in `report.untrustedFieldsDropped`.
+* Limits: 50 000 titles, 100 000 outings, 1 000 lists, 200 000 list items, 200 seasons/title, 2 000
+  episodes/season, 5 000 viewings/title, 100 tags, ids ≤ 128 chars, any string ≤ 20 000 chars.
+* Per row: title needs `tmdbId` (positive int), `type` ∈ {movie,tv}, non-blank `title`; `status` ∈
+  {watched,watchlist,watching,dropped} (unknown ⇒ **reject the row**, never default); ratings ∈ [0,5];
+  outing needs a string `titleId`, ISO `showtime`/`endsAt`, status ∈ {scheduled,completed,missed,cancelled},
+  minutes ∈ [0,1440]. Unknown outing `format` and odd date forms are *warnings* (kept as-is).
+* A rejected row never aborts the rest; every rejection carries a path and reason in the report.
+
+## Dates
+
+Undated stays undated: a viewing or episode watch event with no date is restored with no date — it
+is never replaced by "today". Historical dates and both date (`YYYY-MM-DD`) and datetime forms are
+preserved exactly as written.
+
+## Companions
+
+Canonical `{name, friendUserId?}` (web `normalizeCompanions`): strings become `{name}`, objects keep
+`friendUserId`, blank names are dropped, names trimmed. Android's Room stores names only today, so a
+restore reports "friend links dropped: N" until companion identity lands in Room.
+
+## Tickets
+
+* A backup contains **no ticket bytes** unless the user explicitly opts in; until that exists the UI
+  must say "ticket photos are not included" (no complete-photo-backup claim).
+* Archive descriptors (`ticketAttachment`, object keys, hashes, operation ids, aliases) are untrusted
+  provenance: never used as authorization, never adopted. When bytes are included, import
+  **recaptures** them under a **new** local attachment UUID and enqueues a **new** owner-confirmed
+  command (ticket repository contract). *PLANNED.*
+
+## Restore semantics (*PLANNED*, later batches)
+
+1. Parse + validate + plan completely in memory (no writes). Show the report before confirming.
+2. One Room transaction via the runtime `LocalTransactor` writes the rows **and** their outbox
+   entries so imported titles sync; nothing partial on failure.
+3. A durable per-owner restore receipt keyed by the archive's content hash is committed in the same
+   transaction, so a repeated or crash-interrupted restore is idempotent and never re-queues.
+4. Owner-scoped: restore targets only the signed-in account's runtime database.
+5. Archived `localOnly` venue notes and theater interest remain inert until explicitly admitted.
+   Future restore must follow `moviegoing-preferences.md` for the shared private tables, preserving
+   existing local data and requiring proven revisions for replacements.
+
+## Report
+
+`titlesNew, titlesSkippedExisting, titlesRejected, outingsNew, outingsRejected, listsNew,
+listItemsNew, listItemsDropped, untrustedFieldsDropped, unknownTopLevelKeysIgnored, warnings[],
+rejections[]` — each issue is `{path, message, fatal}`.
+
+## Gaps (web vs Android) this contract makes explicit
+
+| Data | Web export | Android Room today |
+| --- | --- | --- |
+| lists + membership | **not exported/imported** | stored; v2 adds them |
+| companion friend ids | kept | **dropped** (names only) |
+| physicalMedia, customWatchUrl, inHomeCollection, rtUrl, awardsCount, bechdel*, contentRating, imdbId, scores | kept | Room v18 retains rich title metadata; restore and re-export mappings still require verification per field |
+| tags | kept | column exists |
+| ticket bytes | not exported | managed by ticket repository |
+| venue notes, theater interest | n/a | local data remains; shared private storage exists, with client admission pending; `localOnly` in v2 preserves archive provenance |
+
+## Completeness claims (binding on UI copy and reports)
+
+* A codec round trip is **not** a lossless installed-app restore. A restore is only called lossless when
+  every archive value either has durable, owner-scoped storage that survives restore **and re-export**, or
+  the report lists it as unsupported. Until storage exists the feature says "incomplete support" and lists
+  what was omitted; it never says "complete backup".
+* `ext` / unknown fields carry no authority: they are inert data (no receipts, outbox entries, aliases,
+  descriptors or ids are ever re-activated from them).
+* Skip-with-report dedupe matches current web and is NOT a lossless restore of existing-title histories:
+  every omitted title, history row and list reference is reported and the source archive is preserved.
+  Merging histories into an existing title is a required follow-up for a complete restore path.
+* Companion friend links must not be permanently dropped as final parity: companion identity storage is
+  owned by the outing-integrity worker; this contract consumes whatever API/storage it provides.
+* Archive identities stay separate from copy-admission identities; the archive is never rewritten.
+* Ticket photos: no "complete portable backup" claim until explicit byte inclusion + recapture exists.
+
+## Read bounds
+
+A reader enforces a **byte limit before allocating** the document text (reject oversized files from the file
+size or a bounded read, e.g. 64 MiB), then parses. The codec materializes the whole tree in memory
+(`JSONObject`): it is **bounded, not streaming**, and must not be described as streaming.
+
+## Shared fixtures (`docs/fixtures/library-backup/`)
+
+* `v1-web-export.json` — web envelope: TV graph, viewing↔outing links, companions with friend ids,
+  managed + legacy ticket fields, unknown future fields, physical media/tags.
+* `undated-and-companions.json` — v2 envelope: undated viewing + undated episode watch event,
+  mixed companion forms, a list with a duplicate and a dangling item, `localOnly`, unknown top-level key.
+* `hostile.json` — duplicate/non-string ids, rating 9, unknown status, bad tmdbId, untrusted keys,
+  dangling `completedViewingId`/`outingId`, outing with missing title / bad showtime, blank list name.
+
+## Strict parsing (implemented)
+
+Own RFC 8259 parser: trailing tokens, comments, single quotes, unquoted keys, NaN/Infinity, leading zeros, raw control
+characters, bad escapes and **duplicate keys** are rejected; exactly one leading BOM is stripped; depth ≤ 64, nodes ≤ 4M;
+`parseBytes` checks the byte limit first and decodes UTF-8 with a REPORTing decoder. Integers use `Long` or exact `BigInteger`,
+and decimals/exponents use exact `BigDecimal`. Numeric tokens are limited to 64 characters and must have a finite
+`doubleValue` for Android framework compatibility; the stored value is never rounded. Unpaired UTF-16 surrogates are
+rejected. `tmdbId` must be an
+integer in 1..Int.MAX (`1.5`, `603.0`, `1e3`, `"603"` are rejected). A present, non-null container (`seasons`, `episodes`,
+`viewings`, `watchEvents`, `ratings`, `reviews`, `companions`, `tags`, `genres`, `seats`, list `items`) must be an array.
+Season/episode numbers are integers ≥ 0 and unique within their parent.
+
+## Admitted rows vs archive (implemented)
+
+In **planCopy output only**, each row is rebuilt from a per-entity allowlist of known fields; everything else moves verbatim
+into a single inert `ext` object. Untrusted keys (the list above **plus `ticketImagePath`**, matched case-insensitively) are
+removed at any depth, including inside `ext`, and counted. The archive document and `encode` stay lossless.
+
+## Report fields (additional)
+
+`listsRejected, historyRowsOmittedForSkippedTitles, viewingOutingRefsDropped, outingViewingRefsDropped, outingsRetargeted,
+listItemsRetargeted, completedOutingsRejected, ambiguousIdRows`.
+
+## Additional fixtures
+
+`trailing-garbage`, `duplicate-keys`, `float-tmdb`, `malformed-containers`, `duplicate-natural-keys`, `ambiguous-ids`,
+`completed-without-history`, `skipped-title-completed-outing`, `ticket-path-and-ext`, `bare-array`, `v2-android-export`.

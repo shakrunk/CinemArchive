@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android backup validation now preserves archive values and plans copies with fresh identities; installed-app export and restore integration remain under development.
 - Android now offers explicit review and recovery of pending viewing edits, preserving server revisions and clearing only confirmed obsolete outing links.
 - Android now retains synced physical collections, custom watch links and rich title metadata offline, including backfill for existing libraries.
 - Offline ratings after an outing completion can use its proven title revision while preserving newer edits and historical completion uncertainty.

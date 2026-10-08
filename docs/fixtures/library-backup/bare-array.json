@@ -1,0 +1,4 @@
+[
+  { "id": "ba-1", "tmdbId": 101, "type": "movie", "title": "Bare One", "year": 1990, "genres": ["Drama"], "status": "watched", "rating": 3.5, "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+  { "id": "ba-2", "tmdbId": 102, "type": "tv", "title": "Bare Two", "year": 2005, "genres": [], "status": "watchlist", "tags": ["later"], "addedAt": "2026-01-02", "viewings": [] }
+]

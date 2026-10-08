@@ -55,6 +55,7 @@ class SupabaseRemoteMutationWriter(
                     else -> upsertList(payload)
                 }
                 "list_item" -> when (entry.operation) {
+                    MEMBERSHIP_COMMAND -> ListMembershipTransport(client, sessionProvider).push(entry)
                     "delete" -> deleteListItem(payload)
                     else -> upsertListItem(payload)
                 }

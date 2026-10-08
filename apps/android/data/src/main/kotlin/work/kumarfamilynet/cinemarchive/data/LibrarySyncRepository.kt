@@ -150,8 +150,8 @@ class LibrarySyncRepository(
     private suspend fun syncLocked() {
         val session = authRepository.currentSession() ?: return
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
-        // rows/tombstones skipped while this title's credit projection was protected.
-        if (pendingKeys().any { it.startsWith("title_credits:") || it.startsWith("title_catalog:") }) {
+        // rows/tombstones skipped while credits or natural-key memberships were protected.
+        if (pendingKeys().any { it.startsWith("title_credits:") || it.startsWith("title_catalog:") || it.startsWith("list_membership:") }) {
             dataStore.edit { it[cursorKey] = EPOCH }
         }
         // Push first (best effort — offline just leaves entries queued and protected below).
@@ -600,6 +600,10 @@ class LibrarySyncRepository(
 internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean {
     if (pending.isEmpty()) return false
     val entityType = row.getString("entity_type")
+    if (entityType == "list_item") {
+        val payload = row.optJSONObject("payload")
+        if (payload != null && membershipProjectionKey(payload.optString("listId"), payload.optString("titleId")) in pending) return true
+    }
     val creditTypes = setOf("title_cast", "title_crew", "season_cast", "episode_crew")
     if (entityType in creditTypes && "title_credits:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
     if (entityType in creditTypes && "title_catalog:${row.getJSONObject("payload").optString("titleId")}" in pending) return true

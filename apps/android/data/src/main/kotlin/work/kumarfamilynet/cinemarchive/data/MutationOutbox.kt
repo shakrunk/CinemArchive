@@ -120,6 +120,7 @@ class MutationOutbox(
      *  copy is the user's newer intent and the server hasn't seen it yet. */
     suspend fun pendingEntityKeys(): Set<String> = buildSet {
         val entries = outboxDao.getPending()
+        addAll(membershipProtectionKeys(entries))
         entries.forEach { entry ->
             add(pendingKey(entry.entityType, entry.entityId))
             if (entry.entityType == "title_credits") {

@@ -98,15 +98,8 @@ class ListsRepository(
             outbox.enqueue(
                 entityType = "list_item",
                 entityId = id,
-                operation = "upsert",
-                payload = JSONObject().apply {
-                    put("id", id)
-                    put("listId", listId)
-                    put("titleId", titleId)
-                    put("position", JSONObject.NULL)
-                    put("addedAt", now)
-                    put("updatedAt", now)
-                },
+                operation = MEMBERSHIP_COMMAND,
+                payload = membershipPayload(id, listId, titleId, true, now),
             )
         }
     }
@@ -118,8 +111,8 @@ class ListsRepository(
             outbox.enqueue(
                 entityType = "list_item",
                 entityId = id,
-                operation = "delete",
-                payload = JSONObject().put("id", id),
+                operation = MEMBERSHIP_COMMAND,
+                payload = membershipPayload(id, listId, titleId, false, null),
             )
         }
     }

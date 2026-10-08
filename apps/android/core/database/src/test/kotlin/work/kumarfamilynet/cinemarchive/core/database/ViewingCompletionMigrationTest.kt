@@ -43,7 +43,7 @@ class ViewingCompletionMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 15
         } finally { fixture.close() }
-        val upgraded = builder(name).addMigrations(LibraryDatabase.MIGRATION_15_16).build()
+        val upgraded = builder(name).addMigrations(LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17).build()
         try {
             val viewing = upgraded.viewingDao().getById("viewing")!!
             assertEquals("Keep this history", viewing.notes)

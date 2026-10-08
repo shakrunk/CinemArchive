@@ -29,8 +29,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ListItemEntity::class,
         TheaterInterestEntity::class,
         LegacyRestoreReceiptEntity::class,
+        TicketOriginalEntity::class,
+        TicketAssociationEntity::class,
+        TicketIntentEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -54,6 +57,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun listItemDao(): ListItemDao
     abstract fun theaterInterestDao(): TheaterInterestDao
     abstract fun legacyRestoreReceiptDao(): LegacyRestoreReceiptDao
+    abstract fun ticketAttachmentDao(): TicketAttachmentDao
 
     companion object {
         const val LEGACY_DATABASE_NAME = "cinemarchive.db"
@@ -189,6 +193,15 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Keep legacy paths, queued writes and local completion identity proofs untouched. */
+        internal val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `ticket_originals` (`projectId` TEXT NOT NULL, `ownerId` TEXT NOT NULL, `attachmentId` TEXT NOT NULL, `outingId` TEXT NOT NULL, `descriptorJson` TEXT NOT NULL, `savedAt` INTEGER NOT NULL, PRIMARY KEY(`projectId`, `ownerId`, `attachmentId`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `ticket_associations` (`projectId` TEXT NOT NULL, `ownerId` TEXT NOT NULL, `outingId` TEXT NOT NULL, `attachmentId` TEXT, PRIMARY KEY(`projectId`, `ownerId`, `outingId`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `ticket_intents` (`operationId` TEXT NOT NULL, `projectId` TEXT NOT NULL, `ownerId` TEXT NOT NULL, `outingId` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `acknowledgedAt` INTEGER, PRIMARY KEY(`operationId`))")
+            }
+        }
+
         /** [name] is the SQLite file name. Per-account runtimes pass an owner-derived name (see
          *  AccountRuntime) so two accounts never share a file; the legacy global
          *  `cinemarchive.db` ([LEGACY_DATABASE_NAME]) is never opened by an active runtime. */
@@ -197,7 +210,7 @@ abstract class LibraryDatabase : RoomDatabase() {
             LibraryDatabase::class.java,
             name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
@@ -218,7 +231,7 @@ abstract class LibraryDatabase : RoomDatabase() {
          */
         fun createForRecovery(context: Context, name: String): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, name)
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
                 .build()
     }
 }

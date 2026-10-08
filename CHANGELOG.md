@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Shared library sync now includes season cast, episode crew and their deletion records, allowing native person filters to backfill existing credits safely.
 - Android: outing edits now send only changed fields, preserve uncertain legacy changes for review, and use consistent screening formats in plans and Ledger totals.
 - Android retains tags, studios, franchise metadata and explicit metadata clears, with a lossless local database upgrade and backend-aware sync backfill.
 - Web outing sharing waits for pending plan edits, isolates account changes, and shows each recipient the confirmed delivered snapshot.

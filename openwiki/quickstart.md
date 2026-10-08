@@ -11,6 +11,7 @@
 - **Library** — Poster wall or sortable list of your movies/shows with client-side search, filtering (type, status, genre, tag, network, decade, rating, language, studio, director), and sorting.
 - **Episode-level tracking** — Log individual episodes per season, decoupled from ratings and reviews. Season/series stats roll up automatically from episode data.
 - **The Ledger** — Stats dashboards with charts, viewing timeline, top genres/directors, media breakdown, franchise grouping, and customizable widget layouts.
+- **Custom lists** — Group titles into your own private lists (a marathon, a ranked shortlist); a title can be in many lists, independent of watch status. Web and Android.
 - **Up Next** — Upcoming releases and unwatched episodes at a glance.
 - **Social features** — Share read-only links with time-bound tokens, add friends, comment & react to titles, send recommendations with personal notes, view friend activity feeds.
 - **Notifications** — Per-feature push notifications when friends interact, shares are used, or recommendations arrive.

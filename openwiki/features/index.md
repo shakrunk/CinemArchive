@@ -1,6 +1,6 @@
 # Features & Domains
 
-CinemArchive is organized around six major feature domains. This section explains each one: what it does, why it matters, how it's built, and where to look for code.
+CinemArchive is organized around nine major feature domains. This section explains each one: what it does, why it matters, how it's built, and where to look for code.
 
 ---
 
@@ -456,6 +456,37 @@ Source: `/src/views/ledger/panels/` (each panel has its own CSS in the same file
 2. Add theme name to `Theme` type in useAppStore.ts
 3. Register in theme picker UI
 4. Test across all views
+
+---
+
+## 9. Custom Lists
+
+**What it does**: Group titles into your own named lists — a marathon, a ranked shortlist, a movie-night pile. Available on web and Android.
+
+### Key Concepts
+
+- **Many-to-many**: a title can be in any number of lists, and a list holds any number of titles (`list_items` join table, `unique(list_id, title_id)`).
+- **Independent of status**: list membership is separate from `titles.status`; a watchlist title can also sit in lists.
+- **Private**: owner-only RLS; lists are not shared with friends or via share tokens yet.
+- **Ordering**: v1 orders by `added_at`; `list_items.position` is reserved for manual reordering.
+
+### How It Works
+
+1. The Lists view creates a list; the "Add to list" sheet on a title toggles membership (and can create a list on the fly).
+2. Writes are optimistic store actions (`createList`, `deleteList`, `addTitleToList`, `removeTitleFromList`), with the DB write following.
+3. Deleting a list cascades to its `list_items`; both tables write `sync_tombstones` so Android's incremental sync sees deletions.
+
+### Where to Look
+
+| Component | Responsibility |
+|-----------|-----------------|
+| `/apps/web/src/views/Lists.tsx` | List grid, create form, list detail |
+| `/apps/web/src/components/AddToListSheet.tsx` | Per-title list membership toggles |
+| `/apps/web/src/store/useAppStore.ts` | `ListsSlice` (`lists`, `listMemberships`, actions) |
+| `/apps/web/src/lib/db.ts` | `fetchLists`, `fetchListMemberships` and write helpers |
+| `/supabase/migrations/20260821000000_lists.sql` | Tables, RLS, sync arms |
+| `/apps/android/feature/lists/` | Android Lists tab |
+| `/docs/android-contracts/lists.md` | Cross-client contract |
 
 ---
 

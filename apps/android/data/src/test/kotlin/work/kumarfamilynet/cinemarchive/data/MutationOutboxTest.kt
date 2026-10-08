@@ -36,6 +36,8 @@ private class FakeOutboxDao : OutboxDao {
         publish()
     }
 
+    override suspend fun markForReview(id: String, reason: String): Int = error("Not used by this fixture")
+
     override suspend fun recordFailure(id: String, error: String?) {
         val existing = entries[id] ?: return
         entries[id] = existing.copy(attemptCount = existing.attemptCount + 1, lastError = error)

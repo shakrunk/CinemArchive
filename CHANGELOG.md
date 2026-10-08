@@ -38,6 +38,7 @@ number is chosen.
 - Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
 
 ### Added
+- Android: Profile now offers explicit review, selected-field reapplication, discard and preserved-original export for saved outing changes, with restart-safe retry and isolated recovery for unreadable records.
 - Shared backend: saved outing changes can be reapplied through an owner-scoped, version-checked review API with durable retry receipts; native review controls follow separately.
 - Shared backend: private ticket attachment storage with owner-only access, conflict-safe replacement, interrupted-request receipts, and retained deletion recovery; client capture integration follows separately.
 - Android: Library now supports metadata filters, half-star rating thresholds, matching search fields, six sort orders in both directions, and franchise grouping.

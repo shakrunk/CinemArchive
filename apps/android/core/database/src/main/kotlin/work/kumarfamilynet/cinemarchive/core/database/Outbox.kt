@@ -44,4 +44,8 @@ interface OutboxDao {
 
     @Query("UPDATE mutation_outbox SET attemptCount = attemptCount + 1, lastError = :error WHERE id = :id")
     suspend fun recordFailure(id: String, error: String?)
+
+    /** Preserve SQLite rowid/FIFO order while pausing an intent for explicit user review. */
+    @Query("UPDATE mutation_outbox SET operation = 'review', lastError = :reason WHERE id = :id")
+    suspend fun markForReview(id: String, reason: String): Int
 }

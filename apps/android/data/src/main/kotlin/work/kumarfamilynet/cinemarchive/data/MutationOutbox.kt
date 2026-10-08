@@ -29,6 +29,9 @@ class MutationOutbox(
     // concurrent passes would push the same entry twice.
     private val flushMutex = Mutex()
 
+    /** Resolution must not race a push or let dependent commands overtake the reviewed entry. */
+    internal suspend fun <T> withFlushPaused(block: suspend () -> T): T = flushMutex.withLock { block() }
+
     private val _conflicts = MutableSharedFlow<ConflictNotice>(extraBufferCapacity = 16)
 
     /** Edits the server rejected because a newer version existed. The local projection has

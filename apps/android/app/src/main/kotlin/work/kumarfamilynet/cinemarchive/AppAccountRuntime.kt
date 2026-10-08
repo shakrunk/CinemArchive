@@ -177,6 +177,13 @@ class AppAccountRuntime(
         friendsRepository = friendsRepository,
     )
 
+    val outingRecoveryRepository = work.kumarfamilynet.cinemarchive.data.OutingRecoveryRepository(
+        ownerId, session::currentSession, database.outboxDao(), database.cinemaOutingDao(),
+        database.titleDao(), outbox,
+        work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_outing_recovery")),
+        work.kumarfamilynet.cinemarchive.data.OutingRecoveryRepository.remote(client, ownerId, session::currentSession),
+    )
+
     val ledgerRepository = LedgerRepository(
         titleDao = database.titleDao(),
         viewingDao = database.viewingDao(),

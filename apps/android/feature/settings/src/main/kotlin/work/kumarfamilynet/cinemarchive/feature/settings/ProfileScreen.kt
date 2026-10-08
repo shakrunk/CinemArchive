@@ -85,6 +85,7 @@ fun ProfileRoute(
     // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
     // the only feedback needed before the screen it names takes over.
     selectedCategory: SettingsCategory? = null,
+    outingRecovery: (@Composable () -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -119,6 +120,7 @@ fun ProfileRoute(
         legacyRestore = legacyRestore,
         onSignOut = authRepository::signOut,
         selectedCategory = selectedCategory,
+        outingRecovery = outingRecovery,
     )
 }
 
@@ -181,6 +183,7 @@ private fun ProfileScreen(
     legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     onSignOut: () -> Unit,
     selectedCategory: SettingsCategory? = null,
+    outingRecovery: (@Composable () -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -367,6 +370,7 @@ private fun ProfileScreen(
             item {
                 ReadingWidthColumn {
                     if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
+                    if (signedInEmail != null) outingRecovery?.invoke()
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

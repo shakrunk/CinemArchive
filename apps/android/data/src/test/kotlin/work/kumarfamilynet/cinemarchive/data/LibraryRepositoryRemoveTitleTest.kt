@@ -117,6 +117,8 @@ private class RecordingOutboxDaoRm : OutboxDao {
     override fun observePending(): Flow<List<OutboxEntity>> = MutableStateFlow(entries)
     override suspend fun getPending(): List<OutboxEntity> = entries
     override suspend fun remove(id: String) { entries.removeAll { it.id == id } }
+    override suspend fun markForReview(id: String, reason: String): Int = error("Not used by this fixture")
+
     override suspend fun recordFailure(id: String, error: String?) = Unit
 }
 

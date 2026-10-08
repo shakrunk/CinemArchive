@@ -792,6 +792,7 @@ private fun CinemArchiveApp(
                             onOpenDeveloperSettings = { selectedSettingsCategory = SettingsCategory.DEVELOPER },
                             legacyLoadStatus = runtime::legacyStatus,
                             legacyRestore = runtime::restoreLegacy,
+                            outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                             selectedCategory = activeCategory,
                         )
                     }
@@ -887,6 +888,7 @@ private fun CinemArchiveApp(
                     onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
                     legacyLoadStatus = runtime::legacyStatus,
                     legacyRestore = runtime::restoreLegacy,
+                    outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                 )
                 Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
                 Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)

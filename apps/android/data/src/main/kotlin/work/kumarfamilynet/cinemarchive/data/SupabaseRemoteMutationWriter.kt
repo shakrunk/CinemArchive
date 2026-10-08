@@ -44,6 +44,7 @@ class SupabaseRemoteMutationWriter(
                     "insert" -> insertOuting(payload)
                     "update" -> patchOuting(payload)
                     "upsert" -> verifyLegacyOuting(payload)
+                    "review" -> PushResult.Retry("Open Profile > Saved outing changes to review this preserved change.")
                     else -> PushResult.Retry("Unknown outing operation ${entry.operation}")
                 }
                 "list" -> when (entry.operation) {

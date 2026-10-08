@@ -762,6 +762,9 @@ export const useAppStore = create<AppStore>()(
       // Stable UUIDs so local IDs match the DB rows — enables reliable delete/undo
       const createsWatchEvent = Boolean(opts.watchedAt || opts.prePlatform)
       const watchEventId = createsWatchEvent ? crypto.randomUUID() : undefined
+      const ratingId = opts.rating && opts.rating > 0 ? crypto.randomUUID() : undefined
+      const reviewId = opts.reviewText?.trim() ? crypto.randomUUID() : undefined
+      const now = new Date().toISOString()
 
       // Sync to DB: resolve episode id from current state, then fire async
       if (s.user) {
@@ -771,13 +774,12 @@ export const useAppStore = create<AppStore>()(
         if (targetEpisode) {
           const userId = s.user.id
           const episodeId = targetEpisode.id
-          const dbOpts = { ...opts, watchEventId }
+          const dbOpts = { ...opts, watchEventId, ratingId, reviewId, recordedAt: now }
           syncToDb(get, 'Failed to sync episode log to DB:', () => logEpisodeToDb(userId, episodeId, dbOpts),
             'Couldn\'t save watch event — check your connection.')
         }
       }
 
-      const now = new Date().toISOString()
       const titles = s.titles.map((t) => {
         if (t.id !== titleId) return t
         const seasons = (t.seasons ?? []).map((season) => {
@@ -797,21 +799,21 @@ export const useAppStore = create<AppStore>()(
                 },
               ]
             }
-            if (opts.rating && opts.rating > 0) {
+            if (opts.rating && opts.rating > 0 && ratingId) {
               updated.ratings = [
                 ...ep.ratings,
                 {
-                  id: crypto.randomUUID(),
+                  id: ratingId,
                   rating: opts.rating,
                   ratedAt: now,
                 },
               ]
             }
-            if (opts.reviewText?.trim()) {
+            if (opts.reviewText?.trim() && reviewId) {
               updated.reviews = [
                 ...ep.reviews,
                 {
-                  id: crypto.randomUUID(),
+                  id: reviewId,
                   reviewText: opts.reviewText.trim(),
                   reviewedAt: now,
                   colorMode: opts.colorMode,
@@ -843,7 +845,7 @@ export const useAppStore = create<AppStore>()(
 
     if (state.user) {
       const userId = state.user.id
-      const dbOpts = { watchedAt, watchEventId, colorMode }
+      const dbOpts = { watchedAt, watchEventId, colorMode, recordedAt: new Date().toISOString() }
       syncToDb(get, 'Failed to sync quick episode log to DB:', () => logEpisodeToDb(userId, episodeId, dbOpts),
         'Couldn\'t save watch event — check your connection.')
     }

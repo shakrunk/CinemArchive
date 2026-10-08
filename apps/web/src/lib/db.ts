@@ -834,8 +834,8 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
 
   const mappedPatch: any = {}
   if (patch.status !== undefined) mappedPatch.status = patch.status
-  if (patch.rating !== undefined) mappedPatch.rating = patch.rating
-  if (patch.notes !== undefined) mappedPatch.notes = patch.notes
+  if ('rating' in patch) mappedPatch.rating = patch.rating ?? null
+  if ('notes' in patch) mappedPatch.notes = patch.notes ?? null
   if (patch.tags !== undefined) mappedPatch.tags = patch.tags
   if (patch.inHomeCollection !== undefined) mappedPatch.in_home_collection = patch.inHomeCollection
   // Clearing the shelf passes physicalMedia: undefined — presence of the key
@@ -933,49 +933,70 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
   }
 }
 
+export interface EpisodeLogWrite {
+  watchedAt?: string
+  prePlatform?: boolean // watched before joining — creates a watch event with a null (indeterminate) date
+  watchNotes?: string
+  rating?: number
+  reviewText?: string
+  colorMode?: 'bw' | 'color'
+  watchEventId?: string
+  ratingId?: string
+  reviewId?: string
+  recordedAt: string
+}
+
+/** IDs and timestamp are assigned by the caller once, before optimism or delivery.
+ * Retrying a partly delivered log inserts only missing records and never overwrites
+ * a historical record that another device may have subsequently edited. */
 export async function logEpisodeToDb(
   userId: string,
   episodeId: string,
-  opts: {
-    watchedAt?: string
-    prePlatform?: boolean // watched before joining — creates a watch event with a null (indeterminate) date
-    watchNotes?: string
-    rating?: number
-    reviewText?: string
-    colorMode?: 'bw' | 'color'
-    watchEventId?: string // client-supplied uuid so the optimistic store id matches the DB row (enables reliable delete/undo)
-  }
+  opts: EpisodeLogWrite
 ): Promise<void> {
   if (!supabase) return
 
+  if ((opts.watchedAt || opts.prePlatform) && !opts.watchEventId ||
+      opts.rating && opts.rating > 0 && !opts.ratingId ||
+      opts.reviewText?.trim() && !opts.reviewId ||
+      !opts.recordedAt || !Number.isFinite(Date.parse(opts.recordedAt))) {
+    throw new Error('Episode logs require stable record IDs and a timestamp before delivery.')
+  }
+  const insertOnce = { onConflict: 'id', ignoreDuplicates: true }
+
   if (opts.watchedAt || opts.prePlatform) {
-    const { error } = await supabase.from('episode_watch_events').insert({
-      ...(opts.watchEventId ? { id: opts.watchEventId } : {}),
+    const { error } = await supabase.from('episode_watch_events').upsert({
+      id: opts.watchEventId,
       episode_id: episodeId,
       user_id: userId,
-      watched_at: opts.watchedAt ?? null,
+      watched_at: opts.prePlatform ? null : opts.watchedAt ?? null,
       notes: opts.watchNotes || undefined,
       color_mode: opts.colorMode ?? null,
-    })
+      created_at: opts.recordedAt,
+    }, insertOnce)
     unwrap(error, 'Error inserting episode watch event:')
   }
 
   if (opts.rating && opts.rating > 0) {
-    const { error } = await supabase.from('episode_ratings').insert({
+    const { error } = await supabase.from('episode_ratings').upsert({
+      id: opts.ratingId,
       episode_id: episodeId,
       user_id: userId,
       rating: opts.rating,
-    })
+      rated_at: opts.recordedAt,
+    }, insertOnce)
     unwrap(error, 'Error inserting episode rating:')
   }
 
   if (opts.reviewText?.trim()) {
-    const { error } = await supabase.from('episode_reviews').insert({
+    const { error } = await supabase.from('episode_reviews').upsert({
+      id: opts.reviewId,
       episode_id: episodeId,
       user_id: userId,
       review_text: opts.reviewText.trim(),
       color_mode: opts.colorMode ?? null,
-    })
+      reviewed_at: opts.recordedAt,
+    }, insertOnce)
     unwrap(error, 'Error inserting episode review:')
   }
 }
@@ -989,13 +1010,14 @@ export async function insertPrePlatformWatchEventsToDb(
 ): Promise<void> {
   if (!supabase || events.length === 0) return
 
-  const { error } = await supabase.from('episode_watch_events').insert(
+  const { error } = await supabase.from('episode_watch_events').upsert(
     events.map((e) => ({
       id: e.id,
       episode_id: e.episodeId,
       user_id: userId,
       watched_at: null,
-    }))
+    })),
+    { onConflict: 'id', ignoreDuplicates: true }
   )
   unwrap(error, 'Error inserting pre-platform watch events:')
 }

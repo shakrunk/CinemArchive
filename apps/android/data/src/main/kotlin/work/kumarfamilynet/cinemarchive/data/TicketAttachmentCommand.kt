@@ -2,7 +2,9 @@ package work.kumarfamilynet.cinemarchive.data
 
 import java.net.URI
 import java.util.UUID
+import java.time.Instant
 import org.json.JSONObject
+import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 import work.kumarfamilynet.cinemarchive.core.model.TicketAttachment
 import work.kumarfamilynet.cinemarchive.core.model.TicketBarcode
 import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
@@ -20,8 +22,11 @@ data class TicketAttachmentCommand(
     val outingId: String,
     val attachment: TicketAttachment?,
     val expectedAttachmentId: String?,
+    val expectedUpdatedAt: String? = null,
+    val expectedOperationId: String? = null,
 ) {
     val kind: String get() = if (attachment == null) "ticket.detach" else "ticket.attach"
+    val revisionGuarded: Boolean get() = expectedUpdatedAt != null || expectedOperationId != null
 }
 
 internal fun checkedTicketUuid(value: String): String = value.also {
@@ -79,6 +84,14 @@ internal fun checkedTicketCommand(command: TicketAttachmentCommand): TicketAttac
     it.expectedAttachmentId?.let(::checkedTicketUuid)
     it.attachment?.let { descriptor -> checkedTicketAttachment(it.scope, descriptor) }
     require(it.attachment == null || it.attachment.id != it.expectedAttachmentId) { "Replacement must use a new attachment." }
+    require(it.expectedUpdatedAt == null || it.expectedOperationId == null) { "Ticket intent has two outing guards." }
+    it.expectedUpdatedAt?.let(::ticketInstant)
+    it.expectedOperationId?.let { id -> checkedTicketUuid(id); require(id != command.operationId) { "Ticket cannot depend on itself." } }
+}
+
+internal fun ticketInstant(value: String): Instant {
+    require(value.matches(Regex("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})"))) { "Invalid ticket revision timestamp." }
+    return Instant.parse(value)
 }
 
 internal fun TicketAttachmentCommand.toTicketJson(): JSONObject {
@@ -87,15 +100,47 @@ internal fun TicketAttachmentCommand.toTicketJson(): JSONObject {
         .put("projectId", scope.projectId).put("ownerId", scope.ownerId).put("kind", kind).put("outingId", outingId)
         .put("expectedAttachmentId", expectedAttachmentId ?: JSONObject.NULL)
         .put("attachment", attachment?.toTicketJson() ?: JSONObject.NULL)
+        .apply {
+            expectedUpdatedAt?.let { put("expectedUpdatedAt", it) }
+            expectedOperationId?.let { put("expectedOperationId", it) }
+        }
 }
 
 internal fun ticketCommandFromJson(json: JSONObject): TicketAttachmentCommand {
-    json.exactTicketKeys("version", "operationId", "projectId", "ownerId", "kind", "outingId", "expectedAttachmentId", "attachment")
+    val guards = listOf("expectedUpdatedAt", "expectedOperationId").filter(json::has)
+    require(guards.size <= 1)
+    json.exactTicketKeys("version", "operationId", "projectId", "ownerId", "kind", "outingId", "expectedAttachmentId", "attachment", *guards.toTypedArray())
     require(json.get("version") == TICKET_COMMAND_VERSION) { "Unsupported ticket command version." }
     val scope = checkedTicketScope(TicketOwnerScope(json.ticketString("projectId"), json.ticketString("ownerId")))
     val attachment = if (json.get("attachment") === JSONObject.NULL) null else ticketAttachmentFromJson(scope, json.getJSONObject("attachment"))
     return checkedTicketCommand(TicketAttachmentCommand(json.ticketString("operationId"), scope, json.ticketString("outingId"),
-        attachment, json.ticketNullableString("expectedAttachmentId"))).also {
+        attachment, json.ticketNullableString("expectedAttachmentId"),
+        if (json.has("expectedUpdatedAt")) json.ticketString("expectedUpdatedAt") else null,
+        if (json.has("expectedOperationId")) json.ticketString("expectedOperationId") else null)).also {
         require(json.ticketString("kind") == it.kind) { "Ticket command kind does not match its content." }
     }
 }
+
+internal fun ticketCommand(entry: OutboxEntity): TicketAttachmentCommand {
+    require(entry.entityType == TICKET_COMMAND_ENTITY && entry.operation == TICKET_COMMAND_OPERATION)
+    return ticketCommandFromJson(JSONObject(entry.payloadJson)).also {
+        require(it.operationId == entry.id && it.outingId == entry.entityId) { "Ticket queue identity differs from its saved intent." }
+    }
+}
+
+internal fun TicketAttachmentCommand.receiptRequest(): JSONObject = JSONObject().put("kind", kind).put("outingId", outingId)
+    .put("attachmentId", attachment?.id ?: JSONObject.NULL).put("expectedAttachmentId", expectedAttachmentId ?: JSONObject.NULL)
+    .apply { if (revisionGuarded) {
+        put("expectedUpdatedAt", expectedUpdatedAt ?: JSONObject.NULL)
+        put("expectedOperationId", expectedOperationId ?: JSONObject.NULL)
+    } }
+
+internal fun TicketAttachmentCommand.finalizeArgs(): JSONObject = JSONObject().put("p_operation_id", operationId)
+    .put("p_outing_id", outingId).put("p_expected_attachment_id", expectedAttachmentId ?: JSONObject.NULL)
+    .apply {
+        attachment?.let { put("p_attachment_id", it.id) }
+        if (revisionGuarded) {
+            put("p_expected_updated_at", expectedUpdatedAt ?: JSONObject.NULL)
+            put("p_expected_operation_id", expectedOperationId ?: JSONObject.NULL)
+        }
+    }

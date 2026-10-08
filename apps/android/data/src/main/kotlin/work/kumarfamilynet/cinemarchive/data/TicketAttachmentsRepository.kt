@@ -64,6 +64,24 @@ class TicketAttachmentsRepository(
         StoredTicketOriginal(attachment, file)
     }
 
+    /** A download may finish after replacement, detach, or sign-out. Its owner-scoped bytes
+     * can remain cached, but the old photo must not be returned as the current ticket. */
+    internal suspend fun readOrDownload(outingId: String, download: suspend (TicketAttachment) -> StoredTicketOriginal): StoredTicketOriginal? = withContext(Dispatchers.IO) {
+        current(); checkedTicketUuid(outingId)
+        val association = dao.association(scope.projectId, scope.ownerId, outingId) ?: return@withContext null
+        val attachment = association.attachmentId?.let { descriptor(it) } ?: return@withContext null
+        val local = try { files.read(attachment) } catch (_: IllegalArgumentException) { null }
+        if (local == null) {
+            current()
+            require(download(attachment).attachment == attachment) { "Downloaded ticket identity changed." }
+        }
+        current()
+        check(dao.association(scope.projectId, scope.ownerId, outingId) == association && dao.outingExists(outingId)) {
+            "The ticket changed while downloading its photo."
+        }
+        StoredTicketOriginal(attachment, files.read(attachment)).also { current() }
+    }
+
     private suspend fun admit(outingId: String, attachment: TicketAttachment?, operationId: String): TicketAttachmentCommand {
         val command = transactor.run {
             current()
@@ -76,14 +94,18 @@ class TicketAttachmentsRepository(
                 }
                 val queued = dao.queued(operationId)
                 check(existing.acknowledgedAt != null || (queued != null && queued.payloadJson == existing.payloadJson &&
-                    queued.entityType == TICKET_COMMAND_ENTITY && queued.entityId == outingId)) { "Ticket recovery data is incomplete." }
+                    queued.entityType == TICKET_COMMAND_ENTITY && queued.operation == TICKET_COMMAND_OPERATION && queued.entityId == outingId)) { "Ticket recovery data is incomplete." }
                 current()
                 return@run saved
             }
             require(dao.queued(operationId) == null) { "This operation ID already belongs to another queued change." }
-            check(dao.outingExists(outingId)) { "This outing is no longer available." }
+            val outing = checkNotNull(dao.outing(outingId)) { "This outing is no longer available." }
             val previous = dao.association(scope.projectId, scope.ownerId, outingId)
-            val saved = checkedTicketCommand(TicketAttachmentCommand(operationId, scope, outingId, attachment, previous?.attachmentId))
+            val guard = resolveOutingPrecondition(outing, dao.pending(), scope)
+            if (guard is OutingPrecondition.Review) error(guard.reason)
+            val saved = checkedTicketCommand(TicketAttachmentCommand(operationId, scope, outingId, attachment, previous?.attachmentId,
+                (guard as? OutingPrecondition.Literal)?.updatedAt, (guard as? OutingPrecondition.Operation)?.operationId))
+            check(saved.revisionGuarded) { "Refresh and review this outing before changing its ticket." }
             if (attachment != null) {
                 // A detached/replaced attachment may already be retired remotely. Only the
                 // original immutable operation above may reuse its ID; new intent needs new bytes identity.

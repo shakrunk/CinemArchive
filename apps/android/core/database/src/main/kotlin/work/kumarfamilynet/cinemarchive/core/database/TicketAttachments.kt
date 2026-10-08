@@ -73,4 +73,16 @@ interface TicketAttachmentDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM cinema_outings WHERE id = :id)")
     suspend fun outingExists(id: String): Boolean
+
+    @Query("SELECT * FROM cinema_outings WHERE id = :id")
+    suspend fun outing(id: String): CinemaOutingEntity?
+
+    @Query("SELECT * FROM mutation_outbox ORDER BY rowid ASC")
+    suspend fun pending(): List<OutboxEntity>
+
+    @Query("SELECT * FROM ticket_associations WHERE projectId = :project AND ownerId = :owner ORDER BY outingId")
+    suspend fun associations(project: String, owner: String): List<TicketAssociationEntity>
+
+    @Query("SELECT * FROM ticket_intents WHERE projectId = :project AND ownerId = :owner ORDER BY operationId")
+    suspend fun intents(project: String, owner: String): List<TicketIntentEntity>
 }

@@ -54,4 +54,19 @@ class TicketAttachmentCommandTest {
         assertThrows(IllegalArgumentException::class.java) { checkedTicketCommand(fixture.command().copy(expectedAttachmentId = fixture.attachment)) }
         assertThrows(IllegalArgumentException::class.java) { checkedTicketAttachment(fixture.scope, fixture.descriptor().copy(byteLength = MAX_TICKET_BYTES + 1)) }
     }
+
+    @Test fun guardsAreExclusiveAndLegacyPayloadStaysUnchanged() {
+        val legacy = fixture.command()
+        assertFalse(legacy.revisionGuarded)
+        assertFalse(legacy.toTicketJson().has("expectedUpdatedAt"))
+        val guarded = legacy.copy(expectedUpdatedAt = "2026-10-08T12:00:00.123456Z")
+        assertEquals(guarded, ticketCommandFromJson(guarded.toTicketJson()))
+        assertTrue(guarded.revisionGuarded)
+        val causal = legacy.copy(expectedOperationId = "40000000-0000-4000-8000-000000000002")
+        assertEquals(causal, ticketCommandFromJson(causal.toTicketJson()))
+        assertThrows(IllegalArgumentException::class.java) { checkedTicketCommand(guarded.copy(expectedOperationId = causal.expectedOperationId)) }
+        assertThrows(IllegalArgumentException::class.java) { checkedTicketCommand(legacy.copy(expectedOperationId = legacy.operationId)) }
+        assertThrows(IllegalArgumentException::class.java) { checkedTicketCommand(legacy.copy(expectedUpdatedAt = "2026-10-08T12:00:00.1234567Z")) }
+        assertThrows(IllegalArgumentException::class.java) { ticketCommandFromJson(legacy.toTicketJson().put("expectedUpdatedAt", JSONObject.NULL)) }
+    }
 }

@@ -100,5 +100,14 @@ class OutingMutationQueueTest {
         assertFalse(JSONObject(saved.payloadJson).has(OUTING_COMMAND_DATA))
         assertEquals("New cinema", db.cinemaOutingDao().getById("outing")!!.venue)
     }
+
+    @Test fun missingTicketScopeRollsBackOptimisticEditAndPreservesOriginalQueue() = runBlocking {
+        db.outboxDao().enqueue(OutboxEntity("ticket", TICKET_COMMAND_ENTITY, "outing", TICKET_COMMAND_OPERATION, "{}", 1))
+        val before = db.cinemaOutingDao().getById("outing")
+        val queue = db.outboxDao().getPending()
+        assertTrue(runCatching { edit() }.isFailure)
+        assertEquals(before, db.cinemaOutingDao().getById("outing"))
+        assertEquals(queue, db.outboxDao().getPending())
+    }
 }
 

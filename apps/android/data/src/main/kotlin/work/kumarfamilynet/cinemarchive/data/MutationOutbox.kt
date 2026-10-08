@@ -27,6 +27,7 @@ class MutationOutbox(
     private val transactor: LocalTransactor = PassthroughTransactor,
     private val appliedHandler: AppliedMutationHandler = AppliedMutationHandler { _, _ -> error("No handler configured for this command receipt") },
     private val pendingProjectionKeys: suspend (List<OutboxEntity>) -> Set<String> = { emptySet() },
+    internal val outingOwnerScope: work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope? = null,
 ) {
     // One flush at a time: startup, resume and pull-to-refresh can all ask for one, and two
     // concurrent passes would push the same entry twice.

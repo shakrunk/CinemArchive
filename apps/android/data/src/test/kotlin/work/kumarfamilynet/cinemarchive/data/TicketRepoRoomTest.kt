@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import work.kumarfamilynet.cinemarchive.core.database.*
 import work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope
+import work.kumarfamilynet.cinemarchive.core.model.TicketAssociation
 
 @RunWith(RobolectricTestRunner::class)
 class TicketRepoRoomTest {
@@ -30,6 +31,7 @@ class TicketRepoRoomTest {
         fixture.scope, db.ticketAttachmentDao(), transactor, files, { current }, { 1234L },
     )
     private fun original(id: String = fixture.attachment) = files.capture(id, "image/png", fixture.bytes.inputStream()).attachment
+    private fun projection() = TicketProjectionRepository(fixture.scope, db.ticketAttachmentDao(), RoomTransactor(db), { current })
 
     @Before fun setup() = runBlocking {
         current = true
@@ -48,6 +50,7 @@ class TicketRepoRoomTest {
         val command = repo().attach(fixture.outing, capture, fixture.operation)
         val pending = db.outboxDao().getPending().single()
         assertEquals(command.toTicketJson().toString(), pending.payloadJson)
+        assertEquals(OutingCommandFixture.baseline, command.expectedUpdatedAt)
         assertEquals(fixture.operation, pending.id)
         assertEquals(TICKET_COMMAND_ENTITY, pending.entityType)
         db.close(); db = open()
@@ -181,5 +184,99 @@ class TicketRepoRoomTest {
         assertNull(repo().observe(fixture.outing).first())
         assertNull(db.ticketAttachmentDao().intent(fixture.operation))
         assertArrayEquals(fixture.bytes, files.read(capture).readBytes())
+    }
+
+    @Test fun guardedChainSurvivesRetry() = runBlocking {
+        val capture = original()
+        val first = repo().attach(fixture.outing, capture, fixture.operation)
+        val clear = repo().detach(fixture.outing, "40000000-0000-4000-8000-000000000002")
+        assertEquals(first.operationId, clear.expectedOperationId)
+        assertNull(clear.expectedUpdatedAt)
+        val updated = db.cinemaOutingDao().getById(fixture.outing)!!.copy(updatedAt = "2026-10-10T12:00:00Z")
+        db.cinemaOutingDao().upsert(updated)
+        db.close(); db = open()
+        assertEquals(first, repo().attach(fixture.outing, capture, first.operationId))
+        assertEquals(clear, repo().detach(fixture.outing, clear.operationId))
+        assertNull(repo().observe(fixture.outing).first()!!.attachment)
+    }
+
+    @Test fun legacyPendingNeedsReview() = runBlocking {
+        val capture = original(); val legacy = fixture.command()
+        val payload = legacy.toTicketJson().toString(); val dao = db.ticketAttachmentDao()
+        dao.insertOriginal(TicketOriginalEntity(fixture.scope.projectId, fixture.scope.ownerId, capture.id, fixture.outing, capture.toTicketJson().toString(), 1))
+        dao.insertIntent(TicketIntentEntity(legacy.operationId, fixture.scope.projectId, fixture.scope.ownerId, fixture.outing, payload, 1))
+        dao.insertCommand(OutboxEntity(legacy.operationId, TICKET_COMMAND_ENTITY, fixture.outing, TICKET_COMMAND_OPERATION, payload, 1))
+        dao.putAssociation(TicketAssociationEntity(fixture.scope.projectId, fixture.scope.ownerId, fixture.outing, capture.id))
+        assertEquals(legacy, repo().attach(fixture.outing, capture, legacy.operationId))
+        try { repo().detach(fixture.outing, "40000000-0000-4000-8000-000000000002"); fail("Unproven predecessor cannot authorize new intent") }
+        catch (_: IllegalStateException) { }
+        assertEquals(payload, dao.queued(legacy.operationId)!!.payloadJson)
+        assertEquals(capture, repo().observe(fixture.outing).first()!!.attachment)
+    }
+
+    @Test fun descriptorClearIsAuthoritative() = runBlocking {
+        val metadata = fixture.descriptor(); val projection = projection()
+        assertTrue(projection.apply(TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, metadata))), projection.captureToken()))
+        assertEquals(metadata, repo().observe(fixture.outing).first()!!.attachment)
+        assertFalse(projection.apply(TicketDescriptorRead(false, emptyList()), projection.captureToken()))
+        assertEquals(metadata, repo().observe(fixture.outing).first()!!.attachment)
+        assertTrue(projection.apply(TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, null))), projection.captureToken()))
+        assertNotNull(repo().observe(fixture.outing).first())
+        assertNull(repo().observe(fixture.outing).first()!!.attachment)
+        assertEquals("/legacy/photo.png", db.cinemaOutingDao().getById(fixture.outing)!!.ticketImagePath)
+    }
+
+    @Test fun staleRefreshPreservesCapture() = runBlocking {
+        val projection = projection(); val token = projection.captureToken(); val capture = original()
+        repo().attach(fixture.outing, capture, fixture.operation)
+        val cleared = TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, null)))
+        assertFalse(projection.apply(cleared, token))
+        assertEquals(capture, repo().observe(fixture.outing).first()!!.attachment)
+        // A fresh read still cannot replace pending optimism before its own receipt is confirmed.
+        assertTrue(projection.apply(cleared, projection.captureToken()))
+        assertEquals(capture, repo().observe(fixture.outing).first()!!.attachment)
+    }
+
+    @Test fun projectionOwnerAndQuota() = runBlocking {
+        val projection = projection(); val token = projection.captureToken(); val metadata = fixture.descriptor()
+        current = false
+        try { projection.apply(TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, metadata))), token); fail("Account ended") }
+        catch (_: IllegalStateException) { }
+        current = true
+        db.openHelper.writableDatabase.execSQL("CREATE TEMP TRIGGER reject_projection BEFORE INSERT ON ticket_associations BEGIN SELECT RAISE(ABORT, 'quota'); END")
+        try { projection.apply(TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, metadata))), token); fail("All projection changes must roll back") }
+        catch (_: android.database.sqlite.SQLiteException) { }
+        assertNull(db.ticketAttachmentDao().original(fixture.scope.projectId, fixture.scope.ownerId, metadata.id))
+        assertNull(repo().observe(fixture.outing).first())
+    }
+
+    @Test fun downloadCannotReviveDetach() = runBlocking {
+        val metadata = fixture.descriptor(); val projection = projection()
+        projection.apply(TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, metadata))), projection.captureToken())
+        try {
+            repo().readOrDownload(fixture.outing) { descriptor ->
+                val cached = files.cache(descriptor, fixture.bytes.inputStream())
+                repo().detach(fixture.outing, fixture.operation)
+                cached
+            }
+            fail("Do not display a ticket detached during download")
+        } catch (error: IllegalStateException) { assertTrue(error.message!!.contains("changed while downloading")) }
+        assertNull(repo().observe(fixture.outing).first()!!.attachment)
+        assertArrayEquals(fixture.bytes, files.read(metadata).readBytes())
+    }
+
+    @Test fun downloadFencesAccountAndCaches() = runBlocking {
+        val metadata = fixture.descriptor(); val projection = projection()
+        projection.apply(TicketDescriptorRead(true, listOf(TicketAssociation(fixture.outing, metadata))), projection.captureToken())
+        try {
+            repo().readOrDownload(fixture.outing) { descriptor ->
+                val cached = files.cache(descriptor, fixture.bytes.inputStream())
+                current = false
+                cached
+            }
+            fail("Late private download must stay hidden")
+        } catch (_: IllegalStateException) { }
+        current = true
+        assertArrayEquals(fixture.bytes, repo().readOrDownload(fixture.outing) { error("Already cached for this owner") }!!.file.readBytes())
     }
 }

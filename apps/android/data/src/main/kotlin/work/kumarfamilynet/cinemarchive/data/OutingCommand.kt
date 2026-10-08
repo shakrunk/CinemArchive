@@ -13,12 +13,14 @@ internal const val OUTING_COMMAND_DATA = "outingCommand"
 internal suspend fun MutationOutbox.enqueueOutingCommand(entity: CinemaOutingEntity, previous: CinemaOutingEntity? = null) {
     val payload = entity.mutationPayload(previous)
     if (previous != null && payload.length() == 2) return
-    val predecessor = pendingEntries().lastOrNull { it.entityType == "cinema_outing" && it.entityId == entity.id }
-    val uncertain = previous != null && predecessor != null &&
-        (predecessor.operation != OUTING_COMMAND || runCatching { outingCommandOperations(predecessor) }.isFailure)
-    enqueue("cinema_outing", entity.id, if (uncertain) "review" else OUTING_COMMAND,
-        if (uncertain) payload else outingCommandPayload(payload, previous == null,
-            previous?.updatedAt?.takeIf { predecessor == null }, predecessor?.id))
+    val pending = pendingEntries()
+    require(outingOwnerScope != null || pending.none { it.entityType == TICKET_COMMAND_ENTITY && it.entityId == entity.id }) {
+        "The ticket owner scope is unavailable; this change was not saved."
+    }
+    val guard = previous?.let { resolveOutingPrecondition(it, pending, outingOwnerScope) }
+    enqueue("cinema_outing", entity.id, if (guard is OutingPrecondition.Review) "review" else OUTING_COMMAND,
+        if (guard is OutingPrecondition.Review) payload else outingCommandPayload(payload, previous == null,
+            (guard as? OutingPrecondition.Literal)?.updatedAt, (guard as? OutingPrecondition.Operation)?.operationId))
 }
 
 /** The wire request is captured once, alongside the optimistic row in its Room transaction. */

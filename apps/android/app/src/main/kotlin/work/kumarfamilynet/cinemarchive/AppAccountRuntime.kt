@@ -97,6 +97,7 @@ class AppAccountRuntime(
         SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") },
         TitleConflictHandler(database.titleDao(), database.titleReconcileDao()),
         transactor,
+        outingOwnerScope = work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), identity.userId),
         appliedHandler = work.kumarfamilynet.cinemarchive.data.AppliedMutationHandler { entry, receipt ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             when (entry.entityType) {

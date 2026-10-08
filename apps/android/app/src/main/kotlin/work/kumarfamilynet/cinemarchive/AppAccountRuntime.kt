@@ -101,6 +101,7 @@ class AppAccountRuntime(
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             when (entry.entityType) {
                 "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
+                "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
                 "cinema_outing" -> work.kumarfamilynet.cinemarchive.data.OutingCommandApplier(database, ownerId).apply(entry, receipt)
                 else -> error("No canonical receipt handler for ${entry.entityType}")
             }

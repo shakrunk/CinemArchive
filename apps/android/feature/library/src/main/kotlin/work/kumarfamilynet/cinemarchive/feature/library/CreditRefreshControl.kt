@@ -22,7 +22,7 @@ internal fun CreditRefreshControl(titleId: String, refresh: suspend () -> Boolea
                 try {
                     val changed = refresh()
                     failed = false
-                    message = if (changed) "Credits refreshed on this device. Changes will sync when connected." else "Credits are up to date."
+                    message = if (changed) "Credit refresh saved. Missing episodes will appear after sync." else "Credits are up to date."
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {

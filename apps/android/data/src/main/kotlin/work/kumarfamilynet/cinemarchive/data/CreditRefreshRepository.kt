@@ -34,6 +34,7 @@ class CreditRefreshRepository(
             val current = checkNotNull(database.titleDao().getById(titleId)) { "Title is no longer in your library" }
             require(current.tmdbId == beforeFetch.tmdbId && current.type == beforeFetch.type) { "Title identity changed during refresh" }
             val old = readCreditRows(database, titleId)
+            val queuedParents = enqueueMissingEpisodeCatalog(database, outbox, titleId, ownerId, fresh)
             val oldByIdentity = old.associateBy { it.identity }
             val next = mutableListOf<CreditRow>()
             fun add(row: CreditRow) { next += row.copy(id = oldByIdentity[row.identity]?.id ?: UUID.randomUUID().toString()) }
@@ -64,7 +65,7 @@ class CreditRefreshRepository(
             val nextIdentities = next.map { it.identity }.toSet()
             val removed = old.filter { it.identity !in nextIdentities }
             val changed = next.filter { oldByIdentity[it.identity] != it }
-            if (removed.isEmpty() && changed.isEmpty()) return@atomically false
+            if (removed.isEmpty() && changed.isEmpty()) return@atomically queuedParents
             val operations = JSONArray()
             // Ownership/existence barrier, with no tracking columns or timestamp changes.
             operations.put(JSONObject().put("table", "titles").put("action", "update")

@@ -165,6 +165,14 @@ class TransactionalRuntimeTest {
     }
 
     @Test fun creditAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {
+        verifyAckBeforeProcessInterruption("title_credits")
+    }
+
+    @Test fun catalogAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {
+        verifyAckBeforeProcessInterruption("title_catalog")
+    }
+
+    private suspend fun verifyAckBeforeProcessInterruption(entityType: String) {
         val db = memoryDb()
         db.titleDao().upsertAll(listOf(title("show")))
         val file = tmpFile("credit-ack-crash")
@@ -177,7 +185,7 @@ class TransactionalRuntimeTest {
                 return PushResult.Success
             }
         })
-        queue.enqueue("title_credits", "show", "refresh", JSONObject())
+        queue.enqueue(entityType, "show", if (entityType == "title_catalog") "ensure" else "refresh", JSONObject())
         val http = SyncHttp(ArrayDeque(listOf(JSONArray().put(creditRow("title_cast", "cast", JSONObject()
             .put("titleId", "show").put("tmdbPersonId", 42).put("name", "Unchanged old credit").put("castOrder", 0))))))
         val interrupted = syncRepository(db, queue, http, file, prefs, pushPending = {

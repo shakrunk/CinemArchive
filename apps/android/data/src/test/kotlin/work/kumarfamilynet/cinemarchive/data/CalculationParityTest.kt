@@ -50,6 +50,16 @@ class CalculationParityTest {
     }
 
     @Test
+    fun `filling a coarse season preserves stored progress but displays only actual episode history like web`() = runTest {
+        val coarse = CalculationFixture(titles = listOf(title("show")), seasons = listOf(season("s", "show", 1, 3, 2)))
+        assertEquals(2, coarse.library().observeTitleDetail("show").first()!!.seasons.single().episodesWatched)
+        val filled = coarse.copy(episodes = (1..3).map { episode("ep-$it", "show", "s", it) })
+        assertEquals(2, filled.seasons.single().episodesWatched)
+        assertEquals(0, filled.library().observeTitleDetail("show").first()!!.seasons.single().episodesWatched)
+        assertEquals(0, filled.library().observeUpNext().first().watching.single().episodesWatched)
+    }
+
+    @Test
     fun `up next excludes completed and coarse only shows and orders by latest watch including specials`() = runTest {
         val fixture = CalculationFixture(
             titles = listOf(title("A"), title("Z"), title("complete"), title("coarse"), title("new", added = "2026-02-01")),

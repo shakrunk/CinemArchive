@@ -37,7 +37,7 @@ class CreditRefreshScreenTest {
         compose.onNodeWithText("Refresh credits").performClick()
         compose.onNodeWithText("No connection. Try again.").assertIsDisplayed()
         compose.onNodeWithText("Refresh credits").performClick()
-        compose.onNodeWithText("Credits refreshed on this device. Changes will sync when connected.").assertExists()
+        compose.onNodeWithText("Credit refresh saved. Missing episodes will appear after sync.").assertExists()
         compose.onNodeWithTag("credit-Cast-84").performClick()
         compose.runOnIdle { assertEquals(LibraryPerson(84,"Recovered person"),selected); assertEquals(2,calls) }
     }

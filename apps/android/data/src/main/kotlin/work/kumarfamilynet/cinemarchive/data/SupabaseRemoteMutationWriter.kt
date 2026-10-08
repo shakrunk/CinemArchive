@@ -27,6 +27,7 @@ class SupabaseRemoteMutationWriter(
         return try {
             when (entry.entityType) {
                 "title_credits" -> pushCreditRefresh(entry, payload)
+                "title_catalog" -> EpisodeCatalogFillTransport(client, sessionProvider).push(entry)
                 "title" -> when (entry.operation) {
                     "insert" -> insertTitle(payload)
                     "delete" -> deleteTitle(payload)

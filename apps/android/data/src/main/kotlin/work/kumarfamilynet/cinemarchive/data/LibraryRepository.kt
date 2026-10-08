@@ -28,7 +28,6 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
-import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.AddTitleRequest
@@ -56,7 +55,7 @@ private data class EpisodeAggregate(
 )
 
 private data class UpNextCoreSources(
-    val titles: List<TitleListRow>,
+    val titles: List<TitleEntity>,
     val seasons: List<SeasonEntity>,
     val outingRows: List<CinemaOutingEntity>,
     val viewingRows: List<ViewingEntity>,
@@ -297,13 +296,13 @@ class LibraryRepository(
      *  first synced down (schema.sql's default/bulk-add value) and nothing server-side updates
      *  it when an episode gets watched afterward (episode_watch_events is the only write the
      *  web app makes) — so it goes stale at 0 (or whatever it started at) for any title tracked
-     *  episode-by-episode. Falls back to the season column only for a title with no locally
-     *  synced episode rows at all. Watchlist titles with a scheduled outing move to the
+     *  episode-by-episode. Falls back independently for each season without locally synced
+     *  episode rows. Watchlist titles with a scheduled outing move to the
      *  marquee instead of the plain watchlist list
      *  (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §7). */
     fun observeUpNext(): Flow<UpNextBoard> = combine(
         combine(
-            titleDao.observeLibrary(),
+            titleDao.observeAllTitles(),
             seasonDao.observeAllSeasons(),
             cinemaOutingDao.observeAllOutings(),
             viewingDao.observeAllViewings(),
@@ -316,6 +315,7 @@ class LibraryRepository(
         val (episodes, watchEvents) = episodeSources
         val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
         val now = Instant.now()
+        val today = now.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
         val outings = outingRows.map { it.toDomain() }
         val titlesById = titles.associateBy { it.id }
         val viewingsById = viewingRows.associate { it.id to Viewing(it.id, it.date, it.rating, it.notes, it.venue, it.companions, it.outingId) }
@@ -327,37 +327,45 @@ class LibraryRepository(
         val seasonById = mainSeasons.associateBy { it.id }
         val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
         val episodesByTitle = episodes.filter { it.seasonId in seasonById }.groupBy { it.titleId }
-        val totalsByTitle = mainSeasons.groupBy { it.titleId }.mapValues { (_, rows) ->
-            rows.sumOf { it.episodeCount } to rows.sumOf { it.episodesWatched }
-        }
+        val seasonsByTitle = mainSeasons.groupBy { it.titleId }
+        val titleIdByEpisode = episodes.associate { it.id to it.titleId }
+        val lastWatchedByTitle = watchEvents.filter { it.watchedAt != null }
+            .groupBy { titleIdByEpisode[it.episodeId] }
+            .mapValues { (_, events) -> events.maxOf { it.watchedAt!! } }
         val watching = titles
-            .filter { LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHING }
+            .filter { it.type == MediaType.TV.name && LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHING }
+            .sortedByDescending { lastWatchedByTitle[it.id] ?: it.addedAt }
             .mapNotNull { row ->
-                val (total, watchedFallback) = totalsByTitle[row.id] ?: return@mapNotNull null
-                if (total <= 0) return@mapNotNull null
+                val titleSeasons = seasonsByTitle[row.id].orEmpty()
+                val total = titleSeasons.sumOf { it.episodeCount }
                 val titleEpisodes = episodesByTitle[row.id].orEmpty()
-                val watched = if (titleEpisodes.isNotEmpty()) {
-                    titleEpisodes.count { it.id in watchedEpisodeIds }
-                } else {
-                    watchedFallback
-                }
+                val watched = watchedEpisodeCount(titleSeasons, titleEpisodes, watchedEpisodeIds)
                 val next = titleEpisodes
                     .sortedWith(compareBy({ seasonById[it.seasonId]?.seasonNumber ?: 0 }, { it.episodeNumber }))
-                    .firstOrNull { it.id !in watchedEpisodeIds }
+                    .firstOrNull { it.id !in watchedEpisodeIds } ?: return@mapNotNull null
                 UpNextWatching(
                     id = row.id,
                     name = row.title,
                     posterUrl = row.posterUrl,
                     episodesWatched = watched,
                     episodesTotal = total,
-                    nextSeasonNumber = next?.let { seasonById[it.seasonId]?.seasonNumber },
-                    nextEpisodeNumber = next?.episodeNumber,
-                    nextEpisodeName = next?.episodeName,
-                    nextEpisodeAirDate = next?.airDate,
+                    nextSeasonNumber = seasonById[next.seasonId]?.seasonNumber,
+                    nextEpisodeNumber = next.episodeNumber,
+                    nextEpisodeName = next.episodeName,
+                    nextEpisodeAirDate = next.airDate,
                 )
             }
         val watchlist = titles
             .filter { LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHLIST && it.id !in scheduledTitleIds }
+            .sortedWith(compareBy<TitleEntity> { it.releaseDate?.let { date -> date > today } == true }
+                .thenComparator { a, b ->
+                    val releaseDate = a.releaseDate
+                    if (releaseDate != null && releaseDate > today) {
+                        releaseDate.compareTo(b.releaseDate ?: "")
+                    } else {
+                        b.addedAt.compareTo(a.addedAt)
+                    }
+                })
             .map { row ->
                 LibraryTitle(
                     id = row.id,
@@ -438,12 +446,10 @@ class LibraryRepository(
             if (title == null) return@combine null
 
             val watchCountByEpisode = aggregate.watchCounts.associate { it.episodeId to it.watchCount }
-            // aggregate.ratings is newest-first (see EpisodeRatingDao), so the first match per
-            // episode is the latest rating.
-            val latestRatingByEpisode = mutableMapOf<String, Double>()
-            for (rating in aggregate.ratings) {
-                latestRatingByEpisode.getOrPut(rating.episodeId) { rating.rating }
-            }
+            // Episode cards summarize every rating, matching web avgEpisodeRating.
+            val ratingsByEpisode = aggregate.ratings.groupBy { it.episodeId }
+            val averageRatingByEpisode = ratingsByEpisode
+                .mapValues { (_, ratings) -> ratings.map { it.rating }.average() }
 
             val episodesBySeason = aggregate.episodes.groupBy { it.seasonId }
 
@@ -486,7 +492,8 @@ class LibraryRepository(
                                 airDate = episode.airDate,
                                 runtime = episode.runtime,
                                 watchCount = watchCountByEpisode[episode.id] ?: 0,
-                                latestRating = latestRatingByEpisode[episode.id],
+                                latestRating = ratingsByEpisode[episode.id]?.firstOrNull()?.rating,
+                                averageRating = averageRatingByEpisode[episode.id],
                                 synopsis = episode.synopsis,
                                 stillUrl = episode.stillUrl,
                             )
@@ -718,5 +725,19 @@ class LibraryRepository(
                 put("updatedAt", updatedAt)
             },
         )
+    }
+}
+
+/** Match web episodesWatchedInSeason: coarse progress applies independently to each
+ * season without episode rows; repeats count once and Specials never enter series totals. */
+internal fun watchedEpisodeCount(
+    seasons: List<SeasonEntity>,
+    episodes: List<EpisodeEntity>,
+    watchedEpisodeIds: Set<String>,
+): Int {
+    val bySeason = episodes.groupBy { it.seasonId }
+    return seasons.filterNot { isSpecialsSeason(it.seasonNumber) }.sumOf { season ->
+        val rows = bySeason[season.id].orEmpty()
+        if (rows.isEmpty()) season.episodesWatched else rows.count { it.id in watchedEpisodeIds }
     }
 }

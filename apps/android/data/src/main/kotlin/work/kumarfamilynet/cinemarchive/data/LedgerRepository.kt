@@ -172,7 +172,10 @@ class LedgerRepository(
             } else {
                 null
             }
-            val board = cache.getOrPut(scope to rangeStart) { buildBoard(sources.scopedTo(scope, rangeStart), sources.titles) }
+            val board = cache.getOrPut(scope to rangeStart) {
+                val scoped = sources.scopedTo(scope, null)
+                buildBoard(sources.scopedTo(scope, rangeStart), sources.titles, scoped.viewings, rangeStart)
+            }
             widget.id to board
         }
     }
@@ -237,7 +240,12 @@ class LedgerRepository(
         val episodes: List<EpisodeEntity>,
     )
 
-    private fun buildBoard(s: LedgerSources, ratingTitles: List<TitleEntity> = s.titles): LedgerBoard {
+    private fun buildBoard(
+        s: LedgerSources,
+        ratingTitles: List<TitleEntity> = s.titles,
+        fullViewings: List<ViewingEntity> = s.viewings,
+        rangeStart: LocalDate? = null,
+    ): LedgerBoard {
         val titles = s.titles
         val viewings = s.viewings
         val titleById = titles.associateBy { it.id }
@@ -245,7 +253,7 @@ class LedgerRepository(
         val series = titles.filter { it.type == MediaType.TV.name }
 
         val runtimeBuckets = listOf(
-            "< 90 min" to movies.count { (it.runtime ?: 0) < 90 },
+            "< 90 min" to movies.count { (it.runtime ?: 0) in 1..89 },
             "90–120 min" to movies.count { (it.runtime ?: 0) in 90..119 },
             "120–150 min" to movies.count { (it.runtime ?: 0) in 120..149 },
             "150+ min" to movies.count { (it.runtime ?: 0) >= 150 },
@@ -279,18 +287,21 @@ class LedgerRepository(
             weeklyActivity = weeklyActivity(viewings),
             dailyActivity = dailyActivity(viewings),
             encores = encores(viewings, titleById),
-            monthlyRun = monthlyRun(viewings),
+            monthlyRun = monthlyRun(viewings, rangeStart),
             ratingBuckets = ratingBuckets(titles),
             ratingTitles = ratingTitles.map { RatingObservation(it.id, it.title, MediaType.valueOf(it.type), it.rating) },
             genres = tally(titles.flatMap { it.genres }),
             auteurs = auteurs(titles, s.crew),
-            ensemble = tally(s.cast.filter { it.castOrder < 5 }.map { it.name }),
+            ensemble = s.cast.filter { it.castOrder < 5 }
+                .groupBy { if (it.tmdbPersonId != 0) "id:${it.tmdbPersonId}" else "name:${it.name}" }
+                .values.map { LedgerCategoryCount(it.first().name, it.size) }
+                .sortedByDescending { it.count },
             verdicts = verdicts(titles),
             languages = tally(titles.mapNotNull { it.originalLanguage?.let { code -> displayLanguage(code) } }),
             weekdays = weekdays(viewings),
             streaks = streaks(viewings, s.watchedAtDates),
-            trajectory = trajectory(titles, viewings),
-            revivals = revivals(viewings),
+            trajectory = trajectory(titles, fullViewings, rangeStart),
+            revivals = revivals(fullViewings, rangeStart),
             timewarp = timewarp(viewings, titleById),
             stillRolling = stillRolling(titles, s.seasons, s.episodes, s.watchEvents),
             moviegoing = moviegoing(viewings, s.outings),
@@ -358,12 +369,19 @@ class LedgerRepository(
             .sortedByDescending { it.viewingCount }
 
     /** The Run: monthly trend, gap-filled, default window 12mo (ledger.md §2). */
-    private fun monthlyRun(viewings: List<ViewingEntity>): List<LedgerMonthlyCount> {
+    private fun monthlyRun(viewings: List<ViewingEntity>, rangeStart: LocalDate?): List<LedgerMonthlyCount> {
         val today = LocalDate.now()
         val dates = viewings.mapNotNull { parseLocalDate(it.date) }
-        return (11 downTo 0).map { monthsAgo ->
-            val month = today.minusMonths(monthsAgo.toLong())
-            val count = dates.count { it.year == month.year && it.monthValue == month.monthValue }
+        val currentMonth = today.withDayOfMonth(1)
+        val earliest = dates.minOrNull()?.withDayOfMonth(1)
+        val first = rangeStart?.withDayOfMonth(1)
+            ?: earliest?.coerceAtLeast(currentMonth.minusYears(10))
+            ?: currentMonth.minusMonths(11)
+        val end = maxOf(first, currentMonth)
+        val start = first.coerceAtMost(end.minusMonths(11))
+        return (0..ChronoUnit.MONTHS.between(start, end)).map { offset ->
+            val month = start.plusMonths(offset)
+            val count = if (month < first) 0 else dates.count { it.year == month.year && it.monthValue == month.monthValue }
             LedgerMonthlyCount(month.format(DateTimeFormatter.ofPattern("MMM yyyy")), count)
         }
     }
@@ -433,7 +451,7 @@ class LedgerRepository(
 
     /** Shifting Standards: a title lands in the quarter of its first *dated* viewing,
      *  falling back to addedAt (ledger.md §2). */
-    private fun trajectory(titles: List<TitleEntity>, viewings: List<ViewingEntity>): List<LedgerQuarterRating> {
+    private fun trajectory(titles: List<TitleEntity>, viewings: List<ViewingEntity>, rangeStart: LocalDate?): List<LedgerQuarterRating> {
         val firstDatedViewingByTitle = viewings
             .mapNotNull { v -> parseLocalDate(v.date)?.let { v.titleId to it } }
             .groupBy({ it.first }, { it.second })
@@ -442,7 +460,8 @@ class LedgerRepository(
         val quarterByRatedTitle = titles.mapNotNull { title ->
             val rating = title.rating ?: return@mapNotNull null
             val landingDate = firstDatedViewingByTitle[title.id] ?: parseLocalDate(title.addedAt)
-            landingDate?.let { Triple(title.id, rating, it) }
+            landingDate?.takeIf { rangeStart == null || !it.isBefore(rangeStart) }
+                ?.let { Triple(title.id, rating, it) }
         }
 
         return quarterByRatedTitle
@@ -451,14 +470,14 @@ class LedgerRepository(
             .sortedBy { it.key }
             .map { (label, entries) ->
                 val ratings = entries.map { (_, rating, _) -> rating }
-                LedgerQuarterRating(label, ratings.average(), ratings.size)
+                LedgerQuarterRating(label, kotlin.math.floor(ratings.average() * 10 + 0.5) / 10, ratings.size)
             }
     }
 
     /** Premieres & Revivals: per title, the earliest viewing (undated sorts first, per
      *  ledger.md §2) is the premiere; every later viewing is a revival. Only dated viewings
      *  render into a month bucket. */
-    private fun revivals(viewings: List<ViewingEntity>): List<LedgerPremiereRevivalBucket> {
+    private fun revivals(viewings: List<ViewingEntity>, rangeStart: LocalDate?): List<LedgerPremiereRevivalBucket> {
         val premiereMonths = mutableListOf<String>()
         val revivalMonths = mutableListOf<String>()
 
@@ -468,6 +487,7 @@ class LedgerRepository(
             )
             ordered.forEachIndexed { index, viewing ->
                 val date = parseLocalDate(viewing.date) ?: return@forEachIndexed
+                if (rangeStart != null && date.isBefore(rangeStart)) return@forEachIndexed
                 val monthLabel = date.format(DateTimeFormatter.ofPattern("MMM yyyy"))
                 if (index == 0) premiereMonths += monthLabel else revivalMonths += monthLabel
             }
@@ -485,9 +505,7 @@ class LedgerRepository(
         }
     }
 
-    /** The Revival House: age = viewing year - release year, floored at 0, 5 fixed buckets
-     *  (ledger.md §2). Exact bucket cutoffs aren't pinned by the contract doc — this uses a
-     *  reasonable Android-chosen quintent scheme. */
+    /** The Revival House: the same five age buckets as web deriveTimewarp. */
     private fun timewarp(viewings: List<ViewingEntity>, titleById: Map<String, TitleEntity>): List<LedgerCategoryCount> {
         val ages = viewings.mapNotNull { v ->
             val year = parseLocalDate(v.date)?.year ?: return@mapNotNull null
@@ -495,11 +513,11 @@ class LedgerRepository(
             (year - releaseYear).coerceAtLeast(0)
         }
         val buckets = listOf(
-            "Same year" to (0..0),
-            "1–2 yrs" to (1..2),
-            "3–5 yrs" to (3..5),
-            "6–15 yrs" to (6..15),
-            "16+ yrs" to (16..Int.MAX_VALUE),
+            "First run · 0–1 yr" to (0..1),
+            "Recent · 2–5 yr" to (2..5),
+            "Modern · 6–20 yr" to (6..20),
+            "Classic · 21–50 yr" to (21..50),
+            "Vintage · 51+ yr" to (51..Int.MAX_VALUE),
         )
         return buckets.map { (label, range) -> LedgerCategoryCount(label, ages.count { it in range }) }
     }
@@ -523,16 +541,12 @@ class LedgerRepository(
         return titles.filter { it.type == MediaType.TV.name }.mapNotNull { title ->
             val titleSeasons = seasonsByTitle[title.id] ?: emptyList()
             val titleEpisodes = episodesByTitle[title.id].orEmpty()
-            val watched = if (titleEpisodes.isNotEmpty()) {
-                titleEpisodes.count { it.id in watchedEpisodeIds }
-            } else {
-                titleSeasons.sumOf { it.episodesWatched }
-            }
+            val watched = watchedEpisodeCount(titleSeasons, titleEpisodes, watchedEpisodeIds)
             val total = titleSeasons.sumOf { it.episodeCount }
             val isPartial = watched > 0 && watched < total
             if (title.status != LibraryStatus.WATCHING.name && !isPartial) return@mapNotNull null
             LedgerProgressEntry(title.id, title.title, watched, total)
-        }
+        }.sortedByDescending { if (it.episodeCount > 0) it.episodesWatched.toDouble() / it.episodeCount else 0.0 }
     }
 
     /** At the Movies: viewings with a non-null venue are cinema trips (venue is filled for

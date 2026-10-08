@@ -49,6 +49,8 @@ data class EpisodeDetail(
     val latestRating: Double?,
     val synopsis: String? = null,
     val stillUrl: String? = null,
+    /** Mean of all logged ratings, matching the web episode card. */
+    val averageRating: Double? = latestRating,
 )
 
 data class Viewing(

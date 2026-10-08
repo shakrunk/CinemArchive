@@ -11,6 +11,7 @@ number is chosen.
 
 ### Fixed
 
+- Android: Up Next ordering, mixed season progress, episode average ratings, and Ledger history/date-range calculations now match the web app.
 - Web: GitHub Pages deep links now recover when session storage is unavailable, and stale external redirect values no longer interrupt startup.
 - Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
 

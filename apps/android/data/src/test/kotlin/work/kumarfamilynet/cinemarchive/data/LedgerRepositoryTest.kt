@@ -412,10 +412,10 @@ class LedgerRepositoryTest {
     }
 
     @Test
-    fun `The Revival House buckets both viewings into 16 plus years`() = runTest {
+    fun `The Revival House buckets both viewings into modern titles`() = runTest {
         val board = LedgerFixture.repository().observeLedgerBoard().first()
-        assertEquals(2, board.timewarp.single { it.label == "16+ yrs" }.count)
-        assertEquals(0, board.timewarp.filter { it.label != "16+ yrs" }.sumOf { it.count })
+        assertEquals(2, board.timewarp.single { it.label == "Modern · 6–20 yr" }.count)
+        assertEquals(0, board.timewarp.filter { it.label != "Modern · 6–20 yr" }.sumOf { it.count })
     }
 
     @Test

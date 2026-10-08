@@ -936,7 +936,7 @@ private fun EpisodeRow(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 for (star in 1..5) {
-                    val filled = star <= (episode.latestRating ?: 0.0)
+                    val filled = star <= (episode.averageRating ?: 0.0)
                     Icon(
                         if (filled) Icons.Filled.Star else Icons.Filled.StarBorder,
                         contentDescription = "Rate $star star${if (star == 1) "" else "s"}",

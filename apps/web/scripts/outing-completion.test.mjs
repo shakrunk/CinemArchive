@@ -51,6 +51,8 @@ before(async () => {
   assert.ok(schema.includes(causalReversal.trim()))
   const viewingRevision = (await readFile(new URL('supabase/migrations/20261008213850_outing_completion_viewing_revision.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(viewingRevision.trim()))
+  const outingRevision = (await readFile(new URL('supabase/migrations/20261008220210_outing_completion_outing_revision.sql', root), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(outingRevision.trim()))
   await db.exec(schema)
   await db.exec('grant select,update,delete on public.cinema_outings,public.titles,public.viewings to authenticated; grant select on public.notifications to authenticated;')
   for (const id of [owner, other]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@example.test`])
@@ -70,6 +72,13 @@ async function causalRevert(snapshot, outingOperation, viewingOperation = null, 
 }
 
 function viewingEffect(snapshot) { return snapshot.rows.find(row => row.table === 'viewings') }
+function outingEffect(snapshot) { return snapshot.rows.find(row => row.table === 'cinema_outings') }
+async function dependentOuting(snapshot, values = { venue: 'Pending native venue' }) {
+  return db.query('select apply_library_command($1,$2::jsonb) as result', [randomUUID(), JSON.stringify([{
+    table: 'cinema_outings', action: 'update', key: { id: snapshot.outingId }, values,
+    expectedOperationId: snapshot.operationId,
+  }])])
+}
 async function dependentViewing(snapshot, action = 'update', values = { notes: 'Native pending note' }) {
   return db.query('select apply_library_command($1,$2::jsonb) as result', [randomUUID(), JSON.stringify([{
     table: 'viewings', action, key: { id: snapshot.canonicalViewingId },
@@ -98,6 +107,66 @@ test('completion exposes only its immutable viewing identity and revision as a c
   const later = await complete(outing)
   assert.deepEqual(viewingEffect(later), viewingEffect(first))
   assert.notEqual(later.viewing.updated_at, viewingEffect(later).row.updated_at)
+})
+
+test('completion outing effect retains its original revision across later edits and receipt replay', async () => {
+  const outing = await makeOuting(), operation = randomUUID(), provisional = randomUUID()
+  const first = await complete(outing, { operation, provisional })
+  assert.equal(first.completionOutingVersion, first.outing.updated_at)
+  assert.deepEqual(outingEffect(first), { table: 'cinema_outings', key: { id: outing.id }, row: {
+    id: outing.id, user_id: owner, title_id: outing.title_id, updated_at: first.completionOutingVersion,
+  } })
+  await dependentOuting(first)
+  const replay = await complete(outing, { operation, provisional })
+  assert.equal(replay.outing.venue, 'Pending native venue')
+  assert.deepEqual(outingEffect(replay), outingEffect(first))
+  assert.equal(replay.completionOutingVersion, first.completionOutingVersion)
+  await assert.rejects(dependentOuting(replay), { code: '40001' })
+})
+
+test('web-first completion cannot authorize a pending native venue change over a newer edit', async () => {
+  const outing = await makeOuting()
+  await db.query("select * from complete_due_outings('UTC')")
+  const version = (await db.query('select to_jsonb(o) as row from cinema_outings o where id=$1', [outing.id])).rows[0].row.updated_at
+  await db.query("update cinema_outings set venue='Newer web venue' where id=$1", [outing.id])
+  const native = await complete(outing)
+  assert.equal(native.status, 'already_completed')
+  assert.equal(native.completionOutingVersion, version)
+  assert.equal(outingEffect(native).row.updated_at, version)
+  assert.notEqual(native.outing.updated_at, version)
+  await assert.rejects(dependentOuting(native), { code: '40001' })
+  assert.equal((await db.query('select venue from cinema_outings where id=$1', [outing.id])).rows[0].venue, 'Newer web venue')
+})
+
+test('historical completion revisions remain unproven and old accepted receipts remain unchanged', async () => {
+  let outing, first, operation, provisional
+  try {
+    await installCompletionDefinition('20261008213850_outing_completion_viewing_revision.sql')
+    outing = await makeOuting(); operation = randomUUID(); provisional = randomUUID()
+    first = await complete(outing, { operation, provisional })
+    assert.equal(first.completionOutingVersion, undefined)
+  } finally {
+    await installCompletionDefinition('20261008220210_outing_completion_outing_revision.sql')
+  }
+  await as('authenticated', owner)
+  assert.deepEqual(await complete(outing, { operation, provisional }), first)
+  await db.query("update cinema_outings set notes='Keep later note' where id=$1", [outing.id])
+  const later = await complete(outing)
+  assert.equal(later.completionOutingVersion, null)
+  assert.equal(outingEffect(later).row.updated_at, null)
+  assert.equal(later.outing.notes, 'Keep later note')
+  await assert.rejects(dependentOuting(later), { code: '40001' })
+})
+
+test('deleted outing keeps immutable completion effect without becoming editable through replay', async () => {
+  const outing = await makeOuting(), operation = randomUUID(), provisional = randomUUID()
+  const first = await complete(outing, { operation, provisional })
+  await db.query('delete from cinema_outings where id=$1', [outing.id])
+  const replay = await complete(outing, { operation, provisional })
+  assert.equal(replay.outing, null)
+  assert.deepEqual(outingEffect(replay), outingEffect(first))
+  assert.equal(replay.completionOutingVersion, first.completionOutingVersion)
+  await assert.rejects(dependentOuting(replay), { code: '40001' })
 })
 
 test('web-first completion retains its original baseline when native arrives after newer notes and ratings', async () => {
@@ -151,7 +220,7 @@ test('old accepted receipts and historical metadata never acquire an inferred vi
     first = await complete(outing, { operation, provisional })
     assert.equal(viewingEffect(first), undefined)
   } finally {
-    await installCompletionDefinition('20261008213850_outing_completion_viewing_revision.sql')
+    await installCompletionDefinition('20261008220210_outing_completion_outing_revision.sql')
   }
   await as('authenticated', owner)
   assert.deepEqual(await complete(outing, { operation, provisional }), first)

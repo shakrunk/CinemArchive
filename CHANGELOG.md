@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Shared completion receipts preserve the original outing revision, preventing older pending plan changes from overwriting newer edits on another device.
 - Web JSON imports regenerate episode and history identities while retaining their contents, and reject duplicate identities before saving.
 - Android credit refresh now fills empty seasons and missing Specials using confirmed episode identities, preserving existing progress and watch history.
 - Shared episode catalog fill reuses existing season and episode identities without overwriting watch progress, metadata or history from another device.

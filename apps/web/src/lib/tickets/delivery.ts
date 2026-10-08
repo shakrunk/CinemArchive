@@ -4,14 +4,15 @@ import type { OfflineSnapshot } from '../offline/snapshot'
 import { assertCommand } from '../offline/validation'
 import { classifyLibraryError } from '../offlineRpc'
 import { isTicketMutation, type TicketAttachment, type TicketBlobRecord, type TicketMutation } from './types'
-import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObjectKey } from './validation'
+import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObjectKey, ticketTimestampMicros } from './validation'
 
 interface TicketReceipt {
   operationId: string
   outingId: string
   attachment: TicketAttachment | null
   outingUpdatedAt: string
-  request: { kind: TicketMutation['kind']; outingId: string; attachmentId: string | null; expectedAttachmentId: string | null }
+  outingRevisionGuarded?: boolean
+  request: { kind: TicketMutation['kind']; outingId: string; attachmentId: string | null; expectedAttachmentId: string | null; expectedUpdatedAt?: string | null; expectedOperationId?: string | null }
   rows: { table: string; key: { id: string }; row: { id: string; updated_at: string } }[]
 }
 interface TicketDeliveryOptions {
@@ -26,9 +27,17 @@ interface TicketDeliveryOptions {
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 function assertReceipt(value: unknown, command: PendingCommand, mutation: TicketMutation): asserts value is TicketReceipt {
   const request = object(value) && value.request
+  const guarded = !!(mutation.expectedUpdatedAt || mutation.expectedOperationId)
+  const keys = ['kind', 'outingId', 'attachmentId', 'expectedAttachmentId', ...(guarded ? ['expectedUpdatedAt', 'expectedOperationId'] : [])]
+  const guardMatches = object(request) && (!guarded || (object(value) && value.outingRevisionGuarded === true &&
+    request.expectedOperationId === (mutation.expectedOperationId ?? null) &&
+    (mutation.expectedUpdatedAt ? ticketTimestampMicros(request.expectedUpdatedAt) === ticketTimestampMicros(mutation.expectedUpdatedAt)
+      : request.expectedUpdatedAt === null)))
   if (!object(value) || value.operationId !== command.id || value.outingId !== mutation.outingId ||
       typeof value.outingUpdatedAt !== 'string' || !Number.isFinite(Date.parse(value.outingUpdatedAt)) ||
-      !object(request) || request.kind !== mutation.kind || request.outingId !== mutation.outingId || request.expectedAttachmentId !== mutation.expectedAttachmentId ||
+      !object(request) || !guardMatches || Object.keys(request).length !== keys.length || !keys.every((key) => Object.hasOwn(request, key)) ||
+      (!guarded && value.outingRevisionGuarded === true) ||
+      request.kind !== mutation.kind || request.outingId !== mutation.outingId || request.expectedAttachmentId !== mutation.expectedAttachmentId ||
       request.attachmentId !== (mutation.kind === 'ticket.attach' ? mutation.attachment.id : null) ||
       (mutation.kind === 'ticket.attach' ? !isTicketAttachment(value.attachment) || !sameTicketAttachment(value.attachment, mutation.attachment) : value.attachment !== null) ||
       !Array.isArray(value.rows) || !value.rows.some((effect: unknown) => object(effect) && effect.table === 'cinema_outings' &&
@@ -73,11 +82,13 @@ export function createTicketCommandDelivery(options: TicketDeliveryOptions) {
       return body
     }
     try {
+      const guardArgs = mutation.expectedUpdatedAt || mutation.expectedOperationId
+        ? { p_expected_updated_at: mutation.expectedUpdatedAt ?? null, p_expected_operation_id: mutation.expectedOperationId ?? null } : {}
       const receipt = await rpc('get_ticket_command_receipt', { p_operation_id: command.id })
       if (receipt !== null) assertReceipt(receipt, command, mutation)
       else if (mutation.kind === 'ticket.detach') {
         assertReceipt(await rpc('detach_ticket_attachment', { p_operation_id: command.id, p_outing_id: mutation.outingId,
-          p_expected_attachment_id: mutation.expectedAttachmentId }), command, mutation)
+          p_expected_attachment_id: mutation.expectedAttachmentId, ...guardArgs }), command, mutation)
       } else {
         const attachment = mutation.attachment
         if (attachment.objectKey !== ticketObjectKey(context.scope, attachment.id)) return { kind: 'failed', message: 'Ticket object belongs to another owner' }
@@ -111,7 +122,7 @@ export function createTicketCommandDelivery(options: TicketDeliveryOptions) {
             }
           }
           assertReceipt(await rpc('finalize_ticket_attachment', { p_operation_id: command.id, p_outing_id: mutation.outingId,
-            p_attachment_id: attachment.id, p_expected_attachment_id: mutation.expectedAttachmentId }), command, mutation)
+            p_attachment_id: attachment.id, p_expected_attachment_id: mutation.expectedAttachmentId, ...guardArgs }), command, mutation)
         }
       }
       assertCurrent()

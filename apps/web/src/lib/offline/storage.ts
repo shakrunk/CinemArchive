@@ -2,10 +2,10 @@ import { createCommand, OFFLINE_VERSION, omitUndefined, sameScope, scopeKey, typ
 import { applyMutation } from './replay'
 import { replayPending } from './replay'
 import { mutationEntities } from './entities'
-import { capturePreconditions } from './preconditions'
+import { capturePreconditions, captureRowPrecondition, OfflineRevisionError } from './preconditions'
 import { emptySnapshot, mergeRefreshedSnapshot, type OfflineSnapshot } from './snapshot'
 import { assertCommand, assertMutation, assertSnapshot } from './validation'
-import { isTicketMutation, type TicketAttachment, type TicketBlobRecord, type TicketCapture } from '../tickets/types'
+import { isTicketMutation, type TicketAttachment, type TicketBlobRecord, type TicketCapture, type TicketOutingGuard } from '../tickets/types'
 import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObjectKey } from '../tickets/validation'
 
 const DOCUMENTS = 'owners'
@@ -79,7 +79,8 @@ function appendToDocument(d: OwnerDocument, command: PendingCommand): void {
     const prior = [...d.commands].reverse().find((pending) => mutationEntities(pending.mutation, projection).has(key))
     if (prior) prerequisites.add(prior.id)
   }
-  const preconditions = command.preconditions ?? capturePreconditions(command.mutation, d.base, d.commands)
+  const capturedPreconditions = capturePreconditions(command.mutation, d.base, d.commands)
+  const preconditions = command.preconditions ?? capturedPreconditions
   d.commands.push({ ...command, ...(preconditions.length ? { preconditions } : {}),
     dependsOn: [...new Set([...command.dependsOn, ...prerequisites])], sequence: d.nextSequence++, state: 'pending', attempts: 0, nextAttemptAt: 0 })
 }
@@ -172,7 +173,9 @@ export class IndexedDbOfflineStore {
         if (result) resolve(result)
         else reject(new OfflineStorageError('Offline transaction completed without a result'))
       }
-      tx.onabort = () => reject(new OfflineStorageError('Could not persist offline changes; they are not saved on this device', error ?? tx.error))
+      tx.onabort = () => reject(new OfflineStorageError(error instanceof OfflineRevisionError
+        ? `${error.message} These changes are not saved on this device.`
+        : 'Could not persist offline changes; they are not saved on this device', error ?? tx.error))
       tx.onerror = (event) => {
         error ??= tx.error ?? (event.target as IDBRequest | null)?.error
         // WebKit can emit an error preparing Blob/File data without completing
@@ -235,8 +238,14 @@ export class IndexedDbOfflineStore {
         return
       }
       const expectedAttachmentId = outing.ticketAttachment?.id ?? null
-      const mutation = capture ? { kind: 'ticket.attach' as const, outingId, expectedAttachmentId, attachment: capture.attachment }
-        : { kind: 'ticket.detach' as const, outingId, expectedAttachmentId }
+      let guard: TicketOutingGuard = {}
+      if (!localOnly) {
+        const condition = captureRowPrecondition('cinema_outings', outingId, document.base, document.commands)
+        if (!condition) throw new OfflineRevisionError('This outing has no saved revision proof. Reconnect and refresh it before changing its ticket; the existing photo is unchanged.')
+        guard = condition.afterCommandId ? { expectedOperationId: condition.afterCommandId } : { expectedUpdatedAt: condition.updatedAt! }
+      }
+      const mutation = capture ? { kind: 'ticket.attach' as const, outingId, expectedAttachmentId, attachment: capture.attachment, ...guard }
+        : { kind: 'ticket.detach' as const, outingId, expectedAttachmentId, ...guard }
       const command = createCommand(scope, mutation, { id: operationId, createdAt })
       if (capture) {
         const records = tx.objectStore(TICKET_BLOBS)

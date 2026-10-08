@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from 'vitest'
 import { createTicketCommandDelivery } from './delivery'
-import { ticketFixture, ticketOwner, ticketOuting, ticketSnapshot } from './fixtures.test-support'
+import { ticketFixture, ticketOwner, ticketOuting, ticketSnapshot, ticketRevision } from './fixtures.test-support'
 import { createCommand } from '../offline/commands'
 import type { DeliveryContext } from '../offline/coordinator'
 
@@ -122,4 +122,45 @@ it('retains a confirmed command until the descriptor refresh is authoritative', 
   s.fetchBase.mockResolvedValueOnce({ ...ticketSnapshot(), ticketAttachmentSupport: 'unsupported', outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: s.attachment }] })
   expect(await s.deliver(s.command, s.context)).toMatchObject({ kind: 'retry', message: expect.stringContaining('authoritative') })
   expect(s.readBlob).not.toHaveBeenCalled()
+})
+
+it('sends the immutable literal outing guard and accepts equivalent offset timestamps at microsecond precision', async () => {
+  const s = await setup()
+  const command = createCommand(ticketOwner, { kind: 'ticket.attach', outingId: ticketOuting.id, attachment: s.attachment,
+    expectedAttachmentId: null, expectedUpdatedAt: ticketRevision }, { id: s.command.id })
+  const receipt = { ...s.receipt, outingRevisionGuarded: true,
+    request: { ...s.receipt.request, expectedUpdatedAt: '2026-10-08T13:00:00.123456-06:00', expectedOperationId: null } }
+  s.fetch.mockResolvedValueOnce(json(null)).mockResolvedValueOnce(json({ attachment: s.attachment, state: 'attached' })).mockResolvedValueOnce(json(receipt))
+  expect(await s.deliver(command, s.context)).toMatchObject({ kind: 'success' })
+  expect(JSON.parse(s.fetch.mock.calls[2][1]!.body as string)).toMatchObject({ p_expected_updated_at: ticketRevision, p_expected_operation_id: null })
+  s.fetch.mockResolvedValue(json({ ...receipt, request: { ...receipt.request, expectedUpdatedAt: '2026-10-08T19:00:00.123457Z' } }))
+  expect(await s.deliver(command, s.context)).toMatchObject({ kind: 'retry', message: expect.stringContaining('different') })
+})
+
+it('sends a detach predecessor guard and rejects unproven or mismatched guarded receipts', async () => {
+  const s = await setup(), predecessor = '40000000-0000-4000-8000-000000000002'
+  const command = createCommand(ticketOwner, { kind: 'ticket.detach', outingId: ticketOuting.id, expectedAttachmentId: s.attachment.id, expectedOperationId: predecessor })
+  const receipt = { ...s.receipt, operationId: command.id, attachment: null, outingRevisionGuarded: true,
+    request: { kind: 'ticket.detach', outingId: ticketOuting.id, attachmentId: null, expectedAttachmentId: s.attachment.id, expectedUpdatedAt: null, expectedOperationId: predecessor } }
+  s.fetch.mockResolvedValueOnce(json(null)).mockResolvedValueOnce(json(receipt))
+  expect(await s.deliver(command, s.context)).toMatchObject({ kind: 'success' })
+  expect(JSON.parse(s.fetch.mock.calls[1][1]!.body as string)).toMatchObject({ p_expected_updated_at: null, p_expected_operation_id: predecessor })
+  for (const broken of [
+    { ...receipt, outingRevisionGuarded: false }, { ...receipt, outingRevisionGuarded: undefined },
+    { ...receipt, request: { ...receipt.request, expectedOperationId: s.command.id } },
+    { ...receipt, request: { ...receipt.request, expectedUpdatedAt: ticketRevision } },
+  ]) {
+    s.fetch.mockResolvedValueOnce(json(broken))
+    expect(await s.deliver(command, s.context)).toMatchObject({ kind: 'retry' })
+  }
+  expect(s.readBlob).not.toHaveBeenCalled()
+})
+
+it('never retrofits a legacy command to acknowledge a guarded receipt with the same operation ID', async () => {
+  const s = await setup()
+  s.fetch.mockResolvedValueOnce(json({ ...s.receipt, outingRevisionGuarded: true,
+    request: { ...s.receipt.request, expectedUpdatedAt: ticketRevision, expectedOperationId: null } }))
+  expect(await s.deliver(s.command, s.context)).toMatchObject({ kind: 'retry' })
+  s.fetch.mockResolvedValueOnce(json({ ...s.receipt, outingRevisionGuarded: false }))
+  expect(await s.deliver(s.command, s.context)).toMatchObject({ kind: 'success' })
 })

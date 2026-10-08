@@ -130,7 +130,8 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
   const command = value as PendingCommand
   if (command.mutation.kind === 'outing.revert' && command.baseRevision) throw new Error('Outing reversal requires separate outing and viewing guards')
   if (isTicketMutation(command.mutation)) {
-    if (!isTicketId(command.id) || command.baseRevision || command.preconditions?.length) throw new Error('Ticket commands use attachment CAS, not row revision guards')
+    if (!isTicketId(command.id) || command.baseRevision || command.preconditions?.length) throw new Error('Ticket commands keep revision guards in their immutable ticket intent')
+    if (command.mutation.expectedOperationId === command.id) throw new Error('A ticket cannot depend on its own operation')
     if (command.mutation.kind === 'ticket.attach' && command.mutation.attachment.objectKey !== ticketObjectKey(command.scope, command.mutation.attachment.id)) throw new Error('Ticket attachment belongs to another owner')
   }
   const rows = mutationRows(command.mutation)

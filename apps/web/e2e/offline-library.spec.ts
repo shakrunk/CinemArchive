@@ -98,3 +98,63 @@ test('switching accounts hides private work synchronously and retains it for its
   expect(await page.evaluate(() => window.offlineHarness.snapshot?.titles[0].id)).toBe(title.id)
   expect(await page.evaluate(() => window.offlineHarness.status?.commands.length)).toBe(1)
 })
+
+test('ticket revision intent survives real IndexedDB restart and receipt-only recovery without adopting a newer revision', async ({ page }) => {
+  await page.goto('/e2e/offline-harness.html')
+  const saved = await page.evaluate(async () => {
+    const storagePath = '/src/lib/offline/storage.ts', fixturePath = '/src/lib/tickets/fixtures.test-support.ts'
+    const { IndexedDbOfflineStore } = await import(storagePath)
+    const { ticketFixture, ticketOwner, ticketOuting, ticketSnapshot } = await import(fixturePath)
+    const fixture = await ticketFixture(), db = new IndexedDbOfflineStore({ databaseName: 'ticket-guard-browser' })
+    await db.replaceBase(ticketOwner, ticketSnapshot())
+    const read = await db.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob)
+    const command = read.document.commands[0]
+    await db.recordFailure(ticketOwner, command.id, { state: 'pending', message: 'Finalize response lost' })
+    await db.close()
+    return { id: command.id, mutation: command.mutation }
+  })
+  await page.reload()
+  const recovered = await page.evaluate(async () => {
+    const storagePath = '/src/lib/offline/storage.ts', fixturePath = '/src/lib/tickets/fixtures.test-support.ts'
+    const deliveryPath = '/src/lib/tickets/delivery.ts', commandsPath = '/src/lib/offline/commands.ts'
+    const { IndexedDbOfflineStore } = await import(storagePath)
+    const { createTicketCommandDelivery } = await import(deliveryPath)
+    const { createCommand } = await import(commandsPath)
+    const { ticketFixture, ticketOwner, ticketOuting, ticketSnapshot } = await import(fixturePath)
+    const fixture = await ticketFixture(), db = new IndexedDbOfflineStore({ databaseName: 'ticket-guard-browser' })
+    const original = (await db.read(ticketOwner)).document.commands[0]
+    const canonicalBase = { ...ticketSnapshot(), ticketAttachmentSupport: 'authoritative',
+      rowRevisions: { [`cinema_outings:${ticketOuting.id}`]: '2026-10-09T00:00:00.654321Z' },
+      outings: [{ ...ticketOuting, venue: 'Newer remote venue', ticketManaged: true, ticketAttachment: fixture.attachment }] }
+    await db.replaceBase(ticketOwner, canonicalBase)
+    await db.retry(ticketOwner, original.id)
+    const calls: string[] = []
+    const deliver = createTicketCommandDelivery({ projectId: ticketOwner.projectId, anonKey: 'test-only',
+      session: async () => ({ userId: ticketOwner.userId, accessToken: 'test-only' }),
+      readBlob: async () => { throw new Error('Receipt recovery must not need bytes') },
+      fetchBase: async () => canonicalBase,
+      fetch: async (url: string) => {
+        calls.push(String(url))
+        return new Response(JSON.stringify({ ...fixture.receipt, operationId: original.id, outingRevisionGuarded: true,
+          request: { ...fixture.receipt.request, expectedUpdatedAt: original.mutation.expectedUpdatedAt, expectedOperationId: null } }),
+        { headers: { 'Content-Type': 'application/json' } })
+      },
+    })
+    const retry = (await db.read(ticketOwner)).document.commands[0]
+    const result = await deliver(retry, { scope: ticketOwner, signal: new AbortController().signal, isCurrent: () => true })
+    if (result.kind !== 'success') throw new Error(`Unexpected delivery ${result.kind}`)
+    await db.acknowledge(ticketOwner, retry.id, undefined, result.canonicalBase)
+    const detached = await db.detachTicket(ticketOwner, ticketOuting.id)
+    const detach = detached.document.commands[0]
+    const read = await db.append(createCommand(ticketOwner, { kind: 'outing.patch', outingId: ticketOuting.id, patch: { notes: 'Next local edit' } }))
+    await db.close()
+    return { id: retry.id, mutation: retry.mutation, calls, detach, next: read.document.commands[1], venue: read.document.base.outings[0].venue }
+  })
+  expect(recovered.id).toBe(saved.id)
+  expect(recovered.mutation).toEqual(saved.mutation)
+  expect(recovered.calls).toHaveLength(1)
+  expect(recovered.calls[0]).toContain('get_ticket_command_receipt')
+  expect(recovered.venue).toBe('Newer remote venue')
+  expect(recovered.detach.mutation).toMatchObject({ expectedUpdatedAt: '2026-10-09T00:00:00.654321Z' })
+  expect(recovered.next.preconditions).toEqual([{ table: 'cinema_outings', id: recovered.detach.mutation.outingId, afterCommandId: recovered.detach.id }])
+})

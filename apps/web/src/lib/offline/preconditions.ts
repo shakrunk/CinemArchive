@@ -1,7 +1,9 @@
 import type { Mutation, RevisionTable, RowPrecondition, PendingCommand } from './commands'
 import type { OfflineSnapshot } from './snapshot'
+import { isTicketMutation } from '../tickets/types'
 
 interface Row { table: RevisionTable; id: string; guard: boolean }
+export class OfflineRevisionError extends Error {}
 export function collectRowRevisions(titles: unknown[], outings: unknown[]): Record<string, string> {
   const revisions: Record<string, string> = {}
   const collect = (table: RevisionTable, value: unknown): void => {
@@ -45,14 +47,26 @@ export function mutationRows(mutation: Mutation): Row[] {
       case 'outing.revert': return [{ table: 'cinema_outings', id: leaf.outingId, guard: true },
         { table: 'titles', id: leaf.titleId, guard: false },
         ...(leaf.viewingId && leaf.viewingPresent ? [{ table: 'viewings' as const, id: leaf.viewingId, guard: true }] : [])]
-      // Ticket CAS is independent of ordinary outing fields, but a following
-      // generic patch must use the ticket operation's canonical row receipt.
+      // Ticket guards live in immutable ticket intent, not generic preconditions.
       case 'ticket.attach': case 'ticket.detach': return [{ table: 'cinema_outings', id: leaf.outingId, guard: false }]
       case 'list.create': return [{ table: 'lists', id: leaf.list.id, guard: false }]
       case 'list.patch': case 'list.delete': return [{ table: 'lists', id: leaf.listId, guard: true }]
       default: return []
     }
   })
+}
+
+export function captureRowPrecondition(table: RevisionTable, id: string, base: OfflineSnapshot, pending: PendingCommand[]): RowPrecondition | undefined {
+  const predecessor = [...pending].reverse().find((command) => mutationRows(command.mutation).some((row) => row.table === table && row.id === id))
+  if (predecessor) {
+    const prior = predecessor.mutation
+    if (isTicketMutation(prior) && !prior.expectedUpdatedAt && !prior.expectedOperationId) {
+      throw new OfflineRevisionError('An older ticket change has no outing revision proof. Sync or review it, then refresh the outing before saving another change.')
+    }
+    return { table, id, afterCommandId: predecessor.id }
+  }
+  const updatedAt = base.rowRevisions?.[`${table}:${id}`]
+  return updatedAt ? { table, id, updatedAt } : undefined
 }
 
 /** Called inside the append transaction. A later local edit refers to its
@@ -64,9 +78,7 @@ export function capturePreconditions(mutation: Mutation, base: OfflineSnapshot, 
     const key = `${row.table}:${row.id}`
     if (!row.guard || seen.has(key)) return []
     seen.add(key)
-    const predecessor = [...pending].reverse().find((command) => mutationRows(command.mutation).some((prior) => prior.table === row.table && prior.id === row.id))
-    if (predecessor) return [{ table: row.table, id: row.id, afterCommandId: predecessor.id }]
-    const updatedAt = base.rowRevisions?.[key]
-    return updatedAt ? [{ table: row.table, id: row.id, updatedAt }] : []
+    const condition = captureRowPrecondition(row.table, row.id, base, pending)
+    return condition ? [condition] : []
   })
 }

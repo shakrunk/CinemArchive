@@ -5,7 +5,8 @@ import { ticketDigest, ticketObjectKey } from './validation'
 
 export const ticketOwner = { projectId: 'https://example.supabase.co', userId: '10000000-0000-4000-8000-000000000001' }
 export const ticketOuting = { ...outing, id: '20000000-0000-4000-8000-000000000001', ticketImagePath: '/private/legacy.jpg' }
-export const ticketSnapshot = () => ({ ...snapshot(), outings: [ticketOuting] })
+export const ticketRevision = '2026-10-08T19:00:00.123456Z'
+export const ticketSnapshot = () => ({ ...snapshot(), outings: [ticketOuting], rowRevisions: { [`cinema_outings:${ticketOuting.id}`]: ticketRevision } })
 export const ticketId = '30000000-0000-4000-8000-000000000001'
 export const operationId = '40000000-0000-4000-8000-000000000001'
 export async function ticketFixture(id = ticketId) {

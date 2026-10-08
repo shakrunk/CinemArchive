@@ -6,6 +6,15 @@ const plain = (value: unknown): value is Record<string, unknown> => value !== nu
   (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
 const exact = (value: Record<string, unknown>, keys: readonly string[]) => Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
 
+/** PostgreSQL receipt JSON normalizes offsets and fractional widths. */
+export function ticketTimestampMicros(value: unknown): bigint | null {
+  if (typeof value !== 'string') return null
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!match) return null
+  const seconds = Date.parse(`${match[1]}${match[3]}`)
+  return Number.isFinite(seconds) ? BigInt(seconds) * 1000n + BigInt((match[2] ?? '').padEnd(6, '0')) : null
+}
+
 export function ticketObjectKey(scope: OfflineScope, attachmentId: string): string {
   if ((!isTicketId(scope.userId) && scope.userId !== 'anonymous-local-only') || !isTicketId(attachmentId)) throw new Error('Invalid ticket owner or attachment ID')
   return `${scope.userId}/${attachmentId}/original`
@@ -28,9 +37,13 @@ export function sameTicketAttachment(a: TicketAttachment, b: TicketAttachment): 
 }
 export function isValidTicketMutation(value: unknown): value is TicketMutation {
   if (!plain(value) || !isTicketId(value.outingId) || (value.expectedAttachmentId !== null && !isTicketId(value.expectedAttachmentId))) return false
+  const guardKeys = ['expectedUpdatedAt', 'expectedOperationId'].filter((key) => Object.hasOwn(value, key))
+  if (guardKeys.length > 1 || (guardKeys[0] === 'expectedUpdatedAt' &&
+      ticketTimestampMicros(value.expectedUpdatedAt) === null) ||
+      (guardKeys[0] === 'expectedOperationId' && !isTicketId(value.expectedOperationId))) return false
   return value.kind === 'ticket.attach'
-    ? exact(value, ['kind', 'outingId', 'expectedAttachmentId', 'attachment']) && isTicketAttachment(value.attachment)
-    : value.kind === 'ticket.detach' && exact(value, ['kind', 'outingId', 'expectedAttachmentId'])
+    ? exact(value, ['kind', 'outingId', 'expectedAttachmentId', 'attachment', ...guardKeys]) && isTicketAttachment(value.attachment)
+    : value.kind === 'ticket.detach' && exact(value, ['kind', 'outingId', 'expectedAttachmentId', ...guardKeys])
 }
 
 export async function ticketDigest(blob: Blob): Promise<string> {

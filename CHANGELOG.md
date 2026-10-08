@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web ticket changes retain the outing revision across offline reloads and retries, preserving newer plan edits and offering recovery when an older queued change has no revision proof.
 - Shared ticket commands can guard the outing revision, preventing a ticket upload from hiding a newer plan edit when later changes sync.
 - Android title details now show stored tags, language, release date, studios, franchise, date added and IMDb score while offline.
 - Shared completion receipts preserve the original outing revision, preventing older pending plan changes from overwriting newer edits on another device.

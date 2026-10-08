@@ -12,9 +12,15 @@ export interface TicketAttachment {
   barcode: TicketBarcode | null
 }
 export type TicketCapture = Omit<TicketAttachment, 'objectKey'>
-export type TicketMutation =
+/** Absence is retained only for pre-guard journals and anonymous local edits. */
+export type TicketOutingGuard =
+  | { expectedUpdatedAt: string; expectedOperationId?: never }
+  | { expectedOperationId: string; expectedUpdatedAt?: never }
+  | { expectedUpdatedAt?: never; expectedOperationId?: never }
+export type TicketMutation = (
   | { kind: 'ticket.attach'; outingId: string; expectedAttachmentId: string | null; attachment: TicketAttachment }
   | { kind: 'ticket.detach'; outingId: string; expectedAttachmentId: string | null }
+) & TicketOutingGuard
 export interface TicketBlobRecord {
   scope: OfflineScope
   outingId: string

@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { IDBFactory, IDBObjectStore, IDBDatabase } from 'fake-indexeddb'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createCommand, scopeKey } from '../offline/commands'
+import { createCommand, scopeKey, type PendingCommand } from '../offline/commands'
 import { IndexedDbOfflineStore } from '../offline/storage'
 import { replayPending } from '../offline/replay'
-import { assertMutation, assertSnapshot } from '../offline/validation'
-import { ticketFixture, ticketOwner, ticketOuting, ticketSnapshot, ticketId, operationId } from './fixtures.test-support'
+import { assertCommand, assertMutation, assertSnapshot } from '../offline/validation'
+import { ticketFixture, ticketOwner, ticketOuting, ticketSnapshot, ticketId, operationId, ticketRevision } from './fixtures.test-support'
 import { isTicketAttachment, ticketObjectKey } from './validation'
 
 const stores: IndexedDbOfflineStore[] = []
@@ -16,12 +16,28 @@ function store(factory = new IDBFactory()) {
 }
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(stores.splice(0).map((db) => db.close())) })
 
+async function legacyJournal(factory: IDBFactory, commands: PendingCommand[]) {
+  const db = store(factory)
+  await db.replaceBase(ticketOwner, ticketSnapshot())
+  await db.close()
+  await new Promise<void>((resolve, reject) => {
+    const open = factory.open('ticket-store-tests')
+    open.onsuccess = () => {
+      const connection = open.result, tx = connection.transaction('owners', 'readwrite')
+      tx.objectStore('owners').put({ version: 1, scope: ticketOwner, revision: 7, nextSequence: commands.length + 1,
+        base: ticketSnapshot(), commands }, scopeKey(ticketOwner))
+      tx.oncomplete = () => { connection.close(); resolve() }; tx.onabort = () => reject(tx.error)
+    }
+    open.onerror = () => reject(open.error)
+  })
+}
+
 it('commits original bytes and command together, survives reopening and isolates owner/project', async () => {
   const factory = new IDBFactory(), db = store(factory)
   const { attachment, blob } = await ticketFixture()
   await db.replaceBase(ticketOwner, ticketSnapshot())
   const saved = await db.attachTicket(ticketOwner, ticketOuting.id, attachment, blob, { id: operationId })
-  expect(saved.document.commands[0].mutation).toMatchObject({ kind: 'ticket.attach', expectedAttachmentId: null })
+  expect(saved.document.commands[0].mutation).toMatchObject({ kind: 'ticket.attach', expectedAttachmentId: null, expectedUpdatedAt: ticketRevision })
   expect(replayPending(saved.document.base, saved.document.commands).outings[0]).toMatchObject({ ticketAttachment: attachment, ticketManaged: true })
   await db.close()
   const reopened = store(factory)
@@ -58,7 +74,8 @@ it('captures rapid replacement CAS and generic causal guards without rewriting s
   const [before, a, b, after] = read.document.commands
   expect(a.dependsOn).toContain(before.id)
   expect(a.preconditions).toBeUndefined()
-  expect(b.mutation).toMatchObject({ expectedAttachmentId: first.attachment.id })
+  expect(a.mutation).toMatchObject({ expectedOperationId: before.id })
+  expect(b.mutation).toMatchObject({ expectedAttachmentId: first.attachment.id, expectedOperationId: a.id })
   expect(b.dependsOn).toContain(a.id)
   expect(after.preconditions).toEqual([{ table: 'cinema_outings', id: ticketOuting.id, afterCommandId: b.id }])
   await db.acknowledge(ticketOwner, a.id)
@@ -76,6 +93,82 @@ it('retains bytes after detach and marks legacy fallback as managed, including a
   expect(read.document.base.outings[0].ticketAttachment).toBeUndefined()
   expect(read.document.base.outings[0]).toMatchObject({ ticketManaged: true, ticketImagePath: '/private/legacy.jpg' })
   expect(await db.readTicketBlob(anonymous, ticketId)).not.toBeNull()
+})
+
+it('preserves unknown-outcome guards across restart, refresh and retry, and chains a detach transactionally', async () => {
+  const factory = new IDBFactory(), db = store(factory), fixture = await ticketFixture()
+  await db.replaceBase(ticketOwner, ticketSnapshot())
+  await db.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob, { id: operationId })
+  await db.recordFailure(ticketOwner, operationId, { state: 'pending', message: 'Response lost', nextAttemptAt: 123 })
+  const original = (await db.read(ticketOwner)).document.commands[0].mutation
+  await db.close()
+  const reopened = store(factory)
+  await reopened.replaceBase(ticketOwner, { ...ticketSnapshot(), rowRevisions: { [`cinema_outings:${ticketOuting.id}`]: '2026-10-09T00:00:00.000001Z' } })
+  await reopened.retry(ticketOwner, operationId)
+  await reopened.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob, { id: operationId })
+  const saved = await reopened.detachTicket(ticketOwner, ticketOuting.id)
+  expect(saved.document.commands[0].mutation).toEqual(original)
+  expect(saved.document.commands[1].mutation).toMatchObject({ kind: 'ticket.detach', expectedAttachmentId: fixture.attachment.id, expectedOperationId: operationId })
+  expect(saved.document.commands[1].dependsOn).toContain(operationId)
+})
+
+it('requires a known revision for authenticated tickets and retains the prior photo when proof is missing', async () => {
+  const db = store(), fixture = await ticketFixture()
+  await db.replaceBase(ticketOwner, { ...ticketSnapshot(), rowRevisions: {}, outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: fixture.attachment }] })
+  await expect(db.detachTicket(ticketOwner, ticketOuting.id)).rejects.toThrow('Reconnect and refresh')
+  const replacement = await ticketFixture('30000000-0000-4000-8000-000000000002')
+  await expect(db.attachTicket(ticketOwner, ticketOuting.id, replacement.attachment, replacement.blob)).rejects.toThrow('Reconnect and refresh')
+  expect((await db.read(ticketOwner)).document.base.outings[0].ticketAttachment).toEqual(fixture.attachment)
+  expect(await db.readTicketBlob(ticketOwner, replacement.attachment.id)).toBeNull()
+  expect((await db.read(ticketOwner)).document.commands).toEqual([])
+})
+
+it('chains a ticket from an offline outing create without requiring a guessed server revision', async () => {
+  const db = store(), fixture = await ticketFixture()
+  await db.replaceBase(ticketOwner, { ...ticketSnapshot(), outings: [], rowRevisions: {} })
+  const outing = { ...ticketOuting, ticketImagePath: undefined }
+  const create = createCommand(ticketOwner, { kind: 'outing.create', outing })
+  await db.append(create)
+  const read = await db.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob)
+  expect(read.document.commands[1].mutation).toMatchObject({ expectedOperationId: create.id })
+  expect(read.document.commands[1].dependsOn).toContain(create.id)
+})
+
+it('keeps legacy pending intent immutable and rejects new dependent edits instead of borrowing its unproven revision', async () => {
+  const factory = new IDBFactory(), fixture = await ticketFixture()
+  const legacy = { ...fixture.command, sequence: 1, attempts: 2 }
+  await legacyJournal(factory, [legacy])
+  const db = store(factory)
+  await db.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob, { id: legacy.id })
+  await expect(db.detachTicket(ticketOwner, ticketOuting.id)).rejects.toThrow('older ticket change')
+  const edit = createCommand(ticketOwner, { kind: 'outing.patch', outingId: ticketOuting.id, patch: { venue: 'Unseen edit' } })
+  await expect(db.append(edit)).rejects.toThrow('Sync or review')
+  await expect(db.append({ ...edit, preconditions: [{ table: 'cinema_outings', id: ticketOuting.id, updatedAt: ticketRevision }] })).rejects.toThrow('Sync or review')
+  const read = await db.read(ticketOwner)
+  expect(read.document.commands).toEqual([legacy])
+  expect(read.quarantined).toEqual([])
+})
+
+it('retains an already-persisted dependency on a legacy ticket for backend conflict review without rewriting it', async () => {
+  const factory = new IDBFactory(), fixture = await ticketFixture()
+  const legacy = { ...fixture.command, sequence: 1 }
+  const dependent = { ...createCommand(ticketOwner, { kind: 'outing.patch', outingId: ticketOuting.id, patch: { venue: 'Old queued edit' } },
+    { dependsOn: [legacy.id], preconditions: [{ table: 'cinema_outings', id: ticketOuting.id, afterCommandId: legacy.id }] }), sequence: 2 }
+  await legacyJournal(factory, [legacy, dependent])
+  const read = await store(factory).read(ticketOwner)
+  expect(read.document.commands).toEqual([legacy, dependent])
+  expect(read.quarantined).toEqual([])
+})
+
+it('validates exclusive ticket revision guards, exact precision and self-dependencies', async () => {
+  const { command } = await ticketFixture()
+  for (const guard of [
+    { expectedUpdatedAt: null }, { expectedOperationId: null }, { expectedOperationId: 'not-a-uuid' },
+    { expectedUpdatedAt: ticketRevision, expectedOperationId: operationId }, { expectedUpdatedAt: '2026-10-08' },
+    { expectedUpdatedAt: '2026-10-08T19:00:00.1234567Z' },
+  ]) expect(() => assertMutation({ ...command.mutation, ...guard })).toThrow()
+  expect(() => assertCommand({ ...command, mutation: { ...command.mutation, expectedOperationId: command.id } })).toThrow('own operation')
+  expect(() => assertCommand({ ...command, mutation: { ...command.mutation, expectedUpdatedAt: ticketRevision } })).not.toThrow()
 })
 
 it('rejects reused IDs with different metadata, corrupt bytes and generic bypasses', async () => {

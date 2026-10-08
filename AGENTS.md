@@ -53,6 +53,21 @@ OpenWiki includes repository overview, architecture notes, workflows, domain con
 
 When working in this repository, read the OpenWiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
 
+### Which tool for which question
+
+| Question | Use | Why |
+|----------|-----|-----|
+| What breaks if I change X? Who calls it? Which tests cover it? Review this diff. | `code-review-graph` (MCP) | Structural graph of the code, kept current by hooks; built for impact and review. Use it before Grep/Glob/Read. |
+| Why is it built this way? How do the pieces fit together? Where do I start? | `openwiki/` (read `openwiki/quickstart.md`) | Prose docs: architecture, workflows, domains, operations. Orientation, not code navigation. |
+| Cross-client rules, contracts, schema ownership | `docs/`, `schema.sql`, the ADRs | Normative; they outrank `openwiki/` (see the precedence order above). |
+
+`graphify` is not used in this repo (no graph is built or committed). Don't suggest it
+or reference its output here.
+
+`openwiki/` is generated: a regeneration overwrites hand edits. Prefer fixing the source
+or the normative docs, then regenerate; if you must patch a page by hand, expect it to be
+rewritten.
+
 ---
 
 ## Verification

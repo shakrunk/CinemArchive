@@ -42,6 +42,8 @@ suspend fun buildSharedLibrarySnapshot(context: Context, library: SharedLibrary)
                     addedAt = title.addedAt.orEmpty(), updatedAt = row.optStringOrNull("updated_at").orEmpty(),
                     imdbRating = row.doubleOrNull("imdb_rating"), originalLanguage = row.optStringOrNull("original_language"),
                     releaseDate = row.optStringOrNull("release_date"),
+                    tags = row.strings("tags"), studios = row.strings("studios"),
+                    collectionId = row.intOrNull("collection_id"), collectionName = row.optStringOrNull("collection_name"),
                 )))
                 val episodes = row.rows("episodes")
                 val seasons = row.rows("seasons").map { season ->
@@ -95,6 +97,8 @@ suspend fun buildSharedLibrarySnapshot(context: Context, library: SharedLibrary)
 
 private fun JSONObject.rows(key: String): List<JSONObject> =
     optJSONArray(key)?.let { a -> (0 until a.length()).map(a::getJSONObject) }.orEmpty()
+private fun JSONObject.strings(key: String): List<String> =
+    optJSONArray(key)?.let { a -> (0 until a.length()).map(a::getString) }.orEmpty()
 private fun JSONObject.intOrNull(key: String): Int? = if (isNull(key)) null else optInt(key)
 private fun JSONObject.doubleOrNull(key: String): Double? = if (isNull(key)) null else optDouble(key)
 private fun JSONObject.companionNames(): List<String> = optJSONArray("companions")?.let { a ->

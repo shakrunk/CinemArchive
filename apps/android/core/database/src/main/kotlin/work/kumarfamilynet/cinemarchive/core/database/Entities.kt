@@ -1,6 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.database
 
 import androidx.room.Dao
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -43,6 +44,10 @@ data class TitleEntity(
     // Mirrors schema.sql's titles.release_date — drives the Up Next watchlist card's
     // "releases <date>" label for a title that hasn't come out yet.
     val releaseDate: String? = null,
+    @ColumnInfo(defaultValue = "''") val tags: List<String> = emptyList(),
+    @ColumnInfo(defaultValue = "''") val studios: List<String> = emptyList(),
+    val collectionId: Int? = null,
+    val collectionName: String? = null,
 )
 
 @Entity(

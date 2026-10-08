@@ -82,7 +82,8 @@ private const val PAGE_SIZE = 500
  * keep this constant's history a complete audit trail per its own stated policy.
  */
 // 7: episode watch notes. Re-read existing events while preserving queued local edits/deletes.
-private const val SYNC_SCHEMA_VERSION = 7
+// 8: title tags, studios, and franchise metadata used by Library filters and grouping.
+private const val SYNC_SCHEMA_VERSION = 8
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -156,11 +157,25 @@ class LibrarySyncRepository(
         // that as version 1, so every pre-existing install also gets the one-time reset.
         val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
         var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
+        var metadataSchemaAvailable = true
+        var sawMetadataTitle = false
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
             if (rows.length() == 0) break
+            if (storedSchemaVersion < 8) {
+                for (index in 0 until rows.length()) {
+                    val row = rows.getJSONObject(index)
+                    if (row.getString("entity_type") == "title") {
+                        sawMetadataTitle = true
+                        val payload = row.getJSONObject("payload")
+                        if (listOf("tags", "studios", "collectionId", "collectionName").any { !payload.has(it) }) {
+                            metadataSchemaAvailable = false
+                        }
+                    }
+                }
+            }
             transactor.run { applyPage(rows, deferred) }
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
             dataStore.edit { it[cursorKey] = cursor }
@@ -173,7 +188,12 @@ class LibrarySyncRepository(
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
         // idempotently) does the full resync again rather than settling for a partial one.
-        if (storedSchemaVersion < SYNC_SCHEMA_VERSION) dataStore.edit { it[schemaVersionKey] = SYNC_SCHEMA_VERSION }
+        // An older RPC can still sync safely, but must not acknowledge the metadata backfill:
+        // its later migration does not bump existing title timestamps. An empty archive cannot
+        // prove capability either: keep retrying from epoch until a complete title is observed.
+        if (storedSchemaVersion < SYNC_SCHEMA_VERSION && metadataSchemaAvailable && (storedSchemaVersion >= 8 || sawMetadataTitle)) {
+            dataStore.edit { it[schemaVersionKey] = SYNC_SCHEMA_VERSION }
+        }
     }
 
     /**
@@ -400,9 +420,13 @@ class LibrarySyncRepository(
         notes = optStringOrNull("notes"),
         addedAt = getString("addedAt"),
         updatedAt = getString("updatedAt"),
-        releaseDate = optStringOrNull("releaseDate") ?: existing?.releaseDate,
-        imdbRating = optDoubleOrNull("imdbRating") ?: existing?.imdbRating,
-        originalLanguage = optStringOrNull("originalLanguage") ?: existing?.originalLanguage,
+        releaseDate = if (has("releaseDate")) optStringOrNull("releaseDate") else existing?.releaseDate,
+        imdbRating = if (has("imdbRating")) optDoubleOrNull("imdbRating") else existing?.imdbRating,
+        originalLanguage = if (has("originalLanguage")) optStringOrNull("originalLanguage") else existing?.originalLanguage,
+        tags = if (has("tags")) optJSONArray("tags").toStringList() else existing?.tags.orEmpty(),
+        studios = if (has("studios")) optJSONArray("studios").toStringList() else existing?.studios.orEmpty(),
+        collectionId = if (has("collectionId")) optIntOrNull("collectionId") else existing?.collectionId,
+        collectionName = if (has("collectionName")) optStringOrNull("collectionName") else existing?.collectionName,
     )
 
     // `castOrder`/`department` are the only fields either Ledger credits widget reads

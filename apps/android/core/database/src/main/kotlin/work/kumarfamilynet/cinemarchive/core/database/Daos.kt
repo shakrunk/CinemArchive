@@ -22,6 +22,12 @@ data class TitleListRow(
     val rating: Double?,
     val releaseDate: String?,
     val genres: List<String>,
+    val addedAt: String? = null,
+    val originalLanguage: String? = null,
+    val tags: List<String> = emptyList(),
+    val studios: List<String> = emptyList(),
+    val collectionId: Int? = null,
+    val collectionName: String? = null,
 )
 
 data class EpisodeWatchCount(val episodeId: String, val watchCount: Int)
@@ -42,7 +48,8 @@ data class TitleIdByTmdbKey(val id: String, val tmdbId: Int, val type: String)
 @Dao
 interface TitleDao {
     @Query(
-        "SELECT id, title, year, posterUrl, status, type, director, network, rating, releaseDate, genres " +
+        "SELECT id, title, year, posterUrl, status, type, director, network, rating, releaseDate, genres, " +
+            "addedAt, originalLanguage, tags, studios, collectionId, collectionName " +
             "FROM titles ORDER BY title COLLATE NOCASE",
     )
     fun observeLibrary(): Flow<List<TitleListRow>>

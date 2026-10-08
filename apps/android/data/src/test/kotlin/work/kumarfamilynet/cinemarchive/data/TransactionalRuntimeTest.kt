@@ -256,7 +256,10 @@ class TransactionalRuntimeTest {
         val outbox = outbox(db, ScriptedWriter { PushResult.Retry("offline") })
         outbox.enqueue("episode_watch_event", "pending", "upsert", JSONObject().put("id", "pending"))
         libraryRepository(db, outbox).deleteEpisodeWatchEvent("ep", "deleted")
-        val page = JSONArray()
+        val page = JSONArray().put(titleRow("t1", "watchlist", "2026-01-01T00:00:00Z").apply {
+            getJSONObject("payload").put("tags", JSONArray()).put("studios", JSONArray())
+                .put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL)
+        })
         for (id in listOf("existing", "pending", "deleted")) page.put(JSONObject()
             .put("entity_type", "episode_watch_event").put("entity_id", id).put("updated_at", "2026-01-01T00:00:00Z")
             .put("payload", JSONObject().put("id", id).put("episodeId", "ep").put("watchedAt", JSONObject.NULL).put("notes", "Server note")))
@@ -266,10 +269,90 @@ class TransactionalRuntimeTest {
         prefs.edit { it[intPreferencesKey("sync_schema_version")] = 6; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
         syncRepository(db, outbox, http, file, prefs).syncNow()
         assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
-        assertEquals(7, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        assertEquals(8, prefs.data.first()[intPreferencesKey("sync_schema_version")])
         val events = db.episodeWatchEventDao().observeAllWatchEvents().first().associateBy { it.id }
         assertEquals("Server note", events.getValue("existing").notes)
         assertEquals("Local note", events.getValue("pending").notes)
         assertTrue("pending deletion stays deleted", "deleted" !in events)
+    }
+
+    @Test fun libraryMetadataUpgradeBackfillsFromEpochAndPreservesPendingTitleEditsAndDeletes() = runTest {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("existing"), title("pending").copy(tags = listOf("Local tag")), title("deleted")))
+        val outbox = outbox(db, ScriptedWriter { PushResult.Retry("offline") })
+        val repo = libraryRepository(db, outbox)
+        repo.updateTitleStatus("pending", LibraryStatus.DROPPED, "2026-10-08T00:00:00Z")
+        repo.removeTitle("deleted")
+        val page = JSONArray()
+        for (id in listOf("existing", "pending", "deleted")) page.put(titleRow(id, "watched", "2026-01-01T00:00:00Z").apply {
+            getJSONObject("payload").put("tags", JSONArray().put("Server tag")).put("studios", JSONArray().put("Studio"))
+                .put("collectionId", 42).put("collectionName", "Collection")
+        })
+        val http = SyncHttp(ArrayDeque(listOf(page)))
+        val file = tmpFile("library-metadata-sync")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 7; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
+        syncRepository(db, outbox, http, file, prefs).syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+        assertEquals(8, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        val added = db.titleDao().getById("existing")!!
+        assertEquals(listOf("Server tag"), added.tags)
+        assertEquals(listOf("Studio"), added.studios)
+        assertEquals(42, added.collectionId)
+        assertEquals("Collection", added.collectionName)
+        assertEquals(listOf("Local tag"), db.titleDao().getById("pending")!!.tags)
+        assertEquals("DROPPED", db.titleDao().getById("pending")!!.status)
+        assertNull(db.titleDao().getById("deleted"))
+        assertEquals(2, db.outboxDao().getPending().size)
+    }
+
+    @Test fun absentMetadataPreservesLocalValuesButExplicitNullAndEmptyArraysClearThem() = runTest {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("t1").copy(tags = listOf("Tag"), studios = listOf("Studio"),
+            collectionId = 42, collectionName = "Collection", originalLanguage = "ja", releaseDate = "2020-01-01", imdbRating = 8.0)))
+        val outbox = outbox(db, ScriptedWriter { PushResult.Success })
+        val absent = SyncHttp(ArrayDeque(listOf(JSONArray().put(titleRow("t1", "watched", "2026-02-01T00:00:00Z")))))
+        syncRepository(db, outbox, absent, tmpFile("metadata-absent")).syncNow()
+        val retained = db.titleDao().getById("t1")!!
+        assertEquals(listOf("Tag"), retained.tags); assertEquals(listOf("Studio"), retained.studios)
+        assertEquals(42, retained.collectionId); assertEquals("Collection", retained.collectionName)
+        assertEquals("ja", retained.originalLanguage); assertEquals("2020-01-01", retained.releaseDate)
+        assertEquals(8.0, retained.imdbRating!!, 0.0)
+        val clear = titleRow("t1", "watched", "2026-03-01T00:00:00Z").apply {
+            getJSONObject("payload").put("tags", JSONArray()).put("studios", JSONArray())
+                .put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL)
+                .put("originalLanguage", JSONObject.NULL).put("releaseDate", JSONObject.NULL).put("imdbRating", JSONObject.NULL)
+        }
+        syncRepository(db, outbox, SyncHttp(ArrayDeque(listOf(JSONArray().put(clear)))), tmpFile("metadata-clear")).syncNow()
+        val cleared = db.titleDao().getById("t1")!!
+        assertTrue(cleared.tags.isEmpty()); assertTrue(cleared.studios.isEmpty())
+        assertNull(cleared.collectionId); assertNull(cleared.collectionName)
+        assertNull(cleared.originalLanguage); assertNull(cleared.releaseDate); assertNull(cleared.imdbRating)
+    }
+
+    @Test fun emptyThenOlderRpcDoesNotAcknowledgeMetadataUpgradeBeforeUnchangedRowsCanBeBackfilled() = runTest {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("t1")))
+        val outbox = outbox(db, ScriptedWriter { PushResult.Success })
+        val oldRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z")
+        val upgradedRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z").apply {
+            getJSONObject("payload").put("tags", JSONArray().put("Backfilled"))
+                .put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL)
+        }
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(oldRow), JSONArray().put(upgradedRow), JSONArray())))
+        val file = tmpFile("metadata-rollout")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 7; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
+        val sync = syncRepository(db, outbox, http, file, prefs)
+        sync.syncNow()
+        assertEquals("an empty response cannot prove metadata capability", 7, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        sync.syncNow()
+        assertEquals(7, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        sync.syncNow()
+        assertEquals(List(3) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
+        assertEquals(listOf("Backfilled"), db.titleDao().getById("t1")!!.tags)
+        assertEquals(8, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        sync.syncNow()
+        assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
     }
 }

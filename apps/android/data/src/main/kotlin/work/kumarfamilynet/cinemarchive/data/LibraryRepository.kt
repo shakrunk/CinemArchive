@@ -198,6 +198,9 @@ class LibraryRepository(
             imdbRating = details.imdbRating,
             originalLanguage = details.originalLanguage,
             releaseDate = details.releaseDate,
+            studios = details.studios,
+            collectionId = details.collectionId,
+            collectionName = details.collectionName,
         )
 
         outbox.atomically {
@@ -260,10 +263,12 @@ class LibraryRepository(
         cinemaOutingDao.observeAllOutings(),
         titleDao.observeLastInteractions(),
         theaterInterestDao.observeAll(),
-    ) { rows, outings, interactions, theaterInterest ->
+        titleCastDao.observeAllCast(),
+    ) { rows, outings, interactions, theaterInterest, cast ->
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings.map { it.toDomain() })
         val lastInteractionByTitle = interactions.associate { it.titleId to it.lastInteractionAt }
         val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
+        val castByTitle = cast.groupBy { it.titleId }
         rows.map { row ->
             LibraryTitle(
                 id = row.id,
@@ -280,6 +285,13 @@ class LibraryRepository(
                 genres = row.genres,
                 lastInteractionAt = lastInteractionByTitle[row.id],
                 interestedInTheaters = row.id in interestedTitleIds,
+                addedAt = row.addedAt,
+                originalLanguage = row.originalLanguage,
+                tags = row.tags,
+                studios = row.studios,
+                collectionId = row.collectionId,
+                collectionName = row.collectionName,
+                castNames = castByTitle[row.id].orEmpty().map { it.name },
             )
         }
     }

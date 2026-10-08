@@ -27,7 +27,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TheaterInterestEntity::class,
         LegacyRestoreReceiptEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -155,6 +155,16 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive metadata only: retain every local watch, queued write, and recovery receipt. */
+        internal val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE titles ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE titles ADD COLUMN studios TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE titles ADD COLUMN collectionId INTEGER")
+                db.execSQL("ALTER TABLE titles ADD COLUMN collectionName TEXT")
+            }
+        }
+
         /** [name] is the SQLite file name. Per-account runtimes pass an owner-derived name (see
          *  AccountRuntime) so two accounts never share a file; the legacy global
          *  `cinemarchive.db` ([LEGACY_DATABASE_NAME]) is never opened by an active runtime. */
@@ -163,7 +173,7 @@ abstract class LibraryDatabase : RoomDatabase() {
             LibraryDatabase::class.java,
             name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
@@ -184,7 +194,7 @@ abstract class LibraryDatabase : RoomDatabase() {
          */
         fun createForRecovery(context: Context, name: String): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, name)
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                 .build()
     }
 }

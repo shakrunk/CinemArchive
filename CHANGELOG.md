@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android retains tags, studios, franchise metadata and explicit metadata clears, with a lossless local database upgrade and backend-aware sync backfill.
 - Web outing sharing waits for pending plan edits, isolates account changes, and shows each recipient the confirmed delivered snapshot.
 - Outing plan sharing now supports safe retries after an interrupted response and returns the actual delivered plan snapshot.
 

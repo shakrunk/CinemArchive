@@ -7,38 +7,8 @@
     <title>CinemArchive</title>
     <meta name="description" content="The Projection Room — your personal cinematic archive" />
     <meta name="theme-color" content="#0b0907" />
-    <!-- Theme FOUC guard: apply the persisted theme to <html> before first paint.
-         Reads the Zustand-persisted store (key must match useAppStore's name). -->
-    <script>
-      (function () {
-        var COLORS = { dark: '#0b0907', light: '#f4ede0', noir: '#0d0d0f', matrix: '#020403' };
-        function systemTheme() {
-          return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-        }
-        try {
-          var raw = localStorage.getItem('cinemarchive-library');
-          var state = raw && JSON.parse(raw).state;
-          var theme = state && state.theme;
-          var unlocked = (state && state.unlockedThemes) || ['dark', 'light'];
-          // themeMode 'system' always re-resolves against the live OS
-          // preference rather than trusting whatever was last persisted.
-          if (state && state.themeMode === 'system') theme = systemTheme();
-          if (!COLORS.hasOwnProperty(theme) || unlocked.indexOf(theme) === -1) theme = systemTheme();
-          document.documentElement.setAttribute('data-theme', theme);
-          if (theme !== 'dark') {
-            var m = document.querySelector('meta[name="theme-color"]');
-            if (m) m.setAttribute('content', COLORS[theme]);
-          }
-        } catch (e) {
-          var fallback = systemTheme();
-          document.documentElement.setAttribute('data-theme', fallback);
-          if (fallback !== 'dark') {
-            var m2 = document.querySelector('meta[name="theme-color"]');
-            if (m2) m2.setAttribute('content', COLORS[fallback]);
-          }
-        }
-      })();
-    </script>
+    <!-- Synchronous so theme and Pages redirect settle before first paint/router startup. -->
+    <script src="/bootstrap.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- No crossorigin: <img> requests to TMDB aren't CORS requests, so a
@@ -48,16 +18,6 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=Hanken+Grotesk:wght@300..800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap"
       rel="stylesheet"
     />
-    <!-- SPA redirect: GitHub Pages passes the path via query string from 404.html -->
-    <script>
-      (function () {
-        var redirect = sessionStorage.redirect;
-        delete sessionStorage.redirect;
-        if (redirect && redirect !== location.href) {
-          history.replaceState(null, null, redirect);
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

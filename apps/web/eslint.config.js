@@ -12,6 +12,11 @@ export default defineConfig([
   // sees two candidate tsconfigRootDirs and refuses to parse anything.
   globalIgnores(['dist', 'dist-e2e', 'playwright-report', 'test-results', '.worktrees']),
   {
+    files: ['public/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,

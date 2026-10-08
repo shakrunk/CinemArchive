@@ -1,4 +1,7 @@
 import { expect, test } from 'playwright/test'
+import { readFileSync } from 'node:fs'
+
+const pagesFallback = readFileSync(new URL('../public/404.html', import.meta.url), 'utf8')
 
 // Exercise the real production bundle and service worker, using the app's existing
 // unconfigured/local mode. These tests never authenticate or mutate remote data.
@@ -14,6 +17,37 @@ test('opens a deep link and restores the active view on reload', async ({ page }
   await page.reload()
   await expect(page.getByRole('heading', { name: 'The Library', exact: true })).toBeVisible()
   await expect(page).toHaveURL(/\?view=library$/)
+})
+
+test.describe('GitHub Pages startup fallback', () => {
+  // Exercise the hosting fallback rather than an installed worker's navigation handler.
+  test.use({ serviceWorkers: 'block' })
+
+  test('restores the original path, query and fragment before routing', async ({ page }) => {
+    await page.route('**/missing?*', (route) => route.fulfill({ status: 404, contentType: 'text/html', body: pagesFallback }))
+    await page.goto('/missing?view=lists#details')
+    await expect(page.getByRole('button', { name: 'Create your first list', exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/missing\?view=lists#details$/)
+    expect(await page.evaluate(() => sessionStorage.getItem('redirect'))).toBeNull()
+  })
+
+  test('preserves routing parameters when session storage is unavailable', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'sessionStorage', { get() { throw new DOMException('Storage unavailable', 'SecurityError') } })
+    })
+    await page.route('**/missing?*', (route) => route.fulfill({ status: 404, contentType: 'text/html', body: pagesFallback }))
+    await page.goto('/missing?view=lists#details')
+    await expect(page.getByRole('button', { name: 'Create your first list', exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/\?view=lists#details$/)
+  })
+
+  test('discards stale cross-origin redirects without breaking startup', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('redirect', 'https://example.invalid/?view=lists'))
+    await page.goto('/?view=library')
+    await expect(page.getByRole('heading', { name: 'The Library', exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\?view=library$/)
+    expect(await page.evaluate(() => sessionStorage.getItem('redirect'))).toBeNull()
+  })
 })
 
 test('creates a local list, restores its deep link, goes back, and confirms deletion', async ({ page }) => {

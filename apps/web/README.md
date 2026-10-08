@@ -128,6 +128,8 @@ Before the first browser run, install the locked runner's browsers with
 The suite creates a separate `dist-e2e/` build with Supabase disabled and runs its own local
 preview server; no account or production credentials are needed. It tests local UI/persistence
 and the offline shell, not live auth, remote writes, or service-worker upgrade/rollback.
+Pages fallback routing, restricted session storage, and external synchronous startup
+scripts are covered in [web startup](../../docs/web-startup.md).
 
 ---
 

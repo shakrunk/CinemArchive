@@ -454,3 +454,42 @@ Root approved A then B after viewing checkpoint739d335. Sharing worker ACK no co
 ### 2026-10-08T17:32:47.424610+00:00 — Astra — CHECKPOINTS
 
 Viewing history committed 739d335; causal queued-command backend 305026c; web durable-command preparation 44a5327; stateless sharing backend/web reader 1c41919 (native integration tracked #319). Shared web gates: typecheck/lint/build plus 367 units passed; SQL 44/44; native assemble/lint plus 313 JVM tests, zero failures, three existing live skips. No deploy/push. Sonnet remains conserving until 20:30 UTC, no new assignment yet. Codex continues native shared viewer, episode history, and web complete action cutover. Root owns Ledger editor async callers; workers own isolated migrations, root canonical schema integration.
+
+### 2026-10-08T17:56:36+00:00 — Codex parity_verification_audit — EPISODE A READY / FROZEN
+
+Shared native full gate PASS per sharing runner: assembleDebug, lintDebug, all JVM and connected synthetic sharing tests2/2. XML totals334 tests,0 failures/errors,3 existing live skips,48 suites; lint0errors,67warnings,1information. New episode coverage13 tests: history8,writer3,Room12to13 migration1,sync-version7 pending-write preservation1. Notes SQL fixture7/7 passes including authenticated isolation, anon denial, private definer/public invoker permissions, empty search path, canonical equality. Added test adapter scope CalculationParityTest.kt empty review observation; isolated migration20261008173528_episode_watch_notes_sync.sql and apps/web/scripts/episode-watch-notes-sync.test.mjs finalized. All episode A files frozen for root checkpoint. B Up Next exact-event undo/finale starts only after A commit and runner coordination. Sharing worker may adjust own parser as separately requested by root.
+
+### 2026-10-08T17:58:21.672268+00:00 — Astra — EPISODE CHECKPOINT
+
+Native episode history committed 6c7e739: dated/pre-platform rewatches, watch notes, independent rating/review histories and exact-event deletion. Room13 preserves existing history/queue/recovery receipts; sync schema7 re-reads notes. Full native334 tests pass with3existinglive skips, SQL notes7/7; sharing emulator2/2. Sharing strict nested-owner guard finishing finalchecks; native UpNext undo/finale next. Web full durableaction cutover still inprogress, root Ledger/coordinator/autoouting/accountauth seams ready. Sonnet budget conservation remains until20:30UTC.
+
+### 2026-10-08T18:00:19+00:00 — Codex parity_verification_audit — UPNEXT B CLAIM (WAITING FOR NATIVE FREEZE RELEASE)
+
+Root approved B after episodeA6c7e739. Exact scope: core/model/src/main/kotlin/work/kumarfamilynet/cinemarchive/core/model/UpNextBoard.kt (next episode ID and watch receipt); data/src/main/kotlin/work/kumarfamilynet/cinemarchive/data/LibraryRepository.kt (atomic advance/receipt, log return ID only); data/src/test/kotlin/work/kumarfamilynet/cinemarchive/data/UpNextAdvanceTest.kt new. Feature/upnext/build.gradle.kts test deps; feature/upnext/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/upnext/{UpNextScreen.kt,UpNextEpisodeActions.kt new}; feature/upnext/src/test/kotlin/work/kumarfamilynet/cinemarchive/feature/upnext/UpNextEpisodeActionsTest.kt new. App/src/androidTest/kotlin/work/kumarfamilynet/cinemarchive/OwnerEpisodeHistoryScreenTest.kt new synthetic smoke; CHANGELOG own entry. Paths under apps/android except changelog. Main-season exact-event undo6s and finale retained card/manual status; busy or failed undo retains recovery past expiry. No native edits until sharing worker releases active gate freeze. No metadata/social/account source overlap.
+
+
+### Astra — 2026-10-08 18:09 UTC — checkpoint and budget coordination
+
+Native sharing committed as bb951e1: anonymous scoped library, read-only title details and Ledger, owner scope/link management. Final gates:335 JVM tests (0 failures,3 existing live skips),2 emulator tests, build/lint green (66 baseline warnings). Sonnet remains parked until20:30UTC /2:30pm Denver; no new work assigned before reset. Codex episode worker owns UpNext exact-event Undo/finale; social worker owns title comments/recommendation and scheduled outing plan integration. Web worker finishes durable caller cutover, while root completed large-import atomic bounds/27 SQL regressions and Ledger async guard tests. No push or deployment.
+
+
+### 2026-10-08T18:11:35.103005+00:00 — Codex parity_verification_audit — UPNEXT B FULL GATE CLAIM
+
+Focused app compile + UpNext Room6 and deterministic action7 tests passed. Social worker ACK native source frozen; running assembleDebug/lintDebug/all JVM/assembleDebugAndroidTest now, followed by two synthetic owner episode/UpNext tests on existing headway-api36 emulator. B source frozen, no live account or network data used by device tests. Root retains staging/commit ownership.
+
+
+### 2026-10-08T18:26:30.760251+00:00 — Codex parity_verification_audit — UPNEXT B READY / NATIVE RUNNER RELEASED
+
+Full combined gate PASS: :app:assembleDebug :app:lintDebug testDebugUnitTest :app:connectedDebugAndroidTest (owner/social class filter). Final XML358 JVM,51 suites,0 failures/errors,3 existing live skips; lint66 baseline warnings,0 errors/info; synthetic emulator4/4 (owner history/UpNext2, social2). B adds6 real Room+7 deterministic action tests. Exact-event Undo6s, stale-card protection, retained finale/manual status, failed undo retry past expiry; owner smoke covers cancel, undated watch notes, exactdelete, finale undo/manualfinish. Initial owner-test ambiguous horizontal/vertical scroll selector fixed; rerun passes. B exact9-file scope (claim above plus new files) frozen for root checkpoint; LibraryRepository tmdbId projection hunk belongs separately to social worker. No git writes. Remaining episode parity: bulk pre-platform season/series and Noir color mode; not waived.
+
+
+### 2026-10-08T18:33:39.321660+00:00 — Codex parity_verification_audit — LIBRARY STORAGE A CLAIM
+
+Root approved storage checkpoint before full Library UI. Exact scope under apps/android: core/model/.../{LibraryTitle.kt,MediaCatalog.kt comment}; core/database/.../{Entities.kt TitleEntity fields,Daos.kt TitleListRow/query,LibraryDatabase.kt Room14 additive}; schema14 generated; core/database/src/test/.../{LibraryMetadataMigrationTest.kt new,EpisodeNotesMigrationTest.kt migration chain}; data/.../{LibraryRepository.kt observeLibrary/addTitle only,LibrarySyncRepository.kt metadata mapping/schema8,SharedLibrarySnapshot.kt optional title metadata}; data/src/test/.../{LibraryMetadataProjectionTest.kt new,LibraryRepositoryAddTitleTest.kt metadata assertions,TransactionalRuntimeTest.kt sync preservation/clear/backfill}. Ellipses use work/kumarfamilynet/cinemarchive namespace. Tags, studios, collectionId/Name persist; originalLanguage/addedAt/cast names projected for filters. Social worker ACK no DB/sync collisions and owns separate outing methods/UI. Root owns RPC migration adding those four metadata keys and canonical schema; no SQL edits by this worker. Full Library filters UI/pure fixtures follows committed storage checkpoint. No Git writes.
+
+
+### 2026-10-08T18:40:00Z - Astra - VERIFIED CHECKPOINTS / CLAIMS
+
+Web durable action cutover committed d1ddb27; atomic import/provider identities 440044e; authenticated scoped social readers 66a776c; email/profile state 06752c1. Native Up Next exact Undo/finale d481157 and title social 26db2fa committed after 358 JVM tests plus four synthetic emulator cases, build/lint green. Shared metadata sync e52f46d prepares native Room14/full Library filters. Web calendar dates 25dc013, hydration deep links 1304e0a and accessible chart tables aac82f9 committed; 423 unit tests, typecheck/lint/build and combined 12 browser cases passed. Parity trailers pass 29 commits. All local, no deployment/push.
+
+Current Codex claims: parity_verification_audit owns native Library metadata then filters/search/sorts/franchises; reverse_parity_audit owns native outing sharing/PostShow recommendation; web_outbox_design owns web outing-share pending-write/account fences after completing ticket architecture audit. Root owns integration, shared contracts and checkpoints. Sonnet has no new assignment before 20:30 UTC; previous handoff fully acknowledged, not dismissed. Full parity remains open, including portable tickets, rich discovery/details, native imports, lifecycle proof and remaining inventory.

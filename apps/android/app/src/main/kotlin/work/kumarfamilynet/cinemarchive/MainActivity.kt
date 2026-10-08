@@ -115,6 +115,7 @@ import work.kumarfamilynet.cinemarchive.feature.friends.FriendsRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerRoute
 import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
+import work.kumarfamilynet.cinemarchive.feature.library.rememberAccountLibraryFilters
 import work.kumarfamilynet.cinemarchive.feature.library.TitleDetailRoute
 import work.kumarfamilynet.cinemarchive.feature.lists.ListsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
@@ -418,6 +419,8 @@ private fun CinemArchiveApp(
     val listsRepository = runtime.listsRepository
     val librarySyncRepository = runtime.librarySyncRepository
     val syncServices = runtime.syncServices
+    // Both owner and sign-in generation fence saved person labels and every Library filter.
+    val libraryFiltersState = rememberAccountLibraryFilters("${runtime.ownerId}:${runtime.identity.generation}")
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
@@ -632,6 +635,7 @@ private fun CinemArchiveApp(
                             Tab.LIBRARY -> LibraryRoute(
                                 repository,
                                 librarySyncRepository,
+                                filtersState = libraryFiltersState,
                                 viewMode = libraryViewMode,
                                 onToggleViewMode = onToggleLibraryViewMode,
                                 gridColumns = posterGridColumns,
@@ -851,6 +855,11 @@ private fun CinemArchiveApp(
                     onRequestNotificationPermission = requestNotificationPermission,
                     onRecommendTitle = { recommendTitleId = it },
                     onShareOutingPlans = { shareOutingId = it },
+                    onBrowsePerson = { person ->
+                        libraryFiltersState.value = libraryFiltersState.value.copy(person = person)
+                        overlay = null
+                        tab = Tab.LIBRARY
+                    },
                     socialContent = { detail ->
                         work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(titleSocialSource, runtime.ownerId, detail)
                     },

@@ -17,7 +17,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -29,6 +36,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryGrouping
 import work.kumarfamilynet.cinemarchive.core.model.LibrarySortDirection
 import work.kumarfamilynet.cinemarchive.core.model.LibrarySortOrder
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
+import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 
 internal val LibraryFiltersSaver = mapSaver(
@@ -39,6 +47,7 @@ internal val LibraryFiltersSaver = mapSaver(
         "decades" to filters.decades.toList(), "languages" to filters.languages.toList(),
         "studio" to filters.studio.orEmpty(), "rating" to filters.minRating,
         "sort" to filters.sortOrder.name, "direction" to filters.sortDirection.name, "group" to filters.grouping.name,
+        "personId" to (filters.person?.tmdbPersonId ?: 0), "personName" to filters.person?.name.orEmpty(),
     ) },
     restore = { values ->
         fun strings(key: String) = (values[key] as? List<*>)?.filterIsInstance<String>()?.toSet().orEmpty()
@@ -53,9 +62,25 @@ internal val LibraryFiltersSaver = mapSaver(
             sortOrder = LibrarySortOrder.entries.find { it.name == values["sort"] } ?: LibrarySortOrder.LAST_INTERACTION,
             sortDirection = LibrarySortDirection.entries.find { it.name == values["direction"] } ?: LibrarySortDirection.DESCENDING,
             grouping = LibraryGrouping.entries.find { it.name == values["group"] } ?: LibraryGrouping.NONE,
+            person = (values["personId"] as? Int)?.takeIf { it > 0 }?.let { LibraryPerson(it, values["personName"] as? String ?: "") },
         )
     },
 )
+
+/** Validate the owner on restoration too: rememberSaveable inputs alone do not do this. */
+fun accountLibraryFiltersSaver(accountKey: String): Saver<LibraryFilters, Any> = mapSaver(
+    save = { filters -> mapOf("account" to accountKey, "filters" to with(LibraryFiltersSaver) { save(filters) }) },
+    restore = { values ->
+        if (values["account"] == accountKey) values["filters"]?.let(LibraryFiltersSaver::restore) ?: LibraryFilters()
+        else LibraryFilters()
+    },
+)
+
+@Composable
+fun rememberAccountLibraryFilters(accountKey: String): MutableState<LibraryFilters> {
+    val saver = remember(accountKey) { accountLibraryFiltersSaver(accountKey) }
+    return rememberSaveable(accountKey, stateSaver = saver) { mutableStateOf(LibraryFilters()) }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +90,10 @@ internal fun LibraryFilterSheet(
     onChange: (LibraryFilters) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var showPeople by remember { mutableStateOf(false) }
+    if (showPeople) LibraryPersonPicker(choices.people, onSelect = {
+        onChange(filters.copy(person = it)); showPeople = false
+    }, onDismiss = { showPeople = false })
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -75,6 +104,12 @@ internal fun LibraryFilterSheet(
                 }
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+                Row {
+                    TextButton(onClick = { showPeople = true }, enabled = choices.people.isNotEmpty()) {
+                        Text(filters.person?.let { "Featuring ${it.name}" } ?: "Choose person")
+                    }
+                    if (filters.person != null) TextButton(onClick = { onChange(filters.copy(person = null)) }) { Text("Clear person") }
+                }
                 FilterChoices("Type", listOf("All", "Movies", "TV"), setOf(when (filters.type) {
                     null -> "All"; MediaType.MOVIE -> "Movies"; MediaType.TV -> "TV"
                 })) { onChange(filters.copy(type = when (it) { "Movies" -> MediaType.MOVIE; "TV" -> MediaType.TV; else -> null })) }

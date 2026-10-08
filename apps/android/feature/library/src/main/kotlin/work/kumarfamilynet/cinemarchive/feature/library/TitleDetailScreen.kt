@@ -96,6 +96,7 @@ import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
+import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.core.model.ViewingDraft
 import work.kumarfamilynet.cinemarchive.core.model.isUnaired
@@ -282,6 +283,7 @@ fun TitleDetailRoute(
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
     onRecommendTitle: ((String) -> Unit)? = null,
     onShareOutingPlans: ((String) -> Unit)? = null,
+    onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
 ) {
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
@@ -332,6 +334,7 @@ fun TitleDetailRoute(
         socialContent = socialContent,
         onRecommendTitle = onRecommendTitle,
         onShareOutingPlans = onShareOutingPlans,
+        onBrowsePerson = onBrowsePerson,
     )
 }
 
@@ -368,6 +371,7 @@ fun TitleDetailScreen(
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
     onRecommendTitle: ((String) -> Unit)? = null,
     onShareOutingPlans: ((String) -> Unit)? = null,
+    onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -562,6 +566,14 @@ fun TitleDetailScreen(
                 }
             }
 
+            if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty()) {
+                item(key = "title-credits") {
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
+                        PersonCreditsSection("Cast", detail.cast, onBrowsePerson)
+                        PersonCreditsSection("Crew", detail.crew, onBrowsePerson)
+                    }
+                }
+            }
             if (detail.seasons.isNotEmpty()) {
                 item {
                     ReadingWidthColumn {
@@ -596,6 +608,11 @@ fun TitleDetailScreen(
 
                 val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
                     ?: detail.seasons.orderedForDisplay().first()
+                if (selectedSeason.cast.isNotEmpty()) item(key = "season-credits") {
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
+                        PersonCreditsSection("Season cast", selectedSeason.cast, onBrowsePerson)
+                    }
+                }
                 items(selectedSeason.episodes, key = EpisodeDetail::id) { episode ->
                     ReadingWidthColumn {
                         EpisodeRow(
@@ -603,6 +620,7 @@ fun TitleDetailScreen(
                             onSaveEpisodeLog,
                             onDeleteEpisodeWatch,
                             cast = episodeCast[episode.id],
+                            onBrowsePerson = onBrowsePerson,
                             onShowCast = { onLoadEpisodeCast(episode.id, selectedSeason.seasonNumber, episode.episodeNumber) },
                             modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
                         )
@@ -895,6 +913,7 @@ private fun EpisodeRow(
     onDeleteEpisodeWatch: suspend (String, String) -> Unit,
     cast: EpisodeCast?,
     onShowCast: () -> Unit,
+    onBrowsePerson: ((LibraryPerson) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val watched = episode.watchCount > 0
@@ -967,6 +986,7 @@ private fun EpisodeRow(
                         .clickable { synopsisExpanded = !synopsisExpanded },
                 )
             }
+            PersonCreditsSection("Episode crew", episode.crew, onBrowsePerson)
             EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch)
             TextButton(
                 onClick = {
@@ -983,7 +1003,7 @@ private fun EpisodeRow(
                 )
             }
             if (castExpanded) {
-                EpisodeCastSection(cast, modifier = Modifier.padding(top = 4.dp))
+                EpisodeCastSection(cast, onBrowsePerson, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -992,7 +1012,7 @@ private fun EpisodeRow(
 /** The expanded cast of one episode: series regulars, then guest stars, each a horizontal row
  *  of headshots — the web app's `EpisodeCastSection`. A null [cast] means it's still loading. */
 @Composable
-private fun EpisodeCastSection(cast: EpisodeCast?, modifier: Modifier = Modifier) {
+private fun EpisodeCastSection(cast: EpisodeCast?, onBrowsePerson: ((LibraryPerson) -> Unit)?, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         when {
             cast == null -> CircularProgressIndicator(
@@ -1006,15 +1026,15 @@ private fun EpisodeCastSection(cast: EpisodeCast?, modifier: Modifier = Modifier
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
             else -> {
-                if (cast.cast.isNotEmpty()) EpisodeCastRow("Episode cast", cast.cast)
-                if (cast.guestStars.isNotEmpty()) EpisodeCastRow("Guest stars", cast.guestStars)
+                if (cast.cast.isNotEmpty()) EpisodeCastRow("Episode cast", cast.cast, onBrowsePerson)
+                if (cast.guestStars.isNotEmpty()) EpisodeCastRow("Guest stars", cast.guestStars, onBrowsePerson)
             }
         }
     }
 }
 
 @Composable
-private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
+private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>, onBrowsePerson: ((LibraryPerson) -> Unit)?) {
     Column {
         Text(
             label,
@@ -1026,7 +1046,7 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
             items(members, key = EpisodeCastMember::tmdbPersonId) { member ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.width(72.dp),
+                    modifier = Modifier.width(72.dp).clickable(enabled = onBrowsePerson != null) { onBrowsePerson?.invoke(LibraryPerson(member.tmdbPersonId, member.name)) },
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,

@@ -170,7 +170,8 @@ private data class CalculationFixture(
     fun library() = LibraryRepository(
         titleDao, seasonDao, episodeDao, watchDao,
         calculationDao("observeRatings" to ratings), calculationDao("observeReviews" to emptyList<EpisodeReviewEntity>()), viewingDao, outingDao,
-        calculationDao(), calculationDao(), calculationDao("observeAll" to emptyList<TheaterInterestEntity>(), "observeIsInterested" to false),
+        calculationDao("observeAllCast" to cast), calculationDao("observeAllCrew" to emptyList<TitleCrewEntity>()),
+        calculationDao("observeAll" to emptyList<TheaterInterestEntity>(), "observeIsInterested" to false),
         MutationOutbox(calculationDao(), calculationDao(), calculationDao()), calculationDao(),
         personCreditsDao = FakePersonCreditsDao(),
     )

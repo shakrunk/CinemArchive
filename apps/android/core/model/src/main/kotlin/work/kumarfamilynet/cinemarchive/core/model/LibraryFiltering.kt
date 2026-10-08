@@ -21,18 +21,22 @@ data class LibraryFilters(
     val sortOrder: LibrarySortOrder = LibrarySortOrder.LAST_INTERACTION,
     val sortDirection: LibrarySortDirection = LibrarySortDirection.DESCENDING,
     val grouping: LibraryGrouping = LibraryGrouping.NONE,
+    val person: LibraryPerson? = null,
 ) {
     val activeFilterCount: Int get() = listOf(
         type != null, statuses.isNotEmpty(), genres.isNotEmpty(), tags.isNotEmpty(),
         networks.isNotEmpty(), decades.isNotEmpty(), languages.isNotEmpty(),
-        studio != null, minRating > 0, grouping != LibraryGrouping.NONE,
+        studio != null, minRating > 0, grouping != LibraryGrouping.NONE, person != null,
     ).count { it }
 }
 
 data class LibraryFilterChoices(
     val genres: List<String>, val tags: List<String>, val networks: List<String>,
     val decades: List<String>, val languages: List<String>, val studios: List<String>,
+    val people: List<LibraryPersonChoice> = emptyList(),
 )
+
+data class LibraryPersonChoice(val person: LibraryPerson, val titles: List<String>)
 
 fun libraryFilterChoices(titles: List<LibraryTitle>) = LibraryFilterChoices(
     genres = titles.flatMap { it.genres }.distinct().sorted(),
@@ -41,6 +45,10 @@ fun libraryFilterChoices(titles: List<LibraryTitle>) = LibraryFilterChoices(
     decades = titles.map { decade(it.year) }.distinct().sorted(),
     languages = titles.mapNotNull { it.originalLanguage?.takeIf(String::isNotEmpty) }.distinct().sorted(),
     studios = titles.flatMap { it.studios }.distinct().sorted(),
+    people = titles.flatMap { title -> title.people.map { it to title.name } }
+        .groupBy { it.first.tmdbPersonId }.values.map { rows ->
+            LibraryPersonChoice(rows.first().first, rows.map { it.second }.distinct().sorted())
+        }.sortedWith(compareBy({ it.person.name.lowercase() }, { it.person.tmdbPersonId })),
 )
 
 fun filterLibrary(titles: List<LibraryTitle>, filters: LibraryFilters): List<LibraryTitle> {
@@ -56,6 +64,7 @@ fun filterLibrary(titles: List<LibraryTitle>, filters: LibraryFilters): List<Lib
             (filters.decades.isEmpty() || decade(title.year) in filters.decades) &&
             (filters.languages.isEmpty() || title.originalLanguage in filters.languages) &&
             (filters.studio == null || filters.studio in title.studios) &&
+            (filters.person == null || title.people.any { it.tmdbPersonId == filters.person.tmdbPersonId }) &&
             (title.rating ?: 0.0) >= filters.minRating
     }
     val collator = Collator.getInstance()

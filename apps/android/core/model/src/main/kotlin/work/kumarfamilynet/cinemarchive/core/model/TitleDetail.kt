@@ -1,10 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.model
 
 /**
- * Read-only detail view of a single title, mirroring the shape documented in
- * docs/android-contracts/title-detail.md (a subset of the full web contract — cast/crew
- * are deferred until the network sync layer lands, since they add real weight to every
- * Room read for a screen that doesn't need them to demonstrate the read-only spine).
+ * Read-only detail view of a title and its locally mirrored history and credits.
  */
 data class TitleDetail(
     val id: String,
@@ -30,6 +27,8 @@ data class TitleDetail(
     val interestedInTheaters: Boolean = false,
     /** Stable provider identity for recommendation snapshots; unavailable on legacy synthetic rows. */
     val tmdbId: Int? = null,
+    val cast: List<PersonCredit> = emptyList(),
+    val crew: List<PersonCredit> = emptyList(),
 )
 
 data class SeasonDetail(
@@ -39,6 +38,7 @@ data class SeasonDetail(
     val episodesWatched: Int,
     val airYear: Int?,
     val episodes: List<EpisodeDetail>,
+    val cast: List<PersonCredit> = emptyList(),
 )
 
 data class EpisodeDetail(
@@ -56,7 +56,12 @@ data class EpisodeDetail(
     val watchEvents: List<EpisodeWatch> = emptyList(),
     val ratings: List<EpisodeRating> = emptyList(),
     val reviews: List<EpisodeReview> = emptyList(),
+    val crew: List<PersonCredit> = emptyList(),
 )
+
+data class PersonCredit(val tmdbPersonId: Int, val name: String, val role: String?) {
+    val person: LibraryPerson get() = LibraryPerson(tmdbPersonId, name)
+}
 
 data class EpisodeWatch(val id: String, val watchedAt: String?, val notes: String? = null)
 data class EpisodeRating(val id: String, val rating: Double, val ratedAt: String)

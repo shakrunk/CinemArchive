@@ -41,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -128,6 +129,7 @@ fun LibraryRoute(
     profileInitial: String = "C",
     onTitleClick: (String) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
+    filtersState: MutableState<LibraryFilters>? = null,
 ) {
     val viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory(repository, librarySyncRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -143,6 +145,7 @@ fun LibraryRoute(
         profileInitial = profileInitial,
         onTitleClick = onTitleClick,
         onFabExpandedChange = onFabExpandedChange,
+        filtersState = filtersState,
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refresh,
     )
@@ -160,11 +163,13 @@ fun LibraryScreen(
     profileInitial: String = "C",
     onTitleClick: (String) -> Unit,
     onFabExpandedChange: (Boolean) -> Unit = {},
+    filtersState: MutableState<LibraryFilters>? = null,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
 ) {
     var showFilterSheet by remember { mutableStateOf(false) }
-    var filters by rememberSaveable(stateSaver = LibraryFiltersSaver) { mutableStateOf(LibraryFilters()) }
+    val localFilters = rememberSaveable(stateSaver = LibraryFiltersSaver) { mutableStateOf(LibraryFilters()) }
+    var filters by (filtersState ?: localFilters)
     val titles = remember(allTitles, filters) { filterLibrary(allTitles, filters) }
     val choices = remember(allTitles) { libraryFilterChoices(allTitles) }
     val groupedTitles = remember(titles, filters.grouping) { groupLibrary(titles, filters.grouping) }
@@ -256,6 +261,13 @@ fun LibraryScreen(
                         )
                     }
                 }
+            }
+        }
+
+        filters.person?.let { person ->
+            TextButton(onClick = { filters = filters.copy(person = null) }, modifier = Modifier.padding(horizontal = 20.dp)
+                .semantics { contentDescription = "Clear person filter" }) {
+                Text("Featuring ${person.name} ×")
             }
         }
 

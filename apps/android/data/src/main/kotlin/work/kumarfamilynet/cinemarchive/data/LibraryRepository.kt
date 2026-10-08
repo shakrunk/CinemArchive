@@ -16,6 +16,7 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.PersonCreditsDao
 import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
+import work.kumarfamilynet.cinemarchive.core.model.PersonCredit
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
@@ -55,6 +56,11 @@ import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.core.model.isSpecialsSeason
+
+private data class TitleCreditAggregate(
+    val cast: List<TitleCastEntity>, val crew: List<TitleCrewEntity>,
+    val seasonCast: List<SeasonCastEntity>, val episodeCrew: List<EpisodeCrewEntity>,
+)
 
 private data class EpisodeAggregate(
     val seasons: List<SeasonEntity>,
@@ -504,13 +510,19 @@ class LibraryRepository(
             EpisodeAggregate(seasons, episodes, watches, ratings, reviews)
         }
 
+        val creditAggregate = combine(titleCastDao.observeAllCast(), titleCrewDao.observeAllCrew(),
+            personCreditsDao.observeSeasonCast(), personCreditsDao.observeEpisodeCrew()) { cast, crew, seasonCast, episodeCrew ->
+            TitleCreditAggregate(cast.filter { it.titleId == titleId }, crew.filter { it.titleId == titleId },
+                seasonCast.filter { it.titleId == titleId }, episodeCrew.filter { it.titleId == titleId })
+        }
         return combine(
             titleDao.observeTitle(titleId),
-            episodeAggregate,
+            combine(episodeAggregate, creditAggregate) { episodes, credits -> episodes to credits },
             viewingDao.observeViewings(titleId),
             cinemaOutingDao.observeOutingsForTitle(titleId),
             theaterInterestDao.observeIsInterested(titleId),
-        ) { title, aggregate, viewings, outingRows, isInterested ->
+        ) { title, detailSources, viewings, outingRows, isInterested ->
+            val (aggregate, credits) = detailSources
             if (title == null) return@combine null
 
             val watchesByEpisode = aggregate.watchEvents.groupBy { it.episodeId }
@@ -539,6 +551,8 @@ class LibraryRepository(
                 rating = title.rating,
                 notes = title.notes,
                 genres = title.genres,
+                cast = credits.cast.sortedBy { it.castOrder }.map { PersonCredit(it.tmdbPersonId, it.name, it.characterName) },
+                crew = credits.crew.map { PersonCredit(it.tmdbPersonId, it.name, it.job) },
                 seasons = aggregate.seasons.map { season ->
                     val seasonEpisodes = episodesBySeason[season.id].orEmpty()
                     // season.episodesWatched (the synced column) is never updated after a
@@ -555,6 +569,8 @@ class LibraryRepository(
                         episodeCount = season.episodeCount,
                         episodesWatched = episodesWatched,
                         airYear = season.airYear,
+                        cast = credits.seasonCast.filter { it.seasonId == season.id }.sortedBy { it.castOrder }
+                            .map { PersonCredit(it.tmdbPersonId, it.name, it.characterName) },
                         episodes = seasonEpisodes.map { episode ->
                             EpisodeDetail(
                                 id = episode.id,
@@ -565,6 +581,8 @@ class LibraryRepository(
                                 watchCount = watchCountByEpisode[episode.id] ?: 0,
                                 latestRating = ratingsByEpisode[episode.id]?.firstOrNull()?.rating,
                                 averageRating = averageRatingByEpisode[episode.id],
+                                crew = credits.episodeCrew.filter { it.episodeId == episode.id }
+                                    .map { PersonCredit(it.tmdbPersonId, it.name, it.job) },
                                 synopsis = episode.synopsis,
                                 stillUrl = episode.stillUrl,
                                 watchEvents = watchesByEpisode[episode.id].orEmpty()

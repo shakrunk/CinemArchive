@@ -18,6 +18,7 @@ import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import { computeMarqueeEntries, formatCompanions, type MarqueeEntry } from 'src/store/outings'
+import { computeOutingMemories, type OutingMemory } from 'src/store/outingMemories'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile } from 'src/lib/ics'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import type { Title } from 'src/store/mockData'
@@ -539,6 +540,27 @@ function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?:
 
 // ─── Up Next view ────────────────────────────────────────────────────────────
 
+function OutingMemoryCard({ entry, delayMs }: { entry: OutingMemory; delayMs?: number }) {
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const { outing, title, yearsAgo, viewing } = entry
+  const companions = formatCompanions(outing.companions)
+  return (
+    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+      <p className="font-mono text-xs text-amber mt-0.5">
+        {yearsAgo} {yearsAgo === 1 ? 'year' : 'years'} ago today
+      </p>
+      {outing.venue && <p className="font-sans text-sm text-paper-dim">{outing.venue}</p>}
+      {companions && <p className="font-sans text-sm text-paper-dim">With {companions}</p>}
+      {viewing?.rating != null && (
+        <p className="font-mono text-xs text-amber" aria-label={`Rated ${viewing.rating} out of 5 stars`}>
+          <span aria-hidden="true">★ {viewing.rating.toFixed(1)}</span>
+        </p>
+      )}
+      {viewing?.notes && <p className="font-sans text-sm text-paper-dim break-words mt-1">“{viewing.notes}”</p>}
+    </CardFrame>
+  )
+}
+
 export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const shows = useUpNextShows()
   const upcoming = useUpcomingTitles()
@@ -550,7 +572,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const outings = useAppStore((s) => s.outings)
   const titles = useAppStore((s) => s.titles)
-  const isSharedView = useAppStore((s) => s.isSharedView)
+  const isSharedView = useAppStore((s) => s.isSharedView || s.viewerContext.kind !== 'owner')
 
   // A single shared "now" tick for the whole section (not per-card timers) —
   // countdown labels re-derive once a minute; completion itself is driven by
@@ -563,6 +585,11 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
 
   const marqueeEntries = useMemo(
     () => (isSharedView ? [] : computeMarqueeEntries(outings, titles, now)),
+    [isSharedView, outings, titles, now]
+  )
+
+  const memories = useMemo(
+    () => (isSharedView ? [] : computeOutingMemories(outings, titles, now)),
     [isSharedView, outings, titles, now]
   )
 
@@ -591,14 +618,15 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   // app's smart-landing check") — Up Next isn't "empty" just because nothing's
   // mid-episode or on the watchlist yet.
   const isEmpty =
-    shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee
+    shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee && memories.length === 0
 
   const totalCards =
     shows.length +
     finishedToShow.length +
     marqueeEntries.length +
     availableWatchlist.length +
-    comingSoon.length
+    comingSoon.length +
+    memories.length
   const delays = useMemo(() => staggerDelays(totalCards), [totalCards])
   let cardIndex = 0
 
@@ -651,9 +679,17 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
               )}
             </>
           )}
+          {memories.length > 0 && (
+            <>
+              <Eyebrow as="h2" size="lg" className="col-span-full pt-2 pb-1">On this day</Eyebrow>
+              {memories.map((entry) => (
+                <OutingMemoryCard key={entry.outing.id} entry={entry} delayMs={delays[cardIndex++]} />
+              ))}
+            </>
+          )}
           {availableWatchlist.length > 0 && (
             <>
-              {(hasLiveSection || hasMarquee) && (
+              {(hasLiveSection || hasMarquee || memories.length > 0) && (
                 <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
                   On your watchlist
                 </Eyebrow>
@@ -665,7 +701,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           )}
           {comingSoon.length > 0 && (
             <>
-              {(hasLiveSection || hasMarquee || availableWatchlist.length > 0) && (
+              {(hasLiveSection || hasMarquee || memories.length > 0 || availableWatchlist.length > 0) && (
                 <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
                   Coming soon
                 </Eyebrow>

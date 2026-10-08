@@ -16,6 +16,8 @@ number is chosen.
 
 ### Added
 
+- Web: Up Next now shows private On This Day cinema memories with the original venue, companions, rating, and notes, matching Android.
+- Web: the moviegoing Ledger panel now includes venue and format spending, best-value theaters, and milestone badges in a complete keyboard-accessible detail view, matching Android.
 - Android: the Add-title form now has a date-watched picker (and a "watched before joining" undated option) for titles logged as Watched, matching the web app.
 - Web and Android: Settings → Data & Portability (web) and Settings → Import & sync
   (Android) can now import watched titles and ratings from

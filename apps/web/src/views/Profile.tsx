@@ -39,6 +39,7 @@ import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
+import { SyncConnections } from 'src/components/SyncConnections'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { Eyebrow } from 'src/components/ui/typography'
@@ -1164,7 +1165,7 @@ function DataSection() {
       id="data"
       title="Data & Portability"
       Icon={Download}
-      description="Export your entire library as a JSON file, import a previously exported archive, or bring your watch history and ratings over from a Letterboxd CSV export. Duplicates are skipped on import."
+      description="Export your entire library as a JSON file, import a previously exported archive, bring your watch history and ratings over from a Letterboxd CSV export, or import from Simkl, Plex and Emby. Duplicates are skipped on import."
     >
       <MessageBanner message={message} />
       <div className="flex gap-2 max-w-md">
@@ -1225,6 +1226,7 @@ function DataSection() {
         diary.csv, or watchlist.csv). Films are matched to TMDB by name and year;
         anything that can't be matched confidently is reported, not guessed.
       </p>
+      <SyncConnections />
     </Section>
   )
 }

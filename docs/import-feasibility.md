@@ -103,3 +103,24 @@ The prototype deliberately splits pure logic from I/O so later importers slot in
 | Trakt OAuth + full history/ratings sync | ~2–3 days |
 | Simkl | ~1–2 days |
 | Netflix best-effort with review UI | ~3+ days |
+
+## Shipped: Simkl, Plex and Emby import
+
+_Added 2026-10-07._ Settings → Data & Portability (`apps/web/src/components/SyncConnections.tsx`)
+imports watched titles and ratings from three services. It is **import-only**; pushing changes
+back out is a separate opt-in (`integration_connections.direction = 'two_way'`) that is not yet
+implemented.
+
+| Service | Where calls run | Auth | Stored |
+| ------- | --------------- | ---- | ------ |
+| Simkl | `simkl-sync` Edge Function (Simkl's CORS policy is undocumented) | Device flow, `SIMKL_CLIENT_ID` Edge Function secret, no client secret | Tokens in `integration_secrets` (service role only) |
+| Plex | Browser, direct to the user's server over https | PIN flow | Nothing; token held in memory for the sync |
+| Emby | Browser, direct to the user's server over https | Username/password sent only to their own server | Nothing; only the server URL on the connection row |
+
+Shared pipeline: `apps/web/src/lib/sync/core.ts` resolves items by TMDB id, then IMDb/TVDB id
+(`media-proxy?action=find`), then name+year, and merges without overwriting (only fills an empty
+rating, adds viewings on unseen dates, promotes watchlist → watched). `external_title_links`
+records provenance.
+
+Known limits: TV is title-level only (no `episode_watch_events`); Plex/Emby only import played or
+rated items; Letterboxd remains the single-CSV importer (zip upload and CSV export are follow-ups).

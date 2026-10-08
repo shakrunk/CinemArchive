@@ -38,6 +38,9 @@ before(async () => {
   const capacity = (await readFile(new URL("../../../supabase/migrations/20261008180456_library_command_import_capacity.sql", import.meta.url), "utf8")).replaceAll("\r\n", "\n")
   assert.ok(schema.includes(capacity.trim()), "canonical schema includes import capacity")
   await database.exec(capacity)
+  const credits = (await readFile(new URL('../../../supabase/migrations/20261008201710_credit_refresh_commands.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(credits.trim()), 'canonical schema includes credit refresh commands')
+  await database.exec(credits)
   await database.query('insert into auth.users(id,email) values ($1,$2),($3,$4)', [owner,'owner@example.test',other,'other@example.test'])
   await database.exec('grant select on all tables in schema public to authenticated;')
 }, { timeout: 60000 })
@@ -323,3 +326,105 @@ test("oversized imports are rejected before creating any rows or receipts", asyn
   assert.equal((await rows("titles")).some(row => row.id === title.key.id), false)
   await command([title], receipt)
 }, { timeout: 60000 })
+
+async function creditGraph() {
+  const title = titleOperation(), season = randomUUID(), episode = randomUUID()
+  title.values.type = 'tv'
+  await command([title,
+    { table: 'seasons', action: 'insert', key: { id: season }, values: { title_id: title.key.id, season_number: 0, episode_count: 1 } },
+    { table: 'episodes', action: 'insert', key: { id: episode }, values: { title_id: title.key.id, season_number: 0, episode_number: 1 } },
+  ])
+  return [
+    { table: 'title_cast', action: 'put', key: { title_id: title.key.id, tmdb_person_id: 100 }, values: { name: 'Actor', character_name: 'Role', cast_order: 30 } },
+    { table: 'title_crew', action: 'put', key: { title_id: title.key.id, tmdb_person_id: 200, job: 'Director' }, values: { name: 'Director', department: 'Directing' } },
+    { table: 'season_cast', action: 'put', key: { season_id: season, tmdb_person_id: 300 }, values: { title_id: title.key.id, name: 'Special guest', character_name: 'Guest', cast_order: 40 } },
+    { table: 'episode_crew', action: 'put', key: { episode_id: episode, tmdb_person_id: 400, job: 'Writer' }, values: { title_id: title.key.id, name: 'Writer' } },
+  ]
+}
+
+test('provider refresh puts insert and update all four credit types without replacing canonical IDs', async () => {
+  const ops = await creditGraph()
+  const first = await command(ops)
+  const second = await command(ops.map(op => ({ ...op, values: { ...op.values, name: 'Refreshed' } })))
+  for (let i = 0; i < ops.length; i++) {
+    assert.equal(second.rows[i].row.id, first.rows[i].row.id)
+    assert.equal(second.rows[i].row.user_id, owner)
+    assert.equal(second.rows[i].row.name, 'Refreshed')
+    assert.deepEqual(second.rows[i].key, ops[i].key)
+  }
+})
+
+test('credit refresh preserves omitted metadata and clears explicit null without changing identity', async () => {
+  const [cast] = await creditGraph()
+  const first = await command([cast])
+  const second = await command([{ ...cast, values: { character_name: null } }])
+  assert.equal(second.rows[0].row.id, first.rows[0].row.id)
+  assert.equal(second.rows[0].row.character_name, null)
+  assert.equal(second.rows[0].row.name, 'Actor')
+  assert.equal(second.rows[0].row.cast_order, 30)
+})
+
+test('retry of an accepted credit refresh cannot roll back later metadata or resurrect deleted credits', async () => {
+  const ops = await creditGraph(), id = randomUUID()
+  const first = await command(ops, id)
+  await command([{ ...ops[0], values: { name: 'Later refresh' } }, { table: ops[1].table, action: 'delete', key: ops[1].key }])
+  assert.deepEqual(await command(ops, id), first)
+  assert.equal((await rows('title_cast')).find(r => r.id === first.rows[0].row.id).name, 'Later refresh')
+  assert.equal((await rows('title_crew')).some(r => r.id === first.rows[1].row.id), false)
+  await assert.rejects(command([{ ...ops[0], values: { name: 'Changed retry' } }], id), { code: '22023' })
+})
+
+test('a new refresh can recreate an independently removed credit and returns its new canonical identity', async () => {
+  const ops = await creditGraph()
+  const first = await command(ops)
+  await command(ops.map(op => ({ table: op.table, action: 'delete', key: op.key })))
+  const second = await command(ops)
+  second.rows.forEach((row, i) => assert.notEqual(row.row.id, first.rows[i].row.id))
+})
+
+test('credit puts reject foreign graphs and immutable parent changes atomically', async () => {
+  const ops = await creditGraph()
+  await command(ops)
+  const alternate = titleOperation()
+  await command([alternate])
+  for (const op of ops.slice(2)) {
+    await assert.rejects(command([{ ...op, values: { ...op.values, title_id: alternate.key.id } }]), { code: '22023' })
+    await assert.rejects(command([{ ...op, key: { ...op.key, tmdb_person_id: 999 }, values: { ...op.values, title_id: alternate.key.id } }]), { code: '42501' })
+  }
+  await database.query("select set_config('request.jwt.claim.sub',$1,false)", [other])
+  for (const op of ops) await assert.rejects(command([op]), { code: '42501' })
+})
+
+test('legacy foreign credit occupying an owned natural identity cannot be adopted or modified', async () => {
+  const [cast] = await creditGraph()
+  const foreignId = randomUUID()
+  await database.exec('reset role')
+  await database.query('insert into title_cast(id,user_id,title_id,tmdb_person_id,name) values($1,$2,$3,$4,$5)', [foreignId, other, cast.key.title_id, cast.key.tmdb_person_id, 'Foreign legacy row'])
+  await database.exec('set role authenticated')
+  await assert.rejects(command([cast]), { code: '23505' })
+  await database.exec('reset role')
+  const row = (await database.query('select * from title_cast where id=$1', [foreignId])).rows[0]
+  assert.equal(row.user_id, other)
+  assert.equal(row.name, 'Foreign legacy row')
+})
+
+test('credit put remains restricted and a bad child rolls back the entire refresh', async () => {
+  const ops = await creditGraph(), id = randomUUID()
+  const bad = { ...ops[3], values: { ...ops[3].values, user_id: other } }
+  await assert.rejects(command([...ops.slice(0, 3), bad], id), { code: '22023' })
+  assert.equal((await rows('title_cast')).some(r => r.title_id === ops[0].key.title_id), false)
+  await command(ops, id)
+  for (const table of ['titles', 'viewings', 'cinema_outings']) {
+    await assert.rejects(command([{ table, action: 'put', key: { id: randomUUID() }, values: {} }]), { code: '22023' })
+  }
+})
+
+test('a credit refresh receipt still supports exact causal revision checks', async () => {
+  const [cast] = await creditGraph(), id = randomUUID()
+  await command([cast], id)
+  const patch = { table: cast.table, action: 'update', key: cast.key, values: { name: 'Causal edit' }, expectedOperationId: id }
+  const next = randomUUID()
+  const receipt = await command([patch], next)
+  assert.deepEqual(await command([patch], next), receipt)
+  await assert.rejects(command([patch]), { code: '40001' })
+})

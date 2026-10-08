@@ -62,7 +62,7 @@ These can't proceed autonomously and aren't ordering-blocked by anything above:
   - [x] Applied to production (2026-07-13): [PR #92](https://github.com/shakrunk/CinemArchive/pull/92)
         merged to `main` (v1.5.0), then the "DB Migrate (manual)" GitHub Actions workflow
         was dispatched by explicit user confirmation — note this workflow is
-        `workflow_dispatch`-only, *not* automatic on push to `main` despite `CLAUDE.md`
+        `workflow_dispatch`-only, *not* automatic on push to `main` despite `AGENTS.md`
         describing it that way; worth fixing that doc separately. Verified directly against
         the live project (`taoyxhbacdvnhevqyrqm`): `sync_tombstones` table exists,
         `sync_library_changes` RPC exists, all 10 previously-missing `updated_at` columns

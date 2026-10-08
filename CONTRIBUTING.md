@@ -3,7 +3,7 @@
 Thanks for looking. CinemArchive is a personal project, but the conventions here are strict — both
 humans and AI agents work in this repo, and undocumented drift is expensive.
 
-**[CLAUDE.md](CLAUDE.md) is authoritative for every convention below.** This file is the short
+**[AGENTS.md](AGENTS.md) is authoritative for every convention below.** This file is the short
 version; the wiki's [Contributing](https://github.com/shakrunk/CinemArchive/wiki/Contributing) page is
 the walkthrough with reasoning and a pre-PR checklist.
 
@@ -53,7 +53,7 @@ Topic branch → `dev` → (release PR) → `main`. **Version-bump and release P
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/) — the commit type determines the release
-version bump (see [CLAUDE.md § Versioning](CLAUDE.md#versioning)).
+version bump (see [AGENTS.md § Versioning](AGENTS.md#versioning)).
 
 ```
 feat(ledger): add Revival House widget

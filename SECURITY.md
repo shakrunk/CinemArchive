@@ -107,5 +107,5 @@ process as an external report, just without the acknowledgement step.
   automatically rather than relying on review to catch it.
 - **Convention, not enforcement, on `main`** — GitHub branch protection is not currently enabled; `main`
   is expected to receive code only through a `dev` → `main` PR (see
-  [CLAUDE.md § Branching & Release](CLAUDE.md#branching--release)), but this is a process convention
+  [AGENTS.md § Branching & Release](AGENTS.md#branching--release)), but this is a process convention
   rather than a server-enforced rule. Tracked as a known gap rather than presented as a control.

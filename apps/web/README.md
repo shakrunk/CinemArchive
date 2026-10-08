@@ -77,7 +77,7 @@ apps/web/
 
 The app version shown in Settings → About (`__APP_VERSION__`) comes from the **repo-root**
 `package.json`, not this directory's `package.json` — see `vite.config.ts` and the root
-`CLAUDE.md`'s Versioning section.
+`AGENTS.md`'s Versioning section.
 
 ---
 

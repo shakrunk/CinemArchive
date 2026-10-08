@@ -22,7 +22,7 @@ It's a JAMstack app: a static React frontend on GitHub Pages, backed by a shared
 | Something is broken | [Troubleshooting](https://github.com/shakrunk/CinemArchive/wiki/Troubleshooting) |
 | Which doc owns which fact | [Documentation Map](https://github.com/shakrunk/CinemArchive/wiki/Documentation-Map) |
 
-The wiki **explains and navigates**; anything normative lives in this repository — `schema.sql`, `CHANGELOG.md`, `docs/`, and the `CLAUDE.md` convention files. Where they disagree, the repo wins.
+The wiki **explains and navigates**; anything normative lives in this repository — `schema.sql`, `CHANGELOG.md`, `docs/`, and the `AGENTS.md` convention files. Where they disagree, the repo wins.
 
 ---
 
@@ -33,7 +33,7 @@ The wiki **explains and navigates**; anything normative lives in this repository
 | Web | [`apps/web/`](apps/web/README.md) | Vite + React + TypeScript, deployed to GitHub Pages. See [apps/web/README.md](apps/web/README.md) for its stack, project structure, and local dev setup. |
 | Android | `apps/android/` | Kotlin + Jetpack Compose (module layout: `app`, `core:model`, `core:designsystem`, `core:database`, `data`, `feature:{auth,library,discover,upnext,ledger,lists,settings}`). Room-backed local database with an outbox-based incremental sync layer (`sync_tombstones`, see `docs/android-sync-contract.md`). Pre-distribution (not yet published to Play; signed APKs are attached to each GitHub Release for sideloading). Tracks feature parity with the web app domain by domain — see `docs/android-parity-matrix.md` and `docs/android-implementation-status.md`, and `docs/android-contracts/` for the per-domain field/RLS/fixture contracts. |
 
-Each client has its own nested `CLAUDE.md` with client-specific guidance for Claude Code, layered on top of the repo-root [CLAUDE.md](CLAUDE.md).
+Each client has its own nested `AGENTS.md` with client-specific guidance for AI coding agents, layered on top of the repo-root [AGENTS.md](AGENTS.md) (each `CLAUDE.md` just imports its `AGENTS.md` for Claude Code).
 
 ---
 
@@ -106,7 +106,7 @@ Full workflow, including how migrations reach production and the failure modes: 
 
 ## Contributing
 
-Conventions are strict and written down: verification gates, Conventional Commits, branch topology, and the versioning policy live in [CLAUDE.md](CLAUDE.md) (authoritative), with a walkthrough in [CONTRIBUTING.md](CONTRIBUTING.md) and the wiki's [Contributing](https://github.com/shakrunk/CinemArchive/wiki/Contributing) page.
+Conventions are strict and written down: verification gates, Conventional Commits, branch topology, and the versioning policy live in [AGENTS.md](AGENTS.md) (authoritative), with a walkthrough in [CONTRIBUTING.md](CONTRIBUTING.md) and the wiki's [Contributing](https://github.com/shakrunk/CinemArchive/wiki/Contributing) page.
 
 Security issues: please don't open a public issue — see [SECURITY.md](SECURITY.md).
 

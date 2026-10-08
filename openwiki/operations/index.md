@@ -412,5 +412,5 @@ supabase db push --remote-only  # Push directly to production (risky without loc
 ## Questions?
 
 - Check `.github/workflows/` for how CI/CD is configured
-- Read `/CLAUDE.md` for development guidelines
+- Read `/AGENTS.md` for development guidelines
 - Refer to [Architecture](../architecture/overview.md) for data model details

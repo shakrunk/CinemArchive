@@ -180,7 +180,7 @@ node scripts/verify-*.mjs
 | File | Purpose |
 |------|---------|
 | `README.md` | Main readme: overview, features, tech stack, setup |
-| `CLAUDE.md` | Guidance for Claude Code (this repo's AI conventions) |
+| `AGENTS.md` | Conventions for AI coding agents (`CLAUDE.md` files import it) |
 | `AGENTS.md` | Agent instructions (you are here, OpenWiki reference) |
 | `CODE_OF_CONDUCT.md` | Community guidelines |
 | `LICENSE` | MIT license |

@@ -280,6 +280,8 @@ fun TitleDetailRoute(
     onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit = {},
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
+    onRecommendTitle: ((String) -> Unit)? = null,
+    onShareOutingPlans: ((String) -> Unit)? = null,
 ) {
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
@@ -328,6 +330,8 @@ fun TitleDetailRoute(
         episodeCast = episodeCast,
         onLoadEpisodeCast = viewModel::onLoadEpisodeCast,
         socialContent = socialContent,
+        onRecommendTitle = onRecommendTitle,
+        onShareOutingPlans = onShareOutingPlans,
     )
 }
 
@@ -362,6 +366,8 @@ fun TitleDetailScreen(
     episodeCast: Map<String, EpisodeCast?> = emptyMap(),
     onLoadEpisodeCast: (String, Int, Int) -> Unit = { _, _, _ -> },
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
+    onRecommendTitle: ((String) -> Unit)? = null,
+    onShareOutingPlans: ((String) -> Unit)? = null,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -406,6 +412,7 @@ fun TitleDetailScreen(
                     detail.scheduledOuting?.let { outing ->
                         ScheduledOutingBanner(
                             outing = outing,
+                            onShare = onShareOutingPlans?.let { share -> { share(outing.id) } },
                             onEdit = { editingOuting = outing },
                             onCancel = { onCancelOuting(outing.id) },
                             modifier = Modifier.padding(bottom = 16.dp),
@@ -689,6 +696,7 @@ fun TitleDetailScreen(
                 postShowViewing = null
             },
             onDismiss = { postShowViewing = null },
+            onRecommend = if (detail?.tmdbId != null && onRecommendTitle != null) ({ onRecommendTitle(detail.id) }) else null,
         )
     }
 
@@ -750,7 +758,7 @@ private fun metaLine(detail: TitleDetail): String = listOfNotNull(
 ).joinToString(" · ")
 
 @Composable
-private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier, onShare: (() -> Unit)? = null) {
     val now = remember { Instant.now() }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -772,6 +780,7 @@ private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCa
                 TextButton(onClick = onEdit) { Text("Edit") }
                 TextButton(onClick = onCancel) { Text("Cancel outing") }
             }
+            onShare?.let { TextButton(onClick = it) { Text("Share plans") } }
         }
     }
 }

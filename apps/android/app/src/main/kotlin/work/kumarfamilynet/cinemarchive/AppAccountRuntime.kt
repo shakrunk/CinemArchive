@@ -167,6 +167,14 @@ class AppAccountRuntime(
         alarmScheduler = alarmScheduler,
     )
 
+    val outingPlansRepository = work.kumarfamilynet.cinemarchive.data.OutingPlansRepository.create(
+        client, ownerId, session::currentSession,
+        snapshot = { id -> work.kumarfamilynet.cinemarchive.data.readOutingPlanSnapshot(
+            id, database.cinemaOutingDao(), database.titleDao(), outbox,
+        ) },
+        friendsRepository = friendsRepository,
+    )
+
     val ledgerRepository = LedgerRepository(
         titleDao = database.titleDao(),
         viewingDao = database.viewingDao(),

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,10 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * "How was it?" — the post-show follow-up sheet (web plan §4.4), scoped to what Android v1 can
- * do without a live backend: rate, note, and the "Didn't make it" revert. `Recommend to
- * friends` is deferred (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §8 — the
- * friends stack doesn't exist on Android yet). Stateless and callback-driven so it can be
+ * "How was it?" — rate, note, recommend, or revert a missed outing. Callback-driven so it can be
  * triggered from either the title detail banner or an Up Next "Fresh from the lobby" card
  * without those feature modules depending on each other.
  */
@@ -46,6 +45,7 @@ fun PostShowSheet(
     onDidntMakeIt: () -> Unit,
     onDismiss: () -> Unit,
     sheetState: SheetState = androidx.compose.material3.rememberModalBottomSheetState(),
+    onRecommend: (() -> Unit)? = null,
 ) {
     var notes by rememberSaveable(titleName) { mutableStateOf(initialNotes) }
     // Mirrors the rating locally rather than trusting [initialRating] to update in time: the
@@ -55,7 +55,7 @@ fun PostShowSheet(
     var rating by rememberSaveable(titleName) { mutableStateOf(initialRating) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp, 0.dp, 20.dp, 28.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp, 0.dp, 20.dp, 28.dp)) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Icon(Icons.Filled.LocalMovies, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 Text(
@@ -91,6 +91,13 @@ fun PostShowSheet(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
             )
 
+            onRecommend?.let { recommend ->
+                TextButton(onClick = {
+                    onSaveNotes(notes)
+                    onDismiss()
+                    recommend()
+                }) { Text("Recommend to a friend") }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 TextButton(onClick = onDidntMakeIt) { Text("Didn't make it") }
                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))

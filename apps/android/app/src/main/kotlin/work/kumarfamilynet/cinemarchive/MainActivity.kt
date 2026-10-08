@@ -420,6 +420,19 @@ private fun CinemArchiveApp(
     val syncServices = runtime.syncServices
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    var recommendTitleId by remember { mutableStateOf<String?>(null) }
+    var shareOutingId by remember { mutableStateOf<String?>(null) }
+    val titleSocialSource = remember(runtime) {
+        work.kumarfamilynet.cinemarchive.feature.friends.RepositoryTitleSocialSource(runtime.friendsRepository) {
+            authRepository.observeIdentity().value == runtime.identity
+        }
+    }
+    recommendTitleId?.let { id ->
+        TitleRecommendationDialog(repository, titleSocialSource, runtime.ownerId, id, onDismiss = { recommendTitleId = null })
+    }
+    shareOutingId?.let { id ->
+        work.kumarfamilynet.cinemarchive.feature.friends.OutingPlansDialog(runtime.outingPlansRepository, id, onDismiss = { shareOutingId = null })
+    }
     // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
     // stays on screen permanently, so which detail sits opposite it needs its own state
     // instead of being encoded in `overlay` the way the phone-width push navigation is.
@@ -632,6 +645,7 @@ private fun CinemArchiveApp(
                                 repository,
                                 outingsRepository,
                                 librarySyncRepository,
+                                onRecommendTitle = { recommendTitleId = it },
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 onTitleClick = { overlay = Overlay.Detail(it) },
@@ -834,13 +848,10 @@ private fun CinemArchiveApp(
                     current.titleId,
                     onBack = closeOverlay,
                     onRequestNotificationPermission = requestNotificationPermission,
+                    onRecommendTitle = { recommendTitleId = it },
+                    onShareOutingPlans = { shareOutingId = it },
                     socialContent = { detail ->
-                        val socialSource = remember(runtime) {
-                            work.kumarfamilynet.cinemarchive.feature.friends.RepositoryTitleSocialSource(runtime.friendsRepository) {
-                                authRepository.observeIdentity().value == runtime.identity
-                            }
-                        }
-                        work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(socialSource, runtime.ownerId, detail)
+                        work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(titleSocialSource, runtime.ownerId, detail)
                     },
                 )
                 is Overlay.Add -> AddTitleOverlayRoute(

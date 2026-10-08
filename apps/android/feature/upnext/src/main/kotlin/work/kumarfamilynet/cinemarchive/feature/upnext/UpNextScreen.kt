@@ -165,6 +165,7 @@ fun UpNextRoute(
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
+    onRecommendTitle: ((String) -> Unit)? = null,
 ) {
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
@@ -190,6 +191,7 @@ fun UpNextRoute(
         onFabExpandedChange = onFabExpandedChange,
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refresh,
+        onRecommendTitle = onRecommendTitle,
     )
 }
 
@@ -213,6 +215,7 @@ fun UpNextScreen(
     onFabExpandedChange: (Boolean) -> Unit = {},
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    onRecommendTitle: ((String) -> Unit)? = null,
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -384,6 +387,7 @@ fun UpNextScreen(
                 companions = entry.outing.companions,
                 initialRating = 0.0,
                 initialNotes = "",
+                onRecommend = onRecommendTitle?.let { recommend -> { recommend(entry.outing.titleId) } },
                 onRate = { onRatePostShow(viewingId, entry.outing.titleId, it) },
                 onSaveNotes = { onSaveFollowUpNotes(viewingId, it) },
                 onDidntMakeIt = {

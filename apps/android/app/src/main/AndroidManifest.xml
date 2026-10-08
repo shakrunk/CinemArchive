@@ -72,6 +72,14 @@
             android:name=".OutingCompletionReceiver"
             android:exported="false" />
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.tickets"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/ticket_camera_paths" />
+        </provider>
+
         <!-- PackageInstaller's reply to a committed update session. Not optional: the system
              delivers its install-confirmation Intent here and installs nothing until the app
              launches it, so without this receiver the Install button silently does nothing.

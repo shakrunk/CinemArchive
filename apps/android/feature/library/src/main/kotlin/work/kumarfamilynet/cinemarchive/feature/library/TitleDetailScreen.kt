@@ -94,7 +94,6 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.ScheduledEpisode
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
-import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
@@ -232,14 +231,6 @@ class TitleDetailViewModel(
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
     }
 
-    /** Persists a ticket photo picked+decoded by [OutingScheduleSheet] (GitHub #219). */
-    fun onCaptureTicket(outingId: String, imagePath: String, barcodePayload: String?, barcodeFormat: TicketBarcodeFormat?) {
-        viewModelScope.launch { outingsRepository.saveTicketCapture(outingId, imagePath, barcodePayload, barcodeFormat) }
-    }
-
-    fun onClearTicketCapture(outingId: String) {
-        viewModelScope.launch { outingsRepository.clearTicketCapture(outingId) }
-    }
 
     fun onRatePostShow(viewingId: String, rating: Double) {
         viewModelScope.launch { repository.rateViewing(viewingId, titleId, rating) }
@@ -292,6 +283,7 @@ fun TitleDetailRoute(
     listsRepository: ListsRepository,
     titleId: String,
     onBack: () -> Unit,
+    onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
     onRequestNotificationPermission: () -> Unit = {},
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
     onRecommendTitle: ((String) -> Unit)? = null,
@@ -301,6 +293,7 @@ fun TitleDetailRoute(
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
 ) {
+    val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
@@ -343,8 +336,8 @@ fun TitleDetailRoute(
         onScheduleOuting = viewModel::onScheduleOuting,
         onEditOuting = viewModel::onEditOuting,
         onCancelOuting = viewModel::onCancelOuting,
-        onCaptureTicket = viewModel::onCaptureTicket,
-        onClearTicketCapture = viewModel::onClearTicketCapture,
+        onViewTicket = onViewTicket,
+        ticketOutings = ticketOutings,
         onRatePostShow = viewModel::onRatePostShow,
         onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
         onDidntMakeIt = viewModel::onDidntMakeIt,
@@ -387,8 +380,8 @@ fun TitleDetailScreen(
     onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onCancelOuting: (String) -> Unit = {},
-    onCaptureTicket: (String, String, String?, TicketBarcodeFormat?) -> Unit = { _, _, _, _ -> },
-    onClearTicketCapture: (String) -> Unit = {},
+    onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
+    ticketOutings: List<CinemaOuting> = emptyList(),
     onRatePostShow: (String, Double) -> Unit = { _, _ -> },
     onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
     onDidntMakeIt: (String) -> Unit = {},
@@ -453,6 +446,12 @@ fun TitleDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                     )
+
+                    if (onViewTicket != null) ticketOutings.forEach { outing ->
+                        TextButton(onClick = { onViewTicket(outing, detail.title) }) {
+                            Text("Ticket · ${outing.venue ?: "Cinema"} · ${outing.showtime.take(10)}")
+                        }
+                    }
 
                     detail.scheduledOuting?.let { outing ->
                         ScheduledOutingBanner(
@@ -761,8 +760,10 @@ fun TitleDetailScreen(
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
             onSaveVenueNotes = onSaveVenueNotes,
-            onCaptureTicket = onCaptureTicket,
-            onClearTicketCapture = onClearTicketCapture,
+            onManageTicket = onViewTicket?.let { open -> { outing ->
+                showScheduleSheet = false; editingOuting = null
+                open(outing, detail?.title ?: "Cinema outing")
+            } },
         )
     }
 

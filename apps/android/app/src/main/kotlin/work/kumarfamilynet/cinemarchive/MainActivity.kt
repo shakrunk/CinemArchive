@@ -84,7 +84,6 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.MediumWindowBreakpoint
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingBottomNav
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingNavigationRail
 import work.kumarfamilynet.cinemarchive.core.designsystem.NavDestination
-import work.kumarfamilynet.cinemarchive.core.designsystem.TicketScreen
 import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
@@ -389,7 +388,7 @@ private sealed interface Overlay {
     /** The "at the theater" screen (seat + ticket QR code) — carries the outing and title name
      *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
      *  that opens this already has both in memory. */
-    data class Ticket(val outing: CinemaOuting, val titleName: String) : Overlay
+    data class Ticket(val outingId: String, val titleName: String) : Overlay
 }
 
 /**
@@ -653,7 +652,7 @@ private fun CinemArchiveApp(
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 onTitleClick = { overlay = Overlay.Detail(it) },
-                                onViewTicket = { overlay = Overlay.Ticket(it.outing, it.titleName) },
+                                onViewTicket = { overlay = Overlay.Ticket(it.outing.id, it.titleName) },
                                 onFabExpandedChange = { fabExpanded = it },
                             )
                             Tab.LEDGER -> LedgerRoute(
@@ -798,6 +797,7 @@ private fun CinemArchiveApp(
                             legacyRestore = runtime::restoreLegacy,
                             outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                             titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
+                            ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
                             viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                             selectedCategory = activeCategory,
@@ -858,6 +858,7 @@ private fun CinemArchiveApp(
                     onRequestNotificationPermission = requestNotificationPermission,
                     onRecommendTitle = { recommendTitleId = it },
                     onShareOutingPlans = { shareOutingId = it },
+                    onViewTicket = { outing, title -> overlay = Overlay.Ticket(outing.id, title) },
                     onBrowsePerson = { person ->
                         libraryFiltersState.value = libraryFiltersState.value.copy(person = person)
                         overlay = null
@@ -905,6 +906,7 @@ private fun CinemArchiveApp(
                     legacyRestore = runtime::restoreLegacy,
                     outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                     titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
+                    ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
                     viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
                         subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                 )
@@ -947,7 +949,9 @@ private fun CinemArchiveApp(
                     onBack = openProfile,
                     onLock = lockDeveloperSettings,
                 )
-                is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
+                is Overlay.Ticket -> work.kumarfamilynet.cinemarchive.feature.library.PortableTicketRoute(
+                    runtime.tickets, current.outingId, current.titleName, onBack = closeOverlay, onSaved = runtime::syncTickets,
+                )
             }
             }
             }

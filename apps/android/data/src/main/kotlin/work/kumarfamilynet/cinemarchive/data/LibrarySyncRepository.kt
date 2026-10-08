@@ -131,6 +131,7 @@ class LibrarySyncRepository(
      *  edit + its queue entry lands entirely before the page (and is then protected) or entirely
      *  after it (and wins) — never between the pending check and the write. */
     private val transactor: LocalTransactor = PassthroughTransactor,
+    private val afterPull: suspend () -> Unit = {},
 ) {
     /** The ONE sync pipeline: startup, resume and pull-to-refresh all land here and run
      *  strictly one at a time, so a push and a pull can never interleave. */
@@ -145,7 +146,7 @@ class LibrarySyncRepository(
      *  does blocking OkHttp network calls, and a caller invoking it from a Compose
      *  `LaunchedEffect`/`viewModelScope` (Main by default) would otherwise hit a
      *  `NetworkOnMainThreadException`. */
-    suspend fun syncNow() = withContext(Dispatchers.IO) { syncMutex.withLock { syncLocked() } }
+    suspend fun syncNow() = withContext(Dispatchers.IO) { syncMutex.withLock { syncLocked(); afterPull() } }
 
     /** Recovery can remove protection without a push. Commit replay before that removal,
      * serialized with pulls so a concurrent page cannot advance past the retained epoch. */

@@ -92,15 +92,29 @@ class AppAccountRuntime(
 
     private val transactor = RoomTransactor(database)
 
-    private val outbox = MutationOutbox(
+    val tickets: work.kumarfamilynet.cinemarchive.data.TicketRuntime by lazy {
+        work.kumarfamilynet.cinemarchive.data.TicketRuntime.create(database,
+            work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId),
+            java.io.File(context.filesDir, "ticket-originals"), BuildConfig.SUPABASE_PUBLISHABLE_KEY,
+            session::currentSession, { outbox }, ::isCurrent,
+            replayBoundary = { action -> librarySyncRepository.withDurableReplay(action) })
+    }
+
+    private val ordinaryWriter = SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") }
+
+    private val outbox: MutationOutbox = MutationOutbox(
         database.outboxDao(),
-        SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") },
+        object : work.kumarfamilynet.cinemarchive.data.RemoteMutationWriter {
+            override suspend fun push(entry: work.kumarfamilynet.cinemarchive.core.database.OutboxEntity) =
+                if (entry.entityType == "ticket_attachment") tickets.push(entry) else ordinaryWriter.push(entry)
+        },
         TitleConflictHandler(database.titleDao(), database.titleReconcileDao()),
         transactor,
         outingOwnerScope = work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), identity.userId),
         appliedHandler = work.kumarfamilynet.cinemarchive.data.AppliedMutationHandler { entry, receipt ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             when (entry.entityType) {
+                "ticket_attachment" -> tickets.apply(entry, receipt)
                 "title" -> work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
                 "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
                 "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
@@ -112,7 +126,7 @@ class AppAccountRuntime(
         },
         pendingProjectionKeys = { entries ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
-            work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries)
+            work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries) + tickets.protectionKeys(entries)
         },
     )
 
@@ -156,6 +170,7 @@ class AppAccountRuntime(
         pushPending = outbox::flush,
         pendingKeys = outbox::pendingEntityKeys,
         transactor = transactor,
+        afterPull = { tickets.refresh() },
     )
 
     val listsRepository = ListsRepository(
@@ -274,6 +289,9 @@ class AppAccountRuntime(
 
     /** Runs [block] inside this runtime's scope: closing the runtime cancels it. */
     suspend fun <T> runOwned(block: suspend () -> T): T = scope.async { block() }.await()
+
+    /** A durable capture survives leaving the viewer; delivery belongs to this account runtime. */
+    fun syncTickets() { if (isCurrent()) scope.launch { librarySyncRepository.syncNow() } }
 
     /** True while this is still exactly the current sign-in and not being torn down. */
     fun isCurrent(): Boolean = !closing && auth0.observeIdentity().value == identity

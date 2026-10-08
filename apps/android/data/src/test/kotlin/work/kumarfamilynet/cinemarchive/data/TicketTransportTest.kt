@@ -129,7 +129,7 @@ class TicketTransportTest {
     }
 
     @Test fun retiredPreparationNeedsExistingReceipt() = runTest {
-        reply(null); reply(prepared("retired")); reply(null)
+        reply(null); reply(prepared("retired")); reply(null); reply(JSONObject().put("code", "40001"), 409)
         assertTrue(transport().push(entry()) is PushResult.Review)
         reply(null); reply(prepared("retired")); reply(receipt()); currentGraph()
         assertTrue(transport().push(entry()) is PushResult.Applied)
@@ -213,7 +213,7 @@ class TicketTransportTest {
     }
 
     @Test fun conflictKeepsIntentWhileCancellationPropagates() = runTest {
-        reply(JSONObject().put("code", "40001"), 409)
+        reply(null); reply(prepared("attached")); reply(JSONObject().put("code", "40001"), 409)
         assertTrue(transport().push(entry()) is PushResult.Review)
         reply(receipt()); afterResponse = { throw IOException("Response lost") }
         assertTrue(transport().push(entry()) is PushResult.Retry)

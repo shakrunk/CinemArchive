@@ -85,4 +85,19 @@ interface TicketAttachmentDao {
 
     @Query("SELECT * FROM ticket_intents WHERE projectId = :project AND ownerId = :owner ORDER BY operationId")
     suspend fun intents(project: String, owner: String): List<TicketIntentEntity>
+
+    @Query("SELECT * FROM ticket_intents WHERE projectId = :project AND ownerId = :owner AND outingId = :outing ORDER BY createdAt DESC, operationId")
+    fun observeIntents(project: String, owner: String, outing: String): Flow<List<TicketIntentEntity>>
+
+    @Query("SELECT * FROM ticket_intents WHERE projectId = :project AND ownerId = :owner ORDER BY createdAt DESC, operationId")
+    fun observeAllIntents(project: String, owner: String): Flow<List<TicketIntentEntity>>
+
+    @Query("DELETE FROM ticket_associations WHERE projectId = :project AND ownerId = :owner AND outingId = :outing")
+    suspend fun removeAssociation(project: String, owner: String, outing: String)
+
+    @Query("UPDATE ticket_intents SET acknowledgedAt = :at WHERE operationId = :id AND projectId = :project AND ownerId = :owner AND payloadJson = :payload")
+    suspend fun acknowledge(id: String, project: String, owner: String, payload: String, at: Long): Int
+
+    @Query("UPDATE mutation_outbox SET operation = 'ticket_v1', lastError = NULL WHERE id = :id AND entityType = 'ticket_attachment' AND payloadJson = :payload")
+    suspend fun retry(id: String, payload: String): Int
 }

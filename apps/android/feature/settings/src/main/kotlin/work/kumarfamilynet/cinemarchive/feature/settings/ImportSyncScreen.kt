@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -43,12 +48,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
+import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.data.IntegrationConnection
 import work.kumarfamilynet.cinemarchive.data.SimklPoll
 import work.kumarfamilynet.cinemarchive.data.SyncItem
 import work.kumarfamilynet.cinemarchive.data.SyncProvider
 import work.kumarfamilynet.cinemarchive.data.SyncResult
 import work.kumarfamilynet.cinemarchive.data.SyncServices
+import work.kumarfamilynet.cinemarchive.data.letterboxdToSyncItems
+import work.kumarfamilynet.cinemarchive.data.parseLetterboxdCsv
 
 /**
  * Settings → Import & sync. Connect-and-import for Simkl, Plex and Emby — the Android
@@ -64,6 +72,7 @@ fun ImportSyncRoute(
 ) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
     var connections by remember { mutableStateOf<List<IntegrationConnection>>(emptyList()) }
     var busy by remember { mutableStateOf<SyncProvider?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -177,6 +186,24 @@ fun ImportSyncRoute(
         val items = withContext(Dispatchers.IO) { services.emby.items(session) }
         services.repository.recordConnection(SyncProvider.EMBY, session.baseUrl, session.username)
         runImport(items)
+    }
+
+    fun importLetterboxd(uri: Uri) = guarded(SyncProvider.LETTERBOXD, "Letterboxd import failed.") {
+        val (text, fileName) = withContext(Dispatchers.IO) {
+            val body = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                ?: error("Could not read that file.")
+            val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+            body to name.orEmpty()
+        }
+        val rows = parseLetterboxdCsv(text)
+        check(rows.isNotEmpty()) { "No films found in that CSV." }
+        // watchlist.csv rows land on the watchlist; everything else is history.
+        val status = if (fileName.contains("watchlist", ignoreCase = true)) LibraryStatus.WATCHLIST else LibraryStatus.WATCHED
+        runImport(letterboxdToSyncItems(rows, status))
+    }
+    val letterboxdPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) importLetterboxd(uri)
     }
 
     fun disconnect(provider: SyncProvider) {
@@ -302,6 +329,33 @@ fun ImportSyncRoute(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth(),
                         )
+                    }
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(16.dp)) {
+                            Text("Letterboxd", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Pick one file from your Letterboxd data export (watched.csv, ratings.csv, diary.csv or " +
+                                    "watchlist.csv). Films are matched to TMDB by name and year; anything that can't be " +
+                                    "matched confidently is reported, not guessed.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Button(
+                                onClick = { letterboxdPicker.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "text/plain")) },
+                                enabled = busy == null,
+                            ) {
+                                if (busy == SyncProvider.LETTERBOXD) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.padding(end = 8.dp).size(16.dp))
+                                Text("Import CSV")
+                            }
+                        }
                     }
                 }
             }

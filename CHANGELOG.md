@@ -13,7 +13,8 @@ number is chosen.
 
 - Web and Android: Settings → Data & Portability (web) and Settings → Import & sync
   (Android) can now import watched titles and ratings from
-  Simkl, Plex and Emby (import-only; existing ratings and viewings are never
+  Simkl, Plex and Emby, and re-importing a Letterboxd CSV now merges into films already in
+  the library (import-only; existing ratings and viewings are never
   overwritten). TV is imported at title level; episode history is not yet synced.
 
 ## [1.33.1] - 2026-10-06

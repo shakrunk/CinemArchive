@@ -123,4 +123,4 @@ rating, adds viewings on unseen dates, promotes watchlist → watched). `externa
 records provenance.
 
 Known limits: TV is title-level only (no `episode_watch_events`); Plex/Emby only import played or
-rated items; Letterboxd remains the single-CSV importer (zip upload and CSV export are follow-ups).
+rated items; Letterboxd is still a single-CSV importer on both clients (zip upload and CSV export are follow-ups), but now runs through the same resolve + merge pipeline, so re-imports add new viewings and ratings instead of skipping known films. Two-way (share-back) is not implemented on any provider yet.

@@ -211,7 +211,7 @@ private fun ProfileScreen(
                         iconContainer = MaterialTheme.colorScheme.secondaryContainer,
                         iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
                         title = "Import & sync",
-                        subtitle = "Simkl, Plex & Emby",
+                        subtitle = "Letterboxd, Simkl, Plex & Emby",
                         onClick = onOpenImportSync,
                         selected = selectedCategory == SettingsCategory.IMPORT_SYNC,
                         modifier = Modifier.padding(top = 10.dp),

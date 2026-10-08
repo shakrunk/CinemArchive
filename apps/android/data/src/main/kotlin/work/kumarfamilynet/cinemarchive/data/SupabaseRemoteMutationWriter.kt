@@ -26,6 +26,7 @@ class SupabaseRemoteMutationWriter(
         val payload = JSONObject(entry.payloadJson)
         return try {
             when (entry.entityType) {
+                "title_credits" -> pushCreditRefresh(entry, payload)
                 "title" -> when (entry.operation) {
                     "insert" -> insertTitle(payload)
                     "delete" -> deleteTitle(payload)
@@ -60,6 +61,18 @@ class SupabaseRemoteMutationWriter(
         } catch (e: Exception) {
             PushResult.Retry(e.message ?: e.javaClass.simpleName)
         }
+    }
+
+    private fun pushCreditRefresh(entry: OutboxEntity, payload: JSONObject): PushResult {
+        require(entry.operation == "refresh") { "Unknown credit refresh operation" }
+        val session = sessionProvider()
+        require(payload.getString("ownerId") == session.userId && payload.getString("titleId") == entry.entityId) { "Credit refresh account or title changed" }
+        val operations = payload.getJSONArray("operations")
+        val receipt = JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
+            .put("p_operations", operations).toString(), session.accessToken))
+        require(sessionProvider().userId == session.userId) { "This sign-in has ended" }
+        checkedLibraryCommandReceipt(entry.id, operations, receipt, session.userId)
+        return PushResult.Applied(receipt)
     }
 
     /**

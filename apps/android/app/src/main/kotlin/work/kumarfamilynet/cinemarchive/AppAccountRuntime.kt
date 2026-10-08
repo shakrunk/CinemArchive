@@ -97,6 +97,17 @@ class AppAccountRuntime(
         SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") },
         TitleConflictHandler(database.titleDao(), database.titleReconcileDao()),
         transactor,
+        appliedHandler = work.kumarfamilynet.cinemarchive.data.AppliedMutationHandler { entry, receipt ->
+            check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
+            when (entry.entityType) {
+                "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
+                else -> error("No canonical receipt handler for ${entry.entityType}")
+            }
+        },
+        pendingProjectionKeys = { entries ->
+            check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
+            work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries)
+        },
     )
 
     /** Edits the server refused because a newer version existed (projection already reconciled). */
@@ -159,6 +170,15 @@ class AppAccountRuntime(
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)
+
+    val creditRefreshRepository = work.kumarfamilynet.cinemarchive.data.CreditRefreshRepository(
+        database, outbox,
+        work.kumarfamilynet.cinemarchive.data.CreditMetadataFetcher { title ->
+            discoverRepository.fetchDetails(work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult(
+                title.tmdbId, title.title, title.year, work.kumarfamilynet.cinemarchive.core.model.MediaType.valueOf(title.type), title.posterUrl, title.synopsis,
+            ))
+        }, ownerId, isCurrentOwner = { auth.observeIdentity().value == identity },
+    )
 
     val outingsRepository = OutingsRepository(
         cinemaOutingDao = database.cinemaOutingDao(),

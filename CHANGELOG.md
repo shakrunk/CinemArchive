@@ -40,6 +40,7 @@ number is chosen.
 - Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
 
 ### Added
+- Android: refresh full cast and crew for existing titles and tracked seasons or episodes, preserving history and safely reconciling interrupted sync.
 - Android: Library can filter by a credited person across titles, seasons and episodes; credit links preserve existing filters and distinguish people with the same name.
 - Android: Profile now offers explicit review, selected-field reapplication, discard and preserved-original export for saved outing changes, with restart-safe retry and isolated recovery for unreadable records.
 - Shared backend: saved outing changes can be reapplied through an owner-scoped, version-checked review API with durable retry receipts; native review controls follow separately.

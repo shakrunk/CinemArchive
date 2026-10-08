@@ -1,6 +1,7 @@
 package work.kumarfamilynet.cinemarchive.data
 
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,6 +25,8 @@ class MutationOutbox(
     private val remoteWriter: RemoteMutationWriter,
     private val conflictHandler: ConflictHandler,
     private val transactor: LocalTransactor = PassthroughTransactor,
+    private val appliedHandler: AppliedMutationHandler = AppliedMutationHandler { _, _ -> error("No handler configured for this command receipt") },
+    private val pendingProjectionKeys: suspend (List<OutboxEntity>) -> Set<String> = { emptySet() },
 ) {
     // One flush at a time: startup, resume and pull-to-refresh can all ask for one, and two
     // concurrent passes would push the same entry twice.
@@ -31,6 +34,8 @@ class MutationOutbox(
 
     /** Resolution must not race a push or let dependent commands overtake the reviewed entry. */
     internal suspend fun <T> withFlushPaused(block: suspend () -> T): T = flushMutex.withLock { block() }
+
+    internal suspend fun pendingEntries(): List<OutboxEntity> = outboxDao.getPending()
 
     private val _conflicts = MutableSharedFlow<ConflictNotice>(extraBufferCapacity = 16)
 
@@ -60,14 +65,32 @@ class MutationOutbox(
      *  [PushResult.Conflict] resolves immediately (the server payload wins by construction,
      *  see [PushResult.Conflict]'s kdoc) rather than staying queued for another retry. */
     suspend fun flush() = flushMutex.withLock {
-        val queue = outboxDao.getPending()
-        for (entry in queue) {
+        while (true) {
+            // ACK handlers may retarget dependent commands. Never push a stale queue snapshot.
+            val entry = outboxDao.getPending().firstOrNull() ?: break
             when (val result = remoteWriter.push(entry)) {
                 is PushResult.Success -> outboxDao.remove(entry.id)
+                is PushResult.Applied -> {
+                    try {
+                        transactor.run {
+                            appliedHandler.apply(entry, result.receipt)
+                            outboxDao.remove(entry.id)
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        outboxDao.recordFailure(entry.id, "Remote change is saved, but local confirmation needs retry: ${error.message ?: error.javaClass.simpleName}")
+                        break
+                    }
+                }
                 is PushResult.Retry -> {
                     outboxDao.recordFailure(entry.id, result.reason)
                     // Later edits/deletes can depend on this create. Letting them overtake
                     // a failed create can resurrect a deleted viewing on the next retry.
+                    break
+                }
+                is PushResult.Review -> {
+                    outboxDao.markForReview(entry.id, result.reason)
                     break
                 }
                 is PushResult.Conflict -> {
@@ -78,7 +101,7 @@ class MutationOutbox(
                         // A later offline edit to the same entity is still queued: put it back on
                         // top of the server row so it isn't rolled back out of the projection.
                         val key = pendingKey(entry.entityType, entry.entityId)
-                        val later = queue.dropWhile { it.id != entry.id }.drop(1)
+                        val later = outboxDao.getPending().dropWhile { it.id != entry.id }.drop(1)
                             .filter { pendingKey(it.entityType, it.entityId) == key }
                         if (later.isNotEmpty()) {
                             conflictHandler.rebasePending(entry.entityType, entry.entityId, later.map { JSONObject(it.payloadJson) })
@@ -94,8 +117,17 @@ class MutationOutbox(
     /** Keys (`type:id`, see [pendingKey]) of every entity with a queued, not-yet-pushed mutation —
      *  upserts AND deletes. The pull side must not overwrite or resurrect these rows: the local
      *  copy is the user's newer intent and the server hasn't seen it yet. */
-    suspend fun pendingEntityKeys(): Set<String> =
-        outboxDao.getPending().mapTo(HashSet()) { pendingKey(it.entityType, it.entityId) }
+    suspend fun pendingEntityKeys(): Set<String> = buildSet {
+        val entries = outboxDao.getPending()
+        entries.forEach { entry ->
+            add(pendingKey(entry.entityType, entry.entityId))
+            if (entry.entityType == "title_credits") {
+                val payload = JSONObject(entry.payloadJson)
+                payload.optJSONArray("protectedKeys")?.let { keys -> (0 until keys.length()).forEach { add(keys.getString(it)) } }
+            }
+        }
+        addAll(pendingProjectionKeys(entries))
+    }
 
     fun observePendingCount(): Flow<Int> = outboxDao.observePending().map { it.size }
 }

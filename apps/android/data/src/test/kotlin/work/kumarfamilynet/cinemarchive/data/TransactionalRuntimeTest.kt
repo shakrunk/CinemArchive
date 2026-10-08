@@ -116,6 +116,7 @@ class TransactionalRuntimeTest {
 
     private fun syncRepository(db: LibraryDatabase, outbox: MutationOutbox, http: SyncHttp, file: File,
         preferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>? = null,
+        pushPending: suspend () -> Unit = outbox::flush,
     ) = LibrarySyncRepository(
         dataStore = preferences ?: PreferenceDataStoreFactory.create(scope = scope) { file },
         client = SupabaseRestClient("https://x.supabase.co", "anon", http.client),
@@ -124,7 +125,7 @@ class TransactionalRuntimeTest {
         watchEventDao = db.episodeWatchEventDao(), ratingDao = db.episodeRatingDao(), reviewDao = db.episodeReviewDao(),
         viewingDao = db.viewingDao(), cinemaOutingDao = db.cinemaOutingDao(), titleCastDao = db.titleCastDao(),
         titleCrewDao = db.titleCrewDao(), listDao = db.listDao(), listItemDao = db.listItemDao(),
-        pushPending = outbox::flush, pendingKeys = outbox::pendingEntityKeys, transactor = RoomTransactor(db),
+        pushPending = pushPending, pendingKeys = outbox::pendingEntityKeys, transactor = RoomTransactor(db),
         personCreditsDao = db.personCreditsDao(),
     )
 
@@ -132,6 +133,65 @@ class TransactionalRuntimeTest {
 
     private fun creditRow(type: String, id: String, payload: JSONObject) = JSONObject()
         .put("entity_type", type).put("entity_id", id).put("updated_at", "2026-01-01T00:00:00Z").put("payload", payload.put("id", id))
+
+    @Test fun pendingCreditRefreshRewindsAndReplaysUnchangedRowsAndNullParentTombstonesAfterAck() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show")))
+        db.titleCastDao().upsertAll(listOf(
+            work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity("cast", "show", 42, "Local name", null, 0),
+            work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity("deleted", "show", 84, "Deleted remotely", null, 1),
+        ))
+        val file = tmpFile("credit-replay")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 9; it[cursor] = "2026-10-08T00:00:00Z" }
+        val writer = ScriptedWriter { PushResult.Retry("offline") }
+        val queue = outbox(db, writer)
+        queue.enqueue("title_credits", "show", "refresh", JSONObject().put("protectedKeys", JSONArray().put("title_cast:deleted")))
+        fun page() = JSONArray()
+            .put(creditRow("title_cast", "cast", JSONObject().put("titleId", "show").put("tmdbPersonId", 42).put("name", "Remote name").put("castOrder", 0)))
+            .put(creditRow("tombstone", "deleted", JSONObject().put("entityType", "title_cast")).put("parent_id", JSONObject.NULL))
+        val http = SyncHttp(ArrayDeque(listOf(page(), page())))
+        val sync = syncRepository(db, queue, http, file, prefs)
+        sync.syncNow()
+        assertEquals(setOf("Local name", "Deleted remotely"), db.titleCastDao().observeAllCast().first().map { it.name }.toSet())
+        assertEquals("2026-01-01T00:00:00Z", prefs.data.first()[cursor])
+        writer.next = { PushResult.Success }
+        sync.syncNow()
+        assertEquals(listOf("Remote name"), db.titleCastDao().observeAllCast().first().map { it.name })
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertEquals(List(2) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
+        assertEquals(9, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+    }
+
+    @Test fun creditAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show")))
+        val file = tmpFile("credit-ack-crash")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 9; it[cursor] = "2026-10-08T00:00:00Z" }
+        val queue = outbox(db, object : RemoteMutationWriter {
+            override suspend fun push(entry: work.kumarfamilynet.cinemarchive.core.database.OutboxEntity): PushResult {
+                assertEquals("rewind must already be durable before network", "1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+                return PushResult.Success
+            }
+        })
+        queue.enqueue("title_credits", "show", "refresh", JSONObject())
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray().put(creditRow("title_cast", "cast", JSONObject()
+            .put("titleId", "show").put("tmdbPersonId", 42).put("name", "Unchanged old credit").put("castOrder", 0))))))
+        val interrupted = syncRepository(db, queue, http, file, prefs, pushPending = {
+            queue.flush()
+            throw kotlinx.coroutines.CancellationException("process interrupted after local ACK")
+        })
+        assertTrue(runCatching { interrupted.syncNow() }.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertTrue(http.requests.isEmpty())
+        assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+        syncRepository(db, queue, http, file, prefs).syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+        assertEquals("Unchanged old credit", db.titleCastDao().observeAllCast().first().single().name)
+    }
 
     @Test fun personCreditsResolveParentsAcrossPagesAndTombstonesDoNotResurrectDeferredRows() = runBlocking {
         val db = memoryDb()

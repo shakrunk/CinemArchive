@@ -149,6 +149,11 @@ class LibrarySyncRepository(
 
     private suspend fun syncLocked() {
         val session = authRepository.currentSession() ?: return
+        // Persist before any ACK can drain the queue. A crash after ACK must still replay
+        // rows/tombstones skipped while this title's credit projection was protected.
+        if (pendingKeys().any { it.startsWith("title_credits:") }) {
+            dataStore.edit { it[cursorKey] = EPOCH }
+        }
         // Push first (best effort — offline just leaves entries queued and protected below).
         try {
             pushPending()
@@ -595,6 +600,8 @@ class LibrarySyncRepository(
 internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean {
     if (pending.isEmpty()) return false
     val entityType = row.getString("entity_type")
+    val creditTypes = setOf("title_cast", "title_crew", "season_cast", "episode_crew")
+    if (entityType in creditTypes && "title_credits:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
     val key = if (entityType == "tombstone") {
         pendingKey(row.getJSONObject("payload").getString("entityType"), row.getString("entity_id"))
     } else {

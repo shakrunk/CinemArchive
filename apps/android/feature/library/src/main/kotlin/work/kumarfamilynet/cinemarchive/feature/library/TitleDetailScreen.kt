@@ -284,6 +284,7 @@ fun TitleDetailRoute(
     onRecommendTitle: ((String) -> Unit)? = null,
     onShareOutingPlans: ((String) -> Unit)? = null,
     onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
+    onRefreshCredits: (suspend () -> Boolean)? = null,
 ) {
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
@@ -335,6 +336,7 @@ fun TitleDetailRoute(
         onRecommendTitle = onRecommendTitle,
         onShareOutingPlans = onShareOutingPlans,
         onBrowsePerson = onBrowsePerson,
+        onRefreshCredits = onRefreshCredits,
     )
 }
 
@@ -372,6 +374,7 @@ fun TitleDetailScreen(
     onRecommendTitle: ((String) -> Unit)? = null,
     onShareOutingPlans: ((String) -> Unit)? = null,
     onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
+    onRefreshCredits: (suspend () -> Boolean)? = null,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -566,11 +569,12 @@ fun TitleDetailScreen(
                 }
             }
 
-            if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty()) {
+            if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty() || onRefreshCredits != null) {
                 item(key = "title-credits") {
                     ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
                         PersonCreditsSection("Cast", detail.cast, onBrowsePerson)
                         PersonCreditsSection("Crew", detail.crew, onBrowsePerson)
+                        onRefreshCredits?.let { CreditRefreshControl(detail.id, it) }
                     }
                 }
             }

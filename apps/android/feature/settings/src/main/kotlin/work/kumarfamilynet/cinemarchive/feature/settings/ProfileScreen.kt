@@ -52,7 +52,7 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, APPEARANCE, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
+enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, SHARING, APPEARANCE, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
@@ -67,6 +67,7 @@ fun ProfileRoute(
     onOpenInvites: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenFriends: () -> Unit,
+    onOpenSharing: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenImportSync: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -101,6 +102,7 @@ fun ProfileRoute(
         onOpenInvites = onOpenInvites,
         onOpenNotifications = onOpenNotifications,
         onOpenFriends = onOpenFriends,
+        onOpenSharing = onOpenSharing,
         ownedCount = titles.size,
         watchedCount = titles.count { it.status == LibraryStatus.WATCHED },
         appearanceSummary = "${themeMode.label()} · ${palette.label()}",
@@ -162,6 +164,7 @@ private fun ProfileScreen(
     onOpenInvites: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenFriends: () -> Unit,
+    onOpenSharing: () -> Unit,
     ownedCount: Int,
     watchedCount: Int,
     appearanceSummary: String,
@@ -255,6 +258,16 @@ private fun ProfileScreen(
                             title = "Friends",
                             subtitle = "Requests, inbox & activity",
                             onClick = onOpenFriends,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.People,
+                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            title = "Share links",
+                            subtitle = "Read-only access & visibility",
+                            onClick = onOpenSharing,
+                            selected = selectedCategory == SettingsCategory.SHARING,
                             modifier = Modifier.padding(bottom = 10.dp),
                         )
                         ProfileRow(

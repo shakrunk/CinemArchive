@@ -128,11 +128,11 @@ class SupabaseRestClient(
 
     /** Calls a PostgREST RPC (`POST /rest/v1/rpc/<name>`) — used for `sync_library_changes`.
      *  Returns the raw JSON array/object response body. */
-    fun rpc(name: String, paramsJson: String, accessToken: String): String {
+    fun rpc(name: String, paramsJson: String, accessToken: String?): String {
         val request = Request.Builder()
             .url("$baseUrl/rest/v1/rpc/$name")
             .header("apikey", anonKey)
-            .header("Authorization", "Bearer $accessToken")
+            .apply { accessToken?.let { header("Authorization", "Bearer $it") } }
             .post(paramsJson.toRequestBody(JSON_MEDIA_TYPE))
             .build()
         return execute(request)

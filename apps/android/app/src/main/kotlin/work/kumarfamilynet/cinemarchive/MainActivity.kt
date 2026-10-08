@@ -1,6 +1,7 @@
 package work.kumarfamilynet.cinemarchive
 
 import android.Manifest
+import android.content.Intent
 import android.animation.ObjectAnimator
 import android.os.Build
 import android.os.Bundle
@@ -123,6 +124,8 @@ import work.kumarfamilynet.cinemarchive.feature.settings.ImportSyncRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
+import work.kumarfamilynet.cinemarchive.feature.settings.SharingRoute
+import work.kumarfamilynet.cinemarchive.data.SharingRules
 import work.kumarfamilynet.cinemarchive.feature.settings.profileInitial
 import work.kumarfamilynet.cinemarchive.feature.settings.IdentityRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.InvitesRoute
@@ -134,10 +137,33 @@ private val VoidColor = Color(0xFF0B0907)
 private val AmberColor = Color(0xFFE9B266)
 
 class MainActivity : ComponentActivity() {
+    private var sharedToken by mutableStateOf<String?>(null)
+    private var sharedLaunch by androidx.compose.runtime.mutableLongStateOf(0L)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingLink(intent)
+    }
+
+    private fun handleIncomingLink(incoming: Intent) {
+        val uri = incoming.data ?: return
+        val app = application as CinemArchiveApplication
+        val token = SharingRules.tokenFromLink(uri.toString())
+        if (token != null) {
+            sharedToken = token
+            sharedLaunch++
+        }
+        else if (app.authRepository.isAuthCallback(uri)) {
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
+            }
+        }
+    }
     companion object {
         /** Read by [OutingCompletionReceiver]'s notification tap — opens straight to the
-         *  title whose outing just completed (standard launchMode recreates this Activity on
-         *  tap via FLAG_ACTIVITY_CLEAR_TASK, so onCreate always sees a fresh intent). */
+         *  title whose outing just completed (FLAG_ACTIVITY_CLEAR_TASK recreates this
+         *  Activity, so onCreate always sees a fresh intent). */
         const val EXTRA_OPEN_TITLE_ID = "open_title_id"
     }
 
@@ -163,14 +189,8 @@ class MainActivity : ComponentActivity() {
         val initialTitleId = intent.getStringExtra(EXTRA_OPEN_TITLE_ID)
         val initialTitleOwnerId = intent.getStringExtra(OutingCompletionReceiver.EXTRA_OWNER_ID)
 
-        // Magic-link tap: standard launchMode means this is a fresh onCreate (same pattern
-        // OutingCompletionReceiver's notification tap relies on), so intent.data is always
-        // this launch's own — never a stale one from a prior instance.
-        intent.data?.let { uri ->
-            if (authRepository.isAuthCallback(uri)) {
-                lifecycleScope.launch { withContext(Dispatchers.IO) { authRepository.completeMagicLinkCallback(uri) } }
-            }
-        }
+        // Both cold and singleTop warm launches use the same share/auth dispatcher.
+        handleIncomingLink(intent)
 
         setContent {
             val themeMode by preferencesRepository.observeThemeMode()
@@ -198,8 +218,19 @@ class MainActivity : ComponentActivity() {
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
                 Surface {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (identity == null) {
-                            LoginRoute(authRepository)
+                        val openedToken = sharedToken
+                        if (openedToken != null) {
+                            androidx.compose.runtime.key(openedToken, sharedLaunch) {
+                                SharedLibraryRoute(openedToken, app.sharedLibraryRepository, onClose = {
+                                    sharedToken = null
+                                    intent.data = null
+                                })
+                            }
+                        } else if (identity == null) {
+                            androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+                                LoginRoute(authRepository, modifier = Modifier.weight(1f))
+                                SharedLinkPromptButton(onOpen = { sharedToken = it })
+                            }
                         } else {
                             val rt = runtime
                             if (rt == null) {
@@ -228,6 +259,7 @@ class MainActivity : ComponentActivity() {
                                             initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
                                             appVersionName = BuildConfig.VERSION_NAME,
                                             isDebugBuild = isDebugBuild,
+                                             onOpenSharedLink = { sharedToken = it },
                                         )
                                     }
                                 }
@@ -344,6 +376,7 @@ private sealed interface Overlay {
     data object Identity : Overlay
     data object Invites : Overlay
     data object Notifications : Overlay
+    data object Sharing : Overlay
     data object Friends : Overlay
     data class FriendLibrary(val friendUserId: String, val label: String) : Overlay
     data object Appearance : Overlay
@@ -376,6 +409,7 @@ private fun CinemArchiveApp(
     initialTitleId: String? = null,
     appVersionName: String,
     isDebugBuild: Boolean,
+    onOpenSharedLink: (String) -> Unit,
 ) {
     val repository = runtime.libraryRepository
     val ledgerRepository = runtime.ledgerRepository
@@ -692,6 +726,7 @@ private fun CinemArchiveApp(
                 Overlay.Identity -> SettingsCategory.IDENTITY
                 Overlay.Invites -> SettingsCategory.INVITES
                 Overlay.Notifications -> SettingsCategory.NOTIFICATIONS
+                Overlay.Sharing -> SettingsCategory.SHARING
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
                 Overlay.ImportSync -> SettingsCategory.IMPORT_SYNC
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
@@ -734,6 +769,7 @@ private fun CinemArchiveApp(
                             onOpenInvites = { selectedSettingsCategory = SettingsCategory.INVITES },
                             onOpenNotifications = { selectedSettingsCategory = SettingsCategory.NOTIFICATIONS },
                             onOpenFriends = { overlay = Overlay.Friends },
+                            onOpenSharing = { selectedSettingsCategory = SettingsCategory.SHARING },
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
                             onOpenImportSync = { selectedSettingsCategory = SettingsCategory.IMPORT_SYNC },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
@@ -752,6 +788,7 @@ private fun CinemArchiveApp(
                         when (activeCategory) {
                             SettingsCategory.IDENTITY -> IdentityRoute(accountRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.INVITES -> InvitesRoute(accountRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.SHARING -> SharingSettings(runtime, onBack = closeOverlay, onOpenSharedLink = onOpenSharedLink, showBack = false)
                             SettingsCategory.NOTIFICATIONS -> NotificationsRoute(
                                 notificationsRepository,
                                 onBack = closeOverlay,
@@ -822,6 +859,7 @@ private fun CinemArchiveApp(
                     onOpenInvites = { overlay = Overlay.Invites },
                     onOpenNotifications = { overlay = Overlay.Notifications },
                     onOpenFriends = { overlay = Overlay.Friends },
+                    onOpenSharing = { overlay = Overlay.Sharing },
                     onOpenAppearance = { overlay = Overlay.Appearance },
                     onOpenImportSync = { overlay = Overlay.ImportSync },
                     onOpenAbout = { overlay = Overlay.About },
@@ -833,6 +871,7 @@ private fun CinemArchiveApp(
                 )
                 Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
                 Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)
+                Overlay.Sharing -> SharingSettings(runtime, onBack = openProfile, onOpenSharedLink = onOpenSharedLink)
                 Overlay.Notifications -> NotificationsRoute(
                     notificationsRepository,
                     onBack = openProfile,
@@ -887,3 +926,10 @@ private const val BACK_SLIDE_FRACTION = 0.10f
  *  with the window but a list pane that also grew would leave the category rows looking
  *  stretched well past what their short titles need. */
 private val SettingsListPaneWidth = 320.dp
+
+@Composable
+private fun SharingSettings(runtime: AppAccountRuntime, onBack: () -> Unit, onOpenSharedLink: (String) -> Unit, showBack: Boolean = true) {
+    val titles by runtime.libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
+    SharingRoute(runtime.sharingRepository, availableGenres = titles.flatMap { it.genres }.distinct().sorted(),
+        onBack = onBack, showBack = showBack, onOpenSharedLink = onOpenSharedLink)
+}

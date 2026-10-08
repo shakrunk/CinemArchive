@@ -245,11 +245,9 @@ fun LedgerScreen(
     // fall just under the threshold on exactly the widths a rail appears at, in the same
     // breath as switching nav (see docs: responsive-foldable-layout plan).
     isWideLayout: Boolean = false,
-    // Android has no friend/shared viewer mode yet (see LedgerWidgets.kt's kdoc on the same
-    // gap), so this is always null today — threaded through now so the eventual Friends/
-    // Sharing work only needs to supply a real value, not rewire this call chain. See
-    // docs/superpowers/plans/2026-07-23-android-ledger-parity.md §8.
+    // Shared viewers identify the scoped archive and suppress all owner editing controls.
     viewedDisplayName: String? = null,
+    readOnly: Boolean = false,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -258,7 +256,7 @@ fun LedgerScreen(
             modifier = Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 0.dp),
         ) {
             Text("THE NUMBERS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
+            if (!readOnly) ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -266,7 +264,7 @@ fun LedgerScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         ) {
             Text("The Ledger", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(vertical = 2.dp))
-            TextButton(onClick = onToggleEditMode) {
+            if (!readOnly) TextButton(onClick = onToggleEditMode) {
                 Icon(
                     if (editMode) Icons.Filled.Check else Icons.Filled.Edit,
                     contentDescription = null,
@@ -287,7 +285,7 @@ fun LedgerScreen(
             return@Column
         }
 
-        if (editMode) {
+        if (editMode && !readOnly) {
             LedgerEditModeContent(
                 modifier = Modifier.fillMaxSize(),
                 layout = layout,

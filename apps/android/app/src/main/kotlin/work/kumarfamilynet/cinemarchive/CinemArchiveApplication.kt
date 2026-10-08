@@ -34,6 +34,11 @@ class CinemArchiveApplication : Application() {
 
     val authRepository: AuthRepository by lazy { AuthRepository(this, supabaseClient) }
 
+    /** Share viewing always uses only the public apikey, even while an owner is signed in. */
+    val sharedLibraryRepository: work.kumarfamilynet.cinemarchive.data.SharingRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.SharingRepository(supabaseClient, { null })
+    }
+
     /** Public Discover browsing; it works signed-out (anon key) so it is deliberately not part
      *  of any account runtime. */
     val discoverRepository: DiscoverRepository by lazy { DiscoverRepository(supabaseClient, authRepository) }

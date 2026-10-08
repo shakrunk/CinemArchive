@@ -107,6 +107,9 @@ class AppAccountRuntime(
     val accountRepository = AccountRepository(client, session::currentSession)
     val notificationsRepository = NotificationsRepository(client, session::currentSession)
     val friendsRepository = FriendsRepository(client, session::currentSession)
+    val sharingRepository = work.kumarfamilynet.cinemarchive.data.SharingRepository(
+        client, session::currentSession,
+    )
 
     val ledgerLayoutRepository = LedgerLayoutRepository(dataStore("cinemarchive_ledger_layout"), session, SupabaseLedgerLayoutWriter(client))
 

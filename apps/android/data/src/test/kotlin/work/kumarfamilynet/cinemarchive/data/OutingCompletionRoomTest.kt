@@ -126,6 +126,7 @@ class OutingCompletionRoomTest {
         assertEquals(pending.payloadJson, retained.payloadJson)
         assertEquals(provisional, retained.entityId)
         assertNull(db.viewingDao().getById(canonical))
+        assertNull(db.cinemaOutingDao().getById(outing)!!.completedViewingId)
         assertNotNull(db.viewingDao().getById(provisional))
         assertEquals(canonical, db.viewingCompletionAliasDao().byProvisionalId(provisional)!!.canonicalViewingId)
     }

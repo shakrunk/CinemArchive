@@ -87,6 +87,7 @@ fun ProfileRoute(
     selectedCategory: SettingsCategory? = null,
     outingRecovery: (@Composable () -> Unit)? = null,
     titleChangesContent: (@Composable () -> Unit)? = null,
+    viewingChangesContent: (@Composable () -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -123,6 +124,7 @@ fun ProfileRoute(
         selectedCategory = selectedCategory,
         outingRecovery = outingRecovery,
         titleChangesContent = titleChangesContent,
+        viewingChangesContent = viewingChangesContent,
     )
 }
 
@@ -187,6 +189,7 @@ private fun ProfileScreen(
     selectedCategory: SettingsCategory? = null,
     outingRecovery: (@Composable () -> Unit)? = null,
     titleChangesContent: (@Composable () -> Unit)? = null,
+    viewingChangesContent: (@Composable () -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -375,6 +378,7 @@ private fun ProfileScreen(
                     if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
                     if (signedInEmail != null) outingRecovery?.invoke()
                     if (signedInEmail != null) titleChangesContent?.invoke()
+                    if (signedInEmail != null) viewingChangesContent?.invoke()
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

@@ -19,14 +19,19 @@ import work.kumarfamilynet.cinemarchive.data.OutingRecoverySource
 
 /** Current-account pending intents, distinct from the unknown-owner pre-isolation archive. */
 @Composable
-fun OutingRecoverySection(source: OutingRecoverySource, onExport: ((String) -> Unit)? = null) {
+fun OutingRecoverySection(source: OutingRecoverySource, onExport: ((String) -> Unit)? = null) =
+    OutingRecoverySection(source, RecoverySubject.OUTING, onExport)
+
+@Composable
+fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject, onExport: ((String) -> Unit)? = null) {
     val scope = rememberCoroutineScope()
-    val controller = remember(source) { OutingRecoveryController(source, scope) }
+    val controller = remember(source, subject) { OutingRecoveryController(source, scope, subject) }
     val state by controller.state.collectAsState()
     val context = LocalContext.current
     var preparedExport by remember(source) { mutableStateOf<String?>(null) }
     var exportMessage by remember(source) { mutableStateOf<String?>(null) }
     var confirmation by remember(source) { mutableStateOf<String?>(null) }
+    val deleting = subject == RecoverySubject.VIEWING && "delete" in state.selected
     val document = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         val original = preparedExport
         preparedExport = null
@@ -45,20 +50,20 @@ fun OutingRecoverySection(source: OutingRecoverySource, onExport: ((String) -> U
     }
     fun export(id: String) = controller.export(id) { original ->
         if (onExport != null) onExport(original)
-        else { preparedExport = original; document.launch("cinemarchive-outing-change.json") }
+        else { preparedExport = original; document.launch("cinemarchive-" + subject.label + "-change.json") }
     }
     DisposableEffect(controller) { onDispose { preparedExport = null; controller.close() } }
     LaunchedEffect(source) { source.changes.collect { controller.refresh() } }
     if (!source.isActive()) return
 
     Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        Text("Saved outing changes", style = MaterialTheme.typography.titleMedium)
+        Text("Saved " + subject.label + " changes", style = MaterialTheme.typography.titleMedium)
         Text("Review changes that could not be safely synced. Originals remain available to export.",
             style = MaterialTheme.typography.bodySmall)
         state.error?.takeIf { state.focusedId == null }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.message?.takeIf { state.focusedId == null }?.let { Text(it) }
         exportMessage?.let { Text(it) }
-        if (state.cards.isEmpty()) Text(if (state.busy) "Loading…" else "No saved outing changes.", style = MaterialTheme.typography.bodySmall)
+        if (state.cards.isEmpty()) Text(if (state.busy) "Loading…" else "No saved " + subject.label + " changes.", style = MaterialTheme.typography.bodySmall)
         state.cards.forEach { card ->
             Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                 Text(card.title, style = MaterialTheme.typography.titleSmall)
@@ -80,7 +85,7 @@ fun OutingRecoverySection(source: OutingRecoverySource, onExport: ((String) -> U
         val review = state.review
         AlertDialog(
             onDismissRequest = controller::dismiss,
-            title = { Text(review?.title ?: "Saved outing change") },
+            title = { Text(review?.title ?: "Saved " + subject.label + " change") },
             text = {
                 Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
                     if (state.busy) Text("Working…")
@@ -116,14 +121,14 @@ fun OutingRecoverySection(source: OutingRecoverySource, onExport: ((String) -> U
                         OutlinedButton(onClick = { confirmation = "discard" },
                             enabled = !state.busy && review?.pendingAttempt != true) { Text("Discard saved change") }
                     }
-                    TextButton(onClick = { controller.open(state.focusedId!!) }, enabled = !state.busy) { Text("Reload current plan") }
+                    TextButton(onClick = { controller.open(state.focusedId!!) }, enabled = !state.busy) { Text("Reload current " + subject.item) }
                 }
             },
             confirmButton = {
                 if (review != null && !review.resolved) TextButton(
                     onClick = { if (review.pendingAttempt) controller.apply() else confirmation = "apply" },
                     enabled = !state.busy && (review.pendingAttempt || (review.remoteExists && state.selected.isNotEmpty())),
-                ) { Text(if (review.pendingAttempt) "Confirm previous attempt" else "Apply selected fields") }
+                ) { Text(if (review.pendingAttempt) "Confirm previous attempt" else if (deleting) "Delete this viewing" else "Apply selected fields") }
             },
             dismissButton = { TextButton(onClick = controller::dismiss) { Text("Close") } },
         )
@@ -131,14 +136,17 @@ fun OutingRecoverySection(source: OutingRecoverySource, onExport: ((String) -> U
     confirmation?.let { action ->
         AlertDialog(
             onDismissRequest = { confirmation = null },
-            title = { Text(if (action == "apply") "Apply only selected fields?" else "Discard this saved change?") },
-            text = { Text(if (action == "apply")
-                "Selected saved values will replace the current values only if the plan has not changed. The other saved values will be discarded. The original remains available to export."
-                else "This removes only this saved change from the queue and keeps the current plan. Viewing history and other pending changes are preserved. The original remains available to export.") },
+            title = { Text(if (action == "apply") { if (deleting) "Delete this exact viewing?" else "Apply only selected fields?" } else "Discard this saved change?") },
+            text = { Text(when {
+                action == "apply" && deleting -> "Delete only this viewing if it has not changed. Other viewing history and the title's status and rating are preserved. The original saved change remains available to export."
+                action == "apply" -> "Selected saved values will replace the current values only if the " + subject.item + " has not changed. The other saved values will be discarded. The original remains available to export."
+                subject == RecoverySubject.OUTING -> "This removes only this saved change from the queue and keeps the current plan. Viewing history and other pending changes are preserved. The original remains available to export."
+                else -> "This removes only this saved change from the queue and keeps the current viewing. Other viewing history and pending changes are preserved. The original remains available to export."
+            }) },
             confirmButton = { TextButton(onClick = {
                 confirmation = null
                 if (action == "apply") controller.apply() else controller.discard()
-            }) { Text(if (action == "apply") "Apply selected and keep other current values" else "Discard this change") } },
+            }) { Text(if (action == "apply") { if (deleting) "Delete only this viewing" else "Apply selected and keep other current values" } else "Discard this change") } },
             dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
         )
     }

@@ -216,6 +216,12 @@ class AppAccountRuntime(
         work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_outing_recovery")),
         work.kumarfamilynet.cinemarchive.data.OutingRecoveryRepository.remote(client, ownerId, session::currentSession),
     )
+    val viewingRecoveryRepository = work.kumarfamilynet.cinemarchive.data.ViewingRecoveryRepository(
+        database, ownerId, session::currentSession, outbox,
+        work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_viewing_recovery")),
+        work.kumarfamilynet.cinemarchive.data.ViewingRecoveryRepository.remote(client, ownerId, session::currentSession),
+        replayBoundary = { action -> librarySyncRepository.withDurableReplay(action) },
+    )
 
     val ledgerRepository = LedgerRepository(
         titleDao = database.titleDao(),

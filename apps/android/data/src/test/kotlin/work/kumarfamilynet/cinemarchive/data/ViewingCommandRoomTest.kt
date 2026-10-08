@@ -70,6 +70,15 @@ class ViewingCommandRoomTest {
         assertEquals(later, db.outboxDao().getPending().single())
     }
 
+    @Test fun confirmedMissingEventClearsOnlyItsExactOutingPointer() = runBlocking {
+        val linked = viewingLinkedOuting("linked", entry.entityId)
+        val laterLink = viewingLinkedOuting("later", ViewingCommandFixture.nextOperation)
+        db.cinemaOutingDao().upsertAll(listOf(linked, laterLink))
+        ack(ViewingCommandFixture.envelope(entry, null))
+        assertEquals(linked.copy(completedViewingId = null), db.cinemaOutingDao().getById(linked.id))
+        assertEquals(laterLink, db.cinemaOutingDao().getById(laterLink.id))
+    }
+
     @Test fun laterLocalDeleteNeverResurrectsAndLeavesOtherRewatchesAlone() = runBlocking {
         val independent = db.viewingDao().getById(entry.entityId)!!.copy(id = ViewingCommandFixture.nextOperation, notes = "Independent history")
         db.viewingDao().upsert(independent)
@@ -136,3 +145,9 @@ class ViewingCommandRoomTest {
         assertTrue(db.outboxDao().getPending().isEmpty())
     }
 }
+
+internal fun viewingLinkedOuting(id: String, viewingId: String) = CinemaOutingEntity(id, ViewingCommandFixture.title,
+    "2026-10-01T19:00:00Z", runtimeMinutes = 90, endsAt = "2026-10-01T21:00:00Z", venue = "Preserved venue",
+    companions = listOf("Friend"), format = null, ticketPrice = 12.0, notes = "Private note",
+    ticketImagePath = "private/ticket", completedViewingId = viewingId, status = "COMPLETED",
+    createdAt = ViewingCommandFixture.baseline, updatedAt = ViewingCommandFixture.baseline)

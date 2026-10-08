@@ -20,6 +20,7 @@ class ViewingCommandApplier(private val database: LibraryDatabase, private val o
             // A removed remote event cannot be recreated by an old receipt. Keep any unsent
             // draft in its original queue payload for explicit recovery, not as live history.
             database.viewingDao().deleteById(entry.entityId)
+            database.completionQueueDao().clearViewingLink(entry.entityId)
             return
         }
         if (local == null) return // a later local delete remains deleted

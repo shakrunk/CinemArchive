@@ -20,7 +20,12 @@ data class OutingRecoveryState(
     val message: String? = null,
 )
 
-class OutingRecoveryController(private val source: OutingRecoverySource, private val scope: CoroutineScope) {
+enum class RecoverySubject(val label: String, val item: String) {
+    OUTING("outing", "plan"), VIEWING("viewing", "viewing"),
+}
+
+class OutingRecoveryController(private val source: OutingRecoverySource, private val scope: CoroutineScope,
+    private val subject: RecoverySubject = RecoverySubject.OUTING) {
     private val mutable = MutableStateFlow(OutingRecoveryState())
     val state = mutable.asStateFlow()
     private var job: Job? = null
@@ -83,10 +88,12 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
             val cards = source.items()
             checkActive()
             mutable.value = state.value.copy(review = updated, cards = cards, message = when (result) {
-                OutingRecoveryOutcome.APPLIED -> "Selected fields applied. The original remains available to export."
-                OutingRecoveryOutcome.CONFIRMED -> "Original outing change confirmed. The current plan has been refreshed and the original remains available to export."
-                OutingRecoveryOutcome.CHANGED -> "The current plan changed. Review its latest values and select fields again."
-                OutingRecoveryOutcome.MISSING -> "The plan is no longer available. No replacement was created."
+                OutingRecoveryOutcome.APPLIED -> if (subject == RecoverySubject.VIEWING && "delete" in value.selected)
+                    "Selected viewing deleted. Other history is preserved and the original remains available to export."
+                    else "Selected fields applied. The original remains available to export."
+                OutingRecoveryOutcome.CONFIRMED -> "Original " + subject.label + " change confirmed. The current " + subject.item + " has been refreshed and the original remains available to export."
+                OutingRecoveryOutcome.CHANGED -> "The current " + subject.item + " changed. Review its latest values and select fields again."
+                OutingRecoveryOutcome.MISSING -> "The " + subject.item + " is no longer available. No replacement was created."
             })
         }
     }

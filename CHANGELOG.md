@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android now offers explicit review and recovery of pending viewing edits, preserving server revisions and clearing only confirmed obsolete outing links.
 - Android now retains synced physical collections, custom watch links and rich title metadata offline, including backfill for existing libraries.
 - Offline ratings after an outing completion can use its proven title revision while preserving newer edits and historical completion uncertainty.
 - Shared storage now supports private venue notes and theater-interest flags, including guarded note edits and cross-client sync.

@@ -97,6 +97,8 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
                 if (projectedOuting != null) database.cinemaOutingDao().upsert(projectedOuting)
                 else database.cinemaOutingDao().deleteById(command.outingId)
             }
+            // The exact owner viewing GET may be newer than the RPC's outing snapshot.
+            if (checked.viewing == null) database.completionQueueDao().clearViewingLink(alias.canonicalViewingId)
             if (checked.title != null && queue.drop(1).none { it.entityType == "title" && it.entityId == command.titleId }) {
                 database.titleDao().updateStatus(command.titleId, checked.title.getString("status").uppercase(), checked.title.getString("updated_at"))
             }

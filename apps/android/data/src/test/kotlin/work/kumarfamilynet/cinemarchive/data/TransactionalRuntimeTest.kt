@@ -539,6 +539,37 @@ class TransactionalRuntimeTest {
         assertNull(cleared.originalLanguage); assertNull(cleared.releaseDate); assertNull(cleared.imdbRating)
     }
 
+    @Test fun viewingBackfillUsesEnvelopeRevisionWithoutOverwritingPendingHistory() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("movie")))
+        fun event(id: String) = work.kumarfamilynet.cinemarchive.core.database.ViewingEntity(
+            id, "movie", "2026-01-01", null, "Local note", null,
+        )
+        db.viewingDao().upsertAll(listOf(event("existing"), event("pending"), event("deleted")))
+        val queue = outbox(db, ScriptedWriter { PushResult.Retry("offline") })
+        queue.enqueue("viewing", "pending", "update", JSONObject().put("id", "pending").put("notes", "Local note"))
+        queue.enqueue("viewing", "deleted", "delete", JSONObject().put("id", "deleted"))
+        db.viewingDao().deleteById("deleted")
+        val revision = "2026-01-02T03:04:05.123456Z"
+        val page = JSONArray()
+        for (id in listOf("existing", "pending", "deleted")) page.put(JSONObject()
+            .put("entity_type", "viewing").put("entity_id", id).put("updated_at", revision)
+            .put("payload", JSONObject().put("id", id).put("titleId", "movie").put("date", "2026-01-01")
+                .put("notes", "Server note").put("updatedAt", "2099-01-01T00:00:00Z")))
+        val file = tmpFile("viewing-revision")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 9; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
+        val http = SyncHttp(ArrayDeque(listOf(page)))
+        syncRepository(db, queue, http, file, prefs).syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+        assertEquals(revision, db.viewingDao().getById("existing")!!.updatedAt)
+        assertEquals("Server note", db.viewingDao().getById("existing")!!.notes)
+        assertEquals("Local note", db.viewingDao().getById("pending")!!.notes)
+        assertNull("Skipped pending rows cannot borrow a server revision", db.viewingDao().getById("pending")!!.updatedAt)
+        assertNull(db.viewingDao().getById("deleted"))
+        assertEquals(2, db.outboxDao().getPending().size)
+    }
+
     @Test fun emptyThenOlderRpcDoesNotAcknowledgeMetadataUpgradeBeforeUnchangedRowsCanBeBackfilled() = runTest {
         val db = memoryDb()
         db.titleDao().upsertAll(listOf(title("t1")))

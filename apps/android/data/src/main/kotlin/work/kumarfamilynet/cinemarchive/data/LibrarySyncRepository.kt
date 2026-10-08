@@ -383,7 +383,12 @@ class LibrarySyncRepository(
         byType["title_crew"]?.forEach { deferred.addCrew(it.payload().toTitleCrewEntity()) }
         byType["season_cast"]?.forEach { deferred.addSeasonCast(it.payload().toSeasonCastEntity()) }
         byType["episode_crew"]?.forEach { deferred.addEpisodeCrew(it.payload().toEpisodeCrewEntity()) }
-        byType["viewing"]?.forEach { deferred.addViewing(it.payload().toViewingEntity()) }
+        byType["viewing"]?.forEach { row ->
+            // The sync envelope has always carried the server revision, including on older
+            // payload versions. Never substitute a local timestamp or a payload hint for CAS.
+            val revision = row.getString("updated_at").also { java.time.Instant.parse(it) }
+            deferred.addViewing(row.payload().toViewingEntity(revision))
+        }
         byType["episode_watch_event"]?.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity()) }
         byType["episode_rating"]?.forEach { deferred.addRating(it.payload().toRatingEntity()) }
         byType["episode_review"]?.forEach { deferred.addReview(it.payload().toReviewEntity()) }
@@ -531,7 +536,7 @@ class LibrarySyncRepository(
         stillUrl = optStringOrNull("stillUrl"),
     )
 
-    private fun JSONObject.toViewingEntity() = ViewingEntity(
+    private fun JSONObject.toViewingEntity(revision: String) = ViewingEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         date = optStringOrNull("date"),
@@ -540,6 +545,7 @@ class LibrarySyncRepository(
         venue = optStringOrNull("venue"),
         companions = optJSONArray("companions").toCompanionNames(),
         outingId = optStringOrNull("outingId"),
+        updatedAt = revision,
     )
 
     // Postgres's status/previous_status enums are lowercase ('scheduled', 'watched', ...);

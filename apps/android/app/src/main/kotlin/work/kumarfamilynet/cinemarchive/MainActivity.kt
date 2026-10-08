@@ -798,6 +798,8 @@ private fun CinemArchiveApp(
                             legacyRestore = runtime::restoreLegacy,
                             outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                             titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
+                            viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
+                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                             selectedCategory = activeCategory,
                         )
                     }
@@ -903,6 +905,8 @@ private fun CinemArchiveApp(
                     legacyRestore = runtime::restoreLegacy,
                     outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                     titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
+                    viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
+                        subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                 )
                 Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
                 Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)

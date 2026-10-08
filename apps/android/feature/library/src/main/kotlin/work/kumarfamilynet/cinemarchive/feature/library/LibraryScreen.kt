@@ -6,10 +6,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,8 +24,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
@@ -35,20 +31,15 @@ import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -73,13 +66,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
-import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
-import work.kumarfamilynet.cinemarchive.core.designsystem.ConnectedToggleGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
-import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.designsystem.ContentReadingMaxWidth
@@ -88,9 +78,10 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterMinTileWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
-import work.kumarfamilynet.cinemarchive.core.model.LibraryGrouping
-import work.kumarfamilynet.cinemarchive.core.model.LibrarySortOrder
-import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
+import work.kumarfamilynet.cinemarchive.core.model.LibraryFilters
+import work.kumarfamilynet.cinemarchive.core.model.filterLibrary
+import work.kumarfamilynet.cinemarchive.core.model.groupLibrary
+import work.kumarfamilynet.cinemarchive.core.model.libraryFilterChoices
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
@@ -142,57 +133,8 @@ fun LibraryRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
-    var search by rememberSaveable { mutableStateOf("") }
-    var statusFilters by rememberSaveable { mutableStateOf(setOf<LibraryStatus>()) }
-    var genreFilters by rememberSaveable { mutableStateOf(setOf<String>()) }
-    var minRating by rememberSaveable { mutableStateOf(0) }
-    var sortOrder by rememberSaveable { mutableStateOf(LibrarySortOrder.LAST_INTERACTION) }
-    var grouping by rememberSaveable { mutableStateOf(LibraryGrouping.NONE) }
-
-    val availableGenres = remember(uiState.titles) {
-        uiState.titles.flatMap { it.genres }.distinct().sorted()
-    }
-
-    val filtered = uiState.titles.filter { title ->
-        (statusFilters.isEmpty() || title.status in statusFilters) &&
-            (genreFilters.isEmpty() || title.genres.any { it in genreFilters }) &&
-            (minRating == 0 || (title.rating ?: 0.0) >= minRating) &&
-            (search.isBlank() || title.name.contains(search, ignoreCase = true))
-    }
-    val sorted = when (sortOrder) {
-        // Newest interaction first, and a title with no usable timestamp at all sinks to the
-        // bottom rather than floating to the top of "most recent".
-        LibrarySortOrder.LAST_INTERACTION -> filtered.sortedWith(
-            compareByDescending<LibraryTitle, String?>(nullsFirst()) { it.lastInteractionAt }
-                .thenBy { it.name.lowercase() },
-        )
-        LibrarySortOrder.TITLE -> filtered.sortedBy { it.name.lowercase() }
-        LibrarySortOrder.YEAR_NEWEST -> filtered.sortedWith(compareByDescending<LibraryTitle> { it.year ?: Int.MIN_VALUE }.thenBy { it.name.lowercase() })
-        LibrarySortOrder.RATING_HIGHEST -> filtered.sortedWith(compareByDescending<LibraryTitle> { it.rating ?: -1.0 }.thenBy { it.name.lowercase() })
-    }
-
     LibraryScreen(
-        titles = sorted,
-        search = search,
-        onSearchChange = { search = it },
-        statusFilters = statusFilters,
-        onToggleStatus = { s -> statusFilters = if (s in statusFilters) statusFilters - s else statusFilters + s },
-        availableGenres = availableGenres,
-        genreFilters = genreFilters,
-        onToggleGenre = { g -> genreFilters = if (g in genreFilters) genreFilters - g else genreFilters + g },
-        minRating = minRating,
-        onMinRatingChange = { minRating = it },
-        sortOrder = sortOrder,
-        onSortOrderChange = { sortOrder = it },
-        grouping = grouping,
-        onGroupingChange = { grouping = it },
-        onResetFilters = {
-            statusFilters = emptySet()
-            genreFilters = emptySet()
-            minRating = 0
-            sortOrder = LibrarySortOrder.LAST_INTERACTION
-            grouping = LibraryGrouping.NONE
-        },
+        allTitles = uiState.titles,
         viewMode = viewMode,
         onToggleViewMode = onToggleViewMode,
         gridColumns = gridColumns,
@@ -208,22 +150,8 @@ fun LibraryRoute(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryScreen(
-    titles: List<LibraryTitle>,
-    search: String,
-    onSearchChange: (String) -> Unit,
-    statusFilters: Set<LibraryStatus>,
-    onToggleStatus: (LibraryStatus) -> Unit,
-    availableGenres: List<String>,
-    genreFilters: Set<String>,
-    onToggleGenre: (String) -> Unit,
-    minRating: Int,
-    onMinRatingChange: (Int) -> Unit,
-    sortOrder: LibrarySortOrder,
-    onSortOrderChange: (LibrarySortOrder) -> Unit,
-    grouping: LibraryGrouping,
-    onGroupingChange: (LibraryGrouping) -> Unit,
-    onResetFilters: () -> Unit,
+fun LibraryScreen(
+    allTitles: List<LibraryTitle>,
     viewMode: LibraryViewMode,
     onToggleViewMode: () -> Unit,
     gridColumns: Int,
@@ -236,25 +164,12 @@ private fun LibraryScreen(
     onRefresh: () -> Unit = {},
 ) {
     var showFilterSheet by remember { mutableStateOf(false) }
-    val activeFilterCount = statusFilters.size + genreFilters.size + (if (minRating > 0) 1 else 0)
-
-    // Status order matches the filter sheet's status chips — grouping just re-buckets the
-    // already-sorted list, so relative order within each bucket is unaffected.
-    val groupedTitles: List<Pair<LibraryStatus?, List<LibraryTitle>>> = if (grouping == LibraryGrouping.STATUS) {
-        listOf(LibraryStatus.WATCHED, LibraryStatus.WATCHING, LibraryStatus.WATCHLIST, LibraryStatus.DROPPED)
-            .mapNotNull { status ->
-                val group = titles.filter { it.status == status }
-                if (group.isEmpty()) null else status to group
-            }
-    } else {
-        listOf(null to titles)
-    }
-    // Which headers are present — switching "Group by" (or a status filter that changes which
-    // header rows exist) re-anchors the lazy list's first-visible index without the user having
-    // scrolled. Feeding that shape in as the scroll hook's content key stops the re-anchor from
-    // being misread as a downward scroll, which otherwise fed back into a collapse/expand loop
-    // between this and the shrinking search bar below (#187).
-    val headerShape = groupedTitles.map { it.first }
+    var filters by rememberSaveable(stateSaver = LibraryFiltersSaver) { mutableStateOf(LibraryFilters()) }
+    val titles = remember(allTitles, filters) { filterLibrary(allTitles, filters) }
+    val choices = remember(allTitles) { libraryFilterChoices(allTitles) }
+    val groupedTitles = remember(titles, filters.grouping) { groupLibrary(titles, filters.grouping) }
+    // Header changes re-anchor lazy lists; do not interpret that as user scrolling.
+    val headerShape = groupedTitles.map { it.key }
 
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
@@ -303,12 +218,12 @@ private fun LibraryScreen(
                 ) {
                     Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     androidx.compose.foundation.text.BasicTextField(
-                        value = search,
-                        onValueChange = onSearchChange,
+                        value = filters.search,
+                        onValueChange = { filters = filters.copy(search = it) },
                         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                        modifier = Modifier.padding(start = 10.dp).weight(1f),
+                        modifier = Modifier.padding(start = 10.dp).weight(1f).semantics { contentDescription = "Search library" },
                         decorationBox = { inner ->
-                            if (search.isEmpty()) {
+                            if (filters.search.isEmpty()) {
                                 Text(
                                     "Search your library…",
                                     style = MaterialTheme.typography.bodyMedium,
@@ -320,8 +235,8 @@ private fun LibraryScreen(
                     )
                     IconButton(onClick = { showFilterSheet = true }, modifier = Modifier.size(32.dp)) {
                         BadgedBox(badge = {
-                            if (activeFilterCount > 0) {
-                                Badge { Text(activeFilterCount.toString()) }
+                            if (filters.activeFilterCount > 0) {
+                                Badge { Text(filters.activeFilterCount.toString()) }
                             }
                         }) {
                             Icon(
@@ -346,18 +261,9 @@ private fun LibraryScreen(
 
         if (showFilterSheet) {
             LibraryFilterSheet(
-                statusFilters = statusFilters,
-                onToggleStatus = onToggleStatus,
-                availableGenres = availableGenres,
-                genreFilters = genreFilters,
-                onToggleGenre = onToggleGenre,
-                minRating = minRating,
-                onMinRatingChange = onMinRatingChange,
-                sortOrder = sortOrder,
-                onSortOrderChange = onSortOrderChange,
-                grouping = grouping,
-                onGroupingChange = onGroupingChange,
-                onReset = onResetFilters,
+                filters = filters,
+                choices = choices,
+                onChange = { filters = it },
                 onDismiss = { showFilterSheet = false },
             )
         }
@@ -376,7 +282,7 @@ private fun LibraryScreen(
                 )
 
                 if (titles.isEmpty()) {
-                    EmptyLibrary(modifier = Modifier.fillMaxSize())
+                    EmptyLibrary(filtered = allTitles.isNotEmpty(), onReset = { filters = LibraryFilters() }, modifier = Modifier.fillMaxSize())
                 } else if (viewMode == LibraryViewMode.GRID) {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
@@ -388,10 +294,10 @@ private fun LibraryScreen(
                             .fillMaxWidth()
                             .pinchToResizeGrid(gridColumns, onGridColumnsChange),
                     ) {
-                        groupedTitles.forEach { (status, group) ->
-                            if (status != null) {
-                                item(span = { GridItemSpan(maxLineSpan) }, key = "header-${status.name}") {
-                                    LibraryGroupHeader(libraryStatusLabel(status))
+                        groupedTitles.forEach { (key, label, group) ->
+                            if (label != null) {
+                                item(span = { GridItemSpan(maxLineSpan) }, key = "header-$key") {
+                                    LibraryGroupHeader(label)
                                 }
                             }
                             items(group, key = LibraryTitle::id) { title ->
@@ -409,10 +315,10 @@ private fun LibraryScreen(
                         contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
                         verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
                     ) {
-                        groupedTitles.forEach { (status, group) ->
-                            if (status != null) {
-                                item(key = "header-${status.name}") {
-                                    LibraryGroupHeader(libraryStatusLabel(status))
+                        groupedTitles.forEach { (key, label, group) ->
+                            if (label != null) {
+                                item(key = "header-$key") {
+                                    LibraryGroupHeader(label)
                                 }
                             }
                             itemsIndexed(group, key = { _, title -> title.id }) { index, title ->
@@ -552,13 +458,6 @@ private fun starGlyphs(rating: Double): String {
     return "★".repeat(n) + "☆".repeat(5 - n)
 }
 
-private fun libraryStatusLabel(status: LibraryStatus): String = when (status) {
-    LibraryStatus.WATCHED -> "Watched"
-    LibraryStatus.WATCHING -> "Watching"
-    LibraryStatus.WATCHLIST -> "Watchlist"
-    LibraryStatus.DROPPED -> "Dropped"
-}
-
 @Composable
 private fun LibraryGroupHeader(label: String) {
     Text(
@@ -569,139 +468,20 @@ private fun LibraryGroupHeader(label: String) {
     )
 }
 
-/**
- * The Library filter/sort sheet (#120/KP-050) — replaces the old always-visible status row.
- * Status stays a [ConnectedToggleGroup] (multi-select), sort/grouping are single-select
- * [SegmentedGroup]s, minimum rating is a tappable star row (tapping the already-selected star
- * clears it back to "any"), and genres — when the library has any — are wrap-flowing
- * [FilterChip]s.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryFilterSheet(
-    statusFilters: Set<LibraryStatus>,
-    onToggleStatus: (LibraryStatus) -> Unit,
-    availableGenres: List<String>,
-    genreFilters: Set<String>,
-    onToggleGenre: (String) -> Unit,
-    minRating: Int,
-    onMinRatingChange: (Int) -> Unit,
-    sortOrder: LibrarySortOrder,
-    onSortOrderChange: (LibrarySortOrder) -> Unit,
-    grouping: LibraryGrouping,
-    onGroupingChange: (LibraryGrouping) -> Unit,
-    onReset: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp).padding(bottom = 24.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            ) {
-                Text("Filter & sort", style = MaterialTheme.typography.titleMedium)
-                val hasAnyFilter = statusFilters.isNotEmpty() || genreFilters.isNotEmpty() || minRating > 0 ||
-                    sortOrder != LibrarySortOrder.LAST_INTERACTION || grouping != LibraryGrouping.NONE
-                if (hasAnyFilter) {
-                    TextButton(onClick = onReset) {
-                        Text("Reset")
-                    }
-                }
-            }
-
-            FilterSheetLabel("Status")
-            ConnectedToggleGroup(
-                options = listOf(
-                    ChoiceOption(LibraryStatus.WATCHED, "Watched"),
-                    ChoiceOption(LibraryStatus.WATCHING, "Watching"),
-                    ChoiceOption(LibraryStatus.WATCHLIST, "Watchlist"),
-                    ChoiceOption(LibraryStatus.DROPPED, "Dropped"),
-                ),
-                selected = statusFilters,
-                onToggle = onToggleStatus,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-
-            FilterSheetLabel("Sort by")
-            SegmentedGroup(
-                options = listOf(
-                    ChoiceOption(LibrarySortOrder.LAST_INTERACTION, "Smart"),
-                    ChoiceOption(LibrarySortOrder.TITLE, "Title"),
-                    ChoiceOption(LibrarySortOrder.YEAR_NEWEST, "Newest"),
-                    ChoiceOption(LibrarySortOrder.RATING_HIGHEST, "Top rated"),
-                ),
-                selected = sortOrder,
-                onSelect = onSortOrderChange,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-
-            FilterSheetLabel("Group by")
-            SegmentedGroup(
-                options = listOf(
-                    ChoiceOption(LibraryGrouping.NONE, "None"),
-                    ChoiceOption(LibraryGrouping.STATUS, "Status"),
-                ),
-                selected = grouping,
-                onSelect = onGroupingChange,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-
-            FilterSheetLabel("Minimum rating")
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(bottom = if (availableGenres.isEmpty()) 0.dp else 16.dp),
-            ) {
-                for (star in 1..5) {
-                    IconButton(onClick = { onMinRatingChange(if (minRating == star) 0 else star) }) {
-                        Icon(
-                            if (star <= minRating) Icons.Filled.Star else Icons.Filled.StarBorder,
-                            contentDescription = "At least $star star${if (star == 1) "" else "s"}",
-                            tint = if (star <= minRating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            if (availableGenres.isNotEmpty()) {
-                FilterSheetLabel("Genres")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    availableGenres.forEach { genre ->
-                        FilterChip(
-                            selected = genre in genreFilters,
-                            onClick = { onToggleGenre(genre) },
-                            label = { Text(genre) },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterSheetLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 8.dp),
-    )
-}
-
-@Composable
-private fun EmptyLibrary(modifier: Modifier = Modifier) {
+private fun EmptyLibrary(filtered: Boolean, onReset: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Your library is ready", style = MaterialTheme.typography.headlineSmall)
+        Text(if (filtered) "No titles match your filters" else "Your library is ready", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Sign in and sync to bring your collection into the projection room.",
+            if (filtered) "Try another search or reset the filters." else "Sign in and sync to bring your collection into the projection room.",
             modifier = Modifier.padding(top = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
         )
+        if (filtered) TextButton(onClick = onReset) { Text("Reset filters") }
     }
 }
 

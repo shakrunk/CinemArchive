@@ -59,12 +59,8 @@ interface TitleDao {
      * whole-table flows together in the repository — the Library only ever needs one string per
      * title out of these tables, and Room still re-emits when any of them changes.
      *
-     * The rollup compares the timestamps as strings. They are ISO-8601 and UTC-based on both
-     * write paths (`Instant.toString()` locally, PostgREST's `timestamptz` rendering when synced
-     * down), so lexicographic order is chronological order down to the second; the formats
-     * differ only in the fractional-second width and the `Z` vs `+00:00` suffix, which can only
-     * reorder events within the same second. `viewings.date` is date-only and therefore sorts as that
-     * day's midnight, matching how the web app's `new Date(...)` parses it.
+     * Normalize every source to UTC milliseconds before MAX so date-only, offset and
+     * fractional-second timestamps compare chronologically, like web Date values.
      *
      * Aggregate `MAX` ignores NULLs (a null `watchedAt` — "watched before joining" — contributes
      * nothing, as it does on the web), while scalar `MAX` returns NULL if *any* argument is, so
@@ -73,18 +69,18 @@ interface TitleDao {
     @Query(
         """
         SELECT t.id AS titleId, NULLIF(MAX(
-            IFNULL(t.addedAt, ''),
-            IFNULL((SELECT MAX(v.date) FROM viewings v WHERE v.titleId = t.id), ''),
+            IFNULL(strftime('%Y-%m-%dT%H:%M:%fZ', t.addedAt), ''),
+            IFNULL((SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', v.date)) FROM viewings v WHERE v.titleId = t.id), ''),
             IFNULL((
-                SELECT MAX(w.watchedAt) FROM episode_watch_events w
+                SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', w.watchedAt)) FROM episode_watch_events w
                 JOIN episodes e ON e.id = w.episodeId WHERE e.titleId = t.id
             ), ''),
             IFNULL((
-                SELECT MAX(r.ratedAt) FROM episode_ratings r
+                SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', r.ratedAt)) FROM episode_ratings r
                 JOIN episodes e ON e.id = r.episodeId WHERE e.titleId = t.id
             ), ''),
             IFNULL((
-                SELECT MAX(rv.reviewedAt) FROM episode_reviews rv
+                SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', rv.reviewedAt)) FROM episode_reviews rv
                 JOIN episodes e ON e.id = rv.episodeId WHERE e.titleId = t.id
             ), '')
         ), '') AS lastInteractionAt

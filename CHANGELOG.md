@@ -34,6 +34,7 @@ number is chosen.
 - Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
 
 ### Added
+- Android: Library now supports metadata filters, half-star rating thresholds, matching search fields, six sort orders in both directions, and franchise grouping.
 - Android can share upcoming outing plans with friends or the system share/calendar sheet, and recommend a title directly after a viewing.
 
 - Web: eight Ledger charts now offer complete data tables with keyboard access, including compact layouts, zero-count dates, rating comparisons, and screening streaks.

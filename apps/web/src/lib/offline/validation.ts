@@ -110,7 +110,9 @@ function isLeaf(value: unknown): boolean {
   return record(value) && typeof value.kind === 'string' && Object.hasOwn(checks, value.kind) && checks[value.kind](value)
 }
 export function assertMutation(value: unknown): asserts value is Mutation {
-  const valid = isLeaf(value) || isValidTicketMutation(value) || (record(value) && value.kind === 'batch' &&
+  const revert = shape({ kind: oneOf('outing.revert'), outingId: id, titleId: id, viewingId: nullable(id), viewingPresent: boolean })(value) &&
+    record(value) && (!value.viewingPresent || value.viewingId !== null)
+  const valid = isLeaf(value) || revert || isValidTicketMutation(value) || (record(value) && value.kind === 'batch' &&
     shape({ kind: text, mutations: (v) => Array.isArray(v) && v.length > 0 && v.length <= 10_000 && v.every(isLeaf) })(value))
   if (!valid) throw new Error('Invalid or unsupported offline mutation')
 }
@@ -126,6 +128,7 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     preconditions: array(precondition),
   })(value)) throw new Error('Invalid or unsupported offline command')
   const command = value as PendingCommand
+  if (command.mutation.kind === 'outing.revert' && command.baseRevision) throw new Error('Outing reversal requires separate outing and viewing guards')
   if (isTicketMutation(command.mutation)) {
     if (!isTicketId(command.id) || command.baseRevision || command.preconditions?.length) throw new Error('Ticket commands use attachment CAS, not row revision guards')
     if (command.mutation.kind === 'ticket.attach' && command.mutation.attachment.objectKey !== ticketObjectKey(command.scope, command.mutation.attachment.id)) throw new Error('Ticket attachment belongs to another owner')

@@ -5,6 +5,7 @@ import type { DeliveryContext, DeliveryResult } from './offline/coordinator'
 import type { OfflineSnapshot } from './offline/snapshot'
 import { isTicketMutation } from './tickets/types'
 import { assertCommand } from './offline/validation'
+import { outingRevertBody, outingRevertReceiptStatus } from './outingRevert'
 
 export interface LibraryOperation {
   table: string
@@ -88,6 +89,7 @@ function seasonOperations(titleId: string, season: Season, recordedAt: string, r
 /** Pure mapping: retry uses exactly the same IDs, payload and recorded timestamps. */
 export function libraryOperations(command: PendingCommand): LibraryOperation[] {
   if (isTicketMutation(command.mutation)) throw new Error('Ticket commands require their dedicated delivery adapter')
+  if (command.mutation.kind === 'outing.revert') throw new Error('Outing reversal requires its guarded delivery adapter')
   const leaf = (mutation: TrackingMutation): LibraryOperation[] => {
     switch (mutation.kind) {
       case 'title.create': {
@@ -118,7 +120,9 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
       case 'viewing.patch': return [update('viewings',mutation.viewingId,mapped(mutation.patch,viewingFields))]
       case 'viewing.delete': return [remove('viewings',{id:mutation.viewingId})]
       case 'outing.create': return [insert('cinema_outings',mutation.outing.id,{title_id:mutation.outing.titleId,...mapped(mutation.outing,outingFields)})]
-      case 'outing.patch': return [update('cinema_outings',mutation.outingId,mapped(mutation.patch,outingFields))]
+      case 'outing.patch':
+        if (mutation.patch.status === 'missed') throw new Error('This saved completion reversal needs review. Discard it and use Didn’t make it again after syncing.')
+        return [update('cinema_outings',mutation.outingId,mapped(mutation.patch,outingFields))]
       case 'outing.delete': return [remove('cinema_outings',{id:mutation.outingId})]
       case 'list.create': return [insert('lists',mutation.list.id,mapped(mutation.list,{name:'name',description:'description',createdAt:'created_at'}))]
       case 'list.patch': return [update('lists',mutation.listId,mapped(mutation.patch,{name:'name',description:'description'}))]
@@ -150,7 +154,7 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
 /** Run before durable admission as well as delivery. Reserve room for the
  * per-row revision guards that IndexedDB captures during its transaction. */
 export function assertDeliverableCommand(command: PendingCommand): void {
-  if (isTicketMutation(command.mutation)) { assertCommand(command); return }
+  if (isTicketMutation(command.mutation) || command.mutation.kind === 'outing.revert') { assertCommand(command); return }
   const operations = libraryOperations(command)
   // Pretty JSON conservatively covers PostgreSQL jsonb's spaces, including
   // separators inside large nested values that occupy only one operation.
@@ -167,7 +171,7 @@ export function classifyLibraryError(status: number, code: string | undefined, m
   return {kind:'failed',message}
 }
 
-export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContext)=>Promise<OfflineSnapshot>, deliverTicket?: (command: PendingCommand, context: DeliveryContext) => Promise<DeliveryResult>) {
+export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContext)=>Promise<OfflineSnapshot>, deliverTicket?: (command: PendingCommand, context: DeliveryContext) => Promise<DeliveryResult>, onOutingReverted?: (outingId: string) => void) {
   return async (command: PendingCommand, context: DeliveryContext): Promise<DeliveryResult> => {
     if (isTicketMutation(command.mutation)) return deliverTicket ? deliverTicket(command, context) : { kind: 'failed', message: 'Ticket attachment sync is not configured. Your saved photo remains on this device.' }
     const project=import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -177,15 +181,19 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed before sync.'}
     const {data,error}=await supabase.auth.getSession()
     if (error || !data.session || data.session.user.id!==context.scope.userId) return {kind:'auth',message:'Sign in to sync this account.'}
-    let operations: LibraryOperation[]
-    try { assertDeliverableCommand(command); operations=libraryOperations(command) } catch (error) { return {kind:'failed',message:error instanceof Error ? error.message : 'Invalid command.'} }
+    const reverting = command.mutation.kind === 'outing.revert'
+    let body: Record<string, unknown>
+    try {
+      assertDeliverableCommand(command)
+      body = reverting ? outingRevertBody(command) : { p_operation_id: command.id, p_operations: libraryOperations(command) }
+    } catch (error) { return {kind:'failed',message:error instanceof Error ? error.message : 'Invalid command.'} }
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed before sync.'}
     // Capture the owner token: a concurrent account change must never cause the
     // auth client's automatic headers to send this owner's command as another user.
-    const response=await fetch(`${project.replace(/\/$/,'')}/rest/v1/rpc/apply_library_command`,{
+    const response=await fetch(`${project.replace(/\/$/,'')}/rest/v1/rpc/${reverting ? 'revert_cinema_outing' : 'apply_library_command'}`,{
       method:'POST', signal:context.signal,
       headers:{apikey:key,Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},
-      body:JSON.stringify({p_operation_id:command.id,p_operations:operations}),
+      body:JSON.stringify(body),
     })
     const result: unknown=await response.json()
     if (!response.ok) {
@@ -193,11 +201,17 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
       return classifyLibraryError(response.status,failure?.code,failure?.message ?? 'Library sync failed.')
     }
     if (!result || typeof result!=='object' || !('operationId' in result) || result.operationId!==command.id) return {kind:'retry',message:'Sync returned an unrecognized receipt.'}
+    if (reverting) {
+      const status = outingRevertReceiptStatus(command, body, result)
+      if (!status) return { kind: 'retry', message: 'Completion reversal returned an unrecognized receipt.' }
+      if (status !== 'applied') return { kind: 'conflict', message: status === 'missing' ? 'This outing was removed on another device.' : 'This completion changed on another device. Review its history before removing it.' }
+    }
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed during sync.'}
     // Receipts intentionally describe the ORIGINAL result. A fresh snapshot
     // preserves edits made on another device after that command was committed.
     const canonicalBase=await fetchBase(context)
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed during refresh.'}
+    if (command.mutation.kind === 'outing.revert') onOutingReverted?.(command.mutation.outingId)
     return {kind:'success',canonicalBase}
   }
 }

@@ -1,5 +1,5 @@
 import type { Episode, Season, Title } from '../../store/mockData'
-import type { Mutation, PendingCommand, TrackingMutation } from './commands'
+import type { Mutation, PendingCommand, TrackingMutation, OutingRevertMutation } from './commands'
 import type { OfflineSnapshot } from './snapshot'
 import type { TicketMutation } from '../tickets/types'
 
@@ -81,7 +81,7 @@ function episode(state: OfflineSnapshot, titleId: string, episodeId: string, cha
   }) }))
 }
 
-function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMutation): OfflineSnapshot {
+function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMutation | OutingRevertMutation): OfflineSnapshot {
   switch (mutation.kind) {
     case 'title.create':
       return state.titles.some((t) => t.id === mutation.title.id)
@@ -115,6 +115,15 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMu
     case 'outing.create': return state.outings.some((o) => o.id === mutation.outing.id) ? state : { ...state, outings: [mutation.outing, ...state.outings] }
     case 'outing.patch': return { ...state, outings: state.outings.map((o) => o.id === mutation.outingId ? fields(o, mutation.patch) : o) }
     case 'outing.delete': return { ...state, outings: state.outings.filter((o) => o.id !== mutation.outingId) }
+    case 'outing.revert': {
+      const outing = state.outings.find((o) => o.id === mutation.outingId && o.titleId === mutation.titleId)
+      const viewing = state.titles.find((t) => t.id === mutation.titleId)?.viewings.find((v) => v.id === mutation.viewingId)
+      if (!outing || outing.status !== 'completed' || (outing.completedViewingId ?? null) !== mutation.viewingId || viewing?.rating != null) return state
+      // Only the server can prove that no later intentional title-status write
+      // occurred. Keep its status until the guarded receipt supplies fresh state.
+      const next = titles(state, mutation.titleId, (t) => ({ ...t, viewings: t.viewings.filter((v) => v.id !== mutation.viewingId) }))
+      return { ...next, outings: next.outings.map((o) => o.id === mutation.outingId ? fields(o, { status: 'missed', completedViewingId: null }) : o) }
+    }
     case 'ticket.attach': return { ...state, outings: state.outings.map((o) => o.id === mutation.outingId ? { ...o, ticketAttachment: mutation.attachment, ticketManaged: true } : o) }
     case 'ticket.detach': return { ...state, outings: state.outings.map((o) => o.id === mutation.outingId ? fields(o, { ticketAttachment: null, ticketManaged: true }) : o) }
     case 'list.create': return state.lists.some((l) => l.id === mutation.list.id) ? state : { ...state, lists: [mutation.list, ...state.lists] }

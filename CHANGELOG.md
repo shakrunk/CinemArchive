@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web: "Didn't make it" now queues a guarded reversal, preserving rated history, newer device edits and deliberate title-status changes across retries.
 - Android outing edits and viewing-unlink changes now use durable, version-checked commands; uncertain responses retain the original operation for confirmation instead of overwriting newer plans.
 - Shared outing reversal can follow queued plan and viewing edits using their exact receipts, while preserving later edits and rated history.
 - Shared credit refresh now updates provider metadata without replacing existing cast or crew identities, with owner-safe insertion and replay receipts.

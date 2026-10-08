@@ -38,7 +38,11 @@ export type TrackingMutation =
 
 /** A compound user action is one journal record and one delivery hook invocation.
  * The remote writer must supply transactional semantics for compound actions. */
-export type Mutation = TrackingMutation | TicketMutation | { kind: 'batch'; mutations: TrackingMutation[] }
+export interface OutingRevertMutation {
+  kind: 'outing.revert'; outingId: string; titleId: string
+  viewingId: string | null; viewingPresent: boolean
+}
+export type Mutation = TrackingMutation | TicketMutation | OutingRevertMutation | { kind: 'batch'; mutations: TrackingMutation[] }
 
 export type RevisionTable = 'titles' | 'lists' | 'cinema_outings' | 'seasons' | 'episodes' | 'viewings' | 'episode_watch_events' | 'episode_ratings' | 'episode_reviews'
 export type RowPrecondition = { table: RevisionTable; id: string } & ({ updatedAt: string; afterCommandId?: never } | { afterCommandId: string; updatedAt?: never })

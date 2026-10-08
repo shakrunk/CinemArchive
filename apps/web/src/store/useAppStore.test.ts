@@ -50,7 +50,7 @@ function makeNotification(overrides: Partial<AppNotificationItem> = {}): AppNoti
     mediaType: 'movie',
     title: 'The Long Reel',
     posterUrl: null,
-    payload: {},
+    payload: { outingId: 'o1' },
     createdAt: '2026-07-17T22:10:00.000Z',
     readAt: null,
     ...overrides,
@@ -75,7 +75,7 @@ beforeEach(async () => {
 })
 
 describe('revertOutingCompletion ("Didn\'t make it")', async () => {
-  it('deletes the auto-logged viewing, reverts a still-watched title, and marks the outing missed', async () => {
+  it('removes the identified viewing but retains title status until a server revision proves restoration is safe', async () => {
     const viewing = { id: 'v1', titleId: 't1', date: '2026-07-17', venue: 'AMC Georgetown' }
     await seedState({
       titles: [makeTitle({ status: 'watched', viewings: [viewing] })],
@@ -86,7 +86,7 @@ describe('revertOutingCompletion ("Didn\'t make it")', async () => {
 
     const title = useAppStore.getState().titles.find((t) => t.id === 't1')!
     expect(title.viewings).toEqual([])
-    expect(title.status).toBe('watchlist') // outing.previousStatus
+    expect(title.status).toBe('watched') // Matching status alone cannot rule out a later intentional write.
 
     const outing = useAppStore.getState().outings.find((o) => o.id === 'o1')!
     expect(outing.status).toBe('missed')
@@ -118,6 +118,13 @@ describe('revertOutingCompletion ("Didn\'t make it")', async () => {
     expect(useAppStore.getState().outings[0].status).toBe('scheduled')
   })
 
+  it('preserves rated history and refuses to queue a reversal for it', async () => {
+    await seedState({ titles: [makeTitle({ viewings: [{ id: 'v1', titleId: 't1', rating: 4 }] })], outings: [makeOuting()] })
+    await expect(useAppStore.getState().revertOutingCompletion('o1')).rejects.toThrow('rating')
+    expect(useAppStore.getState().outings[0].status).toBe('completed')
+    expect(useAppStore.getState().titles[0].viewings[0].rating).toBe(4)
+  })
+
   it('drops the matching stale outing_completed notification from the inbox', async () => {
     await seedState({
       titles: [makeTitle({ status: 'watched', viewings: [{ id: 'v1', titleId: 't1', date: '2026-07-17' }] })],
@@ -142,6 +149,15 @@ describe('revertOutingCompletion ("Didn\'t make it")', async () => {
     await useAppStore.getState().revertOutingCompletion('o1')
 
     expect(useAppStore.getState().notificationInbox).toHaveLength(1)
+  })
+
+  it('retains another trip notification for the same title and unidentifiable legacy items', async () => {
+    await seedState({ titles: [makeTitle()], outings: [makeOuting()], notificationInbox: [
+      makeNotification({ id: 'other-trip', payload: { outingId: 'o2' } }),
+      makeNotification({ id: 'legacy', payload: {} }),
+    ] })
+    await useAppStore.getState().revertOutingCompletion('o1')
+    expect(useAppStore.getState().notificationInbox.map((item) => item.id)).toEqual(['other-trip', 'legacy'])
   })
 })
 

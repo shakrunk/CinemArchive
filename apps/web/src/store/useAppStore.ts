@@ -327,8 +327,8 @@ interface OutingsSlice {
   // first (same match-by-tmdbId+type resolution the recommendation inbox
   // uses), then returns the titleId either way for the prefilled sheet.
   // "Didn't make it" (plan §5.6): deletes the auto-logged viewing, reverts the
-  // title status iff it's still 'watched', flips the outing to 'missed', and
-  // drops the now-stale outing_completed inbox item.
+  // title status only when its completion revision is unchanged, and marks
+  // the outing missed. Confirmed reversal removes its identified inbox item.
   // The single choke point for auto-completion (plan §4.3) — calls
   // complete_due_outings and applies whatever transitions it returns.
   reconcileOutings: () => Promise<void>
@@ -652,11 +652,12 @@ const writeLibrary: LibraryWrite = (prepare) => writeLocalLibrary(async (state) 
   return result
 })
 
-function afterOutingRevert(outingId: string): void {
+function afterOutingRevert(outingId: string, confirmed = false): void {
   const state = useAppStore.getState()
+  if (state.user && !isDevMockUser(state.user) && !confirmed) return
   const outing = state.outings.find((row) => row.id === outingId && row.status === 'missed')
   if (!outing) return
-  const stale = state.notificationInbox.filter((item) => item.type === 'outing_completed' && item.titleId === outing.titleId)
+  const stale = state.notificationInbox.filter((item) => item.type === 'outing_completed' && item.titleId === outing.titleId && item.payload.outingId === outingId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
   if (stale) void state.deleteNotificationItem(stale.id)
 }
@@ -684,7 +685,7 @@ const libraryRuntime = new OfflineLibraryRuntime({
   deliver: createLibraryCommandDelivery(fetchOwnerSnapshot, createTicketCommandDelivery({ ...ticketRemoteOptions,
     readBlob: (scope, id) => ownerOfflineStorage.readTicketBlob(scope, id),
     fetchBase: (context) => fetchOwnerSnapshot(context, true),
-  })),
+  }), (outingId) => afterOutingRevert(outingId, true)),
   onSnapshot: (snapshot) => {
     const s = useAppStore.getState()
     const userId = s.user && !isDevMockUser(s.user) ? s.user.id : null

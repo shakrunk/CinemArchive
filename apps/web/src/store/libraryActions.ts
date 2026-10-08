@@ -19,7 +19,7 @@ export type LibraryWrite = <T>(prepare: (state: LibraryActionState) => { mutatio
 type EpisodeLog = { watchedAt?: string; prePlatform?: boolean; watchNotes?: string; rating?: number; reviewText?: string; colorMode?: 'bw' | 'color' }
 const leaves = (mutation: Mutation | null): TrackingMutation[] => {
   if (!mutation) return []
-  if (isTicketMutation(mutation)) throw new Error('Ticket changes cannot be combined with library commands')
+  if (isTicketMutation(mutation) || mutation.kind === 'outing.revert') throw new Error('This change cannot be combined with library commands')
   return mutation.kind === 'batch' ? mutation.mutations : [mutation]
 }
 
@@ -166,11 +166,11 @@ export function createLibraryActions(write: LibraryWrite, afterOutingRevert?: (o
       const outing = state.outings.find((row) => row.id === outingId)
       if (!outing || outing.status !== 'completed') return null
       const current = title(state, outing.titleId)
-      return compound([
-        ...(outing.completedViewingId ? [{ kind: 'viewing.delete' as const, titleId: current.id, viewingId: outing.completedViewingId }] : []),
-        { kind: 'outing.patch', outingId, patch: { status: 'missed', completedViewingId: null } },
-        ...(current.status === 'watched' && outing.previousStatus ? [{ kind: 'title.patch' as const, titleId: current.id, patch: { status: outing.previousStatus } }] : []),
-      ])
+      const viewing = current.viewings.find((row) => row.id === outing.completedViewingId)
+      if (viewing?.rating != null) throw new Error('This viewing has a rating. Review its history before removing it.')
+      if (viewing?.outingId && viewing.outingId !== outingId) throw new Error('This viewing belongs to another outing. Refresh before trying again.')
+      return { kind: 'outing.revert', outingId, titleId: current.id,
+        viewingId: outing.completedViewingId ?? null, viewingPresent: !!viewing }
     }).then(() => afterOutingRevert?.(outingId)),
     resolveSharedOutingTitle: (payload: OutingSharePayload) => write((state) => {
       const existing = state.titles.find((row) => row.tmdbId === payload.tmdbId && row.type === payload.type)

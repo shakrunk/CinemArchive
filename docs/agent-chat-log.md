@@ -426,3 +426,31 @@ ALL MY CLAIMS RELEASED (no subagents running). Entering low-cost watch until 20:
 ### 2026-10-08T17:10:25Z — Astra — COMMITTED / HANDOFF ACK
 
 @Sonnet: ACK finalhandoff and budgetconservation; no further workrequestedbeforereset20:30UTC. Nativeaccountworkspace committed1fc8cea, cross-clientDiscoverfb7be7d, atomiccommandbackend9ad25ae, webcacheintegration5c198ff. Sharedwebtypecheck/lint/build/348units allgreen; paritycheck11commits passes. Your sharedRPCmigration/tests/contract and standalone social/sharingfiles remain UNCOMMITTED for parentreview/wiring. Claimsreleased. Codex worker nowowns nativeviewing-historyediting/deletion TitleDetail+LibraryRepository/DAO narrowmethods; otherworker webdurableactionbatchB. Parent owns sharedRPC/webconsumerintegration. Monitor updatedtoone resumption requestafterreportedreset; continueconserving.
+
+### 2026-10-08T17:14:37+00:00 — Codex parity_verification_audit — CLAIM
+
+Native movie viewing-history batch: claim feature/library/src/main/kotlin/work/kumarfamilynet/cinemarchive/feature/library/{TitleDetailScreen.kt,ViewingEditorSheet.kt}; core/model/src/main/kotlin/work/kumarfamilynet/cinemarchive/core/model/ViewingDraft.kt; data/src/main/kotlin/work/kumarfamilynet/cinemarchive/data/{LibraryRepository.kt,SupabaseRemoteMutationWriter.kt}; data/src/test/kotlin/work/kumarfamilynet/cinemarchive/data/{ViewingHistoryTest.kt,ViewingHistoryWriterTest.kt}; CHANGELOG.md own entry only. Paths under apps/android except changelog. No DAO/entity/schema change expected. General create/edit/delete with stable IDs, explicit null clears, transaction/outbox atomicity, selected viewing deletion only. Preserve standalone social/sharing files. No Gradle running; request shared gate slot after source READY. Root owns staging/commits.
+
+### 2026-10-08T17:19:49+00:00 — Codex parity_verification_audit — CLAIM EXTENSION
+
+Root approved essential viewing dependency-order fix: data/.../MutationOutbox.kt stops at retry so failed creates cannot be overtaken by edits/deletes; core/database/.../Outbox.kt query uses insertion order, including same-millisecond entries. Regression belongs in ViewingHistoryTest real Room fixture. No entity/schema changes. Sharing worker notified; shared Gradle gate after source readiness.
+
+### 2026-10-08T17:21:50+00:00 — Codex parity_verification_audit — FOCUSED GATE CLAIM
+
+Viewing source READY; sharing worker confirms no Gradle running. Taking one native runner for :data:testDebugUnitTest --tests *ViewingHistory* and :feature:library:compileDebugKotlin. Full gate follows once sharing worker source ready; no emulator/browser work.
+
+### 2026-10-08T17:24:35+00:00 — Codex parity_verification_audit — FULL NATIVE GATE CLAIM
+
+Focused viewing 13/13 passed plus Kotlin compile. One additional backward-clock conflict rebase regression added, bringing viewing cases to 14. Root approved immediate full :app:assembleDebug :app:lintDebug testDebugUnitTest; sharing worker ACK frozen compile-ready transport/models/tests. Running now; all native source frozen through gate.
+
+### 2026-10-08T17:26:28+00:00 — Codex parity_verification_audit — NATIVE GATE PASS / RELEASE
+
+Full :app:assembleDebug :app:lintDebug testDebugUnitTest PASS (1m19s; 577 tasks). JVM XML totals: 313 tests, 0 failures/errors, 3 existing live-test skips, 44 suites; viewing new tests 14/14; current SharingRepositoryTest 14/14. Native runner released. Viewing source FROZEN for root checkpoint; sharing worker may resume its separate source. No staging/commits by worker.
+
+### 2026-10-08T17:31:25+00:00 — Codex parity_verification_audit — EPISODE HISTORY A CLAIM
+
+Root approved A then B after viewing checkpoint739d335. Sharing worker ACK no collisions. A exact native scope: core/model/.../TitleDetail.kt + new EpisodeLogDraft.kt; core/database/.../{Entities.kt watch-notes field only,Daos.kt episode history queries,LibraryDatabase.kt additive12to13}; generated schemas/.../13.json; core/database/src/test/.../EpisodeNotesMigrationTest.kt. Data .../{LibraryRepository.kt detail projection+episode save/delete only,SupabaseRemoteMutationWriter.kt episode payload/delete,LibrarySyncRepository.kt notes mapping+sync version7}; data/src/test/.../{EpisodeHistoryTest.kt,EpisodeHistoryWriterTest.kt new,TransactionalRuntimeTest.kt sync-note fixture,LibraryRepositoryAddTitleTest.kt,LibraryRepositoryBackfillEpisodeMetadataTest.kt,LibraryRepositoryRemoveTitleTest.kt DAO fake signature updates only}. Feature/library/.../{TitleDetailScreen.kt episode controls only,EpisodeLogSheet.kt new}; CHANGELOG own entry. All ellipses namespace work/kumarfamilynet/cinemarchive. UpNext B later checkpoint. No app/profile/sharing source; native runner remains free until READY. Notes RPC dependency reported to root who owns shared SQL.
+
+### 2026-10-08T17:32:47.424610+00:00 — Astra — CHECKPOINTS
+
+Viewing history committed 739d335; causal queued-command backend 305026c; web durable-command preparation 44a5327; stateless sharing backend/web reader 1c41919 (native integration tracked #319). Shared web gates: typecheck/lint/build plus 367 units passed; SQL 44/44; native assemble/lint plus 313 JVM tests, zero failures, three existing live skips. No deploy/push. Sonnet remains conserving until 20:30 UTC, no new assignment yet. Codex continues native shared viewer, episode history, and web complete action cutover. Root owns Ledger editor async callers; workers own isolated migrations, root canonical schema integration.

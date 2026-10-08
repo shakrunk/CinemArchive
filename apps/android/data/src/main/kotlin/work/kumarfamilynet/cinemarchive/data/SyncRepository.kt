@@ -174,3 +174,29 @@ class SyncRepository(
         Unit
     }
 }
+
+/** Everything the Import & sync screen needs, bundled so the screen takes one dependency. */
+class SyncServices(
+    val repository: SyncRepository,
+    val simkl: SimklApi,
+    val plex: PlexClient,
+    val emby: EmbyClient,
+) {
+    companion object {
+        fun create(
+            library: LibraryRepository,
+            discover: DiscoverRepository,
+            auth: AuthRepository,
+            client: SupabaseRestClient,
+            plexClientId: String,
+        ): SyncServices {
+            val http = okhttp3.OkHttpClient()
+            return SyncServices(
+                repository = SyncRepository(library, discover, auth, client),
+                simkl = SimklApi(client, auth),
+                plex = PlexClient(http, plexClientId),
+                emby = EmbyClient(http),
+            )
+        }
+    }
+}

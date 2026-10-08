@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +46,7 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { APPEARANCE, PERMISSIONS, ABOUT, DEVELOPER }
+enum class SettingsCategory { APPEARANCE, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
@@ -55,6 +56,7 @@ fun ProfileRoute(
     appVersionName: String,
     onClose: () -> Unit,
     onOpenAppearance: () -> Unit,
+    onOpenImportSync: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     // Governs the Developer Settings row's visibility — see
@@ -82,6 +84,7 @@ fun ProfileRoute(
         appVersionName = appVersionName,
         onClose = onClose,
         onOpenAppearance = onOpenAppearance,
+        onOpenImportSync = onOpenImportSync,
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
         devSettingsUnlocked = devSettingsUnlocked,
@@ -134,6 +137,7 @@ private fun ProfileScreen(
     appVersionName: String,
     onClose: () -> Unit,
     onOpenAppearance: () -> Unit,
+    onOpenImportSync: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     devSettingsUnlocked: Boolean,
@@ -197,6 +201,20 @@ private fun ProfileScreen(
                         subtitle = appearanceSummary,
                         onClick = onOpenAppearance,
                         selected = selectedCategory == SettingsCategory.APPEARANCE,
+                    )
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Sync,
+                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        title = "Import & sync",
+                        subtitle = "Simkl, Plex & Emby",
+                        onClick = onOpenImportSync,
+                        selected = selectedCategory == SettingsCategory.IMPORT_SYNC,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
             }

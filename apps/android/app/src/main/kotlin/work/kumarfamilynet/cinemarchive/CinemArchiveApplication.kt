@@ -33,6 +33,7 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.data.SupabaseLedgerLayoutWriter
 import work.kumarfamilynet.cinemarchive.data.SupabaseRemoteMutationWriter
 import work.kumarfamilynet.cinemarchive.data.SupabaseRestClient
+import work.kumarfamilynet.cinemarchive.data.SyncServices
 import work.kumarfamilynet.cinemarchive.data.TitleConflictHandler
 
 class CinemArchiveApplication : Application() {
@@ -120,6 +121,16 @@ class CinemArchiveApplication : Application() {
             outbox = outbox,
             episodeMetadataFetcher = discoverRepository,
         )
+    }
+
+    /** Third-party import (Simkl, Plex, Emby). Plex/Emby are called straight from the device;
+     *  the stable random client id Plex wants is generated once and kept in plain prefs (it
+     *  identifies this install, it is not a credential). */
+    val syncServices: SyncServices by lazy {
+        val prefs = getSharedPreferences("sync", MODE_PRIVATE)
+        val plexClientId = prefs.getString("plex_client_id", null)
+            ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString("plex_client_id", it).apply() }
+        SyncServices.create(libraryRepository, discoverRepository, authRepository, supabaseClient, plexClientId)
     }
 
     val outingsRepository: OutingsRepository by lazy {

@@ -103,6 +103,7 @@ import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+import work.kumarfamilynet.cinemarchive.data.SyncServices
 import work.kumarfamilynet.cinemarchive.feature.auth.LoginRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.AddTitleOverlayRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute
@@ -113,6 +114,7 @@ import work.kumarfamilynet.cinemarchive.feature.lists.ListsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.DeveloperSettingsRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.ImportSyncRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
@@ -148,6 +150,7 @@ class MainActivity : ComponentActivity() {
         val ledgerRepository = (application as CinemArchiveApplication).ledgerRepository
         val ledgerLayoutRepository = (application as CinemArchiveApplication).ledgerLayoutRepository
         val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
+        val syncServices = (application as CinemArchiveApplication).syncServices
         val outingsRepository = (application as CinemArchiveApplication).outingsRepository
         val listsRepository = (application as CinemArchiveApplication).listsRepository
         val authRepository = (application as CinemArchiveApplication).authRepository
@@ -201,6 +204,7 @@ class MainActivity : ComponentActivity() {
                                 authRepository,
                                 librarySyncRepository,
                                 appUpdateRepository,
+                                syncServices,
                                 apkInstaller,
                                 initialTitleId = initialTitleId,
                                 appVersionName = BuildConfig.VERSION_NAME,
@@ -316,6 +320,7 @@ private sealed interface Overlay {
     ) : Overlay
     data object Profile : Overlay
     data object Appearance : Overlay
+    data object ImportSync : Overlay
     data object About : Overlay
     data object Permissions : Overlay
     data object DeveloperSettings : Overlay
@@ -345,6 +350,7 @@ private fun CinemArchiveApp(
     authRepository: AuthRepository,
     librarySyncRepository: LibrarySyncRepository,
     appUpdateRepository: AppUpdateRepository,
+    syncServices: SyncServices,
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     appVersionName: String,
@@ -459,7 +465,7 @@ private fun CinemArchiveApp(
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
             overlay = when (overlay) {
-                Overlay.Appearance, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
+                Overlay.Appearance, Overlay.ImportSync, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
                 else -> null
             }
             backProgress.snapTo(0f)
@@ -620,6 +626,7 @@ private fun CinemArchiveApp(
             // picked from the list, defaulting to Appearance.
             val settingsCategoryFromOverlay = when (overlay) {
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
+                Overlay.ImportSync -> SettingsCategory.IMPORT_SYNC
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
                 Overlay.About -> SettingsCategory.ABOUT
                 Overlay.DeveloperSettings -> SettingsCategory.DEVELOPER
@@ -655,6 +662,7 @@ private fun CinemArchiveApp(
                             appVersionName,
                             onClose = closeOverlay,
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
+                            onOpenImportSync = { selectedSettingsCategory = SettingsCategory.IMPORT_SYNC },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
                             onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
                             devSettingsUnlocked = devSettingsUnlocked,
@@ -668,6 +676,7 @@ private fun CinemArchiveApp(
                         // list pane opposite it is the only way out, via its own close button.
                         when (activeCategory) {
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false)
                             SettingsCategory.ABOUT -> AboutRoute(
                                 appVersionName,
                                 appUpdateRepository,
@@ -723,12 +732,14 @@ private fun CinemArchiveApp(
                     appVersionName,
                     onClose = closeOverlay,
                     onOpenAppearance = { overlay = Overlay.Appearance },
+                    onOpenImportSync = { overlay = Overlay.ImportSync },
                     onOpenAbout = { overlay = Overlay.About },
                     onOpenPermissions = { overlay = Overlay.Permissions },
                     devSettingsUnlocked = devSettingsUnlocked,
                     onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
+                Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile)
                 Overlay.About -> AboutRoute(
                     appVersionName,
                     appUpdateRepository,

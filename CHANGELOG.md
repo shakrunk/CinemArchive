@@ -11,6 +11,7 @@ number is chosen.
 
 ### Fixed
 
+- Android: local libraries, pending changes, sync jobs, and outing notifications now stay with their signed-in account; legacy device data can be recovered explicitly with crash-safe receipts.
 - Android: Up Next ordering, mixed season progress, episode average ratings, and Ledger history/date-range calculations now match the web app.
 - Web: retrying an episode log preserves the original watch, rating, and review IDs and timestamps, avoiding duplicates after a lost response; clearing a title's rating or notes now clears the synced value too.
 - Web: GitHub Pages deep links now recover when session storage is unavailable, and stale external redirect values no longer interrupt startup.
@@ -18,6 +19,7 @@ number is chosen.
 
 ### Added
 
+- Android: profile identity editing, invite redemption and management, notification inbox, and Friends screens for relationships, recommendations, activity, and read-only libraries.
 - Web: Appearance now offers Android's four text sizes and bundled Lexend font, with a live preview, apply/cancel/reset controls, and device-local preferences that work offline.
 - Web: Up Next now shows private On This Day cinema memories with the original venue, companions, rating, and notes, matching Android.
 - Web: the moviegoing Ledger panel now includes venue and format spending, best-value theaters, and milestone badges in a complete keyboard-accessible detail view, matching Android.

@@ -119,8 +119,10 @@ class OutingsRepository(
             createdAt = nowIso,
             updatedAt = nowIso,
         )
-        cinemaOutingDao.upsert(entity)
-        enqueueOutingMutation(entity)
+        outbox.atomically {
+            cinemaOutingDao.upsert(entity)
+            enqueueOutingMutation(entity)
+        }
         rearmAlarm()
         return id
     }
@@ -140,29 +142,32 @@ class OutingsRepository(
         bookingRef: String?,
         notes: String?,
     ) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(
-            showtime = showtime.toString(),
-            previewsMinutes = previewsMinutes,
-            runtimeMinutes = runtimeMinutes,
-            endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
-            venue = venue,
-            companions = companions,
-            format = format?.name,
-            ticketPrice = ticketPrice,
-            // `seat` is deliberately carried forward untouched: the edit form has no input
-            // for it, so taking it from `seating` would erase a pre-#221 row's only seat
-            // record the first time it's edited for any other reason.
-            auditorium = seating.auditorium,
-            seatRow = seating.seatRow,
-            seats = seating.seats,
-            bookingRef = bookingRef,
-            notes = notes,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
-        rearmAlarm()
+        val applied = outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically false
+            val updated = existing.copy(
+                showtime = showtime.toString(),
+                previewsMinutes = previewsMinutes,
+                runtimeMinutes = runtimeMinutes,
+                endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
+                venue = venue,
+                companions = companions,
+                format = format?.name,
+                ticketPrice = ticketPrice,
+                // `seat` is deliberately carried forward untouched: the edit form has no input
+                // for it, so taking it from `seating` would erase a pre-#221 row's only seat
+                // record the first time it's edited for any other reason.
+                auditorium = seating.auditorium,
+                seatRow = seating.seatRow,
+                seats = seating.seats,
+                bookingRef = bookingRef,
+                notes = notes,
+                updatedAt = Instant.now().toString(),
+            )
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated)
+            true
+        }
+        if (applied) rearmAlarm()
     }
 
     /** Attaches a captured ticket photo (GitHub #219) to an outing, plus whatever barcode
@@ -176,51 +181,60 @@ class OutingsRepository(
         barcodePayload: String?,
         barcodeFormat: TicketBarcodeFormat?,
     ) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(
-            ticketImagePath = imagePath,
-            ticketBarcodePayload = barcodePayload,
-            ticketBarcodeFormat = barcodeFormat?.name,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            val updated = existing.copy(
+                ticketImagePath = imagePath,
+                ticketBarcodePayload = barcodePayload,
+                ticketBarcodeFormat = barcodeFormat?.name,
+                updatedAt = Instant.now().toString(),
+            )
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated)
+        }
     }
 
     /** Removes a captured ticket photo/barcode, e.g. before re-capturing or if it was added by
      *  mistake. Does not touch [CinemaOutingEntity.bookingRef] — that's a separately-entered
      *  field, not part of the capture. */
     suspend fun clearTicketCapture(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(
-            ticketImagePath = null,
-            ticketBarcodePayload = null,
-            ticketBarcodeFormat = null,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            val updated = existing.copy(
+                ticketImagePath = null,
+                ticketBarcodePayload = null,
+                ticketBarcodeFormat = null,
+                updatedAt = Instant.now().toString(),
+            )
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated)
+        }
     }
 
     /** Cancels a still-scheduled outing (before the show ends) — kept as a row for history,
      *  never transitions to completed. No-op for an outing that's already completed/missed/
      *  cancelled. */
     suspend fun cancelOuting(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        if (existing.status != OutingStatus.SCHEDULED.name) return
-        val updated = existing.copy(status = OutingStatus.CANCELLED.name, updatedAt = Instant.now().toString())
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
-        rearmAlarm()
+        val applied = outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically false
+            if (existing.status != OutingStatus.SCHEDULED.name) return@atomically false
+            val updated = existing.copy(status = OutingStatus.CANCELLED.name, updatedAt = Instant.now().toString())
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated)
+            true
+        }
+        if (applied) rearmAlarm()
     }
 
     /** Stamps the 14-day follow-up window closed without rating — the post-show card/inbox
      *  item's ✕ dismissal (web plan §4.4). */
     suspend fun dismissFollowUp(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(followUpDismissedAt = Instant.now().toString(), updatedAt = Instant.now().toString())
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            val updated = existing.copy(followUpDismissedAt = Instant.now().toString(), updatedAt = Instant.now().toString())
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated)
+        }
     }
 
     /** "Didn't make it" — reverts a completion: deletes the auto-logged viewing, restores the
@@ -229,43 +243,46 @@ class OutingsRepository(
      *  `MISSED`. Hidden by the UI once the viewing has a rating — enforced by the caller, not
      *  here, so this stays a pure revert regardless of who calls it. */
     suspend fun revertCompletion(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        if (existing.status != OutingStatus.COMPLETED.name) return
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            if (existing.status != OutingStatus.COMPLETED.name) return@atomically
 
-        existing.completedViewingId?.let { viewingId ->
-            viewingDao.deleteById(viewingId)
-            // Not yet meaningfully flushable: SupabaseRemoteMutationWriter's "viewing" case
-            // always upserts regardless of `operation` (docs/android-sync-contract.md's delete
-            // contract isn't implemented for viewings yet). Harmless today since the writer
-            // is Unconfigured; worth fixing before this write path goes live.
-            outbox.enqueue(
-                entityType = "viewing",
-                entityId = viewingId,
-                operation = "delete",
-                payload = JSONObject().put("id", viewingId),
+            existing.completedViewingId?.let { viewingId ->
+                viewingDao.deleteById(viewingId)
+                // Not yet meaningfully flushable: SupabaseRemoteMutationWriter's "viewing" case
+                // always upserts regardless of `operation` (docs/android-sync-contract.md's delete
+                // contract isn't implemented for viewings yet). Harmless today since the writer
+                // is Unconfigured; worth fixing before this write path goes live.
+                outbox.enqueue(
+                    entityType = "viewing",
+                    entityId = viewingId,
+                    operation = "delete",
+                    payload = JSONObject().put("id", viewingId),
+                )
+            }
+
+            // One-shot read (not observeTitle().first()): don't collect a Room Flow inside a transaction.
+            val title = titleDao.getById(existing.titleId)
+            val previousStatus = existing.previousStatus
+            if (title != null && previousStatus != null && title.status == LibraryStatus.WATCHED.name) {
+                val nowIso = Instant.now().toString()
+                titleDao.updateStatus(existing.titleId, previousStatus, nowIso)
+                outbox.enqueue(
+                    entityType = "title",
+                    entityId = existing.titleId,
+                    operation = "update",
+                    payload = JSONObject().put("id", existing.titleId).put("status", previousStatus).put("updatedAt", nowIso),
+                )
+            }
+
+            val reverted = existing.copy(
+                status = OutingStatus.MISSED.name,
+                completedViewingId = null,
+                updatedAt = Instant.now().toString(),
             )
+            cinemaOutingDao.upsert(reverted)
+            enqueueOutingMutation(reverted)
         }
-
-        val title = titleDao.observeTitle(existing.titleId).first()
-        val previousStatus = existing.previousStatus
-        if (title != null && previousStatus != null && title.status == LibraryStatus.WATCHED.name) {
-            val nowIso = Instant.now().toString()
-            titleDao.updateStatus(existing.titleId, previousStatus, nowIso)
-            outbox.enqueue(
-                entityType = "title",
-                entityId = existing.titleId,
-                operation = "update",
-                payload = JSONObject().put("id", existing.titleId).put("status", previousStatus).put("updatedAt", nowIso),
-            )
-        }
-
-        val reverted = existing.copy(
-            status = OutingStatus.MISSED.name,
-            completedViewingId = null,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(reverted)
-        enqueueOutingMutation(reverted)
     }
 
     /**
@@ -293,57 +310,63 @@ class OutingsRepository(
             val title = titleDao.observeTitle(entity.titleId).first() ?: continue
             val nowIso = now.toString()
 
-            val viewingId = viewingDao.getByOutingId(entity.id)?.id ?: run {
-                val id = UUID.randomUUID().toString()
-                val viewedDate = Instant.parse(entity.showtime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
-                viewingDao.upsert(
-                    ViewingEntity(
-                        id = id,
-                        titleId = entity.titleId,
-                        date = viewedDate,
-                        rating = null,
-                        notes = null,
-                        venue = entity.venue,
-                        companions = entity.companions,
-                        outingId = entity.id,
-                    ),
-                )
-                outbox.enqueue(
-                    entityType = "viewing",
-                    entityId = id,
-                    operation = "upsert",
-                    payload = JSONObject().apply {
-                        put("id", id)
-                        put("titleId", entity.titleId)
-                        put("date", viewedDate)
-                        put("venue", entity.venue ?: JSONObject.NULL)
-                        put("companions", JSONArray(entity.companions))
-                        put("outingId", entity.id)
-                    },
-                )
-                id
-            }
-
             val previousStatus = title.status
             val newStatus = if (previousStatus == LibraryStatus.WATCHED.name) previousStatus else LibraryStatus.WATCHED.name
-            if (previousStatus != newStatus) {
-                titleDao.updateStatus(entity.titleId, newStatus, nowIso)
-                outbox.enqueue(
-                    entityType = "title",
-                    entityId = entity.titleId,
-                    operation = "update",
-                    payload = JSONObject().put("id", entity.titleId).put("status", newStatus).put("updatedAt", nowIso),
-                )
-            }
 
-            val completed = entity.copy(
-                status = OutingStatus.COMPLETED.name,
-                previousStatus = previousStatus,
-                completedViewingId = viewingId,
-                updatedAt = nowIso,
-            )
-            cinemaOutingDao.upsert(completed)
-            enqueueOutingMutation(completed)
+            // One transaction per outing: the viewing insert, title status flip, outing status
+            // flip and their outbox entries commit together (or not at all).
+            val viewingId = outbox.atomically {
+                val resolvedViewingId = viewingDao.getByOutingId(entity.id)?.id ?: run {
+                    val id = UUID.randomUUID().toString()
+                    val viewedDate = Instant.parse(entity.showtime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+                    viewingDao.upsert(
+                        ViewingEntity(
+                            id = id,
+                            titleId = entity.titleId,
+                            date = viewedDate,
+                            rating = null,
+                            notes = null,
+                            venue = entity.venue,
+                            companions = entity.companions,
+                            outingId = entity.id,
+                        ),
+                    )
+                    outbox.enqueue(
+                        entityType = "viewing",
+                        entityId = id,
+                        operation = "upsert",
+                        payload = JSONObject().apply {
+                            put("id", id)
+                            put("titleId", entity.titleId)
+                            put("date", viewedDate)
+                            put("venue", entity.venue ?: JSONObject.NULL)
+                            put("companions", JSONArray(entity.companions))
+                            put("outingId", entity.id)
+                        },
+                    )
+                    id
+                }
+
+                if (previousStatus != newStatus) {
+                    titleDao.updateStatus(entity.titleId, newStatus, nowIso)
+                    outbox.enqueue(
+                        entityType = "title",
+                        entityId = entity.titleId,
+                        operation = "update",
+                        payload = JSONObject().put("id", entity.titleId).put("status", newStatus).put("updatedAt", nowIso),
+                    )
+                }
+
+                val completed = entity.copy(
+                    status = OutingStatus.COMPLETED.name,
+                    previousStatus = previousStatus,
+                    completedViewingId = resolvedViewingId,
+                    updatedAt = nowIso,
+                )
+                cinemaOutingDao.upsert(completed)
+                enqueueOutingMutation(completed)
+                resolvedViewingId
+            }
 
             transitions += OutingTransition(
                 outingId = entity.id,

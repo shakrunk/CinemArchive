@@ -35,7 +35,7 @@ sealed interface SimklPoll {
 
 class SimklApi(
     private val client: SupabaseRestClient,
-    private val authRepository: AuthRepository,
+    private val authRepository: SessionSource,
 ) {
     fun start(): SimklDeviceCode {
         val json = call(JSONObject().put("action", "start").put("write", false))

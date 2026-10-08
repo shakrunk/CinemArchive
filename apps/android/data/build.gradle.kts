@@ -15,6 +15,8 @@ android {
     }
 }
 
+android.testOptions.unitTests.isIncludeAndroidResources = true
+
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 dependencies {
@@ -35,6 +37,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Real in-memory Room for repository tests (account retention, write-vs-pull, recovery).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.room.ktx)
     // Android's org.json is a compile-only stub that throws at runtime on the JVM unit
     // test classpath; the real implementation takes priority as an explicit dependency.
     testImplementation(libs.json)

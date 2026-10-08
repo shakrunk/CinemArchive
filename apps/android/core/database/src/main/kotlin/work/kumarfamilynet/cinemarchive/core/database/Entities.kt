@@ -1,9 +1,13 @@
 package work.kumarfamilynet.cinemarchive.core.database
 
+import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
+import androidx.room.Query
 import androidx.room.TypeConverter
 
 /**
@@ -364,6 +368,32 @@ data class ListItemEntity(
     val addedAt: String,
     val updatedAt: String,
 )
+
+/**
+ * Durable proof, committed in the SAME transaction as the recovered data, that a legacy-archive
+ * restore delivered something into THIS account's database (see the data module's
+ * `LegacyArchive`). `key` is `entry:<legacy outbox id>` (kind `entry`: that outbox entry was
+ * handed to this account, even if it has since been pushed and removed from `mutation_outbox`),
+ * `skip:<outbox id>` (kind `skipped`: handed over but its local row could not be restored yet) or
+ * `archive:<archiveId>` (kind `complete`: nothing skipped). `archiveId` is the SHA-256 of the
+ * legacy file. Local-only: not synced.
+ */
+@Entity(tableName = "legacy_restore_receipt")
+data class LegacyRestoreReceiptEntity(
+    @PrimaryKey val key: String,
+    val archiveId: String,
+    val kind: String,
+    val restoredAt: String,
+)
+
+@Dao
+interface LegacyRestoreReceiptDao {
+    @Query("SELECT `key` FROM legacy_restore_receipt WHERE archiveId = :archiveId")
+    suspend fun keysFor(archiveId: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(row: LegacyRestoreReceiptEntity)
+}
 
 class Converters {
     @TypeConverter

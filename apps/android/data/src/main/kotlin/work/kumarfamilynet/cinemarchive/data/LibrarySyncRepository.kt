@@ -1,12 +1,14 @@
 package work.kumarfamilynet.cinemarchive.data
 
-import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -23,6 +25,8 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.ListDao
 import work.kumarfamilynet.cinemarchive.core.database.ListEntity
 import work.kumarfamilynet.cinemarchive.core.database.ListItemDao
+import work.kumarfamilynet.cinemarchive.core.database.LocalTransactor
+import work.kumarfamilynet.cinemarchive.core.database.PassthroughTransactor
 import work.kumarfamilynet.cinemarchive.core.database.ListItemEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
@@ -35,7 +39,6 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 
-private val Context.librarySyncDataStore by preferencesDataStore(name = "cinemarchive_sync")
 private const val EPOCH = "1970-01-01T00:00:00Z"
 private const val PAGE_SIZE = 500
 
@@ -96,9 +99,9 @@ private const val SYNC_SCHEMA_VERSION = 6
  * had no credits at all and the Ledger's Ensemble widget could never populate (#177).
  */
 class LibrarySyncRepository(
-    context: Context,
+    private val dataStore: DataStore<Preferences>,
     private val client: SupabaseRestClient,
-    private val authRepository: AuthRepository,
+    private val authRepository: SessionSource,
     private val titleDao: TitleDao,
     private val seasonDao: SeasonDao,
     private val episodeDao: EpisodeDao,
@@ -111,8 +114,21 @@ class LibrarySyncRepository(
     private val titleCrewDao: TitleCrewDao,
     private val listDao: ListDao,
     private val listItemDao: ListItemDao,
+    /** Pushes queued local edits. Run before every pull so the server (and so the pull) already
+     *  reflects what this device did while offline. */
+    private val pushPending: suspend () -> Unit = {},
+    /** [pendingKey]s of entities with a queued, unpushed mutation. The pull never overwrites,
+     *  deletes or resurrects these — the local copy is the user's newer intent. */
+    private val pendingKeys: suspend () -> Set<String> = { emptySet() },
+    /** Each pulled page (including reading [pendingKeys]) is applied as one transaction, so a user
+     *  edit + its queue entry lands entirely before the page (and is then protected) or entirely
+     *  after it (and wins) — never between the pending check and the write. */
+    private val transactor: LocalTransactor = PassthroughTransactor,
 ) {
-    private val dataStore = context.librarySyncDataStore
+    /** The ONE sync pipeline: startup, resume and pull-to-refresh all land here and run
+     *  strictly one at a time, so a push and a pull can never interleave. */
+    private val syncMutex = Mutex()
+
     private val cursorKey = stringPreferencesKey("last_synced_at")
     private val schemaVersionKey = intPreferencesKey("sync_schema_version")
 
@@ -122,8 +138,18 @@ class LibrarySyncRepository(
      *  does blocking OkHttp network calls, and a caller invoking it from a Compose
      *  `LaunchedEffect`/`viewModelScope` (Main by default) would otherwise hit a
      *  `NetworkOnMainThreadException`. */
-    suspend fun syncNow() = withContext(Dispatchers.IO) {
-        val session = authRepository.currentSession() ?: return@withContext
+    suspend fun syncNow() = withContext(Dispatchers.IO) { syncMutex.withLock { syncLocked() } }
+
+    private suspend fun syncLocked() {
+        val session = authRepository.currentSession() ?: return
+        // Push first (best effort — offline just leaves entries queued and protected below).
+        try {
+            pushPending()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Offline or a failing entry: it stays queued, and is protected from the pull below.
+        }
         val prefs = dataStore.data.first()
         // An install that predates SYNC_SCHEMA_VERSION has no stored version at all — treat
         // that as version 1, so every pre-existing install also gets the one-time reset.
@@ -134,7 +160,7 @@ class LibrarySyncRepository(
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
             if (rows.length() == 0) break
-            applyPage(rows, deferred)
+            transactor.run { applyPage(rows, deferred) }
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
             dataStore.edit { it[cursorKey] = cursor }
             // A page may overshoot PAGE_SIZE — the RPC widens it to avoid splitting a group of
@@ -142,7 +168,7 @@ class LibrarySyncRepository(
             // nothing left to send, so a short page is still a reliable "that was the last one".
             if (rows.length() < PAGE_SIZE) break
         }
-        deferred.flush()
+        transactor.run { deferred.flush() }
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
         // idempotently) does the full resync again rather than settling for a partial one.
@@ -275,7 +301,11 @@ class LibrarySyncRepository(
      *  direct DAO call — see [DeferredRows]'s kdoc for why that's necessary even though title
      *  is always applied first *within* a page. */
     private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows) {
-        val byType = (0 until rows.length()).map { rows.getJSONObject(it) }.groupBy { it.getString("entity_type") }
+        // Re-read per page: edits enqueued while an earlier page was applying are protected too.
+        val pending = pendingKeys()
+        val byType = (0 until rows.length()).map { rows.getJSONObject(it) }
+            .filterNot { isProtectedFromPull(it, pending) }
+            .groupBy { it.getString("entity_type") }
 
         byType["title"]?.forEach { row ->
             val payload = row.payload()
@@ -496,4 +526,16 @@ class LibrarySyncRepository(
         addedAt = getString("addedAt"),
         updatedAt = getString("updatedAt"),
     )
+}
+
+/** True for a pulled row (upsert or tombstone) whose entity has a queued local mutation. */
+internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean {
+    if (pending.isEmpty()) return false
+    val entityType = row.getString("entity_type")
+    val key = if (entityType == "tombstone") {
+        pendingKey(row.getJSONObject("payload").getString("entityType"), row.getString("entity_id"))
+    } else {
+        pendingKey(entityType, row.getString("entity_id"))
+    }
+    return key in pending
 }

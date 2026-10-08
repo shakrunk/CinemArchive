@@ -28,6 +28,11 @@ interface RemoteMutationWriter {
  *  read model, so a losing local write converges to what the server actually holds. */
 fun interface ConflictHandler {
     suspend fun applyRemote(entityType: String, entityId: String, serverPayload: JSONObject)
+
+    /** Re-applies [laterPending] — still-queued LATER edits to the same entity, oldest first —
+     *  on top of the just-reconciled server row, so a conflicted earlier edit can never roll a
+     *  newer offline edit back out of the local projection while that edit waits to retry. */
+    suspend fun rebasePending(entityType: String, entityId: String, laterPending: List<JSONObject>) = Unit
 }
 
 /**

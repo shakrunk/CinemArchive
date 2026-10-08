@@ -73,6 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,11 +102,15 @@ import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
+import work.kumarfamilynet.cinemarchive.data.NotificationRules
+import work.kumarfamilynet.cinemarchive.data.visibleRuntime
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.data.SyncServices
 import work.kumarfamilynet.cinemarchive.feature.auth.LoginRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.AddTitleOverlayRoute
+import work.kumarfamilynet.cinemarchive.feature.friends.FriendLibraryRoute
+import work.kumarfamilynet.cinemarchive.feature.friends.FriendsRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerRoute
 import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
@@ -119,6 +124,10 @@ import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
 import work.kumarfamilynet.cinemarchive.feature.settings.profileInitial
+import work.kumarfamilynet.cinemarchive.feature.settings.IdentityRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.InvitesRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.NotificationsRoute
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalUnreadNotificationCount
 import work.kumarfamilynet.cinemarchive.feature.upnext.UpNextRoute
 
 private val VoidColor = Color(0xFF0B0907)
@@ -145,19 +154,14 @@ class MainActivity : ComponentActivity() {
                 start()
             }
         }
-        val repository = (application as CinemArchiveApplication).libraryRepository
-        val discoverRepository = (application as CinemArchiveApplication).discoverRepository
-        val ledgerRepository = (application as CinemArchiveApplication).ledgerRepository
-        val ledgerLayoutRepository = (application as CinemArchiveApplication).ledgerLayoutRepository
-        val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
-        val syncServices = (application as CinemArchiveApplication).syncServices
-        val outingsRepository = (application as CinemArchiveApplication).outingsRepository
-        val listsRepository = (application as CinemArchiveApplication).listsRepository
-        val authRepository = (application as CinemArchiveApplication).authRepository
-        val librarySyncRepository = (application as CinemArchiveApplication).librarySyncRepository
-        val appUpdateRepository = (application as CinemArchiveApplication).appUpdateRepository
-        val apkInstaller = (application as CinemArchiveApplication).apkInstaller
+        val app = application as CinemArchiveApplication
+        val discoverRepository = app.discoverRepository
+        val preferencesRepository = app.preferencesRepository
+        val authRepository = app.authRepository
+        val appUpdateRepository = app.appUpdateRepository
+        val apkInstaller = app.apkInstaller
         val initialTitleId = intent.getStringExtra(EXTRA_OPEN_TITLE_ID)
+        val initialTitleOwnerId = intent.getStringExtra(OutingCompletionReceiver.EXTRA_OWNER_ID)
 
         // Magic-link tap: standard launchMode means this is a fresh onCreate (same pattern
         // OutingCompletionReceiver's notification tap relies on), so intent.data is always
@@ -178,6 +182,10 @@ class MainActivity : ComponentActivity() {
             val fontScale by preferencesRepository.observeFontScale()
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
             val session by authRepository.observeSession().collectAsStateWithLifecycle()
+            val identity by authRepository.observeIdentity().collectAsStateWithLifecycle()
+            val publishedRuntime by app.accountRuntimeManager.runtime.collectAsStateWithLifecycle()
+            // Never render a runtime that is not exactly the current sign-in (see visibleRuntime).
+            val runtime = visibleRuntime(identity, publishedRuntime)
             val isDebugBuild = BuildConfig.DEBUG
             // Read at this top level (rather than inside CinemArchiveApp) so the banner covers
             // LoginRoute too, not just the signed-in app shell. remember(isDebugBuild) keeps the
@@ -190,26 +198,40 @@ class MainActivity : ComponentActivity() {
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
                 Surface {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (session == null) {
+                        if (identity == null) {
                             LoginRoute(authRepository)
                         } else {
-                            CinemArchiveApp(
-                                repository,
-                                discoverRepository,
-                                ledgerRepository,
-                                ledgerLayoutRepository,
-                                preferencesRepository,
-                                outingsRepository,
-                                listsRepository,
-                                authRepository,
-                                librarySyncRepository,
-                                appUpdateRepository,
-                                syncServices,
-                                apkInstaller,
-                                initialTitleId = initialTitleId,
-                                appVersionName = BuildConfig.VERSION_NAME,
-                                isDebugBuild = isDebugBuild,
-                            )
+                            val rt = runtime
+                            if (rt == null) {
+                                // Signed in, but the account runtime is still being assembled (local-only,
+                                // no network wait) — or is being swapped for another account.
+                                Box(modifier = Modifier.fillMaxSize())
+                            } else {
+                                // key(rt): a new sign-in is a fresh composition, so no remembered UI state
+                                // survives across accounts; the runtime is also the ViewModel store.
+                                androidx.compose.runtime.key(rt) {
+                                    androidx.compose.runtime.DisposableEffect(rt) {
+                                        rt.onUiAttached()
+                                        onDispose { rt.onUiDetached() }
+                                    }
+                                    androidx.compose.runtime.CompositionLocalProvider(
+                                        androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner provides rt,
+                                        LocalUnreadNotificationCount provides rt.notificationsRepository.inbox.collectAsStateWithLifecycle().value.unreadCount,
+                                    ) {
+                                        CinemArchiveApp(
+                                            rt,
+                                            discoverRepository,
+                                            preferencesRepository,
+                                            authRepository,
+                                            appUpdateRepository,
+                                            apkInstaller,
+                                            initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
+                                            appVersionName = BuildConfig.VERSION_NAME,
+                                            isDebugBuild = isDebugBuild,
+                                        )
+                                    }
+                                }
+                            }
                         }
                         // Sibling of both LoginRoute and CinemArchiveApp (rather than nested
                         // inside the latter) so it covers sign-in too — added after the app
@@ -319,6 +341,11 @@ private sealed interface Overlay {
         val openKey: String = java.util.UUID.randomUUID().toString(),
     ) : Overlay
     data object Profile : Overlay
+    data object Identity : Overlay
+    data object Invites : Overlay
+    data object Notifications : Overlay
+    data object Friends : Overlay
+    data class FriendLibrary(val friendUserId: String, val label: String) : Overlay
     data object Appearance : Overlay
     data object ImportSync : Overlay
     data object About : Overlay
@@ -340,22 +367,23 @@ private sealed interface Overlay {
  */
 @Composable
 private fun CinemArchiveApp(
-    repository: LibraryRepository,
+    runtime: AppAccountRuntime,
     discoverRepository: DiscoverRepository,
-    ledgerRepository: LedgerRepository,
-    ledgerLayoutRepository: LedgerLayoutRepository,
     preferencesRepository: PreferencesRepository,
-    outingsRepository: OutingsRepository,
-    listsRepository: ListsRepository,
     authRepository: AuthRepository,
-    librarySyncRepository: LibrarySyncRepository,
     appUpdateRepository: AppUpdateRepository,
-    syncServices: SyncServices,
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     appVersionName: String,
     isDebugBuild: Boolean,
 ) {
+    val repository = runtime.libraryRepository
+    val ledgerRepository = runtime.ledgerRepository
+    val ledgerLayoutRepository = runtime.ledgerLayoutRepository
+    val outingsRepository = runtime.outingsRepository
+    val listsRepository = runtime.listsRepository
+    val librarySyncRepository = runtime.librarySyncRepository
+    val syncServices = runtime.syncServices
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
     // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
@@ -389,7 +417,41 @@ private fun CinemArchiveApp(
     val closeOverlay = { overlay = null }
 
     val session by authRepository.observeSession().collectAsStateWithLifecycle()
-    val profileInitial = remember(session?.email) { profileInitial(session?.email) }
+    val accountRepository = runtime.accountRepository
+    val notificationsRepository = runtime.notificationsRepository
+    val accountProfile by accountRepository.profile.collectAsStateWithLifecycle()
+    val conflictContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(runtime) {
+        runtime.conflicts.collect {
+            android.widget.Toast.makeText(
+                conflictContext,
+                "A newer change from another device replaced one of your edits; your library now matches it.",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+    // Account isolation: drop the previous user's cached identity/inbox the moment the signed-in
+    // user changes (or signs out), then poll the unread badge while this shell is on screen —
+    // web polls every 45s because the inbox has no realtime subscription.
+    val pollOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(session?.userId) {
+        accountRepository.onSessionChanged(session?.userId)
+        notificationsRepository.onSessionChanged(session?.userId)
+        if (session != null) {
+            // STARTED-gated: refreshes once on every resume, never polls while backgrounded.
+            pollOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                while (true) {
+                    notificationsRepository.refreshUnreadCount()
+                    delay(NotificationRules.POLL_INTERVAL_MS)
+                }
+            }
+        }
+    }
+    val profileInitial = remember(session?.email, accountProfile) {
+        (accountProfile?.displayName?.takeIf { it.isNotBlank() } ?: accountProfile?.username?.takeIf { it.isNotBlank() })
+            ?.firstOrNull()?.uppercaseChar()?.toString()
+            ?: profileInitial(session?.email)
+    }
 
     // Requested contextually — the moment the user opens the schedule sheet, not at app
     // launch (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6) — the OS prompt
@@ -465,7 +527,9 @@ private fun CinemArchiveApp(
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
             overlay = when (overlay) {
+                Overlay.Identity, Overlay.Invites, Overlay.Notifications, Overlay.Friends,
                 Overlay.Appearance, Overlay.ImportSync, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
+                is Overlay.FriendLibrary -> Overlay.Friends
                 else -> null
             }
             backProgress.snapTo(0f)
@@ -625,6 +689,9 @@ private fun CinemArchiveApp(
             // device was unfolded mid-visit to one of them), otherwise it's whatever was last
             // picked from the list, defaulting to Appearance.
             val settingsCategoryFromOverlay = when (overlay) {
+                Overlay.Identity -> SettingsCategory.IDENTITY
+                Overlay.Invites -> SettingsCategory.INVITES
+                Overlay.Notifications -> SettingsCategory.NOTIFICATIONS
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
                 Overlay.ImportSync -> SettingsCategory.IMPORT_SYNC
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
@@ -659,14 +726,22 @@ private fun CinemArchiveApp(
                             repository,
                             preferencesRepository,
                             authRepository,
+                            accountRepository,
+                            notificationsRepository,
                             appVersionName,
                             onClose = closeOverlay,
+                            onOpenIdentity = { selectedSettingsCategory = SettingsCategory.IDENTITY },
+                            onOpenInvites = { selectedSettingsCategory = SettingsCategory.INVITES },
+                            onOpenNotifications = { selectedSettingsCategory = SettingsCategory.NOTIFICATIONS },
+                            onOpenFriends = { overlay = Overlay.Friends },
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
                             onOpenImportSync = { selectedSettingsCategory = SettingsCategory.IMPORT_SYNC },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
                             onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
                             devSettingsUnlocked = devSettingsUnlocked,
                             onOpenDeveloperSettings = { selectedSettingsCategory = SettingsCategory.DEVELOPER },
+                            legacyLoadStatus = runtime::legacyStatus,
+                            legacyRestore = runtime::restoreLegacy,
                             selectedCategory = activeCategory,
                         )
                     }
@@ -675,6 +750,16 @@ private fun CinemArchiveApp(
                         // showBack = false: this pane has no "back" of its own to unwind — the
                         // list pane opposite it is the only way out, via its own close button.
                         when (activeCategory) {
+                            SettingsCategory.IDENTITY -> IdentityRoute(accountRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.INVITES -> InvitesRoute(accountRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.NOTIFICATIONS -> NotificationsRoute(
+                                notificationsRepository,
+                                onBack = closeOverlay,
+                                onOpenTitle = { overlay = Overlay.Detail(it) },
+                                onOpenProfile = { selectedSettingsCategory = SettingsCategory.IDENTITY },
+                                onOpenFriends = { overlay = Overlay.Friends },
+                                showBack = false,
+                            )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false)
                             SettingsCategory.ABOUT -> AboutRoute(
@@ -729,14 +814,43 @@ private fun CinemArchiveApp(
                     repository,
                     preferencesRepository,
                     authRepository,
+                    accountRepository,
+                    notificationsRepository,
                     appVersionName,
                     onClose = closeOverlay,
+                    onOpenIdentity = { overlay = Overlay.Identity },
+                    onOpenInvites = { overlay = Overlay.Invites },
+                    onOpenNotifications = { overlay = Overlay.Notifications },
+                    onOpenFriends = { overlay = Overlay.Friends },
                     onOpenAppearance = { overlay = Overlay.Appearance },
                     onOpenImportSync = { overlay = Overlay.ImportSync },
                     onOpenAbout = { overlay = Overlay.About },
                     onOpenPermissions = { overlay = Overlay.Permissions },
                     devSettingsUnlocked = devSettingsUnlocked,
                     onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
+                    legacyLoadStatus = runtime::legacyStatus,
+                    legacyRestore = runtime::restoreLegacy,
+                )
+                Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
+                Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)
+                Overlay.Notifications -> NotificationsRoute(
+                    notificationsRepository,
+                    onBack = openProfile,
+                    onOpenTitle = { overlay = Overlay.Detail(it) },
+                    onOpenProfile = openProfile,
+                    onOpenFriends = { overlay = Overlay.Friends },
+                )
+                Overlay.Friends -> FriendsRoute(
+                    runtime.friendsRepository,
+                    viewerUserId = runtime.ownerId,
+                    onBack = openProfile,
+                    onOpenFriendLibrary = { id, label -> overlay = Overlay.FriendLibrary(id, label) },
+                )
+                is Overlay.FriendLibrary -> FriendLibraryRoute(
+                    runtime.friendsRepository,
+                    friendUserId = current.friendUserId,
+                    label = current.label,
+                    onBack = { overlay = Overlay.Friends },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile)

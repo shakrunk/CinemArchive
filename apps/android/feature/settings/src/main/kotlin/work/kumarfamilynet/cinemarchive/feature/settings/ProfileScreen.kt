@@ -18,6 +18,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
@@ -39,22 +43,30 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
+import work.kumarfamilynet.cinemarchive.data.AccountRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
+import work.kumarfamilynet.cinemarchive.data.NotificationsRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { APPEARANCE, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
+enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, APPEARANCE, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
     libraryRepository: LibraryRepository,
     preferencesRepository: PreferencesRepository,
     authRepository: AuthRepository,
+    accountRepository: AccountRepository,
+    notificationsRepository: NotificationsRepository,
     appVersionName: String,
     onClose: () -> Unit,
+    onOpenIdentity: () -> Unit,
+    onOpenInvites: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenFriends: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenImportSync: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -65,6 +77,8 @@ fun ProfileRoute(
     // overrides it.
     devSettingsUnlocked: Boolean,
     onOpenDeveloperSettings: () -> Unit,
+    legacyLoadStatus: suspend () -> work.kumarfamilynet.cinemarchive.data.LegacyArchiveStatus,
+    legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     // Non-null only in the wide/split layout, where this list sits permanently alongside its
     // detail pane rather than being replaced by it — highlights which category is showing
     // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
@@ -76,7 +90,17 @@ fun ProfileRoute(
     val palette by preferencesRepository.observePalette().collectAsStateWithLifecycle(initialValue = ArchivePalette.BRAND)
     val session by authRepository.observeSession().collectAsStateWithLifecycle()
 
+    val account by accountRepository.profile.collectAsStateWithLifecycle()
+    val inbox by notificationsRepository.inbox.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(session?.userId) { runCatching { accountRepository.refreshProfile() } }
+
     ProfileScreen(
+        heading = account?.displayName?.takeIf { it.isNotBlank() } ?: account?.username?.takeIf { it.isNotBlank() },
+        unreadNotifications = inbox.unreadCount,
+        onOpenIdentity = onOpenIdentity,
+        onOpenInvites = onOpenInvites,
+        onOpenNotifications = onOpenNotifications,
+        onOpenFriends = onOpenFriends,
         ownedCount = titles.size,
         watchedCount = titles.count { it.status == LibraryStatus.WATCHED },
         appearanceSummary = "${themeMode.label()} · ${palette.label()}",
@@ -89,6 +113,8 @@ fun ProfileRoute(
         onOpenPermissions = onOpenPermissions,
         devSettingsUnlocked = devSettingsUnlocked,
         onOpenDeveloperSettings = onOpenDeveloperSettings,
+        legacyLoadStatus = legacyLoadStatus,
+        legacyRestore = legacyRestore,
         onSignOut = authRepository::signOut,
         selectedCategory = selectedCategory,
     )
@@ -130,6 +156,12 @@ internal fun ArchivePalette.label(): String = when (this) {
 
 @Composable
 private fun ProfileScreen(
+    heading: String?,
+    unreadNotifications: Int,
+    onOpenIdentity: () -> Unit,
+    onOpenInvites: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenFriends: () -> Unit,
     ownedCount: Int,
     watchedCount: Int,
     appearanceSummary: String,
@@ -142,10 +174,12 @@ private fun ProfileScreen(
     onOpenPermissions: () -> Unit,
     devSettingsUnlocked: Boolean,
     onOpenDeveloperSettings: () -> Unit,
+    legacyLoadStatus: suspend () -> work.kumarfamilynet.cinemarchive.data.LegacyArchiveStatus,
+    legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     onSignOut: () -> Unit,
     selectedCategory: SettingsCategory? = null,
 ) {
-    val displayName = profileDisplayName(signedInEmail)
+    val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onClose) {
@@ -191,6 +225,51 @@ private fun ProfileScreen(
                 }
             }
 
+            if (signedInEmail != null) {
+                item {
+                    ReadingWidthColumn {
+                        ProfileRow(
+                            icon = Icons.Filled.Person,
+                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            title = "Identity",
+                            subtitle = "Display name & username",
+                            onClick = onOpenIdentity,
+                            selected = selectedCategory == SettingsCategory.IDENTITY,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.Notifications,
+                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            title = "Notifications",
+                            subtitle = if (unreadNotifications > 0) "$unreadNotifications unread" else "You're all caught up",
+                            onClick = onOpenNotifications,
+                            selected = selectedCategory == SettingsCategory.NOTIFICATIONS,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.People,
+                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            title = "Friends",
+                            subtitle = "Requests, inbox & activity",
+                            onClick = onOpenFriends,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.ConfirmationNumber,
+                            iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            title = "Invites",
+                            subtitle = "Invite people to the archive",
+                            onClick = onOpenInvites,
+                            selected = selectedCategory == SettingsCategory.INVITES,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                    }
+                }
+            }
             item {
                 ReadingWidthColumn {
                     ProfileRow(
@@ -274,6 +353,7 @@ private fun ProfileScreen(
 
             item {
                 ReadingWidthColumn {
+                    if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

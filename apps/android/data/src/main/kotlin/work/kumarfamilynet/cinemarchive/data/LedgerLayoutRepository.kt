@@ -1,9 +1,9 @@
 package work.kumarfamilynet.cinemarchive.data
 
-import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -17,7 +17,6 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetSettings
 import work.kumarfamilynet.cinemarchive.core.model.RawLedgerWidget
 import work.kumarfamilynet.cinemarchive.core.model.RawLedgerWidgetSettings
 
-private val Context.ledgerLayoutDataStore by preferencesDataStore(name = "cinemarchive_ledger_layout")
 
 /**
  * The Ledger board's customizable widget layout — add/remove/move/resize/settings — persisted
@@ -33,11 +32,10 @@ private val Context.ledgerLayoutDataStore by preferencesDataStore(name = "cinema
  * see [resolveLayoutReconciliation] for the actual merge rule.
  */
 class LedgerLayoutRepository(
-    context: Context,
-    private val authRepository: AuthRepository,
+    private val dataStore: DataStore<Preferences>,
+    private val authRepository: SessionSource,
     private val remoteWriter: SupabaseLedgerLayoutWriter,
 ) {
-    private val dataStore = context.ledgerLayoutDataStore
     private val layoutKey = stringPreferencesKey("ledger_layout")
 
     fun observeLayout(): Flow<List<LedgerWidgetConfig>> = dataStore.data.map { preferences ->

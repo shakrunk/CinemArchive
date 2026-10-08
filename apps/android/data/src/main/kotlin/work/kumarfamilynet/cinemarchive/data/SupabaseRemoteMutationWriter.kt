@@ -180,13 +180,14 @@ class SupabaseRemoteMutationWriter(
         val updated = JSONArray(client.patchWithFilter("titles", filter, session.accessToken, body.toString()))
         if (updated.length() > 0) return PushResult.Success
 
-        val current = JSONArray(client.get("titles", "id=eq.$id&select=status,updated_at", session.accessToken))
+        val current = JSONArray(client.get("titles", "id=eq.$id&select=status,rating,updated_at", session.accessToken))
         if (current.length() == 0) return PushResult.Retry("Title $id not found or not owned by this session")
         val currentRow = current.getJSONObject(0)
         return PushResult.Conflict(
             JSONObject()
                 .put("id", id)
                 .put("status", currentRow.getString("status"))
+                .put("rating", if (currentRow.isNull("rating")) JSONObject.NULL else currentRow.getDouble("rating"))
                 .put("updatedAt", currentRow.getString("updated_at")),
         )
     }

@@ -194,19 +194,21 @@ class LibraryRepository(
             releaseDate = details.releaseDate,
         )
 
-        titleDao.upsertAll(listOf(title))
-        seasonDao.upsertAll(seasons.map { it.first })
-        episodeDao.upsertAll(episodes)
-        if (cast.isNotEmpty()) titleCastDao.upsertAll(cast)
-        if (crew.isNotEmpty()) titleCrewDao.upsertAll(crew)
-        viewing?.let { viewingDao.upsertAll(listOf(it)) }
+        outbox.atomically {
+            titleDao.upsertAll(listOf(title))
+            seasonDao.upsertAll(seasons.map { it.first })
+            episodeDao.upsertAll(episodes)
+            if (cast.isNotEmpty()) titleCastDao.upsertAll(cast)
+            if (crew.isNotEmpty()) titleCrewDao.upsertAll(crew)
+            viewing?.let { viewingDao.upsertAll(listOf(it)) }
 
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "insert",
-            payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing),
-        )
+            outbox.enqueue(
+                entityType = "title",
+                entityId = titleId,
+                operation = "insert",
+                payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing),
+            )
+        }
         return titleId
     }
 
@@ -220,13 +222,15 @@ class LibraryRepository(
      * a plain hard delete with no undo.
      */
     suspend fun removeTitle(titleId: String) {
-        titleDao.deleteById(titleId)
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "delete",
-            payload = JSONObject().put("id", titleId),
-        )
+        outbox.atomically {
+            titleDao.deleteById(titleId)
+            outbox.enqueue(
+                entityType = "title",
+                entityId = titleId,
+                operation = "delete",
+                payload = JSONObject().put("id", titleId),
+            )
+        }
     }
 
     /** What sync's merge planner needs to know about an existing title — see [planMerge]. */
@@ -569,18 +573,21 @@ class LibraryRepository(
         }
         if (updated.isEmpty()) return
 
-        episodeDao.upsertAll(updated)
-        for (episode in updated) {
-            outbox.enqueue(
-                entityType = "episode_metadata",
-                entityId = episode.id,
-                operation = "update",
-                payload = JSONObject().apply {
-                    put("id", episode.id)
-                    put("synopsis", episode.synopsis ?: JSONObject.NULL)
-                    put("stillUrl", episode.stillUrl ?: JSONObject.NULL)
-                },
-            )
+        // The TMDB fetches above stay outside the transaction; only the DB writes + enqueues are atomic.
+        outbox.atomically {
+            episodeDao.upsertAll(updated)
+            for (episode in updated) {
+                outbox.enqueue(
+                    entityType = "episode_metadata",
+                    entityId = episode.id,
+                    operation = "update",
+                    payload = JSONObject().apply {
+                        put("id", episode.id)
+                        put("synopsis", episode.synopsis ?: JSONObject.NULL)
+                        put("stillUrl", episode.stillUrl ?: JSONObject.NULL)
+                    },
+                )
+            }
         }
     }
 
@@ -599,27 +606,31 @@ class LibraryRepository(
      *  regardless of whether the user actually touched the star control, and coupling it to
      *  rating would silently stamp a fake 0★ rating on a still-unrated viewing. */
     suspend fun rateViewing(viewingId: String, titleId: String, rating: Double) {
-        val existing = viewingDao.getById(viewingId) ?: return
-        val updated = existing.copy(rating = rating)
-        viewingDao.upsert(updated)
-        outbox.enqueue(
-            entityType = "viewing",
-            entityId = viewingId,
-            operation = "update",
-            payload = JSONObject().apply { put("id", viewingId); put("rating", rating) },
-        )
-        updateTitleRating(titleId, rating, Instant.now().toString())
+        outbox.atomically {
+            val existing = viewingDao.getById(viewingId) ?: return@atomically
+            val updated = existing.copy(rating = rating)
+            viewingDao.upsert(updated)
+            outbox.enqueue(
+                entityType = "viewing",
+                entityId = viewingId,
+                operation = "update",
+                payload = JSONObject().apply { put("id", viewingId); put("rating", rating) },
+            )
+            updateTitleRating(titleId, rating, Instant.now().toString())
+        }
     }
 
     suspend fun updateViewingNotes(viewingId: String, notes: String) {
-        val existing = viewingDao.getById(viewingId) ?: return
-        viewingDao.upsert(existing.copy(notes = notes))
-        outbox.enqueue(
-            entityType = "viewing",
-            entityId = viewingId,
-            operation = "update",
-            payload = JSONObject().apply { put("id", viewingId); put("notes", notes) },
-        )
+        outbox.atomically {
+            val existing = viewingDao.getById(viewingId) ?: return@atomically
+            viewingDao.upsert(existing.copy(notes = notes))
+            outbox.enqueue(
+                entityType = "viewing",
+                entityId = viewingId,
+                operation = "update",
+                payload = JSONObject().apply { put("id", viewingId); put("notes", notes) },
+            )
+        }
     }
 
     /** Logs a watch for [episodeId] — optimistic local write + a queued remote push, per
@@ -627,70 +638,78 @@ class LibraryRepository(
      *  here (not left to the server) so a retried push upserts instead of duplicating. */
     suspend fun logEpisodeWatched(episodeId: String, watchedAt: String?) {
         val id = UUID.randomUUID().toString()
-        watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(id = id, episodeId = episodeId, watchedAt = watchedAt)))
-        outbox.enqueue(
-            entityType = "episode_watch_event",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("episodeId", episodeId)
-                put("watchedAt", watchedAt ?: JSONObject.NULL)
-            },
-        )
+        outbox.atomically {
+            watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(id = id, episodeId = episodeId, watchedAt = watchedAt)))
+            outbox.enqueue(
+                entityType = "episode_watch_event",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("episodeId", episodeId)
+                    put("watchedAt", watchedAt ?: JSONObject.NULL)
+                },
+            )
+        }
     }
 
     /** Records a rating for [episodeId] — same client-generated-id contract as
      *  [logEpisodeWatched]; ratings are an independent log, not tied to a watch event. */
     suspend fun logEpisodeRating(episodeId: String, rating: Double, ratedAt: String) {
         val id = UUID.randomUUID().toString()
-        ratingDao.upsertAll(listOf(EpisodeRatingEntity(id = id, episodeId = episodeId, rating = rating, ratedAt = ratedAt)))
-        outbox.enqueue(
-            entityType = "episode_rating",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("episodeId", episodeId)
-                put("rating", rating)
-                put("ratedAt", ratedAt)
-            },
-        )
+        outbox.atomically {
+            ratingDao.upsertAll(listOf(EpisodeRatingEntity(id = id, episodeId = episodeId, rating = rating, ratedAt = ratedAt)))
+            outbox.enqueue(
+                entityType = "episode_rating",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("episodeId", episodeId)
+                    put("rating", rating)
+                    put("ratedAt", ratedAt)
+                },
+            )
+        }
     }
 
     /** Records a review for [episodeId] — same client-generated-id contract as
      *  [logEpisodeWatched]; reviews are an independent log, not tied to a watch event or rating. */
     suspend fun logEpisodeReview(episodeId: String, reviewText: String, reviewedAt: String) {
         val id = UUID.randomUUID().toString()
-        reviewDao.upsertAll(listOf(EpisodeReviewEntity(id = id, episodeId = episodeId, reviewText = reviewText, reviewedAt = reviewedAt)))
-        outbox.enqueue(
-            entityType = "episode_review",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("episodeId", episodeId)
-                put("reviewText", reviewText)
-                put("reviewedAt", reviewedAt)
-            },
-        )
+        outbox.atomically {
+            reviewDao.upsertAll(listOf(EpisodeReviewEntity(id = id, episodeId = episodeId, reviewText = reviewText, reviewedAt = reviewedAt)))
+            outbox.enqueue(
+                entityType = "episode_review",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("episodeId", episodeId)
+                    put("reviewText", reviewText)
+                    put("reviewedAt", reviewedAt)
+                },
+            )
+        }
     }
 
     /** Logs a re-watch timeline entry for [titleId] — same client-generated-id contract as
      *  [logEpisodeWatched]. */
     suspend fun logViewing(titleId: String, date: String?) {
         val id = UUID.randomUUID().toString()
-        viewingDao.upsertAll(listOf(ViewingEntity(id = id, titleId = titleId, date = date, rating = null, notes = null, venue = null)))
-        outbox.enqueue(
-            entityType = "viewing",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("titleId", titleId)
-                put("date", date ?: JSONObject.NULL)
-            },
-        )
+        outbox.atomically {
+            viewingDao.upsertAll(listOf(ViewingEntity(id = id, titleId = titleId, date = date, rating = null, notes = null, venue = null)))
+            outbox.enqueue(
+                entityType = "viewing",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("titleId", titleId)
+                    put("date", date ?: JSONObject.NULL)
+                },
+            )
+        }
     }
 
     /** Changes [titleId]'s status — an in-place update, not an append-only log, so the
@@ -698,33 +717,37 @@ class LibraryRepository(
      *  last-write-wins conflict resolution designed in docs/android-sync-contract.md §4.2,
      *  so it must reflect when this change was made, not be left stale. */
     suspend fun updateTitleStatus(titleId: String, status: LibraryStatus, updatedAt: String) {
-        titleDao.updateStatus(titleId, status.name, updatedAt)
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "update",
-            payload = JSONObject().apply {
-                put("id", titleId)
-                put("status", status.name)
-                put("updatedAt", updatedAt)
-            },
-        )
+        outbox.atomically {
+            titleDao.updateStatus(titleId, status.name, updatedAt)
+            outbox.enqueue(
+                entityType = "title",
+                entityId = titleId,
+                operation = "update",
+                payload = JSONObject().apply {
+                    put("id", titleId)
+                    put("status", status.name)
+                    put("updatedAt", updatedAt)
+                },
+            )
+        }
     }
 
     /** Sets [titleId]'s own rating (distinct from per-episode ratings) — same in-place
      *  update contract as [updateTitleStatus]. */
     suspend fun updateTitleRating(titleId: String, rating: Double, updatedAt: String) {
-        titleDao.updateRating(titleId, rating, updatedAt)
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "update",
-            payload = JSONObject().apply {
-                put("id", titleId)
-                put("rating", rating)
-                put("updatedAt", updatedAt)
-            },
-        )
+        outbox.atomically {
+            titleDao.updateRating(titleId, rating, updatedAt)
+            outbox.enqueue(
+                entityType = "title",
+                entityId = titleId,
+                operation = "update",
+                payload = JSONObject().apply {
+                    put("id", titleId)
+                    put("rating", rating)
+                    put("updatedAt", updatedAt)
+                },
+            )
+        }
     }
 }
 

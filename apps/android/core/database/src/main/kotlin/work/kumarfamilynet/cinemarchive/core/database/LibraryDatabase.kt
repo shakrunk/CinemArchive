@@ -25,13 +25,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ListEntity::class,
         ListItemEntity::class,
         TheaterInterestEntity::class,
+        LegacyRestoreReceiptEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun titleDao(): TitleDao
+    abstract fun titleReconcileDao(): TitleReconcileDao
     abstract fun seasonDao(): SeasonDao
     abstract fun episodeDao(): EpisodeDao
     abstract fun episodeWatchEventDao(): EpisodeWatchEventDao
@@ -46,8 +48,11 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun listDao(): ListDao
     abstract fun listItemDao(): ListItemDao
     abstract fun theaterInterestDao(): TheaterInterestDao
+    abstract fun legacyRestoreReceiptDao(): LegacyRestoreReceiptDao
 
     companion object {
+        const val LEGACY_DATABASE_NAME = "cinemarchive.db"
+
         /** Adds titles.releaseDate (see Entities.kt's TitleEntity kdoc). A real ALTER TABLE,
          *  not destructive fallback, because real synced user data now lives in this table —
          *  wiping it on every schema bump forces a full re-sync from Supabase before the
@@ -134,16 +139,46 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
-        fun create(context: Context): LibraryDatabase = Room.databaseBuilder(
+        /** Adds `legacy_restore_receipt` — see [LegacyRestoreReceiptEntity]. New table, same
+         *  additive-migration rationale as MIGRATION_4_5. */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `legacy_restore_receipt` (`key` TEXT NOT NULL, `archiveId` TEXT NOT NULL, `kind` TEXT NOT NULL, `restoredAt` TEXT NOT NULL, PRIMARY KEY(`key`))",
+                )
+            }
+        }
+
+        /** [name] is the SQLite file name. Per-account runtimes pass an owner-derived name (see
+         *  AccountRuntime) so two accounts never share a file; the legacy global
+         *  `cinemarchive.db` ([LEGACY_DATABASE_NAME]) is never opened by an active runtime. */
+        fun create(context: Context, name: String): LibraryDatabase = Room.databaseBuilder(
             context,
             LibraryDatabase::class.java,
-            "cinemarchive.db",
+            name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
+
+        /**
+         * Opens the database [name] (in the app's databases directory — a disposable working copy of the legacy
+         * global `cinemarchive.db`, see the data module's `LegacyArchive`) with the same
+         * migration list as [create] but WITHOUT destructive fallback: opening a recovery copy
+         * must never wipe the very data being recovered, so an unmigratable or newer file
+         * throws on first use instead. The caller owns the file and must close the instance.
+         *
+         * The path is routed through a [android.content.ContextWrapper] rather than passed to
+         * Room as a bare name, because `Context.getDatabasePath` only honors absolute paths
+         * that start with the platform separator (which fails for Windows host paths under
+         * Robolectric).
+         */
+        fun createForRecovery(context: Context, name: String): LibraryDatabase =
+            Room.databaseBuilder(context, LibraryDatabase::class.java, name)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                .build()
     }
 }

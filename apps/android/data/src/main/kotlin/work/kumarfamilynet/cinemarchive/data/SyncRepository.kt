@@ -47,7 +47,7 @@ data class IntegrationConnection(
 class SyncRepository(
     private val libraryRepository: LibraryRepository,
     private val discoverRepository: DiscoverRepository,
-    private val authRepository: AuthRepository,
+    private val authRepository: SessionSource,
     private val client: SupabaseRestClient,
 ) {
     suspend fun import(
@@ -186,7 +186,7 @@ class SyncServices(
         fun create(
             library: LibraryRepository,
             discover: DiscoverRepository,
-            auth: AuthRepository,
+            auth: SessionSource,
             client: SupabaseRestClient,
             plexClientId: String,
         ): SyncServices {

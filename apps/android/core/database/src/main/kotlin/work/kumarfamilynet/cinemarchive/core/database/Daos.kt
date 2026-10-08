@@ -399,3 +399,14 @@ interface ListItemDao {
     @Query("DELETE FROM list_items WHERE listId = :listId AND titleId = :titleId")
     suspend fun deleteByListAndTitle(listId: String, titleId: String)
 }
+
+/**
+ * Nullable title-field setters, kept apart from [TitleDao] so adding them doesn't force every
+ * [TitleDao] test double to grow a method. Used to mirror a server row that has NO rating after
+ * a push conflict — [TitleDao.updateRating] can only set a value.
+ */
+@Dao
+interface TitleReconcileDao {
+    @Query("UPDATE titles SET rating = :rating, updatedAt = :updatedAt WHERE id = :titleId")
+    suspend fun setRating(titleId: String, rating: Double?, updatedAt: String)
+}

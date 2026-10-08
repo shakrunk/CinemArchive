@@ -41,3 +41,25 @@ Evidence: `apps/web/scripts/library-command.test.mjs` exercises every credit tab
 identity retention, explicit clears, retry after edits/deletion, parent and owner
 fences, rollback, restricted entities and causal command compatibility. These are
 local PostgreSQL fixture tests, not a claim of live simultaneous HTTP testing.
+
+## Missing catalog parents
+
+Migration `20261008214554_ensure_episode_catalog_parents.sql` adds `ensure` for
+`seasons` keyed by `{title_id, season_number}` and `episodes` keyed by
+`{title_id, season_number, episode_number}`. Missing rows receive server UUIDs;
+existing owned rows return unchanged, including their UUID, metadata, progress
+and timestamps. Season values may contain `episode_count` and `air_year`;
+episode values may contain `episode_name`, `air_date`, `runtime`, `synopsis` and
+`still_url`. Progress, history, explicit UUIDs and revision guards are rejected.
+The owned title and, for an episode, its owned natural season are locked through
+insertion. A foreign legacy row occupying a natural identity is a conflict.
+
+Ensure parents before credit operations. Persist the request before dispatch;
+receipts return exact natural keys and canonical rows. Retrying an accepted
+operation never recreates a parent deleted later. A new intentional ensure may
+create a new parent identity. Clients therefore fetch current owned parents
+before local acknowledgment, materialize only confirmed live parents, and queue
+their credit commands atomically using those canonical IDs. Never expose guessed
+editable parent IDs or infer watches from coarse progress. Library command tests
+cover canonical adoption, untouched history/progress/metadata, noncontiguous
+Specials, rollback, deleted-parent retries and ownership conflicts.

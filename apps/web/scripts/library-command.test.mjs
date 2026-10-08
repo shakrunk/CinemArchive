@@ -41,6 +41,9 @@ before(async () => {
   const credits = (await readFile(new URL('../../../supabase/migrations/20261008201710_credit_refresh_commands.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(credits.trim()), 'canonical schema includes credit refresh commands')
   await database.exec(credits)
+  const ensure = (await readFile(new URL('../../../supabase/migrations/20261008214554_ensure_episode_catalog_parents.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(ensure.trim()), 'canonical schema includes episode catalog ensure')
+  await database.exec(ensure)
   await database.query('insert into auth.users(id,email) values ($1,$2),($3,$4)', [owner,'owner@example.test',other,'other@example.test'])
   await database.exec('grant select on all tables in schema public to authenticated;')
 }, { timeout: 60000 })
@@ -427,4 +430,86 @@ test('a credit refresh receipt still supports exact causal revision checks', asy
   const receipt = await command([patch], next)
   assert.deepEqual(await command([patch], next), receipt)
   await assert.rejects(command([patch]), { code: '40001' })
+})
+
+async function catalogOperations() {
+  const title = titleOperation()
+  title.values.type = 'tv'
+  await command([title])
+  return [
+    { table: 'seasons', action: 'ensure', key: { title_id: title.key.id, season_number: 0 }, values: { episode_count: 2, air_year: 2020 } },
+    ...[2, 10].map(episode_number => ({ table: 'episodes', action: 'ensure', key: { title_id: title.key.id, season_number: 0, episode_number },
+      values: { episode_name: `Special ${episode_number}`, air_date: '2020-01-01', runtime: 45, synopsis: 'Provider details', still_url: null } })),
+  ]
+}
+
+test('catalog ensure creates canonical parents with noncontiguous Specials and unchanged retry receipts', async () => {
+  const ops = await catalogOperations(), id = randomUUID()
+  const first = await command(ops, id)
+  assert.equal(first.rows.length, 3)
+  assert.equal(first.rows[0].row.episodes_watched, 0)
+  assert.deepEqual(first.rows.slice(1).map(r => r.row.episode_number), [2, 10])
+  assert.equal(new Set(first.rows.map(r => r.row.id)).size, 3)
+  assert.ok(first.rows.every(r => r.row.user_id === owner && r.row.title_id === ops[0].key.title_id))
+  assert.deepEqual(await command(ops, id), first)
+})
+
+test('a second device adopts existing natural identities without changing progress, metadata or history', async () => {
+  const ops = await catalogOperations()
+  const first = await command(ops)
+  const season = first.rows[0].row, episode = first.rows[1].row, watch = randomUUID()
+  await command([
+    { table: 'seasons', action: 'update', key: { id: season.id }, values: { episodes_watched: 2, episode_count: 9 } },
+    { table: 'episodes', action: 'update', key: { id: episode.id }, values: { episode_name: 'Existing custom name', synopsis: 'Keep metadata' } },
+    { table: 'episode_watch_events', action: 'insert', key: { id: watch }, values: { episode_id: episode.id, notes: 'Keep my history' } },
+  ])
+  const before = (await rows('episodes')).find(r => r.id === episode.id)
+  const second = await command(ops.map(op => ({ ...op, values: { ...op.values, ...(op.table === 'episodes' ? { episode_name: 'New provider title' } : { episode_count: 1 }) } })))
+  assert.deepEqual(second.rows.map(r => r.row.id), first.rows.map(r => r.row.id))
+  assert.equal(second.rows[0].row.episodes_watched, 2)
+  assert.equal(second.rows[0].row.episode_count, 9)
+  assert.equal(second.rows[1].row.episode_name, 'Existing custom name')
+  assert.equal(second.rows[1].row.synopsis, 'Keep metadata')
+  assert.equal(new Date(second.rows[1].row.updated_at).getTime(), before.updated_at.getTime())
+  assert.equal((await rows('episode_watch_events')).find(r => r.id === watch).notes, 'Keep my history')
+})
+
+test('an old accepted ensure receipt cannot recreate a remotely deleted parent', async () => {
+  const ops = await catalogOperations(), id = randomUUID()
+  const first = await command(ops, id)
+  await command([{ table: 'episodes', action: 'delete', key: { id: first.rows[1].row.id } }])
+  assert.deepEqual(await command(ops, id), first)
+  assert.equal((await rows('episodes')).some(r => r.id === first.rows[1].row.id), false)
+  const next = await command([ops[1]])
+  assert.notEqual(next.rows[0].row.id, first.rows[1].row.id)
+})
+
+test('catalog ensure is restricted to provider fields and rolls back missing-parent graphs', async () => {
+  const ops = await catalogOperations()
+  await assert.rejects(command([ops[1]]), { code: '23503' })
+  const id = randomUUID()
+  await assert.rejects(command([ops[0], { ...ops[1], values: { ...ops[1].values, episode_id: randomUUID() } }], id), { code: '22023' })
+  assert.equal((await rows('seasons')).some(r => r.title_id === ops[0].key.title_id), false)
+  await assert.rejects(command([{ ...ops[0], values: { ...ops[0].values, episodes_watched: 2 } }]), { code: '22023' })
+  await assert.rejects(command([{ ...ops[0], expectedUpdatedAt: '2000-01-01T00:00:00Z' }]), { code: '22023' })
+  await assert.rejects(command([{ ...ops[0], expectedOperationId: randomUUID() }]), { code: '22023' })
+  await assert.rejects(command([{ table: 'viewings', action: 'ensure', key: { id: randomUUID() }, values: {} }]), { code: '22023' })
+  await command(ops, id)
+})
+
+test('catalog ensure rejects foreign parents and foreign legacy rows occupying the natural identity', async () => {
+  const ops = await catalogOperations()
+  await database.query("select set_config('request.jwt.claim.sub',$1,false)", [other])
+  await assert.rejects(command([ops[0]]), { code: '42501' })
+  await database.query("select set_config('request.jwt.claim.sub',$1,false)", [owner])
+  await database.exec('reset role')
+  const foreign = randomUUID()
+  await database.query('insert into seasons(id,user_id,title_id,season_number,episode_count) values($1,$2,$3,0,5)', [foreign, other, ops[0].key.title_id])
+  await database.exec('set role authenticated')
+  await assert.rejects(command([ops[0]]), { code: '23505' })
+  await assert.rejects(command([ops[1]]), { code: '23503' })
+  await database.exec('reset role')
+  const row = (await database.query('select user_id,episode_count from seasons where id=$1', [foreign])).rows[0]
+  assert.equal(row.user_id, other)
+  assert.equal(row.episode_count, 5)
 })

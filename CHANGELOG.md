@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Shared episode catalog fill reuses existing season and episode identities without overwriting watch progress, metadata or history from another device.
 - Shared completion receipts retain the original viewing revision so another device's pending edits cannot overwrite newer history; new completion notifications identify their exact outing.
 - Web: "Didn't make it" now queues a guarded reversal, preserving rated history, newer device edits and deliberate title-status changes across retries.
 - Android outing edits and viewing-unlink changes now use durable, version-checked commands; uncertain responses retain the original operation for confirmation instead of overwriting newer plans.

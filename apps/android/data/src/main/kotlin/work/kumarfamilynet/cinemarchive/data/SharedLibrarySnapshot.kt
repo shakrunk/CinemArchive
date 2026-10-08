@@ -64,6 +64,16 @@ suspend fun buildSharedLibrarySnapshot(context: Context, library: SharedLibrary)
                         ep.getInt("episode_number"), ep.optStringOrNull("episode_name"), ep.optStringOrNull("air_date"),
                         ep.intOrNull("runtime"), ep.optStringOrNull("synopsis"), ep.optStringOrNull("still_url"))
                 })
+                db.personCreditsDao().upsertSeasonCast(row.rows("seasons").flatMap { season ->
+                    season.rows("season_cast").map { credit -> SeasonCastEntity(
+                        credit.getString("id"), title.id, season.getString("id"), credit.getInt("tmdb_person_id"),
+                        credit.getString("name"), credit.optStringOrNull("character_name"), credit.optInt("cast_order")) }
+                })
+                db.personCreditsDao().upsertEpisodeCrew(episodes.flatMap { episode ->
+                    episode.rows("episode_crew").map { credit -> EpisodeCrewEntity(
+                        credit.getString("id"), title.id, episode.getString("id"), credit.getInt("tmdb_person_id"),
+                        credit.getString("name"), credit.getString("job")) }
+                })
                 db.episodeWatchEventDao().upsertAll(episodes.flatMap { ep -> ep.rows("episode_watch_events").map {
                     EpisodeWatchEventEntity(it.getString("id"), ep.getString("id"), it.optStringOrNull("watched_at"), it.optStringOrNull("notes"))
                 } })

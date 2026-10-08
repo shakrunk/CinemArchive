@@ -12,6 +12,10 @@ import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.PersonCreditsDao
+import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
@@ -91,6 +95,7 @@ class LibraryRepository(
     private val theaterInterestDao: TheaterInterestDao,
     private val outbox: MutationOutbox,
     private val episodeMetadataFetcher: EpisodeMetadataFetcher,
+    private val personCreditsDao: PersonCreditsDao,
 ) {
     /**
      * Adds a catalog result to the library: an optimistic Room write of everything the title
@@ -141,7 +146,7 @@ class LibraryRepository(
                 )
             }
         }
-        val cast = details.cast.take(MAX_CAST_ROWS).map { credit ->
+        val cast = details.cast.distinctBy { it.tmdbPersonId }.map { credit ->
             TitleCastEntity(
                 id = UUID.randomUUID().toString(),
                 titleId = titleId,
@@ -160,6 +165,23 @@ class LibraryRepository(
                 job = credit.job,
                 department = credit.department,
             )
+        }
+        val seasonIds = seasons.associate { it.first.seasonNumber to it.first.id }
+        val episodeIds = episodes.associate { (it.seasonId to it.episodeNumber) to it.id }
+        val seasonCast = details.seasons.flatMap { season ->
+            val seasonId = seasonIds.getValue(season.seasonNumber)
+            season.cast.distinctBy { it.tmdbPersonId }.map { credit ->
+                SeasonCastEntity(UUID.randomUUID().toString(), titleId, seasonId, credit.tmdbPersonId,
+                    credit.name, credit.characterName, credit.order)
+            }
+        }
+        val episodeCrew = details.seasons.flatMap { season ->
+            season.episodes.flatMap { episode ->
+                val episodeId = episodeIds.getValue(seasonIds.getValue(season.seasonNumber) to episode.episodeNumber)
+                episode.crew.distinctBy { it.tmdbPersonId to it.job }.map { credit ->
+                    EpisodeCrewEntity(UUID.randomUUID().toString(), titleId, episodeId, credit.tmdbPersonId, credit.name, credit.job)
+                }
+            }
         }
         // A title logged as already watched gets its first viewing here, so it lands on the
         // Ledger's date-bucketed widgets immediately instead of only counting once the user
@@ -209,13 +231,15 @@ class LibraryRepository(
             episodeDao.upsertAll(episodes)
             if (cast.isNotEmpty()) titleCastDao.upsertAll(cast)
             if (crew.isNotEmpty()) titleCrewDao.upsertAll(crew)
+            personCreditsDao.upsertSeasonCast(seasonCast)
+            personCreditsDao.upsertEpisodeCrew(episodeCrew)
             viewing?.let { viewingDao.upsertAll(listOf(it)) }
 
             outbox.enqueue(
                 entityType = "title",
                 entityId = titleId,
                 operation = "insert",
-                payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing),
+                payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing, seasonCast, episodeCrew),
             )
         }
         return titleId
@@ -263,12 +287,13 @@ class LibraryRepository(
         cinemaOutingDao.observeAllOutings(),
         titleDao.observeLastInteractions(),
         theaterInterestDao.observeAll(),
-        titleCastDao.observeAllCast(),
-    ) { rows, outings, interactions, theaterInterest, cast ->
+        combine(titleCastDao.observeAllCast(), personCreditsDao.observeLibraryPeople()) { cast, people -> cast to people },
+    ) { rows, outings, interactions, theaterInterest, credits ->
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings.map { it.toDomain() })
         val lastInteractionByTitle = interactions.associate { it.titleId to it.lastInteractionAt }
         val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
-        val castByTitle = cast.groupBy { it.titleId }
+        val castByTitle = credits.first.groupBy { it.titleId }
+        val peopleByTitle = credits.second.groupBy { it.titleId }
         rows.map { row ->
             LibraryTitle(
                 id = row.id,
@@ -292,6 +317,7 @@ class LibraryRepository(
                 collectionId = row.collectionId,
                 collectionName = row.collectionName,
                 castNames = castByTitle[row.id].orEmpty().map { it.name },
+                people = peopleByTitle[row.id].orEmpty().distinctBy { it.tmdbPersonId }.map { LibraryPerson(it.tmdbPersonId, it.name) },
             )
         }
     }

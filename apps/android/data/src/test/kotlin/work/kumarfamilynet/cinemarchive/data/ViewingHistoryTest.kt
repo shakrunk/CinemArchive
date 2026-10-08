@@ -31,6 +31,7 @@ class ViewingHistoryTest {
             override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = emptyList<MediaEpisode>()
             override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = EpisodeCast.EMPTY
         },
+        personCreditsDao = db.personCreditsDao(),
     )
 
     @Before fun setUp() = runBlocking {

@@ -172,6 +172,7 @@ private data class CalculationFixture(
         calculationDao("observeRatings" to ratings), calculationDao("observeReviews" to emptyList<EpisodeReviewEntity>()), viewingDao, outingDao,
         calculationDao(), calculationDao(), calculationDao("observeAll" to emptyList<TheaterInterestEntity>(), "observeIsInterested" to false),
         MutationOutbox(calculationDao(), calculationDao(), calculationDao()), calculationDao(),
+        personCreditsDao = FakePersonCreditsDao(),
     )
     suspend fun panel(id: LedgerWidgetId, range: String): LedgerBoard = ledger().observeLedgerBoards(flowOf(listOf(
         LedgerWidgetConfig("test", id, LedgerWidgetWidth.FULL, LedgerWidgetSettings(timeRange = range)),

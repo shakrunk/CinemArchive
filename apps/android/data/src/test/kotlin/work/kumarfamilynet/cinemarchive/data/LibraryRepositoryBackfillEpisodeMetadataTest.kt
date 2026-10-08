@@ -63,7 +63,8 @@ class LibraryRepositoryBackfillEpisodeMetadataTest {
             theaterInterestDao = NoTheaterInterestDao2,
             outbox = MutationOutbox(outboxDao, NoopWriter2, NoopConflictHandler2),
             episodeMetadataFetcher = fetcher,
-        )
+        personCreditsDao = FakePersonCreditsDao(),
+    )
 
     @Test
     fun `fills only the null fields, preserving anything already written, and skips a fully-populated season`() = runTest {

@@ -35,7 +35,11 @@ data class LibraryTitle(
     val collectionId: Int? = null,
     val collectionName: String? = null,
     val castNames: List<String> = emptyList(),
+    val people: List<LibraryPerson> = emptyList(),
 )
+
+/** Provider identity is authoritative: two credited people may have the same name. */
+data class LibraryPerson(val tmdbPersonId: Int, val name: String)
 
 enum class LibraryStatus {
     WATCHLIST,

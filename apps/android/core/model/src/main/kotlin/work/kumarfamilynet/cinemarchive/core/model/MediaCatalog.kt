@@ -89,6 +89,7 @@ data class MediaSeason(
      *  season still counts toward progress via [episodeCount], it just can't be ticked off
      *  episode by episode until a later sync fills the rows in. */
     val episodes: List<MediaEpisode> = emptyList(),
+    val cast: List<MediaCredit> = emptyList(),
 )
 
 data class MediaEpisode(
@@ -98,6 +99,7 @@ data class MediaEpisode(
     val runtime: Int?,
     val synopsis: String? = null,
     val stillUrl: String? = null,
+    val crew: List<MediaCrewCredit> = emptyList(),
 )
 
 /** One person credited on a single episode — the `action=episode_credits` payload. Unlike

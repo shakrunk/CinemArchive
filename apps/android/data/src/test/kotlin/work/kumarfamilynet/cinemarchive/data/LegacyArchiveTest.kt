@@ -203,6 +203,8 @@ class LegacyArchiveTest {
             db.viewingDao().upsert(ViewingEntity("v1", "t1", "2026-01-02", 4.0, null, null))
             db.titleCastDao().upsertAll(listOf(TitleCastEntity("c1", "t1", 1, "Actor", null, 0)))
             db.titleCrewDao().upsertAll(listOf(TitleCrewEntity("k1", "t1", 2, "Dir", "Director", null)))
+            db.personCreditsDao().upsertSeasonCast(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity("sc1", "t1", "s1", 42, "Same name", null, 0)))
+            db.personCreditsDao().upsertEpisodeCrew(listOf(work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity("ec1", "t1", "e1", 84, "Same name", "Writer")))
             // t2 is a plain synced title with no pending entry: must NOT be copied.
             db.viewingDao().upsert(ViewingEntity("v2", "t2", "2026-01-03", null, null, null))
             db.outboxDao().enqueue(outbox("o1", "title", "t1", "insert", """{"id":"t1"}""", 10))
@@ -211,7 +213,7 @@ class LegacyArchiveTest {
 
         val result = restore(include = false)
 
-        assertEquals(LegacyRestoreResult.Success(restoredOutboxEntries = 1, restoredRows = 7, skippedRows = 0), result)
+        assertEquals(LegacyRestoreResult.Success(restoredOutboxEntries = 1, restoredRows = 9, skippedRows = 0), result)
         assertNotNull(target.titleDao().getById("t1"))
         assertNull(target.titleDao().getById("t2"))
         assertEquals(1, count(target, "seasons"))
@@ -220,6 +222,8 @@ class LegacyArchiveTest {
         assertEquals(1, count(target, "viewings"))
         assertEquals(1, count(target, "title_cast"))
         assertEquals(1, count(target, "title_crew"))
+        assertEquals(1, count(target, "season_cast"))
+        assertEquals(1, count(target, "episode_crew"))
         assertEquals(listOf("o1"), target.outboxDao().getPending().map { it.id })
         assertEquals(hash, sha(legacyFile()))
         assertTrue(legacyFile().exists())

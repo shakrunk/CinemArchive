@@ -27,6 +27,8 @@ class EpisodeNotesMigrationTest {
         try {
             val old = fixture.openHelper.writableDatabase
             old.execSQL("DROP TABLE episode_watch_events")
+            old.execSQL("DROP TABLE season_cast")
+            old.execSQL("DROP TABLE episode_crew")
             old.execSQL("DROP TABLE titles")
             val entities = schema.getJSONArray("entities")
             for (index in 0 until entities.length()) {
@@ -46,7 +48,7 @@ class EpisodeNotesMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 12
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_12_13, LibraryDatabase.MIGRATION_13_14).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_12_13, LibraryDatabase.MIGRATION_13_14, LibraryDatabase.MIGRATION_14_15).build()
         try {
             val event = upgraded.episodeWatchEventDao().observeAllWatchEvents().first().single()
             assertEquals("watch", event.id)

@@ -20,6 +20,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         OutboxEntity::class,
         TitleCastEntity::class,
         TitleCrewEntity::class,
+        SeasonCastEntity::class,
+        EpisodeCrewEntity::class,
         CinemaOutingEntity::class,
         VenueNoteEntity::class,
         ListEntity::class,
@@ -27,7 +29,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TheaterInterestEntity::class,
         LegacyRestoreReceiptEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -43,6 +45,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun outboxDao(): OutboxDao
     abstract fun titleCastDao(): TitleCastDao
     abstract fun titleCrewDao(): TitleCrewDao
+    abstract fun personCreditsDao(): PersonCreditsDao
     abstract fun cinemaOutingDao(): CinemaOutingDao
     abstract fun venueNoteDao(): VenueNoteDao
     abstract fun listDao(): ListDao
@@ -165,6 +168,17 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `season_cast` (`id` TEXT NOT NULL, `titleId` TEXT NOT NULL, `seasonId` TEXT NOT NULL, `tmdbPersonId` INTEGER NOT NULL, `name` TEXT NOT NULL, `characterName` TEXT, `castOrder` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`titleId`) REFERENCES `titles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`seasonId`) REFERENCES `seasons`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_season_cast_titleId` ON `season_cast` (`titleId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_season_cast_seasonId` ON `season_cast` (`seasonId`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `episode_crew` (`id` TEXT NOT NULL, `titleId` TEXT NOT NULL, `episodeId` TEXT NOT NULL, `tmdbPersonId` INTEGER NOT NULL, `name` TEXT NOT NULL, `job` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`titleId`) REFERENCES `titles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE, FOREIGN KEY(`episodeId`) REFERENCES `episodes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_episode_crew_titleId` ON `episode_crew` (`titleId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_episode_crew_episodeId` ON `episode_crew` (`episodeId`)")
+            }
+        }
+
         /** [name] is the SQLite file name. Per-account runtimes pass an owner-derived name (see
          *  AccountRuntime) so two accounts never share a file; the legacy global
          *  `cinemarchive.db` ([LEGACY_DATABASE_NAME]) is never opened by an active runtime. */
@@ -173,7 +187,7 @@ abstract class LibraryDatabase : RoomDatabase() {
             LibraryDatabase::class.java,
             name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
@@ -194,7 +208,7 @@ abstract class LibraryDatabase : RoomDatabase() {
          */
         fun createForRecovery(context: Context, name: String): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, name)
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                 .build()
     }
 }

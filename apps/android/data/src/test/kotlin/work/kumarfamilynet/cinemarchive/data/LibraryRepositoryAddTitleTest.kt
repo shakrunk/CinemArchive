@@ -191,7 +191,8 @@ class LibraryRepositoryAddTitleTest {
             theaterInterestDao = NoTheaterInterestDao,
             outbox = MutationOutbox(outboxDao, NoopWriter, NoopConflictHandler),
             episodeMetadataFetcher = NoEpisodeMetadataFetcher,
-        )
+        personCreditsDao = FakePersonCreditsDao(),
+    )
     }
 
     private val movie = MediaDetails(
@@ -373,16 +374,15 @@ class LibraryRepositoryAddTitleTest {
         assertTrue(castDao.written.all { it.titleId == id } && crewDao.written.all { it.titleId == id })
     }
 
-    /** TMDB bills whole ensembles; the payload is one JSON blob in a Room row, and only the
-     *  top five matter to anything that reads it. */
+    /** People below the leading cast still participate in cross-client person filtering. */
     @Test
-    fun `cast is capped`() = runTest {
+    fun `full cast remains available for person filters`() = runTest {
         val crowd = (0 until 60).map { MediaCredit(it, "Actor $it", null, it) }
         val repo = repository()
 
         repo.addTitle(AddTitleRequest(movie.copy(cast = crowd), LibraryStatus.WATCHLIST, null, null))
 
-        assertEquals(MAX_CAST_ROWS, castDao.written.size)
+        assertEquals(crowd.size, castDao.written.size)
         assertEquals("Actor 0", castDao.written.first().name)
     }
 

@@ -85,21 +85,20 @@ class DiscoverRepository(
             }
             val seasons = base.seasons.map { season ->
                 async {
-                    val episodes = runCatching {
-                        parseSeasonEpisodes(
-                            client.invokeFunction(
-                                "media-proxy",
-                                "action=season&id=${base.tmdbId}&season=${season.seasonNumber}",
-                                accessToken,
-                            ),
+                    val (episodes, cast) = runCatching {
+                        val body = client.invokeFunction(
+                            "media-proxy",
+                            "action=season&id=${base.tmdbId}&season=${season.seasonNumber}",
+                            accessToken,
                         )
-                    }.getOrDefault(emptyList())
+                        parseSeasonEpisodes(body) to parseSeasonCast(body)
+                    }.getOrDefault(emptyList<MediaEpisode>() to emptyList())
                     if (season.isSpecials) {
                         // Specials keep TMDB's own (possibly non-contiguous) numbering and
                         // count only the episodes TMDB actually returned — see buildSeasons.
-                        season.copy(episodes = episodes, episodeCount = episodes.size)
+                        season.copy(episodes = episodes, episodeCount = episodes.size, cast = cast)
                     } else {
-                        season.copy(episodes = episodes)
+                        season.copy(episodes = episodes, cast = cast)
                     }
                 }
             }

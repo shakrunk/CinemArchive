@@ -156,6 +156,19 @@ class SupabaseRemoteMutationWriter(
                 .putNullable("department", member, "department")
         }?.let { client.upsert("title_crew", session.accessToken, it.toString()) }
 
+        // Optional arrays preserve compatibility with title inserts queued by older clients.
+        payload.rows("seasonCast") { member ->
+            JSONObject().put("id", member.getString("id")).put("title_id", titleId).put("user_id", userId)
+                .put("season_id", member.getString("seasonId")).put("tmdb_person_id", member.getInt("tmdbPersonId"))
+                .put("name", member.getString("name")).putNullable("character_name", member, "characterName")
+                .put("cast_order", member.getInt("castOrder"))
+        }?.let { client.upsert("season_cast", session.accessToken, it.toString()) }
+        payload.rows("episodeCrew") { member ->
+            JSONObject().put("id", member.getString("id")).put("title_id", titleId).put("user_id", userId)
+                .put("episode_id", member.getString("episodeId")).put("tmdb_person_id", member.getInt("tmdbPersonId"))
+                .put("name", member.getString("name")).put("job", member.getString("job"))
+        }?.let { client.upsert("episode_crew", session.accessToken, it.toString()) }
+
         payload.optJSONObject("viewing")?.let { viewing ->
             val body = JSONObject()
                 .put("id", viewing.getString("id"))

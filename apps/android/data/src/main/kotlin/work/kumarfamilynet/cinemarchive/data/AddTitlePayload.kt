@@ -3,21 +3,14 @@ package work.kumarfamilynet.cinemarchive.data
 import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
-
-/**
- * How many cast rows a newly added title carries. TMDB bills whole ensembles — a big
- * production can list 150 people — and the only thing reading `title_cast` locally is the
- * Ledger Ensemble widget's leading-cast tally (`castOrder < 5`, docs/android-contracts/ledger.md
- * §2). Twenty leaves generous headroom for that while keeping the outbox payload, which is one
- * JSON blob in a Room row, from ballooning by an order of magnitude per add.
- */
-internal const val MAX_CAST_ROWS = 20
 
 /**
  * The single outbox payload for an added title — the whole object graph
@@ -39,6 +32,8 @@ internal fun buildAddTitlePayload(
     cast: List<TitleCastEntity>,
     crew: List<TitleCrewEntity>,
     viewing: ViewingEntity?,
+    seasonCast: List<SeasonCastEntity> = emptyList(),
+    episodeCrew: List<EpisodeCrewEntity> = emptyList(),
 ): JSONObject {
     val seasonNumberById = seasons.associate { it.id to it.seasonNumber }
     return JSONObject().apply {
@@ -72,6 +67,18 @@ internal fun buildAddTitlePayload(
         put("studios", JSONArray(details.studios))
         putOrNull("collectionId", details.collectionId)
         putOrNull("collectionName", details.collectionName)
+        put("seasonCast", JSONArray().apply {
+            seasonCast.forEach { credit -> put(JSONObject().apply {
+                put("id", credit.id); put("seasonId", credit.seasonId); put("tmdbPersonId", credit.tmdbPersonId)
+                put("name", credit.name); putOrNull("characterName", credit.characterName); put("castOrder", credit.castOrder)
+            }) }
+        })
+        put("episodeCrew", JSONArray().apply {
+            episodeCrew.forEach { credit -> put(JSONObject().apply {
+                put("id", credit.id); put("episodeId", credit.episodeId); put("tmdbPersonId", credit.tmdbPersonId)
+                put("name", credit.name); put("job", credit.job)
+            }) }
+        })
 
         put(
             "seasons",

@@ -28,7 +28,9 @@ class LibraryMetadataProjectionTest {
                 object : EpisodeMetadataFetcher {
                     override suspend fun fetchSeasonEpisodes(tmdbId: Int, seasonNumber: Int) = emptyList<MediaEpisode>()
                     override suspend fun fetchEpisodeCast(tmdbId: Int, seasonNumber: Int, episodeNumber: Int) = EpisodeCast.EMPTY
-                })
+                },
+                personCreditsDao = db.personCreditsDao(),
+            )
             val row = repo.observeLibrary().first().first { it.id == "one" }
             assertEquals("2026-01-01T00:00:00Z", row.addedAt)
             assertEquals("ja", row.originalLanguage)

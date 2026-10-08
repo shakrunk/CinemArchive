@@ -60,6 +60,7 @@ class LibraryRepositoryRemoveTitleTest {
         theaterInterestDao = NoTheaterInterestDaoRm,
         outbox = MutationOutbox(outboxDao, NoopWriterRm, NoopConflictHandlerRm),
         episodeMetadataFetcher = NoEpisodeMetadataFetcher2,
+        personCreditsDao = FakePersonCreditsDao(),
     )
 
     @Test

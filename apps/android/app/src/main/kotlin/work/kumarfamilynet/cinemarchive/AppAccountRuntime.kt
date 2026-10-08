@@ -129,6 +129,7 @@ class AppAccountRuntime(
         titleCrewDao = database.titleCrewDao(),
         listDao = database.listDao(),
         listItemDao = database.listItemDao(),
+        personCreditsDao = database.personCreditsDao(),
         pushPending = outbox::flush,
         pendingKeys = outbox::pendingEntityKeys,
         transactor = transactor,
@@ -154,6 +155,7 @@ class AppAccountRuntime(
         theaterInterestDao = database.theaterInterestDao(),
         outbox = outbox,
         episodeMetadataFetcher = discoverRepository,
+        personCreditsDao = database.personCreditsDao(),
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)

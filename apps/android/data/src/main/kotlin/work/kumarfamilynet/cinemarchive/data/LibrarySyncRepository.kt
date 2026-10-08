@@ -16,6 +16,9 @@ import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.PersonCreditsDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
@@ -83,7 +86,8 @@ private const val PAGE_SIZE = 500
  */
 // 7: episode watch notes. Re-read existing events while preserving queued local edits/deletes.
 // 8: title tags, studios, and franchise metadata used by Library filters and grouping.
-private const val SYNC_SCHEMA_VERSION = 8
+// 9: season cast and episode crew, gated by the RPC's explicit personCreditsVersion marker.
+private const val SYNC_SCHEMA_VERSION = 9
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -116,6 +120,7 @@ class LibrarySyncRepository(
     private val titleCrewDao: TitleCrewDao,
     private val listDao: ListDao,
     private val listItemDao: ListItemDao,
+    private val personCreditsDao: PersonCreditsDao,
     /** Pushes queued local edits. Run before every pull so the server (and so the pull) already
      *  reflects what this device did while offline. */
     private val pushPending: suspend () -> Unit = {},
@@ -159,20 +164,22 @@ class LibrarySyncRepository(
         var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
         var metadataSchemaAvailable = true
         var sawMetadataTitle = false
+        var personSchemaAvailable = true
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
             if (rows.length() == 0) break
-            if (storedSchemaVersion < 8) {
+            if (storedSchemaVersion < SYNC_SCHEMA_VERSION) {
                 for (index in 0 until rows.length()) {
                     val row = rows.getJSONObject(index)
                     if (row.getString("entity_type") == "title") {
                         sawMetadataTitle = true
                         val payload = row.getJSONObject("payload")
-                        if (listOf("tags", "studios", "collectionId", "collectionName").any { !payload.has(it) }) {
+                        if (storedSchemaVersion < 8 && listOf("tags", "studios", "collectionId", "collectionName").any { !payload.has(it) }) {
                             metadataSchemaAvailable = false
                         }
+                        if (payload.optInt("personCreditsVersion", 0) < 1) personSchemaAvailable = false
                     }
                 }
             }
@@ -191,8 +198,9 @@ class LibrarySyncRepository(
         // An older RPC can still sync safely, but must not acknowledge the metadata backfill:
         // its later migration does not bump existing title timestamps. An empty archive cannot
         // prove capability either: keep retrying from epoch until a complete title is observed.
-        if (storedSchemaVersion < SYNC_SCHEMA_VERSION && metadataSchemaAvailable && (storedSchemaVersion >= 8 || sawMetadataTitle)) {
-            dataStore.edit { it[schemaVersionKey] = SYNC_SCHEMA_VERSION }
+        if (storedSchemaVersion < SYNC_SCHEMA_VERSION && sawMetadataTitle && metadataSchemaAvailable) {
+            val acknowledged = if (personSchemaAvailable) SYNC_SCHEMA_VERSION else maxOf(storedSchemaVersion, 8)
+            if (acknowledged > storedSchemaVersion) dataStore.edit { it[schemaVersionKey] = acknowledged }
         }
     }
 
@@ -226,6 +234,8 @@ class LibrarySyncRepository(
         private val cinemaOutings = mutableListOf<CinemaOutingEntity>()
         private val cast = mutableListOf<TitleCastEntity>()
         private val crew = mutableListOf<TitleCrewEntity>()
+        private val seasonCast = mutableListOf<SeasonCastEntity>()
+        private val episodeCrew = mutableListOf<EpisodeCrewEntity>()
         private val watchEvents = mutableListOf<EpisodeWatchEventEntity>()
         private val ratings = mutableListOf<EpisodeRatingEntity>()
         private val reviews = mutableListOf<EpisodeReviewEntity>()
@@ -254,6 +264,14 @@ class LibrarySyncRepository(
 
         suspend fun addCrew(row: TitleCrewEntity) {
             if (titleDao.getById(row.titleId) != null) titleCrewDao.upsertAll(listOf(row)) else crew += row
+        }
+
+        suspend fun addSeasonCast(row: SeasonCastEntity) {
+            if (personCreditsDao.hasSeason(row.titleId, row.seasonId)) personCreditsDao.upsertSeasonCast(listOf(row)) else seasonCast += row
+        }
+
+        suspend fun addEpisodeCrew(row: EpisodeCrewEntity) {
+            if (personCreditsDao.hasEpisode(row.titleId, row.episodeId)) personCreditsDao.upsertEpisodeCrew(listOf(row)) else episodeCrew += row
         }
 
         suspend fun addWatchEvent(row: EpisodeWatchEventEntity) {
@@ -286,6 +304,8 @@ class LibrarySyncRepository(
                 "cinema_outing" -> cinemaOutings.removeAll { it.id == entityId }
                 "title_cast" -> cast.removeAll { it.id == entityId }
                 "title_crew" -> crew.removeAll { it.id == entityId }
+                "season_cast" -> seasonCast.removeAll { it.id == entityId }
+                "episode_crew" -> episodeCrew.removeAll { it.id == entityId }
                 "episode_watch_event" -> watchEvents.removeAll { it.id == entityId }
                 "episode_rating" -> ratings.removeAll { it.id == entityId }
                 "episode_review" -> reviews.removeAll { it.id == entityId }
@@ -305,6 +325,8 @@ class LibrarySyncRepository(
                     ?.let { payload.toEpisodeEntity(it) }
             }
             episodeDao.upsertAll(resolvedEpisodes)
+            personCreditsDao.upsertSeasonCast(seasonCast.filter { personCreditsDao.hasSeason(it.titleId, it.seasonId) })
+            personCreditsDao.upsertEpisodeCrew(episodeCrew.filter { personCreditsDao.hasEpisode(it.titleId, it.episodeId) })
 
             watchEventDao.upsertAll(watchEvents.filter { episodeDao.getById(it.episodeId) != null })
             ratingDao.upsertAll(ratings.filter { episodeDao.getById(it.episodeId) != null })
@@ -337,6 +359,8 @@ class LibrarySyncRepository(
         byType["episode"]?.forEach { deferred.addEpisode(it.payload()) }
         byType["title_cast"]?.forEach { deferred.addCast(it.payload().toTitleCastEntity()) }
         byType["title_crew"]?.forEach { deferred.addCrew(it.payload().toTitleCrewEntity()) }
+        byType["season_cast"]?.forEach { deferred.addSeasonCast(it.payload().toSeasonCastEntity()) }
+        byType["episode_crew"]?.forEach { deferred.addEpisodeCrew(it.payload().toEpisodeCrewEntity()) }
         byType["viewing"]?.forEach { deferred.addViewing(it.payload().toViewingEntity()) }
         byType["episode_watch_event"]?.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity()) }
         byType["episode_rating"]?.forEach { deferred.addRating(it.payload().toRatingEntity()) }
@@ -359,6 +383,8 @@ class LibrarySyncRepository(
                 "cinema_outing" -> cinemaOutingDao.deleteById(entityId)
                 "title_cast" -> titleCastDao.deleteById(entityId)
                 "title_crew" -> titleCrewDao.deleteById(entityId)
+                "season_cast" -> personCreditsDao.deleteSeasonCast(entityId)
+                "episode_crew" -> personCreditsDao.deleteEpisodeCrew(entityId)
                 "list" -> listDao.deleteById(entityId)
                 "list_item" -> listItemDao.deleteById(entityId)
             }
@@ -449,6 +475,17 @@ class LibrarySyncRepository(
         name = getString("name"),
         job = getString("job"),
         department = optStringOrNull("department"),
+    )
+
+    private fun JSONObject.toSeasonCastEntity() = SeasonCastEntity(
+        id = getString("id"), titleId = getString("titleId"), seasonId = getString("seasonId"),
+        tmdbPersonId = getInt("tmdbPersonId"), name = getString("name"),
+        characterName = optStringOrNull("characterName"), castOrder = optInt("castOrder", 0),
+    )
+
+    private fun JSONObject.toEpisodeCrewEntity() = EpisodeCrewEntity(
+        id = getString("id"), titleId = getString("titleId"), episodeId = getString("episodeId"),
+        tmdbPersonId = getInt("tmdbPersonId"), name = getString("name"), job = getString("job"),
     )
 
     private fun JSONObject.toSeasonEntity() = SeasonEntity(

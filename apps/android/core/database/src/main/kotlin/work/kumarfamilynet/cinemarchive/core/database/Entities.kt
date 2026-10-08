@@ -247,6 +247,43 @@ data class TitleCrewEntity(
     val department: String?,
 )
 
+/** Season-billed people participate in person filtering even when absent from series cast. */
+@Entity(
+    tableName = "season_cast",
+    foreignKeys = [
+        ForeignKey(entity = TitleEntity::class, parentColumns = ["id"], childColumns = ["titleId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = SeasonEntity::class, parentColumns = ["id"], childColumns = ["seasonId"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [Index("titleId"), Index("seasonId")],
+)
+data class SeasonCastEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val seasonId: String,
+    val tmdbPersonId: Int,
+    val name: String,
+    val characterName: String?,
+    val castOrder: Int,
+)
+
+/** Director and writing credits for an individual episode, keyed by stable provider identity. */
+@Entity(
+    tableName = "episode_crew",
+    foreignKeys = [
+        ForeignKey(entity = TitleEntity::class, parentColumns = ["id"], childColumns = ["titleId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = EpisodeEntity::class, parentColumns = ["id"], childColumns = ["episodeId"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [Index("titleId"), Index("episodeId")],
+)
+data class EpisodeCrewEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val episodeId: String,
+    val tmdbPersonId: Int,
+    val name: String,
+    val job: String,
+)
+
 /**
  * Local mirror of `cinema_outings` (schema.sql) — a booked cinema trip. Originally just the
  * two owner-private columns the Ledger "At the Movies" widget reads (`format`, `ticketPrice`);

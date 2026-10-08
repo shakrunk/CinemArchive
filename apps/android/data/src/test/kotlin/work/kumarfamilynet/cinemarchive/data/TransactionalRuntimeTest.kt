@@ -89,6 +89,7 @@ class TransactionalRuntimeTest {
         viewingDao = db.viewingDao(), cinemaOutingDao = db.cinemaOutingDao(), titleCastDao = db.titleCastDao(),
         titleCrewDao = db.titleCrewDao(), theaterInterestDao = db.theaterInterestDao(), outbox = outbox,
         episodeMetadataFetcher = NoMetadata,
+        personCreditsDao = db.personCreditsDao(),
     )
 
     private fun outbox(db: LibraryDatabase, writer: RemoteMutationWriter) =
@@ -124,9 +125,72 @@ class TransactionalRuntimeTest {
         viewingDao = db.viewingDao(), cinemaOutingDao = db.cinemaOutingDao(), titleCastDao = db.titleCastDao(),
         titleCrewDao = db.titleCrewDao(), listDao = db.listDao(), listItemDao = db.listItemDao(),
         pushPending = outbox::flush, pendingKeys = outbox::pendingEntityKeys, transactor = RoomTransactor(db),
+        personCreditsDao = db.personCreditsDao(),
     )
 
     private fun tmpFile(name: String) = File.createTempFile(name, ".preferences_pb").also { it.delete(); it.deleteOnExit() }
+
+    private fun creditRow(type: String, id: String, payload: JSONObject) = JSONObject()
+        .put("entity_type", type).put("entity_id", id).put("updated_at", "2026-01-01T00:00:00Z").put("payload", payload.put("id", id))
+
+    @Test fun personCreditsResolveParentsAcrossPagesAndTombstonesDoNotResurrectDeferredRows() = runBlocking {
+        val db = memoryDb()
+        val seasonCredit = JSONObject().put("titleId", "show").put("seasonId", "season").put("tmdbPersonId", 42).put("name", "Same name").put("castOrder", 0)
+        val episodeCredit = JSONObject().put("titleId", "show").put("episodeId", "ep").put("tmdbPersonId", 84).put("name", "Same name").put("job", "Writer")
+        val early = JSONArray().apply { repeat(498) { put(creditRow("season_cast", "sc", JSONObject(seasonCredit.toString()))) }
+            put(creditRow("episode_crew", "ec", episodeCredit)); put(creditRow("season_cast", "deleted", JSONObject(seasonCredit.toString()))) }
+        val parent = titleRow("show", "WATCHING", "2026-01-01T00:00:00Z").apply { getJSONObject("payload")
+            .put("tags", JSONArray()).put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL).put("personCreditsVersion", 1) }
+        val late = JSONArray().put(parent)
+            .put(creditRow("season", "season", JSONObject().put("titleId", "show").put("seasonNumber", 0).put("episodeCount", 1).put("episodesWatched", 0)))
+            .put(creditRow("episode", "ep", JSONObject().put("titleId", "show").put("seasonNumber", 0).put("episodeNumber", 3)))
+            .put(creditRow("tombstone", "deleted", JSONObject().put("entityType", "season_cast")))
+        val http = SyncHttp(ArrayDeque(listOf(early, late)))
+        syncRepository(db, outbox(db, ScriptedWriter { PushResult.Success }), http, tmpFile("person-sync")).syncNow()
+        assertEquals(listOf("sc"), db.personCreditsDao().observeSeasonCast().first().map { it.id })
+        assertEquals(listOf("ec"), db.personCreditsDao().observeEpisodeCrew().first().map { it.id })
+        assertEquals(setOf(42, 84), libraryRepository(db, outbox(db, ScriptedWriter { PushResult.Success })).observeLibrary().first().single().people.map { it.tmdbPersonId }.toSet())
+    }
+
+    @Test fun personCapabilityBackfillsUnchangedCreditsAfterEmptyAndOlderBackendWithoutDiscardingPendingEdits() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show", "DROPPED")))
+        db.seasonDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonEntity("season", "show", 1, 1, 0, null)))
+        val queue = outbox(db, ScriptedWriter { PushResult.Retry("offline") })
+        queue.enqueue("title", "show", "update", JSONObject().put("id", "show").put("status", "DROPPED"))
+        val old = titleRow("show", "WATCHING", "2026-01-01T00:00:00Z")
+        val upgraded = JSONObject(old.toString()).apply { getJSONObject("payload").put("personCreditsVersion", 1) }
+        val credit = creditRow("season_cast", "sc", JSONObject().put("titleId", "show").put("seasonId", "season").put("tmdbPersonId", 42).put("name", "Person"))
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(old), JSONArray().put(credit).put(upgraded), JSONArray())))
+        val file = tmpFile("person-capability")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 8; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
+        val sync = syncRepository(db, queue, http, file, prefs)
+        sync.syncNow(); sync.syncNow()
+        assertEquals(8, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        sync.syncNow()
+        assertEquals(9, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        assertTrue(http.requests.take(3).all { it.getString("p_since") == "1970-01-01T00:00:00Z" })
+        assertEquals("DROPPED", db.titleDao().getById("show")!!.status)
+        assertEquals(1, db.outboxDao().getPending().size)
+        assertEquals(42, db.personCreditsDao().observeSeasonCast().first().single().tmdbPersonId)
+        sync.syncNow()
+        assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
+    }
+
+    @Test fun personCreditsRejectWrongTitleParentsAndApplyDirectAndParentDeletes() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show"), title("other")))
+        db.seasonDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonEntity("season", "show", 1, 1, 0, null)))
+        db.personCreditsDao().upsertSeasonCast(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity("remove", "show", "season", 42, "Person", null, 0)))
+        val wrong = creditRow("season_cast", "wrong", JSONObject().put("titleId", "other").put("seasonId", "season").put("tmdbPersonId", 84).put("name", "Wrong parent"))
+        val rows = JSONArray().put(wrong).put(creditRow("tombstone", "remove", JSONObject().put("entityType", "season_cast")))
+        syncRepository(db, outbox(db, ScriptedWriter { PushResult.Success }), SyncHttp(ArrayDeque(listOf(rows))), tmpFile("person-delete")).syncNow()
+        assertTrue(db.personCreditsDao().observeSeasonCast().first().isEmpty())
+        db.personCreditsDao().upsertSeasonCast(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity("cascade", "show", "season", 42, "Person", null, 0)))
+        db.titleDao().deleteById("show")
+        assertTrue(db.personCreditsDao().observeSeasonCast().first().isEmpty())
+    }
 
     @Test fun accountsNeverShareStorageAndEachRetainsItsOwnQueueAcrossSwitches() = runBlocking {
         val a = fileDb("user-a")
@@ -337,7 +401,7 @@ class TransactionalRuntimeTest {
         val oldRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z")
         val upgradedRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z").apply {
             getJSONObject("payload").put("tags", JSONArray().put("Backfilled"))
-                .put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL)
+                .put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL).put("personCreditsVersion", 1)
         }
         val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(oldRow), JSONArray().put(upgradedRow), JSONArray())))
         val file = tmpFile("metadata-rollout")
@@ -351,7 +415,7 @@ class TransactionalRuntimeTest {
         sync.syncNow()
         assertEquals(List(3) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
         assertEquals(listOf("Backfilled"), db.titleDao().getById("t1")!!.tags)
-        assertEquals(8, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        assertEquals(9, prefs.data.first()[intPreferencesKey("sync_schema_version")])
         sync.syncNow()
         assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
     }

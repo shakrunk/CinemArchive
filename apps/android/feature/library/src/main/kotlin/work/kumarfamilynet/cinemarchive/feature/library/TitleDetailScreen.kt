@@ -569,6 +569,12 @@ fun TitleDetailScreen(
                 }
             }
 
+            item(key = "catalog-details") {
+                ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                    CatalogDetailsSection(detail)
+                }
+            }
+
             if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty() || onRefreshCredits != null) {
                 item(key = "title-credits") {
                     ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {

@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android title details now show stored tags, language, release date, studios, franchise, date added and IMDb score while offline.
 - Shared completion receipts preserve the original outing revision, preventing older pending plan changes from overwriting newer edits on another device.
 - Web JSON imports regenerate episode and history identities while retaining their contents, and reject duplicate identities before saving.
 - Android credit refresh now fills empty seasons and missing Specials using confirmed episode identities, preserving existing progress and watch history.

@@ -29,6 +29,13 @@ data class TitleDetail(
     val tmdbId: Int? = null,
     val cast: List<PersonCredit> = emptyList(),
     val crew: List<PersonCredit> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val originalLanguage: String? = null,
+    val releaseDate: String? = null,
+    val studios: List<String> = emptyList(),
+    val collectionName: String? = null,
+    val addedAt: String? = null,
+    val imdbRating: Double? = null,
 )
 
 data class SeasonDetail(

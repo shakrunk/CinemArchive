@@ -551,6 +551,13 @@ class LibraryRepository(
                 rating = title.rating,
                 notes = title.notes,
                 genres = title.genres,
+                tags = title.tags,
+                originalLanguage = title.originalLanguage,
+                releaseDate = title.releaseDate,
+                studios = title.studios,
+                collectionName = title.collectionName,
+                addedAt = title.addedAt,
+                imdbRating = title.imdbRating,
                 cast = credits.cast.sortedBy { it.castOrder }.map { PersonCredit(it.tmdbPersonId, it.name, it.characterName) },
                 crew = credits.crew.map { PersonCredit(it.tmdbPersonId, it.name, it.job) },
                 seasons = aggregate.seasons.map { season ->

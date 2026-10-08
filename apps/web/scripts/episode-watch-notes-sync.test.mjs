@@ -8,11 +8,12 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 const database = new PGlite({ extensions: { pgcrypto } })
 const owner = randomUUID()
 const other = randomUUID()
+const ownerTitle = randomUUID()
 const episode = randomUUID()
 const watched = randomUUID()
 const undated = randomUUID()
 const foreignWatch = randomUUID()
-const migration = await readFile(new URL('../../../supabase/migrations/20261008173528_episode_watch_notes_sync.sql', import.meta.url), 'utf8')
+const migration = await readFile(new URL('../../../supabase/migrations/20261008183232_library_discovery_sync_fields.sql', import.meta.url), 'utf8')
 const canonicalSchema = (await readFile(new URL('../../../schema.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
 
 before(async () => {
@@ -32,12 +33,13 @@ before(async () => {
   await database.exec(await readFile(new URL('../../../supabase/migrations/20261008162831_atomic_library_commands.sql', import.meta.url), 'utf8'))
   await database.query('insert into auth.users(id,email) values ($1,$2),($3,$4)', [owner, 'owner@example.test', other, 'other@example.test'])
   for (const [user, watch] of [[owner, watched], [other, foreignWatch]]) {
-    const title = randomUUID()
+    const title = user === owner ? ownerTitle : randomUUID()
     const ep = user === owner ? episode : randomUUID()
     await database.query("insert into titles(id,user_id,tmdb_id,type,title,year,status) values ($1,$2,42,'tv','A show',2020,'watching')", [title, user])
     await database.query('insert into episodes(id,user_id,title_id,season_number,episode_number) values ($1,$2,$3,1,1)', [ep, user, title])
     await database.query("insert into episode_watch_events(id,user_id,episode_id,watched_at,notes) values ($1,$2,$3,'2026-01-03','With family')", [watch, user, ep])
   }
+  await database.query("update titles set tags=array['family','rewatch'], studios=array['Example Studio'], collection_id=42, collection_name='Example Collection' where id=$1", [ownerTitle])
   await database.query('insert into episode_watch_events(id,user_id,episode_id,watched_at,notes) values ($1,$2,$3,null,null)', [undated, owner, episode])
   await database.query("select set_config('request.jwt.claim.sub',$1,false)", [owner])
   const old = await database.query("select payload from sync_library_changes('1970-01-01',500) where entity_id=$1", [watched])
@@ -116,4 +118,36 @@ test('anonymous RPC access is denied even when a subject setting is present', as
 
 test('canonical schema contains the complete secured migration', () => {
   assert.ok(canonicalSchema.includes(migration.replaceAll('\r\n', '\n').trim()))
+})
+
+test('existing title sync includes tags, studios and franchise identity without rewriting rows', async () => {
+  const row = (await database.query("select payload from sync_library_changes('1970-01-01',500) where entity_id=$1", [ownerTitle])).rows[0]
+  assert.deepEqual(row.payload.tags, ['family', 'rewatch'])
+  assert.deepEqual(row.payload.studios, ['Example Studio'])
+  assert.equal(row.payload.collectionId, 42)
+  assert.equal(row.payload.collectionName, 'Example Collection')
+})
+
+test('metadata remains owner scoped and unknown franchise fields are explicitly null', async () => {
+  await database.query("select set_config('request.jwt.claim.sub',$1,false)", [other])
+  try {
+    const rows = (await database.query("select entity_id,payload from sync_library_changes('1970-01-01',500) where entity_type='title'")).rows
+    assert.equal(rows.length, 1)
+    assert.notEqual(rows[0].entity_id, ownerTitle)
+    assert.deepEqual(rows[0].payload.tags, [])
+    assert.deepEqual(rows[0].payload.studios, [])
+    assert.equal(rows[0].payload.collectionId, null)
+    assert.equal(rows[0].payload.collectionName, null)
+  } finally { await database.query("select set_config('request.jwt.claim.sub',$1,false)", [owner]) }
+})
+
+test('clearing tags, studios and a franchise is visible on the next sync', async () => {
+  await database.exec('reset role')
+  await database.query("update titles set tags='{}', studios='{}', collection_id=null, collection_name=null where id=$1", [ownerTitle])
+  await database.exec('set role authenticated')
+  const row = (await database.query("select payload from sync_library_changes('1970-01-01',500) where entity_id=$1", [ownerTitle])).rows[0]
+  assert.deepEqual(row.payload.tags, [])
+  assert.deepEqual(row.payload.studios, [])
+  assert.equal(row.payload.collectionId, null)
+  assert.equal(row.payload.collectionName, null)
 })

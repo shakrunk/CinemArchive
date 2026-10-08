@@ -22,15 +22,23 @@ Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Verification gates
 
-**Typecheck, lint and build must all pass before a change is complete.** There is no CI job running
-these for the web app on a pull request, so this is on you.
+**Typecheck, lint and build must all pass before a change is complete.** The Web workflow runs
+these gates, unit tests, and a production dependency audit on every PR into `dev` or `main`.
+It has no path filter, so a required check can report on documentation-only PRs too.
 
 ```bash
 # web — from apps/web/
-npm run lint && npm run build && npm run test
+npm ci
+npm run typecheck
+npm run lint:ci
+npm run test
+npm audit --omit=dev --audit-level=moderate
+npm run build
 ```
 
-`npm run build` runs `tsc -b` first, so it covers the typecheck gate.
+`npm run build` also runs `tsc -b`. `lint:ci` caps existing warnings; ordinary `lint` still
+prints all findings. Lower the cap as debt is removed; do not raise it to admit new warnings.
+See [release readiness](docs/release-readiness.md) for current coverage and remaining gates.
 
 ```bash
 # android — from apps/android/

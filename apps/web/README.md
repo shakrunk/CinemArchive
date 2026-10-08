@@ -70,6 +70,7 @@ apps/web/
   functions/redeem-invite/     # Edge Function: invite-code account creation
 ../../.github/workflows/
   deploy.yml                   # Build + deploy to GitHub Pages (+ release + Android APK)
+  web.yml                      # Web PR checks, also required before the deploy build
   db-migrate.yml               # supabase db push (manual workflow_dispatch)
   deploy-functions.yml         # Deploys supabase/functions/** on change
   parity.yml                   # Enforces Parity: trailers on PRs
@@ -84,13 +85,13 @@ The app version shown in Settings → About (`__APP_VERSION__`) comes from the *
 ## Local development
 
 ### Prerequisites
-- Node.js (project uses Node 22.x locally)
+- Node.js 22.23.2 (matches web verification and deployment CI)
 - A Supabase project (for auth + persistence; the app also runs read-only on seed data without one)
 
 ### Setup
 1. From `apps/web/`, install dependencies:
    ```bash
-   npm install
+   npm ci
    ```
 2. Create `apps/web/.env.local` with your Supabase project's public values:
    ```
@@ -106,11 +107,17 @@ The app version shown in Settings → About (`__APP_VERSION__`) comes from the *
 ### Commands
 ```bash
 npm run dev        # Start dev server (HMR)
+npm run typecheck  # TypeScript project check
 npm run build      # Type-check (tsc -b) + production build → dist/
 npm run preview    # Preview the production build locally
 npm run lint       # ESLint
+npm run lint:ci    # ESLint with an enforced existing-warning budget
 npm run test        # Vitest
 ```
+
+The [Web workflow](../../.github/workflows/web.yml) runs these checks and a production
+dependency audit for PRs and before deployment. See [release readiness](../../docs/release-readiness.md)
+for evidence, audit limitations, and remaining launch requirements.
 
 ---
 

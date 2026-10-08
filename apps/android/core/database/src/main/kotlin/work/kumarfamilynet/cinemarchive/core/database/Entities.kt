@@ -13,8 +13,7 @@ import androidx.room.TypeConverter
 
 /**
  * Local mirror of the `titles` table (see schema.sql / docs/android-contracts/title-detail.md).
- * A read-only subset for now — cast/crew/physical-media/badge-score columns are deferred
- * until the network sync layer (docs/android-sync-contract.md) actually populates them.
+ * Owner fields and catalog metadata are preserved independently of whether a screen displays them.
  */
 @Entity(tableName = "titles")
 data class TitleEntity(
@@ -48,6 +47,18 @@ data class TitleEntity(
     @ColumnInfo(defaultValue = "''") val studios: List<String> = emptyList(),
     val collectionId: Int? = null,
     val collectionName: String? = null,
+    val contentRating: String? = null,
+    val imdbId: String? = null,
+    val rtUrl: String? = null,
+    val rtScore: Int? = null,
+    val metacriticScore: Int? = null,
+    val customWatchUrl: String? = null,
+    val inHomeCollection: Boolean? = null,
+    /** Keep the complete JSON array, including unknown fields, until an explicit owner edit. */
+    val physicalMediaJson: String? = null,
+    val awardsCount: Int? = null,
+    val bechdelOutcome: String? = null,
+    val bechdelScore: String? = null,
 )
 
 @Entity(

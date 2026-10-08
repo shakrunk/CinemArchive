@@ -24,6 +24,7 @@ class TicketMigrationTest {
             val old = fixture.openHelper.writableDatabase
             listOf("ticket_intents", "ticket_originals", "ticket_associations").forEach { old.execSQL("DROP TABLE $it") }
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/16.json").readText()).getJSONObject("database")
+            restoreEmptyFixtureTable(old, schema, "titles")
             val setup = schema.getJSONArray("setupQueries")
             for (index in 0 until setup.length()) old.execSQL(setup.getString(index))
             old.execSQL("INSERT INTO titles (id,tmdbId,type,title,genres,status,addedAt,updatedAt,tags,studios) VALUES ('title',42,'MOVIE','Film','','WATCHED','2026-01-01','2026-01-01','','')")
@@ -34,7 +35,7 @@ class TicketMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 16
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_16_17).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18).build()
         try {
             assertEquals("/legacy/tickets/original.png", upgraded.cinemaOutingDao().getById("outing")!!.ticketImagePath)
             assertEquals("Real payload", upgraded.cinemaOutingDao().getById("outing")!!.ticketBarcodePayload)

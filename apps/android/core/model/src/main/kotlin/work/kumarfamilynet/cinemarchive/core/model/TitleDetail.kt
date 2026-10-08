@@ -36,6 +36,26 @@ data class TitleDetail(
     val collectionName: String? = null,
     val addedAt: String? = null,
     val imdbRating: Double? = null,
+    val contentRating: String? = null,
+    val imdbId: String? = null,
+    val rtUrl: String? = null,
+    val rtScore: Int? = null,
+    val metacriticScore: Int? = null,
+    val customWatchUrl: String? = null,
+    val inHomeCollection: Boolean? = null,
+    val physicalMedia: List<PhysicalMediaItem> = emptyList(),
+    val awardsCount: Int? = null,
+    val bechdelOutcome: String? = null,
+    val bechdelScore: String? = null,
+)
+
+/** Display projection retains the complete copy object for later edits without losing notes/extensions. */
+data class PhysicalMediaItem(
+    val id: String,
+    val format: String,
+    val edition: String?,
+    val notes: String?,
+    val sourceJson: String,
 )
 
 data class SeasonDetail(

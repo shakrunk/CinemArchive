@@ -26,6 +26,7 @@ class ViewingCompletionMigrationTest {
             old.execSQL("DROP TABLE viewing_completion_aliases")
             old.execSQL("DROP TABLE viewings")
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/15.json").readText()).getJSONObject("database")
+            restoreEmptyFixtureTable(old, schema, "titles")
             val entities = schema.getJSONArray("entities")
             for (index in 0 until entities.length()) {
                 val entity = entities.getJSONObject(index)
@@ -43,7 +44,7 @@ class ViewingCompletionMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 15
         } finally { fixture.close() }
-        val upgraded = builder(name).addMigrations(LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17).build()
+        val upgraded = builder(name).addMigrations(LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18).build()
         try {
             val viewing = upgraded.viewingDao().getById("viewing")!!
             assertEquals("Keep this history", viewing.notes)

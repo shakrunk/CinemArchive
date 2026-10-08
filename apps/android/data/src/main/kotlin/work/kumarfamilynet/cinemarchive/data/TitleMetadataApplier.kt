@@ -50,5 +50,6 @@ internal fun JSONObject.toMetadataTitle(local: TitleEntity): TitleEntity {
         updatedAt = getString("updated_at"), imdbRating = if (isNull("imdb_rating")) null else getDouble("imdb_rating"),
         originalLanguage = text("original_language"), releaseDate = text("release_date"), studios = strings("studios"),
         collectionId = int("collection_id"), collectionName = text("collection_name"),
-    ).withTitleMetadata(JSONObject().put("tags", getJSONArray("tags")).put("status", getString("status")).put("rating", get("rating")))
+    ).withRichMetadata(this, snakeCase = true)
+        .withTitleMetadata(JSONObject().put("tags", getJSONArray("tags")).put("status", getString("status")).put("rating", get("rating")))
 }

@@ -44,7 +44,7 @@ suspend fun buildSharedLibrarySnapshot(context: Context, library: SharedLibrary)
                     releaseDate = row.optStringOrNull("release_date"),
                     tags = row.strings("tags"), studios = row.strings("studios"),
                     collectionId = row.intOrNull("collection_id"), collectionName = row.optStringOrNull("collection_name"),
-                )))
+                ).withRichMetadata(row, snakeCase = true)))
                 val episodes = row.rows("episodes")
                 val seasons = row.rows("seasons").map { season ->
                     SeasonEntity(season.getString("id"), title.id, season.getInt("season_number"),

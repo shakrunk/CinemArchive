@@ -298,7 +298,7 @@ class TransactionalRuntimeTest {
         val queue = outbox(db, ScriptedWriter { PushResult.Retry("offline") })
         queue.enqueue("title", "show", "update", JSONObject().put("id", "show").put("status", "DROPPED"))
         val old = titleRow("show", "WATCHING", "2026-01-01T00:00:00Z")
-        val upgraded = JSONObject(old.toString()).apply { getJSONObject("payload").put("personCreditsVersion", 1) }
+        val upgraded = JSONObject(old.toString()).apply { getJSONObject("payload").put("personCreditsVersion", 1).put("titleMetadataVersion", 1) }
         val credit = creditRow("season_cast", "sc", JSONObject().put("titleId", "show").put("seasonId", "season").put("tmdbPersonId", 42).put("name", "Person"))
         val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(old), JSONArray().put(credit).put(upgraded), JSONArray())))
         val file = tmpFile("person-capability")
@@ -314,7 +314,7 @@ class TransactionalRuntimeTest {
         assertEquals(1, db.outboxDao().getPending().size)
         assertEquals(42, db.personCreditsDao().observeSeasonCast().first().single().tmdbPersonId)
         sync.syncNow()
-        assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
+        assertEquals("1970-01-01T00:00:00Z", http.requests.last().getString("p_since")) // Protected title keeps rich backfill unacknowledged.
     }
 
     @Test fun personCreditsRejectWrongTitleParentsAndApplyDirectAndParentDeletes() = runBlocking {
@@ -546,7 +546,7 @@ class TransactionalRuntimeTest {
         val oldRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z")
         val upgradedRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z").apply {
             getJSONObject("payload").put("tags", JSONArray().put("Backfilled"))
-                .put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL).put("personCreditsVersion", 1)
+                .put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL).put("personCreditsVersion", 1).put("titleMetadataVersion", 1)
         }
         val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(oldRow), JSONArray().put(upgradedRow), JSONArray())))
         val file = tmpFile("metadata-rollout")
@@ -560,8 +560,53 @@ class TransactionalRuntimeTest {
         sync.syncNow()
         assertEquals(List(3) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
         assertEquals(listOf("Backfilled"), db.titleDao().getById("t1")!!.tags)
-        assertEquals(9, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        assertEquals(10, prefs.data.first()[intPreferencesKey("sync_schema_version")])
         sync.syncNow()
+        assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
+    }
+
+    @Test fun richMetadataBackfillsOnlyAfterCapabilityAndPendingLegacyEditsDrain() = runTest {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("existing").copy(contentRating = "Local", inHomeCollection = true),
+            title("pending", "DROPPED").copy(customWatchUrl = "https://local.example")))
+        val writer = ScriptedWriter { PushResult.Retry("offline") }
+        val queue = outbox(db, writer)
+        queue.enqueue("title", "pending", "update", JSONObject().put("id", "pending").put("status", "DROPPED"))
+        fun page(upgraded: Boolean, clear: Boolean = false) = JSONArray().apply {
+            for (id in listOf("existing", "pending")) put(titleRow(id, "watched", "2026-01-01T00:00:00Z").apply {
+                getJSONObject("payload").put("personCreditsVersion", 1).apply {
+                    if (upgraded) put("titleMetadataVersion", 1).put("contentRating", if (clear) JSONObject.NULL else "PG-13")
+                        .put("customWatchUrl", if (clear) JSONObject.NULL else "https://server.example/watch")
+                        .put("inHomeCollection", false).put("physicalMedia", if (clear) JSONArray() else JSONArray("""[{"id":"copy","format":"DVD","notes":"Keep","unknown":{"v":1}}]"""))
+                        .put("rtScore", 0).put("metacriticScore", 0).put("awardsCount", 0)
+                }
+            })
+        }
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray(), page(false), page(true), page(true), page(true, true))))
+        val file = tmpFile("rich-rollout")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val schema = intPreferencesKey("sync_schema_version")
+        prefs.edit { it[schema] = 9; it[stringPreferencesKey("last_synced_at")] = "2026-10-08T00:00:00Z" }
+        val sync = syncRepository(db, queue, http, file, prefs)
+        sync.syncNow(); sync.syncNow()
+        assertEquals(9, prefs.data.first()[schema])
+        assertEquals("Local", db.titleDao().getById("existing")!!.contentRating)
+        assertEquals(true, db.titleDao().getById("existing")!!.inHomeCollection)
+        sync.syncNow()
+        assertEquals(9, prefs.data.first()[schema]) // Pending legacy write still protects an unchanged title.
+        assertEquals("PG-13", db.titleDao().getById("existing")!!.contentRating)
+        assertEquals("https://local.example", db.titleDao().getById("pending")!!.customWatchUrl)
+        assertEquals("DROPPED", db.titleDao().getById("pending")!!.status)
+        writer.next = { PushResult.Success }; sync.syncNow()
+        assertEquals(10, prefs.data.first()[schema])
+        assertEquals(List(4) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
+        assertEquals("https://server.example/watch", db.titleDao().getById("pending")!!.customWatchUrl)
+        val shelf = JSONArray(db.titleDao().getById("pending")!!.physicalMediaJson).getJSONObject(0)
+        assertEquals("Keep", shelf.getString("notes")); assertEquals(1, shelf.getJSONObject("unknown").getInt("v"))
+        sync.syncNow()
+        val cleared = db.titleDao().getById("pending")!!
+        assertNull(cleared.contentRating); assertNull(cleared.customWatchUrl)
+        assertEquals(false, cleared.inHomeCollection); assertEquals("[]", cleared.physicalMediaJson); assertEquals(0, cleared.rtScore)
         assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
     }
 }

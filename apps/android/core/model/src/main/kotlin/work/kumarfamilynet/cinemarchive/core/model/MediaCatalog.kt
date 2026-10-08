@@ -40,12 +40,8 @@ fun TrendingTitle.asSearchResult() = MediaSearchResult(
  * Everything `media-proxy?action=details` (plus the OMDb `ratings` action) can tell us about a
  * title, in the shape `LibraryRepository.addTitle` needs to write it.
  *
- * A few fields here have no column in the local Room mirror ([contentRating], [imdbId],
- * [rtScore], [metacriticScore]) — they're carried
- * anyway because the *server* has columns for all of them (schema.sql's `titles`), and the web
- * app renders them. Dropping them on the Android add path would mean a title added on a phone
- * looks permanently poorer on the web than the same title added there. They ride in the outbox
- * payload only; see `SupabaseRemoteMutationWriter.insertTitle`.
+ * Catalog fields are mirrored in Room and included in the outbox graph so Android and web
+ * retain the same certification, external IDs and critic scores from this fetch.
  */
 data class MediaDetails(
     val tmdbId: Int,

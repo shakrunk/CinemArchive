@@ -18,11 +18,8 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
  * isn't split per table). Keys are camelCase like every other outbox payload in this module;
  * `SupabaseRemoteMutationWriter.insertTitle` maps them to their snake_case columns.
  *
- * Carries a handful of fields the local Room mirror has no column for — `contentRating`,
- * `imdbId`, `studios`, `collectionId`/`collectionName`, `rtScore`, `metacriticScore` — read
- * straight off [MediaDetails] rather than off [title]. The server has columns for all of them
- * and the web app renders them, so dropping them here would make a title added on a phone look
- * permanently poorer on the web than the same title added there (see [MediaDetails]' kdoc).
+ * Catalog details accompany the local title projection so both clients receive the same
+ * certification, external IDs, studios, collection and critic scores when a title is added.
  */
 internal fun buildAddTitlePayload(
     title: TitleEntity,

@@ -87,7 +87,7 @@ private const val PAGE_SIZE = 500
 // 7: episode watch notes. Re-read existing events while preserving queued local edits/deletes.
 // 8: title tags, studios, and franchise metadata used by Library filters and grouping.
 // 9: season cast and episode crew, gated by the RPC's explicit personCreditsVersion marker.
-private const val SYNC_SCHEMA_VERSION = 9
+private const val SYNC_SCHEMA_VERSION = 10
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -181,6 +181,7 @@ class LibrarySyncRepository(
         var metadataSchemaAvailable = true
         var sawMetadataTitle = false
         var personSchemaAvailable = true
+        var richTitleSchemaAvailable = true
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
@@ -196,6 +197,7 @@ class LibrarySyncRepository(
                             metadataSchemaAvailable = false
                         }
                         if (payload.optInt("personCreditsVersion", 0) < 1) personSchemaAvailable = false
+                        if (payload.optInt("titleMetadataVersion", 0) < 1) richTitleSchemaAvailable = false
                     }
                 }
             }
@@ -215,7 +217,11 @@ class LibrarySyncRepository(
         // its later migration does not bump existing title timestamps. An empty archive cannot
         // prove capability either: keep retrying from epoch until a complete title is observed.
         if (storedSchemaVersion < SYNC_SCHEMA_VERSION && sawMetadataTitle && metadataSchemaAvailable) {
-            val acknowledged = if (personSchemaAvailable) SYNC_SCHEMA_VERSION else maxOf(storedSchemaVersion, 8)
+            val acknowledged = when {
+                !personSchemaAvailable -> maxOf(storedSchemaVersion, 8)
+                !richTitleSchemaAvailable || pendingKeys().any { it.startsWith("title:") } -> maxOf(storedSchemaVersion, 9)
+                else -> SYNC_SCHEMA_VERSION
+            }
             if (acknowledged > storedSchemaVersion) dataStore.edit { it[schemaVersionKey] = acknowledged }
         }
     }
@@ -469,7 +475,7 @@ class LibrarySyncRepository(
         studios = if (has("studios")) optJSONArray("studios").toStringList() else existing?.studios.orEmpty(),
         collectionId = if (has("collectionId")) optIntOrNull("collectionId") else existing?.collectionId,
         collectionName = if (has("collectionName")) optStringOrNull("collectionName") else existing?.collectionName,
-    )
+    ).withRichMetadata(this, previous = existing)
 
     // `castOrder`/`department` are the only fields either Ledger credits widget reads
     // (The Ensemble filters on castOrder < 5, The Auteurs no longer touches crew at all —

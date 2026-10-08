@@ -27,6 +27,7 @@ class PersonCreditsMigrationTest {
             old.execSQL("DROP TABLE season_cast")
             old.execSQL("DROP TABLE episode_crew")
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/14.json").readText()).getJSONObject("database")
+            restoreEmptyFixtureTable(old, schema, "titles")
             val entities = schema.getJSONArray("entities")
             for (index in 0 until entities.length()) {
                 val entity = entities.getJSONObject(index)
@@ -46,7 +47,7 @@ class PersonCreditsMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 14
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_14_15, LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_14_15, LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18).build()
         try {
             assertEquals(listOf("favorite"), upgraded.titleDao().getById("title")!!.tags)
             assertEquals("A memory", upgraded.episodeWatchEventDao().observeAllWatchEvents().first().single().notes)

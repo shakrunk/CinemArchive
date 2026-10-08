@@ -33,7 +33,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TicketAssociationEntity::class,
         TicketIntentEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -203,6 +203,16 @@ abstract class LibraryDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive catalog/owner fields: no histories, pending commands or identity receipts change. */
+        internal val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("contentRating", "imdbId", "rtUrl", "customWatchUrl", "physicalMediaJson", "bechdelOutcome", "bechdelScore")
+                    .forEach { db.execSQL("ALTER TABLE titles ADD COLUMN `$it` TEXT") }
+                listOf("rtScore", "metacriticScore", "inHomeCollection", "awardsCount")
+                    .forEach { db.execSQL("ALTER TABLE titles ADD COLUMN `$it` INTEGER") }
+            }
+        }
+
         /** [name] is the SQLite file name. Per-account runtimes pass an owner-derived name (see
          *  AccountRuntime) so two accounts never share a file; the legacy global
          *  `cinemarchive.db` ([LEGACY_DATABASE_NAME]) is never opened by an active runtime. */
@@ -211,7 +221,7 @@ abstract class LibraryDatabase : RoomDatabase() {
             LibraryDatabase::class.java,
             name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
@@ -232,7 +242,7 @@ abstract class LibraryDatabase : RoomDatabase() {
          */
         fun createForRecovery(context: Context, name: String): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, name)
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
                 .build()
     }
 }

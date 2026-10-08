@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android now retains synced physical collections, custom watch links and rich title metadata offline, including backfill for existing libraries.
 - Offline ratings after an outing completion can use its proven title revision while preserving newer edits and historical completion uncertainty.
 - Shared storage now supports private venue notes and theater-interest flags, including guarded note edits and cross-client sync.
 - Android title details now support editing tags, with durable status/rating changes and explicit comparison and recovery for saved edits.

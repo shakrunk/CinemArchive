@@ -230,6 +230,10 @@ class LibraryRepository(
             studios = details.studios,
             collectionId = details.collectionId,
             collectionName = details.collectionName,
+            contentRating = details.contentRating,
+            imdbId = details.imdbId,
+            rtScore = details.rtScore,
+            metacriticScore = details.metacriticScore,
         )
 
         outbox.atomically {
@@ -559,6 +563,17 @@ class LibraryRepository(
                 collectionName = title.collectionName,
                 addedAt = title.addedAt,
                 imdbRating = title.imdbRating,
+                contentRating = title.contentRating,
+                imdbId = title.imdbId,
+                rtUrl = title.rtUrl,
+                rtScore = title.rtScore,
+                metacriticScore = title.metacriticScore,
+                customWatchUrl = title.customWatchUrl,
+                inHomeCollection = title.inHomeCollection,
+                physicalMedia = physicalMediaItems(title.physicalMediaJson),
+                awardsCount = title.awardsCount,
+                bechdelOutcome = title.bechdelOutcome,
+                bechdelScore = title.bechdelScore,
                 cast = credits.cast.sortedBy { it.castOrder }.map { PersonCredit(it.tmdbPersonId, it.name, it.characterName) },
                 crew = credits.crew.map { PersonCredit(it.tmdbPersonId, it.name, it.job) },
                 seasons = aggregate.seasons.map { season ->

@@ -96,11 +96,13 @@ class SyncCoreTest {
               {"ratingKey":"1","type":"movie","title":"Heat","year":1995,"userRating":8,"viewCount":2,"lastViewedAt":1714600000,
                "Guid":[{"id":"tmdb://949"},{"id":"imdb://tt0113277"}]},
               {"ratingKey":"2","type":"movie","title":"Unwatched"},
-              {"ratingKey":"3","type":"show","title":"Severance","viewCount":1,"Guid":[{"id":"tvdb://371980"}]}
+              {"ratingKey":"3","type":"show","title":"Severance","viewCount":1,"leafCount":9,"viewedLeafCount":9,"Guid":[{"id":"tvdb://371980"}]},
+              {"ratingKey":"4","type":"show","title":"Slow Horses","leafCount":30,"viewedLeafCount":6}
             ]""",
         )
         val out = mapPlexItems(items)
-        assertEquals(2, out.size)
+        assertEquals(3, out.size)
+        assertEquals(LibraryStatus.WATCHING, out[2].status)
         assertEquals(4.0, out[0].rating!!, 0.0)
         assertEquals(ExternalIds(949, "tt0113277"), out[0].ids)
         assertEquals(listOf("2024-05-01"), out[0].watchedDates)
@@ -115,11 +117,13 @@ class SyncCoreTest {
               {"Id":"a","Type":"Movie","Name":"Heat","ProductionYear":1995,
                "ProviderIds":{"Tmdb":"949","Imdb":"tt0113277"},
                "UserData":{"Played":true,"LastPlayedDate":"2024-05-01T10:00:00.0000000Z"}},
-              {"Id":"b","Type":"Movie","Name":"Nope","UserData":{"Played":false}}
+              {"Id":"b","Type":"Movie","Name":"Nope","UserData":{"Played":false}},
+              {"Id":"c","Type":"Series","Name":"Slow Horses","RecursiveItemCount":30,"UserData":{"Played":false,"UnplayedItemCount":24}}
             ]""",
         )
         val out = mapEmbyItems(items)
-        assertEquals(1, out.size)
+        assertEquals(2, out.size)
+        assertEquals(LibraryStatus.WATCHING, out[1].status)
         assertEquals(ExternalIds(949, "tt0113277"), out[0].ids)
         assertEquals(listOf("2024-05-01"), out[0].watchedDates)
     }

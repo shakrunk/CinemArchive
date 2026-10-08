@@ -175,10 +175,14 @@ internal fun mapPlexItems(items: JSONArray): List<SyncItem> = buildList {
         val m = items.optJSONObject(i) ?: continue
         val kind = m.optString("type")
         if (kind != "movie" && kind != "show") continue
-        val watched = m.optInt("viewCount", 0) > 0
-        val rating = ratingFromTen(if (m.has("userRating")) m.optDouble("userRating") else null)
-        if (!watched && rating == null) continue
         val type = if (kind == "movie") MediaType.MOVIE else MediaType.TV
+        val seen = m.optInt("viewedLeafCount", 0)
+        val total = m.optInt("leafCount", 0)
+        // A show counts as watched only when every episode is; partly watched is "watching".
+        val watched = if (type == MediaType.MOVIE) m.optInt("viewCount", 0) > 0 else total > 0 && seen >= total
+        val watching = type == MediaType.TV && !watched && seen > 0
+        val rating = ratingFromTen(if (m.has("userRating")) m.optDouble("userRating") else null)
+        if (!watched && !watching && rating == null) continue
         val guids = m.optJSONArray("Guid")?.let { g -> (0 until g.length()).map { g.getJSONObject(it).optString("id") } } ?: emptyList()
         val date = if (m.has("lastViewedAt")) toDateOnly(m.optLong("lastViewedAt")) else null
         add(
@@ -189,7 +193,7 @@ internal fun mapPlexItems(items: JSONArray): List<SyncItem> = buildList {
                 title = m.optString("title"),
                 year = if (m.has("year")) m.optInt("year") else null,
                 ids = parseGuids(guids),
-                status = if (watched) LibraryStatus.WATCHED else LibraryStatus.WATCHLIST,
+                status = if (watched) LibraryStatus.WATCHED else if (watching) LibraryStatus.WATCHING else LibraryStatus.WATCHLIST,
                 rating = rating,
                 watchedDates = if (watched && type == MediaType.MOVIE && date != null) listOf(date) else emptyList(),
             ),
@@ -234,7 +238,7 @@ class EmbyClient(private val http: OkHttpClient) {
     }
 
     fun items(session: EmbySession): List<SyncItem> {
-        val url = "${session.baseUrl}/emby/Users/${session.userId}/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=ProviderIds,ProductionYear&EnableUserData=true"
+        val url = "${session.baseUrl}/emby/Users/${session.userId}/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=ProviderIds,ProductionYear,RecursiveItemCount&EnableUserData=true"
         val request = Request.Builder().url(url).header("X-Emby-Token", session.token).get().build()
         http.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "Emby returned ${response.code}." }
@@ -249,10 +253,14 @@ internal fun mapEmbyItems(items: JSONArray): List<SyncItem> = buildList {
         val kind = it.optString("Type")
         if (kind != "Movie" && kind != "Series") continue
         val ud = it.optJSONObject("UserData")
-        val watched = ud?.optBoolean("Played") == true || (ud?.optInt("PlayCount", 0) ?: 0) > 0
-        val rating = ratingFromTen(if (ud != null && ud.has("Rating")) ud.optDouble("Rating") else null)
-        if (!watched && rating == null) continue
         val type = if (kind == "Movie") MediaType.MOVIE else MediaType.TV
+        val watched = ud?.optBoolean("Played") == true || (type == MediaType.MOVIE && (ud?.optInt("PlayCount", 0) ?: 0) > 0)
+        // Emby only flags a series Played once every episode is; an unplayed count below the
+        // episode total means partly watched.
+        val watching = type == MediaType.TV && !watched && ud != null && ud.has("UnplayedItemCount") &&
+            it.has("RecursiveItemCount") && ud.optInt("UnplayedItemCount") < it.optInt("RecursiveItemCount")
+        val rating = ratingFromTen(if (ud != null && ud.has("Rating")) ud.optDouble("Rating") else null)
+        if (!watched && !watching && rating == null) continue
         val p = it.optJSONObject("ProviderIds")
         val date = toDateOnly(ud?.optString("LastPlayedDate")?.takeIf { d -> d.isNotEmpty() })
         add(
@@ -269,7 +277,7 @@ internal fun mapEmbyItems(items: JSONArray): List<SyncItem> = buildList {
                         p?.optString("Tvdb")?.takeIf { v -> v.isNotEmpty() }?.let { v -> "tvdb://$v" },
                     ),
                 ),
-                status = if (watched) LibraryStatus.WATCHED else LibraryStatus.WATCHLIST,
+                status = if (watched) LibraryStatus.WATCHED else if (watching) LibraryStatus.WATCHING else LibraryStatus.WATCHLIST,
                 rating = rating,
                 watchedDates = if (watched && type == MediaType.MOVIE && date != null) listOf(date) else emptyList(),
             ),

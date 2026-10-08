@@ -160,9 +160,9 @@ Deno.serve(async (req: Request) => {
   try {
     if (!CLIENT_ID) return json({ error: 'Simkl sync is not configured on this server.' })
 
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } })
-    const { data: userData } = await userClient.auth.getUser()
+    const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    const { data: userData } = await userClient.auth.getUser(jwt)
     const userId = userData.user?.id
     if (!userId) return json({ error: 'Not signed in.' })
 

@@ -51,7 +51,7 @@ export function SyncConnections() {
 
   const connected = (p: SyncProvider) => connections.find((c) => c.provider === p)
 
-  async function runImport(provider: SyncProvider, items: SyncItem[]) {
+  async function runImport(items: SyncItem[]) {
     if (!user) return
     if (items.length === 0) {
       setMessage({ type: 'success', text: 'Nothing to import — no watched or rated items found.' })
@@ -71,7 +71,6 @@ export function SyncConnections() {
     }
     if (cancelRef.current) parts.push('(cancelled early)')
     setMessage({ type: 'success', text: `${parts.join(' · ')}.` })
-    if (provider !== 'simkl') await recordConnection(user.id, provider, { serverUrl: connected(provider)?.serverUrl })
     await refresh()
   }
 
@@ -99,13 +98,20 @@ export function SyncConnections() {
       setSimklCode(null)
     }
     setStatus('Fetching your Simkl library…')
-    await runImport('simkl', await fetchSimklItems())
+    await runImport(await fetchSimklItems())
   }, 'Simkl sync failed.')
 
-  const syncPlex = () => guarded('plex', async () => {
+  const syncPlex = () => {
+    // Open the window now, inside the click gesture — after the PIN request's await,
+    // browsers (Safari always) treat window.open as an unsolicited popup and block it.
+    const authWindow = plexTokenRef.current ? null : window.open('', '_blank')
+    if (authWindow) authWindow.opener = null
+    return guarded('plex', async () => {
     if (!plexTokenRef.current) {
-      const pin = await startPlexPin()
-      window.open(pin.authUrl, '_blank', 'noopener')
+      let pin
+      try { pin = await startPlexPin() } catch (err) { authWindow?.close(); throw err }
+      if (authWindow) authWindow.location.href = pin.authUrl
+      else window.open(pin.authUrl, '_blank', 'noopener')
       setStatus('Approve CinemArchive in the Plex tab that just opened…')
       const deadline = Date.now() + 5 * 60 * 1000
       for (;;) {
@@ -121,8 +127,9 @@ export function SyncConnections() {
     setStatus(`Reading ${server.name}…`)
     const items = await fetchPlexItems(server.uri, plexTokenRef.current)
     if (user) await recordConnection(user.id, 'plex', { serverUrl: server.uri, accountLabel: server.name })
-    await runImport('plex', items)
-  }, 'Plex sync failed.')
+    await runImport(items)
+    }, 'Plex sync failed.')
+  }
 
   const syncEmby = () => guarded('emby', async () => {
     const session = await embySignIn(embyForm.url, embyForm.username, embyForm.password)
@@ -130,7 +137,7 @@ export function SyncConnections() {
     setStatus('Reading your Emby library…')
     const items = await fetchEmbyItems(session)
     if (user) await recordConnection(user.id, 'emby', { serverUrl: session.baseUrl, accountLabel: session.username })
-    await runImport('emby', items)
+    await runImport(items)
   }, 'Emby sync failed.')
 
   async function disconnect(provider: SyncProvider) {

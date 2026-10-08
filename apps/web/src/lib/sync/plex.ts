@@ -90,6 +90,9 @@ interface PlexMetadata {
   userRating?: number
   viewCount?: number
   lastViewedAt?: number
+  /** Shows only: episodes in the show / episodes the user has watched. */
+  leafCount?: number
+  viewedLeafCount?: number
   Guid?: Array<{ id: string }>
 }
 
@@ -97,9 +100,14 @@ export function mapPlexItems(items: PlexMetadata[]): SyncItem[] {
   const out: SyncItem[] = []
   for (const m of items) {
     if (m.type !== 'movie' && m.type !== 'show') continue
-    const watched = (m.viewCount ?? 0) > 0
+    const isMovie = m.type === 'movie'
+    const seen = m.viewedLeafCount ?? 0
+    const total = m.leafCount ?? 0
+    // A show counts as watched only when every episode is; partly watched is "watching".
+    const watched = isMovie ? (m.viewCount ?? 0) > 0 : total > 0 && seen >= total
+    const watching = !isMovie && !watched && seen > 0
     const rating = ratingFromTen(m.userRating)
-    if (!watched && rating == null) continue
+    if (!watched && !watching && rating == null) continue
     const date = toDateOnly(m.lastViewedAt)
     out.push({
       provider: 'plex',
@@ -108,7 +116,7 @@ export function mapPlexItems(items: PlexMetadata[]): SyncItem[] {
       title: m.title,
       year: m.year,
       ids: parseGuids((m.Guid ?? []).map((g) => g.id)),
-      status: watched ? 'watched' : 'watchlist',
+      status: watched ? 'watched' : watching ? 'watching' : 'watchlist',
       rating,
       watchedDates: watched && m.type === 'movie' && date ? [date] : [],
     })

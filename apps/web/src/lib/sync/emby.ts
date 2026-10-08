@@ -47,7 +47,8 @@ interface EmbyItem {
   Name: string
   ProductionYear?: number
   ProviderIds?: Record<string, string>
-  UserData?: { Played?: boolean; PlayCount?: number; LastPlayedDate?: string; Rating?: number }
+  RecursiveItemCount?: number
+  UserData?: { Played?: boolean; PlayCount?: number; LastPlayedDate?: string; Rating?: number; UnplayedItemCount?: number }
 }
 
 export function mapEmbyItems(items: EmbyItem[]): SyncItem[] {
@@ -55,10 +56,15 @@ export function mapEmbyItems(items: EmbyItem[]): SyncItem[] {
   for (const i of items) {
     if (i.Type !== 'Movie' && i.Type !== 'Series') continue
     const ud = i.UserData ?? {}
-    const watched = ud.Played === true || (ud.PlayCount ?? 0) > 0
+    const isMovie = i.Type === 'Movie'
+    const watched = ud.Played === true || (isMovie && (ud.PlayCount ?? 0) > 0)
+    // Emby only flags a series Played once every episode is; a smaller unplayed count than
+    // the episode total means partly watched.
+    const watching =
+      !isMovie && !watched && ud.UnplayedItemCount != null && i.RecursiveItemCount != null && ud.UnplayedItemCount < i.RecursiveItemCount
     // Emby's per-user Rating is on a 0–10 scale when set.
     const rating = ratingFromTen(ud.Rating)
-    if (!watched && rating == null) continue
+    if (!watched && !watching && rating == null) continue
     const p = i.ProviderIds ?? {}
     const date = toDateOnly(ud.LastPlayedDate)
     out.push({
@@ -72,7 +78,7 @@ export function mapEmbyItems(items: EmbyItem[]): SyncItem[] {
         p.Imdb ? `imdb://${p.Imdb}` : undefined,
         p.Tvdb ? `tvdb://${p.Tvdb}` : undefined,
       ]),
-      status: watched ? 'watched' : 'watchlist',
+      status: watched ? 'watched' : watching ? 'watching' : 'watchlist',
       rating,
       watchedDates: watched && i.Type === 'Movie' && date ? [date] : [],
     })
@@ -84,7 +90,7 @@ export async function fetchEmbyItems(session: EmbySession): Promise<SyncItem[]> 
   const params = new URLSearchParams({
     Recursive: 'true',
     IncludeItemTypes: 'Movie,Series',
-    Fields: 'ProviderIds,ProductionYear',
+    Fields: 'ProviderIds,ProductionYear,RecursiveItemCount',
     EnableUserData: 'true',
   })
   const res = await fetch(`${session.baseUrl}/emby/Users/${session.userId}/Items?${params}`, {

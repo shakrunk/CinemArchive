@@ -20,7 +20,7 @@ class ViewingHistoryWriterTest {
     private val http = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
         requests += chain.request()
         Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("ok")
-            .body("[]".toResponseBody("application/json".toMediaType())).build()
+            .body("[{}]".toResponseBody("application/json".toMediaType())).build()
     }).build()
     private val writer = SupabaseRemoteMutationWriter(SupabaseRestClient("https://x.supabase.co", "anon", http)) { SupabaseSession("token", "owner") }
     private fun entry(op: String, payload: JSONObject, type: String = "viewing") = OutboxEntity("command", type, "watch", op, payload.toString(), 0L)

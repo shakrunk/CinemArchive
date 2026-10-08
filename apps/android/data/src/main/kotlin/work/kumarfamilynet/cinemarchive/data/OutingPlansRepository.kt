@@ -129,16 +129,7 @@ internal fun parseSharedOutingReceipt(outingId: String, response: String): Publi
     val row = JSONObject(response)
     val companions = row.getJSONArray("companions")
     val names = (0 until companions.length()).map { i -> companions.get(i).also { require(it is String) } as String }
-    val format = when (row.optStringOrNull("format")?.lowercase()) {
-        null -> null
-        "standard" -> CinemaFormat.STANDARD
-        "imax" -> CinemaFormat.IMAX
-        "3d", "three_d" -> CinemaFormat.THREE_D
-        "dolby" -> CinemaFormat.DOLBY
-        "70mm", "seventy_mm" -> CinemaFormat.SEVENTY_MM
-        "drive-in", "drive_in" -> CinemaFormat.DRIVE_IN
-        else -> CinemaFormat.OTHER
-    }
+    val format = row.optStringOrNull("format")?.let { CinemaFormat.fromWire(it) ?: CinemaFormat.OTHER }
     val showtime = row.getString("showtime").also { Instant.parse(it) }
     val endsAt = row.getString("ends_at").also { Instant.parse(it) }
     return PublicOutingPlan(outingId, row.getString("title"), showtime, endsAt,

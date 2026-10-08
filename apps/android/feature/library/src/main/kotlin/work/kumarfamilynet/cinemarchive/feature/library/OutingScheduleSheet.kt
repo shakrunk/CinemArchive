@@ -115,6 +115,7 @@ fun OutingScheduleSheet(
     var venue by rememberSaveable { mutableStateOf(initial?.venue ?: "") }
     var companionsText by rememberSaveable { mutableStateOf(initial?.companions?.joinToString(", ") ?: "") }
     var format by rememberSaveable { mutableStateOf(initial?.format ?: CinemaFormat.STANDARD) }
+    var formatChanged by rememberSaveable { mutableStateOf(false) }
     var previews by rememberSaveable { mutableStateOf((initial?.previewsMinutes ?: 20).toString()) }
     var runtime by rememberSaveable { mutableStateOf((initial?.runtimeMinutes ?: defaultRuntimeMinutes ?: 120).toString()) }
     var ticketPrice by rememberSaveable { mutableStateOf(initial?.ticketPrice?.toString() ?: "") }
@@ -256,7 +257,7 @@ fun OutingScheduleSheet(
                 options = listOf(CinemaFormat.STANDARD, CinemaFormat.IMAX, CinemaFormat.THREE_D, CinemaFormat.DOLBY)
                     .map { ChoiceOption(it, it.displayLabel()) },
                 selected = format,
-                onSelect = { format = it },
+                onSelect = { format = it; formatChanged = true },
                 modifier = Modifier.padding(bottom = 14.dp),
             )
 
@@ -408,8 +409,9 @@ fun OutingScheduleSheet(
                         previewsMinutes,
                         runtimeMinutes,
                         venue.ifBlank { null },
-                        companionsText.split(",").map(String::trim).filter(String::isNotBlank),
-                        format,
+                        if (initial != null && companionsText == initial.companions.joinToString(", ")) initial.companions
+                        else companionsText.split(",").map(String::trim).filter(String::isNotBlank),
+                        if (initial != null && !formatChanged) initial.format else format,
                         ticketPrice.toDoubleOrNull(),
                         SeatAssignment(
                             auditorium = auditorium.ifBlank { null },

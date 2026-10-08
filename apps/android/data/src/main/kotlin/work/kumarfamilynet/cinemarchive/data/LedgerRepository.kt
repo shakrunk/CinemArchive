@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
+import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
@@ -557,6 +558,7 @@ class LedgerRepository(
         val trips = viewings.filter { it.venue != null }
         val outingById = outings.associateBy { it.id }
         val joinedOutings = trips.mapNotNull { it.outingId?.let { id -> outingById[id] } }
+            .map { it.copy(format = CinemaFormat.fromWire(it.format)?.wireValue ?: it.format) }
 
         val venueSpend = spendBy(joinedOutings) { it.venue }
         val formatSpend = spendBy(joinedOutings) { it.format }

@@ -113,11 +113,18 @@ npm run preview    # Preview the production build locally
 npm run lint       # ESLint
 npm run lint:ci    # ESLint with an enforced existing-warning budget
 npm run test        # Vitest
+npm run test:e2e    # Production-bundle Playwright checks (desktop engines + mobile Chromium)
 ```
 
 The [Web workflow](../../.github/workflows/web.yml) runs these checks and a production
 dependency audit for PRs and before deployment. See [release readiness](../../docs/release-readiness.md)
 for evidence, audit limitations, and remaining launch requirements.
+
+Before the first browser run, install the locked runner's browsers with
+`npx --no-install playwright install chromium firefox webkit` (add `--with-deps` on Linux).
+The suite creates a separate `dist-e2e/` build with Supabase disabled and runs its own local
+preview server; no account or production credentials are needed. It tests local UI/persistence
+and the offline shell, not live auth, remote writes, or service-worker upgrade/rollback.
 
 ---
 

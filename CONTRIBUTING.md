@@ -34,11 +34,16 @@ npm run lint:ci
 npm run test
 npm audit --omit=dev --audit-level=moderate
 npm run build
+npx --no-install playwright install chromium firefox webkit
+npm run test:e2e
 ```
 
 `npm run build` also runs `tsc -b`. `lint:ci` caps existing warnings; ordinary `lint` still
 prints all findings. Lower the cap as debt is removed; do not raise it to admit new warnings.
 See [release readiness](docs/release-readiness.md) for current coverage and remaining gates.
+Browser tests build their own credential-free production bundle in `dist-e2e/`; they do not
+prove live authentication, backend authorization, or physical-device compatibility. CI keeps
+their reports and failure traces for 14 days.
 
 ```bash
 # android — from apps/android/

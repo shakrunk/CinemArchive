@@ -11,7 +11,7 @@ All ten prerequisite issues (#269–#278) were reviewed. The selected engineerin
 | Issue | Implementation in this pass | Still required |
 | --- | --- | --- |
 | [#271](https://github.com/shakrunk/CinemArchive/issues/271) | Web PR validation, reusable pre-deploy validation, web build before migration, job-level Pages permissions, main-only deployment | Protected-branch required checks/reviews, environment approvals, fully pinned release tooling, Android validation before publication, signed-artifact provenance, production smoke and rollback rehearsal |
-| [#275](https://github.com/shakrunk/CinemArchive/issues/275) | Next slice: browser regression foundation and compatibility checklist | Live auth/invite, backend authorization, cross-client sync, device and accessibility sign-off |
+| [#275](https://github.com/shakrunk/CinemArchive/issues/275) | Production-bundle browser regressions and compatibility checklist; command-palette focus restoration | Live auth/invite, backend authorization, cross-client sync, device and accessibility sign-off |
 | [#278](https://github.com/shakrunk/CinemArchive/issues/278) | Explicit typecheck and lint-budget commands; targeted typing cleanup assigned separately | Remaining typing debt, development dependency remediation, Android tooling alignment, generated documentation refresh |
 
 The remaining issues require private security work (#269), backend contract infrastructure
@@ -30,6 +30,8 @@ npm run lint:ci
 npm run test
 npm audit --omit=dev --audit-level=moderate
 npm run build
+npx --no-install playwright install chromium firefox webkit
+npm run test:e2e
 ```
 
 `.github/workflows/web.yml` runs on all PRs targeting `dev`/`main` and pushes to `dev`.
@@ -46,6 +48,52 @@ Release tagging still follows Pages deployment, and the signed Android APK is bu
 tagging. This remains a partial-release risk under #271; these web gates do not establish
 an atomic cross-client release. Edge Functions deploy independently. `db-migrate.yml` is a
 separate manual recovery/operations path, not the only way migrations reach production.
+
+## Browser coverage and compatibility sign-off
+
+`npm run test:e2e` builds a production bundle in `dist-e2e/`, starts its own preview server
+on `127.0.0.1:4178`, and runs the browser versions bundled with the locked Playwright package.
+It explicitly clears the two Supabase build variables, uses isolated browser contexts, and
+blocks external page requests. Local `.env.local` credentials do not enable live access.
+The test build is separate from `dist/`, which is the only Pages upload directory.
+
+The suite exercises deep-link refresh, local list creation/deletion and browser Back,
+theme persistence/system preference changes, keyboard palette focus, and service-worker
+offline reload with a lazy view. It uses real UI actions rather than exposing a test-only
+store API. Local list tests verify browser persistence, not remote CRUD or authorization.
+
+| Target | Automated coverage | Required manual release evidence |
+| --- | --- | --- |
+| Chromium desktop | All browser smoke scenarios | Stable Chrome and Edge with production configuration |
+| Firefox desktop | UI smoke scenarios; offline worker test skipped | Stable Firefox auth, offline reload, keyboard and private-window storage behavior |
+| WebKit desktop | UI smoke scenarios; offline worker test skipped | Actual macOS/iOS Safari including offline reload; emulation does not certify those platforms |
+| Chromium mobile (Pixel 7 viewport) | All browser smoke scenarios | Physical Android browser, touch targets and installed PWA |
+| Native Android API 31+ | Existing JVM/build/lint gates only | Physical-device auth/deep links, upgrade, process death, sync/outbox and font scaling |
+
+This is a test target matrix, not an approved support promise. For each release candidate,
+record the commit, OS/device and browser version, date, tester, result, and evidence link.
+Product/release owners must approve the final supported matrix under #275/#274.
+
+- [ ] Live invite, passkey/magic-link authentication and expired-session recovery
+- [ ] Owner CRUD, import/export round trip, friends, revoked/expired shares and blocked users
+- [ ] Poor networking, concurrent changes, partial failures and cross-device sync
+- [ ] Service-worker update prompt, rollback, cache isolation and shared-view clearing
+- [ ] PWA installation, private browsing, keyboard/focus, screen reader, contrast and large text
+- [ ] Native Android instrumentation and physical-device upgrade/offline coverage
+
+The Web job installs browser engines and Linux prerequisites, runs the suite with no retries,
+and retains HTML reports plus failure screenshots/traces for 14 days, including failed runs.
+Inspect locally with `npx --no-install playwright show-report`. CI success must still be
+recorded after pushing; a local Windows pass does not certify the GitHub Ubuntu runner.
+See [Playwright configuration](https://playwright.dev/docs/test-configuration) and
+[browser projects](https://playwright.dev/docs/test-projects) for runner configuration.
+
+Offline service-worker navigation is automated only in the two Chromium projects.
+[Playwright documents Chromium-only service-worker support](https://playwright.dev/docs/service-workers);
+its [WebKit offline navigation issue](https://github.com/microsoft/playwright/issues/42775)
+also reproduces with a synthetic response. Local Firefox/WebKit offline-emulation failures
+are explicitly skipped, not counted as passes or evidence of production offline behavior.
+Their physical-browser offline checks remain release requirements.
 
 ## Audit and warning policy
 

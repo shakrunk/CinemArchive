@@ -38,3 +38,16 @@ jobs:
       # Development-tooling advisories are tracked separately in #278.
       - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run build
+      - name: Install browser engines
+        run: npx --no-install playwright install --with-deps chromium firefox webkit
+      - run: npm run test:e2e
+      - name: Retain browser report and failure traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: web-browser-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

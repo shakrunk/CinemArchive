@@ -11,6 +11,9 @@ number is chosen.
 
 ### Fixed
 
+- Web: viewing and episode calendar dates no longer shift to the previous day in western time zones; timestamps still use local time.
+
+- Android: tags, studios, and franchise metadata now remain available locally after adding or syncing titles; upgrades preserve watch history and pending offline changes.
 - Android library sync now includes existing title tags, studios, and franchise metadata for native filtering and grouping.
 
 - Social comments and reactions now require an authenticated owner or a friend allowed by the title sharing scope; fixed a failing comments query and anonymous reaction exposure.

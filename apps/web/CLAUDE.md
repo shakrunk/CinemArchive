@@ -50,10 +50,17 @@ apps/web/
       AddTitleWorkflow.tsx
     views/
       Library.tsx      # Poster wall + sortable ledger list
-      Ledger.tsx       # Stats dashboards
+      Discover.tsx     # TMDB search, trending, recommendation carousels
+      UpNext.tsx       # Watchlist, continue watching, Cinema Outings
+      Lists.tsx        # Custom title lists (grid + detail)
+      Friends.tsx      # Friend requests, activity feed, invites
+      Profile.tsx      # Account, sharing, import/export, about
+      Ledger.tsx / ledger/  # Stats dashboard shell + widget panels
     store/
       useAppStore.ts   # Zustand store
-      mockData.ts      # Dummy data used for the logged-out view
+      outings.ts       # Cinema Outings logic
+      upNext.ts / episodeUtils.ts / ledgerDerive.ts  # Derivations and rollups
+      mockData.ts      # Type definitions + dummy data for the logged-out view
     lib/
       auth.ts          # Passkey/WebAuthn helpers
       db.ts            # All Supabase reads/writes
@@ -75,7 +82,10 @@ Relational tables replace V1's JSON schema:
 - `episode_watch_events` / `episode_ratings` / `episode_reviews` — independent, timestamped per-episode logs (decoupled: watch ≠ rate ≠ review)
 - `viewings` — re-watch timeline entries per title (`venue`/`companions`/`outing_id` columns carry a cinema trip's theater and company, whether logged manually or via a completed outing)
 - `cinema_outings` — a booked movie trip (showtime, venue, companions, format, ticket price, seat); `complete_due_outings()` auto-transitions it `scheduled → completed` (logging a `viewings` row and flipping the title to `watched`) once `showtime + previews + runtime` passes; owner-only, never shared
-- `shared_access_keys` — time-bound read-only access tokens
+- `lists` / `list_items` — user-created custom title lists (many-to-many with `titles`, independent of watch status); owner-only RLS, never shared
+- `shared_access_keys` — time-bound read-only access tokens (scoped via `share_scopes`)
+- Social tables — friendships, recommendations, title comments/reactions, notifications, invite codes (see `schema.sql`)
+- `user_prefs` — per-user settings such as the saved Ledger layout
 - `api_cache` — used by the `media-proxy` Edge Function
 
 RLS: authenticated user gets full CRUD; valid shared-token holders get read-only. `db.ts` maps DB rows ⇄ the client `Title` type (episodes are grouped onto their seasons).

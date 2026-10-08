@@ -26,7 +26,7 @@ apps/android/      # Android app (Kotlin + Jetpack Compose) — see apps/android
 supabase/          # Shared backend: migrations/, functions/ (consumed by every client)
 schema.sql         # Canonical, human-readable copy of the shared DB schema + RLS policies
 docs/              # Repo-wide docs: ADRs, Android↔web contract docs, known problems, etc.
-.github/workflows/ # CI: deploy.yml (web + release + Android APK), android.yml, db-migrate.yml, deploy-functions.yml
+.github/workflows/ # CI: deploy.yml (web + release + Android APK), android.yml, db-migrate.yml, deploy-functions.yml, parity.yml (Parity: trailer check), codeql.yml
 ```
 
 ## Documentation

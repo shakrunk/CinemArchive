@@ -28,6 +28,7 @@ apps/android/
   feature/discover/        # Search, trending, add-title
   feature/upnext/          # Watchlist + continue watching
   feature/ledger/          # Stats dashboard widgets
+  feature/lists/           # Custom lists tab + "Add to list" from title detail
   feature/settings/        # Profile, about, account
 ```
 

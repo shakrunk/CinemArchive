@@ -67,9 +67,12 @@ apps/web/
 ../../supabase/
   migrations/                  # Versioned migrations applied by CI
   functions/media-proxy/       # Edge Function: TMDB/OMDb proxy + cache (keeps API keys server-side)
+  functions/redeem-invite/     # Edge Function: invite-code account creation
 ../../.github/workflows/
   deploy.yml                   # Build + deploy to GitHub Pages (+ release + Android APK)
-  db-migrate.yml               # supabase db push on migration changes
+  db-migrate.yml               # supabase db push (manual workflow_dispatch)
+  deploy-functions.yml         # Deploys supabase/functions/** on change
+  parity.yml                   # Enforces Parity: trailers on PRs
 ```
 
 The app version shown in Settings → About (`__APP_VERSION__`) comes from the **repo-root**

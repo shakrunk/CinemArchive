@@ -71,8 +71,8 @@ schema.sql             # Supabase DB schema + RLS policies (repo root, shared)
 
 The app version (`__APP_VERSION__`, shown in Settings → About) is read by `vite.config.ts`
 from the **repo-root** `package.json` (`../../package.json`), not this directory's own
-`package.json` — see the root AGENTS.md's Versioning section. `apps/web/package.json` keeps
-its own `version` field only because npm requires one; it is not authoritative.
+`package.json` — see the root AGENTS.md's Versioning section. The private web package omits
+an independent `version` field to prevent drift; npm does not require one for unpublished packages.
 
 ### Data Model (schema.sql)
 Relational tables replace V1's JSON schema:

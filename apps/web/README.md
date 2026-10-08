@@ -79,6 +79,9 @@ apps/web/
 The app version shown in Settings → About (`__APP_VERSION__`) comes from the **repo-root**
 `package.json`, not this directory's `package.json` — see `vite.config.ts` and the root
 `AGENTS.md`'s Versioning section.
+This private package and its lockfile omit an independent app version; root version changes
+therefore cannot leave a stale client package version behind. See
+[developer tooling](../../docs/developer-tooling.md) for version ownership and graph commands.
 
 ---
 

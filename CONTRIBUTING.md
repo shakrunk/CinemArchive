@@ -19,6 +19,8 @@ Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
   [`docs/known-problems.md`](docs/known-problems.md) (`KP-###` rows) and
   [`docs/android-parity-matrix.md`](docs/android-parity-matrix.md) (Android↔web gaps — many apparent
   bugs are documented gaps).
+- **Tooling:** [Developer tooling](docs/developer-tooling.md) explains the CLI graph entrypoint,
+  stale-index recovery, RTK usage, and the single application version source.
 
 ## Verification gates
 

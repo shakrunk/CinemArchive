@@ -57,7 +57,7 @@ When working in this repository, read the OpenWiki quickstart first, then follow
 
 | Question | Use | Why |
 |----------|-----|-----|
-| What breaks if I change X? Who calls it? Which tests cover it? Review this diff. | `code-review-graph` (MCP) | Structural graph of the code, kept current by hooks; built for impact and review. Use it before Grep/Glob/Read. |
+| What breaks if I change X? Who calls it? Which tests cover it? Review this diff. | `code-review-graph` CLI (MCP only if registered in your client) | Structural graph for impact and review. Check `status` for freshness before relying on it; use before Grep/Glob/Read. |
 | Why is it built this way? How do the pieces fit together? Where do I start? | `openwiki/` (read `openwiki/quickstart.md`) | Prose docs: architecture, workflows, domains, operations. Orientation, not code navigation. |
 | Cross-client rules, contracts, schema ownership | `docs/`, `schema.sql`, the ADRs | Normative; they outrank `openwiki/` (see the precedence order above). |
 
@@ -264,44 +264,26 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 Overall average: **60-90% token reduction** on common development operations.
 <!-- /rtk-instructions -->
 
-<!-- code-review-graph MCP tools -->
-## MCP Tools: code-review-graph
+## Code-review-graph
 
-**IMPORTANT: This project has a knowledge graph. ALWAYS use the
-code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
-the codebase.** The graph is faster, cheaper (fewer tokens), and gives
-you structural context (callers, dependents, test coverage) that file
-scanning cannot.
+**Use code-review-graph before Grep/Glob/Read for structural exploration and review.**
+The installed CLI is the default entrypoint. MCP registration and auto-update hooks are
+optional per-client integrations; do not assume either is available or that the graph is current.
 
-### When to use graph tools FIRST
+```bash
+rtk code-review-graph status
+rtk code-review-graph search CommandPalette --limit 5
+rtk code-review-graph query callers_of CommandPalette
+rtk code-review-graph query tests_for CommandPalette
+rtk code-review-graph detect-changes --base HEAD
+rtk code-review-graph architecture
+```
 
-- **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
-- **Understanding impact**: `get_impact_radius` instead of manually tracing imports
-- **Code review**: `detect_changes` + `get_review_context` instead of reading entire files
-- **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
-- **Architecture questions**: `get_architecture_overview` + `list_communities`
-
-Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
-
-### Key Tools
-
-| Tool | Use when |
-| ------ | ---------- |
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
-
-### Workflow
-
-1. The graph auto-updates on file changes (via hooks).
-2. Use `detect_changes` for code review.
-3. Use `get_affected_flows` to understand impact.
-4. Use `query_graph` pattern="tests_for" to check coverage.
+`detect-changes` only reads the existing graph. Refresh known changes with `update --base
+<commit>`, or use `build` after a layout move/stale baseline. Verify returned paths match
+the current checkout. Fall back to targeted source inspection when graph coverage is missing
+or stale. See [developer tooling](docs/developer-tooling.md) for recovery and Windows output
+encoding notes. The RTK entrypoint is [RTK.md](RTK.md).
 
 <!-- OPENWIKI:START -->
 

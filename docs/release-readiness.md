@@ -12,7 +12,7 @@ All ten prerequisite issues (#269–#278) were reviewed. The selected engineerin
 | --- | --- | --- |
 | [#271](https://github.com/shakrunk/CinemArchive/issues/271) | Web PR validation, reusable pre-deploy validation, web build before migration, job-level Pages permissions, main-only deployment | Protected-branch required checks/reviews, environment approvals, fully pinned release tooling, Android validation before publication, signed-artifact provenance, production smoke and rollback rehearsal |
 | [#275](https://github.com/shakrunk/CinemArchive/issues/275) | Production-bundle browser regressions and compatibility checklist; command-palette focus restoration | Live auth/invite, backend authorization, cross-client sync, device and accessibility sign-off |
-| [#278](https://github.com/shakrunk/CinemArchive/issues/278) | Explicit typecheck and lint-budget commands; targeted typing cleanup assigned separately | Remaining typing debt, development dependency remediation, Android tooling alignment, generated documentation refresh |
+| [#278](https://github.com/shakrunk/CinemArchive/issues/278) | Explicit typecheck and lint-budget commands; single package-version source; restored RTK entrypoint; corrected CLI graph instructions and rebuilt stale local index | Remaining typing debt, development dependency remediation, Android tooling alignment, generated documentation refresh |
 
 The remaining issues require private security work (#269), backend contract infrastructure
 (#270), privacy/owner approval (#272), production Android identity/distribution (#273),
@@ -100,6 +100,8 @@ Their physical-browser offline checks remain release requirements.
 `lint:ci` rejects increases above the checked-in warning budget in `apps/web/package.json`.
 Remaining warnings must stay visible and the budget should decrease with each cleanup.
 A passing lint gate with warnings is not a zero-debt result.
+See [developer tooling](developer-tooling.md) for graph freshness checks and package-version
+ownership. The initial 78-warning baseline remains until the separately assigned typing cleanup lands.
 
 The production dependency audit blocks moderate-or-higher findings. Run full `npm audit`
 when changing tooling and at release review as well: development dependency findings remain
@@ -108,6 +110,20 @@ tracked in #278 and are not covered by the production-only CI gate. The initial 
 version. Do not force a Tailwind major upgrade solely to silence audit output. Review
 upstream fixes and compatibility, keep the lockfile coherent, and record fresh audit evidence
 before closing #278.
+
+## Local evidence — October 7, 2026
+
+Verified on Windows with Node 22.23.2 and the committed npm dependency resolutions:
+
+- Clean `npm ci` succeeded; the final metadata-only lockfile refresh changed no dependencies.
+- Typecheck, budgeted lint (78 warnings, zero errors), and production build passed.
+- Vitest: 240 tests passed across 29 files, including the new focus-restoration regression.
+- Playwright: 22 passed, two documented offline-emulation skips across four projects.
+- Production dependency audit: zero findings. Full tooling audit is still unresolved under #278.
+- Release workflow YAML parses and dependency ordering was checked locally; hosted CI has not run for these local commits.
+- Cross-client parity declaration passed for the web-only focus fix.
+
+These are local engineering results, not production, Android-device, or final launch approval.
 
 ## Documentation maintenance
 

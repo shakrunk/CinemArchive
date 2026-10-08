@@ -6,6 +6,7 @@ import { outing, title } from '../lib/offline/fixtures.test-support'
 import type { SharedOutingSnapshot } from '../lib/outingSharing'
 
 vi.mock('../lib/offlineRpc', async (original) => ({ ...await original<typeof import('../lib/offlineRpc')>(), createLibraryCommandDelivery: () => vi.fn() }))
+vi.mock('../lib/tickets/remote', async (original) => ({ ...await original<typeof import('../lib/tickets/remote')>(), ticketRemote: { descriptors: vi.fn().mockResolvedValue({ support: 'authoritative', outings: [] }) } }))
 vi.mock('./offlineLibrary', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./offlineLibrary')>()
   const { IDBFactory } = await import('fake-indexeddb')

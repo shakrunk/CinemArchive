@@ -124,3 +124,43 @@ it('validates ticket bounds, ownership, standalone commands and read-only outing
   expect(() => assertSnapshot({ ...ticketSnapshot(), outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: attachment }] })).not.toThrow()
   expect(ticketObjectKey(ticketOwner, ticketId)).toBe(attachment.objectKey)
 })
+
+it('preserves cached managed associations on unsupported refresh and generic ACK, but honors authoritative clears', async () => {
+  const db = store(), { attachment } = await ticketFixture()
+  await db.replaceBase(ticketOwner, { ...ticketSnapshot(), outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: attachment }] })
+  const fallback = { ...ticketSnapshot(), ticketAttachmentSupport: 'unsupported' as const }
+  expect((await db.replaceBase(ticketOwner, fallback)).document.base.outings[0].ticketAttachment).toEqual(attachment)
+  const command = createCommand(ticketOwner, { kind: 'outing.patch', outingId: ticketOuting.id, patch: { venue: 'Cinema' } })
+  await db.append(command)
+  expect((await db.acknowledge(ticketOwner, command.id, undefined, fallback)).document.base.outings[0].ticketAttachment).toEqual(attachment)
+  await db.replaceBase(ticketOwner, { ...ticketSnapshot(), ticketAttachmentSupport: 'authoritative', outings: [{ ...ticketOuting, ticketManaged: true }] })
+  const cleared = await db.replaceBase(ticketOwner, fallback)
+  expect(cleared.document.base.outings[0].ticketManaged).toBe(true)
+  expect(cleared.document.base.outings[0].ticketAttachment).toBeUndefined()
+  expect((await db.read(ticketOwner)).quarantined).toEqual([])
+})
+
+it('caches a verified download only while that exact descriptor remains current', async () => {
+  const db = store(), { attachment, blob } = await ticketFixture()
+  await db.replaceBase(ticketOwner, { ...ticketSnapshot(), outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: attachment }] })
+  await db.cacheTicketBlob(ticketOwner, ticketOuting.id, attachment, blob)
+  expect(await db.readTicketBlob(ticketOwner, attachment.id)).toMatchObject({ source: 'download', outingId: ticketOuting.id })
+  const replacement = await ticketFixture('30000000-0000-4000-8000-000000000002')
+  await db.attachTicket(ticketOwner, ticketOuting.id, replacement.attachment, replacement.blob)
+  await expect(db.cacheTicketBlob(ticketOwner, ticketOuting.id, attachment, blob)).rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringContaining('replaced or removed') }) })
+  expect((await db.readTicketBlob(ticketOwner, attachment.id))?.attachment).toEqual(attachment)
+})
+
+it('keeps the original association and journal intact when downloaded-byte persistence exceeds quota', async () => {
+  const db = store(), { attachment, blob } = await ticketFixture()
+  await db.replaceBase(ticketOwner, { ...ticketSnapshot(), outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: attachment }] })
+  const before = (await db.read(ticketOwner)).document
+  const original = IDBObjectStore.prototype.add
+  vi.spyOn(IDBObjectStore.prototype, 'add').mockImplementation(function (this: IDBObjectStore, ...args: Parameters<typeof original>) {
+    if (this.name === 'ticketBlobs') throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    return original.apply(this, args)
+  })
+  await expect(db.cacheTicketBlob(ticketOwner, ticketOuting.id, attachment, blob)).rejects.toThrow('not saved')
+  expect((await db.read(ticketOwner)).document).toEqual(before)
+  expect(await db.readTicketBlob(ticketOwner, attachment.id)).toBeNull()
+})

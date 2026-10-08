@@ -117,6 +117,7 @@ export function createTicketCommandDelivery(options: TicketDeliveryOptions) {
       assertCurrent()
       const canonicalBase = await options.fetchBase(context)
       assertCurrent()
+      if (canonicalBase.ticketAttachmentSupport !== 'authoritative') throw new Error('Ticket sync requires an authoritative attachment refresh before acknowledgment')
       return { kind: 'success', canonicalBase }
     } catch (error) {
       if (!current()) return { kind: 'auth', message: 'Library account changed during ticket sync' }

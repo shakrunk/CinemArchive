@@ -143,5 +143,5 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
 export function assertSnapshot(value: unknown): asserts value is OfflineSnapshot {
   if (!shape({ titles: array(title), outings: array(outingSnapshot), lists: array(list),
     listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
-  }, { rowRevisions: dictionary(timestamp) })(value)) throw new Error('Invalid or unsupported offline snapshot')
+  }, { rowRevisions: dictionary(timestamp), ticketAttachmentSupport: (v) => v === 'authoritative' || v === 'unsupported' })(value)) throw new Error('Invalid or unsupported offline snapshot')
 }

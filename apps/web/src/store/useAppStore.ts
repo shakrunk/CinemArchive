@@ -8,6 +8,9 @@ import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
 import { assertDeliverableCommand, createLibraryCommandDelivery } from '../lib/offlineRpc'
+import { IndexedDbOfflineStore } from '../lib/offline/storage'
+import { createTicketCommandDelivery } from '../lib/tickets/delivery'
+import { ticketRemoteOptions } from '../lib/tickets/remote'
 import { createCommand } from '../lib/offline/commands'
 import { createLibraryActions, type LibraryWrite } from './libraryActions'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
@@ -664,9 +667,14 @@ function reportOfflineStorageError(error: unknown): void {
   useAppStore.getState().pushNotification({ dedupeKey: 'offline-storage-error', message })
 }
 
+const ownerOfflineStorage = new IndexedDbOfflineStore()
 const libraryRuntime = new OfflineLibraryRuntime({
   projectId: import.meta.env.VITE_SUPABASE_URL || 'unconfigured-local',
-  deliver: createLibraryCommandDelivery(fetchOwnerSnapshot),
+  ownerStorage: ownerOfflineStorage,
+  deliver: createLibraryCommandDelivery(fetchOwnerSnapshot, createTicketCommandDelivery({ ...ticketRemoteOptions,
+    readBlob: (scope, id) => ownerOfflineStorage.readTicketBlob(scope, id),
+    fetchBase: (context) => fetchOwnerSnapshot(context, true),
+  })),
   onSnapshot: (snapshot) => {
     const s = useAppStore.getState()
     const userId = s.user && !isDevMockUser(s.user) ? s.user.id : null

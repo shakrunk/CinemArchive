@@ -7,24 +7,29 @@ import type { Mutation, PendingCommand } from '../lib/offline/commands'
 import { createCommand } from '../lib/offline/commands'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
 import type { TicketCapture } from '../lib/tickets/types'
+import { ticketRemote, mergeOwnedTickets } from '../lib/tickets/remote'
+import { replayPending } from '../lib/offline/replay'
+import { assertTicketBytes, sameTicketAttachment } from '../lib/tickets/validation'
 
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
 export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
 
 /** No partial refresh can be mistaken for an authoritative empty domain. The
  * caller holds the coordinator lock and checks its generation before applying. */
-export async function fetchOwnerSnapshot(context: DeliveryContext): Promise<OfflineSnapshot> {
+export async function fetchOwnerSnapshot(context: DeliveryContext, requireTickets = false): Promise<OfflineSnapshot> {
   if (!context.isCurrent()) throw new Error('Library owner changed')
   const userId = context.scope.userId
-  const [library, lists, listMemberships, pins, ledgerWidgets] = await Promise.all([
+  const [library, lists, listMemberships, pins, ledgerWidgets, tickets] = await Promise.all([
     fetchUserLibrary(userId), fetchLists(userId), fetchListMemberships(userId),
     fetchAllTitlePins(userId), fetchLedgerLayout(userId),
+    ticketRemote.descriptors(context),
   ])
   if (!context.isCurrent()) throw new Error('Library owner changed')
-  return { ...library, lists, listMemberships, ledgerWidgets,
+  if (requireTickets && tickets.support !== 'authoritative') throw new Error('Ticket sync requires the server ticket attachment update; your saved photo remains on this device')
+  return mergeOwnedTickets({ ...library, lists, listMemberships, ledgerWidgets,
     rowRevisions: { ...library.rowRevisions, ...Object.fromEntries(lists.map((list) => [`lists:${list.id}`, list.updatedAt])) },
     pinnedModes: Object.fromEntries(pins.map((pin) => [`${pin.titleId}:${pin.easterEggKey}`, pin.pinnedVariant])),
-  }
+  }, tickets)
 }
 
 export interface OfflineLibraryStatus {
@@ -46,6 +51,7 @@ interface RuntimeOptions {
   anonymousStorage?: IndexedDbOfflineStore
   lock?: ExclusiveLock
   browserEvents?: boolean
+  downloadTicket?: typeof ticketRemote.download
 }
 
 /** Anonymous data uses a separate database and never enters the delivery
@@ -66,6 +72,7 @@ export class OfflineLibraryRuntime {
   private channel: BroadcastChannel | undefined
   private syncing: Promise<void> | undefined
   private broadcastRevision = -1
+  private ticketRequests = new AbortController()
 
   constructor(options: RuntimeOptions) {
     this.options = options
@@ -100,6 +107,8 @@ export class OfflineLibraryRuntime {
   }
 
   async activate(userId: string): Promise<void> {
+    this.ticketRequests.abort()
+    this.ticketRequests = new AbortController()
     this.detachEvents()
     this.generation++
     this.ownerId = userId
@@ -113,6 +122,8 @@ export class OfflineLibraryRuntime {
   /** Synchronously clears the last owner's visible projection before awaiting
    * IndexedDB/auth/network. Also used before friend/shared browsing. */
   deactivate(): void {
+    this.ticketRequests.abort()
+    this.ticketRequests = new AbortController()
     this.detachEvents()
     this.generation++
     this.ownerId = null
@@ -146,6 +157,40 @@ export class OfflineLibraryRuntime {
   }
   reload(): Promise<void> { return this.coordinator.reload() }
   flush(): Promise<void> { return this.coordinator.flush() }
+  /** Returns bytes only for this session's current association. A first online
+   * open becomes available offline only after its cache transaction commits. */
+  async readTicketPhoto(outingId: string, attachmentId: string): Promise<Blob> {
+    if (!this.ready) throw new Error('Library is not ready')
+    const generation = this.generation, ownerId = this.ownerId
+    const scope = ownerId ? { projectId: this.options.projectId, userId: ownerId } : this.anonymousScope
+    const store = ownerId ? this.ownerStorage : this.anonymous
+    const context: DeliveryContext = { scope, signal: this.ticketRequests.signal,
+      isCurrent: () => generation === this.generation && ownerId === this.ownerId && this.ready }
+    const currentAttachment = async () => {
+      const read = await store.read(scope)
+      if (!context.isCurrent() || context.signal.aborted) throw new Error('Library account changed')
+      const attachment = replayPending(read.document.base, read.document.commands).outings.find((outing) => outing.id === outingId)?.ticketAttachment
+      if (!attachment || attachment.id !== attachmentId) throw new Error('This ticket was replaced or removed')
+      return attachment
+    }
+    const attachment = await currentAttachment()
+    const record = await store.readTicketBlob(scope, attachmentId)
+    if (!context.isCurrent()) throw new Error('Library account changed')
+    let blob: Blob
+    if (record) {
+      if (record.outingId !== outingId || !sameTicketAttachment(record.attachment, attachment)) throw new Error('Saved ticket metadata does not match this outing')
+      await assertTicketBytes(record.blob, attachment)
+      blob = record.blob
+    } else {
+      if (!ownerId) throw new Error('The original ticket photo is missing from this browser')
+      blob = await (this.options.downloadTicket ?? ticketRemote.download)(context, attachment)
+      if (!context.isCurrent()) throw new Error('Library account changed')
+      if (!sameTicketAttachment(await currentAttachment(), attachment)) throw new Error('This ticket changed while downloading')
+      await store.cacheTicketBlob(scope, outingId, attachment, blob)
+    }
+    if (!sameTicketAttachment(await currentAttachment(), attachment)) throw new Error('This ticket changed while opening')
+    return blob
+  }
   async attachTicket(outingId: string, capture: TicketCapture, blob: Blob, id = crypto.randomUUID()): Promise<void> {
     const generation = this.generation
     if (this.ownerId) await this.coordinator.attachTicket(outingId, capture, blob, id)

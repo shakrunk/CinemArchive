@@ -8,6 +8,7 @@ import { deferred, snapshot, title } from '../lib/offline/fixtures.test-support'
 import { fetchAllTitlePins, fetchLedgerLayout, fetchListMemberships, fetchLists, fetchUserLibrary } from '../lib/db'
 
 vi.mock('../lib/db', () => ({ fetchAllTitlePins: vi.fn(), fetchLedgerLayout: vi.fn(), fetchListMemberships: vi.fn(), fetchLists: vi.fn(), fetchUserLibrary: vi.fn() }))
+vi.mock('../lib/tickets/remote', async (original) => ({ ...await original<typeof import('../lib/tickets/remote')>(), ticketRemote: { descriptors: vi.fn().mockResolvedValue({ support: 'authoritative', outings: [] }) } }))
 
 const stores: IndexedDbOfflineStore[] = []
 const runtimes: OfflineLibraryRuntime[] = []

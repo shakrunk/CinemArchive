@@ -11,7 +11,7 @@ async function setup() {
   const fixture = await ticketFixture()
   const fetch = vi.fn<typeof globalThis.fetch>()
   const readBlob = vi.fn(async () => fixture.record)
-  const fetchBase = vi.fn(async () => ({ ...ticketSnapshot(), outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: fixture.attachment }] }))
+  const fetchBase = vi.fn(async () => ({ ...ticketSnapshot(), ticketAttachmentSupport: 'authoritative' as 'authoritative' | 'unsupported', outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: fixture.attachment }] }))
   const session = vi.fn(async () => ({ userId: ticketOwner.userId, accessToken: 'owner-token' }))
   const context: DeliveryContext = { scope: ticketOwner, signal: new AbortController().signal, isCurrent: () => true }
   const deliver = createTicketCommandDelivery({ ...ticketOwner, projectId: ticketOwner.projectId, anonKey: 'public-key', session, readBlob, fetchBase, fetch })
@@ -22,7 +22,7 @@ it('looks up the receipt first and acknowledges with fresh canonical state witho
   const s = await setup()
   s.fetch.mockResolvedValue(json(s.receipt))
   const fresh = ticketSnapshot()
-  s.fetchBase.mockResolvedValue({ ...fresh, outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: s.attachment }] })
+  s.fetchBase.mockResolvedValue({ ...fresh, ticketAttachmentSupport: 'authoritative', outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: s.attachment }] })
   expect(await s.deliver(s.command, s.context)).toMatchObject({ kind: 'success' })
   expect(s.fetch).toHaveBeenCalledOnce()
   expect(s.fetch.mock.calls[0][0]).toContain('get_ticket_command_receipt')
@@ -114,4 +114,12 @@ it('classifies CAS refusal as conflict while retaining the pending original', as
     .mockResolvedValueOnce(json({ code: '40001', message: 'Another device replaced this ticket' }, 409))
   expect(await s.deliver(s.command, s.context)).toEqual({ kind: 'conflict', message: 'Another device replaced this ticket' })
   expect(s.fetchBase).not.toHaveBeenCalled()
+})
+
+it('retains a confirmed command until the descriptor refresh is authoritative', async () => {
+  const s = await setup()
+  s.fetch.mockResolvedValue(json(s.receipt))
+  s.fetchBase.mockResolvedValueOnce({ ...ticketSnapshot(), ticketAttachmentSupport: 'unsupported', outings: [{ ...ticketOuting, ticketManaged: true, ticketAttachment: s.attachment }] })
+  expect(await s.deliver(s.command, s.context)).toMatchObject({ kind: 'retry', message: expect.stringContaining('authoritative') })
+  expect(s.readBlob).not.toHaveBeenCalled()
 })

@@ -3,7 +3,7 @@ import { applyMutation } from './replay'
 import { replayPending } from './replay'
 import { mutationEntities } from './entities'
 import { capturePreconditions } from './preconditions'
-import { emptySnapshot, type OfflineSnapshot } from './snapshot'
+import { emptySnapshot, mergeRefreshedSnapshot, type OfflineSnapshot } from './snapshot'
 import { assertCommand, assertMutation, assertSnapshot } from './validation'
 import { isTicketMutation, type TicketAttachment, type TicketBlobRecord, type TicketCapture } from '../tickets/types'
 import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObjectKey } from '../tickets/validation'
@@ -269,10 +269,35 @@ export class IndexedDbOfflineStore {
     })
   }
 
+  async cacheTicketBlob(scope: OfflineScope, outingId: string, attachment: TicketAttachment, blob: Blob): Promise<void> {
+    scope = { ...scope }
+    attachment = JSON.parse(JSON.stringify(attachment)) as TicketAttachment
+    if (attachment.objectKey !== ticketObjectKey(scope, attachment.id)) throw new Error('Ticket belongs to another account')
+    await assertTicketBytes(blob, attachment)
+    await this.transact(scope, (document, tx) => {
+      const current = replayPending(document.base, document.commands).outings.find((outing) => outing.id === outingId)?.ticketAttachment
+      if (!current || !sameTicketAttachment(current, attachment)) throw new Error('This ticket was replaced or removed before its download finished')
+      const records = tx.objectStore(TICKET_BLOBS)
+      const key = ticketBlobKey(scope, attachment.id)
+      const lookup = records.get(key)
+      lookup.onsuccess = () => {
+        try {
+          const old = lookup.result as TicketBlobRecord | undefined
+          if (old) {
+            if (!old.scope || !sameScope(old.scope, scope) || old.outingId !== outingId || !isTicketAttachment(old.attachment) || !sameTicketAttachment(old.attachment, attachment)) tx.abort()
+            return
+          }
+          records.add({ scope, outingId, attachmentId: attachment.id, attachment, blob, sha256: attachment.sha256,
+            byteLength: blob.size, mimeType: attachment.mimeType, createdAt: new Date().toISOString(), source: 'download' } satisfies TicketBlobRecord, key)
+        } catch { tx.abort() }
+      }
+    })
+  }
+
   replaceBase(scope: OfflineScope, base: OfflineSnapshot): Promise<OfflineRead> {
     const captured = omitUndefined(base)
     assertSnapshot(captured)
-    return this.transact(scope, (d) => { d.base = captured })
+    return this.transact(scope, (d) => { d.base = mergeRefreshedSnapshot(d.base, captured) })
   }
 
   /** Anonymous edits update their own snapshot atomically, without ever creating
@@ -294,7 +319,7 @@ export class IndexedDbOfflineStore {
     return this.transact(scope, (d) => {
       const command = d.commands.find((c) => c.id === commandId)
       if (!command) return
-      d.base = base ?? applyMutation(d.base, captured ?? command.mutation)
+      d.base = base ? mergeRefreshedSnapshot(d.base, base) : applyMutation(d.base, captured ?? command.mutation)
       d.commands = d.commands.filter((c) => c.id !== commandId).map((c) => ({ ...c, dependsOn: c.dependsOn.filter((id) => id !== commandId) }))
     })
   }

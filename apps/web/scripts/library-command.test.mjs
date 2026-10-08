@@ -25,10 +25,13 @@ before(async () => {
   // Use the canonical schema, including actual constraints, triggers and RLS.
   const schema = (await readFile(new URL('../../../schema.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
   const migration = (await readFile(migrationUrl, 'utf8')).replaceAll('\r\n', '\n')
-  const [baseline, canonicalCommand] = schema.split('-- Atomic library commands (20261008162831)\n')
-  assert.ok(canonicalCommand.trim() === migration.trim(), 'canonical schema matches migration')
+  const [baseline, following] = schema.split('-- Atomic library commands (20261008162831)\n')
+  assert.ok(following.trimStart().startsWith(migration.trim()), 'canonical schema includes the complete atomic command migration')
   await database.exec(baseline)
   await database.exec(migration)
+  const causal = (await readFile(new URL('../../../supabase/migrations/20261008171852_causal_library_commands.sql', import.meta.url),'utf8')).replaceAll('\r\n','\n')
+  assert.ok(schema.includes(causal.trim()), 'canonical schema includes causal command migration')
+  await database.exec(causal)
   await database.query('insert into auth.users(id,email) values ($1,$2),($3,$4)', [owner,'owner@example.test',other,'other@example.test'])
   await database.exec('grant select on all tables in schema public to authenticated;')
 }, { timeout: 60000 })
@@ -213,4 +216,55 @@ test('receipts with the same UUID remain independent between owners', async () =
   const result=await command([second],id)
   assert.equal(result.rows[0].row.user_id,other)
   assert.equal(result.rows[0].row.id,second.key.id)
+})
+
+test('queued edits use the preceding immutable receipt revision and retry safely', async () => {
+  const title=titleOperation(), first=randomUUID(), second=randomUUID()
+  await command([title],first)
+  const patch={table:'titles',action:'update',key:title.key,values:{notes:'Second queued edit'},expectedOperationId:first}
+  await command([patch],second)
+  await command([{table:'titles',action:'update',key:title.key,values:{rating:4},expectedOperationId:second}])
+  await command([patch],second)
+  const row=(await rows('titles')).find(row=>row.id===title.key.id)
+  assert.equal(row.notes,'Second queued edit')
+  assert.equal(Number(row.rating),4)
+})
+
+test('an intervening device edit conflicts with a causal queued patch', async () => {
+  const title=titleOperation(), first=randomUUID()
+  await command([title],first)
+  await command([{table:'titles',action:'update',key:title.key,values:{notes:'Other device'}}])
+  await assert.rejects(command([{table:'titles',action:'update',key:title.key,values:{notes:'Stale offline edit'},expectedOperationId:first}]),{code:'40001'})
+  assert.equal((await rows('titles')).find(row=>row.id===title.key.id).notes,'Other device')
+})
+
+test('causal references cannot borrow another row or another owner receipt', async () => {
+  const title=titleOperation(), second=titleOperation(), receipt=randomUUID()
+  await command([title],receipt)
+  await command([second])
+  await assert.rejects(command([{table:'titles',action:'update',key:second.key,values:{rating:1},expectedOperationId:receipt}]),{code:'40001'})
+  await database.query("select set_config('request.jwt.claim.sub',$1,false)",[other])
+  const ownTitle=titleOperation()
+  await command([ownTitle])
+  await assert.rejects(command([{table:'titles',action:'update',key:ownTitle.key,values:{rating:1},expectedOperationId:receipt}]),{code:'40001'})
+})
+
+test('a compound receipt supplies its final row revision for the next queued delete', async () => {
+  const title=titleOperation(), receipt=randomUUID()
+  await command([title,
+    {table:'titles',action:'update',key:title.key,values:{notes:'Second effect'}},
+  ],receipt)
+  await command([{table:'titles',action:'delete',key:title.key,expectedOperationId:receipt}])
+  assert.equal((await rows('titles')).some(row=>row.id===title.key.id),false)
+  await assert.rejects(command([{table:'titles',action:'update',key:title.key,values:{notes:'Resurrect'},expectedOperationId:receipt}]),{code:'40001'})
+})
+
+test('causal preconditions reject ambiguous, self-referencing, or deleted predecessors', async () => {
+  const title=titleOperation(), receipt=randomUUID(), deletion=randomUUID(), current=randomUUID()
+  await command([title],receipt)
+  const patch={table:'titles',action:'update',key:title.key,values:{notes:'Invalid'}}
+  await assert.rejects(command([{...patch,expectedOperationId:receipt,expectedUpdatedAt:'2000-01-01T00:00:00Z'}]),{code:'22023'})
+  await assert.rejects(command([{...patch,expectedOperationId:current}],current),{code:'22023'})
+  await command([{table:'titles',action:'delete',key:title.key}],deletion)
+  await assert.rejects(command([{...patch,expectedOperationId:deletion}]),{code:'40001'})
 })

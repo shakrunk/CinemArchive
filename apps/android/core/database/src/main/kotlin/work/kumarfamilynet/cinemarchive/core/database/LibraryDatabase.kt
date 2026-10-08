@@ -47,6 +47,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun episodeReviewDao(): EpisodeReviewDao
     abstract fun viewingDao(): ViewingDao
     abstract fun viewingCompletionAliasDao(): ViewingCompletionAliasDao
+    abstract fun completionQueueDao(): CompletionQueueDao
     abstract fun outboxDao(): OutboxDao
     abstract fun titleCastDao(): TitleCastDao
     abstract fun titleCrewDao(): TitleCrewDao

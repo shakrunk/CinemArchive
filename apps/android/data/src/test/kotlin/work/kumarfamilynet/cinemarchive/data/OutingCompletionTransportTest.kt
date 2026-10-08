@@ -41,9 +41,10 @@ class OutingCompletionTransportTest {
     private fun body(index: Int) = Buffer().also { requests[index].body!!.writeTo(it) }.readUtf8()
     private fun viewing() = JSONObject().put("id", canonical).put("user_id", owner).put("title_id", command.titleId)
         .put("outing_id", command.outingId).put("updated_at", originalVersion).put("notes", JSONObject.NULL)
+        .put("viewed_at", "2026-10-08").put("rating", JSONObject.NULL).put("venue", "Cinema").put("companions", JSONArray())
     private fun response(): JSONObject {
         val outing = OutingCommandFixture.row().put("status", "completed").put("completed_viewing_id", canonical)
-        val proof = JSONObject(viewing().toString()).apply { remove("notes") }
+        val proof = JSONObject(viewing().toString()).apply { listOf("notes", "viewed_at", "rating", "venue", "companions").forEach(::remove) }
         return JSONObject().put("status", "already_completed").put("operationId", entry.id).put("outingId", command.outingId)
             .put("canonicalViewingId", canonical).put("request", command.request())
             .put("rows", JSONArray().put(JSONObject().put("table", "cinema_outings")
@@ -93,6 +94,7 @@ class OutingCompletionTransportTest {
         replies += 503 to "{}"
         assertTrue(transport().push(entry) is PushResult.Retry)
         replies += 200 to response().toString()
+        replies += 200 to JSONArray().put(viewing()).toString()
         assertTrue(transport().push(entry) is PushResult.Applied)
         assertEquals(body(0), body(1))
         val wire = JSONObject(body(0))
@@ -100,7 +102,36 @@ class OutingCompletionTransportTest {
         assertEquals("America/Denver", wire.getString("p_tz"))
         assertEquals(provisional, wire.getString("p_provisional_viewing_id"))
         assertTrue(wire.isNull("p_expected_operation_id"))
-        assertTrue(requests.all { it.header("Authorization") == "Bearer owner-token" && it.url.encodedPath == "/rest/v1/rpc/complete_cinema_outing" })
+        assertTrue(requests.all { it.header("Authorization") == "Bearer owner-token" })
+        assertTrue(requests.take(2).all { it.url.encodedPath == "/rest/v1/rpc/complete_cinema_outing" })
+        assertEquals("eq.$canonical", requests.last().url.queryParameter("id"))
+        assertEquals("eq.$owner", requests.last().url.queryParameter("user_id"))
+    }
+
+    @Test fun deletedOutingDoesNotEraseSurvivingUnlinkedCanonicalHistory() = runTest {
+        replies += 200 to response().put("outing", JSONObject.NULL).put("viewing", JSONObject.NULL).put("title", JSONObject.NULL).toString()
+        replies += 200 to JSONArray().put(viewing().put("outing_id", JSONObject.NULL).put("notes", "Keep independent history")).toString()
+        val result = transport().push(entry) as PushResult.Applied
+        val checked = checkedCompletionEnvelope(entry, result.receipt, owner)
+        assertNull(checked.outing)
+        assertEquals("Keep independent history", checked.viewing!!.getString("notes"))
+        assertTrue(checked.viewing.isNull("outing_id"))
+    }
+
+    @Test fun exactOwnedLookupAbsenceIsSeparateFromImmutableViewingProof() = runTest {
+        replies += 200 to response().toString(); replies += 200 to "[]"
+        val checked = checkedCompletionEnvelope(entry, (transport().push(entry) as PushResult.Applied).receipt, owner)
+        assertNull(checked.viewing)
+        assertEquals(originalVersion, checked.alias!!.canonicalViewingVersion)
+    }
+
+    @Test fun wrongParentInFreshLookupOrRefreshFailureCannotAcknowledgeAcceptedCommand() = runTest {
+        replies += 200 to response().toString()
+        replies += 200 to JSONArray().put(viewing().put("outing_id", provisional)).toString()
+        assertTrue(transport().push(entry) is PushResult.Retry)
+        replies += 200 to response().toString()
+        replies += 409 to """{"code":"40001","message":"Lookup failed"}"""
+        assertTrue(transport().push(entry) is PushResult.Retry)
     }
 
     @Test fun laterWebNotesRemainCurrentButNeverBecomeDependentViewingBaseline() {

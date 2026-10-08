@@ -75,6 +75,11 @@ async function searchTMDB(query: string, type: 'movie' | 'tv') {
   return cachedFetch(`tmdb:search:${type}:${query}`, url)
 }
 
+async function findTMDB(externalId: string, source: 'imdb_id' | 'tvdb_id') {
+  const url = `${TMDB_BASE}/find/${encodeURIComponent(externalId)}?api_key=${TMDB_API_KEY}&external_source=${source}&language=en-US`
+  return cachedFetch(`tmdb:find:${source}:${externalId}`, url)
+}
+
 async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
   // TV: aggregate_credits gives total_episode_count per cast member (standard credits doesn't).
   // credits is still needed for crew. Movies don't have aggregate_credits.
@@ -272,6 +277,14 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         if (!query) throw new Error('Missing query parameter')
         result = await searchTMDB(query, type)
+        break
+      }
+      case 'find': {
+        const id = url.searchParams.get('id') ?? ''
+        const source = url.searchParams.get('source')
+        if (!id) throw new Error('Missing id parameter')
+        if (source !== 'imdb_id' && source !== 'tvdb_id') throw new Error(`Invalid source parameter: ${source}`)
+        result = await findTMDB(id, source)
         break
       }
       case 'details': {

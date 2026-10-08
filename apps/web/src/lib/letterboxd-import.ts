@@ -134,7 +134,7 @@ export function pickBestMatch(candidates: SearchResult[], name: string, year?: n
 // ─── Import pipeline ──────────────────────────────────────────────────────────
 
 /** A film aggregated from possibly-many CSV rows (diary rewatches). */
-interface GroupedFilm {
+export interface GroupedFilm {
   name: string
   year?: number
   rating?: number
@@ -168,7 +168,7 @@ export function groupRows(rows: LetterboxdRow[]): GroupedFilm[] {
   })
 }
 
-function buildTitle(detailed: SearchResult, film: GroupedFilm, status: WatchStatus): Title {
+export function buildTitle(detailed: SearchResult, film: GroupedFilm, status: WatchStatus): Title {
   const id = crypto.randomUUID()
   const lastDate = film.watchedDates[film.watchedDates.length - 1]
   return {
@@ -219,7 +219,7 @@ function buildTitle(detailed: SearchResult, film: GroupedFilm, status: WatchStat
 
 /** Small concurrency pool — enough parallelism to overlap proxy latency
  *  without hammering the Edge Function on a large history. */
-async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+export async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let next = 0
   async function worker() {
     while (next < items.length) {

@@ -268,6 +268,27 @@ export async function searchMedia(query: string): Promise<SearchResult[]> {
 }
 
 /**
+ * Resolve an external id (IMDb "tt…" or TVDB) to a TMDB search result via the
+ * proxy's `find` action. Exact — no fuzzy matching. Returns undefined when TMDB
+ * has no match or when Supabase isn't configured.
+ */
+export async function findMediaByExternalId(
+  source: 'imdb_id' | 'tvdb_id',
+  externalId: string,
+  preferType?: MediaType
+): Promise<SearchResult | undefined> {
+  if (!(isSupabaseConfigured && supabase)) return undefined
+  const { data, error } = await supabase.functions.invoke(
+    `media-proxy?action=find&id=${encodeURIComponent(externalId)}&source=${source}`
+  )
+  if (error) throw error
+  const movies: SearchResult[] = (data?.movie_results ?? []).map((i: any) => mapSearchItem(i, 'movie'))
+  const tv: SearchResult[] = (data?.tv_results ?? []).map((i: any) => mapSearchItem(i, 'tv'))
+  const ordered = preferType === 'tv' ? [...tv, ...movies] : [...movies, ...tv]
+  return ordered[0]
+}
+
+/**
  * Hydrate a search result into full metadata: TMDB details (poster, synopsis,
  * genres, director/network, seasons, cast, crew, studios) plus OMDb critic scores.
  * Falls back to the passed-in `base` values for any field the detail call can't supply.

@@ -28,5 +28,7 @@ export function computeOutingMemories(outings: CinemaOuting[], titles: Title[], 
         ?? title.viewings.find((viewing) => viewing.outingId === outing.id),
     })
   }
-  return memories.sort((a, b) => new Date(b.outing.showtime).getTime() - new Date(a.outing.showtime).getTime())
+  return memories.sort((a, b) =>
+    b.outing.showtime < a.outing.showtime ? -1 : b.outing.showtime > a.outing.showtime ? 1 : 0
+  )
 }

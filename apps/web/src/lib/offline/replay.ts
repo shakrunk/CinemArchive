@@ -48,6 +48,19 @@ function mergeCreatedTitle(existing: Title, pending: Title): Title {
   if (existing.crew || pending.crew) result.crew = mergeMissing(existing.crew ?? [], pending.crew ?? [], (row) => `${row.tmdbPersonId}:${row.job}`)
   return result
 }
+function updateSeasonMetadata(existing: Season | undefined, incoming: Season): Season {
+  const previous = new Map(existing?.episodes?.map((ep) => [ep.id, ep]))
+  const episodes = incoming.episodes?.map((ep) => {
+    const old = previous.get(ep.id)
+    return { ...ep, watchEvents: old?.watchEvents ?? [], ratings: old?.ratings ?? [], reviews: old?.reviews ?? [] }
+  })
+  const merged = { ...existing, ...incoming, episodesWatched: existing?.episodesWatched ?? 0 }
+  if (episodes) {
+    merged.episodes = mergeMissing(episodes, existing?.episodes ?? [], rowId)
+    merged.episodesWatched = merged.episodes.filter((ep) => ep.watchEvents.length > 0).length
+  }
+  return merged
+}
 function fields<T extends object>(row: T, patch: object): T {
   const next = { ...row } as Record<string, unknown>
   for (const [key, value] of Object.entries(patch)) {
@@ -81,7 +94,9 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation): OfflineS
         listMemberships: Object.fromEntries(Object.entries(state.listMemberships).map(([key, ids]) => [key, ids.filter((id) => id !== mutation.titleId)])),
       }
     }
-    case 'season.put': return titles(state, mutation.titleId, (t) => ({ ...t, seasons: put(t.seasons ?? [], mutation.season) }))
+    case 'season.put': return titles(state, mutation.titleId, (t) => ({ ...t,
+      seasons: put(t.seasons ?? [], updateSeasonMetadata(t.seasons?.find((s) => s.id === mutation.season.id), mutation.season)),
+    }))
     case 'episode.metadata': return episode(state, mutation.titleId, mutation.episodeId, (ep) => fields(ep, mutation.patch))
     case 'episode.log': return episode(state, mutation.titleId, mutation.episodeId, (ep) => ({ ...ep,
       watchEvents: mutation.watchEvent ? put(ep.watchEvents, mutation.watchEvent) : ep.watchEvents,

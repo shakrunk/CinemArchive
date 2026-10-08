@@ -5,6 +5,19 @@ import { assertCommand, assertMutation, assertSnapshot } from './validation'
 import { outing, owner, snapshot, stamp, title } from './fixtures.test-support'
 
 describe('durable tracking commands', () => {
+  it('refreshes season metadata without losing newer logs or omitted episodes', () => {
+    const season = title.seasons![0]
+    const episode = season.episodes![0]
+    const saved = { ...episode, watchEvents: [{ id: 'watch-mobile' }], ratings: [{ id: 'rating-mobile', rating: 5, ratedAt: stamp }] }
+    const base = { ...snapshot(), titles: [{ ...title, seasons: [{ ...season, episodes: [saved,
+      { ...episode, id: 'missing-episode', episodeNumber: 2 }], episodesWatched: 1 }] }] }
+    const result = applyMutation(base, { kind: 'season.put', titleId: title.id,
+      season: { ...season, episodes: [{ ...episode, episodeName: 'Refreshed name' }], episodesWatched: 0 } })
+    expect(result.titles[0].seasons![0].episodes).toHaveLength(2)
+    expect(result.titles[0].seasons![0].episodes![0]).toMatchObject({ episodeName: 'Refreshed name', watchEvents: saved.watchEvents, ratings: saved.ratings })
+    expect(result.titles[0].seasons![0].episodesWatched).toBe(1)
+  })
+
   it('round-trips explicit clears and rejects undefined patch intent', () => {
     const command = createCommand(owner, { kind: 'outing.patch', outingId: outing.id, patch: { venue: null, completedViewingId: null } })
     const roundTrip = JSON.parse(JSON.stringify(command))

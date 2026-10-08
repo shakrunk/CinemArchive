@@ -1383,7 +1383,7 @@ export async function fetchAllTitlePins(
     .eq('user_id', userId)
   if (error) {
     console.error('fetchAllTitlePins:', error)
-    return []
+    throw error
   }
   return (data ?? []).map((row) => ({
     titleId: row.title_id as string,

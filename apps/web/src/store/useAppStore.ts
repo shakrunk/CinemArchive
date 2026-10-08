@@ -3,9 +3,10 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
 import { computeLedgerStats } from './ledgerStats'
-import { normalizeCompanions } from './companions'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
-import { toCachedTitle } from './libraryCache'
+import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
+import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
+import { createLibraryCommandDelivery } from '../lib/offlineRpc'
 import { isSpecialsSeason, nextUnwatchedEpisode } from './episodeUtils'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
 import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
@@ -25,11 +26,11 @@ import {
 } from '../lib/ledgerPanels'
 import { decadeOf } from '../lib/utils'
 import {
-  fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
+  fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
   deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
   deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
-  fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
-  fetchLists, fetchListMemberships, insertListToDb, updateListInDb, deleteListFromDb,
+  upsertTitlePin, deleteTitlePin,
+  insertListToDb, updateListInDb, deleteListFromDb,
   addTitleToListInDb, removeTitleFromListInDb,
   fetchLedgerLayout, saveLedgerLayout,
   fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
@@ -285,6 +286,9 @@ interface AuthSlice {
   // succeeds. Views surface it instead of a misleading empty state.
   libraryLoadError: string | null
   viewerContext: ViewerContext
+  offlineStatus: OfflineLibraryStatus
+  offlineStorageError: string | null
+  legacyCacheAvailable: boolean
   setUser: (user: User | null) => void
   setLoadingUser: (loading: boolean) => void
   loadUserLibrary: () => Promise<void>
@@ -655,6 +659,67 @@ const NOTIFICATION_POLL_MS = 45_000
 let notificationPollTimer: number | undefined
 let ownerLibraryRequest: { userId: string; promise: Promise<void> } | undefined
 const LIBRARY_ERROR_KEY = 'owner-library-load'
+let libraryGeneration = 0
+let runtimeOwnerId: string | null = null
+let anonymousReady = false
+
+function ownerSnapshot(s: AppStore): OfflineSnapshot {
+  return { titles: s.titles, outings: s.outings, lists: s.lists,
+    listMemberships: Object.fromEntries(Object.entries(s.listMemberships).map(([id, members]) => [id, [...members]])),
+    pinnedModes: s.pinnedModes, ledgerWidgets: s.ledgerPrefs.widgets,
+  }
+}
+
+function snapshotState(snapshot: OfflineSnapshot, s: AppStore): Partial<AppStore> {
+  return { ...withDerivedTitles(snapshot.titles, s.filters), outings: snapshot.outings,
+    lists: snapshot.lists,
+    listMemberships: Object.fromEntries(Object.entries(snapshot.listMemberships).map(([id, members]) => [id, new Set(members)])),
+    pinnedModes: snapshot.pinnedModes,
+    ledgerPrefs: { widgets: snapshot.ledgerWidgets ?? defaultLedgerPrefs.widgets },
+  }
+}
+
+function reportOfflineStorageError(error: unknown): void {
+  console.error('Browser library persistence failed:', error)
+  const message = "Couldn't save this browser's library data. Keep this tab open and retry."
+  useAppStore.setState({ offlineStorageError: message })
+  useAppStore.getState().pushNotification({ dedupeKey: 'offline-storage-error', message })
+}
+
+const libraryRuntime = new OfflineLibraryRuntime({
+  projectId: import.meta.env.VITE_SUPABASE_URL || 'unconfigured-local',
+  deliver: createLibraryCommandDelivery(fetchOwnerSnapshot),
+  onSnapshot: (snapshot) => {
+    const s = useAppStore.getState()
+    const userId = s.user && !isDevMockUser(s.user) ? s.user.id : null
+    if (s.isSharedView || s.viewerContext.kind !== 'owner' || userId !== runtimeOwnerId) return
+    useAppStore.setState(snapshotState(snapshot ?? emptySnapshot(), s))
+  },
+  onStatus: (offlineStatus) => {
+    const s = useAppStore.getState()
+    const userId = s.user && !isDevMockUser(s.user) ? s.user.id : null
+    if (s.isSharedView || s.viewerContext.kind !== 'owner' || userId !== offlineStatus.ownerId) return
+    anonymousReady = offlineStatus.ownerId === null && offlineStatus.hydrated
+    useAppStore.setState({ offlineStatus })
+  },
+  onError: reportOfflineStorageError,
+})
+
+function stopLibraryRuntime(): void {
+  libraryGeneration++
+  window.clearTimeout(ledgerSaveTimer)
+  ledgerSaveTimer = undefined
+  ledgerSaveGet = null
+  anonymousReady = false
+  runtimeOwnerId = null
+  libraryRuntime.deactivate()
+}
+
+async function loadAnonymousLibrary(): Promise<void> {
+  anonymousReady = false
+  runtimeOwnerId = null
+  await libraryRuntime.loadAnonymous({ ...emptySnapshot(), titles: import.meta.env.DEV ? mockTitles : [] })
+}
 
 function flushLedgerLayoutSave() {
   window.clearTimeout(ledgerSaveTimer)
@@ -1195,9 +1260,12 @@ export const useAppStore = create<AppStore>()(
   unreadNotificationCount: 0,
 
   refreshUnreadNotificationCount: async () => {
-    if (!get().user) return
+    const userId = get().user?.id
+    if (!userId) return
+    const generation = libraryGeneration
     try {
       const count = await fetchUnreadNotificationCount()
+      if (libraryGeneration !== generation || get().user?.id !== userId) return
       set({ unreadNotificationCount: count })
     } catch (err) {
       console.error('Failed to refresh unread notification count:', err)
@@ -1205,8 +1273,12 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadNotificationInbox: async (before) => {
+    const userId = get().user?.id
+    if (!userId) return
+    const generation = libraryGeneration
     try {
       const page = await fetchNotifications(before)
+      if (libraryGeneration !== generation || get().user?.id !== userId) return
       set((s) => ({ notificationInbox: before ? [...s.notificationInbox, ...page] : page }))
     } catch (err) {
       console.error('Failed to load notification inbox:', err)
@@ -1214,6 +1286,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   markOneNotificationRead: async (id) => {
+    const generation = libraryGeneration
     const prev = get().notificationInbox
     set((s) => ({
       notificationInbox: s.notificationInbox.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
@@ -1222,6 +1295,7 @@ export const useAppStore = create<AppStore>()(
     try {
       await markNotificationRead(id)
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to mark notification read:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
@@ -1229,6 +1303,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   markAllNotificationsSeen: async () => {
+    const generation = libraryGeneration
     const prev = get().notificationInbox
     const now = new Date().toISOString()
     set((s) => ({
@@ -1238,6 +1313,7 @@ export const useAppStore = create<AppStore>()(
     try {
       await markAllNotificationsRead()
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to mark all notifications read:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
@@ -1245,6 +1321,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   deleteNotificationItem: async (id) => {
+    const generation = libraryGeneration
     const prev = get().notificationInbox
     const removed = prev.find((n) => n.id === id)
     set((s) => ({
@@ -1254,6 +1331,7 @@ export const useAppStore = create<AppStore>()(
     try {
       await deleteNotification(id)
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to delete notification:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
@@ -1265,35 +1343,41 @@ export const useAppStore = create<AppStore>()(
   loadingUser: false,
   libraryLoadError: null,
   viewerContext: { kind: 'owner' },
+  offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
+  offlineStorageError: null,
+  legacyCacheAvailable: hasLegacyLibraryCache(browserCacheStorage),
 
   setUser: (user) => {
     const previousUserId = get().user?.id
-    set({ user })
     // SIGNED_IN on tab focus and TOKEN_REFRESHED don't change library ownership.
-    if (user && user.id === previousUserId) return
+    if (user && user.id === previousUserId) { set({ user }); return }
+    stopLibraryRuntime()
     ownerLibraryRequest = undefined
     set((s) => ({
-      loadingUser: false,
-      libraryLoadError: null,
-      notifications: s.notifications.filter((n) => n.dedupeKey !== LIBRARY_ERROR_KEY),
+      ...snapshotState(emptySnapshot(), s), user, loadingUser: Boolean(user), libraryLoadError: null,
+      offlineStorageError: null, notifications: [], notificationInbox: [], unreadNotificationCount: 0,
+      offlineStatus: { ownerId: user?.id ?? null, hydrated: false, commands: [], quarantined: [] },
+      viewerContext: { kind: 'owner' }, isSharedView: false, viewedLedgerWidgets: null,
+      selectedTitleId: null, selectedListId: null, isDetailDrawerOpen: false, isAddTitleOpen: false,
+      isOutingScheduleOpen: false, isPostShowSheetOpen: false, postShowOutingId: null,
     }))
     window.clearInterval(notificationPollTimer)
     notificationPollTimer = undefined
+    if (get().legacyCacheAvailable) get().pushNotification({ dedupeKey: 'legacy-library-recovery', kind: 'tip',
+      message: 'An older library cache is preserved on this device for recovery. It has not been assigned to this account.',
+    })
     if (user && isDevMockUser(user)) {
-      // Dev-only mock session — no real Supabase auth backs this id, so skip
-      // the DB-backed loads below and keep whatever's already on screen
-      // (mockTitles in dev) rather than wiping it with an unauthenticated fetch.
+      void loadAnonymousLibrary().catch(reportOfflineStorageError).finally(() => {
+        if (get().user?.id === user.id) set({ loadingUser: false })
+      })
       return
     }
     if (user) {
-      get().loadUserLibrary()
-      get().loadPinnedModes()
+      void get().loadUserLibrary()
       get().refreshUnreadNotificationCount()
       notificationPollTimer = window.setInterval(() => get().refreshUnreadNotificationCount(), NOTIFICATION_POLL_MS)
     } else {
-      // Clear on logout — restore mock data only in dev
-      const fallback = import.meta.env.DEV ? mockTitles : []
-      set((s) => ({ ...withDerivedTitles(fallback, s.filters), pinnedModes: {}, outings: [] }))
+      void loadAnonymousLibrary().catch(reportOfflineStorageError)
     }
   },
 
@@ -1312,33 +1396,20 @@ export const useAppStore = create<AppStore>()(
       try {
         // Outings ride along with the owner's own library fetch (rule §9 —
         // owner-private; never fetched for shared/friend views).
-        const { titles: dbTitles, outings: dbOutings } = await fetchUserLibrary(user.id)
+        if (runtimeOwnerId !== user.id) {
+          anonymousReady = false
+          runtimeOwnerId = user.id
+          await libraryRuntime.activate(user.id)
+        }
+        if (!isCurrent()) return
+        await libraryRuntime.refresh()
         if (!isCurrent()) return
         set((s) => ({
           notifications: s.notifications.filter((n) => n.dedupeKey !== LIBRARY_ERROR_KEY),
         }))
-        // The synced board layout rides along with the library fetch. Server
-        // wins; a user who has never synced adopts their local board once.
-        void fetchLedgerLayout(user.id)
-          .then((widgets) => {
-            if (get().user?.id !== user.id || get().isSharedView || get().viewerContext.kind === 'friend') return
-            if (widgets) set({ ledgerPrefs: { widgets } })
-            else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
-          })
-          .catch((err) => console.error('Failed to load synced Ledger layout:', err))
-        // Guard: if we have local titles but DB returned empty, the session auth
-        // may not have fully propagated — skip the wipe rather than hiding data.
-        const currentTitles = get().titles
-        const hasRealLocalData = currentTitles.some((t) => !t.id.startsWith('mt-'))
-        if (dbTitles.length === 0 && hasRealLocalData) {
-          console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
-          return
-        }
-        set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), outings: dbOutings }))
         // Reconciliation trigger: app load, right after the library lands
         // (plan §4.3) — completes anything that finished while the app was closed.
         void get().reconcileOutings()
-        void get().loadLists()
       } catch (err) {
         if (!isCurrent()) return
         console.error('Failed to load user library from DB:', err)
@@ -1363,23 +1434,29 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadSharedLibrary: async (token) => {
+    stopLibraryRuntime()
+    const generation = libraryGeneration
     ownerLibraryRequest = undefined
-    set({ loadingUser: true, isSharedView: true, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null })
+    set((s) => ({ ...snapshotState(emptySnapshot(), s), loadingUser: true, isSharedView: true,
+      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
+      viewedLedgerWidgets: null, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null }))
     try {
       const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
+      if (libraryGeneration !== generation) return
       set((s) => withDerivedTitles(dbTitles, s.filters))
       // Show the owner's board arrangement (falls back to the default board
       // when they never synced one). Never written into the viewer's prefs.
       if (ownerUserId) {
         void fetchLedgerLayout(ownerUserId)
-          .then((widgets) => set({ viewedLedgerWidgets: widgets }))
-          .catch(() => set({ viewedLedgerWidgets: null }))
+          .then((widgets) => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: widgets }) })
+          .catch(() => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: null }) })
       }
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to load shared library from DB:', err)
       set({ libraryLoadError: "Couldn't load this shared library — the link may have expired." })
     } finally {
-      set({ loadingUser: false })
+      if (libraryGeneration === generation) set({ loadingUser: false })
     }
   },
 
@@ -1387,31 +1464,38 @@ export const useAppStore = create<AppStore>()(
   // (TitleDetailDrawer, episode-card, Discover, etc.) — viewerContext just adds
   // who's being viewed, for the exit affordance and heading text.
   loadFriendLibrary: async (friendUserId, displayName) => {
+    stopLibraryRuntime()
+    const generation = libraryGeneration
     ownerLibraryRequest = undefined
-    set({
+    set((s) => ({
+      ...snapshotState(emptySnapshot(), s), viewedLedgerWidgets: null,
+      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
       loadingUser: true,
       isSharedView: true,
       libraryLoadError: null,
       viewerContext: { kind: 'friend', userId: friendUserId, displayName },
       pendingView: 'library',
-    })
+    }))
     try {
       const dbTitles = await fetchFriendLibrary(friendUserId)
+      if (libraryGeneration !== generation) return
       set((s) => withDerivedTitles(dbTitles, s.filters))
       // Show the friend's board arrangement (read-only RLS policy).
       void fetchLedgerLayout(friendUserId)
-        .then((widgets) => set({ viewedLedgerWidgets: widgets }))
-        .catch(() => set({ viewedLedgerWidgets: null }))
+        .then((widgets) => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: widgets }) })
+        .catch(() => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: null }) })
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to load friend library from DB:', err)
       set({ libraryLoadError: "Couldn't load that friend's library — check your connection." })
       get().pushNotification({ message: "Couldn't load that friend's library — check your connection." })
     } finally {
-      set({ loadingUser: false })
+      if (libraryGeneration === generation) set({ loadingUser: false })
     }
   },
 
   exitFriendView: () => {
+    stopLibraryRuntime()
     // Clear the friend's titles before refetching — loadUserLibrary's
     // hasRealLocalData guard would otherwise see the friend's (real, non-mock)
     // titles still in state and skip the replace if the user's own library is
@@ -1454,14 +1538,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadPinnedModes: async () => {
-    const user = get().user
-    if (!user) return
-    const pins = await fetchAllTitlePins(user.id)
-    const pinnedModes: Record<string, 'bw' | 'color'> = {}
-    for (const pin of pins) {
-      pinnedModes[`${pin.titleId}:${pin.easterEggKey}`] = pin.pinnedVariant
-    }
-    set({ pinnedModes })
+    await get().loadUserLibrary()
   },
 
   // ── Lists ──────────────────────────────────────────────────
@@ -1469,12 +1546,7 @@ export const useAppStore = create<AppStore>()(
   listMemberships: {},
 
   loadLists: async () => {
-    const user = get().user
-    if (!user) return
-    const [lists, memberships] = await Promise.all([fetchLists(user.id), fetchListMemberships(user.id)])
-    const listMemberships: Record<string, Set<string>> = {}
-    for (const [listId, titleIds] of Object.entries(memberships)) listMemberships[listId] = new Set(titleIds)
-    set({ lists, listMemberships })
+    await get().loadUserLibrary()
   },
 
   createList: (name, description = null) => {
@@ -1721,7 +1793,8 @@ export const useAppStore = create<AppStore>()(
 
   reconcileOutings: async () => {
     const user = get().user
-    if (!user) return
+    if (!user || get().isSharedView || !libraryRuntime.canReconcile) return
+    const generation = libraryGeneration
 
     let results: OutingCompletionResult[]
     try {
@@ -1731,7 +1804,7 @@ export const useAppStore = create<AppStore>()(
       console.error('Failed to reconcile cinema outings:', err)
       return
     }
-    if (results.length === 0) return
+    if (results.length === 0 || libraryGeneration !== generation || get().user?.id !== user.id || get().isSharedView) return
 
     set((s) => {
       let titles = s.titles
@@ -1785,22 +1858,15 @@ export const useAppStore = create<AppStore>()(
   },
     }),
     {
-      name: 'cinemarchive-library',
+      name: DEVICE_PREFERENCES_KEY,
       version: PERSIST_VERSION,
-      storage: createJSONStorage(() => browserCacheStorage),
-      // Only the source of truth is persisted; derived state (filteredTitles,
-      // stats) and transient UI flags are recomputed/reset on load. While
-      // browsing a friend's library, `titles` holds THEIR data — never persist
-      // that to the viewer's localStorage. Titles are cached slim (see
-      // toCachedTitle) to stay under the browser's storage quota.
+      storage: createJSONStorage(() => ({ ...browserCacheStorage,
+        getItem: (name) => browserCacheStorage.getItem(name) ?? (name === DEVICE_PREFERENCES_KEY
+          ? JSON.stringify({ version: PERSIST_VERSION, state: readLegacyDevicePreferences(browserCacheStorage) }) : null),
+      })),
+      // Device presentation only. Authenticated and anonymous libraries live
+      // in separate IndexedDB databases; shared/friend data is never persisted.
       partialize: (s) => ({
-        titles: s.viewerContext.kind === 'friend' ? [] : s.titles.map(toCachedTitle),
-        outings: s.viewerContext.kind === 'friend' ? [] : s.outings,
-        // listMemberships is deliberately NOT persisted — it's a
-        // Record<string, Set<string>> and Set doesn't survive
-        // JSON.stringify/parse through this middleware; loadLists() re-derives
-        // it every session instead.
-        lists: s.viewerContext.kind === 'friend' ? [] : s.lists,
         filters: s.filters,
         viewMode: s.viewMode,
         gridSize: s.gridSize,
@@ -1808,22 +1874,10 @@ export const useAppStore = create<AppStore>()(
         themeMode: s.themeMode,
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,
-        ledgerPrefs: s.ledgerPrefs,
       }),
+      merge: (persisted, current) => ({ ...current, ...pickDevicePreferences(persisted) }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        // Existing caches may contain Android's plain companion names. Repair
-        // them before any editor or dashboard reads the web object shape.
-        state.titles = state.titles.map((title) => ({
-          ...title,
-          viewings: title.viewings.map((viewing) => ({
-            ...viewing,
-            companions: viewing.companions == null ? undefined : normalizeCompanions(viewing.companions),
-          })),
-        }))
-        state.outings = state.outings.map((outing) => ({
-          ...outing, companions: normalizeCompanions(outing.companions),
-        }))
         // Older persisted payloads predate themeMode entirely — preserve their
         // persisted theme as an explicit choice rather than opting them into
         // live system-tracking they never asked for.
@@ -1887,6 +1941,15 @@ export const useAppStore = create<AppStore>()(
     }
   )
 )
+
+// Transitional anonymous persistence while action-level durability is wired in
+// the next batch. Owner data never flows through this subscription or localStorage.
+useAppStore.subscribe((state, previous) => {
+  if (!anonymousReady || (state.user && !isDevMockUser(state.user)) || state.isSharedView || state.viewerContext.kind !== 'owner') return
+  if (state.titles === previous.titles && state.outings === previous.outings && state.lists === previous.lists &&
+      state.listMemberships === previous.listMemberships && state.pinnedModes === previous.pinnedModes && state.ledgerPrefs === previous.ledgerPrefs) return
+  void libraryRuntime.saveAnonymous(ownerSnapshot(state)).catch(reportOfflineStorageError)
+})
 
 // ─── Selectors ──────────────────────────────────────────────────────────────
 

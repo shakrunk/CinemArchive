@@ -171,13 +171,15 @@ export class IndexedDbOfflineStore {
   }
 
   /** Only invoke under the coordinator's cross-tab delivery/refresh lock. */
-  acknowledge(scope: OfflineScope, commandId: string, canonicalEffect?: Mutation): Promise<OfflineRead> {
+  acknowledge(scope: OfflineScope, commandId: string, canonicalEffect?: Mutation, canonicalBase?: OfflineSnapshot): Promise<OfflineRead> {
     if (canonicalEffect) assertMutation(canonicalEffect)
     const captured: Mutation | undefined = canonicalEffect ? JSON.parse(JSON.stringify(canonicalEffect)) : undefined
+    const base = canonicalBase === undefined ? undefined : omitUndefined(canonicalBase)
+    if (base !== undefined) assertSnapshot(base)
     return this.transact(scope, (d) => {
       const command = d.commands.find((c) => c.id === commandId)
       if (!command) return
-      d.base = applyMutation(d.base, captured ?? command.mutation)
+      d.base = base ?? applyMutation(d.base, captured ?? command.mutation)
       d.commands = d.commands.filter((c) => c.id !== commandId).map((c) => ({ ...c, dependsOn: c.dependsOn.filter((id) => id !== commandId) }))
     })
   }

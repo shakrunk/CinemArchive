@@ -195,7 +195,10 @@ export default function App() {
   )
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return  // authChecked already true from initial state
+    if (!isSupabaseConfigured) {
+      setUser(null) // Hydrate the separate anonymous library without adopting legacy owner data.
+      return
+    }
 
     const params = new URLSearchParams(window.location.search)
     const shareToken = params.get('share')

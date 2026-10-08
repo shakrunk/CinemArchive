@@ -14,6 +14,20 @@ function store(factory = new IDBFactory()) {
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(connections.splice(0).map((db) => db.close())) })
 
 describe('IndexedDB offline journal', () => {
+  it('acknowledges a receipt retry with fresh server state and replays remaining work', async () => {
+    const db = store()
+    await db.replaceBase(owner, snapshot())
+    const delivered = createCommand(owner, { kind: 'title.patch', titleId: title.id, patch: { notes: 'old delivered edit' } })
+    await db.append(delivered)
+    await db.append(createCommand(owner, { kind: 'title.patch', titleId: title.id, patch: { rating: 4 } }, { dependsOn: [delivered.id] }))
+    const fresh = { ...snapshot(), titles: [{ ...title, notes: 'newer mobile edit' }] }
+    await db.acknowledge(owner, delivered.id, undefined, fresh)
+    const { document } = await db.read(owner)
+    expect(document.commands).toHaveLength(1)
+    expect(document.commands[0].dependsOn).toEqual([])
+    expect(replayPending(document.base, document.commands).titles[0]).toMatchObject({ notes: 'newer mobile edit', rating: 4 })
+  })
+
   it('survives connection close/reopen and isolates both account and project', async () => {
     const factory = new IDBFactory()
     const first = store(factory)

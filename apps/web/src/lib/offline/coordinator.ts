@@ -4,7 +4,7 @@ import type { OfflineSnapshot } from './snapshot'
 import { IndexedDbOfflineStore, type OfflineRead } from './storage'
 
 export type DeliveryResult =
-  | { kind: 'success'; canonicalEffect?: Mutation }
+  | { kind: 'success'; canonicalEffect?: Mutation; canonicalBase?: OfflineSnapshot }
   | { kind: 'retry'; message: string; retryAfterMs?: number }
   | { kind: 'auth'; message: string }
   | { kind: 'failed' | 'conflict'; message: string }
@@ -172,7 +172,7 @@ export class OfflineCoordinator {
         }
         if (!this.current(session)) return // Unknown outcome: next session retries the same operation ID.
         if (result.kind === 'success') {
-          this.publish(session, await this.options.store.acknowledge(session.scope, command.id, result.canonicalEffect))
+          this.publish(session, await this.options.store.acknowledge(session.scope, command.id, result.canonicalEffect, result.canonicalBase))
           continue
         }
         if (result.kind === 'retry') {

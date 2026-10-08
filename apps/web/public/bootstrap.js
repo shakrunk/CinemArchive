@@ -5,7 +5,7 @@
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   }
   try {
-    var raw = localStorage.getItem('cinemarchive-library');
+    var raw = localStorage.getItem('cinemarchive-device-preferences-v1') || localStorage.getItem('cinemarchive-library');
     var state = raw && JSON.parse(raw).state;
     var theme = state && state.theme;
     var unlocked = (state && state.unlockedThemes) || ['dark', 'light'];

@@ -28,6 +28,8 @@ data class TitleDetail(
     val scheduledOuting: CinemaOuting? = null,
     /** "I want to see this in theaters" (issue #205) — see [LibraryTitle.interestedInTheaters]. */
     val interestedInTheaters: Boolean = false,
+    /** Stable provider identity for recommendation snapshots; unavailable on legacy synthetic rows. */
+    val tmdbId: Int? = null,
 )
 
 data class SeasonDetail(

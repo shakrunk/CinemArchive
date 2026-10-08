@@ -487,6 +487,7 @@ class LibraryRepository(
 
             TitleDetail(
                 id = title.id,
+                tmdbId = title.tmdbId,
                 type = MediaType.valueOf(title.type),
                 title = title.title,
                 year = title.year,

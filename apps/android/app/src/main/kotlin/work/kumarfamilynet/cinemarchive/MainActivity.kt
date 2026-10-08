@@ -834,6 +834,14 @@ private fun CinemArchiveApp(
                     current.titleId,
                     onBack = closeOverlay,
                     onRequestNotificationPermission = requestNotificationPermission,
+                    socialContent = { detail ->
+                        val socialSource = remember(runtime) {
+                            work.kumarfamilynet.cinemarchive.feature.friends.RepositoryTitleSocialSource(runtime.friendsRepository) {
+                                authRepository.observeIdentity().value == runtime.identity
+                            }
+                        }
+                        work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(socialSource, runtime.ownerId, detail)
+                    },
                 )
                 is Overlay.Add -> AddTitleOverlayRoute(
                     discoverRepository,

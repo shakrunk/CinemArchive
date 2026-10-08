@@ -25,6 +25,8 @@ number is chosen.
 
 ### Added
 
+- Android: title details now support friend comments, reactions, and searchable recommendations with per-recipient retry and account-isolated loading.
+
 - Android: Up Next now offers exact-event Undo after logging an episode and an explicit series-completion action after a finale, preserving failed undo attempts for retry.
 
 - Web: library edits, episode logs, viewings, outings, lists, imports, and Ledger changes now save durably on the device before confirming success, with account-isolated retries, conflict recovery, and multi-tab synchronization.

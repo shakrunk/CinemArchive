@@ -279,6 +279,7 @@ fun TitleDetailRoute(
     titleId: String,
     onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit = {},
+    socialContent: (@Composable (TitleDetail) -> Unit)? = null,
 ) {
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
@@ -326,6 +327,7 @@ fun TitleDetailRoute(
         onOpenAddToList = { showAddToListSheet = true },
         episodeCast = episodeCast,
         onLoadEpisodeCast = viewModel::onLoadEpisodeCast,
+        socialContent = socialContent,
     )
 }
 
@@ -359,6 +361,7 @@ fun TitleDetailScreen(
     onOpenAddToList: () -> Unit = {},
     episodeCast: Map<String, EpisodeCast?> = emptyMap(),
     onLoadEpisodeCast: (String, Int, Int) -> Unit = { _, _, _ -> },
+    socialContent: (@Composable (TitleDetail) -> Unit)? = null,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -622,6 +625,9 @@ fun TitleDetailScreen(
                         modifier = Modifier.padding(horizontal = 22.dp),
                     )
                 }
+            }
+            if (socialContent != null) {
+                item(key = "social") { ReadingWidthColumn { socialContent(detail) } }
             }
             item {
                 ReadingWidthColumn {

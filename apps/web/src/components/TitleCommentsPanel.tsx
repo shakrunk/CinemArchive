@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { Loader2, Send, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
@@ -195,7 +196,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
               <p className="font-sans text-sm mt-1 whitespace-pre-wrap break-words" style={{ color: 'var(--paper-dim)' }}>
                 {c.body}
               </p>
-              <p className="font-mono mt-1" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+              <p className="font-mono mt-1" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
                 {fmtDateShort(c.createdAt)}
               </p>
             </div>

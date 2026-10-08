@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -60,7 +61,7 @@ export function AddToListSheet({ titleId, titleName, onClose }: AddToListSheetPr
         <div className="px-5 pt-5 pb-4 shrink-0">
           <div
             className="font-mono uppercase tracking-widest"
-            style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+            style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
           >
             Add to list
           </div>

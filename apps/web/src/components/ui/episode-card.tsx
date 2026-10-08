@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useState } from 'react'
 import { Eye, Check, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
@@ -22,7 +23,7 @@ function ColorModePill({ mode, className }: { mode: 'bw' | 'color'; className?: 
     <span
       className={cn('font-mono px-1 rounded', className)}
       style={{
-        fontSize: '9px',
+        fontSize: scaledTextSize('9px'),
         letterSpacing: '0.06em',
         background: mode === 'bw' ? 'rgba(200,200,200,0.12)' : 'rgba(233,178,102,0.15)',
         color: mode === 'bw' ? 'var(--paper-dim)' : 'var(--amber)',
@@ -105,7 +106,7 @@ export function EpisodeCard({
         {/* Episode number badge */}
         <div
           className="absolute top-1.5 left-1.5 font-mono px-1.5 py-0.5 rounded text-white"
-          style={{ fontSize: '10px', background: 'rgba(0,0,0,0.65)' }}
+          style={{ fontSize: scaledTextSize('10px'), background: 'rgba(0,0,0,0.65)' }}
         >
           E{String(episode.episodeNumber).padStart(2, '0')}
         </div>
@@ -142,17 +143,17 @@ export function EpisodeCard({
       <div className="px-2.5 py-2 space-y-0.5">
         <div
           className="font-sans font-medium line-clamp-1"
-          style={{ fontSize: '13px', color: 'var(--paper)' }}
+          style={{ fontSize: scaledTextSize('13px'), color: 'var(--paper)' }}
         >
           {episode.episodeName ?? `Episode ${episode.episodeNumber}`}
         </div>
         {unaired ? (
-          <div className="font-mono" style={{ fontSize: '10px', color: 'var(--amber)' }}>
+          <div className="font-mono" style={{ fontSize: scaledTextSize('10px'), color: 'var(--amber)' }}>
             Airs {fmtReleaseDate(episode.airDate!)}
             {episode.runtime ? ` · ${fmtRuntime(episode.runtime)}` : ''}
           </div>
         ) : (episode.airDate || episode.runtime) && (
-          <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+          <div className="font-mono" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)' }}>
             {episode.airDate ? new Date(episode.airDate).getFullYear() : ''}
             {episode.airDate && episode.runtime ? ' · ' : ''}
             {episode.runtime ? fmtRuntime(episode.runtime) : ''}
@@ -161,7 +162,7 @@ export function EpisodeCard({
         {episode.synopsis && (
           <p
             className="font-sans line-clamp-2"
-            style={{ fontSize: '12px', color: 'var(--paper-dim)', lineHeight: 1.5 }}
+            style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper-dim)', lineHeight: 1.5 }}
           >
             {episode.synopsis}
           </p>
@@ -223,7 +224,7 @@ function EpisodeCastSection({
   const credits = loaded?.key === key ? loaded.credits : null
   if (!credits) {
     return (
-      <div className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+      <div className="font-mono" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)' }}>
         Loading cast…
       </div>
     )
@@ -341,16 +342,16 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
     <div className="ep-panel px-3 py-3 space-y-3 rounded-lg" style={{ borderTop: '1px solid var(--line)', background: 'var(--inset)' }}>
       {/* Director / writers */}
       {(episode.director || (episode.writers && episode.writers.length > 0)) && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: '11px' }}>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5" style={{ fontSize: scaledTextSize('11px') }}>
           {episode.director && (
             <span>
-              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>Dir. </span>
+              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('9px') }}>Dir. </span>
               <span className="font-sans" style={{ color: 'var(--paper-dim)' }}>{episode.director}</span>
             </span>
           )}
           {episode.writers && episode.writers.length > 0 && (
             <span>
-              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>Written by </span>
+              <span className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('9px') }}>Written by </span>
               <span className="font-sans" style={{ color: 'var(--paper-dim)' }}>{episode.writers.join(', ')}</span>
             </span>
           )}
@@ -395,23 +396,23 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
                 <div key={we.id}>
                   {pendingDeleteWeId === we.id ? (
                     <div>
-                      <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>Remove?</div>
+                      <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}>Remove?</div>
                       <div className="flex gap-2 mt-0.5">
                         <button type="button"
                           onClick={() => { deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id); setPendingDeleteWeId(null) }}
                           className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
-                          style={{ color: 'var(--ember)', fontSize: '10px' }}
+                          style={{ color: 'var(--ember)', fontSize: scaledTextSize('10px') }}
                           aria-label="Confirm delete watch event"
                         >Delete</button>
-                        <button type="button" onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: '10px' }} aria-label="Cancel delete watch event">Cancel</button>
+                        <button type="button" onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }} aria-label="Cancel delete watch event">Cancel</button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-start gap-1">
-                      <div className="flex-1 font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
+                      <div className="flex-1 font-mono" style={{ color: 'var(--amber)', fontSize: scaledTextSize('11px') }}>
                         {we.watchedAt ? fmtDate(we.watchedAt) : <span className="italic">Before CinemArchive</span>}
                         {we.colorMode && <ColorModePill mode={we.colorMode} className="ml-1.5" />}
-                        {we.notes && <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>"{we.notes}"</div>}
+                        {we.notes && <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}>"{we.notes}"</div>}
                       </div>
                       {!isSharedView && (
                         <button type="button" onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', flexShrink: 0, marginTop: '1px' }} className="opacity-[0.45] hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Delete watch event" title="Delete watch event">
@@ -429,16 +430,16 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
             <div>
               <Eyebrow as="div" className="mb-1.5">Ratings</Eyebrow>
               {episode.ratings.map((er) => (
-                <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: '11px' }}>
+                <div key={er.id} className="font-mono" style={{ color: 'var(--amber)', fontSize: scaledTextSize('11px') }}>
                   ★ {er.rating}
                   <div className="mt-0.5">
-                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '10px' }}>{fmtDateTime(er.ratedAt).date}</div>
-                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: '9px' }}>{fmtDateTime(er.ratedAt).time}</div>
+                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}>{fmtDateTime(er.ratedAt).date}</div>
+                    <div className="font-mono" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('9px') }}>{fmtDateTime(er.ratedAt).time}</div>
                   </div>
                 </div>
               ))}
               {episode.ratings.length > 1 && avg !== null && (
-                <div className="font-mono mt-1" style={{ color: 'var(--amber-deep)', fontSize: '10px' }}>avg ★ {avg.toFixed(1)}</div>
+                <div className="font-mono mt-1" style={{ color: 'var(--amber-deep)', fontSize: scaledTextSize('10px') }}>avg ★ {avg.toFixed(1)}</div>
               )}
             </div>
           )}
@@ -448,13 +449,13 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
               <Eyebrow as="div" className="mb-1.5">Reviews</Eyebrow>
               {episode.reviews.map((rv) => (
                 <div key={rv.id}>
-                  <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: '11px' }}>"{rv.reviewText}"</div>
+                  <div className="font-sans italic leading-snug" style={{ color: 'var(--paper-dim)', fontSize: scaledTextSize('11px') }}>"{rv.reviewText}"</div>
                   <div className="mt-0.5" style={{ color: 'var(--paper-faint)' }}>
-                    <div className="font-mono flex items-center gap-1.5" style={{ fontSize: '10px' }}>
+                    <div className="font-mono flex items-center gap-1.5" style={{ fontSize: scaledTextSize('10px') }}>
                       <span>{fmtDateTime(rv.reviewedAt).date}</span>
                       {rv.colorMode && <ColorModePill mode={rv.colorMode} />}
                     </div>
-                    <div className="font-mono" style={{ fontSize: '9px' }}>{fmtDateTime(rv.reviewedAt).time}</div>
+                    <div className="font-mono" style={{ fontSize: scaledTextSize('9px') }}>{fmtDateTime(rv.reviewedAt).time}</div>
                   </div>
                 </div>
               ))}
@@ -484,11 +485,11 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
               </div>
             )}
             <div>
-              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>Rating <span style={{ fontSize: '10px' }}>(optional · logged independently)</span></div>
+              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>Rating <span style={{ fontSize: scaledTextSize('10px') }}>(optional · logged independently)</span></div>
               <StarRating value={log.rating} onChange={(r) => setLog((l) => ({ ...l, rating: r }))} size="sm" />
             </div>
             <div>
-              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>Review <span style={{ fontSize: '10px' }}>(optional · logged independently)</span></div>
+              <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>Review <span style={{ fontSize: scaledTextSize('10px') }}>(optional · logged independently)</span></div>
               <textarea aria-label="Episode review" value={log.reviewText} onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))} placeholder="Your thoughts on this episode…" rows={2} className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40" style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }} />
             </div>
             <div className="flex gap-2">

@@ -18,6 +18,7 @@ number is chosen.
 
 ### Added
 
+- Web: Appearance now offers Android's four text sizes and bundled Lexend font, with a live preview, apply/cancel/reset controls, and device-local preferences that work offline.
 - Web: Up Next now shows private On This Day cinema memories with the original venue, companions, rating, and notes, matching Android.
 - Web: the moviegoing Ledger panel now includes venue and format spending, best-value theaters, and milestone badges in a complete keyboard-accessible detail view, matching Android.
 - Android: the Add-title form now has a date-watched picker (and a "watched before joining" undated option) for titles logged as Watched, matching the web app.

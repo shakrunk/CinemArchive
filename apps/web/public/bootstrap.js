@@ -28,6 +28,23 @@
   }
 })();
 
+// Device text preferences are independent of account/library storage. Keep defaults
+// and allowed values in sync with src/lib/textPreferences.ts (covered by its tests).
+;(function () {
+  var preferences = {};
+  try {
+    preferences = JSON.parse(localStorage.getItem('cinemarchive-text-preferences')) || {};
+  } catch {
+    // Private/restricted storage must still render the default text style.
+  }
+  var scales = { small: 0.85, default: 1, large: 1.15, 'extra-large': 1.3 };
+  var family = preferences.family === 'lexend' ? 'lexend' : 'default';
+  var size = Object.prototype.hasOwnProperty.call(scales, preferences.size) ? preferences.size : 'default';
+  document.documentElement.setAttribute('data-text-family', family);
+  document.documentElement.setAttribute('data-text-size', size);
+  document.documentElement.style.setProperty('--text-scale', String(scales[size]));
+})();
+
 // Consume the GitHub Pages fallback once, before the router reads the URL.
 ;(function () {
   try {

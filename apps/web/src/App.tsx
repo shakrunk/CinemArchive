@@ -16,6 +16,7 @@ import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 import { useSmoothScroll } from 'src/lib/useSmoothScroll'
 import { useTabVisibility } from 'src/lib/useTabVisibility'
+import { watchTextPreferences } from 'src/lib/textPreferences'
 
 // Code-split everything that isn't part of the unauthenticated landing path
 // (LandingScreen + ProfileModal stay eagerly bundled — that's the actual
@@ -70,6 +71,7 @@ const A11Y_PILL =
   'px-4 py-2 rounded-md font-sans text-sm font-medium text-paper bg-secondary/60 transition-colors focus:outline-none focus-visible:bg-amber focus-visible:text-[color:var(--on-amber)]'
 
 export default function App() {
+  useEffect(watchTextPreferences, [])
   // Smart landing unless the URL already names a view (deep link / refresh).
   const [currentView, setCurrentView] = useState<AppView>(() => {
     return parseNav(window.location.search, 'discover').view

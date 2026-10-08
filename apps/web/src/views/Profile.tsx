@@ -45,6 +45,7 @@ import { SyncConnections } from 'src/components/SyncConnections'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { Eyebrow } from 'src/components/ui/typography'
+import { TextPreferences } from 'src/components/TextPreferences'
 
 const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: boolean }[] = [
   { id: 'account', label: 'Account', Icon: UserCircle, authOnly: false },
@@ -532,6 +533,7 @@ function AppearanceSection() {
           )
         })}
       </div>
+      <TextPreferences />
     </Section>
   )
 }

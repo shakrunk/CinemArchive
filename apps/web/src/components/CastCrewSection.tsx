@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import type { CastMember, CrewMember } from 'src/store/mockData'
@@ -47,14 +48,14 @@ export function CastCard({
       <div className="p-2">
         <div
           className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber"
-          style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }}
+          style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper)', lineHeight: 1.3 }}
           title={member.name}
         >
           {member.name}
         </div>
         <div
           className="font-mono line-clamp-1 mt-0.5"
-          style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }}
+          style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }}
           title={member.character}
         >
           {member.character || ' '}
@@ -62,7 +63,7 @@ export function CastCard({
         {member.episodeCount != null && (
           <div
             className="font-mono mt-0.5"
-            style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}
+            style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}
           >
             {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
           </div>
@@ -142,7 +143,7 @@ function CastGrid({
             {showAll ? 'Show less' : 'View All'}
           </span>
           {!showAll && (
-            <span className="font-mono" style={{ fontSize: '10px', color: 'var(--paper-faint)' }}>
+            <span className="font-mono" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)' }}>
               +{cast.length - collapsedCount} more
             </span>
           )}
@@ -199,10 +200,10 @@ export function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioCl
             const members = crew!.filter((c) => jobs.includes(c.job))
             if (members.length === 0) return null
             return (
-              <div key={label} className="flex gap-3" style={{ fontSize: '12px' }}>
+              <div key={label} className="flex gap-3" style={{ fontSize: scaledTextSize('12px') }}>
                 <span
                   className="font-mono shrink-0 text-right"
-                  style={{ width: '80px', color: 'var(--paper-faint)', fontSize: '10px', paddingTop: '1px' }}
+                  style={{ width: '80px', color: 'var(--paper-faint)', fontSize: scaledTextSize('10px'), paddingTop: '1px' }}
                 >
                   {label}
                 </span>
@@ -225,10 +226,10 @@ export function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioCl
             )
           })}
           {hasStudios && (
-            <div className="flex gap-3" style={{ fontSize: '12px' }}>
+            <div className="flex gap-3" style={{ fontSize: scaledTextSize('12px') }}>
               <span
                 className="font-mono shrink-0 text-right"
-                style={{ width: '80px', color: 'var(--paper-faint)', fontSize: '10px', paddingTop: '1px' }}
+                style={{ width: '80px', color: 'var(--paper-faint)', fontSize: scaledTextSize('10px'), paddingTop: '1px' }}
               >
                 Studio
               </span>

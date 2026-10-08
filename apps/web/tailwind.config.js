@@ -79,9 +79,9 @@ export default {
         },
       },
       fontFamily: {
-        serif: ["Fraunces", "Hoefler Text", "Georgia", "serif"],
-        sans: ["Hanken Grotesk", "system-ui", "sans-serif"],
-        mono: ["DM Mono", "ui-monospace", "monospace"],
+        serif: ["var(--display)"],
+        sans: ["var(--ui)"],
+        mono: ["var(--mono)"],
       },
       borderRadius: {
         lg: "var(--radius)",

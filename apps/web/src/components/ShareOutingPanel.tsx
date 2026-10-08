@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useState } from 'react'
 import { Send, Check, Loader2, Search, RefreshCw, Share2, Download, Ticket, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
@@ -138,7 +139,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
           <div className="flex-1 min-w-0 pt-1">
             <div
               className="font-mono uppercase tracking-widest"
-              style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+              style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
             >
               Share your plans
             </div>
@@ -175,7 +176,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
 
         <p
           className="px-5 pb-2 font-mono uppercase tracking-widest shrink-0"
-          style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+          style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
         >
           Or share in-app
         </p>
@@ -270,13 +271,13 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                       <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--paper-faint)' }} />
                     )}
                     {state === 'sent' && (
-                      <span className="flex items-center gap-1 font-mono shrink-0" style={{ fontSize: '10px', color: 'var(--amber)' }}>
+                      <span className="flex items-center gap-1 font-mono shrink-0" style={{ fontSize: scaledTextSize('10px'), color: 'var(--amber)' }}>
                         <Check className="w-3.5 h-3.5" />
                         Shared
                       </span>
                     )}
                     {state === 'error' && (
-                      <span className="font-mono shrink-0" style={{ fontSize: '10px', color: 'var(--ember)' }}>
+                      <span className="font-mono shrink-0" style={{ fontSize: scaledTextSize('10px'), color: 'var(--ember)' }}>
                         Failed — tap to retry
                       </span>
                     )}

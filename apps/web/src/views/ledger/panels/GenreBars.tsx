@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 // ─── Genre bars ───────────────────────────────────────────────────────────────
 
 import { useId, useMemo } from 'react'
@@ -126,7 +127,7 @@ export function GenreBars({
                   >
                     <span
                       className="font-serif font-medium leading-tight px-1.5 line-clamp-2 break-words max-w-full"
-                      style={{ fontSize: `${8 + t * 4}px`, color: i === 0 ? 'var(--on-amber)' : 'var(--paper)' }}
+                      style={{ fontSize: scaledTextSize(`${8 + t * 4}px`), color: i === 0 ? 'var(--on-amber)' : 'var(--paper)' }}
                     >
                       {g.genre}
                     </span>

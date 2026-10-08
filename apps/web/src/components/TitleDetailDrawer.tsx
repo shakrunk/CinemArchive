@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState, useEffect, useRef, useMemo, useId } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
@@ -903,10 +904,10 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                     : 'border-transparent hover:border-[var(--line)] hover:bg-[var(--wash)]'
                 )}
               >
-                <div className="font-mono" style={{ fontSize: '13px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
+                <div className="font-mono" style={{ fontSize: scaledTextSize('13px'), color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
                   {seasonShortLabel(s.seasonNumber)}
                 </div>
-                <div className="font-mono" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>
+                <div className="font-mono" style={{ fontSize: scaledTextSize('11px'), color: 'var(--paper-faint)' }}>
                   {pct}%{seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}
                 </div>
               </button>
@@ -1032,10 +1033,10 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                   )}
                 </div>
                 <div className="p-2">
-                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
-                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
+                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
+                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
                   {member.episodeCount != null && (
-                    <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
+                    <div className="font-mono mt-0.5" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
                       {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
                     </div>
                   )}

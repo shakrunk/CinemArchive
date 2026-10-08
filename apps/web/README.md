@@ -42,6 +42,7 @@ apps/web/
       Library.tsx          # Poster wall + ledger list
       Discover.tsx         # TMDB search + trending + recommendation carousels
       UpNext.tsx           # Watchlist + upcoming Cinema Outings
+      Lists.tsx            # Custom title lists: grid, create, list detail
       Friends.tsx          # Friend requests, activity feed, invites
       Profile.tsx          # Auth, account, data import/export, about
       Ledger.tsx / ledger/ # Editable stats dashboard shell + ~19 widget panels (ledger/panels/)

@@ -40,6 +40,7 @@ Each client has its own nested `CLAUDE.md` with client-specific guidance for Cla
 ## Features
 
 - **Library** — poster wall + sortable list view, with client-side search, filtering (type, status, genre, tag, network, decade, rating), and sorting.
+- **Custom lists** — group titles into your own named lists (a marathon, a ranked shortlist, a movie-night pile). Create a list from the Lists view or on the fly from a title's "Add to list" sheet, toggle a title into any number of lists, and open a list to browse its poster grid or remove titles. Lists are independent of watch status (a title can be on the watchlist *and* in several lists) and private to the owner.
 - **Command palette (⌘K / Ctrl+K)** — jump to any title or fire an action (add a title, switch view, change layout) from the keyboard; ↑/↓ to move, Enter to run, Esc to close.
 - **Deep links & back button** — the active view and the open title live in the URL, so a refresh restores where you were, titles are linkable, and the browser/mobile back button closes an open drawer instead of leaving the app.
 - **Episode-level TV tracking** — each season expands into episodes; log watch events, ratings, and reviews per episode, all decoupled (re-watch an episode without changing its rating; review without re-watching). Season and series rollups are computed from the episode data.
@@ -65,7 +66,7 @@ The Supabase project, schema, and Edge Functions are genuinely shared infrastruc
 - **`supabase/migrations/`** — versioned migrations applied by CI. The baseline migration (`20260620084847_initial_schema.sql`) captures the schema as of the multi-client split and is already marked **applied** on the remote.
 - **`supabase/functions/media-proxy/`** — Edge Function proxying TMDB/OMDb (keeps API keys server-side).
 
-The schema covers core library and episode tracking (`titles`, `seasons`, `episodes`, the three independent `episode_watch_events` / `episode_ratings` / `episode_reviews` logs, `viewings`), cinema outings, cached TMDB credits, scoped read-only sharing, invite-only accounts and the friend/social graph, per-user preferences, and the `sync_tombstones` deletion log the Android client's incremental sync consumes.
+The schema covers core library and episode tracking (`titles`, `seasons`, `episodes`, the three independent `episode_watch_events` / `episode_ratings` / `episode_reviews` logs, `viewings`), cinema outings, custom lists (`lists` / `list_items`, owner-only), cached TMDB credits, scoped read-only sharing, invite-only accounts and the friend/social graph, per-user preferences, and the `sync_tombstones` deletion log the Android client's incremental sync consumes.
 
 **Row Level Security:** the authenticated owner gets full CRUD on their rows; holders of a valid shared token get read-only access (scoped by `share_scopes`) via the `app.shared_token` session setting.
 

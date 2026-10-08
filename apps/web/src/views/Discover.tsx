@@ -1,3 +1,4 @@
+import { isCatalogTitleOwned, libraryCatalogKeys } from 'src/lib/catalogIdentity'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Play, Pause, type LucideIcon } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
@@ -214,7 +215,7 @@ const SPROCKET_PITCH_PX = 38.4
 
 interface DiscoverCarouselProps {
   results: SearchResult[]
-  libraryTmdbIds: Set<number>
+  ownedCatalogKeys: ReadonlySet<string>
   isSharedView: boolean
   onAdd: (result: SearchResult) => void
   onSelect: (result: SearchResult) => void
@@ -224,7 +225,7 @@ interface DiscoverCarouselProps {
   paused: boolean
 }
 
-function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSelect, delays, paused }: DiscoverCarouselProps) {
+function DiscoverCarousel({ results, ownedCatalogKeys, isSharedView, onAdd, onSelect, delays, paused }: DiscoverCarouselProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<HTMLDivElement>(null)
@@ -465,7 +466,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
               <DiscoverCard
                 key={`${result.type}-${result.tmdbId}-a-${i}`}
                 result={result}
-                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isOwned={isCatalogTitleOwned(ownedCatalogKeys, result)}
                 isSharedView={isSharedView}
                 onAdd={onAdd}
                 onSelect={handleSelect}
@@ -478,7 +479,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
               <DiscoverCard
                 key={`${result.type}-${result.tmdbId}-b-${i}`}
                 result={result}
-                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isOwned={isCatalogTitleOwned(ownedCatalogKeys, result)}
                 isSharedView={isSharedView}
                 onAdd={onAdd}
                 onSelect={handleSelect}
@@ -838,9 +839,9 @@ export function Discover() {
   const [becauseWatchedPaused, setBecauseWatchedPaused] = useState(false)
   const [moreStarringPaused, setMoreStarringPaused] = useState(false)
 
-  // Fast owned-title lookup by tmdbId
-  const libraryTmdbIds = useMemo(
-    () => new Set(titles.map((t) => t.tmdbId).filter((id): id is number => id != null)),
+  // Movie and television IDs are separate TMDB namespaces.
+  const ownedCatalogKeys = useMemo(
+    () => libraryCatalogKeys(titles),
     [titles]
   )
 
@@ -890,7 +891,7 @@ export function Discover() {
     fetchPersonCredits(moreStarringPersonId)
       .then((credits) => {
         if (cancelled) return
-        setMoreStarringResults(credits.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+        setMoreStarringResults(credits.filter((r) => !isCatalogTitleOwned(ownedCatalogKeys, r)))
         setLoadedMoreStarringPersonId(moreStarringPersonId)
       })
       .catch((err) => {
@@ -900,7 +901,7 @@ export function Discover() {
         setLoadedMoreStarringPersonId(moreStarringPersonId)
       })
     return () => { cancelled = true }
-  }, [moreStarringPersonId, libraryTmdbIds])
+  }, [moreStarringPersonId, ownedCatalogKeys])
 
   const genres = filterType === 'tv' ? TV_GENRES : MOVIE_GENRES
 
@@ -1147,7 +1148,7 @@ export function Discover() {
     fetchRecommendations(tmdbId, type)
       .then((recs) => {
         if (cancelled) return
-        setBecauseWatchedResults(recs.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+        setBecauseWatchedResults(recs.filter((r) => !isCatalogTitleOwned(ownedCatalogKeys, r)))
         setLoadedBecauseWatchedId(id)
       })
       .catch((err) => {
@@ -1157,7 +1158,7 @@ export function Discover() {
         setLoadedBecauseWatchedId(id)
       })
     return () => { cancelled = true }
-  }, [becauseWatchedTitle, libraryTmdbIds])
+  }, [becauseWatchedTitle, ownedCatalogKeys])
 
   // Hide stale results whenever the current basis isn't the loaded one (or can't
   // be seeded at all) — mirrors visibleMoreStarringResults below. Filtered by
@@ -1180,7 +1181,7 @@ export function Discover() {
 
   const moreStarringDelays = useMemo(() => staggerDelays(visibleMoreStarringResults.length), [visibleMoreStarringResults.length])
 
-  const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
+  const selectedIsOwned = isCatalogTitleOwned(ownedCatalogKeys, selectedResult)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
 
   return (
@@ -1429,7 +1430,7 @@ export function Discover() {
           ) : (
             <DiscoverCarousel
               results={displayResults}
-              libraryTmdbIds={libraryTmdbIds}
+              ownedCatalogKeys={ownedCatalogKeys}
               isSharedView={isSharedView}
               onAdd={openAddTitlePreselected}
               onSelect={setSelectedResult}
@@ -1465,7 +1466,7 @@ export function Discover() {
             ) : visibleBecauseWatchedResults.length > 0 ? (
               <DiscoverCarousel
                 results={visibleBecauseWatchedResults}
-                libraryTmdbIds={libraryTmdbIds}
+                ownedCatalogKeys={ownedCatalogKeys}
                 isSharedView={isSharedView}
                 onAdd={openAddTitlePreselected}
                 onSelect={setSelectedResult}
@@ -1506,7 +1507,7 @@ export function Discover() {
             ) : visibleMoreStarringResults.length > 0 ? (
               <DiscoverCarousel
                 results={visibleMoreStarringResults}
-                libraryTmdbIds={libraryTmdbIds}
+                ownedCatalogKeys={ownedCatalogKeys}
                 isSharedView={isSharedView}
                 onAdd={openAddTitlePreselected}
                 onSelect={setSelectedResult}

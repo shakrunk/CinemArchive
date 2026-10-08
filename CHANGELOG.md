@@ -12,6 +12,7 @@ number is chosen.
 ### Fixed
 
 - Android: local libraries, pending changes, sync jobs, and outing notifications now stay with their signed-in account; legacy device data can be recovered explicitly with crash-safe receipts.
+- Android: Discover now searches the remote catalog beyond trending titles. Both clients now distinguish movie and TV ownership when TMDB IDs overlap, preserving the correct add actions and recommendations.
 - Android: Up Next ordering, mixed season progress, episode average ratings, and Ledger history/date-range calculations now match the web app.
 - Web: retrying an episode log preserves the original watch, rating, and review IDs and timestamps, avoiding duplicates after a lost response; clearing a title's rating or notes now clears the synced value too.
 - Web: GitHub Pages deep links now recover when session storage is unavailable, and stale external redirect values no longer interrupt startup.

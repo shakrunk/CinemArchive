@@ -40,7 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,12 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ContentReadingMaxWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
@@ -75,45 +70,6 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
-
-private enum class TypeFilter(val label: String) { ALL("All"), MOVIE("Movies"), TV("TV") }
-
-data class DiscoverUiState(
-    val titles: List<TrendingTitle> = emptyList(),
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val error: String? = null,
-)
-
-/** Loads this week's trending movies/TV from [DiscoverRepository]. [retry] (surfaced on
- *  load failure) and [refresh] (pull-to-refresh) both re-fetch — they only differ in which
- *  loading flag they flip, since [retry] fires from the full-screen error state (nothing to
- *  show underneath a pull indicator yet) while [refresh] fires over an already-visible list. */
-class DiscoverViewModel(private val repository: DiscoverRepository) : ViewModel() {
-    private val _uiState = MutableStateFlow(DiscoverUiState())
-    val uiState: StateFlow<DiscoverUiState> = _uiState
-
-    init {
-        fetch(showFullScreenLoading = true)
-    }
-
-    fun retry() = fetch(showFullScreenLoading = true)
-
-    fun refresh() = fetch(showFullScreenLoading = false)
-
-    private fun fetch(showFullScreenLoading: Boolean) {
-        viewModelScope.launch {
-            _uiState.update {
-                if (showFullScreenLoading) it.copy(isLoading = true, error = null) else it.copy(isRefreshing = true, error = null)
-            }
-            runCatching { repository.fetchTrending() }
-                .onSuccess { titles -> _uiState.update { it.copy(titles = titles, isLoading = false, isRefreshing = false) } }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, isRefreshing = false, error = e.message ?: "Couldn't load trending titles") }
-                }
-        }
-    }
-}
 
 private class DiscoverViewModelFactory(
     private val repository: DiscoverRepository,
@@ -137,25 +93,15 @@ fun DiscoverRoute(
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // "Added" now means exactly one thing — the title is a real row in the library, whether it
-    // got there from this grid, the Add overlay, the web app, or a sync. The process-lifetime
-    // DiscoverSampleStore this used to be unioned with is gone along with the mock add path.
-    val libraryTmdbIds by libraryRepository.observeLibraryTmdbIds()
-        .collectAsStateWithLifecycle(initialValue = emptySet())
-    val addedIds = remember(libraryTmdbIds) { libraryTmdbIds.map(Int::toString).toSet() }
-    // Resolves a trending result already in the real library to its Room row id, so tapping
-    // it opens the same title-detail screen Library uses instead of the bare preview sheet
-    // below — real parity for anything actually owned (#119/KP-049).
+    // The same media identity drives ownership badges, preview actions and opening detail.
     val idsByTmdbKey by libraryRepository.observeLibraryTitleIdsByTmdbKey()
         .collectAsStateWithLifecycle(initialValue = emptyMap())
     var search by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(search) { viewModel.onQueryChange(search) }
     var typeFilter by rememberSaveable { mutableStateOf(TypeFilter.ALL) }
     var preview by remember { mutableStateOf<TrendingTitle?>(null) }
 
-    val filtered = uiState.titles.filter { title ->
-        (typeFilter == TypeFilter.ALL || (typeFilter == TypeFilter.MOVIE) == (title.type == MediaType.MOVIE)) &&
-            (search.isBlank() || title.title.contains(search, ignoreCase = true))
-    }
+    val filtered = filterDiscoverTitles(uiState.titles, typeFilter)
 
     DiscoverScreen(
         search = search,
@@ -168,9 +114,9 @@ fun DiscoverRoute(
         error = uiState.error,
         onRetry = viewModel::retry,
         onRefresh = viewModel::refresh,
-        addedIds = addedIds,
+        addedIds = idsByTmdbKey.keys,
         onOpenTitle = { title ->
-            val realId = idsByTmdbKey[title.tmdbId to title.type]
+            val realId = idsByTmdbKey[title.mediaIdentity]
             if (realId != null) onTitleClick(realId) else preview = title
         },
         onAdd = onAddTitle,
@@ -184,7 +130,7 @@ fun DiscoverRoute(
     preview?.let { title ->
         TrendingTitlePreviewSheet(
             title = title,
-            isAdded = title.tmdbId.toString() in addedIds,
+            isAdded = title.mediaIdentity in idsByTmdbKey,
             onAdd = { preview = null; onAddTitle(title) },
             onDismiss = { preview = null },
         )
@@ -204,7 +150,7 @@ private fun DiscoverScreen(
     error: String?,
     onRetry: () -> Unit,
     onRefresh: () -> Unit,
-    addedIds: Set<String>,
+    addedIds: Set<Pair<Int, MediaType>>,
     onOpenTitle: (TrendingTitle) -> Unit,
     onAdd: (TrendingTitle) -> Unit,
     gridColumns: Int,
@@ -291,7 +237,7 @@ private fun DiscoverScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Couldn't load trending titles",
+                    if (search.isBlank()) "Couldn't load trending titles" else "Couldn't search titles",
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -311,7 +257,7 @@ private fun DiscoverScreen(
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Text(
-                        "${titles.size} titles",
+                        if (search.isNotBlank() && titles.isEmpty()) "No titles found for “${search.trim()}”" else "${titles.size} titles",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
@@ -327,10 +273,10 @@ private fun DiscoverScreen(
                             .fillMaxWidth()
                             .pinchToResizeGrid(gridColumns, onGridColumnsChange),
                     ) {
-                        items(titles, key = TrendingTitle::tmdbId) { title ->
+                        items(titles, key = TrendingTitle::catalogKey) { title ->
                             DiscoverCard(
                                 title = title,
-                                isAdded = title.tmdbId.toString() in addedIds,
+                                isAdded = title.mediaIdentity in addedIds,
                                 columns = gridColumns,
                                 onOpen = { onOpenTitle(title) },
                                 onAdd = { onAdd(title) },

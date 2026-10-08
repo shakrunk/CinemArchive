@@ -32,6 +32,8 @@ number is chosen.
 
 ### Added
 
+- Web: eight Ledger charts now offer complete data tables with keyboard access, including compact layouts, zero-count dates, rating comparisons, and screening streaks.
+
 - Android: title details now support friend comments, reactions, and searchable recommendations with per-recipient retry and account-isolated loading.
 
 - Android: Up Next now offers exact-event Undo after logging an episode and an explicit series-completion action after a finale, preserving failed undo attempts for retry.

@@ -23,6 +23,7 @@ const WidgetPreview = memo(function WidgetPreview({ panel }: { panel: LedgerPane
   return (
     <div
       aria-hidden
+      inert
       className="relative h-[96px] overflow-hidden rounded-md border border-[var(--line)] pointer-events-none select-none bg-[var(--ink-2)]"
     >
       <div className="absolute top-0 left-0 w-[600px] origin-top-left" style={{ transform: 'scale(0.4)' }}>

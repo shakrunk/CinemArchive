@@ -66,6 +66,7 @@ export function ScreeningNights({
         describeLedgerSettings(settings)
       }
       className={className}
+      data={{ columns: ["Day", "Screenings"], rows: counts.map((count, day) => [DAY_LABELS[day], count]) }}
     >
       {total === 0 ? (
         <PanelEmpty message="No dated screenings yet" />

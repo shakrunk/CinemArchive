@@ -32,6 +32,12 @@ before(async () => {
   const causal = (await readFile(new URL('../../../supabase/migrations/20261008171852_causal_library_commands.sql', import.meta.url),'utf8')).replaceAll('\r\n','\n')
   assert.ok(schema.includes(causal.trim()), 'canonical schema includes causal command migration')
   await database.exec(causal)
+  const imports = (await readFile(new URL('../../../supabase/migrations/20261008174436_durable_import_links.sql', import.meta.url),'utf8')).replaceAll('\r\n','\n')
+  assert.ok(schema.includes(imports.trim()), 'canonical schema includes durable import links')
+  await database.exec(imports)
+  const capacity = (await readFile(new URL("../../../supabase/migrations/20261008180456_library_command_import_capacity.sql", import.meta.url), "utf8")).replaceAll("\r\n", "\n")
+  assert.ok(schema.includes(capacity.trim()), "canonical schema includes import capacity")
+  await database.exec(capacity)
   await database.query('insert into auth.users(id,email) values ($1,$2),($3,$4)', [owner,'owner@example.test',other,'other@example.test'])
   await database.exec('grant select on all tables in schema public to authenticated;')
 }, { timeout: 60000 })
@@ -50,6 +56,27 @@ function titleOperation(id = randomUUID()) {
   return { table:'titles', action:'insert', key:{id}, values:{tmdb_id:++number,type:'movie',title:'A film',year:2026,status:'watchlist'} }
 }
 async function rows(table) { return (await database.query(`select * from public.${table}`)).rows }
+
+test('an imported title and external identity commit atomically and retry safely', async () => {
+  const title = titleOperation(), id = randomUUID()
+  const link = { table: 'external_title_links', action: 'insert', key: { provider: 'letterboxd', external_id: randomUUID() }, values: { title_id: title.key.id } }
+  const first = await command([title, link], id)
+  assert.deepEqual(await command([title, link], id), first)
+  await command([link])
+  assert.equal((await rows('external_title_links')).filter(row => row.external_id === link.key.external_id).length, 1)
+  const second = titleOperation()
+  await assert.rejects(command([second, { ...link, values: { title_id: second.key.id } }]), { code: '23505' })
+  assert.equal((await rows('titles')).some(row => row.id === second.key.id), false)
+})
+
+test('external identities cannot attach another owner title or change their owner', async () => {
+  const title = titleOperation()
+  await command([title])
+  await database.query("select set_config('request.jwt.claim.sub',$1,false)", [other])
+  const link = { table: 'external_title_links', action: 'insert', key: { provider: 'plex', external_id: randomUUID() }, values: { title_id: title.key.id } }
+  await assert.rejects(command([link]), { code: '42501' })
+  await assert.rejects(command([{ ...link, values: { ...link.values, user_id: owner } }]), { code: '22023' })
+})
 
 test('creates a title and viewing in one transaction and returns canonical rows', async () => {
   const title = titleOperation()
@@ -268,3 +295,31 @@ test('causal preconditions reject ambiguous, self-referencing, or deleted predec
   await command([{table:'titles',action:'delete',key:title.key}],deletion)
   await assert.rejects(command([{...patch,expectedOperationId:deletion}]),{code:'40001'})
 })
+
+
+test("an imported TV graph beyond 2048 operations remains atomic and replay-safe", async () => {
+  const title = titleOperation(), receipt = randomUUID()
+  title.values.type = "tv"
+  const graph = [title, { table: "seasons", action: "insert", key: { id: randomUUID() }, values: { title_id: title.key.id, season_number: 1, episode_count: 2100 } }, ...Array.from({ length: 2100 }, (_, index) => ({
+    table: "episodes", action: "insert", key: { id: randomUUID() },
+    values: { title_id: title.key.id, season_number: 1, episode_number: index + 1 },
+  }))]
+  const first = await command(graph, receipt)
+  assert.equal(first.rows.length, 2102)
+  assert.deepEqual(await command(graph, receipt), first)
+  assert.equal((await rows("episodes")).filter(row => row.title_id === title.key.id).length, 2100)
+  const failed = titleOperation()
+  const badGraph = [failed, ...graph.slice(1).map(op => ({ ...op, key: { id: randomUUID() }, values: { ...op.values, title_id: failed.key.id } })),
+    { table: "viewings", action: "insert", key: { id: randomUUID() }, values: { title_id: failed.key.id, rating: 7 } }]
+  await assert.rejects(command(badGraph), { code: "23514" })
+  assert.equal((await rows("titles")).some(row => row.id === failed.key.id), false)
+  assert.equal((await rows("episodes")).some(row => row.title_id === failed.key.id), false)
+}, { timeout: 60000 })
+
+test("oversized imports are rejected before creating any rows or receipts", async () => {
+  const title = titleOperation(), receipt = randomUUID()
+  await assert.rejects(command(Array(50001).fill(title), receipt), { code: "22023" })
+  await assert.rejects(command([{ ...title, values: { ...title.values, notes: "x".repeat(16777216) } }], receipt), { code: "22023" })
+  assert.equal((await rows("titles")).some(row => row.id === title.key.id), false)
+  await command([title], receipt)
+}, { timeout: 60000 })

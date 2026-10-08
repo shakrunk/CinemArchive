@@ -23,6 +23,8 @@ number is chosen.
 
 ### Added
 
+- Library imports can sync larger TV histories atomically and retain provider identities without partially creating a title.
+
 - Android: shared links now open scoped, read-only libraries and Ledger statistics without signing in; owners can create, restrict, and revoke links from Profile.
 
 - Android: episode detail now logs dated or pre-platform rewatches with watch notes and independent half-star ratings and reviews, shows their histories, and deletes individual watches without removing ratings or reviews.

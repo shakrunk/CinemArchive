@@ -11,6 +11,7 @@ import { assertDeliverableCommand, createLibraryCommandDelivery } from '../lib/o
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
 import { createTicketCommandDelivery } from '../lib/tickets/delivery'
 import { ticketRemoteOptions } from '../lib/tickets/remote'
+import type { TicketCapture } from '../lib/tickets/types'
 import { createCommand } from '../lib/offline/commands'
 import { createLibraryActions, type LibraryWrite } from './libraryActions'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
@@ -318,6 +319,9 @@ interface OutingsSlice {
   // Soft-cancel (plan §4.2): kept as a history row, hidden from all surfaces.
   // Stamps follow_up_dismissed_at — called both on an explicit ✕ and after rating.
   shareOutingPlans: (outingId: string, recipientIds: string[], operationId: string) => Promise<SharedOutingSnapshot>
+  attachOutingTicket: (outingId: string, capture: TicketCapture, blob: Blob) => Promise<void>
+  detachOutingTicket: (outingId: string) => Promise<void>
+  readOutingTicket: (outingId: string, attachmentId: string) => Promise<Blob>
   // "I've got tickets too" resolution (plan §4.10/§5.16) — if the shared
   // payload's tmdb_id isn't already in the library, adds it to the watchlist
   // first (same match-by-tmdbId+type resolution the recommendation inbox
@@ -608,7 +612,7 @@ let runtimeOwnerId: string | null = null
 let libraryHydration: Promise<void> | undefined
 let localWriteTail: Promise<unknown> = Promise.resolve()
 
-const writeLibrary: LibraryWrite = (prepare) => {
+function writeLocalLibrary<T>(work: (state: AppStore) => Promise<T>): Promise<T> {
   const generation = libraryGeneration
   const ownerId = useAppStore.getState().user?.id ?? null
   const current = () => generation === libraryGeneration && (useAppStore.getState().user?.id ?? null) === ownerId
@@ -620,12 +624,7 @@ const writeLibrary: LibraryWrite = (prepare) => {
     if (state.isSharedView || state.viewerContext.kind !== 'owner') throw new Error('This library is read-only')
     if (!state.offlineStatus.hydrated) throw new Error('Your local library is still loading. Please retry shortly.')
     if (state.offlineStatus.quarantined.length) throw new Error('Recover the damaged local cache before saving more changes')
-    const { mutation, result } = prepare(state)
-    if (mutation) {
-      assertDeliverableCommand(createCommand({ projectId: import.meta.env.VITE_SUPABASE_URL || 'local', userId: ownerId || 'anonymous-local-only' }, mutation))
-      if (state.user && !isDevMockUser(state.user)) await libraryRuntime.submit(mutation)
-      else await libraryRuntime.submitAnonymous(mutation)
-    }
+    const result = await work(state)
     if (!current()) throw new Error('The change was saved for the previous account; the account has now changed')
     useAppStore.setState({ offlineStorageError: null })
     return result
@@ -641,6 +640,17 @@ const writeLibrary: LibraryWrite = (prepare) => {
   })
   return pending
 }
+
+const writeLibrary: LibraryWrite = (prepare) => writeLocalLibrary(async (state) => {
+  const { mutation, result } = prepare(state)
+  if (mutation) {
+    const ownerId = state.user && !isDevMockUser(state.user) ? state.user.id : 'anonymous-local-only'
+    assertDeliverableCommand(createCommand({ projectId: import.meta.env.VITE_SUPABASE_URL || 'local', userId: ownerId }, mutation))
+    if (state.user && !isDevMockUser(state.user)) await libraryRuntime.submit(mutation)
+    else await libraryRuntime.submitAnonymous(mutation)
+  }
+  return result
+})
 
 function afterOutingRevert(outingId: string): void {
   const state = useAppStore.getState()
@@ -722,6 +732,13 @@ export const useAppStore = create<AppStore>()(
   filteredTitles: applyFiltersToTitles(import.meta.env.DEV ? mockTitles : [], defaultFilters),
 
   ...createLibraryActions(writeLibrary, afterOutingRevert),
+  attachOutingTicket: (outingId, capture, blob) => writeLocalLibrary(() => libraryRuntime.attachTicket(outingId, capture, blob)),
+  detachOutingTicket: (outingId) => writeLocalLibrary(() => libraryRuntime.detachTicket(outingId)),
+  readOutingTicket: (outingId, attachmentId) => {
+    const state = get()
+    if (state.isSharedView || state.viewerContext.kind !== 'owner') return Promise.reject(new Error('Tickets are private to the library owner'))
+    return libraryRuntime.readTicketPhoto(outingId, attachmentId)
+  },
 
   setFilter: (key, value) =>
     set((s) => {

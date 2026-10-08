@@ -14,6 +14,7 @@ import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type Title } from 'src/store/mockData'
 import { Eyebrow } from 'src/components/ui/typography'
 import { formatSeatShort, parseSeatsInput } from 'src/lib/seating'
+import { TicketButton } from './TicketViewer'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
 // Exported for reuse by the viewing editor (TitleDetailDrawer, plan §4.6/§7.4)
@@ -635,6 +636,7 @@ function OutingForm({
         />
       </div>
 
+      {editingOuting && <TicketButton outingId={editingOuting.id} />}
       <Button type="submit" className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium">
         <Ticket className="w-4 h-4 mr-2" />
         {isPast ? 'Log this outing' : editingOuting ? 'Save changes' : 'Get tickets'}
@@ -663,6 +665,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
         {formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, formatSeatShort(outing))}
       </p>
       <div className="flex flex-col gap-2 items-center pt-2">
+        <TicketButton outingId={outing.id} />
         <Button
           onClick={() => setSharePanelOpen(true)}
           className="w-full max-w-[220px] bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"

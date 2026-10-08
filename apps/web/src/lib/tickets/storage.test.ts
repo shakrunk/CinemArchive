@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { IDBFactory, IDBObjectStore } from 'fake-indexeddb'
+import { IDBFactory, IDBObjectStore, IDBDatabase } from 'fake-indexeddb'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createCommand, scopeKey } from '../offline/commands'
 import { IndexedDbOfflineStore } from '../offline/storage'
@@ -163,4 +163,51 @@ it('keeps the original association and journal intact when downloaded-byte persi
   await expect(db.cacheTicketBlob(ticketOwner, ticketOuting.id, attachment, blob)).rejects.toThrow('not saved')
   expect((await db.read(ticketOwner)).document).toEqual(before)
   expect(await db.readTicketBlob(ticketOwner, attachment.id)).toBeNull()
+})
+
+it('writes raw original bytes and reads both new byte records and legacy Blob records after reopening', async () => {
+  const factory = new IDBFactory(), db = store(factory), fixture = await ticketFixture()
+  await db.replaceBase(ticketOwner, ticketSnapshot())
+  await db.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob)
+  await db.close()
+  const originalBytes = await fixture.blob.arrayBuffer()
+  await new Promise<void>((resolve, reject) => {
+    const request = factory.open('ticket-store-tests')
+    request.onsuccess = () => {
+      const connection = request.result, tx = connection.transaction('ticketBlobs', 'readwrite'), records = tx.objectStore('ticketBlobs')
+      const key = JSON.stringify([ticketOwner.projectId, ticketOwner.userId, fixture.attachment.id])
+      const read = records.get(key)
+      read.onsuccess = () => {
+        expect(read.result.blob).toBeUndefined()
+        expect(read.result.bytes).toBeInstanceOf(ArrayBuffer)
+        expect(read.result.bytes).toEqual(originalBytes)
+        records.put(fixture.record, key)
+      }
+      tx.oncomplete = () => { connection.close(); resolve() }; tx.onabort = () => reject(tx.error)
+    }
+    request.onerror = () => reject(request.error)
+  })
+  const restored = await store(factory).readTicketBlob(ticketOwner, fixture.attachment.id)
+  expect(restored!.blob.type).toBe(fixture.attachment.mimeType)
+  expect(await restored!.blob.arrayBuffer()).toEqual(await fixture.blob.arrayBuffer())
+})
+
+it('explicitly aborts and rejects when a browser emits a transaction error without an automatic abort', async () => {
+  const db = store(), fixture = await ticketFixture()
+  await db.replaceBase(ticketOwner, ticketSnapshot())
+  const transaction = IDBDatabase.prototype.transaction
+  vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args: Parameters<typeof transaction>) {
+    const tx = transaction.apply(this, args)
+    const get = tx.objectStore('owners').get
+    vi.spyOn(tx.objectStore('owners'), 'get').mockImplementation(function (this: IDBObjectStore, ...getArgs: Parameters<typeof get>) {
+      const request = get.apply(this, getArgs)
+      request.addEventListener('success', () => tx.dispatchEvent(new Event('error')))
+      return request
+    })
+    return tx
+  })
+  await expect(db.attachTicket(ticketOwner, ticketOuting.id, fixture.attachment, fixture.blob)).rejects.toThrow('not saved')
+  vi.restoreAllMocks()
+  expect((await db.read(ticketOwner)).document.commands).toEqual([])
+  expect(await db.readTicketBlob(ticketOwner, fixture.attachment.id)).toBeNull()
 })

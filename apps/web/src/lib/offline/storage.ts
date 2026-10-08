@@ -11,6 +11,9 @@ import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObje
 const DOCUMENTS = 'owners'
 const QUARANTINE = 'quarantine'
 const TICKET_BLOBS = 'ticketBlobs'
+/** Binary bytes avoid browser-specific File/Blob persistence failures. Legacy
+ * Blob rows remain readable; neither representation changes the original. */
+type StoredTicketBlob = Omit<TicketBlobRecord, 'blob'> & { bytes?: ArrayBuffer; blob?: Blob }
 export const OFFLINE_DATABASE = 'cinemarchive-offline-v1'
 
 export interface OwnerDocument {
@@ -170,7 +173,12 @@ export class IndexedDbOfflineStore {
         else reject(new OfflineStorageError('Offline transaction completed without a result'))
       }
       tx.onabort = () => reject(new OfflineStorageError('Could not persist offline changes; they are not saved on this device', error ?? tx.error))
-      tx.onerror = () => { error ??= tx.error }
+      tx.onerror = (event) => {
+        error ??= tx.error ?? (event.target as IDBRequest | null)?.error
+        // WebKit can emit an error preparing Blob/File data without completing
+        // its automatic abort. Never leave a save promise or write lock hanging.
+        try { tx.abort() } catch { /* Already aborted or completed. */ }
+      }
     })
   }
 
@@ -203,14 +211,14 @@ export class IndexedDbOfflineStore {
     options = { ...options }
     const attachment: TicketAttachment = JSON.parse(JSON.stringify({ ...capture, objectKey: ticketObjectKey(scope, capture.id) }))
     await assertTicketBytes(blob, attachment)
-    return this.changeTicket(scope, outingId, { attachment, blob }, options)
+    return this.changeTicket(scope, outingId, { attachment, bytes: await blob.arrayBuffer() }, options)
   }
 
   detachTicket(scope: OfflineScope, outingId: string, options: { id?: string; localOnly?: boolean } = {}): Promise<OfflineRead> {
     return this.changeTicket(scope, outingId, undefined, options)
   }
 
-  private changeTicket(scope: OfflineScope, outingId: string, capture: { attachment: TicketAttachment; blob: Blob } | undefined, options: { id?: string; localOnly?: boolean }): Promise<OfflineRead> {
+  private changeTicket(scope: OfflineScope, outingId: string, capture: { attachment: TicketAttachment; bytes: ArrayBuffer } | undefined, options: { id?: string; localOnly?: boolean }): Promise<OfflineRead> {
     scope = { ...scope }
     const operationId = options.id ?? crypto.randomUUID()
     const localOnly = options.localOnly === true
@@ -236,13 +244,13 @@ export class IndexedDbOfflineStore {
         const lookup = records.get(key)
         lookup.onsuccess = () => {
           try {
-            const old = lookup.result as TicketBlobRecord | undefined
+            const old = lookup.result as StoredTicketBlob | undefined
             if (old) {
               if (!old.scope || !sameScope(old.scope, scope) || old.outingId !== outingId || !isTicketAttachment(old.attachment) || !sameTicketAttachment(old.attachment, capture.attachment)) tx.abort()
               return
             }
-            records.add({ scope: { ...scope }, outingId, attachmentId: capture.attachment.id, attachment: capture.attachment, blob: capture.blob,
-              sha256: capture.attachment.sha256, byteLength: capture.blob.size, mimeType: capture.attachment.mimeType, createdAt, source: 'capture' } satisfies TicketBlobRecord, key)
+            records.add({ scope: { ...scope }, outingId, attachmentId: capture.attachment.id, attachment: capture.attachment, bytes: capture.bytes,
+              sha256: capture.attachment.sha256, byteLength: capture.bytes.byteLength, mimeType: capture.attachment.mimeType, createdAt, source: 'capture' } satisfies StoredTicketBlob, key)
           } catch { tx.abort() }
         }
       }
@@ -259,9 +267,16 @@ export class IndexedDbOfflineStore {
       const request = tx.objectStore(TICKET_BLOBS).get(ticketBlobKey(scope, attachmentId))
       let record: TicketBlobRecord | null = null
       request.onsuccess = () => {
-        const value = request.result as TicketBlobRecord | undefined
+        const value = request.result as StoredTicketBlob | undefined
         if (value && (!value.scope || !sameScope(value.scope, scope) || value.attachmentId !== attachmentId)) { tx.abort(); return }
-        record = value ?? null
+        if (value) {
+          if (value.bytes !== undefined && !(value.bytes instanceof ArrayBuffer)) { tx.abort(); return }
+          const blob = value.bytes ? new Blob([value.bytes], { type: value.mimeType }) : value.blob
+          if (!blob || typeof blob.arrayBuffer !== 'function') { tx.abort(); return }
+          const restored = { ...value, blob }
+          delete restored.bytes
+          record = restored
+        }
       }
       tx.oncomplete = () => resolve(record)
       tx.onabort = () => reject(new OfflineStorageError('Could not read this owner’s ticket photo', tx.error))
@@ -274,6 +289,7 @@ export class IndexedDbOfflineStore {
     attachment = JSON.parse(JSON.stringify(attachment)) as TicketAttachment
     if (attachment.objectKey !== ticketObjectKey(scope, attachment.id)) throw new Error('Ticket belongs to another account')
     await assertTicketBytes(blob, attachment)
+    const bytes = await blob.arrayBuffer()
     await this.transact(scope, (document, tx) => {
       const current = replayPending(document.base, document.commands).outings.find((outing) => outing.id === outingId)?.ticketAttachment
       if (!current || !sameTicketAttachment(current, attachment)) throw new Error('This ticket was replaced or removed before its download finished')
@@ -282,13 +298,13 @@ export class IndexedDbOfflineStore {
       const lookup = records.get(key)
       lookup.onsuccess = () => {
         try {
-          const old = lookup.result as TicketBlobRecord | undefined
+          const old = lookup.result as StoredTicketBlob | undefined
           if (old) {
             if (!old.scope || !sameScope(old.scope, scope) || old.outingId !== outingId || !isTicketAttachment(old.attachment) || !sameTicketAttachment(old.attachment, attachment)) tx.abort()
             return
           }
-          records.add({ scope, outingId, attachmentId: attachment.id, attachment, blob, sha256: attachment.sha256,
-            byteLength: blob.size, mimeType: attachment.mimeType, createdAt: new Date().toISOString(), source: 'download' } satisfies TicketBlobRecord, key)
+          records.add({ scope, outingId, attachmentId: attachment.id, attachment, bytes, sha256: attachment.sha256,
+            byteLength: bytes.byteLength, mimeType: attachment.mimeType, createdAt: new Date().toISOString(), source: 'download' } satisfies StoredTicketBlob, key)
         } catch { tx.abort() }
       }
     })

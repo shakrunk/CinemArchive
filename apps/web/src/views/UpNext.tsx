@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
+import { TicketButton } from '../components/TicketViewer'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
@@ -401,6 +402,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
           <span aria-label={presentation.ariaLabel}>{presentation.label}</span>
         </p>
         {detailLine && <p className="font-sans text-sm text-paper-dim truncate">{detailLine}</p>}
+        {!isSharedView && <div className="pt-2"><TicketButton outingId={outing.id} /></div>}
         {!isSharedView && (
           <div className="mt-auto pt-3 flex items-center justify-between gap-2">
             {confirmingCancel ? (
@@ -558,6 +560,7 @@ function OutingMemoryCard({ entry, delayMs }: { entry: OutingMemory; delayMs?: n
         </p>
       )}
       {viewing?.notes && <p className="font-sans text-sm text-paper-dim break-words mt-1">“{viewing.notes}”</p>}
+      <TicketButton outingId={outing.id} />
     </CardFrame>
   )
 }

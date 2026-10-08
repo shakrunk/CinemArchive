@@ -10,6 +10,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
+import { TicketButton } from './TicketViewer'
 import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
@@ -173,12 +174,13 @@ function TicketStubLine({ viewing, outing }: { viewing: Viewing; outing: CinemaO
     companionLabel && `with ${companionLabel}`,
     outing?.format,
   ].filter((s): s is string => Boolean(s))
-  if (segments.length === 0) return null
+  if (segments.length === 0 && !outing) return null
 
   return (
-    <div className="flex items-center gap-2 mt-1.5">
+    <div className="flex flex-wrap items-center gap-2 mt-1.5">
       <span className="ticket-perforation" aria-hidden="true" />
       <span className="font-mono text-xs text-amber/80">{segments.join(' · ')}</span>
+      {outing && <TicketButton outingId={outing.id} />}
     </div>
   )
 }
@@ -288,6 +290,7 @@ function ViewingEditForm({
           <Eyebrow as="p" size="md">
             Ticket details
           </Eyebrow>
+          <TicketButton outingId={outing.id} />
           <div className="flex flex-wrap gap-2">
             {CINEMA_FORMATS.map((f) => (
               <button

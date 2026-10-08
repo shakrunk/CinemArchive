@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
+
 ### Added
 
 - Android: the Add-title form now has a date-watched picker (and a "watched before joining" undated option) for titles logged as Watched, matching the web app.

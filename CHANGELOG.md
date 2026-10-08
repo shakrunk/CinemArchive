@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Offline ratings after an outing completion can use its proven title revision while preserving newer edits and historical completion uncertainty.
 - Shared storage now supports private venue notes and theater-interest flags, including guarded note edits and cross-client sync.
 - Android title details now support editing tags, with durable status/rating changes and explicit comparison and recovery for saved edits.
 - The shared sync feed now includes saved watch links, physical collections, content ratings and critic/accolade metadata for Android clients that support those fields.

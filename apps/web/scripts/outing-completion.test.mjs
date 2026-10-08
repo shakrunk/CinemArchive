@@ -53,6 +53,8 @@ before(async () => {
   assert.ok(schema.includes(viewingRevision.trim()))
   const outingRevision = (await readFile(new URL('supabase/migrations/20261008220210_outing_completion_outing_revision.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(outingRevision.trim()))
+  const titleEffect = (await readFile(new URL('supabase/migrations/20261008234136_completion_title_effect.sql', root), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(titleEffect.trim()))
   await db.exec(schema)
   await db.exec('grant select,update,delete on public.cinema_outings,public.titles,public.viewings to authenticated; grant select on public.notifications to authenticated;')
   for (const id of [owner, other]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@example.test`])
@@ -93,6 +95,90 @@ async function installCompletionDefinition(migration) {
   await as('postgres')
   await db.exec(definition.replace(/^create function/, 'create or replace function'))
 }
+
+function titleEffect(snapshot) { return snapshot.rows.find(row => row.table === 'titles') }
+async function dependentTitle(snapshot, values = { rating: 4.5 }, id = randomUUID(), titleId = snapshot.title?.id ?? titleEffect(snapshot)?.key.id) {
+  return (await db.query('select apply_library_command($1,$2) as result', [id, [{
+    table: 'titles', action: 'update', key: { id: titleId }, values, expectedOperationId: snapshot.operationId,
+  }]])).rows[0].result
+}
+
+test('completion exposes only its actual title status effect for an offline follow-up rating', async () => {
+  const outing = await makeOuting(), operation = randomUUID(), provisional = randomUUID()
+  const first = await complete(outing, { operation, provisional })
+  assert.equal(first.completionTitleVersion, first.title.updated_at)
+  assert.deepEqual(titleEffect(first), { table: 'titles', key: { id: outing.title_id }, row: {
+    id: outing.title_id, user_id: owner, updated_at: first.completionTitleVersion,
+  } })
+  const editId = randomUUID(), edited = await dependentTitle(first, { rating: 4.5 }, editId)
+  assert.equal(edited.rows[0].row.rating, 4.5)
+  await db.query("update titles set notes='Newer notes' where id=$1", [outing.title_id])
+  const replay = await complete(outing, { operation, provisional })
+  assert.equal(replay.completionTitleVersion, first.completionTitleVersion)
+  assert.deepEqual(titleEffect(replay), titleEffect(first))
+  assert.notEqual(replay.title.updated_at, first.completionTitleVersion)
+  assert.deepEqual(await dependentTitle(first, { rating: 4.5 }, editId), edited)
+  await assert.rejects(dependentTitle(replay, { notes: 'Older queued notes' }), { code: '40001' })
+  assert.equal((await db.query('select notes from titles where id=$1', [outing.title_id])).rows[0].notes, 'Newer notes')
+})
+
+test('completion of an already watched title cannot lend its preserved title revision', async () => {
+  const outing = await makeOuting({ titleStatus: 'watched' })
+  const before = (await db.query('select updated_at from titles where id=$1', [outing.title_id])).rows[0].updated_at
+  const first = await complete(outing)
+  assert.equal(first.completionTitleVersion, null)
+  assert.equal(titleEffect(first), undefined)
+  assert.equal(new Date(first.title.updated_at).toISOString(), before.toISOString())
+  await db.query("update titles set notes='Other device' where id=$1", [outing.title_id])
+  const later = await complete(outing)
+  assert.equal(later.completionTitleVersion, null)
+  assert.equal(titleEffect(later), undefined)
+  await assert.rejects(dependentTitle(later), { code: '40001' })
+  assert.equal((await db.query('select notes from titles where id=$1', [outing.title_id])).rows[0].notes, 'Other device')
+})
+
+test('historical completion receipts and records never acquire a guessed title effect', async () => {
+  const outing = await makeOuting(), operation = randomUUID(), provisional = randomUUID()
+  let old
+  try {
+    await installCompletionDefinition('20261008222209_guarded_ticket_outing_dependencies.sql')
+    await as('authenticated', owner)
+    old = await complete(outing, { operation, provisional })
+  } finally {
+    await installCompletionDefinition('20261008234136_completion_title_effect.sql')
+    await as('authenticated', owner)
+  }
+  assert.equal(old.completionTitleVersion, undefined)
+  const replay = await complete(outing, { operation, provisional })
+  assert.deepEqual(replay, old)
+  const fresh = await complete(outing)
+  assert.equal(fresh.completionTitleVersion, null)
+  assert.equal(titleEffect(fresh), undefined)
+  await assert.rejects(dependentTitle(replay), { code: '40001' })
+  await assert.rejects(dependentTitle(fresh), { code: '40001' })
+})
+
+test('web automatic completion retains its original title effect when another client arrives later', async () => {
+  const outing = await makeOuting()
+  await db.query("select * from complete_due_outings('UTC')")
+  const original = (await db.query('select updated_at from titles where id=$1', [outing.title_id])).rows[0].updated_at
+  await db.query("update titles set notes='Newer after web completion' where id=$1", [outing.title_id])
+  const native = await complete(outing)
+  assert.equal(new Date(native.completionTitleVersion).toISOString(), original.toISOString())
+  assert.notEqual(native.completionTitleVersion, native.title.updated_at)
+  await assert.rejects(dependentTitle(native), { code: '40001' })
+})
+
+test('completion title effects are exact-owner and exact-title scoped and cannot resurrect deletion', async () => {
+  const outing = await makeOuting(), first = await complete(outing), unrelated = await makeOuting()
+  await assert.rejects(dependentTitle(first, { rating: 3 }, randomUUID(), unrelated.title_id), { code: '40001' })
+  await as('authenticated', other)
+  await assert.rejects(dependentTitle(first), { code: '40001' })
+  await as('authenticated', owner)
+  await db.query('delete from titles where id=$1', [outing.title_id])
+  await assert.rejects(dependentTitle(first), { code: '40001' })
+  assert.equal((await db.query('select id from titles where id=$1', [outing.title_id])).rows.length, 0)
+})
 
 test('completion exposes only its immutable viewing identity and revision as a causal effect', async () => {
   const outing = await makeOuting(), first = await complete(outing)

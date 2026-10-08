@@ -43,3 +43,9 @@ For a title dependency, a reversal receipt is valid evidence only when `titleSta
 Required evidence: native-first and web-first convergence, two devices and lost responses, timezone capture and midnight boundaries, reschedule/cancel conflicts, exact viewing deletion before retry, pending edits/deletes retargeted after aliasing, restart recovery, owner switches, and no historical duplicate cleanup. Local PostgreSQL tests alone cannot establish production concurrency or device lifecycle behavior.
 
 Local embedded PostgreSQL coverage now passes native-first/web-first convergence, immutable operation conflicts, captured-zone dates, current edited-viewing responses, deleted viewing/outing retries, rescheduled/cancelled/future/missed conflicts, ambiguous historical event retention, UUID collision rollback and owner/auth boundaries. These sequential local cases do not prove simultaneous pooled HTTP execution.
+
+### Actual title effects
+
+Completion results expose nullable `completionTitleVersion` only when that completion actually changed the title status to watched. When proven, `rows` also contains a minimal title effect with its ID, owner and original revision. A dependent title command can use this revision; a later unrelated edit must still conflict.
+
+Retries preserve the original effect even when the current snapshot has changed. Already-watched titles have no title effect. Historical completions are not backfilled, and old immutable receipts remain unchanged: a missing or null effect requires explicit review, not inference from the current title. The existing `completed_title_version` field serves reversal bookkeeping and is not proof that completion changed the title.

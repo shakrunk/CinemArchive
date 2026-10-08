@@ -27,12 +27,12 @@ This diagram shows the deliberate ownership boundary: clients share backend serv
 | Area | Web | Android |
 |---|---|---|
 | UI and state | React 19, Vite, TypeScript, Zustand, Tailwind/Radix | Kotlin, Jetpack Compose, Material 3 |
-| Local data behavior | In-memory/persisted client state; owner library loaded through `lib/db.ts` | Room read model, repositories, durable mutation outbox |
+| Local data behavior | IndexedDB owner snapshot and command journal coordinated by the offline runtime; owner library loaded through `lib/db.ts` | Room read model, repositories, durable mutation outbox |
 | Navigation | URL state and deep links through `navigation.ts` and `useNavigationSync.ts` | Single Android app module with feature modules and navigation surfaces |
-| Offline posture | PWA app-shell caching; normal persistence is remote Supabase | Local-first cached reads and incremental server synchronization |
+| Offline posture | PWA app-shell caching plus a durable owner command journal; remote Supabase remains authoritative | Local-first cached reads and incremental server synchronization |
 | Tests | Vitest plus focused verification scripts | Gradle/JVM tests across model, data, and database modules |
 
-The web client **reads and writes through** `apps/web/src/lib/db.ts`; the Android client **shares the same backend but synchronizes through** repositories in `apps/android/data/`. This distinction is central when changing a shared domain: a browser update can be immediately remote, while Android must preserve Room mapping, cursor pull, and queued-write semantics. See [Workflows](../workflows/index.md).
+The web client **reads through** `apps/web/src/lib/db.ts` and **delivers owner writes through** the offline command runtime and `apply_library_command` RPC; the Android client **shares the same backend but synchronizes through** repositories in `apps/android/data/`. This distinction is central when changing a shared domain: browser owner edits are journaled and replayed before remote acknowledgement, while Android must preserve Room mapping, cursor pull, and queued-write semantics. See [Workflows](../workflows/index.md).
 
 ## Web application
 
@@ -42,7 +42,7 @@ The web client **reads and writes through** `apps/web/src/lib/db.ts`; the Androi
 - A normal authenticated session calls the owner-library path.
 - `?friend=<userId>` is resolved only after authentication because friend-read RLS depends on `auth.uid()`.
 
-`useAppStore.ts` owns library data, UI state, lists, outings, notification state, and client-side derivations. Mutations update local state optimistically and use `lib/db.ts` for async persistence; errors are surfaced through retryable UI feedback. The store’s title graph includes TV seasons, episodes, independent watch/rating/review logs, viewing history, credits, lists, and owner-only cinema outings.
+`useAppStore.ts` owns library data, UI state, lists, outings, notification state, and client-side derivations. Owner mutations are converted into offline commands, persisted in IndexedDB, replayed locally, and delivered to the `apply_library_command` RPC for atomic remote persistence; shared and friend views remain read-only. The store’s title graph includes TV seasons, episodes, independent watch/rating/review logs, viewing history, credits, lists, and owner-only cinema outings.
 
 ## Android application
 
@@ -73,7 +73,7 @@ Android therefore **depends on** the shared schema’s sync RPC and tombstones, 
 - profiles, friendships, sharing scopes, comments, reactions, recommendations, notifications, and invite codes;
 - Android synchronization metadata, including tombstones and `sync_library_changes`.
 
-RLS grants owners access to their rows and selectively permits read-only shared or friend access. Shared links set `app.shared_token` through an RPC before content reads; optional scopes can narrow access by genre or status. Cinema outings are owner-only. These authorization boundaries **constrain every workflow** in [Operations](../operations/index.md), so a UI guard is not a substitute for an RLS policy.
+RLS grants owners access to their rows and selectively permits read-only friend access. Anonymous shared links use the stateless `get_shared_library` RPC instead of connection-local `app.shared_token`; optional scopes can narrow access by genre or status, and cinema outings remain owner-only. These authorization boundaries **constrain every workflow** in [Operations](../operations/index.md), so a UI guard is not a substitute for an RLS policy.
 
 ## Edge Functions
 

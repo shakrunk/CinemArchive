@@ -63,7 +63,7 @@ Android reads the Supabase URL and publishable key from its gitignored `local.pr
 
 ## Mental model
 
-- **Web is online-first.** `App.tsx` selects an owner, anonymous shared-link, or authenticated friend read path; Zustand holds the active client state and `lib/db.ts` is the Supabase boundary.
+- **Web uses a durable owner journal.** `App.tsx` selects an owner, anonymous shared-link, or authenticated friend read path; Zustand holds the active client state, `lib/db.ts` is the read boundary, and owner writes flow through the IndexedDB offline command runtime.
 - **Android is local-first.** Compose features read Room through repositories. `LibrarySyncRepository` pulls server changes, while `MutationOutbox` records changes for retryable remote delivery.
 - **The backend is shared and authoritative.** `schema.sql` documents tables and RLS; timestamped migrations are the deployable schema history. Both clients use it, so backend changes need cross-client consideration.
 - **Product parity is intentional rather than automatic.** `docs/android-parity-matrix.md` tracks domain coverage and explicit Android-only behavior. [Features and domains](features/index.md) summarizes the important distinctions.
@@ -81,5 +81,4 @@ This wiki is a navigation and maintenance guide. Source code, `schema.sql`, depl
 
 ## Backlog
 
-- **Android social and sharing coverage** — `docs/android-parity-matrix.md` rows for Sharing, Friends, and Notifications remain Discovery; their UI/API design is intentionally deferred.
 - **Cross-client sync test depth** — `apps/android/data/` has sync/outbox tests, but `ListsRepository` and some cross-device flows lack focused regression coverage according to the parity matrix.

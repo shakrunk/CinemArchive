@@ -34,6 +34,10 @@ data class AddTitleLogForm(
     val status: LibraryStatus = LibraryStatus.WATCHLIST,
     val rating: Double = 0.0,
     val notes: String = "",
+    /** ISO date the title was watched; only used when [status] is WATCHED. */
+    val watchedOn: LocalDate = LocalDate.now(),
+    /** "Watched before joining CinemArchive": the seed viewing is saved undated. */
+    val prePlatform: Boolean = false,
 )
 
 data class AddTitleUiState(
@@ -174,6 +178,10 @@ class AddTitleViewModel(
 
     fun onNotesChange(notes: String) = _uiState.update { it.copy(form = it.form.copy(notes = notes)) }
 
+    fun onWatchedOnChange(date: LocalDate) = _uiState.update { it.copy(form = it.form.copy(watchedOn = date)) }
+
+    fun onPrePlatformChange(prePlatform: Boolean) = _uiState.update { it.copy(form = it.form.copy(prePlatform = prePlatform)) }
+
     /** Writes the title and reports its new local id to [onAdded]. The write itself is
      *  local-only and effectively instant — the Supabase push is the outbox's problem, and
      *  deliberately not awaited here, so adding a title works offline. */
@@ -188,7 +196,7 @@ class AddTitleViewModel(
                 status = state.form.status,
                 rating = state.form.rating.takeIf { it > 0.0 },
                 notes = state.form.notes.trim().takeIf { it.isNotEmpty() },
-                watchedOn = LocalDate.now().toString(),
+                watchedOn = if (state.form.prePlatform) null else state.form.watchedOn.toString(),
             )
             runCatching { libraryRepository.addTitle(request) }
                 .onSuccess { id ->

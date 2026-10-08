@@ -11,6 +11,7 @@ number is chosen.
 
 ### Added
 
+- Android: the Add-title form now has a date-watched picker (and a "watched before joining" undated option) for titles logged as Watched, matching the web app.
 - Web and Android: Settings → Data & Portability (web) and Settings → Import & sync
   (Android) can now import watched titles and ratings from
   Simkl, Plex and Emby, and re-importing a Letterboxd CSV now merges into films already in

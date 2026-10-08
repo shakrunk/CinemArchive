@@ -112,11 +112,17 @@ class UpNextViewModel(
         }
     }
 
-    fun onMarkEpisodeWatched(titleId: String) {
-        viewModelScope.launch {
-            repository.advanceNextEpisode(titleId, LocalDate.now().toString())
-        }
-    }
+    private val episodeActions = UpNextEpisodeActions(
+        scope = viewModelScope,
+        advance = { title -> repository.advanceNextEpisode(title.id, LocalDate.now().toString(), title.nextEpisodeId) },
+        deleteWatch = { receipt -> repository.deleteEpisodeWatchEvent(receipt.episodeId, receipt.watchEventId) },
+        markSeriesWatched = repository::markSeriesWatched,
+    )
+    val episodeActionState = episodeActions.state
+
+    fun onMarkEpisodeWatched(title: UpNextWatching) = episodeActions.mark(title)
+    fun onUndoEpisode(titleId: String) = episodeActions.undo(titleId)
+    fun onMarkSeriesWatched(titleId: String) = episodeActions.finishSeries(titleId)
 
     fun onCancelOuting(outingId: String) {
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
@@ -165,6 +171,7 @@ fun UpNextRoute(
     )
     val board by viewModel.board.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val episodeActions by viewModel.episodeActionState.collectAsStateWithLifecycle()
     UpNextScreen(
         board,
         onTitleClick,
@@ -175,6 +182,9 @@ fun UpNextRoute(
         onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
         onDismissFollowUp = viewModel::onDismissFollowUp,
         onDidntMakeIt = viewModel::onDidntMakeIt,
+        episodeActions = episodeActions,
+        onUndoEpisode = viewModel::onUndoEpisode,
+        onMarkSeriesWatched = viewModel::onMarkSeriesWatched,
         onOpenProfile = onOpenProfile,
         profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
@@ -185,16 +195,19 @@ fun UpNextRoute(
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun UpNextScreen(
+fun UpNextScreen(
     board: UpNextBoard,
     onTitleClick: (String) -> Unit,
     onViewTicket: (UpNextOuting) -> Unit,
-    onMarkWatched: (String) -> Unit,
+    onMarkWatched: (UpNextWatching) -> Unit,
     onCancelOuting: (String) -> Unit,
     onRatePostShow: (String, String, Double) -> Unit,
     onSaveFollowUpNotes: (String, String) -> Unit,
     onDismissFollowUp: (String) -> Unit,
     onDidntMakeIt: (String) -> Unit,
+    episodeActions: Map<String, EpisodeActionState> = emptyMap(),
+    onUndoEpisode: (String) -> Unit = {},
+    onMarkSeriesWatched: (String) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
@@ -212,6 +225,9 @@ private fun UpNextScreen(
         }
     }
     var postShowEntry by remember { mutableStateOf<UpNextOuting?>(null) }
+    val finales = episodeActions.values.filter { it.receipt?.caughtUp == true }
+    val finaleIds = finales.map { it.snapshot.id }.toSet()
+    val watching = board.watching.filterNot { it.id in finaleIds }
 
     val listState = rememberLazyListState()
     val collapsed = rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
@@ -291,7 +307,7 @@ private fun UpNextScreen(
                 }
             }
 
-            if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
+            if (board.watching.isEmpty() && finales.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
                 item {
                     ReadingWidthColumn {
                         Text(
@@ -303,7 +319,7 @@ private fun UpNextScreen(
                 }
             }
 
-            if (board.watching.isNotEmpty()) {
+            if (watching.isNotEmpty() || finales.isNotEmpty()) {
                 item {
                     ReadingWidthColumn {
                         Text(
@@ -315,13 +331,26 @@ private fun UpNextScreen(
                     }
                 }
             }
-            itemsIndexed(board.watching, key = { _, it -> it.id }) { index, title ->
+            itemsIndexed(finales, key = { _, it -> "finale-${it.snapshot.id}" }) { index, action ->
+                ReadingWidthColumn {
+                    CaughtUpCard(
+                        action = action,
+                        shape = groupShape(index, finales.size),
+                        onOpen = { onTitleClick(action.snapshot.id) },
+                        onUndo = { onUndoEpisode(action.snapshot.id) },
+                        onFinish = { onMarkSeriesWatched(action.snapshot.id) },
+                    )
+                }
+            }
+            itemsIndexed(watching, key = { _, it -> it.id }) { index, title ->
                 ReadingWidthColumn {
                     ContinueWatchingCard(
                         title,
-                        shape = groupShape(index, board.watching.size),
+                        shape = groupShape(index, watching.size),
                         onOpen = { onTitleClick(title.id) },
-                        onMarkWatched = { onMarkWatched(title.id) },
+                        onMarkWatched = { onMarkWatched(title) },
+                        action = episodeActions[title.id],
+                        onUndo = { onUndoEpisode(title.id) },
                     )
                 }
             }
@@ -546,7 +575,14 @@ private fun addOutingToCalendar(context: android.content.Context, entry: UpNextO
 }
 
 @Composable
-private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: () -> Unit, onMarkWatched: () -> Unit) {
+private fun ContinueWatchingCard(
+    title: UpNextWatching,
+    shape: Shape,
+    onOpen: () -> Unit,
+    onMarkWatched: () -> Unit,
+    action: EpisodeActionState?,
+    onUndo: () -> Unit,
+) {
     val pct = if (title.episodesTotal > 0) (title.episodesWatched.toFloat() / title.episodesTotal) else 0f
     val hasNotAired = title.nextEpisodeAirDate?.let { iso ->
         runCatching { LocalDate.parse(iso).isAfter(LocalDate.now()) }.getOrDefault(false)
@@ -617,8 +653,16 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
                         .background(MaterialTheme.colorScheme.primary),
                 ) {}
             }
+            action?.receipt?.let {
+                Text("Watched S${it.seasonNumber} E${it.episodeNumber}", style = MaterialTheme.typography.labelSmall)
+            }
+            action?.error?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
         }
-        if (hasNotAired) {
+        if (action?.receipt != null) {
+            TextButton(onClick = onUndo, enabled = !action.busy) { Text(if (action.busy) "Saving…" else "Undo") }
+        } else if (hasNotAired) {
             Text(
                 "Airs\n${formatShortDate(title.nextEpisodeAirDate!!)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -641,6 +685,7 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
             )
             Surface(
                 onClick = onMarkWatched,
+                enabled = action?.busy != true,
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -652,6 +697,21 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CaughtUpCard(action: EpisodeActionState, shape: Shape, onOpen: () -> Unit, onUndo: () -> Unit, onFinish: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surfaceContainer).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(action.snapshot.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.clickable(onClick = onOpen))
+        Text("All caught up", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        action.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        // These are explicit choices: logging the finale never changes the series status.
+        TextButton(onClick = onFinish, enabled = !action.busy) { Text("Mark series watched") }
+        TextButton(onClick = onUndo, enabled = !action.busy) { Text(if (action.busy) "Saving…" else "Undo") }
     }
 }
 

@@ -36,6 +36,7 @@ import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatch
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatchReceipt
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeRating
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeReview
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
@@ -362,6 +363,7 @@ class LibraryRepository(
                     nextEpisodeNumber = next.episodeNumber,
                     nextEpisodeName = next.episodeName,
                     nextEpisodeAirDate = next.airDate,
+                    nextEpisodeId = next.id,
                 )
             }
         val watchlist = titles
@@ -422,7 +424,14 @@ class LibraryRepository(
      *  choice via the status chips), and the locally cached episode rows aren't guaranteed to
      *  match the season's full episodeCount, so "no more unwatched rows" isn't a safe proxy
      *  for "season complete". */
-    suspend fun advanceNextEpisode(titleId: String, watchedAt: String?) {
+    suspend fun advanceNextEpisode(
+        titleId: String,
+        watchedAt: String?,
+        expectedEpisodeId: String? = null,
+        today: String = java.time.LocalDate.now().toString(),
+    ): EpisodeWatchReceipt? = outbox.atomically {
+        val title = titleDao.getById(titleId) ?: return@atomically null
+        if (title.type != MediaType.TV.name || title.status != LibraryStatus.WATCHING.name) return@atomically null
         val seasonNumberById = seasonDao.observeSeasons(titleId).first()
             .filterNot { isSpecialsSeason(it.seasonNumber) }
             .associate { it.id to it.seasonNumber }
@@ -431,8 +440,19 @@ class LibraryRepository(
             .filter { it.seasonId in seasonNumberById }
             .sortedWith(compareBy({ seasonNumberById.getValue(it.seasonId) }, { it.episodeNumber }))
         val watchCounts = watchEventDao.observeWatchCounts(titleId).first().associate { it.episodeId to it.watchCount }
-        val next = episodes.firstOrNull { (watchCounts[it.id] ?: 0) <= 0 } ?: return
-        logEpisodeWatched(next.id, watchedAt)
+        val unwatched = episodes.filter { (watchCounts[it.id] ?: 0) <= 0 }
+        val next = unwatched.firstOrNull() ?: return@atomically null
+        if (expectedEpisodeId != null && next.id != expectedEpisodeId) return@atomically null
+        if (next.airDate?.let { it > today } == true) return@atomically null
+        val eventId = logEpisodeWatched(next.id, watchedAt)
+        EpisodeWatchReceipt(titleId, next.id, eventId, seasonNumberById.getValue(next.seasonId), next.episodeNumber, unwatched.size == 1)
+    }
+
+    /** Explicit caught-up-card action. Logging a finale alone never changes series status. */
+    suspend fun markSeriesWatched(titleId: String) = outbox.atomically {
+        val title = checkNotNull(titleDao.getById(titleId)) { "This title is no longer in your library" }
+        require(title.type == MediaType.TV.name) { "This title is not a series" }
+        if (title.status != LibraryStatus.WATCHED.name) updateTitleStatus(titleId, LibraryStatus.WATCHED, Instant.now().toString())
     }
 
     fun observeTitleDetail(titleId: String): Flow<TitleDetail?> {
@@ -689,7 +709,7 @@ class LibraryRepository(
     /** Logs a watch for [episodeId] — optimistic local write + a queued remote push, per
      *  the idempotency contract in docs/android-sync-contract.md §4.2: the id is generated
      *  here (not left to the server) so a retried push upserts instead of duplicating. */
-    suspend fun logEpisodeWatched(episodeId: String, watchedAt: String?) {
+    suspend fun logEpisodeWatched(episodeId: String, watchedAt: String?): String {
         val id = UUID.randomUUID().toString()
         outbox.atomically {
             watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(id = id, episodeId = episodeId, watchedAt = watchedAt)))
@@ -704,6 +724,7 @@ class LibraryRepository(
                 },
             )
         }
+        return id
     }
 
     /** Records a rating for [episodeId] — same client-generated-id contract as

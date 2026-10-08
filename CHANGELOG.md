@@ -11,7 +11,8 @@ number is chosen.
 
 ### Added
 
-- Web: Settings → Data & Portability can now import watched titles and ratings from
+- Web and Android: Settings → Data & Portability (web) and Settings → Import & sync
+  (Android) can now import watched titles and ratings from
   Simkl, Plex and Emby (import-only; existing ratings and viewings are never
   overwritten). TV is imported at title level; episode history is not yet synced.
 

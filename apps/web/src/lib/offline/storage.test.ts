@@ -14,6 +14,37 @@ function store(factory = new IDBFactory()) {
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(connections.splice(0).map((db) => db.close())) })
 
 describe('IndexedDB offline journal', () => {
+  it('captures immutable revisions and causal receipt references for rapid same-row edits', async () => {
+    const db = store()
+    await db.replaceBase(owner, { ...snapshot(), rowRevisions: { [`titles:${title.id}`]: '2026-10-08T10:00:00Z' } })
+    const first = createCommand(owner, { kind: 'title.patch', titleId: title.id, patch: { rating: 3 } })
+    const second = createCommand(owner, { kind: 'title.patch', titleId: title.id, patch: { rating: 4 } })
+    await db.append(first)
+    const appended = await db.append(second)
+    expect(appended.document.commands[0].preconditions).toEqual([{ table: 'titles', id: title.id, updatedAt: '2026-10-08T10:00:00Z' }])
+    expect(appended.document.commands[1].preconditions).toEqual([{ table: 'titles', id: title.id, afterCommandId: first.id }])
+    expect(appended.document.commands[1].dependsOn).toContain(first.id)
+    await expect(db.discard(owner, first.id)).rejects.toThrow()
+    await db.acknowledge(owner, first.id)
+    const remaining = (await db.read(owner)).document.commands[0]
+    expect(remaining.dependsOn).toEqual([])
+    expect(remaining.preconditions).toEqual(appended.document.commands[1].preconditions)
+  })
+
+  it('applies anonymous edits transactionally across two tabs without a delivery journal', async () => {
+    const factory = new IDBFactory()
+    const a = store(factory)
+    const b = store(factory)
+    await a.replaceBase(owner, snapshot())
+    await Promise.all([
+      a.applyLocal(owner, { kind: 'title.patch', titleId: title.id, patch: { notes: 'tab A' } }),
+      b.applyLocal(owner, { kind: 'title.patch', titleId: title.id, patch: { rating: 4 } }),
+    ])
+    const { document } = await a.read(owner)
+    expect(document.base.titles[0]).toMatchObject({ notes: 'tab A', rating: 4 })
+    expect(document.commands).toEqual([])
+  })
+
   it('acknowledges a receipt retry with fresh server state and replays remaining work', async () => {
     const db = store()
     await db.replaceBase(owner, snapshot())

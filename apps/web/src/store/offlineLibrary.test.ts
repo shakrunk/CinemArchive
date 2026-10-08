@@ -10,7 +10,8 @@ import { fetchAllTitlePins, fetchLedgerLayout, fetchListMemberships, fetchLists,
 vi.mock('../lib/db', () => ({ fetchAllTitlePins: vi.fn(), fetchLedgerLayout: vi.fn(), fetchListMemberships: vi.fn(), fetchLists: vi.fn(), fetchUserLibrary: vi.fn() }))
 
 const stores: IndexedDbOfflineStore[] = []
-function setup(factory = new IDBFactory()) {
+const runtimes: OfflineLibraryRuntime[] = []
+function setup(factory = new IDBFactory(), browserEvents = false) {
   const ownerStorage = new IndexedDbOfflineStore({ indexedDB: factory, databaseName: 'owner' })
   const anonymousStorage = new IndexedDbOfflineStore({ indexedDB: factory, databaseName: 'anonymous' })
   stores.push(ownerStorage, anonymousStorage)
@@ -19,13 +20,56 @@ function setup(factory = new IDBFactory()) {
   const deliver = vi.fn().mockResolvedValue({ kind: 'success' })
   const runtime = new OfflineLibraryRuntime({ projectId: 'project', ownerStorage, anonymousStorage,
     onSnapshot, onStatus: vi.fn(), onError: vi.fn(), fetchBase, deliver,
-    isAuthenticated: async () => true, lock: async (_name, work) => work(),
+    isAuthenticated: async () => true, lock: async (_name, work) => work(), browserEvents,
   })
+  runtimes.push(runtime)
   return { runtime, ownerStorage, anonymousStorage, onSnapshot, fetchBase, deliver }
 }
-afterEach(async () => { vi.restoreAllMocks(); await Promise.all(stores.splice(0).map((store) => store.close())) })
+afterEach(async () => { runtimes.splice(0).forEach((runtime) => runtime.deactivate()); vi.restoreAllMocks(); vi.unstubAllGlobals(); await Promise.all(stores.splice(0).map((store) => store.close())) })
 
 describe('owner library runtime', () => {
+  it('resumes on browser events, reloads broadcasts without a refresh loop, and detaches on logout', async () => {
+    const channels: FakeChannel[] = []
+    class FakeChannel {
+      onmessage: ((event: MessageEvent) => void) | null = null
+      postMessage = vi.fn()
+      close = vi.fn()
+      constructor() { channels.push(this) }
+    }
+    vi.stubGlobal('BroadcastChannel', FakeChannel)
+    const { runtime, fetchBase, ownerStorage } = setup(new IDBFactory(), true)
+    const read = vi.spyOn(ownerStorage, 'read')
+    await runtime.activate('owner')
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(channels[0].postMessage).toHaveBeenCalled())
+    const reads = read.mock.calls.length
+    channels[0].onmessage!(new MessageEvent('message', { data: { kind: 'changed' } }))
+    await vi.waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads + 1))
+    expect(fetchBase).toHaveBeenCalledOnce()
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledTimes(2))
+    runtime.deactivate()
+    window.dispatchEvent(new Event('online'))
+    expect(channels[0].close).toHaveBeenCalledOnce()
+    expect(fetchBase).toHaveBeenCalledTimes(2)
+  })
+
+  it('publishes anonymous edits only after the durable transaction commits', async () => {
+    const { runtime, anonymousStorage, onSnapshot, deliver } = setup()
+    await runtime.saveAnonymous(snapshot())
+    await runtime.loadAnonymous()
+    const read = await anonymousStorage.read({ projectId: 'project', userId: 'anonymous-local-only' })
+    read.document.base.titles[0].notes = 'durable'
+    const delayed = deferred<typeof read>()
+    vi.spyOn(anonymousStorage, 'applyLocal').mockReturnValueOnce(delayed.promise)
+    const pending = runtime.submitAnonymous({ kind: 'title.patch', titleId: title.id, patch: { notes: 'durable' } })
+    expect(onSnapshot.mock.lastCall![0]!.titles[0].notes).toBeUndefined()
+    delayed.resolve(read)
+    await pending
+    expect(onSnapshot.mock.lastCall![0]!.titles[0].notes).toBe('durable')
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
   it('reopens the same owner with pending optimism before fetching, while other owners start empty', async () => {
     const factory = new IDBFactory()
     const first = setup(factory)

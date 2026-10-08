@@ -19,6 +19,22 @@ beforeEach(()=>{
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks()})
 
 describe('atomic command payloads',()=>{
+  it('maps compound row guards and predecessor receipts without mutating journal payloads', () => {
+    const pending = createCommand(scope, { kind: 'batch', mutations: [
+      { kind: 'title.patch', titleId: 'title', patch: { notes: 'second edit' } },
+      { kind: 'viewing.delete', titleId: 'title', viewingId: 'viewing' },
+    ] }, { preconditions: [
+      { table: 'titles', id: 'title', afterCommandId: 'first-operation' },
+      { table: 'viewings', id: 'viewing', updatedAt: '2026-10-08T00:00:00Z' },
+    ] })
+    const original = JSON.stringify(pending)
+    expect(libraryOperations(pending)).toMatchObject([
+      { expectedOperationId: 'first-operation' }, { expectedUpdatedAt: '2026-10-08T00:00:00Z' },
+    ])
+    expect(JSON.stringify(pending)).toBe(original)
+    expect(() => libraryOperations({ ...pending, preconditions: [{ table: 'titles', id: 'unmatched', updatedAt: '2026-10-08T00:00:00Z' }] })).toThrow('must match')
+  })
+
   it('maps omission and explicit null without inventing IDs or clocks',()=>{
     const pending=command()
     const first=libraryOperations(pending)

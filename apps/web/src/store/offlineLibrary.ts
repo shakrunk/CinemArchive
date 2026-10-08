@@ -4,6 +4,7 @@ import { OfflineCoordinator, type DeliveryContext, type DeliveryResult, type Exc
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
 import type { Mutation, PendingCommand } from '../lib/offline/commands'
+import { createCommand } from '../lib/offline/commands'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
 
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
@@ -20,6 +21,7 @@ export async function fetchOwnerSnapshot(context: DeliveryContext): Promise<Offl
   ])
   if (!context.isCurrent()) throw new Error('Library owner changed')
   return { ...library, lists, listMemberships, ledgerWidgets,
+    rowRevisions: { ...library.rowRevisions, ...Object.fromEntries(lists.map((list) => [`lists:${list.id}`, list.updatedAt])) },
     pinnedModes: Object.fromEntries(pins.map((pin) => [`${pin.titleId}:${pin.easterEggKey}`, pin.pinnedVariant])),
   }
 }
@@ -42,6 +44,7 @@ interface RuntimeOptions {
   ownerStorage?: IndexedDbOfflineStore
   anonymousStorage?: IndexedDbOfflineStore
   lock?: ExclusiveLock
+  browserEvents?: boolean
 }
 
 /** Anonymous data uses a separate database and never enters the delivery
@@ -57,6 +60,10 @@ export class OfflineLibraryRuntime {
   private ready = false
   private pending = 0
   private quarantined = 0
+  private removeListeners: (() => void) | undefined
+  private channel: BroadcastChannel | undefined
+  private syncing: Promise<void> | undefined
+  private broadcastRevision = -1
 
   constructor(options: RuntimeOptions) {
     this.options = options
@@ -80,20 +87,30 @@ export class OfflineLibraryRuntime {
         options.onStatus({ ownerId: this.ownerId, hydrated: this.ready,
           commands: state?.document.commands ?? [], quarantined: state?.quarantined ?? [],
         })
+        if (state && state.document.revision !== this.broadcastRevision) {
+          this.broadcastRevision = state.document.revision
+          this.channel?.postMessage({ kind: 'changed' })
+        }
       },
       onError: options.onError,
     })
   }
 
   async activate(userId: string): Promise<void> {
+    this.detachEvents()
     this.generation++
     this.ownerId = userId
     await this.coordinator.activate({ projectId: this.options.projectId, userId })
+    if (this.ownerId === userId) {
+      this.attachEvents()
+      if (this.options.browserEvents !== false) this.wake()
+    }
   }
 
   /** Synchronously clears the last owner's visible projection before awaiting
    * IndexedDB/auth/network. Also used before friend/shared browsing. */
   deactivate(): void {
+    this.detachEvents()
     this.generation++
     this.ownerId = null
     this.coordinator.deactivate()
@@ -102,12 +119,15 @@ export class OfflineLibraryRuntime {
   async loadAnonymous(fallback = emptySnapshot()): Promise<void> {
     this.deactivate()
     const generation = this.generation
-    const read = await this.anonymous.read(this.anonymousScope)
+    let read = await this.anonymous.read(this.anonymousScope)
+    if (generation !== this.generation || this.ownerId !== null) return
+    if (read.document.revision === 0 && fallback.titles.length > 0) read = await this.anonymous.replaceBase(this.anonymousScope, fallback)
     if (generation !== this.generation || this.ownerId !== null) return
     this.ready = true
     this.quarantined = read.quarantined.length
     this.options.onSnapshot(read.document.revision > 0 ? read.document.base : fallback)
     this.options.onStatus({ ownerId: null, hydrated: true, commands: [], quarantined: read.quarantined })
+    this.attachEvents()
   }
 
   async saveAnonymous(snapshot: OfflineSnapshot): Promise<void> {
@@ -118,7 +138,71 @@ export class OfflineLibraryRuntime {
   reload(): Promise<void> { return this.coordinator.reload() }
   flush(): Promise<void> { return this.coordinator.flush() }
   submit(mutation: Mutation, options?: Parameters<OfflineCoordinator['submit']>[1]): Promise<PendingCommand> {
-    return this.coordinator.submit(mutation, options)
+    return this.coordinator.submit(mutation, options).then((command) => {
+      this.channel?.postMessage({ kind: 'changed' })
+      this.wake()
+      return command
+    })
+  }
+  async submitAnonymous(mutation: Mutation): Promise<void> {
+    if (this.ownerId !== null || !this.ready) throw new Error('Local library is not ready')
+    const generation = this.generation
+    // Use identical validation/explicit-clear rules without persisting an outbox.
+    const command = createCommand(this.anonymousScope, mutation)
+    const read = await this.anonymous.applyLocal(this.anonymousScope, command.mutation)
+    if (generation !== this.generation || this.ownerId !== null) throw new Error('Account changed after local save')
+    this.options.onSnapshot(read.document.base)
+    this.channel?.postMessage({ kind: 'changed' })
+  }
+
+  private detachEvents(): void {
+    this.removeListeners?.()
+    this.removeListeners = undefined
+    this.channel?.close()
+    this.channel = undefined
+    this.syncing = undefined
+    this.broadcastRevision = -1
+  }
+
+  private attachEvents(): void {
+    this.detachEvents()
+    if (this.options.browserEvents === false || typeof window === 'undefined') return
+    const generation = this.generation
+    const resume = () => { if (document.visibilityState !== 'hidden') this.wake() }
+    window.addEventListener('online', resume)
+    window.addEventListener('focus', resume)
+    document.addEventListener('visibilitychange', resume)
+    this.removeListeners = () => {
+      window.removeEventListener('online', resume)
+      window.removeEventListener('focus', resume)
+      document.removeEventListener('visibilitychange', resume)
+    }
+    if (window.BroadcastChannel) {
+      this.channel = new window.BroadcastChannel(`cinemarchive-library:${JSON.stringify([this.options.projectId, this.ownerId])}`)
+      this.channel.onmessage = () => {
+        if (generation !== this.generation) return
+        // A broadcast re-reads and may drain pending work; it must not refresh
+        // the server base, which would create another revision/broadcast loop.
+        if (this.ownerId) void this.reload().then(() => {
+          if (generation === this.generation && this.ownerId) return this.flush()
+        }).catch(this.options.onError)
+        else void this.anonymous.read(this.anonymousScope).then((read) => {
+          if (generation === this.generation && this.ownerId === null) this.options.onSnapshot(read.document.base)
+        }).catch(this.options.onError)
+      }
+    }
+  }
+
+  /** Delivery precedes refresh so reconnect cannot overwrite queued optimism.
+   * Coordinator locking excludes competing tabs, and repeated browser events
+   * share this session's in-flight wake. */
+  private wake(): void {
+    if (!this.ownerId || this.syncing || (typeof navigator !== 'undefined' && navigator.onLine === false)) return
+    const generation = this.generation
+    const sync = this.flush().then(async () => {
+      if (generation === this.generation && this.ownerId) await this.refresh()
+    }).catch(this.options.onError).finally(() => { if (this.syncing === sync) this.syncing = undefined })
+    this.syncing = sync
   }
   retry(commandId: string): Promise<void> { return this.coordinator.retry(commandId) }
   discard(commandId: string): Promise<void> { return this.coordinator.discard(commandId) }

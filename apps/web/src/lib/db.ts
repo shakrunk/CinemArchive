@@ -1,5 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from './auth'
+import { collectRowRevisions } from './offline/preconditions'
 import type {
   CastMember,
   CinemaOuting,
@@ -240,7 +241,7 @@ const TITLE_SELECT = `
 
 // Cinema outings are owner-private (rule §9) — folded into the owner's own
 // library fetch only, never into fetchSharedLibrary/fetchFriendLibrary below.
-export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[] }> {
+export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[]; rowRevisions?: Record<string, string> }> {
   if (!supabase) return { titles: [], outings: [] }
 
   const [{ data, error }, { data: outingRows, error: outingsError }] = await Promise.all([
@@ -254,6 +255,7 @@ export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[
   return {
     titles: (data || []).map(mapDbTitleToLocal),
     outings: (outingRows || []).map(mapDbOutingToLocal),
+    rowRevisions: collectRowRevisions(data || [], outingRows || []),
   }
 }
 

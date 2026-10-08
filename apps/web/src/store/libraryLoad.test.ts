@@ -12,7 +12,7 @@ vi.mock('./offlineLibrary', async (importOriginal) => {
   const factory = new IDBFactory()
   return { ...actual, OfflineLibraryRuntime: class extends actual.OfflineLibraryRuntime {
     constructor(options: ConstructorParameters<typeof actual.OfflineLibraryRuntime>[0]) {
-      super({ ...options, isAuthenticated: async () => true, lock: async (_name, work) => work(),
+      super({ ...options, browserEvents: false, isAuthenticated: async () => true, lock: async (_name, work) => work(),
         ownerStorage: new IndexedDbOfflineStore({ indexedDB: factory, databaseName: 'owner-store-tests' }),
         anonymousStorage: new IndexedDbOfflineStore({ indexedDB: factory, databaseName: 'anonymous-store-tests' }),
       })

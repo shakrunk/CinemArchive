@@ -137,5 +137,7 @@ describe('durable tracking commands', () => {
       JSON.parse('{"kind":"title.patch","titleId":"title-a","patch":{"__proto__":{"notes":"unsafe"}}}'),
     ]) expect(() => assertMutation(invalid)).toThrow()
     expect(() => assertCommand({ ...createCommand(owner, { kind: 'title.delete', titleId: title.id }), version: 42 })).toThrow()
+    expect(() => createCommand(owner, { kind: 'title.delete', titleId: title.id }, { preconditions: [{ table: 'titles', id: 'unrelated', updatedAt: stamp }] })).toThrow('precondition')
+    expect(() => createCommand(owner, { kind: 'title.delete', titleId: title.id }, { id: 'self', preconditions: [{ table: 'titles', id: title.id, afterCommandId: 'self' }] })).toThrow('precondition')
   })
 })

@@ -97,6 +97,9 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation): OfflineS
     case 'season.put': return titles(state, mutation.titleId, (t) => ({ ...t,
       seasons: put(t.seasons ?? [], updateSeasonMetadata(t.seasons?.find((s) => s.id === mutation.season.id), mutation.season)),
     }))
+    case 'season.progress': return titles(state, mutation.titleId, (t) => ({ ...t,
+      seasons: t.seasons?.map((season) => season.id === mutation.seasonId ? { ...season, episodesWatched: mutation.episodesWatched } : season),
+    }))
     case 'episode.metadata': return episode(state, mutation.titleId, mutation.episodeId, (ep) => fields(ep, mutation.patch))
     case 'episode.log': return episode(state, mutation.titleId, mutation.episodeId, (ep) => ({ ...ep,
       watchEvents: mutation.watchEvent ? put(ep.watchEvents, mutation.watchEvent) : ep.watchEvents,

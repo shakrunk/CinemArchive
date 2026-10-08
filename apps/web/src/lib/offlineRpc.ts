@@ -10,6 +10,7 @@ export interface LibraryOperation {
   key: Record<string, string | number>
   values?: Record<string, unknown>
   expectedUpdatedAt?: string
+  expectedOperationId?: string
 }
 
 const titleFields = {
@@ -102,6 +103,7 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
       }
       case 'title.delete': return [remove('titles',{id:mutation.titleId})]
       case 'season.put': return seasonOperations(mutation.titleId,mutation.season,command.createdAt,true)
+      case 'season.progress': return [update('seasons',mutation.seasonId,{episodes_watched:mutation.episodesWatched})]
       case 'episode.metadata': {
         const operations=[update('episodes',mutation.episodeId,mapped(mutation.patch,episodeFields))]
         if ('crew' in mutation.patch) operations.push(remove('episode_crew',{episode_id:mutation.episodeId}),...crewOperations('episode_crew',{title_id:mutation.titleId,episode_id:mutation.episodeId},mutation.patch.crew ?? []))
@@ -127,6 +129,16 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
   if (command.baseRevision) {
     if (operations.length !== 1 || !['update','delete'].includes(operations[0].action)) throw new Error('A revision precondition requires one record patch or deletion')
     operations[0].expectedUpdatedAt=command.baseRevision
+  }
+  const guarded = new Set<string>()
+  for (const precondition of command.preconditions ?? []) {
+    const key = `${precondition.table}:${precondition.id}`
+    if (guarded.has(key)) throw new Error('Duplicate row precondition')
+    guarded.add(key)
+    const operation = operations.find((op) => op.table === precondition.table && op.key.id === precondition.id && ['update', 'delete'].includes(op.action))
+    if (!operation || operation.expectedUpdatedAt) throw new Error('Row precondition must match one patch or deletion')
+    if (precondition.afterCommandId) operation.expectedOperationId = precondition.afterCommandId
+    else operation.expectedUpdatedAt = precondition.updatedAt
   }
   return operations
 }

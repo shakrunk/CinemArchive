@@ -1,5 +1,6 @@
 import type { Mutation, OfflineScope, PendingCommand } from './commands'
 import type { OfflineSnapshot } from './snapshot'
+import { mutationRows } from './preconditions'
 
 type Check = (value: unknown) => boolean
 type Fields = Record<string, Check>
@@ -78,6 +79,7 @@ const checks: Record<string, Check> = {
   'title.patch': shape({ kind: text, titleId: id, patch: patch(titleRequired, titleOptional) }),
   'title.delete': shape({ kind: text, titleId: id }),
   'season.put': shape({ kind: text, titleId: id, season }),
+  'season.progress': shape({ kind: text, titleId: id, seasonId: id, episodesWatched: integer }),
   'episode.metadata': shape({ kind: text, titleId: id, episodeId: id, patch: patch({}, episodeOptional) }),
   'episode.log': (v) => shape({ kind: text, titleId: id, episodeId: id }, { watchEvent: watch, rating, review })(v) &&
     record(v) && ('watchEvent' in v || 'rating' in v || 'review' in v),
@@ -95,6 +97,9 @@ const checks: Record<string, Check> = {
   'pin.set': shape({ kind: text, titleId: id, easterEggKey: id, variant: nullable(color) }),
   'ledger.set': shape({ kind: text, widgets: array(widget) }),
 }
+const revisionTable = oneOf('titles', 'lists', 'cinema_outings', 'seasons', 'episodes', 'viewings', 'episode_watch_events', 'episode_ratings', 'episode_reviews')
+const precondition: Check = (value) => shape({ table: revisionTable, id, updatedAt: timestamp })(value) ||
+  shape({ table: revisionTable, id, afterCommandId: id })(value)
 function isLeaf(value: unknown): boolean {
   return record(value) && typeof value.kind === 'string' && Object.hasOwn(checks, value.kind) && checks[value.kind](value)
 }
@@ -111,10 +116,22 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     version: oneOf(1), id, scope: (v) => shape({ projectId: id, userId: id })(v), createdAt: timestamp,
     sequence: integer, mutation: (v) => { try { assertMutation(v); return true } catch { return false } },
     dependsOn: array(id), state: oneOf('pending', 'failed', 'conflict'), attempts: integer, nextAttemptAt: integer,
-  }, { baseRevision: text, lastError: text })(value)) throw new Error('Invalid or unsupported offline command')
+  }, { baseRevision: text, lastError: text,
+    preconditions: array(precondition),
+  })(value)) throw new Error('Invalid or unsupported offline command')
+  const command = value as PendingCommand
+  const rows = mutationRows(command.mutation)
+  const guarded = new Set<string>()
+  for (const condition of command.preconditions ?? []) {
+    const key = `${condition.table}:${condition.id}`
+    if (guarded.has(key) || condition.afterCommandId === command.id || !rows.some((row) => row.guard && row.table === condition.table && row.id === condition.id)) {
+      throw new Error('Invalid offline row precondition')
+    }
+    guarded.add(key)
+  }
 }
 export function assertSnapshot(value: unknown): asserts value is OfflineSnapshot {
   if (!shape({ titles: array(title), outings: array(outing), lists: array(list),
     listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
-  })(value)) throw new Error('Invalid or unsupported offline snapshot')
+  }, { rowRevisions: dictionary(timestamp) })(value)) throw new Error('Invalid or unsupported offline snapshot')
 }

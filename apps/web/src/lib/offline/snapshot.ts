@@ -10,6 +10,7 @@ export interface OfflineSnapshot {
   listMemberships: Record<string, string[]>
   pinnedModes: Record<string, 'bw' | 'color'>
   ledgerWidgets: LedgerWidget[] | null
+  rowRevisions?: Record<string, string>
 }
 
 export function emptySnapshot(): OfflineSnapshot {

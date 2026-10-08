@@ -17,6 +17,7 @@ export type TrackingMutation =
   | { kind: 'title.patch'; titleId: string; patch: TitlePatch }
   | { kind: 'title.delete'; titleId: string }
   | { kind: 'season.put'; titleId: string; season: Season }
+  | { kind: 'season.progress'; titleId: string; seasonId: string; episodesWatched: number }
   | { kind: 'episode.metadata'; titleId: string; episodeId: string; patch: FieldPatch<Omit<Episode, 'id' | 'episodeNumber' | 'watchEvents' | 'ratings' | 'reviews'>> }
   | { kind: 'episode.log'; titleId: string; episodeId: string; watchEvent?: EpisodeWatchEvent; rating?: EpisodeRating; review?: EpisodeReview }
   | { kind: 'episodeWatch.delete'; titleId: string; episodeId: string; watchEventId: string }
@@ -37,6 +38,9 @@ export type TrackingMutation =
  * The remote writer must supply transactional semantics for compound actions. */
 export type Mutation = TrackingMutation | { kind: 'batch'; mutations: TrackingMutation[] }
 
+export type RevisionTable = 'titles' | 'lists' | 'cinema_outings' | 'seasons' | 'episodes' | 'viewings' | 'episode_watch_events' | 'episode_ratings' | 'episode_reviews'
+export type RowPrecondition = { table: RevisionTable; id: string } & ({ updatedAt: string; afterCommandId?: never } | { afterCommandId: string; updatedAt?: never })
+
 export interface PendingCommand {
   version: typeof OFFLINE_VERSION
   id: string
@@ -47,6 +51,7 @@ export interface PendingCommand {
   mutation: Mutation
   dependsOn: string[]
   baseRevision?: string
+  preconditions?: RowPrecondition[]
   state: 'pending' | 'failed' | 'conflict'
   attempts: number
   nextAttemptAt: number
@@ -78,7 +83,7 @@ export function omitUndefined(value: unknown): unknown {
 export function createCommand(
   scope: OfflineScope,
   mutation: Mutation,
-  options: { id?: string; createdAt?: string; dependsOn?: string[]; baseRevision?: string } = {},
+  options: { id?: string; createdAt?: string; dependsOn?: string[]; baseRevision?: string; preconditions?: RowPrecondition[] } = {},
 ): PendingCommand {
   assertScope(scope)
   const leaves = mutation.kind === 'batch' ? mutation.mutations : [mutation]
@@ -96,6 +101,7 @@ export function createCommand(
     state: 'pending', attempts: 0, nextAttemptAt: 0,
   }
   if (options.baseRevision !== undefined) command.baseRevision = options.baseRevision
+  if (options.preconditions !== undefined) command.preconditions = options.preconditions.map((row) => ({ ...row }))
   assertCommand(command)
   return command
 }

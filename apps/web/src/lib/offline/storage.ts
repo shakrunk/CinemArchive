@@ -1,5 +1,8 @@
 import { OFFLINE_VERSION, omitUndefined, sameScope, scopeKey, type Mutation, type OfflineScope, type PendingCommand } from './commands'
 import { applyMutation } from './replay'
+import { replayPending } from './replay'
+import { mutationEntities } from './entities'
+import { capturePreconditions } from './preconditions'
 import { emptySnapshot, type OfflineSnapshot } from './snapshot'
 import { assertCommand, assertMutation, assertSnapshot } from './validation'
 
@@ -152,7 +155,8 @@ export class IndexedDbOfflineStore {
       const command = captured
       const existing = d.commands.find((c) => c.id === command.id)
       if (existing) {
-        if (JSON.stringify(existing.mutation) !== JSON.stringify(command.mutation) || JSON.stringify(existing.dependsOn) !== JSON.stringify(command.dependsOn)) {
+        if (JSON.stringify(existing.mutation) !== JSON.stringify(command.mutation) || command.dependsOn.some((id) => !existing.dependsOn.includes(id)) ||
+            (command.preconditions && JSON.stringify(existing.preconditions) !== JSON.stringify(command.preconditions))) {
           throw new Error('An operation ID cannot be reused for a different command')
         }
         return
@@ -160,7 +164,13 @@ export class IndexedDbOfflineStore {
       // A dependency must already exist in this owner's journal. Once it is
       // acknowledged it is removed from dependent commands atomically below.
       if (command.dependsOn.some((id) => !d.commands.some((c) => c.id === id))) throw new Error('Unknown command dependency')
-      d.commands.push({ ...command, sequence: d.nextSequence++, state: 'pending', attempts: 0, nextAttemptAt: 0 })
+      const projection = replayPending(d.base, d.commands)
+      const entities = mutationEntities(command.mutation, projection)
+      const prerequisites = d.commands.filter((pending) => [...mutationEntities(pending.mutation, projection)].some((key) => entities.has(key)))
+      const preconditions = command.preconditions ?? capturePreconditions(command.mutation, d.base, d.commands)
+      d.commands.push({ ...command, ...(preconditions.length ? { preconditions } : {}),
+        dependsOn: [...new Set([...command.dependsOn, ...prerequisites.map((pending) => pending.id)])],
+        sequence: d.nextSequence++, state: 'pending', attempts: 0, nextAttemptAt: 0 })
     })
   }
 
@@ -168,6 +178,15 @@ export class IndexedDbOfflineStore {
     const captured = omitUndefined(base)
     assertSnapshot(captured)
     return this.transact(scope, (d) => { d.base = captured })
+  }
+
+  /** Anonymous edits update their own snapshot atomically, without ever creating
+   * an authenticated delivery record. Concurrent tabs cannot lose each other's
+   * disjoint edits through a read/replace race. */
+  applyLocal(scope: OfflineScope, mutation: Mutation): Promise<OfflineRead> {
+    const captured = omitUndefined(mutation)
+    assertMutation(captured)
+    return this.transact(scope, (d) => { d.base = applyMutation(d.base, captured) })
   }
 
   /** Only invoke under the coordinator's cross-tab delivery/refresh lock. */

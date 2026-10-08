@@ -29,7 +29,9 @@ import {
   type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
-import { parseLetterboxdCsv, resolveLetterboxdRows } from 'src/lib/letterboxd-import'
+import { parseLetterboxdCsv, letterboxdToSyncItems } from 'src/lib/letterboxd-import'
+import { resolveSyncItems } from 'src/lib/sync/core'
+import { applySyncOutcome } from 'src/lib/sync/apply'
 import { insertTitleToDb, insertOutingToDb } from 'src/lib/db'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { applyTheme } from 'src/lib/theme'
@@ -1054,6 +1056,7 @@ function DataSection() {
   const user = useAppStore((s) => s.user)
   const titles = useAppStore((s) => s.titles)
   const setTitles = useAppStore((s) => s.setTitles)
+  const updateTitle = useAppStore((s) => s.updateTitle)
   const outings = useAppStore((s) => s.outings)
   const setOutings = useAppStore((s) => s.setOutings)
   const [importing, setImporting] = useState(false)
@@ -1129,26 +1132,22 @@ function DataSection() {
 
       // watchlist.csv rows land on the watchlist; everything else is history.
       const status = /watchlist/i.test(file.name) ? ('watchlist' as const) : ('watched' as const)
-      const existingMovieIds = new Set(
-        titles.filter((t) => t.type === 'movie' && t.tmdbId != null).map((t) => t.tmdbId)
-      )
-      const { imported, unmatched, duplicates } = await resolveLetterboxdRows(rows, {
-        status,
-        isDuplicate: (tmdbId) => existingMovieIds.has(tmdbId),
+      const outcome = await resolveSyncItems(letterboxdToSyncItems(rows, status), {
+        library: titles,
         onProgress: (done, total) => setLbProgress({ done, total }),
         isCancelled: () => lbCancelRef.current,
       })
+      let added = 0
+      let updated = 0
+      if (user) ({ added, updated } = await applySyncOutcome({ userId: user.id, outcome, titles, setTitles, updateTitle }))
+      else if (outcome.inserts.length > 0) { setTitles([...outcome.inserts, ...titles]); added = outcome.inserts.length }
 
-      if (imported.length > 0) {
-        setTitles([...imported, ...titles])
-        if (user) await Promise.all(imported.map((t) => insertTitleToDb(user.id, t)))
-      }
-
-      const parts = [`Imported ${imported.length} film${imported.length !== 1 ? 's' : ''}`]
-      if (duplicates > 0) parts.push(`skipped ${duplicates} already in your library`)
-      if (unmatched.length > 0) {
-        const shown = unmatched.slice(0, 5).join(', ')
-        parts.push(`couldn't match ${unmatched.length}: ${shown}${unmatched.length > 5 ? `, +${unmatched.length - 5} more` : ''}`)
+      const parts = [`Added ${added} film${added !== 1 ? 's' : ''}`]
+      if (updated > 0) parts.push(`updated ${updated}`)
+      if (outcome.unchanged > 0) parts.push(`${outcome.unchanged} already up to date`)
+      if (outcome.unmatched.length > 0) {
+        const shown = outcome.unmatched.slice(0, 5).join(', ')
+        parts.push(`couldn't match ${outcome.unmatched.length}: ${shown}${outcome.unmatched.length > 5 ? `, +${outcome.unmatched.length - 5} more` : ''}`)
       }
       if (lbCancelRef.current) parts.push('(cancelled early)')
       setMessage({ type: 'success', text: `${parts.join(' · ')}.` })

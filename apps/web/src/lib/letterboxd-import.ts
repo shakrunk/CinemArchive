@@ -11,7 +11,8 @@
 // docs/import-feasibility.md): parseLetterboxdCsv and pickBestMatch are pure
 // and unit-tested; resolveLetterboxdRows owns the network pipeline.
 
-import { searchMedia, fetchMediaDetails, type SearchResult } from './media'
+import type { SearchResult } from './media'
+import type { SyncItem } from './sync/core'
 import type { Title, WatchStatus } from '../store/mockData'
 
 export interface LetterboxdRow {
@@ -230,58 +231,19 @@ export async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Pro
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
-export interface LetterboxdImportOutcome {
-  imported: Title[]
-  /** "Name (Year)" strings that couldn't be confidently resolved on TMDB. */
-  unmatched: string[]
-  /** Rows skipped because the film is already in the library (or earlier in this batch). */
-  duplicates: number
-}
-
-export async function resolveLetterboxdRows(
-  rows: LetterboxdRow[],
-  opts: {
-    status: WatchStatus
-    isDuplicate: (tmdbId: number) => boolean
-    onProgress?: (done: number, total: number) => void
-    isCancelled?: () => boolean
-  }
-): Promise<LetterboxdImportOutcome> {
-  const films = groupRows(rows)
-  const outcome: LetterboxdImportOutcome = { imported: [], unmatched: [], duplicates: 0 }
-  const seenTmdbIds = new Set<number>()
-  let done = 0
-
-  await mapPool(films, 3, async (film) => {
-    if (opts.isCancelled?.()) return
-    const label = film.year ? `${film.name} (${film.year})` : film.name
-    try {
-      const match = pickBestMatch(await searchMedia(film.name), film.name, film.year)
-      if (!match) {
-        outcome.unmatched.push(label)
-        return
-      }
-      if (opts.isDuplicate(match.tmdbId) || seenTmdbIds.has(match.tmdbId)) {
-        outcome.duplicates++
-        return
-      }
-      const { result: detailed } = await fetchMediaDetails(match)
-      // Re-check after the awaits: a concurrent worker may have claimed the
-      // same tmdbId meanwhile. The check+add pair below runs synchronously.
-      if (seenTmdbIds.has(detailed.tmdbId)) {
-        outcome.duplicates++
-        return
-      }
-      seenTmdbIds.add(detailed.tmdbId)
-      outcome.imported.push(buildTitle(detailed, film, opts.status))
-    } catch (err) {
-      console.error(`Letterboxd import: failed to resolve "${label}":`, err)
-      outcome.unmatched.push(label)
-    } finally {
-      done++
-      opts.onProgress?.(done, films.length)
-    }
-  })
-
-  return outcome
+/** Map grouped Letterboxd rows to provider-agnostic sync items, so a Letterboxd import
+ *  goes through the same resolve + merge pipeline as Simkl/Plex/Emby: re-importing a newer
+ *  diary adds new viewings and fills empty ratings on films already in the library. */
+export function letterboxdToSyncItems(rows: LetterboxdRow[], status: WatchStatus): SyncItem[] {
+  return groupRows(rows).map((film) => ({
+    provider: 'letterboxd' as const,
+    externalId: `${normTitle(film.name)}:${film.year ?? ''}`,
+    type: 'movie' as const,
+    title: film.name,
+    year: film.year,
+    ids: {},
+    status,
+    rating: film.rating,
+    watchedDates: film.watchedDates,
+  }))
 }

@@ -51,6 +51,19 @@ class OutingRecoveryStateTest {
         assertEquals(2, source.calls)
     }
 
+    @Test fun originalCommandConfirmationNeedsNoReplacementSelectionAndReportsConfirmation() = runTest {
+        val source = FakeSource().apply { pending = true; outcome = OutingRecoveryOutcome.CONFIRMED }
+        val controller = OutingRecoveryController(source, this)
+        controller.open("one"); advanceUntilIdle()
+        controller.select("venue", true)
+        assertTrue(controller.state.value.selected.isEmpty())
+        controller.apply(); advanceUntilIdle()
+        assertEquals(1, source.calls)
+        assertTrue(source.selected.isEmpty())
+        assertTrue(controller.state.value.review!!.resolved)
+        assertTrue(controller.state.value.message!!.startsWith("Original outing change confirmed"))
+    }
+
     @Test fun changedRemoteClearsSelectionsAndRequiresANewReview() = runTest {
         val source = FakeSource().apply { outcome = OutingRecoveryOutcome.CHANGED }
         val controller = OutingRecoveryController(source, this)

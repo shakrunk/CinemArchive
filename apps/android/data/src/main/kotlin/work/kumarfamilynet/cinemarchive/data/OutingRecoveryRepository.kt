@@ -18,6 +18,8 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 interface OutingRecoveryRemote {
     suspend fun fetch(session: SupabaseSession, outingId: String): JSONObject?
     suspend fun apply(session: SupabaseSession, outingId: String, attempt: JSONObject): JSONObject
+    suspend fun confirmCommand(session: SupabaseSession, entry: OutboxEntity): PushResult =
+        error("Saved command confirmation is not configured.")
 }
 
 /** Explicit recovery is serialized with pushes; a Room transaction is never held across network IO. */
@@ -35,7 +37,7 @@ class OutingRecoveryRepository(
     override fun isActive() = sessionProvider()?.userId == ownerId
     override suspend fun pendingAttempt(id: String): Boolean {
         active()
-        return archive.record(id)?.optJSONObject("attempt") != null
+        return archive.record(id)?.optJSONObject("attempt") != null || pendingCommand(id) != null
     }
     private suspend fun active(): SupabaseSession {
         currentCoroutineContext().ensureActive()
@@ -69,7 +71,7 @@ class OutingRecoveryRepository(
                 if (row == null) "Not available" else display(row.opt(key) ?: JSONObject.NULL), row != null && key in outingReviewFields)
         }
         OutingRecoveryReview(id, title(record), fields, row?.getString("updated_at"), row != null,
-            record.optJSONObject("attempt") != null, record.getString("state") != "pending",
+            record.optJSONObject("attempt") != null || pendingCommand(id) != null, record.getString("state") != "pending",
             if (wire == null) "This saved change cannot be interpreted. Its original data can still be exported or explicitly discarded."
             else if (row == null) "The current plan is unavailable. It will not be recreated automatically."
             else "Select only the saved fields you want to reapply. Lifecycle and ticket attachment data are retained in the original export.")
@@ -78,6 +80,25 @@ class OutingRecoveryRepository(
     override suspend fun apply(id: String, expectedVersion: String?, selected: Set<String>): OutingRecoveryOutcome = outbox.withFlushPaused {
         val record = retain(id)
         check(record.getString("state") == "pending") { "This change has already been resolved." }
+        pendingCommand(id)?.let { command ->
+            // Unknown delivery must be settled using the original immutable operation before
+            // the user can replace its intent or discard it. A definite conflict enables review.
+            when (val result = remote.confirmCommand(active(), command)) {
+                is PushResult.Applied -> {
+                    active()
+                    val current = currentOutingCommandRow(command, result.receipt, ownerId)
+                    finish(id, record, current, "applied")
+                    return@withFlushPaused OutingRecoveryOutcome.CONFIRMED
+                }
+                is PushResult.Review -> {
+                    active()
+                    outboxDao.markForReview(id, result.reason)
+                    return@withFlushPaused OutingRecoveryOutcome.CHANGED
+                }
+                is PushResult.Retry -> error(result.reason)
+                else -> error("Could not verify the original outing command. Retry the same attempt.")
+            }
+        }
         val original = record.getJSONObject("original")
         val outingId = original.getString("entityId")
         var attempt = record.optJSONObject("attempt")
@@ -128,7 +149,7 @@ class OutingRecoveryRepository(
 
     override suspend fun discard(id: String) = outbox.withFlushPaused {
         val record = retain(id)
-        check(record.optJSONObject("attempt") == null) { "Confirm the pending attempt before discarding this change." }
+        check(record.optJSONObject("attempt") == null && pendingCommand(id) == null) { "Confirm the pending attempt before discarding this change." }
         val outingId = record.getJSONObject("original").getString("entityId")
         val current = remote.fetch(active(), outingId)?.also { validateRow(it, outingId) }
         active()
@@ -176,7 +197,7 @@ class OutingRecoveryRepository(
             // If process death followed a successful local commit, all surviving entries are later.
             val later = (if (index < 0) queue else queue.drop(index + 1))
                 .filter { it.entityType == "cinema_outing" && it.entityId == outingId }
-            if (current != null) {
+            if (current != null && outings.getById(outingId) != null && titles.getById(current.getString("title_id")) != null) {
                 val projection = runCatching {
                     val row = JSONObject(current.toString())
                     later.forEach { entry ->
@@ -188,7 +209,7 @@ class OutingRecoveryRepository(
                 // A malformed later intent must remain reviewable without preventing this
                 // independent resolution. Retain its existing local projection and exact queue.
                 if (projection != null) outings.upsert(projection) else check(later.isNotEmpty())
-            } else if (later.isEmpty()) {
+            } else if (current == null && later.isEmpty()) {
                 // Removing the plan does not delete independent viewing history or queued commands.
                 outings.deleteById(outingId)
             }
@@ -207,6 +228,9 @@ class OutingRecoveryRepository(
         return titleId?.let { titles.getById(it)?.title } ?: "Cinema outing"
     }
 
+    private suspend fun pendingCommand(id: String): OutboxEntity? = outboxDao.getPending()
+        .firstOrNull { it.id == id && it.entityType == "cinema_outing" && it.operation == OUTING_COMMAND }
+
     private fun validateRow(row: JSONObject, id: String) {
         require(row.getString("id") == id && row.getString("user_id") == ownerId) { "Invalid owner-scoped outing response." }
         row.toRecoveryOuting() // validate the complete projection before changing the queue
@@ -224,7 +248,7 @@ class OutingRecoveryRepository(
 
     companion object {
         private fun reviewable(entry: OutboxEntity) = entry.entityType == "cinema_outing" &&
-            (entry.operation in setOf("upsert", "review") || (entry.operation in setOf("insert", "update") && entry.attemptCount > 0))
+            (entry.operation in setOf("upsert", "review") || (entry.operation in setOf("insert", "update", OUTING_COMMAND) && entry.attemptCount > 0))
 
         fun remote(client: SupabaseRestClient, ownerId: String, sessionProvider: () -> SupabaseSession?) = object : OutingRecoveryRemote {
             private fun session() = sessionProvider()?.takeIf { it.userId == ownerId } ?: error("Account changed. Reopen Profile.")
@@ -238,6 +262,8 @@ class OutingRecoveryRepository(
                     .put("p_expected_updated_at", attempt.getString("expectedVersion")).put("p_patch", attempt.getJSONObject("patch"))
                     .put("p_operation_id", attempt.getString("operationId")).toString(), session().accessToken))
             }
+            override suspend fun confirmCommand(session: SupabaseSession, entry: OutboxEntity): PushResult =
+                OutingCommandTransport(client, sessionProvider).push(entry)
         }
     }
 }

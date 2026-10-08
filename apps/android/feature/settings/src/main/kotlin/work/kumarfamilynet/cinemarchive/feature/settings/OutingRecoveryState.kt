@@ -77,13 +77,14 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
             checkActive()
             mutable.value = state.value.copy(selected = emptySet(),
                 review = review.copy(pendingAttempt = false, remoteVersion = null, remoteExists = false))
-            val updated = if (result == OutingRecoveryOutcome.APPLIED)
+            val updated = if (result == OutingRecoveryOutcome.APPLIED || result == OutingRecoveryOutcome.CONFIRMED)
                 review.copy(resolved = true, pendingAttempt = false, fields = emptyList(), message = null)
             else source.review(review.id)
             val cards = source.items()
             checkActive()
             mutable.value = state.value.copy(review = updated, cards = cards, message = when (result) {
                 OutingRecoveryOutcome.APPLIED -> "Selected fields applied. The original remains available to export."
+                OutingRecoveryOutcome.CONFIRMED -> "Original outing change confirmed. The current plan has been refreshed and the original remains available to export."
                 OutingRecoveryOutcome.CHANGED -> "The current plan changed. Review its latest values and select fields again."
                 OutingRecoveryOutcome.MISSING -> "The plan is no longer available. No replacement was created."
             })

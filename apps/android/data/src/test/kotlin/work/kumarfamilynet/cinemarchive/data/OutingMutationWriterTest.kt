@@ -57,32 +57,28 @@ class OutingMutationWriterTest {
         assertTrue(body().has("ticket_image_path") && body().isNull("ticket_image_path"))
     }
 
-    @Test fun venueOnlyPatchPreservesRemoteCompanionIdentityCompletionAndTickets() = runTest {
-        replies += 200 to JSONArray().put(remote()).toString()
+    @Test fun legacyVenuePatchWithoutBaselineRequiresReviewWithoutNetworkWrite() = runTest {
         val existing = seed()
         val changed = existing.copy(venue = "New cinema", updatedAt = "2026-10-08T13:00:00Z")
-        assertEquals(PushResult.Success, writer.push(entry("update", changed.mutationPayload(existing))))
-        assertEquals(setOf("venue", "updated_at"), body().keys().asSequence().toSet())
-        assertEquals("PATCH", requests.single().method)
-        assertEquals("eq.owner", requests.single().url.queryParameter("user_id"))
+        assertTrue(writer.push(entry("update", changed.mutationPayload(existing))) is PushResult.Review)
+        assertTrue(requests.isEmpty())
     }
 
     @Test fun explicitClearsDoNotClearAbsentFieldsAndPreserveCompanionFriendIds() = runTest {
-        replies += 200 to JSONArray().put(remote()).toString()
         val payload = JSONObject().put("id", "outing").put("notes", JSONObject.NULL)
             .put("companions", JSONArray().put(JSONObject().put("name", "Sam").put("friendUserId", "friend")))
             .put("updatedAt", "2026-10-08T13:00:00Z")
-        assertEquals(PushResult.Success, writer.push(entry("update", payload)))
-        assertTrue(body().isNull("notes"))
-        assertFalse(body().has("completed_viewing_id"))
-        assertFalse(body().has("follow_up_dismissed_at"))
-        assertEquals("friend", body().getJSONArray("companions").getJSONObject(0).getString("friendUserId"))
+        val command = outingCommandPayload(payload, false, "2026-10-08T12:00:00Z", null)
+        val values = outingCommandOperations(entry(OUTING_COMMAND, command)).getJSONObject(0).getJSONObject("values")
+        assertTrue(values.isNull("notes"))
+        assertFalse(values.has("completed_viewing_id"))
+        assertFalse(values.has("follow_up_dismissed_at"))
+        assertEquals("friend", values.getJSONArray("companions").getJSONObject(0).getString("friendUserId"))
     }
 
     @Test fun missingPatchTargetIsRetainedInsteadOfRecreated() = runTest {
-        replies += 200 to "[]"
-        assertTrue(writer.push(entry("update", JSONObject().put("id", "outing").put("venue", "Edit"))) is PushResult.Retry)
-        assertEquals("PATCH", requests.single().method)
+        assertTrue(writer.push(entry("update", JSONObject().put("id", "outing").put("venue", "Edit"))) is PushResult.Review)
+        assertTrue(requests.isEmpty())
     }
 
     @Test fun exactLegacySnapshotIsAcknowledgedReadOnlyDespiteTimestampAndFormatSpelling() = runTest {

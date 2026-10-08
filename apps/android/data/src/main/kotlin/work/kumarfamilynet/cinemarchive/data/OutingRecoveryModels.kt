@@ -14,7 +14,7 @@ data class OutingRecoveryReview(
     val resolved: Boolean,
     val message: String? = null,
 )
-enum class OutingRecoveryOutcome { APPLIED, CHANGED, MISSING }
+enum class OutingRecoveryOutcome { APPLIED, CONFIRMED, CHANGED, MISSING }
 
 interface OutingRecoverySource {
     val changes: Flow<Unit>

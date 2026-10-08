@@ -383,14 +383,7 @@ class OutingsRepository(
         showtime.plusSeconds((previewsMinutes + runtimeMinutes) * 60L)
 
     private suspend fun enqueueOutingMutation(entity: CinemaOutingEntity, previous: CinemaOutingEntity? = null) {
-        val payload = entity.mutationPayload(previous)
-        if (previous != null && payload.length() == 2) return
-        outbox.enqueue(
-            entityType = "cinema_outing",
-            entityId = entity.id,
-            operation = if (previous == null) "insert" else "update",
-            payload = payload,
-        )
+        outbox.enqueueOutingCommand(entity, previous)
     }
 }
 

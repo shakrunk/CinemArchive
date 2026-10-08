@@ -44,8 +44,9 @@ class OutingMutationQueueTest {
     @Test fun editingVenueQueuesOnlyItsIntentAndPreservesTicketNamesAndFormat() = runBlocking {
         edit()
         val entry = db.outboxDao().getPending().single()
-        assertEquals("update", entry.operation)
-        assertEquals(setOf("id", "updatedAt", "venue"), JSONObject(entry.payloadJson).keys().asSequence().toSet())
+        assertEquals(OUTING_COMMAND, entry.operation)
+        assertEquals(setOf("id", "updatedAt", "venue", OUTING_COMMAND_DATA), JSONObject(entry.payloadJson).keys().asSequence().toSet())
+        assertEquals("2026-01-01T00:00:00Z", outingCommandOperations(entry).getJSONObject(0).getString("expectedUpdatedAt"))
         val row = db.cinemaOutingDao().getById("outing")!!
         assertEquals(listOf("Smith, Alex"), row.companions)
         assertEquals("owner/remote-ticket", row.ticketImagePath)
@@ -56,12 +57,15 @@ class OutingMutationQueueTest {
         repo.clearTicketCapture("outing")
         repo.cancelOuting("outing")
         repo.dismissFollowUp("outing")
-        val payloads = db.outboxDao().getPending().map { JSONObject(it.payloadJson) }
+        val pending = db.outboxDao().getPending()
+        val payloads = pending.map { JSONObject(it.payloadJson).also { json -> json.remove(OUTING_COMMAND_DATA) } }
         assertEquals(setOf("id", "updatedAt", "ticketImagePath"), payloads[0].keys().asSequence().toSet())
         assertTrue(payloads[0].isNull("ticketImagePath"))
         assertEquals(setOf("id", "updatedAt", "status"), payloads[1].keys().asSequence().toSet())
         assertEquals(setOf("id", "updatedAt", "followUpDismissedAt"), payloads[2].keys().asSequence().toSet())
-        assertTrue(db.outboxDao().getPending().all { it.operation == "update" })
+        assertTrue(pending.all { it.operation == OUTING_COMMAND })
+        assertEquals(pending[0].id, outingCommandOperations(pending[1]).getJSONObject(0).getString("expectedOperationId"))
+        assertEquals(pending[1].id, outingCommandOperations(pending[2]).getJSONObject(0).getString("expectedOperationId"))
     }
 
     @Test fun explicitCreateAndFollowingEditRemainOrderedWhileReviewFailurePreservesBoth() = runBlocking {
@@ -69,7 +73,9 @@ class OutingMutationQueueTest {
             listOf("Friend"), CinemaFormat.DOLBY, null, SeatAssignment(null, null, emptyList()), null, null)
         repo.cancelOuting(id)
         val before = db.outboxDao().getPending()
-        assertEquals(listOf("insert", "update"), before.map { it.operation })
+        assertEquals(listOf(OUTING_COMMAND, OUTING_COMMAND), before.map { it.operation })
+        assertEquals("insert", outingCommandOperations(before[0]).getJSONObject(0).getString("action"))
+        assertEquals(before[0].id, outingCommandOperations(before[1]).getJSONObject(0).getString("expectedOperationId"))
         assertEquals("Dolby", JSONObject(before.first().payloadJson).getString("format"))
         outbox.flush()
         val after = db.outboxDao().getPending()
@@ -83,6 +89,16 @@ class OutingMutationQueueTest {
         edit(format = null)
         assertEquals("Future format", db.cinemaOutingDao().getById("outing")!!.format)
         assertFalse(JSONObject(db.outboxDao().getPending().single().payloadJson).has("format"))
+    }
+
+    @Test fun legacyPredecessorDoesNotBecomeAnInventedServerBaseline() = runBlocking {
+        db.outboxDao().enqueue(OutboxEntity("legacy", "cinema_outing", "outing", "update",
+            """{"id":"outing","venue":"Older saved change"}""", 1))
+        edit()
+        val saved = db.outboxDao().getPending().last()
+        assertEquals("review", saved.operation)
+        assertFalse(JSONObject(saved.payloadJson).has(OUTING_COMMAND_DATA))
+        assertEquals("New cinema", db.cinemaOutingDao().getById("outing")!!.venue)
     }
 }
 

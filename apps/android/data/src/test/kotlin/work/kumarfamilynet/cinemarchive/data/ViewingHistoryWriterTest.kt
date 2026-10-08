@@ -69,13 +69,10 @@ class ViewingHistoryWriterTest {
         assertEquals("outing", body().getString("outing_id"))
     }
 
-    @Test fun unlinkOutingSendsNullWithoutReplacingOtherOutingFields() = runTest {
+    @Test fun legacyOutingUnlinkWithoutBaselineRequiresReviewInsteadOfUnconditionalPatch() = runTest {
         val payload = JSONObject().put("id", "outing").put("completedViewingId", JSONObject.NULL)
             .put("followUpDismissedAt", "2026-10-08T12:00:00Z").put("updatedAt", "2026-10-08T12:00:00Z")
-        assertEquals(PushResult.Success, writer.push(entry("update", payload, "cinema_outing")))
-        assertEquals("PATCH", requests.single().method)
-        assertTrue(body().has("completed_viewing_id") && body().isNull("completed_viewing_id"))
-        assertFalse(body().has("status"))
-        assertFalse(body().has("companions"))
+        assertTrue(writer.push(entry("update", payload, "cinema_outing")) is PushResult.Review)
+        assertTrue(requests.isEmpty())
     }
 }

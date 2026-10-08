@@ -891,13 +891,9 @@ class LibraryRepository(
             val now = Instant.now().toString()
             cinemaOutingDao.observeOutingsForTitle(titleId).first()
                 .filter { it.completedViewingId == viewingId }.forEach { outing ->
-                    cinemaOutingDao.upsert(outing.copy(completedViewingId = null, followUpDismissedAt = now, updatedAt = now))
-                    outbox.enqueue("cinema_outing", outing.id, "update", JSONObject().apply {
-                        put("id", outing.id)
-                        put("completedViewingId", JSONObject.NULL)
-                        put("followUpDismissedAt", now)
-                        put("updatedAt", now)
-                    })
+                    val unlinked = outing.copy(completedViewingId = null, followUpDismissedAt = now, updatedAt = now)
+                    cinemaOutingDao.upsert(unlinked)
+                    outbox.enqueueOutingCommand(unlinked, outing)
                 }
             viewingDao.deleteById(viewingId)
             outbox.enqueue("viewing", viewingId, "delete", JSONObject().put("id", viewingId))

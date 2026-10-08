@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android outing edits and viewing-unlink changes now use durable, version-checked commands; uncertain responses retain the original operation for confirmation instead of overwriting newer plans.
 - Shared outing reversal can follow queued plan and viewing edits using their exact receipts, while preserving later edits and rated history.
 - Shared credit refresh now updates provider metadata without replacing existing cast or crew identities, with owner-safe insertion and replay receipts.
 - Shared outing completion now preserves one canonical viewing identity across retries and provides guarded reversal that protects newer edits, ratings and title-status changes; native reconciliation is being integrated separately.

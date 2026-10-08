@@ -110,7 +110,26 @@ class ViewingHistoryTest {
         val queue = db.outboxDao().getPending()
         assertEquals("delete", queue.single { it.entityType == "viewing" }.operation)
         assertTrue(JSONObject(queue.single { it.entityType == "cinema_outing" }.payloadJson).isNull("completedViewingId"))
+        val unlink = queue.single { it.entityType == "cinema_outing" }
+        assertEquals(OUTING_COMMAND, unlink.operation)
+        val operation = outingCommandOperations(unlink).getJSONObject(0)
+        assertEquals(outing().updatedAt, operation.getString("expectedUpdatedAt"))
+        assertEquals(setOf("completed_viewing_id", "follow_up_dismissed_at"), operation.getJSONObject("values").keys().asSequence().toSet())
         assertEquals("WATCHLIST", db.titleDao().getById("title")!!.status)
+    }
+
+    @Test fun viewingDeletionUnlinkDependsOnExactEarlierOutingCommandBeforeDeletingTheEvent() = runBlocking {
+        db.cinemaOutingDao().upsert(outing())
+        db.viewingDao().upsert(event("watch", "outing"))
+        val intent = JSONObject().put("id", "outing").put("venue", "Edited venue").put("updatedAt", "2026-01-03T15:00:00Z")
+        db.outboxDao().enqueue(OutboxEntity("earlier", "cinema_outing", "outing", OUTING_COMMAND,
+            outingCommandPayload(intent, false, outing().updatedAt, null).toString(), 1))
+        repo.deleteViewing("title", "watch")
+        val queue = db.outboxDao().getPending()
+        assertEquals(listOf("cinema_outing", "cinema_outing", "viewing"), queue.map { it.entityType })
+        assertEquals("earlier", outingCommandOperations(queue[1]).getJSONObject(0).getString("expectedOperationId"))
+        assertFalse(outingCommandOperations(queue[1]).getJSONObject(0).has("expectedUpdatedAt"))
+        assertEquals("delete", queue[2].operation)
     }
 
     @Test fun enqueueFailureRollsBackEditAndDeletionIncludingOutingChanges() = runBlocking {

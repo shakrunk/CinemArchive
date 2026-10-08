@@ -42,8 +42,9 @@ class SupabaseRemoteMutationWriter(
                     else -> upsertViewing(payload)
                 }
                 "cinema_outing" -> when (entry.operation) {
+                    OUTING_COMMAND -> OutingCommandTransport(client, sessionProvider).push(entry)
                     "insert" -> insertOuting(payload)
-                    "update" -> patchOuting(payload)
+                    "update" -> PushResult.Review("Saved outing edits have no verified server baseline. Open Profile > Saved outing changes to review them.")
                     "upsert" -> verifyLegacyOuting(payload)
                     "review" -> PushResult.Retry("Open Profile > Saved outing changes to review this preserved change.")
                     else -> PushResult.Retry("Unknown outing operation ${entry.operation}")
@@ -59,6 +60,7 @@ class SupabaseRemoteMutationWriter(
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             PushResult.Retry(e.message ?: e.javaClass.simpleName)
         }
     }
@@ -309,16 +311,6 @@ class SupabaseRemoteMutationWriter(
         val session = sessionProvider()
         client.delete("viewings", "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken)
         return PushResult.Success
-    }
-
-    private fun patchOuting(payload: JSONObject): PushResult {
-        val session = sessionProvider()
-        val body = outingWireBody(payload, session.userId, insert = false)
-        if (body.length() == 0 || (body.length() == 1 && body.has("updated_at"))) return PushResult.Success
-        val rows = JSONArray(client.patchWithFilter("cinema_outings",
-            "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken, body.toString()))
-        return if (rows.length() == 1) PushResult.Success
-        else PushResult.Retry("Outing is missing or unavailable. Saved changes require review; it will not be recreated automatically.")
     }
 
     /** Plain INSERT distinguishes a new plan from editing a cached one; retries never merge over another client. */

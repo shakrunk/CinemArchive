@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
+import { createStorageFixture } from './storage-fixture.mjs'
 
 const db = new PGlite({ extensions: { pgcrypto } })
 const owner = randomUUID(), friend = randomUUID(), stranger = randomUUID(), other = randomUUID()
@@ -33,6 +34,7 @@ before(async () => {
   const schema = (await readFile(new URL('schema.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   const migration = (await readFile(new URL('supabase/migrations/20261008184253_outing_share_receipts.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(migration.trim()))
+  await createStorageFixture(db)
   await db.exec(schema)
   // Migration is safe to apply again to the canonical schema fixture.
   await db.exec(migration)

@@ -57,7 +57,7 @@ Each client has its own nested `AGENTS.md` with client-specific guidance for AI 
 - **Where to watch** — TMDB watch-provider listings, plus a personal "in my home collection" toggle and a physical media shelf (DVD/Blu-ray/4K UHD/etc., with edition notes).
 - **Import** — bring in watch history/ratings from Letterboxd CSV exports (watched, ratings, diary, watchlist), matched to TMDB by name + year.
 - **Keyboard-first** — numbered view switching, `Ctrl/Cmd+,` for Settings, and a shortcuts help dialog alongside the command palette.
-- **Auth** — passkey / WebAuthn via Supabase Auth.
+- **Auth** — passwordless email links via Supabase Auth, with invite-only account creation.
 - **Shareable read-only links** — time-bound, scope-configurable access tokens let others browse your library without editing it.
 - **Offline-first PWA** — installable, with a service worker caching the app shell, posters, and fonts.
 - **Import / export** — back up or move your library as JSON.

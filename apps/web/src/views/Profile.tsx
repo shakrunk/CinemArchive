@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
+  Mail, Key, Plus, Trash2, Copy, Check, LogOut, Loader2, type LucideIcon,
   Download, Upload, Eye, EyeOff, Settings2,
   UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
   LayoutGrid, GripVertical, Ticket, RefreshCw, Info, ExternalLink,
@@ -14,9 +14,7 @@ import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import {
   isSupabaseConfigured,
   signInWithEmail,
-  signInWithPasskey,
   signOut,
-  registerPasskey,
   createSharedKey,
   revokeSharedKey,
   listSharedKeys,
@@ -47,10 +45,9 @@ import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { Eyebrow } from 'src/components/ui/typography'
 import { TextPreferences } from 'src/components/TextPreferences'
 
-const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: boolean }[] = [
+const SECTION_NAV: { id: string; label: string; Icon: LucideIcon; authOnly: boolean }[] = [
   { id: 'account', label: 'Account', Icon: UserCircle, authOnly: false },
   { id: 'identity', label: 'Identity', Icon: Pencil, authOnly: true },
-  { id: 'security', label: 'Security', Icon: Shield, authOnly: true },
   { id: 'appearance', label: 'Appearance', Icon: Sun, authOnly: false },
   { id: 'navigation', label: 'Navigation', Icon: LayoutGrid, authOnly: false },
   { id: 'sharing', label: 'Shared Links', Icon: Key, authOnly: true },
@@ -122,24 +119,6 @@ function SignInCard() {
     }
   }
 
-  async function handlePasskeySignIn() {
-    if (!email.trim()) {
-      setMessage({ type: 'error', text: 'Enter your email first to authenticate with a passkey.' })
-      return
-    }
-    setLoading(true)
-    setMessage(null)
-    try {
-      await signInWithPasskey(email)
-      setMessage({ type: 'success', text: 'Passkey verification initiated. Check your browser prompt.' })
-    } catch (err) {
-      console.error(err)
-      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to sign in with passkey.') })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="space-y-4">
       <AuthModeTabs mode={mode} onChange={switchMode} />
@@ -178,17 +157,6 @@ function SignInCard() {
             >
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
               Send Magic Link
-            </Button>
-            <Button
-              type="button"
-              onClick={handlePasskeySignIn}
-              disabled={loading}
-              variant="outline"
-              className="border-border text-muted-foreground hover:text-foreground"
-              title="Sign In with Passkey"
-              aria-label="Sign In with Passkey"
-            >
-              <Fingerprint className="w-4 h-4" />
             </Button>
           </div>
         </form>
@@ -391,50 +359,6 @@ function IdentitySection({
           Save Changes
         </Button>
       </form>
-    </Section>
-  )
-}
-
-// ─── Security ─────────────────────────────────────────────────────────────────
-
-function SecuritySection() {
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<Message | null>(null)
-
-  async function handleRegisterPasskey() {
-    setLoading(true)
-    setMessage(null)
-    try {
-      await registerPasskey()
-      setMessage({ type: 'success', text: 'Passkey registered successfully! You can now use it to sign in.' })
-    } catch (err) {
-      console.error(err)
-      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to register passkey.') })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Section
-      id="security"
-      title="Passkey Security"
-      Icon={Shield}
-      description="Add a biometric passkey (face lock, fingerprint, or PIN) to log in instantly on this device next time without waiting for email links."
-    >
-      <MessageBanner message={message} />
-      <Button
-        onClick={handleRegisterPasskey}
-        disabled={loading}
-        className="bg-secondary/60 hover:bg-amber/20 hover:text-amber text-paper font-sans text-xs border border-border transition-colors gap-2"
-      >
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Fingerprint className="w-3.5 h-3.5 text-amber" />
-        )}
-        Register new Passkey
-      </Button>
     </Section>
   )
 }
@@ -1423,7 +1347,7 @@ export function Profile() {
   const authed = Boolean(user) && isSupabaseConfigured && !isSharedView
   // Mask rather than reset on sign-out: a fresh fetch overwrites it on the
   // next sign-in, and effects must not set state synchronously.
-  const effectiveProfile = authed ? profile : null
+  const effectiveProfile = authed && profile?.user_id === user?.id ? profile : null
 
   useEffect(() => {
     if (!authed) return
@@ -1436,7 +1360,7 @@ export function Profile() {
     return () => {
       cancelled = true
     }
-  }, [authed])
+  }, [authed, user?.id])
 
   const visibleNav = SECTION_NAV.filter((s) => authed || !s.authOnly)
 
@@ -1481,7 +1405,7 @@ export function Profile() {
         </nav>
 
         {/* Sections */}
-        <div className="col-span-12 lg:col-span-9 xl:col-span-7 space-y-10">
+        <div key={user?.id ?? 'anonymous'} className="col-span-12 lg:col-span-9 xl:col-span-7 space-y-10">
           <AccountSection profile={effectiveProfile} />
 
           {authed && (
@@ -1491,7 +1415,6 @@ export function Profile() {
               onProfileChange={setProfile}
             />
           )}
-          {authed && <SecuritySection />}
 
           <AppearanceSection />
 

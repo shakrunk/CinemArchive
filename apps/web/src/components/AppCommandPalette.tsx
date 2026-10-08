@@ -45,7 +45,7 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     map['action:view-ledger'] = () => onNavigate('ledger')
     list.push({ id: 'action:view-discover', kind: 'action', label: 'Go to Discover', hint: 'view', keywords: 'explore browse trending genres movies tv' })
     map['action:view-discover'] = () => onNavigate('discover')
-    list.push({ id: 'action:view-profile', kind: 'action', label: 'Go to Profile & Settings', hint: 'view', keywords: 'account settings preferences theme shared links sign in out passkey export import' })
+    list.push({ id: 'action:view-profile', kind: 'action', label: 'Go to Profile & Settings', hint: 'view', keywords: 'account settings preferences theme shared links sign in out email export import' })
     map['action:view-profile'] = () => onNavigate('profile')
     if (user && !isSharedView) {
       list.push({ id: 'action:view-friends', kind: 'action', label: 'Go to Friends', hint: 'view', keywords: 'friends social recommendations activity inbox' })

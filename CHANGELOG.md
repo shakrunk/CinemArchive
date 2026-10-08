@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Shared outing completion now preserves one canonical viewing identity across retries and provides guarded reversal that protects newer edits, ratings and title-status changes; native reconciliation is being integrated separately.
 - Android now retains season cast, episode crew and the full cast of newly added titles, preserving credited person identities through local upgrades and sync.
 - Shared library sync now includes season cast, episode crew and their deletion records, allowing native person filters to backfill existing credits safely.
 - Android: outing edits now send only changed fields, preserve uncertain legacy changes for review, and use consistent screening formats in plans and Ledger totals.

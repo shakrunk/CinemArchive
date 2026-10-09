@@ -39,6 +39,11 @@ class DiscoverRepository(
         parseCatalogPersonTitles(client.invokeFunction("media-proxy", "action=person_credits&id=$id", accessToken()))
     }
 
+    suspend fun fetchRecommendations(id: Int, type: MediaType): List<TrendingTitle> = withContext(Dispatchers.IO) {
+        val token = accessToken()
+        fetchCatalogRecommendations(id, type) { client.invokeFunction("media-proxy", it, token) }
+    }
+
     suspend fun fetchStudioTitles(id: Int, type: MediaType?): List<TrendingTitle> = withContext(Dispatchers.IO) {
         val token = accessToken()
         fetchCatalogStudioTitles(id, type) { client.invokeFunction("media-proxy", it, token) }

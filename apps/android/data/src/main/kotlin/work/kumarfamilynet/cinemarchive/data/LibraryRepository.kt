@@ -351,6 +351,11 @@ class LibraryRepository(
             rows.associate { (it.tmdbId to MediaType.valueOf(it.type)) to it.id }
         }
 
+    /** Account-local title identities and title cast only; crew/episode credits are not actors here. */
+    fun observeDiscoverLibrary(): Flow<DiscoverLibrary> = combine(
+        titleDao.observeAllTitles(), titleCastDao.observeAllCast(), ::discoverLibrary,
+    )
+
     /** Continue-watching + watchlist + marquee board for the Up Next screen. Episode totals
      *  come from [SeasonDao.observeAllSeasons]'s already-aggregated per-season counts (same
      *  rollup the Ledger board uses) rather than a new query — a WATCHING title with zero

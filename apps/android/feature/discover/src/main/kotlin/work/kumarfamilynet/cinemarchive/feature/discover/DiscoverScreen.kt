@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -32,6 +36,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,6 +58,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -81,6 +91,16 @@ private class DiscoverViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T = DiscoverViewModel(repository) as T
 }
 
+private class DiscoverShelvesViewModelFactory(
+    private val repository: DiscoverRepository,
+    private val libraryRepository: LibraryRepository,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = DiscoverShelvesViewModel(
+        libraryRepository.observeDiscoverLibrary(), repository::fetchRecommendations, repository::fetchPersonTitles,
+    ) as T
+}
+
 @Composable
 fun DiscoverRoute(
     repository: DiscoverRepository,
@@ -95,6 +115,11 @@ fun DiscoverRoute(
 ) {
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val shelvesViewModel: DiscoverShelvesViewModel = viewModel(factory = DiscoverShelvesViewModelFactory(repository, libraryRepository))
+    val shelves by shelvesViewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(uiState.mode, uiState.query, uiState.genreId) {
+        shelvesViewModel.setVisible(uiState.mode == DiscoverMode.TITLES && uiState.query.isBlank() && uiState.genreId == null)
+    }
 
     // The same media identity drives ownership badges, preview actions and opening detail.
     val idsByTmdbKey by libraryRepository.observeLibraryTitleIdsByTmdbKey()
@@ -111,7 +136,7 @@ fun DiscoverRoute(
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
         onRetry = viewModel::retry,
-        onRefresh = viewModel::refresh,
+        onRefresh = { viewModel.refresh(); shelvesViewModel.retryRecommendations(); shelvesViewModel.retryStarring() },
         addedIds = idsByTmdbKey.keys,
         onOpenTitle = { title ->
             val realId = idsByTmdbKey[title.mediaIdentity]
@@ -135,6 +160,11 @@ fun DiscoverRoute(
         selectedLookup = uiState.selectedLookup,
         onLookupSelect = viewModel::onLookupSelect,
         onLookupBack = viewModel::clearLookup,
+        shelves = shelves,
+        onRecommendationTitle = shelvesViewModel::selectTitle,
+        onStarringPerson = shelvesViewModel::selectPerson,
+        onRetryRecommendations = shelvesViewModel::retryRecommendations,
+        onRetryStarring = shelvesViewModel::retryStarring,
     )
 
     preview?.let { title ->
@@ -180,7 +210,13 @@ fun DiscoverScreen(
     selectedLookup: CatalogLookup? = null,
     onLookupSelect: (CatalogLookup) -> Unit = {},
     onLookupBack: () -> Unit = {},
+    shelves: DiscoverShelvesState = DiscoverShelvesState(),
+    onRecommendationTitle: (String) -> Unit = {},
+    onStarringPerson: (Int) -> Unit = {},
+    onRetryRecommendations: () -> Unit = {},
+    onRetryStarring: () -> Unit = {},
 ) {
+    val showShelves = mode == DiscoverMode.TITLES && search.isBlank() && genreId == null && shelves.library.titles.isNotEmpty()
     val gridState = rememberLazyGridState()
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
@@ -276,10 +312,10 @@ fun DiscoverScreen(
         }
 
         when {
-            isLoading -> Box(modifier = Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
+            isLoading && !showShelves -> Box(modifier = Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
-            error != null -> Column(
+            error != null && !showShelves -> Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -348,8 +384,18 @@ fun DiscoverScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .testTag("discover-grid")
                             .pinchToResizeGrid(gridColumns, onGridColumnsChange),
                     ) {
+                        if (showShelves && isLoading) item(key = "trending-loading", span = { GridItemSpan(maxLineSpan) }) {
+                            Text("Loading trending titles…")
+                        }
+                        if (showShelves && error != null) item(key = "trending-error", span = { GridItemSpan(maxLineSpan) }) {
+                            Column {
+                                Text("Couldn't load trending titles", color = MaterialTheme.colorScheme.error)
+                                TextButton(onClick = onRetry) { Text("Retry trending") }
+                            }
+                        }
                         items(titles, key = TrendingTitle::catalogKey) { title ->
                             DiscoverCard(
                                 title = title,
@@ -359,11 +405,84 @@ fun DiscoverScreen(
                                 onAdd = { onAdd(title) },
                             )
                         }
+                        if (showShelves) {
+                            item(key = "recommendations", span = { GridItemSpan(maxLineSpan) }) {
+                                DiscoverShelf("Because You Watched", "recommendations",
+                                    shelves.library.titles.map { it.id to it.name }, shelves.selectedTitleId,
+                                    "Choose a title to base recommendations on", "Search titles",
+                                    shelves.recommendations, shelves.visible(shelves.recommendations, typeFilter).filterNot { it.mediaIdentity in addedIds },
+                                    "No recommendations found for this title — try picking another.",
+                                    onRecommendationTitle, onRetryRecommendations, onOpenTitle, onAdd)
+                            }
+                            if (shelves.library.cast.isNotEmpty()) item(key = "starring", span = { GridItemSpan(maxLineSpan) }) {
+                                DiscoverShelf("More Starring", "starring",
+                                    shelves.library.cast.map { it.tmdbPersonId.toString() to it.name }, shelves.selectedPersonId?.toString(),
+                                    "Choose an actor to see more of their titles", "Search actors",
+                                    shelves.starring, shelves.visible(shelves.starring, typeFilter).filterNot { it.mediaIdentity in addedIds },
+                                    "Nothing else to show for this cast member. Try another actor or type.",
+                                    { it.toIntOrNull()?.let(onStarringPerson) }, onRetryStarring, onOpenTitle, onAdd)
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DiscoverShelf(
+    heading: String,
+    tag: String,
+    options: List<Pair<String, String>>,
+    selectedId: String?,
+    pickerLabel: String,
+    searchLabel: String,
+    state: DiscoverShelfResult,
+    titles: List<TrendingTitle>,
+    emptyMessage: String,
+    onSelect: (String) -> Unit,
+    onRetry: () -> Unit,
+    onOpen: (TrendingTitle) -> Unit,
+    onAdd: (TrendingTitle) -> Unit,
+) {
+    var choosing by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().testTag("discover-shelf-$tag"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(heading, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 16.dp))
+        OutlinedButton(onClick = { query = ""; choosing = true }, modifier = Modifier.semantics { contentDescription = pickerLabel }) {
+            Text(options.firstOrNull { it.first == selectedId }?.second ?: "Select…", maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        when {
+            state.loading -> Text("Loading ${if (tag == "recommendations") "recommendations" else "filmography"}…")
+            state.error != null -> Column {
+                Text(state.error, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = onRetry) { Text(if (tag == "recommendations") "Retry recommendations" else "Retry filmography") }
+            }
+            titles.isEmpty() -> Text(emptyMessage, style = MaterialTheme.typography.bodyMedium)
+            else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                items(titles, key = TrendingTitle::catalogKey) { title ->
+                    Box(Modifier.width(160.dp).testTag("$tag-${title.catalogKey}")) {
+                        DiscoverCard(title, isAdded = false, columns = 2, onOpen = { onOpen(title) }, onAdd = { onAdd(title) })
+                    }
+                }
+            }
+        }
+    }
+    if (choosing) AlertDialog(onDismissRequest = { choosing = false }, title = { Text(pickerLabel) },
+        text = {
+            Column {
+                if (options.size > 8) OutlinedTextField(query, { query = it }, label = { Text(searchLabel) }, singleLine = true)
+                val matching = options.filter { options.size <= 8 || it.second.contains(query.trim(), ignoreCase = true) }
+                if (matching.isEmpty()) Text("No matches")
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(matching, key = { it.first }) { option ->
+                        TextButton(onClick = { onSelect(option.first); choosing = false },
+                            modifier = Modifier.fillMaxWidth().testTag("$tag-choice-${option.first}")) { Text(option.second) }
+                    }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { choosing = false }) { Text("Cancel") } })
 }
 
 /** [columns] is the current grid density (#126): a narrower card drops the metadata line, then

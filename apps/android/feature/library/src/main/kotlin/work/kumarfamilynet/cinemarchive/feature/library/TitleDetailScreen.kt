@@ -177,7 +177,8 @@ class TitleDetailViewModel(
 
     suspend fun saveViewing(draft: ViewingDraft, isNew: Boolean) = repository.saveViewing(titleId, draft, isNew)
 
-    suspend fun deleteViewing(viewingId: String) = repository.deleteViewing(titleId, viewingId)
+    suspend fun prepareViewing(viewingId: String?) = repository.prepareViewingEdit(titleId, viewingId)
+    suspend fun deleteViewing(draft: ViewingDraft) = repository.deleteViewing(titleId, draft)
 
     fun onChangeStatus(status: LibraryStatus) {
         editTitle { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
@@ -330,6 +331,9 @@ fun TitleDetailRoute(
         onDeleteEpisodeWatch = viewModel::deleteEpisodeWatch,
         onSaveViewing = viewModel::saveViewing,
         onDeleteViewing = viewModel::deleteViewing,
+        onPrepareViewing = viewModel::prepareViewing,
+        viewingOwnerId = repository.viewingOwnerId,
+        viewingTitleId = titleId,
         onChangeStatus = viewModel::onChangeStatus,
         onToggleTheaterInterest = viewModel::onToggleTheaterInterest,
         onRateTitle = viewModel::onRateTitle,
@@ -373,7 +377,7 @@ fun TitleDetailScreen(
     onSaveEpisodeLog: suspend (String, EpisodeLogDraft) -> Unit = { _, _ -> },
     onDeleteEpisodeWatch: suspend (String, String) -> Unit = { _, _ -> },
     onSaveViewing: suspend (ViewingDraft, Boolean) -> Unit = { _, _ -> },
-    onDeleteViewing: suspend (String) -> Unit = {},
+    onDeleteViewing: suspend (ViewingDraft) -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
     onToggleTheaterInterest: (Boolean) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
@@ -406,16 +410,42 @@ fun TitleDetailScreen(
     onSaveTags: (suspend (List<String>) -> Unit)? = null,
     titleEditError: String? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
+    onPrepareViewing: (suspend (String?) -> ViewingDraft)? = null,
+    viewingOwnerId: String? = null,
+    viewingTitleId: String? = detail?.id,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
     var postShowViewing by remember { mutableStateOf<Viewing?>(null) }
-    var showViewingEditor by remember { mutableStateOf(false) }
-    var editingViewing by remember { mutableStateOf<Viewing?>(null) }
-    var deletingViewing by remember { mutableStateOf<Viewing?>(null) }
+    var editingViewingState by rememberSaveable(viewingTitleId, viewingOwnerId) { mutableStateOf<String?>(null) }
+    var deletingViewingState by rememberSaveable(viewingTitleId, viewingOwnerId) { mutableStateOf<String?>(null) }
+    val editingViewing = restoreViewingEditor(editingViewingState, viewingOwnerId, viewingTitleId)
+    val deletingViewing = restoreViewingEditor(deletingViewingState, viewingOwnerId, viewingTitleId)?.draft
+    var preparingViewing by remember { mutableStateOf(false) }
+    var viewingOpenError by remember { mutableStateOf<String?>(null) }
+    val currentHistoryOwner by androidx.compose.runtime.rememberUpdatedState(viewingOwnerId)
+    val currentHistoryTitle by androidx.compose.runtime.rememberUpdatedState(viewingTitleId)
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
     val historyScope = rememberCoroutineScope()
+    fun openViewing(viewing: Viewing?, deleting: Boolean = false) {
+        val openingTitle = detail?.id ?: return
+        val openingOwner = viewingOwnerId
+        preparingViewing = true
+        viewingOpenError = null
+        historyScope.launch {
+            try {
+                val draft = onPrepareViewing?.invoke(viewing?.id) ?: viewing?.let {
+                    ViewingDraft(it.id, it.date?.take(10), it.rating, it.notes, it.venue, it.companions)
+                } ?: ViewingDraft(java.util.UUID.randomUUID().toString(), java.time.LocalDate.now().toString(), null, null, null)
+                if (currentHistoryOwner != openingOwner || currentHistoryTitle != openingTitle) return@launch
+                val saved = saveViewingEditor(openingOwner, openingTitle, draft, viewing == null)
+                if (deleting) { deletingViewingState = saved; deleteError = null } else editingViewingState = saved
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (currentHistoryOwner == openingOwner) viewingOpenError = e.message ?: "Couldn't open this viewing." }
+            finally { preparingViewing = false }
+        }
+    }
     var showRemoveConfirm by rememberSaveable { mutableStateOf(false) }
     // Keyed on the title id (not just rememberSaveable) so navigating from one series' detail
     // screen straight to another's doesn't carry over a season number that may not exist there.
@@ -701,7 +731,7 @@ fun TitleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Viewing history", style = MaterialTheme.typography.titleMedium)
-                        TextButton(onClick = { editingViewing = null; showViewingEditor = true }) { Text("Log a viewing") }
+                        TextButton(enabled = !preparingViewing, onClick = { openViewing(null) }) { Text("Log a viewing") }
                     }
                 }
             }
@@ -710,8 +740,8 @@ fun TitleDetailScreen(
                     ViewingRow(
                         viewing,
                         onRateClick = { postShowViewing = viewing },
-                        onEditClick = { editingViewing = viewing; showViewingEditor = true },
-                        onDeleteClick = { deletingViewing = viewing; deleteError = null },
+                        onEditClick = { if (!preparingViewing) openViewing(viewing) },
+                        onDeleteClick = { if (!preparingViewing) openViewing(viewing, deleting = true) },
                         modifier = Modifier.padding(horizontal = 22.dp),
                     )
                 }
@@ -785,23 +815,29 @@ fun TitleDetailScreen(
         )
     }
 
-    if (showViewingEditor) {
-        ViewingEditorSheet(editingViewing, onSaveViewing, onDismiss = { showViewingEditor = false; editingViewing = null })
+    viewingOpenError?.let { message ->
+        AlertDialog(onDismissRequest = { viewingOpenError = null }, title = { Text("Viewing unavailable") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = { viewingOpenError = null }) { Text("Close") } })
+    }
+    if (editingViewing != null) {
+        androidx.compose.runtime.key(editingViewingState) {
+            ViewingEditorSheet(editingViewing.draft, editingViewing.isNew, onSaveViewing, onDismiss = { editingViewingState = null })
+        }
     }
     deletingViewing?.let { viewing ->
         AlertDialog(
-            onDismissRequest = { if (!deleting) deletingViewing = null },
+            onDismissRequest = { if (!deleting) deletingViewingState = null },
             title = { Text("Delete this viewing?") },
             text = { Text(deleteError ?: "Remove the viewing from ${viewing.date ?: "before joining"}? Other viewings stay in your history.") },
-            dismissButton = { TextButton(enabled = !deleting, onClick = { deletingViewing = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(enabled = !deleting, onClick = { deletingViewingState = null }) { Text("Cancel") } },
             confirmButton = {
                 TextButton(enabled = !deleting, onClick = {
                     deleting = true
                     deleteError = null
                     historyScope.launch {
                         try {
-                            onDeleteViewing(viewing.id)
-                            deletingViewing = null
+                            onDeleteViewing(viewing)
+                            deletingViewingState = null
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {

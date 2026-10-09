@@ -198,6 +198,8 @@ class AppAccountRuntime(
         episodeMetadataFetcher = discoverRepository,
         personCreditsDao = database.personCreditsDao(),
         mutationOwnerId = ownerId,
+        viewingAliases = database.viewingCompletionAliasDao(),
+        isCurrentOwner = { auth.observeIdentity().value == identity },
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)

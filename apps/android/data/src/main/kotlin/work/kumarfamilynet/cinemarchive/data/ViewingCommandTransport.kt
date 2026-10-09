@@ -20,6 +20,7 @@ internal class ViewingCommandTransport(
             val session = sessionProvider() ?: error("Account changed before viewing sync.")
             fun checkOwner() { check(sessionProvider()?.userId == session.userId) { "Account changed during viewing sync." } }
             val operations = viewingCommandOperations(entry)
+            val titleEffect = viewingTitleEntry(entry, session.userId)
             val linkedOutings = viewingLinkedOutingIds(entry, session.userId)
             checkOwner()
             val receipt = JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
@@ -36,16 +37,12 @@ internal class ViewingCommandTransport(
             currentCoroutineContext().ensureActive(); checkOwner()
             val envelope = JSONObject().put("receipt", receipt).put("current", if (rows.length() == 0) JSONObject.NULL else rows.getJSONObject(0))
             currentViewingCommandRow(entry, envelope, session.userId)
+            if (titleEffect != null) {
+                envelope.put("currentTitle", fetchViewingTitle(client, session, titleEffect.entityId, ::checkOwner) ?: JSONObject.NULL)
+                currentViewingTitle(entry, envelope, session.userId)
+            }
             if (linkedOutings.isNotEmpty()) {
-                val currentOutings = JSONObject()
-                for (id in linkedOutings) {
-                    currentCoroutineContext().ensureActive(); checkOwner()
-                    val outings = JSONArray(client.get("cinema_outings", "id=eq.$id&user_id=eq.${session.userId}&select=*", session.accessToken))
-                    require(outings.length() <= 1)
-                    currentCoroutineContext().ensureActive(); checkOwner()
-                    currentOutings.put(id, if (outings.length() == 0) JSONObject.NULL else outings.getJSONObject(0))
-                }
-                envelope.put("currentOutings", currentOutings)
+                envelope.put("currentOutings", fetchViewingLinkedOutings(client, session, linkedOutings, ::checkOwner))
                 currentViewingLinkedOutings(entry, envelope, session.userId)
             }
             PushResult.Applied(envelope)
@@ -69,7 +66,9 @@ internal fun viewingLinkedOutingIds(entry: OutboxEntity, ownerId: String): List<
             opening.getString("titleId") == payload.getString("titleId")) { "Saved viewing belongs to another account or title." }
     }
     if (!payload.has("linkedOutings")) return emptyList()
-    require(viewingCommandOperations(entry).getJSONObject(0).getString("action") == "delete")
+    val action = if (payload.has(VIEWING_COMMAND_DATA)) viewingCommandOperations(entry.copy(operation = VIEWING_COMMAND)).getJSONObject(0).getString("action")
+        else payload.getJSONObject(VIEWING_REVIEW_INTENT).also { require(it.getString("ownerId") == ownerId) }.getString("action")
+    require(action == "delete")
     require(opening != null && sameCommandJson(opening.getJSONArray("linkedOutings"), payload.getJSONArray("linkedOutings")))
     val ids = payload.getJSONArray("linkedOutings").let { values -> (0 until values.length()).map { values.getString(it).also(java.util.UUID::fromString) } }
     require(ids.size == ids.distinct().size)
@@ -82,9 +81,24 @@ internal fun currentViewingLinkedOutings(entry: OutboxEntity, envelope: JSONObje
         require(!envelope.has("currentOutings") || envelope.getJSONObject("currentOutings").length() == 0)
         return emptyMap()
     }
-    val rows = envelope.getJSONObject("currentOutings")
+    return checkedViewingLinkedOutings(ids, JSONObject(entry.payloadJson).getString("titleId"), ownerId, envelope.getJSONObject("currentOutings"))
+}
+
+internal suspend fun fetchViewingLinkedOutings(client: SupabaseRestClient, session: SupabaseSession, ids: List<String>, checkOwner: () -> Unit): JSONObject {
+    val rows = JSONObject()
+    for (id in ids) {
+        java.util.UUID.fromString(id)
+        currentCoroutineContext().ensureActive(); checkOwner()
+        val found = JSONArray(client.get("cinema_outings", "id=eq.$id&user_id=eq.${session.userId}&select=*", session.accessToken))
+        require(found.length() <= 1)
+        currentCoroutineContext().ensureActive(); checkOwner()
+        rows.put(id, if (found.length() == 0) JSONObject.NULL else found.getJSONObject(0))
+    }
+    return rows
+}
+
+internal fun checkedViewingLinkedOutings(ids: List<String>, titleId: String, ownerId: String, rows: JSONObject): Map<String, JSONObject?> {
     require(rows.keys().asSequence().toSet() == ids.toSet()) { "Current linked outing state is incomplete." }
-    val titleId = JSONObject(entry.payloadJson).getString("titleId")
     return ids.associateWith { id ->
         if (rows.isNull(id)) null else rows.getJSONObject(id).also {
             require(it.getString("id") == id && it.getString("user_id") == ownerId && it.getString("title_id") == titleId)
@@ -96,7 +110,16 @@ internal fun currentViewingLinkedOutings(entry: OutboxEntity, envelope: JSONObje
 /** False denotes a valid identity receipt whose values differ, not an unverified response. */
 internal fun viewingReceiptConfirmsIntent(entry: OutboxEntity, receipt: JSONObject, ownerId: String): Boolean {
     val operations = viewingCommandOperations(entry)
-    val result = checkedLibraryCommandReceipt(entry.id, operations, receipt, ownerId).single()
+    val results = checkedLibraryCommandReceipt(entry.id, operations, receipt, ownerId)
+    viewingTitleEntry(entry, ownerId)?.let { effect ->
+        val title = results[1].getJSONObject("row")
+        require(title.getString("id") == effect.entityId && title.getString("user_id") == ownerId)
+        val patch = titleMetadataPatch(effect, ownerId)
+        require(patch.keys().asSequence().all { title.has(it) && sameCommandJson(patch.get(it), title.get(it)) }) {
+            "Title receipt differs from the saved viewing action."
+        }
+    }
+    val result = results.first()
     val operation = operations.getJSONObject(0)
     if (operation.getString("action") == "delete") return true
     val row = result.getJSONObject("row")
@@ -116,4 +139,19 @@ private fun validateViewingCommandRow(entry: OutboxEntity, row: JSONObject, owne
     require(row.getString("id") == entry.entityId && row.getString("user_id") == ownerId &&
         row.getString("title_id") == JSONObject(entry.payloadJson).getString("titleId")) { "Viewing identity or owner changed." }
     row.toCompletionViewing()
+}
+
+internal suspend fun fetchViewingTitle(client: SupabaseRestClient, session: SupabaseSession, titleId: String, checkOwner: () -> Unit): JSONObject? {
+    java.util.UUID.fromString(titleId)
+    currentCoroutineContext().ensureActive(); checkOwner()
+    val rows = JSONArray(client.get("titles", "id=eq.$titleId&user_id=eq.${session.userId}&select=*", session.accessToken))
+    require(rows.length() <= 1)
+    currentCoroutineContext().ensureActive(); checkOwner()
+    return if (rows.length() == 0) null else checkedCurrentTitle(rows.getJSONObject(0), titleId, session.userId)
+}
+
+internal fun currentViewingTitle(entry: OutboxEntity, envelope: JSONObject, ownerId: String): JSONObject? {
+    val effect = viewingTitleEntry(entry, ownerId) ?: return null
+    require(envelope.has("currentTitle")) { "Current title state is missing from the compound viewing acknowledgment." }
+    return if (envelope.isNull("currentTitle")) null else checkedCurrentTitle(envelope.getJSONObject("currentTitle"), effect.entityId, ownerId)
 }

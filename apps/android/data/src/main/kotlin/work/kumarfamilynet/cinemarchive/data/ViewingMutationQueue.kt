@@ -37,8 +37,8 @@ internal fun captureViewingGuard(previous: ViewingEntity, alias: ViewingCompleti
 }
 
 internal fun captureViewingTitleGuard(title: TitleEntity, pending: List<OutboxEntity>, ownerId: String): ViewingGuard {
-    val related = pending.filter { it.entityType == "title" && it.entityId == title.id }
-    if (related.any { it.operation != TITLE_METADATA_COMMAND || runCatching { titleMetadataOperation(it, ownerId) }.isFailure }) return ViewingGuard()
+    val related = pendingTitleIntents(pending, title.id)
+    if (related.any { runCatching { checkedTitlePredecessor(it, ownerId) }.isFailure }) return ViewingGuard()
     // Completion title effects need the later joint lifecycle cutover. Never borrow its current title snapshot here.
     if (pending.any { it.entityType == "outing_completion" && runCatching {
             completionCommand(it.copy(operation = OUTING_COMPLETION)).titleId == title.id
@@ -89,15 +89,16 @@ internal fun CapturedViewing.fields(draft: ViewingDraft): JSONObject {
     } }
 }
 
-internal fun CapturedViewing.payload(action: String, fields: JSONObject): Pair<String, String> {
+internal fun CapturedViewing.payload(action: String, fields: JSONObject, titlePatch: JSONObject? = null): Pair<String, String> {
     require(action in setOf("insert", "update", "delete") && (action == "insert") == isNew)
     if (action == "delete") require(fields.length() == 0) else viewingWireValues(fields)
-    val dispatch = action == "insert" || guard.known
+    val dispatch = (action == "insert" || guard.known) && (titlePatch == null || titleGuard.known)
     val payload = if (dispatch) viewingCommandPayload(id, titleId, action, fields,
         if (action == "insert") null else guard.revision, if (action == "insert") null else guard.operationId)
-    else JSONObject().put(VIEWING_REVIEW_INTENT, JSONObject().put("version", 1).put("ownerId", ownerId)
+    else JSONObject().put("id", id).put("titleId", titleId).put(VIEWING_REVIEW_INTENT, JSONObject().put("version", 1).put("ownerId", ownerId)
         .put("id", id).put("titleId", titleId).put("action", action).put("fields", fields))
     payload.put(VIEWING_OPENING, JSONObject(raw))
+    if (titlePatch != null) attachViewingTitleEffect(payload, titleMetadataPayload(ownerId, titleId, titlePatch, titleGuard.revision, titleGuard.operationId))
     if (action == "delete") payload.put("linkedOutings", JSONArray(linkedOutings))
     return (if (dispatch) VIEWING_COMMAND else "review") to canonicalViewingJson(payload)
 }
@@ -122,6 +123,7 @@ fun viewingHistoryProtectionKeys(entries: List<OutboxEntity>, ownerId: String): 
         val opening = payload.optJSONObject(VIEWING_OPENING) ?: return@forEach
         require(opening.getString("ownerId") == ownerId)
         add("viewing_history:${entry.entityId}")
+        if (payload.has(VIEWING_TITLE_EFFECT)) add("title:" + opening.getString("titleId"))
         opening.getJSONArray("linkedOutings").let { ids -> (0 until ids.length()).forEach {
             val id = ids.getString(it).also(UUID::fromString)
             add("cinema_outing:$id")

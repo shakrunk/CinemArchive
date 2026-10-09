@@ -37,10 +37,23 @@ internal object ViewingCommandFixture {
         val result = JSONObject().put("table", "viewings").put("key", JSONObject().put("id", viewing))
         if (viewingCommandOperations(entry).getJSONObject(0).getString("action") == "delete") result.put("deleted", true)
         else result.put("row", row)
-        return JSONObject().put("operationId", entry.id).put("rows", JSONArray().put(result))
+        val results = JSONArray().put(result)
+        viewingTitleEntry(entry, owner)?.let { effect -> results.put(JSONObject().put("table", "titles")
+            .put("key", JSONObject().put("id", title)).put("row", titleRow().apply {
+                titleMetadataPatch(effect, owner).let { patch -> patch.keys().forEach { put(it, patch.get(it)) } }
+            })) }
+        return JSONObject().put("operationId", entry.id).put("rows", results)
     }
     fun envelope(entry: OutboxEntity, current: JSONObject? = applied(entry)) = JSONObject()
-        .put("receipt", receipt(entry)).put("current", current ?: JSONObject.NULL)
+        .put("receipt", receipt(entry)).put("current", current ?: JSONObject.NULL).apply {
+            if (viewingTitleEntry(entry, owner) != null) put("currentTitle", receipt(entry).getJSONArray("rows").getJSONObject(1).getJSONObject("row"))
+        }
+    fun titleRow() = TitleMetadataFixture.row().put("id", title).put("user_id", owner).put("updated_at", baseline)
+    fun compound(): OutboxEntity = entry(fields = JSONObject().put("rating", 4.5).put("notes", "Saved note")).let { saved ->
+        val payload = JSONObject(saved.payloadJson)
+        attachViewingTitleEffect(payload, titleMetadataPayload(owner, title, JSONObject().put("rating", 4.5), baseline, null))
+        saved.copy(payloadJson = payload.toString())
+    }
     fun linkedDelete(): OutboxEntity {
         val draft = work.kumarfamilynet.cinemarchive.core.model.ViewingDraft(viewing, "2026-10-01", null, null, null)
         val captured = draft.copy(openingContext = viewingOpening(owner, title, viewing, draft,
@@ -69,6 +82,31 @@ class ViewingCommandTransportTest {
     private fun accepted(entry: OutboxEntity, current: JSONObject? = ViewingCommandFixture.applied(entry)) {
         replies += 200 to ViewingCommandFixture.receipt(entry).toString()
         replies += 200 to JSONArray().apply { current?.let(::put) }.toString()
+    }
+
+    @Test fun compoundUsesOneRpcAndFailedTitleRefreshRetriesBothOriginalGuards() = runTest {
+        val entry = ViewingCommandFixture.compound()
+        accepted(entry); replies += 409 to """{"code":"40001","message":"Title read failed"}"""
+        assertTrue(transport().push(entry) is PushResult.Retry)
+        accepted(entry); replies += 200 to JSONArray().put(ViewingCommandFixture.titleRow().put("rating", 2.0).put("updated_at", "2026-10-09T10:00:00Z")).toString()
+        val result = transport().push(entry) as PushResult.Applied
+        assertEquals(body(0), body(3))
+        assertEquals(2, JSONObject(body(0)).getJSONArray("p_operations").length())
+        assertEquals("/rest/v1/titles", requests.last().url.encodedPath)
+        assertEquals("eq.${ViewingCommandFixture.owner}", requests.last().url.queryParameter("user_id"))
+        assertEquals(2.0, result.receipt.getJSONObject("currentTitle").getDouble("rating"), 0.0)
+    }
+
+    @Test fun compoundWrongTitleEffectAndAccountSwitchNeverAcknowledge() = runTest {
+        val entry = ViewingCommandFixture.compound()
+        val wrong = ViewingCommandFixture.receipt(entry)
+        wrong.getJSONArray("rows").getJSONObject(1).getJSONObject("row").put("rating", 1.0)
+        replies += 200 to wrong.toString()
+        assertTrue(transport().push(entry) is PushResult.Retry)
+        assertEquals(1, requests.size)
+        accepted(entry); replies += 200 to JSONArray().put(ViewingCommandFixture.titleRow()).toString()
+        afterResponse = { if (requests.last().url.encodedPath.endsWith("titles")) session = null }
+        assertTrue(transport().push(entry) is PushResult.Retry)
     }
 
     @Test fun unknownOutcomeRetriesExactCommandAndUsesFreshHistory() = runTest {

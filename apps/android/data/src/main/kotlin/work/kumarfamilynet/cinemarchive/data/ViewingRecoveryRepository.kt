@@ -16,6 +16,8 @@ import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 interface ViewingRecoveryRemote {
     suspend fun fetch(session: SupabaseSession, viewingId: String): JSONObject?
     suspend fun confirm(entry: OutboxEntity): PushResult
+    suspend fun linkedOutings(session: SupabaseSession, ids: List<String>): JSONObject = error("Linked outing refresh is unavailable. Retry without discarding the saved change.")
+    suspend fun title(session: SupabaseSession, titleId: String): JSONObject? = error("Current title refresh is unavailable. Retry without discarding the saved viewing action.")
 }
 
 /** Original bytes and attempted commands live in a separate, owner-scoped recovery store.
@@ -58,9 +60,10 @@ class ViewingRecoveryRepository(
     override suspend fun review(id: String): OutingRecoveryReview = outbox.withFlushPaused {
         val record = retain(id)
         val original = recoveryEntry(record.getJSONObject("original"))
-        val intent = runCatching { intent(original) }.getOrNull()
+        val intent = runCatching { ownedIntent(original) }.getOrNull()
         val target = target(original, intent?.titleId)
         val current = remote.fetch(active(), target.id)?.also { validateCurrent(it, target) }
+        val currentTitle = fetchCompoundTitle(original)
         active()
         val fields = mutableListOf<OutingRecoveryField>()
         if (intent?.action == "delete") {
@@ -76,7 +79,12 @@ class ViewingRecoveryRepository(
                     current?.let { viewingDisplay(it.opt(viewingRecoveryColumns.getValue(key)) ?: JSONObject.NULL) } ?: "Not available", current != null)
             }
         }
-        OutingRecoveryReview(id, title(record), fields, current?.getString("updated_at"), current != null,
+        if (viewingTitleEntry(original, ownerId) != null) {
+            fields += OutingRecoveryField("titleEffect", "Title rating and status", "Selecting the saved rating also updates the title rating. Reapplying a new viewing marks the title watched.",
+                currentTitle?.let { "Status: ${it.getString("status")}; rating: ${viewingDisplay(it.get("rating"))}" } ?: "Title unavailable", false)
+        }
+        val canApply = current != null && (viewingTitleEntry(original, ownerId) == null || currentTitle != null)
+        OutingRecoveryReview(id, title(record), fields, if (canApply) reviewVersion(current!!, currentTitle) else null, canApply,
             record.optJSONObject("attempt") != null || pendingCommand(id) != null, record.getString("state") != "pending",
             when {
                 intent == null -> "This saved change cannot be interpreted. Its original data remains available to export."
@@ -95,7 +103,9 @@ class ViewingRecoveryRepository(
                 is PushResult.Applied -> {
                     active()
                     val current = currentViewingCommandRow(original, result.receipt, ownerId)
-                    finish(id, record, current, "applied", restoreObserved = false)
+                    val outings = currentViewingLinkedOutings(original, result.receipt, ownerId)
+                    val title = currentViewingTitle(original, result.receipt, ownerId)
+                    finish(id, record, current, "applied", restoreObserved = false, currentOutings = outings, currentTitle = title)
                     return@mutate OutingRecoveryOutcome.CONFIRMED
                 }
                 is PushResult.Review -> {
@@ -110,19 +120,29 @@ class ViewingRecoveryRepository(
         var attempt = record.optJSONObject("attempt")
         if (attempt == null) {
             require(!expectedVersion.isNullOrBlank() && selected.isNotEmpty()) { "Review the current event and select an action first." }
-            Instant.parse(expectedVersion)
-            val saved = intent(original)
+            val saved = ownedIntent(original)
+            val versions = readReviewVersion(original, expectedVersion)
             val target = target(original, saved.titleId)
             val current = remote.fetch(active(), target.id)?.also { validateCurrent(it, target) }
                 ?: return@mutate OutingRecoveryOutcome.MISSING
+            val currentTitle = fetchCompoundTitle(original)
+            if (viewingTitleEntry(original, ownerId) != null && currentTitle == null) return@mutate OutingRecoveryOutcome.MISSING
             active()
             val deleting = saved.action == "delete"
             require(if (deleting) selected == setOf("delete") else selected.all { it in viewingRecoveryFields && saved.fields.has(it) })
             val fields = JSONObject()
             if (!deleting) selected.forEach { fields.put(it, saved.fields.get(it)) }
-            val command = OutboxEntity(UUID.randomUUID().toString(), "viewing", target.id, VIEWING_COMMAND,
-                viewingCommandPayload(target.id, current.getString("title_id"), if (deleting) "delete" else "update",
-                    fields, expectedVersion, null).toString(), System.currentTimeMillis())
+            val payload = viewingCommandPayload(target.id, current.getString("title_id"), if (deleting) "delete" else "update", fields, versions.first, null)
+            selectedTitlePatch(original, fields)?.let { patch ->
+                if (saved.action == "insert") payload.put("reviewedInsert", true)
+                attachViewingTitleEffect(payload, titleMetadataPayload(ownerId, current.getString("title_id"), patch, checkNotNull(versions.second), null))
+            }
+            if (deleting && JSONObject(original.payloadJson).has("linkedOutings")) {
+                val originalPayload = JSONObject(original.payloadJson)
+                payload.put("linkedOutings", originalPayload.getJSONArray("linkedOutings"))
+                    .put(VIEWING_OPENING, originalPayload.getJSONObject(VIEWING_OPENING))
+            }
+            val command = OutboxEntity(UUID.randomUUID().toString(), "viewing", target.id, VIEWING_COMMAND, payload.toString(), System.currentTimeMillis())
             attempt = command.originalRecord().getJSONObject("original")
             record.put("attempt", attempt)
             active(); archive.put(id, record.toString()) // durable before the first HTTP request
@@ -134,7 +154,9 @@ class ViewingRecoveryRepository(
             is PushResult.Applied -> {
                 active()
                 val current = currentViewingCommandRow(attempted, result.receipt, ownerId)
-                finish(id, record, current, "applied", restoreObserved = true)
+                val outings = currentViewingLinkedOutings(attempted, result.receipt, ownerId)
+                val title = if (viewingTitleEntry(attempted, ownerId) != null) currentViewingTitle(attempted, result.receipt, ownerId) else fetchCompoundTitle(original)
+                finish(id, record, current, "applied", restoreObserved = true, currentOutings = outings, currentTitle = title)
                 OutingRecoveryOutcome.APPLIED
             }
             is PushResult.Review -> {
@@ -150,11 +172,14 @@ class ViewingRecoveryRepository(
         check(record.getString("state") == "pending") { "This change has already been resolved." }
         check(record.optJSONObject("attempt") == null && pendingCommand(id) == null) { "Confirm the pending attempt before discarding this change." }
         val original = recoveryEntry(record.getJSONObject("original"))
-        val saved = runCatching { intent(original) }.getOrNull()
+        val saved = runCatching { ownedIntent(original) }.getOrNull()
         val target = target(original, saved?.titleId)
         val current = remote.fetch(active(), target.id)?.also { validateCurrent(it, target) }
+        val ids = viewingLinkedOutingIds(original, ownerId)
+        val outings = if (ids.isEmpty()) emptyMap() else checkedViewingLinkedOutings(ids, checkNotNull(saved?.titleId), ownerId, remote.linkedOutings(active(), ids))
+        val title = fetchCompoundTitle(original)
         active()
-        finish(id, record, current, "discarded", restoreObserved = true)
+        finish(id, record, current, "discarded", restoreObserved = true, currentOutings = outings, currentTitle = title)
     }
     override suspend fun exportOriginal(id: String): String = outbox.withFlushPaused {
         active()
@@ -184,9 +209,10 @@ class ViewingRecoveryRepository(
         replayBoundary { result = ViewingRecoveryValue(outbox.withFlushPaused(action)) }
         return checkNotNull(result).value
     }
-    private suspend fun finish(id: String, record: JSONObject, current: JSONObject?, state: String, restoreObserved: Boolean) {
+    private suspend fun finish(id: String, record: JSONObject, current: JSONObject?, state: String, restoreObserved: Boolean,
+        currentOutings: Map<String, JSONObject?> = emptyMap(), currentTitle: JSONObject? = null) {
         val original = recoveryEntry(record.getJSONObject("original"))
-        val target = target(original, runCatching { intent(original).titleId }.getOrNull())
+        val target = target(original, runCatching { ownedIntent(original).titleId }.getOrNull())
         current?.let { validateCurrent(it, target) }
         outbox.atomically {
             active()
@@ -205,7 +231,7 @@ class ViewingRecoveryRepository(
                     val row = JSONObject(current.toString())
                     var deleted = false
                     later.forEach { pending ->
-                        val saved = intent(pending)
+                        val saved = ownedIntent(pending)
                         require(saved.titleId == null || saved.titleId == current.getString("title_id"))
                         require(saved.action != "insert" && !deleted)
                         if (saved.action == "delete") deleted = true
@@ -224,6 +250,10 @@ class ViewingRecoveryRepository(
                 require(provisional == null || provisional.titleId == target.titleId) { "The provisional viewing identity changed." }
                 database.viewingDao().deleteById(original.entityId)
             }
+            if (currentOutings.isNotEmpty()) applyViewingLinkedOutings(database, checkNotNull(target.titleId), currentOutings,
+                if (index < 0) queue else queue.drop(index + 1))
+            if (viewingTitleEntry(original, ownerId) != null) applyCurrentViewingTitle(database, checkNotNull(target.titleId), currentTitle,
+                if (index < 0) queue else queue.drop(index + 1), ownerId)
             dao.remove(id)
             active()
         }
@@ -231,7 +261,7 @@ class ViewingRecoveryRepository(
         active(); archive.put(id, record.toString())
     }
     private suspend fun checkedAttempt(original: OutboxEntity, json: JSONObject): OutboxEntity {
-        val saved = intent(original)
+        val saved = ownedIntent(original)
         val target = target(original, saved.titleId)
         val entry = recoveryEntry(json)
         require(entry.id != original.id && entry.entityId == target.id)
@@ -247,16 +277,50 @@ class ViewingRecoveryRepository(
                 saved.fields.has(it) && sameCommandJson(fields.get(it), saved.fields.get(it))
             }) { "The retained resolution differs from the original saved fields." }
         }
+        val expectedTitle = selectedTitlePatch(original, payload.getJSONObject("fields"))
+        val effect = viewingTitleEntry(entry, ownerId)
+        require((expectedTitle == null) == (effect == null)) { "The title effect differs from the selected viewing fields." }
+        if (effect != null) {
+            require(sameCommandJson(expectedTitle!!, titleMetadataPatch(effect, ownerId)))
+            val titleOperation = titleMetadataOperation(effect, ownerId)
+            require(titleOperation.has("expectedUpdatedAt") && !titleOperation.has("expectedOperationId"))
+        }
         return entry
+    }
+    private suspend fun fetchCompoundTitle(entry: OutboxEntity): JSONObject? {
+        val effect = viewingTitleEntry(entry, ownerId) ?: return null
+        val current = remote.title(active(), effect.entityId)
+        active()
+        return current?.let { checkedCurrentTitle(it, effect.entityId, ownerId) }
+    }
+    private fun selectedTitlePatch(original: OutboxEntity, fields: JSONObject): JSONObject? {
+        val effect = viewingTitleEntry(original, ownerId) ?: return null
+        val saved = titleMetadataPatch(effect, ownerId)
+        return JSONObject().apply {
+            if (saved.has("status") && fields.length() > 0) put("status", saved.get("status"))
+            if (saved.has("rating") && fields.has("rating")) put("rating", saved.get("rating"))
+        }.takeIf { it.length() > 0 }
+    }
+    private fun reviewVersion(viewing: JSONObject, title: JSONObject?): String = if (title == null) viewing.getString("updated_at") else
+        JSONObject().put("viewing", viewing.getString("updated_at")).put("title", title.getString("updated_at")).toString()
+    private fun readReviewVersion(original: OutboxEntity, value: String): Pair<String, String?> {
+        if (viewingTitleEntry(original, ownerId) == null) return value.also(Instant::parse) to null
+        val versions = JSONObject(value)
+        require(versions.keys().asSequence().toSet() == setOf("viewing", "title"))
+        return versions.getString("viewing").also(Instant::parse) to versions.getString("title").also(Instant::parse)
     }
     private suspend fun title(record: JSONObject): String {
         val original = recoveryEntry(record.getJSONObject("original"))
-        val known = runCatching { intent(original).titleId }.getOrNull()
+        val known = runCatching { ownedIntent(original).titleId }.getOrNull()
             ?: database.viewingDao().getById(original.entityId)?.titleId
         return known?.let { database.titleDao().getById(it)?.title } ?: "Viewing history"
     }
     private suspend fun pendingCommand(id: String) = dao.getPending().firstOrNull {
         it.id == id && it.entityType == "viewing" && it.operation == VIEWING_COMMAND
+    }
+    private fun ownedIntent(entry: OutboxEntity): SavedViewingIntent {
+        JSONObject(entry.payloadJson).optJSONObject(VIEWING_OPENING)?.let { require(it.getString("ownerId") == ownerId) }
+        return intent(entry)
     }
     private data class Target(val id: String, val titleId: String?)
     private suspend fun target(original: OutboxEntity, titleId: String?): Target {
@@ -280,6 +344,14 @@ class ViewingRecoveryRepository(
                 if (rows.length() == 0) null else rows.getJSONObject(0)
             }
             override suspend fun confirm(entry: OutboxEntity) = ViewingCommandTransport(client, sessionProvider).push(entry)
+            override suspend fun title(session: SupabaseSession, titleId: String) = withContext(Dispatchers.IO) {
+                require(session.userId == ownerId)
+                fetchViewingTitle(client, session, titleId) { check(sessionProvider()?.userId == ownerId) { "Viewing account changed." } }
+            }
+            override suspend fun linkedOutings(session: SupabaseSession, ids: List<String>) = withContext(Dispatchers.IO) {
+                require(session.userId == ownerId)
+                fetchViewingLinkedOutings(client, session, ids) { check(sessionProvider()?.userId == ownerId) { "Viewing account changed." } }
+            }
         }
     }
 }
@@ -288,6 +360,16 @@ private data class SavedViewingIntent(val titleId: String?, val action: String, 
 private data class ViewingRecoveryValue<T>(val value: T)
 private fun intent(entry: OutboxEntity): SavedViewingIntent {
     val payload = JSONObject(entry.payloadJson)
+    if (payload.has(VIEWING_REVIEW_INTENT)) {
+        val saved = payload.getJSONObject(VIEWING_REVIEW_INTENT)
+        require(entry.operation == "review" && saved.getInt("version") == 1 && saved.getString("id") == entry.entityId)
+        require(saved.getString("ownerId") == payload.getJSONObject(VIEWING_OPENING).getString("ownerId"))
+        val action = saved.getString("action")
+        val fields = saved.getJSONObject("fields")
+        require(action in setOf("insert", "update", "delete"))
+        if (action == "delete") require(fields.length() == 0) else viewingWireValues(fields)
+        return SavedViewingIntent(saved.getString("titleId"), action, fields)
+    }
     if (payload.has("completionIntent")) {
         val saved = payload.getJSONObject("completionIntent")
         require(saved.getString("provisionalViewingId") == entry.entityId)

@@ -27,14 +27,24 @@ internal fun checkedTitlePatch(patch: JSONObject): JSONObject {
 internal suspend fun MutationOutbox.enqueueTitleMetadata(previous: TitleEntity, patch: JSONObject, ownerId: String) {
     require(ownerId.isNotBlank())
     checkedTitlePatch(patch)
-    val predecessor = pendingEntries().lastOrNull { it.entityType == "title" && it.entityId == previous.id }
+    val predecessor = pendingTitleIntents(pendingEntries(), previous.id).lastOrNull()
     val receiptPredecessor = predecessor?.takeIf {
-        it.operation == TITLE_METADATA_COMMAND && runCatching { titleMetadataOperation(it, ownerId) }.isSuccess
+        runCatching { checkedTitlePredecessor(it, ownerId) }.isSuccess
     }
     val draft = predecessor != null && receiptPredecessor == null
     val payload = titleMetadataPayload(ownerId, previous.id, patch,
         if (predecessor == null) previous.updatedAt else null, receiptPredecessor?.id)
     enqueue("title", previous.id, if (draft) "review" else TITLE_METADATA_COMMAND, payload)
+}
+
+internal fun checkedTitlePredecessor(entry: OutboxEntity, ownerId: String) {
+    if (entry.entityType == "viewing") {
+        viewingCommandOperations(entry)
+        titleMetadataOperation(checkNotNull(viewingTitleEntry(entry, ownerId)), ownerId)
+    } else {
+        require(entry.operation == TITLE_METADATA_COMMAND)
+        titleMetadataOperation(entry, ownerId)
+    }
 }
 
 internal fun titleMetadataPayload(ownerId: String, titleId: String, patch: JSONObject, baseline: String?, predecessor: String?): JSONObject {

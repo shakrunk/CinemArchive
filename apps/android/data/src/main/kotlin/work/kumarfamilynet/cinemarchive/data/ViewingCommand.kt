@@ -9,6 +9,7 @@ import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 
 internal const val VIEWING_COMMAND = "command_v2"
 internal const val VIEWING_COMMAND_DATA = "viewingCommand"
+internal const val VIEWING_TITLE_EFFECT = "viewingTitleEffect"
 private val viewingColumns = mapOf("date" to "viewed_at", "rating" to "rating", "notes" to "notes", "venue" to "venue", "companions" to "companions")
 
 internal fun viewingWireValues(fields: JSONObject): JSONObject = JSONObject().apply {
@@ -63,13 +64,44 @@ internal fun viewingCommandOperations(entry: OutboxEntity): JSONArray {
     require(command.keys().asSequence().toSet() == setOf("version", "operations"))
     require(command.getInt("version") == 2)
     val operations = command.getJSONArray("operations")
-    require(operations.length() == 1)
+    require(operations.length() == if (payload.has(VIEWING_TITLE_EFFECT)) 2 else 1)
     val operation = operations.getJSONObject(0)
     val baseline = if (operation.has("expectedUpdatedAt")) operation.getString("expectedUpdatedAt") else null
     val predecessor = if (operation.has("expectedOperationId")) operation.getString("expectedOperationId") else null
     require(predecessor != entry.id)
     val expected = viewingCommandPayload(entry.entityId, payload.getString("titleId"), operation.getString("action"),
         payload.getJSONObject("fields"), baseline, predecessor).getJSONObject(VIEWING_COMMAND_DATA).getJSONArray("operations")
+    viewingTitleEntry(entry)?.let { expected.put(titleMetadataOperation(it, JSONObject(it.payloadJson).getString("ownerId"))) }
     require(sameCommandJson(operations, expected)) { "Saved viewing command differs from its retained intent." }
     return operations
 }
+
+internal fun attachViewingTitleEffect(payload: JSONObject, titleEffect: JSONObject) {
+    payload.put(VIEWING_TITLE_EFFECT, titleEffect)
+    payload.optJSONObject(VIEWING_COMMAND_DATA)?.getJSONArray("operations")?.put(titleEffect.getJSONObject(TITLE_METADATA_DATA).getJSONObject("operation"))
+}
+
+internal fun viewingTitleEntry(entry: OutboxEntity, ownerId: String? = null): OutboxEntity? {
+    val payload = JSONObject(entry.payloadJson)
+    val effect = payload.optJSONObject(VIEWING_TITLE_EFFECT) ?: return null
+    val titleId = payload.getString("titleId")
+    require(effect.getString("titleId") == titleId && (ownerId == null || effect.getString("ownerId") == ownerId))
+    payload.optJSONObject(VIEWING_OPENING)?.let { require(it.getString("ownerId") == effect.getString("ownerId")) }
+    val synthetic = entry.copy(entityType = "title", entityId = titleId, operation = TITLE_METADATA_COMMAND, payloadJson = effect.toString())
+    val patch = titleMetadataPatch(synthetic, effect.getString("ownerId"))
+    require(patch.keys().asSequence().all { it in setOf("status", "rating") })
+    val action = payload.optJSONObject(VIEWING_COMMAND_DATA)?.getJSONArray("operations")?.getJSONObject(0)?.getString("action")
+        ?: payload.getJSONObject(VIEWING_REVIEW_INTENT).getString("action")
+    require(action != "delete")
+    if (patch.has("status")) require(patch.getString("status") == "watched" && (action == "insert" || payload.optBoolean("reviewedInsert")))
+    if (patch.has("rating")) {
+        val fields = payload.optJSONObject("fields") ?: payload.getJSONObject(VIEWING_REVIEW_INTENT).getJSONObject("fields")
+        require(fields.has("rating") && !fields.isNull("rating") && sameCommandJson(fields.get("rating"), patch.get("rating")))
+    }
+    return synthetic
+}
+
+internal fun hasViewingTitleEffect(entry: OutboxEntity, titleId: String): Boolean = entry.entityType == "viewing" && runCatching {
+    val payload = JSONObject(entry.payloadJson)
+    payload.has(VIEWING_TITLE_EFFECT) && payload.getString("titleId") == titleId
+}.getOrDefault(false)

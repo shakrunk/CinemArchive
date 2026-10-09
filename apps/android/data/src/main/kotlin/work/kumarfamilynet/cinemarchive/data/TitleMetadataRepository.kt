@@ -36,11 +36,11 @@ class TitleMetadataRepository(
     override suspend fun compare(titleId: String): TitleMetadataComparison = outbox.withFlushPaused {
         active()
         val queue = database.outboxDao().getPending()
-        val entries = queue.filter { it.entityId == titleId && isMetadata(it) }
+        val entries = reviewEntries(queue, titleId)
         check(entries.isNotEmpty()) { "This title has no saved edits." }
         check(entries.first().operation == "review") { "Retry sync to confirm the original change before reviewing it." }
         val firstIndex = queue.indexOfFirst { it.id == entries.first().id }
-        check(queue.take(firstIndex).none { it.entityType == "title" && it.entityId == titleId }) {
+        check(pendingTitleIntents(queue.take(firstIndex), titleId).isEmpty()) {
             "Sync the older title changes first, then compare these saved edits."
         }
         val patch = mergeTitlePatches(entries.map { titleMetadataPatch(it, ownerId) })
@@ -72,7 +72,7 @@ class TitleMetadataRepository(
             // Replacing the slot retains FIFO order; no unrelated/later legacy edit overtakes this intent.
             check(database.outboxDao().replaceReviewedTitle(first.id, first.payloadJson, replacementId, TITLE_METADATA_COMMAND, payload.toString()) == 1)
             entries.drop(1).forEach { database.outboxDao().remove(it.id) }
-            val remaining = database.outboxDao().getPending().filter { it.entityType == "title" && it.entityId == comparison.titleId }
+            val remaining = pendingTitleIntents(database.outboxDao().getPending(), comparison.titleId)
             database.titleDao().upsertAll(listOf(overlayTitleIntents(current.toMetadataTitle(local), remaining, ownerId)))
         }
     }
@@ -88,7 +88,7 @@ class TitleMetadataRepository(
             entries.forEach { database.outboxDao().remove(it.id) }
             val local = database.titleDao().getById(comparison.titleId)
             if (local != null && current != null) {
-                val remaining = database.outboxDao().getPending().filter { it.entityType == "title" && it.entityId == comparison.titleId }
+                val remaining = pendingTitleIntents(database.outboxDao().getPending(), comparison.titleId)
                 database.titleDao().upsertAll(listOf(overlayTitleIntents(current.toMetadataTitle(local), remaining, ownerId)))
             }
         }
@@ -97,12 +97,12 @@ class TitleMetadataRepository(
     private suspend fun verify(comparison: TitleMetadataComparison): List<OutboxEntity> {
         active()
         val queue = database.outboxDao().getPending()
-        val entries = queue.filter { it.entityId == comparison.titleId && isMetadata(it) }
+        val entries = reviewEntries(queue, comparison.titleId)
         check(entries.isNotEmpty() && entries.first().operation == "review" && snapshot(entries) == comparison.entries) {
             "Saved edits changed. Compare them again before continuing."
         }
         val firstIndex = queue.indexOfFirst { it.id == entries.first().id }
-        check(queue.take(firstIndex).none { it.entityType == "title" && it.entityId == comparison.titleId }) {
+        check(pendingTitleIntents(queue.take(firstIndex), comparison.titleId).isEmpty()) {
             "Sync the older title changes first, then compare these saved edits."
         }
         entries.forEach { titleMetadataPatch(it, ownerId) }
@@ -110,6 +110,13 @@ class TitleMetadataRepository(
     }
 
     private fun snapshot(entries: List<OutboxEntity>) = entries.map { it.id to it.payloadJson }
+    /** Resolve the first title segment; a viewing action is an indivisible boundary. */
+    private fun reviewEntries(queue: List<OutboxEntity>, titleId: String): List<OutboxEntity> {
+        val first = queue.indexOfFirst { it.entityId == titleId && isMetadata(it) }
+        if (first < 0) return emptyList()
+        return queue.drop(first).takeWhile { !hasViewingTitleEffect(it, titleId) }
+            .filter { it.entityId == titleId && isMetadata(it) }
+    }
     private fun isMetadata(entry: OutboxEntity): Boolean = entry.entityType == "title" &&
         runCatching { JSONObject(entry.payloadJson).has(TITLE_METADATA_DATA) }.getOrDefault(false)
 }

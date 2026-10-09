@@ -14,26 +14,39 @@ class TitleMetadataApplier(private val database: LibraryDatabase, private val ow
         require(queue.firstOrNull() == entry) { "Title metadata ACK no longer matches the queue head." }
         checkedTitleMetadataReceipt(entry, envelope.getJSONObject("receipt"), ownerId)
         require(envelope.has("current"))
-        val local = database.titleDao().getById(entry.entityId) ?: return
+        if (database.titleDao().getById(entry.entityId) == null) return
         if (envelope.isNull("current")) return // The durable epoch rewind recovers the authoritative tombstone.
         val current = checkedCurrentTitle(envelope.getJSONObject("current"), entry.entityId, ownerId)
-        val later = queue.drop(1).filter { it.entityType == "title" && it.entityId == entry.entityId }
-        val projected = overlayTitleIntents(current.toMetadataTitle(local), later, ownerId)
-        database.titleDao().upsertAll(listOf(projected))
+        applyCurrentViewingTitle(database, entry.entityId, current, queue.drop(1), ownerId)
     }
 }
 
 internal fun overlayTitleIntents(base: TitleEntity, pending: List<OutboxEntity>, ownerId: String): TitleEntity =
     pending.fold(base) { row, entry ->
         val payload = JSONObject(entry.payloadJson)
-        if (payload.has(TITLE_METADATA_DATA)) row.withTitleMetadata(titleMetadataPatch(entry, ownerId))
+        if (entry.entityType == "viewing") row.withTitleMetadata(titleMetadataPatch(checkNotNull(viewingTitleEntry(entry, ownerId)), ownerId))
+        else if (payload.has(TITLE_METADATA_DATA)) row.withTitleMetadata(titleMetadataPatch(entry, ownerId))
         else if (entry.operation == "update") {
             val patch = JSONObject()
             if (payload.has("status")) patch.put("status", payload.getString("status").lowercase())
             if (payload.has("rating")) patch.put("rating", payload.get("rating"))
-            if (patch.length() == 0) row else row.withTitleMetadata(patch)
-        } else row
+            require(patch.length() > 0) { "A later title intent needs review before projection." }
+            row.withTitleMetadata(patch)
+        } else error("A later title intent needs review before projection.")
     }
+
+internal fun pendingTitleIntents(queue: List<OutboxEntity>, titleId: String): List<OutboxEntity> =
+    queue.filter { (it.entityType == "title" && it.entityId == titleId) || hasViewingTitleEffect(it, titleId) }
+
+internal suspend fun applyCurrentViewingTitle(database: LibraryDatabase, titleId: String, current: JSONObject?,
+    later: List<OutboxEntity>, ownerId: String) {
+    check(database.inTransaction())
+    val local = database.titleDao().getById(titleId) ?: return
+    if (current == null) return // Durable replay recovers deletion; never recreate a missing title from a receipt.
+    checkedCurrentTitle(current, titleId, ownerId)
+    val projected = runCatching { overlayTitleIntents(current.toMetadataTitle(local), pendingTitleIntents(later, titleId), ownerId) }
+    projected.getOrNull()?.let { database.titleDao().upsertAll(listOf(it)) }
+}
 
 /** Full current owned row prevents a skipped protected sync row losing unrelated catalog changes. */
 internal fun JSONObject.toMetadataTitle(local: TitleEntity): TitleEntity {

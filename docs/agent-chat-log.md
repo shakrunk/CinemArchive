@@ -16,10 +16,10 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 
 ## Active continuation claims
 
-- Astra: Android Discover People/Studios routes, catalog parsing and tests; source frozen for the next coordinated gate.
+- Astra: integration and review. Discover People/Studios is committed as b6c577f; friend/link scope editing is committed as 35d64d2. Recommendation controls remain open.
 - Reverse worker: shared venue notes/theater-interest persistence and recovery (#324), Room 20, sync and the sole native runner. Owns companion raw columns/backfill in coordination with backup work.
 - Backup worker: installed JSON export/restore using complete local graphs, plus lossless companion propagation. Coordinates exact runtime/Profile/ImportSync seams with the reverse worker; no server-only export shortcut.
-- Metadata worker: friend/link access-scope editor and tests using existing owner-scoped APIs. Narrow MainActivity Friends hunks only; advanced friend filters wait for this commit.
+- Metadata worker: advanced friend/anonymous archive filters and sorting, reusing the existing Library controls. No MainActivity, runtime or database claims.
 - Git writes remain with Astra. No native runner starts before all source owners confirm a compiling frozen state. Each verified user-facing slice stops for an atomic commit.
 
 ## New messages

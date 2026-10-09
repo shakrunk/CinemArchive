@@ -15,11 +15,11 @@ export function LandingScreen({ onSignIn }: Props) {
         {/* Title block */}
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-4 w-full mb-1">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent to-amber/25" />
+            <div className="flex-1 h-px bg-linear-to-r from-transparent to-amber/25" />
             <span className="font-mono text-[9px] tracking-[0.42em] uppercase text-amber/45 shrink-0">
               est. mmxxiv
             </span>
-            <div className="flex-1 h-px bg-gradient-to-l from-transparent to-amber/25" />
+            <div className="flex-1 h-px bg-linear-to-l from-transparent to-amber/25" />
           </div>
           <h1
             className="font-serif text-5xl sm:text-6xl text-paper tracking-tight leading-none"
@@ -41,7 +41,7 @@ export function LandingScreen({ onSignIn }: Props) {
         {/* CTA */}
         <button type="button"
           onClick={onSignIn}
-          className="mt-1 px-8 py-3 rounded-md bg-amber text-[color:var(--on-amber)] font-sans text-sm font-semibold tracking-wide hover:bg-amber/90 transition-colors"
+          className="mt-1 px-8 py-3 rounded-md bg-amber text-(--on-amber) font-sans text-sm font-semibold tracking-wide hover:bg-amber/90 transition-colors"
         >
           Enter the Archive
         </button>

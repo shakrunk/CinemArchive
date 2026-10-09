@@ -80,8 +80,8 @@ export function EpisodeCard({
       data-episode-id={episode.id}
       aria-label={`${episode.episodeName ?? `Episode ${episode.episodeNumber}`} — click to ${isSelected ? 'collapse' : 'expand'} details`}
       className={cn(
-        'group shrink-0 w-[240px] text-left rounded-lg overflow-hidden border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 cursor-pointer',
-        isSelected ? 'border-amber/50' : 'border-[var(--line)] hover:border-amber/30',
+        'group shrink-0 w-[240px] text-left rounded-lg overflow-hidden border transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 cursor-pointer',
+        isSelected ? 'border-amber/50' : 'border-(--line) hover:border-amber/30',
       )}
       style={{ background: 'var(--inset)' }}
     >
@@ -118,7 +118,7 @@ export function EpisodeCard({
             type="button"
             onClick={handleQuickWatch}
             aria-label={watched ? 'Mark as watched again' : 'Mark as watched'}
-            className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
               background: watched ? 'rgba(233,178,102,0.22)' : 'rgba(0,0,0,0.55)',
               border: watched ? '1px solid rgba(233,178,102,0.4)' : '1px solid transparent',
@@ -406,11 +406,11 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
                       <div className="flex gap-2 mt-0.5">
                         <button type="button"
                           onClick={async () => { if (await saveSucceeded(deleteEpisodeWatchEvent(titleId, season.seasonNumber, episode.episodeNumber, we.id))) setPendingDeleteWeId(null) }}
-                          className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                          className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                           style={{ color: 'var(--ember)', fontSize: scaledTextSize('10px') }}
                           aria-label="Confirm delete watch event"
                         >Delete</button>
-                        <button type="button" onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }} aria-label="Cancel delete watch event">Cancel</button>
+                        <button type="button" onClick={() => setPendingDeleteWeId(null)} className="font-mono transition-opacity hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }} aria-label="Cancel delete watch event">Cancel</button>
                       </div>
                     </div>
                   ) : (
@@ -421,7 +421,7 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
                         {we.notes && <div className="font-sans italic mt-0.5" style={{ color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}>"{we.notes}"</div>}
                       </div>
                       {!isSharedView && (
-                        <button type="button" onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', flexShrink: 0, marginTop: '1px' }} className="opacity-[0.45] hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Delete watch event" title="Delete watch event">
+                        <button type="button" onClick={() => setPendingDeleteWeId(we.id)} style={{ color: 'var(--paper-faint)', flexShrink: 0, marginTop: '1px' }} className="opacity-[0.45] hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm" aria-label="Delete watch event" title="Delete watch event">
                           <Trash2 className="w-2.5 h-2.5" />
                         </button>
                       )}
@@ -496,17 +496,17 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
             </div>
             <div>
               <div className="font-sans text-xs mb-1.5" style={{ color: 'var(--paper-faint)' }}>Review <span style={{ fontSize: scaledTextSize('10px') }}>(optional · logged independently)</span></div>
-              <textarea aria-label="Episode review" value={log.reviewText} onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))} placeholder="Your thoughts on this episode…" rows={2} className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber/40" style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }} />
+              <textarea aria-label="Episode review" value={log.reviewText} onChange={(e) => setLog((l) => ({ ...l, reviewText: e.target.value }))} placeholder="Your thoughts on this episode…" rows={2} className="w-full text-xs font-sans resize-none rounded-md px-2.5 py-2 focus:outline-hidden focus:ring-1 focus:ring-amber/40" style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }} />
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={handleSubmit} aria-label="Save watch event and log" disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()} className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ background: 'var(--amber)', color: '#1a0e06' }}>Save</button>
-              <button type="button" onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }} aria-label="Cancel logging watch event" className="h-8 px-3 rounded-md text-xs font-sans border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60" style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}>Cancel</button>
+              <button type="button" onClick={handleSubmit} aria-label="Save watch event and log" disabled={!log.includeWatch && log.rating === 0 && !log.reviewText.trim()} className="flex-1 h-8 rounded-md text-xs font-sans font-medium transition-all disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60" style={{ background: 'var(--amber)', color: '#1a0e06' }}>Save</button>
+              <button type="button" onClick={() => { setShowForm(false); setLog(EMPTY_EP_LOG) }} aria-label="Cancel logging watch event" className="h-8 px-3 rounded-md text-xs font-sans border transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60" style={{ borderColor: 'var(--line)', color: 'var(--paper-faint)' }}>Cancel</button>
             </div>
           </div>
         ) : (
           <button type="button"
             onClick={() => { if (showSaved) return; setLog((l) => ({ ...l, watchedAt: new Date().toISOString().slice(0, 10), prePlatform: false })); setShowForm(true) }}
-            className="flex items-center gap-1.5 text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+            className="flex items-center gap-1.5 text-xs font-mono transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             style={{ color: showSaved ? 'var(--amber)' : 'var(--amber-deep)' }}
             onMouseEnter={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber)' }}
             onMouseLeave={(e) => { if (!showSaved) e.currentTarget.style.color = 'var(--amber-deep)' }}

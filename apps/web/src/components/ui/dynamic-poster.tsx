@@ -118,7 +118,7 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
         <span
           role="img"
           aria-label="Tickets booked for this movie"
-          className="absolute top-2 left-2 z-[3] w-6 h-6 rounded-full flex items-center justify-center text-[13px] bg-black/60 backdrop-blur-sm border border-amber/40 shadow-sm"
+          className="absolute top-2 left-2 z-3 w-6 h-6 rounded-full flex items-center justify-center text-[13px] bg-black/60 backdrop-blur-xs border border-amber/40 shadow-xs"
         >
           🎟
         </span>
@@ -127,13 +127,13 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
       <div className={cn('poster__face', !faceHasContent && 'poster__face--bare')}>
         {/* top row: category + status */}
         {!hideBadges && (
-          <div className="relative z-[2] flex items-center justify-between">
+          <div className="relative z-2 flex items-center justify-between">
             <span className="font-mono text-[10px] tracking-[0.12em] uppercase text-white/60">
               {title.type === 'tv' ? 'Series' : 'Film'}
             </span>
             <span
               className={cn(
-                'inline-flex items-center px-2 py-[3px] rounded-full font-mono text-[9px] tracking-[0.1em] uppercase backdrop-blur-sm',
+                'inline-flex items-center px-2 py-[3px] rounded-full font-mono text-[9px] tracking-widest uppercase backdrop-blur-xs',
                 badge.cls
               )}
             >
@@ -144,7 +144,7 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
 
         {/* body */}
         {rich ? (
-          <div className="relative z-[2] mt-auto">
+          <div className="relative z-2 mt-auto">
             {/* Poster art already carries the title (logo/typography baked into the
                 image) — an overlay title here is only useful as a fallback for
                 titles with no poster, so skip it once an image is present. */}
@@ -172,7 +172,7 @@ export function DynamicPoster({ title, className, style, onClick, rich = false, 
         ) : (
           /* compact face for the typographic (no-image) case */
           !hasImage && (
-            <div className="relative z-[2] mt-auto">
+            <div className="relative z-2 mt-auto">
               <h3 className="poster__title text-[clamp(16px,1.8vw,21px)]">{title.title}</h3>
               <div className="mt-1.5 font-mono text-[11px] text-white/60">{title.year}</div>
             </div>

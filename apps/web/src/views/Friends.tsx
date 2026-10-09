@@ -174,7 +174,7 @@ function FriendsSection() {
         <Button
           type="submit"
           disabled={sending}
-          className="bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] shrink-0"
+          className="bg-amber hover:bg-amber-muted text-(--on-amber) shrink-0"
           aria-label="Send friend request"
         >
           {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
@@ -417,7 +417,7 @@ function InboxSection() {
           <p className="text-center text-xs font-sans text-muted-foreground italic">Nothing sent your way yet.</p>
           <button
             onClick={() => requestView('library')}
-            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
+            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60')}
           >
             Browse Library
           </button>
@@ -437,7 +437,7 @@ function InboxSection() {
                     handleOpen(r)
                   }
                 }}
-                className="bg-secondary/20 hover:bg-secondary/40 rounded-lg p-3 border border-border flex items-center gap-3 cursor-pointer transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="bg-secondary/20 hover:bg-secondary/40 rounded-lg p-3 border border-border flex items-center gap-3 cursor-pointer transition-colors focus:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               >
                 {r.posterUrl && (
                   <img src={r.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />
@@ -568,7 +568,7 @@ function ActivitySection() {
           <p className="text-center text-xs font-sans text-muted-foreground italic">No friend activity yet.</p>
           <button
             onClick={() => requestView('discover')}
-            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60')}
+            className={cn(SECONDARY_AMBER_BUTTON, 'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60')}
           >
             Discover Titles
           </button>
@@ -579,7 +579,7 @@ function ActivitySection() {
               <button
                 key={`${e.type}:${e.titleId}:${e.friendUserId}:${e.eventAt}`}
                 onClick={() => handleOpen(e)}
-                className="w-full text-left bg-secondary/20 hover:bg-secondary/40 rounded-lg p-3 border border-border flex items-center gap-3 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="w-full text-left bg-secondary/20 hover:bg-secondary/40 rounded-lg p-3 border border-border flex items-center gap-3 transition-colors focus:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               >
                 {e.posterUrl && <img src={e.posterUrl} alt="" className="w-8 h-12 object-cover rounded shrink-0" />}
                 <div className="min-w-0 flex-1">

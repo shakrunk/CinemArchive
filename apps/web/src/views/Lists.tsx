@@ -33,7 +33,7 @@ function NewListForm() {
       <Button
         type="submit"
         disabled={!name.trim()}
-        className="shrink-0 bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+        className="shrink-0 bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
       >
         <Plus className="w-4 h-4 mr-1" />
         Create
@@ -53,7 +53,7 @@ function ListCard({ list, onOpen }: { list: List; onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      className="text-left rounded-xl border p-4 sm:p-5 transition-colors hover:border-amber/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+      className="text-left rounded-xl border p-4 sm:p-5 transition-colors hover:border-amber/40 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
       style={{ borderColor: 'var(--line)', background: 'var(--wash)' }}
     >
       <p className="font-serif text-lg leading-snug truncate" style={{ color: 'var(--paper)' }}>
@@ -65,7 +65,7 @@ function ListCard({ list, onOpen }: { list: List; onOpen: () => void }) {
       <div className="flex items-center justify-between mt-4">
         <div className="flex -space-x-3">
           {memberTitles.slice(0, 4).map((t) => (
-            <div key={t.id} className="ring-2 ring-[var(--wash)] rounded overflow-hidden">
+            <div key={t.id} className="ring-2 ring-(--wash) rounded overflow-hidden">
               <PosterThumb src={t.posterUrl} alt={t.title} type={t.type} size="sm" />
             </div>
           ))}
@@ -123,7 +123,7 @@ function ListDetail({ list, onBack }: { list: List; onBack: () => void }) {
     <div>
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-amber transition-colors mb-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
+        className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-amber transition-colors mb-4 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         All lists
@@ -160,7 +160,7 @@ function ListDetail({ list, onBack }: { list: List; onBack: () => void }) {
         ) : (
           <button
             onClick={() => setConfirmingDelete(true)}
-            className="flex items-center gap-1.5 shrink-0 font-mono text-xs rounded-full px-3 py-1.5 border border-[var(--line)] text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ember/60"
+            className="flex items-center gap-1.5 shrink-0 font-mono text-xs rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ember/60"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete list
@@ -176,18 +176,18 @@ function ListDetail({ list, onBack }: { list: List; onBack: () => void }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {memberTitles.map((t) => (
             <div key={t.id} className="group relative">
-              <button onClick={() => openDetailDrawer(t.id)} className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg">
+              <button onClick={() => openDetailDrawer(t.id)} className="block w-full text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg">
                 <img
                   src={t.posterUrl || undefined}
                   alt={t.title}
-                  className="w-full aspect-[2/3] object-cover rounded-lg bg-secondary"
+                  className="w-full aspect-2/3 object-cover rounded-lg bg-secondary"
                 />
                 <p className="font-sans text-xs mt-1.5 truncate" style={{ color: 'var(--paper)' }}>{t.title}</p>
               </button>
               <button
                 onClick={() => removeTitleFromList(list.id, t.id)}
                 aria-label={`Remove ${t.title} from ${list.name}`}
-                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm text-white/80 hover:bg-black/80 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 backdrop-blur-xs text-white/80 hover:bg-black/80 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />
               </button>

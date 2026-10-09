@@ -55,7 +55,7 @@ export function InTranslation({ className, settings, width = 'sm' }: { className
               <RowTitle className={cn('truncate shrink-0 group-hover:underline decoration-amber/40', width === 'sm' ? 'w-[31%]' : 'w-[34%]')}>
                 {l.name}
               </RowTitle>
-              <span className="flex-1 h-[10px] rounded-sm bg-[var(--wash)] overflow-hidden">
+              <span className="flex-1 h-[10px] rounded-sm bg-(--wash) overflow-hidden">
                 <span
                   className="block h-full rounded-sm bar-fill"
                   style={rankBarFill(l.count / maxCount, i === 0, i * 70)}

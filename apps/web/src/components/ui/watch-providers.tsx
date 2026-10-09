@@ -173,7 +173,7 @@ function PhysicalMediaShelf({
               <button type="button"
                 onClick={() => onChange(items.filter((i) => i.id !== item.id))}
                 aria-label={`Remove ${item.format}${item.edition ? ` (${item.edition})` : ''} from shelf`}
-                className="ml-0.5 text-paper-faint hover:text-ember transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="ml-0.5 text-paper-faint hover:text-ember transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -184,7 +184,7 @@ function PhysicalMediaShelf({
         {!isSharedView && !adding && (
           <button type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 h-8 rounded-md px-2.5 font-mono text-[11px] text-amber/60 hover:text-amber border border-dashed transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="inline-flex items-center gap-1 h-8 rounded-md px-2.5 font-mono text-[11px] text-amber/60 hover:text-amber border border-dashed transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ borderColor: 'var(--line)' }}
           >
             <Plus className="w-3 h-3" />
@@ -199,7 +199,7 @@ function PhysicalMediaShelf({
               value={draftFormat}
               onChange={(e) => setDraftFormat(e.target.value as PhysicalMediaFormat)}
               aria-label="Physical media format"
-              className="h-8 rounded-md px-2 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-amber/40"
+              className="h-8 rounded-md px-2 font-sans text-xs focus:outline-hidden focus:ring-1 focus:ring-amber/40"
               style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
             >
               {PHYSICAL_MEDIA_FORMATS.map((f) => (
@@ -215,13 +215,13 @@ function PhysicalMediaShelf({
               }}
               placeholder="Edition (optional)"
               aria-label="Edition or packaging details"
-              className="h-8 w-36 rounded-md px-2 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-amber/40"
+              className="h-8 w-36 rounded-md px-2 font-sans text-xs focus:outline-hidden focus:ring-1 focus:ring-amber/40"
               style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
             />
-            <button type="button" onClick={commitAdd} aria-label="Add physical copy" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+            <button type="button" onClick={commitAdd} aria-label="Add physical copy" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60">
               <Check className="w-4 h-4" />
             </button>
-            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel adding physical copy" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+            <button type="button" onClick={() => setAdding(false)} aria-label="Cancel adding physical copy" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60">
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </span>
@@ -308,7 +308,7 @@ export function WatchProvidersSection({
         {!isSharedView && !editing && (
           <button type="button"
             onClick={() => { setDraft(customUrl ?? ''); setEditing(true) }}
-            className="text-xs font-mono text-amber/50 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1 flex items-center gap-1"
+            className="text-xs font-mono text-amber/50 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1 flex items-center gap-1"
           >
             <Pencil className="w-2.5 h-2.5" />
             {customUrl ? 'edit link for friends' : 'set link for friends'}
@@ -328,13 +328,13 @@ export function WatchProvidersSection({
             }}
             placeholder="https://…"
             aria-label="Custom where-to-watch URL for friends"
-            className="flex-1 rounded-md px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber/40"
+            className="flex-1 rounded-md px-2.5 py-1.5 font-mono text-xs focus:outline-hidden focus:ring-1 focus:ring-amber/40"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           />
-          <button type="button" onClick={commit} aria-label="Save custom watch link" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+          <button type="button" onClick={commit} aria-label="Save custom watch link" className="text-amber hover:text-amber-bright transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60">
             <Check className="w-4 h-4" />
           </button>
-          <button type="button" onClick={() => setEditing(false)} aria-label="Cancel setting custom watch link" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60">
+          <button type="button" onClick={() => setEditing(false)} aria-label="Cancel setting custom watch link" className="text-paper-faint hover:text-paper transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60">
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
@@ -356,7 +356,7 @@ export function WatchProvidersSection({
             type="button"
             onClick={() => onToggleHomeCollection(!inHomeCollection)}
             aria-pressed={inHomeCollection}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 font-mono text-xs transition-colors hover:border-amber/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 font-mono text-xs transition-colors hover:border-amber/50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
               background: inHomeCollection ? 'rgba(233,178,102,0.12)' : 'var(--inset)',
               border: `1px solid ${inHomeCollection ? 'rgba(233,178,102,0.38)' : 'var(--line)'}`,

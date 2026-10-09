@@ -60,7 +60,7 @@ apps/web/
   scripts/
     migrate-from-v1.mjs    # One-off importer from "The Projection Room" v1 JSON
     verify-*.mjs           # Standalone logic-verification scripts
-  index.html / vite.config.ts / tsconfig*.json / eslint.config.js / tailwind.config.js / …
+  index.html / vite.config.ts / tsconfig*.json / eslint.config.js / …
 
 # One level up (repo root, shared across clients):
 ../../schema.sql               # Canonical DB schema + RLS policies (human-readable copy)
@@ -143,4 +143,4 @@ scripts are covered in [web startup](../../docs/web-startup.md).
 
 The token reference, per-theme rules, voice/copy conventions and component conventions are in the
 wiki's [Design System](https://github.com/shakrunk/CinemArchive/wiki/Design-System) page;
-`src/index.css` and `tailwind.config.js` remain the source of truth.
+`src/index.css` remains the source of truth (Tailwind v4: the theme lives in its `@theme` block).

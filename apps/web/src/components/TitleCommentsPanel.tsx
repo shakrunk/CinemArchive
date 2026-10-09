@@ -142,7 +142,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
               onClick={() => handleToggleReaction(emoji)}
               aria-label={`${mine ? 'Remove' : 'Add'} ${emoji} reaction`}
               title={names}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-sm border transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+              className="flex items-center gap-1 rounded-full px-2.5 py-1 text-sm border transition-colors disabled:opacity-60 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               style={{
                 borderColor: mine ? 'var(--amber)' : 'var(--line)',
                 background: mine ? 'rgb(var(--amber-rgb) / 0.12)' : 'var(--inset)',
@@ -168,7 +168,7 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
           {user && (
             <button type="button"
               onClick={() => textareaRef.current?.focus()}
-              className="text-xs font-medium text-amber hover:text-amber/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 px-2 py-1 rounded"
+              className="text-xs font-medium text-amber hover:text-amber/80 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 px-2 py-1 rounded"
             >
               Be the first to comment
             </button>
@@ -187,13 +187,13 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
                     onClick={() => handleDelete(c.id)}
                     aria-label={`Delete comment: "${c.body.slice(0, 20)}${c.body.length > 20 ? '...' : ''}"`}
                     title="Delete comment"
-                    className="text-muted-foreground hover:text-destructive transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
+                    className="text-muted-foreground hover:text-destructive transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
                 )}
               </div>
-              <p className="font-sans text-sm mt-1 whitespace-pre-wrap break-words" style={{ color: 'var(--paper-dim)' }}>
+              <p className="font-sans text-sm mt-1 whitespace-pre-wrap wrap-break-word" style={{ color: 'var(--paper-dim)' }}>
                 {c.body}
               </p>
               <p className="font-mono mt-1" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
@@ -215,14 +215,14 @@ export function TitleCommentsPanel({ titleId }: { titleId: string }) {
             aria-label="Add a comment"
             rows={1}
             maxLength={BODY_MAX_LEN}
-            className="flex-1 rounded-md px-3 py-2 text-sm font-sans resize-none focus:outline-none"
+            className="flex-1 rounded-md px-3 py-2 text-sm font-sans resize-none focus:outline-hidden"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           />
           <button
             type="submit"
             disabled={posting || !body.trim()}
             aria-label="Post comment"
-            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-md disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{ background: 'var(--amber)', color: 'var(--on-amber)' }}
           >
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

@@ -65,7 +65,7 @@ export function RatingDistribution({
             onClick={() => setView(mode)}
             className={cn('rounded border px-2 py-1 text-xs transition-colors', view === mode
               ? 'border-amber/40 bg-amber/10 text-amber'
-              : 'border-[var(--line)] text-paper-faint hover:text-paper')}
+              : 'border-(--line) text-paper-faint hover:text-paper')}
           >
             {mode === 'distribution' ? 'Distribution' : 'Normalized'}
           </button>
@@ -113,7 +113,7 @@ export function RatingDistribution({
                   setFilter('minRating', d.rating)
                   requestView('library')
                 }}
-                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[var(--wash)] cursor-pointer group"
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-(--wash) cursor-pointer group"
               >
                 <i
                   className="w-2 h-2 rounded-full shrink-0"
@@ -129,7 +129,7 @@ export function RatingDistribution({
                     read as one item, not two lists (KP-038). */}
                 <span
                   aria-hidden="true"
-                  className="flex-1 min-w-3 self-center border-b border-dotted opacity-50 translate-y-[1px]"
+                  className="flex-1 min-w-3 self-center border-b border-dotted opacity-50 translate-y-px"
                   style={{ borderColor: 'var(--paper-faint)' }}
                 />
                 <span className="shrink-0 whitespace-nowrap text-right font-mono text-[11px] text-paper-faint">

@@ -14,7 +14,7 @@ export function NotificationStack() {
     <div
       aria-live="assertive"
       aria-atomic="false"
-      className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[220] flex flex-col gap-2 w-full max-w-xs pointer-events-none"
+      className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-220 flex flex-col gap-2 w-full max-w-xs pointer-events-none"
     >
       {notifications.map((n) => (
         <NotificationCard key={n.id} notification={n} onDismiss={() => dismissNotification(n.id)} />
@@ -78,7 +78,7 @@ function NotificationCard({
           <button type="button"
             onClick={handleRetry}
             disabled={retrying}
-            className="mt-2 font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 flex items-center gap-1 disabled:opacity-50 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+            className="mt-2 font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 flex items-center gap-1 disabled:opacity-50 transition-opacity focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
             <RefreshCw className={cn('w-3 h-3', retrying && 'animate-spin')} />
             {retrying ? 'Retrying…' : 'Retry'}
@@ -87,7 +87,7 @@ function NotificationCard({
       </div>
       <button type="button"
         onClick={onDismiss}
-        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
         aria-label="Dismiss notification"
       >
         <X className="w-3.5 h-3.5" aria-hidden="true" />

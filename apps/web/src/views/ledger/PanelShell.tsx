@@ -99,7 +99,7 @@ export function RowTitle({
 // Hover/click chrome shared by clickable panel rows. Callers add their own
 // layout classes (flex/grid, gap, w-full) and may override `py-2` via twMerge.
 export const LIST_ROW_HOVER =
-  'px-1.5 py-2 rounded-md transition-colors hover:bg-[var(--wash)] text-left cursor-pointer group'
+  'px-1.5 py-2 rounded-md transition-colors hover:bg-(--wash) text-left cursor-pointer group'
 
 // Zero-padded ordinal rank badge ("01", "02", …) used by ranked-list panels.
 export function RankBadge({ rank, className }: { rank: number; className?: string }) {

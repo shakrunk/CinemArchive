@@ -50,11 +50,11 @@ export function StatRibbon() {
   ]
 
   return (
-    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-[var(--line)]">
+    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-(--line)">
       {items.map((item, i) => (
         <div key={item.sub} className="flex items-stretch shrink-0">
           {i > 0 && (
-            <div className="w-px bg-[var(--line-2)] mx-4 sm:mx-8 self-stretch" />
+            <div className="w-px bg-(--line-2) mx-4 sm:mx-8 self-stretch" />
           )}
           <div className="flex flex-col">
             <div className="stat-num text-[clamp(26px,3vw,40px)]">

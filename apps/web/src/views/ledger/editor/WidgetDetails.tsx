@@ -28,7 +28,7 @@ const segmentBtnClass = (active: boolean) =>
     'rounded-md border py-1.5 px-1 font-mono text-[10px] transition-colors',
     active
       ? 'border-amber/40 bg-amber/10 text-amber'
-      : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-[var(--line-2)]',
+      : 'border-(--line) text-paper-faint hover:text-paper hover:border-(--line-2)',
   )
 
 export function WidgetDetails({
@@ -61,7 +61,7 @@ export function WidgetDetails({
   return (
     <aside
       aria-label="Widget details"
-      className={cn('rounded-xl border border-[var(--line)] p-4 flex flex-col gap-3.5 overflow-y-auto min-h-0 scrollbar-thin', className)}
+      className={cn('rounded-xl border border-(--line) p-4 flex flex-col gap-3.5 overflow-y-auto min-h-0 scrollbar-thin', className)}
       style={floatingPanelStyle}
     >
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -108,7 +108,7 @@ export function WidgetDetails({
                 'rounded-md border py-1.5 font-mono text-[10px] transition-colors',
                 selected.width === w
                   ? 'border-amber/40 bg-amber/10 text-amber'
-                  : 'border-[var(--line)] text-paper-faint hover:text-paper hover:border-[var(--line-2)]',
+                  : 'border-(--line) text-paper-faint hover:text-paper hover:border-(--line-2)',
               )}
             >
               {LEDGER_PANEL_WIDTH_LABELS[w]}

@@ -27,10 +27,10 @@ export function CastCard({
       type="button"
       onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
       aria-label={`View details for ${member.name}`}
-      className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
+      className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
       style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
     >
-      <div className="aspect-[2/3] overflow-hidden">
+      <div className="aspect-2/3 overflow-hidden">
         {member.profileUrl ? (
           <img
             src={member.profileUrl}
@@ -131,7 +131,7 @@ function CastGrid({
           type="button"
           onClick={() => setShowAll((v) => !v)}
           aria-expanded={showAll}
-          className="shrink-0 w-[110px] rounded-lg flex flex-col items-center justify-center gap-1.5 border border-dashed transition-colors hover:border-amber/40 hover:bg-amber/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+          className="shrink-0 w-[110px] rounded-lg flex flex-col items-center justify-center gap-1.5 border border-dashed transition-colors hover:border-amber/40 hover:bg-amber/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
           style={{ borderColor: 'var(--line)', minHeight: '120px' }}
         >
           {showAll ? (
@@ -174,7 +174,7 @@ export function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioCl
         type="button"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
-        className="flex items-center gap-2 mb-4 group focus:outline-none"
+        className="flex items-center gap-2 mb-4 group focus:outline-hidden"
       >
         <Eyebrow as="h4" size="xl" tone="dim" font="sans" className="font-semibold group-hover:text-amber transition-colors">
           Cast &amp; Crew
@@ -215,7 +215,7 @@ export function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioCl
                         type="button"
                         onClick={() => onPersonClick({ tmdbPersonId: m.tmdbPersonId, name: m.name, profileUrl: m.profileUrl, job: m.job })}
                         aria-label={`View details for ${m.name}`}
-                        className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-none"
+                        className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-hidden"
                       >
                         {m.name}
                       </button>
@@ -241,7 +241,7 @@ export function CastCrewSection({ cast, crew, studios, onPersonClick, onStudioCl
                       type="button"
                       onClick={() => onStudioClick(s)}
                       aria-label={`Browse titles from ${s}`}
-                      className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-none"
+                      className="text-paper transition-colors hover:text-amber focus-visible:text-amber focus:outline-hidden"
                     >
                       {s}
                     </button> : s}

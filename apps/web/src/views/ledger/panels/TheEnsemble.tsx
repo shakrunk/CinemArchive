@@ -61,7 +61,7 @@ export function TheEnsemble({
                 )}
               >
                 <RankBadge rank={index + 1} />
-                <span className="flex aspect-square items-center justify-center rounded-full bg-[var(--wash)] font-serif text-xs text-paper-dim">
+                <span className="flex aspect-square items-center justify-center rounded-full bg-(--wash) font-serif text-xs text-paper-dim">
                   {getInitials(actor.actor)}
                 </span>
                 <RowTitle className="truncate">{actor.actor}</RowTitle>

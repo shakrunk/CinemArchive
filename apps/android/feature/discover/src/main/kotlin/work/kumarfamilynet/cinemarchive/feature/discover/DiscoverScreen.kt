@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,11 +42,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,19 +96,14 @@ fun DiscoverRoute(
     // The same media identity drives ownership badges, preview actions and opening detail.
     val idsByTmdbKey by libraryRepository.observeLibraryTitleIdsByTmdbKey()
         .collectAsStateWithLifecycle(initialValue = emptyMap())
-    var search by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(search) { viewModel.onQueryChange(search) }
-    var typeFilter by rememberSaveable { mutableStateOf(TypeFilter.ALL) }
     var preview by remember { mutableStateOf<TrendingTitle?>(null) }
 
-    val filtered = filterDiscoverTitles(uiState.titles, typeFilter)
-
     DiscoverScreen(
-        search = search,
-        onSearchChange = { search = it },
-        typeFilter = typeFilter,
-        onTypeFilterChange = { typeFilter = it },
-        titles = filtered,
+        search = uiState.query,
+        onSearchChange = viewModel::onQueryChange,
+        typeFilter = uiState.typeFilter,
+        onTypeFilterChange = viewModel::onTypeChange,
+        titles = uiState.titles,
         isLoading = uiState.isLoading,
         isRefreshing = uiState.isRefreshing,
         error = uiState.error,
@@ -125,6 +120,12 @@ fun DiscoverRoute(
         onOpenProfile = onOpenProfile,
         profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
+        genreId = uiState.genreId,
+        onGenreChange = viewModel::onGenreChange,
+        hasMore = uiState.hasMore,
+        isLoadingMore = uiState.isLoadingMore,
+        moreError = uiState.moreError,
+        onLoadMore = viewModel::loadMore,
     )
 
     preview?.let { title ->
@@ -139,7 +140,7 @@ fun DiscoverRoute(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DiscoverScreen(
+fun DiscoverScreen(
     search: String,
     onSearchChange: (String) -> Unit,
     typeFilter: TypeFilter,
@@ -158,6 +159,12 @@ private fun DiscoverScreen(
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
+    genreId: Int? = null,
+    onGenreChange: (Int?) -> Unit = {},
+    hasMore: Boolean = false,
+    isLoadingMore: Boolean = false,
+    moreError: String? = null,
+    onLoadMore: () -> Unit = {},
 ) {
     val gridState = rememberLazyGridState()
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
@@ -225,6 +232,19 @@ private fun DiscoverScreen(
                     onSelect = onTypeFilterChange,
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
+                Box(Modifier.padding(horizontal = 20.dp)) {
+                    var genresExpanded by remember { mutableStateOf(false) }
+                    val genres = discoverGenres(typeFilter)
+                    TextButton(onClick = { genresExpanded = true }) {
+                        Text("Genre: ${genres.firstOrNull { it.id == genreId }?.name ?: "All genres"}")
+                    }
+                    DropdownMenu(expanded = genresExpanded, onDismissRequest = { genresExpanded = false }) {
+                        DropdownMenuItem(text = { Text("All genres") }, onClick = { genresExpanded = false; onGenreChange(null) })
+                        genres.forEach { genre ->
+                            DropdownMenuItem(text = { Text(genre.name) }, onClick = { genresExpanded = false; onGenreChange(genre.id) })
+                        }
+                    }
+                }
             }
         }
 
@@ -237,7 +257,7 @@ private fun DiscoverScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    if (search.isBlank()) "Couldn't load trending titles" else "Couldn't search titles",
+                    if (search.isNotBlank()) "Couldn't search titles" else if (genreId != null) "Couldn't load this genre" else "Couldn't load trending titles",
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -256,12 +276,19 @@ private fun DiscoverScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        if (search.isNotBlank() && titles.isEmpty()) "No titles found for “${search.trim()}”" else "${titles.size} titles",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    )
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (search.isNotBlank() && titles.isEmpty()) "No titles found for “${search.trim()}”" else "${titles.size} titles",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+                        )
+                        if (search.isBlank() && hasMore) TextButton(onClick = onLoadMore, enabled = !isLoadingMore && !isRefreshing) {
+                            Text(if (isLoadingMore) "Loading more…" else if (moreError != null) "Retry more" else "View more")
+                        }
+                    }
+                    if (moreError != null) Text(moreError, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp))
 
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),

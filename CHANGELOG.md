@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android Discover now browses movie and TV feeds by genre and loads additional pages, retaining results on retry and ignoring outdated requests.
 - Shared viewing commands now reject reused history identities with different supplied values, so linked title updates cannot partially succeed against a conflicting viewing.
 - Web Discover now keeps movies and TV shows in mixed genre pagination and prevents outdated searches or page responses from replacing a newer selection.
 - Android outing recovery now preserves the server revision while displaying pending edits, keeping unsupported saved intents available for review.

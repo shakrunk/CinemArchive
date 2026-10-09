@@ -6,6 +6,13 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 
 class DiscoverCatalogStateTest {
+    @Test fun `genre lists preserve web IDs and change with media type`() {
+        assertEquals(discoverGenres(TypeFilter.MOVIE), discoverGenres(TypeFilter.ALL))
+        assertEquals(28, discoverGenres(TypeFilter.MOVIE).first { it.name == "Action" }.id)
+        assertEquals(10759, discoverGenres(TypeFilter.TV).first { it.name == "Action & Adventure" }.id)
+        assertFalse(discoverGenres(TypeFilter.TV).any { it.id == 28 })
+        assertEquals(18, discoverGenres(TypeFilter.TV).first { it.name == "Drama" }.id)
+    }
     private val movie = TrendingTitle(42, "A movie", 2020, MediaType.MOVIE, null, null)
     private val series = TrendingTitle(42, "A series", 2021, MediaType.TV, null, null)
 

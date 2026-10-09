@@ -26,6 +26,12 @@ class DiscoverRepository(
     private val client: SupabaseRestClient,
     private val authRepository: AuthRepository,
 ) : EpisodeMetadataFetcher {
+    /** A complete catalog page for the selected type and optional genre. Search/add APIs stay separate. */
+    suspend fun fetchBrowse(type: MediaType?, genreId: Int?, page: Int): List<TrendingTitle> = withContext(Dispatchers.IO) {
+        val token = accessToken()
+        fetchDiscoverBrowse(type, genreId, page) { query -> client.invokeFunction("media-proxy", query, token) }
+    }
+
     /** This week's trending movies and TV, interleaved so both kinds stay visible near the
      *  top — matching `fetchTrending('all')`'s alternating merge in the web app. */
     suspend fun fetchTrending(): List<TrendingTitle> = withContext(Dispatchers.IO) {
@@ -185,4 +191,36 @@ class DiscoverRepository(
         }
         return combined
     }
+}
+
+/** Mirrors web's movie-first mixed page, with each request retaining the same genre and page. */
+internal suspend fun fetchDiscoverBrowse(
+    type: MediaType?,
+    genreId: Int?,
+    page: Int,
+    invoke: suspend (String) -> String,
+): List<TrendingTitle> = coroutineScope {
+    require(page in 1..500) { "Catalog page must be between 1 and 500" }
+    require(genreId == null || genreId > 0) { "Invalid genre" }
+    suspend fun fetch(mediaType: MediaType): List<MediaSearchResult> {
+        val action = if (genreId == null) "trending" else "discover"
+        val kind = if (mediaType == MediaType.MOVIE) "movie" else "tv"
+        val query = "action=$action&type=$kind&page=$page" + (genreId?.let { "&genre=$it" } ?: "")
+        return parseSearchPage(invoke(query), mediaType)
+    }
+    val results = if (type != null) {
+        fetch(type).let { if (genreId == null) it.take(20) else it }
+    } else {
+        val movies = async { fetch(MediaType.MOVIE) }
+        val television = async { fetch(MediaType.TV) }
+        val moviePage = movies.await()
+        val tvPage = television.await()
+        buildList {
+            for (i in 0 until maxOf(moviePage.size, tvPage.size)) {
+                moviePage.getOrNull(i)?.let { add(it) }
+                tvPage.getOrNull(i)?.let { add(it) }
+            }
+        }.take(20)
+    }
+    results.map { it.asTrendingTitle() }
 }

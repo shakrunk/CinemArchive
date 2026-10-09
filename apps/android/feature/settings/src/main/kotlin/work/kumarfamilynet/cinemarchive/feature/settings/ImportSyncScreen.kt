@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -71,6 +72,18 @@ fun ImportSyncRoute(
     showBack: Boolean = true,
     backupContent: @Composable () -> Unit = {},
 ) {
+    key(services) {
+        if (services.repository.isCurrent()) ImportSyncContent(services, onBack, showBack, backupContent)
+    }
+}
+
+@Composable
+private fun ImportSyncContent(
+    services: SyncServices,
+    onBack: () -> Unit,
+    showBack: Boolean,
+    backupContent: @Composable () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
@@ -86,8 +99,16 @@ fun ImportSyncRoute(
     var embyUser by rememberSaveable { mutableStateOf("") }
     var embyPassword by remember { mutableStateOf("") }
 
+    fun ensureCurrent() {
+        if (!services.repository.isCurrent()) throw CancellationException("Account changed.")
+    }
     suspend fun refresh() {
-        connections = runCatching { services.repository.connections() }.getOrDefault(emptyList())
+        ensureCurrent()
+        val latest = try { services.repository.connections() } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) { emptyList() }
+        ensureCurrent()
+        connections = latest
     }
     LaunchedEffect(Unit) { refresh() }
 
@@ -100,40 +121,55 @@ fun ImportSyncRoute(
             val shown = r.unmatched.take(5).joinToString(", ")
             parts += "couldn't match ${r.unmatched.size}: $shown${if (r.unmatched.size > 5) ", +${r.unmatched.size - 5} more" else ""}"
         }
+        if (r.failed.isNotEmpty()) {
+            parts += "${r.failed.size} not saved: ${r.failed.take(3).joinToString("; ")}"
+        }
+        if (r.added > 0 || r.updated > 0) parts += "saved on this device; pending changes sync when connected"
+        if (r.added > 0) parts += "use Saved imports above to review or retry a new-title import"
         if (r.cancelled) parts += "(cancelled early)"
         return parts.joinToString(" · ") + "."
     }
 
     suspend fun runImport(items: List<SyncItem>) {
+        ensureCurrent()
         if (items.isEmpty()) {
             message = false to "Nothing to import — no watched or rated items found."
             return
         }
         val result = services.repository.import(
             items,
-            onProgress = { done, total -> status = "Matching $done/$total…" },
+            onProgress = { done, total -> if (services.repository.isCurrent()) status = "Matching $done/$total…" },
             isCancelled = { cancelled },
         )
-        message = false to describe(result)
+        ensureCurrent()
+        message = result.failed.isNotEmpty() to describe(result)
+        if (result.added > 0 || result.updated > 0) scope.launch {
+            try { services.repository.synchronize() } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { /* Durable commands remain available in Saved imports. */ }
+        }
     }
 
     fun guarded(provider: SyncProvider, fallback: String, block: suspend () -> Unit) {
-        if (busy != null) return
+        if (busy != null || !services.repository.isCurrent()) return
         busy = provider
         message = null
         cancelled = false
         scope.launch {
             try {
+                ensureCurrent()
                 block()
+                ensureCurrent()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                message = true to (e.message?.takeIf { it.isNotBlank() } ?: fallback)
+                if (services.repository.isCurrent()) message = true to (e.message?.takeIf { it.isNotBlank() } ?: fallback)
             } finally {
-                busy = null
-                status = null
-                simklCode = null
-                refresh()
+                if (services.repository.isCurrent()) {
+                    busy = null
+                    status = null
+                    simklCode = null
+                    refresh()
+                }
             }
         }
     }
@@ -141,20 +177,24 @@ fun ImportSyncRoute(
     fun syncSimkl() = guarded(SyncProvider.SIMKL, "Simkl sync failed.") {
         if (connected(SyncProvider.SIMKL) == null) {
             val code = withContext(Dispatchers.IO) { services.simkl.start() }
+            ensureCurrent()
             simklCode = "${code.userCode}|${code.verificationUri}"
             val deadline = System.currentTimeMillis() + code.expiresIn * 1000L
             var interval = code.interval
             while (true) {
                 check(!cancelled && System.currentTimeMillis() < deadline) { "Simkl sign-in timed out." }
                 delay(interval * 1000L)
+                ensureCurrent()
                 when (withContext(Dispatchers.IO) { services.simkl.poll(code.deviceCode) }) {
                     SimklPoll.Connected -> break
                     SimklPoll.SlowDown -> interval += 5
                     SimklPoll.Pending -> Unit
                 }
             }
+            ensureCurrent()
             simklCode = null
         }
+        ensureCurrent()
         status = "Fetching your Simkl library…"
         runImport(withContext(Dispatchers.IO) { services.simkl.items() })
     }
@@ -162,18 +202,23 @@ fun ImportSyncRoute(
     fun syncPlex() = guarded(SyncProvider.PLEX, "Plex sync failed.") {
         if (plexToken == null) {
             val pin = withContext(Dispatchers.IO) { services.plex.startPin() }
+            ensureCurrent()
             uriHandler.openUri(pin.authUrl)
             status = "Approve CinemArchive in the Plex page that just opened…"
             val deadline = System.currentTimeMillis() + 5 * 60 * 1000L
             while (plexToken == null) {
                 check(!cancelled && System.currentTimeMillis() < deadline) { "Plex sign-in timed out." }
                 delay(2000)
-                plexToken = withContext(Dispatchers.IO) { services.plex.pollPin(pin) }
+                ensureCurrent()
+                val token = withContext(Dispatchers.IO) { services.plex.pollPin(pin) }
+                ensureCurrent()
+                plexToken = token
             }
         }
         val token = checkNotNull(plexToken)
         val server = withContext(Dispatchers.IO) { services.plex.servers(token) }.firstOrNull()
             ?: error("No reachable Plex server found on your account.")
+        ensureCurrent()
         status = "Reading ${server.name}…"
         val items = withContext(Dispatchers.IO) { services.plex.items(server.uri, token) }
         services.repository.recordConnection(SyncProvider.PLEX, server.uri, server.name)
@@ -182,6 +227,7 @@ fun ImportSyncRoute(
 
     fun syncEmby() = guarded(SyncProvider.EMBY, "Emby sync failed.") {
         val session = withContext(Dispatchers.IO) { services.emby.signIn(embyUrl, embyUser, embyPassword) }
+        ensureCurrent()
         embyPassword = ""
         status = "Reading your Emby library…"
         val items = withContext(Dispatchers.IO) { services.emby.items(session) }
@@ -197,6 +243,7 @@ fun ImportSyncRoute(
                 ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
             body to name.orEmpty()
         }
+        ensureCurrent()
         val rows = parseLetterboxdCsv(text)
         check(rows.isNotEmpty()) { "No films found in that CSV." }
         // watchlist.csv rows land on the watchlist; everything else is history.
@@ -204,19 +251,24 @@ fun ImportSyncRoute(
         runImport(letterboxdToSyncItems(rows, status))
     }
     val letterboxdPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) importLetterboxd(uri)
+        if (uri != null && services.repository.isCurrent()) importLetterboxd(uri)
     }
 
     fun disconnect(provider: SyncProvider) {
+        if (!services.repository.isCurrent()) return
         scope.launch {
             try {
+                ensureCurrent()
                 if (provider == SyncProvider.SIMKL) withContext(Dispatchers.IO) { services.simkl.disconnect() }
                 else services.repository.removeConnection(provider)
+                ensureCurrent()
                 if (provider == SyncProvider.PLEX) plexToken = null
                 refresh()
                 message = false to "Disconnected. Previously imported titles stay in your library."
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                message = true to (e.message ?: "Could not disconnect.")
+                if (services.repository.isCurrent()) message = true to (e.message ?: "Could not disconnect.")
             }
         }
     }

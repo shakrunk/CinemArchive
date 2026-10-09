@@ -237,7 +237,9 @@ class AppAccountRuntime(
         moviegoingPreferences = moviegoingPreferences,
     )
 
-    val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)
+    val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId,
+        work.kumarfamilynet.cinemarchive.data.ProviderImportAdmission(database, outbox, importOwner, ::isCurrent),
+        ::isCurrent, { librarySyncRepository.syncNow() })
 
     val backupRepository by lazy {
         work.kumarfamilynet.cinemarchive.data.LibraryBackupRepository(database,

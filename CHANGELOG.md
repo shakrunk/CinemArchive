@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android provider imports now save new titles, supplied viewing dates and provider identity as one durable operation, with honest partial-failure reporting and account-safe document picking.
 - Android catalog additions now preserve Rotten Tomatoes links, awards, Bechdel results, credit portraits and episode counts through local storage and synchronization.
 - Android now reviews older queued list changes, preserves originals, and recovers membership by list/title identity without losing later edits.
 - Android navigation now supports device-local tab ordering, visibility, compact icons and reset, including phone and wide layouts.

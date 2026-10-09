@@ -11,16 +11,22 @@ internal const val BACKUP_IMPORT_COMMAND = "import_graph_v1"
 internal const val BACKUP_IMPORT_DATA = "libraryImport"
 
 internal data class BackupImportCommand(val scope: TicketOwnerScope, val title: JSONObject,
-    val outings: List<JSONObject>, val admittedAt: String, val mapping: BackupGraphMapping)
+    val outings: List<JSONObject>, val admittedAt: String, val mapping: BackupGraphMapping,
+    val providerLinks: List<ProviderTitleLink> = emptyList())
 
 fun isBackupImport(entry: OutboxEntity): Boolean = entry.entityType == "title" &&
     (entry.operation == BACKUP_IMPORT_COMMAND || runCatching { JSONObject(entry.payloadJson).has(BACKUP_IMPORT_DATA) }.getOrDefault(false))
 
-internal fun importPayload(scope: TicketOwnerScope, title: JSONObject, outings: List<JSONObject>, at: String): String {
+internal fun importPayload(scope: TicketOwnerScope, title: JSONObject, outings: List<JSONObject>, at: String,
+    providerLinks: List<ProviderTitleLink> = emptyList()): String {
     val mapping = mapBackupGraph(title, outings, at)
+    providerLinks.forEach { mapping.operations.put(providerLinkOperation(it, title.getString("id"))) }
+    assertImportOperations(mapping.operations)
+    val body = JSONObject().put("version", 1).put("admittedAt", at).put("title", title)
+        .put("outings", JSONArray(outings)).put("operations", mapping.operations)
+    if (providerLinks.isNotEmpty()) body.put("providerLinks", JSONArray(providerLinks.map { it.json() }))
     return metadataJson(JSONObject().put("ownerId", scope.ownerId).put("projectId", scope.projectId)
-        .put("titleId", title.getString("id")).put(BACKUP_IMPORT_DATA, JSONObject().put("version", 1)
-            .put("admittedAt", at).put("title", title).put("outings", JSONArray(outings)).put("operations", mapping.operations)))
+        .put("titleId", title.getString("id")).put(BACKUP_IMPORT_DATA, body))
 }
 
 internal fun checkedImportCommand(entry: OutboxEntity, scope: TicketOwnerScope? = null): BackupImportCommand {
@@ -32,13 +38,17 @@ internal fun checkedImportCommand(entry: OutboxEntity, scope: TicketOwnerScope? 
     require(scope == null || scope == owner) { "The saved import belongs to another account or server." }
     UUID.fromString(owner.ownerId)
     val body = root.getJSONObject(BACKUP_IMPORT_DATA)
-    require(body.keys().asSequence().toSet() == setOf("version", "admittedAt", "title", "outings", "operations"))
+    require(body.keys().asSequence().toSet() == setOf("version", "admittedAt", "title", "outings", "operations") +
+        (if (body.has("providerLinks")) setOf("providerLinks") else emptySet()))
     require(body.getInt("version") == 1)
     val title = body.getJSONObject("title")
     require(root.getString("titleId") == entry.entityId && title.getString("id") == entry.entityId)
     val at = body.getString("admittedAt").also(Instant::parse)
     val outings = body.getJSONArray("outings").importObjects()
     val mapping = mapBackupGraph(title, outings, at)
+    val links = if (body.has("providerLinks")) checkedProviderLinks(body.getJSONArray("providerLinks")) else emptyList()
+    links.forEach { mapping.operations.put(providerLinkOperation(it, entry.entityId)) }
+    assertImportOperations(mapping.operations)
     require(sameCommandJson(mapping.operations, body.getJSONArray("operations"))) { "The saved import operations do not match its graph." }
     val identities = mapping.operations.importObjects().mapNotNull { it.getJSONObject("key").opt("id") as? String }
     // Only the final completed-outing pointer update may address the same row twice.
@@ -46,7 +56,7 @@ internal fun checkedImportCommand(entry: OutboxEntity, scope: TicketOwnerScope? 
         .mapNotNull { it.getJSONObject("key").opt("id") as? String }
     require(insertIds.distinct().size == insertIds.size)
     identities.forEach { require(UUID.fromString(it).toString() == it) }
-    return BackupImportCommand(owner, title, outings, at, mapping)
+    return BackupImportCommand(owner, title, outings, at, mapping, links)
 }
 
 /** Null means unrelated. A relevant malformed/rejected import is never revision evidence. */

@@ -70,7 +70,10 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
                 OutlinedButton(enabled = !busy, onClick = { preview = null }) { Text("Cancel preview") }
             }
             message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            if (saved.isNotEmpty()) Text("Saved imports", style = MaterialTheme.typography.titleSmall)
+            if (saved.isNotEmpty()) {
+                Text("Saved imports", style = MaterialTheme.typography.titleSmall)
+                Text("New titles from JSON and connected providers stay here until their complete import is confirmed.", style = MaterialTheme.typography.bodySmall)
+            }
             saved.forEach { item ->
                 Text(item.title)
                 Text(item.message ?: "Saved on this device; waiting for confirmation.", style = MaterialTheme.typography.bodySmall)
@@ -83,7 +86,7 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
     removing?.takeIf { source.isCurrent() }?.let { item ->
         AlertDialog(onDismissRequest = { if (!busy) removing = null },
             title = { Text("Remove rejected import?") },
-            text = { Text("Remove ${item.title} from this device and ${item.dependentChanges} later dependent changes that have never been sent. Its server transaction was rejected. Export the current library first to retain later edits; your original JSON file is unchanged. Unconfirmed imports cannot be removed here.") },
+            text = { Text("Remove ${item.title} from this device and ${item.dependentChanges} later dependent changes that have never been sent. Its server transaction was rejected. Export the current library first to retain later edits; original provider data and any archive files are unchanged. Unconfirmed imports cannot be removed here.") },
             confirmButton = { TextButton(enabled = !busy, onClick = { run {
                 source.discardRejected(item)
                 if (source.isCurrent()) { removing = null; message = "Removed the rejected import and its reviewed dependent changes."; scope.launch { runCatching { source.synchronize() } } }

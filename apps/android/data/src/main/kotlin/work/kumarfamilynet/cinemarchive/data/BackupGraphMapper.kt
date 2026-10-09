@@ -155,9 +155,13 @@ internal fun mapBackupGraph(title: JSONObject, outings: List<JSONObject>, admitt
         }
     }
     val graph = LibraryExportGraph(listOf(entity), seasons, episodes, watches, ratings, reviews, viewings, cast, crew, seasonCast, episodeCrew, outingRows)
+    assertImportOperations(ops)
+    return BackupGraphMapping(graph, ops)
+}
+
+internal fun assertImportOperations(ops: JSONArray) {
     require(ops.length() in 1..50_000) { "One title exceeds the 50,000-operation atomic restore limit." }
     require(ops.toString(2).toByteArray(Charsets.UTF_8).size.toLong() + importNumericExpansion(ops) + 128L * ops.length() <= 16L * 1024 * 1024) { "One title exceeds the 16 MiB atomic restore limit." }
-    return BackupGraphMapping(graph, ops)
 }
 
 internal fun importOperation(table: String, key: JSONObject, values: JSONObject, action: String = "insert") =

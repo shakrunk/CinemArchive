@@ -31,6 +31,41 @@ class BackupImportTransportTest {
         replies += 200 to "[]"; replies += 200 to "[]"
     }
 
+
+    private fun providerEntry(): work.kumarfamilynet.cinemarchive.core.database.OutboxEntity {
+        val original = BackupImportFixture.entry()
+        val command = checkedImportCommand(original)
+        return original.copy(payloadJson = importPayload(command.scope, command.title, command.outings, command.admittedAt,
+            listOf(ProviderTitleLink(SyncProvider.PLEX, "movie:123"))))
+    }
+
+    @Test fun providerLinkAndCompleteGraphRetryAsOneExactRequest() = runTest {
+        val entry = providerEntry()
+        replies += 503 to "{}"
+        assertTrue(transport().push(entry) is PushResult.Retry)
+        success(entry)
+        assertTrue(transport().push(entry) is PushResult.Applied)
+        assertEquals(body(0), body(1))
+        val operations = exactMetadataObject(body(1)).getJSONArray("p_operations")
+        val link = operations.getJSONObject(operations.length() - 1)
+        assertEquals("external_title_links", link.getString("table"))
+        assertEquals("movie:123", link.getJSONObject("key").getString("external_id"))
+        assertEquals(entry.entityId, link.getJSONObject("values").getString("title_id"))
+        assertEquals(2, requests.count { it.url.encodedPath.endsWith("/rpc/apply_library_command") })
+    }
+
+    @Test fun mismatchedProviderReceiptCannotAcknowledgeOrBecomeDiscardable() = runTest {
+        val entry = providerEntry()
+        for (field in listOf("user_id", "title_id", "external_id")) {
+            val receipt = BackupImportFixture.receipt(entry)
+            val rows = receipt.getJSONArray("rows")
+            rows.getJSONObject(rows.length() - 1).getJSONObject("row").put(field, "different")
+            replies += 200 to metadataJson(receipt)
+            assertTrue(transport().push(entry) is PushResult.Retry)
+        }
+        assertEquals(3, requests.size) // No current-state fetch follows invalid receipt proof.
+    }
+
     @Test fun unknownOutcomeRetriesExactGraphWithOriginalPrecisionThenReadsCurrent() = runTest {
         val entry = BackupImportFixture.entry()
         replies += 503 to "{}"

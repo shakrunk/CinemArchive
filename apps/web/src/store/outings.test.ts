@@ -356,8 +356,8 @@ describe('formatOutingShareSnapshotLine', () => {
       tmdb_id: 42,
       type: 'movie',
       title: 'Dune Part Three',
-      showtime: new Date(2026, 6, 17, 19, 30).toISOString(),
-      ends_at: new Date(2026, 6, 17, 22, 36).toISOString(),
+      showtime: '2026-07-17T19:30:00.000-06:00',
+      ends_at: '2026-07-17T22:36:00.000-06:00',
       venue: 'AMC Georgetown',
       seat: 'H12',
     })!
@@ -369,8 +369,8 @@ describe('formatOutingShareSnapshotLine', () => {
       tmdb_id: 42,
       type: 'movie',
       title: 'Dune Part Three',
-      showtime: new Date(2026, 6, 17, 19, 30).toISOString(),
-      ends_at: new Date(2026, 6, 17, 22, 36).toISOString(),
+      showtime: '2026-07-17T19:30:00.000-06:00',
+      ends_at: '2026-07-17T22:36:00.000-06:00',
     })!
     expect(formatOutingShareSnapshotLine(payload)).toBe('Fri 7:30 PM')
   })

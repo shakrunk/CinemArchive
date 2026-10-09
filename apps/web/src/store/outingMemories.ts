@@ -13,6 +13,7 @@ export interface OutingMemory {
 export function computeOutingMemories(outings: CinemaOuting[], titles: Title[], now: Date): OutingMemory[] {
   const titlesById = new Map(titles.map((title) => [title.id, title]))
   const memories: OutingMemory[] = []
+  const tsCache = new Map<CinemaOuting, number>()
   for (const outing of outings) {
     if (outing.status !== 'completed') continue
     const title = titlesById.get(outing.titleId)
@@ -20,6 +21,7 @@ export function computeOutingMemories(outings: CinemaOuting[], titles: Title[], 
     const showtime = new Date(outing.showtime)
     const yearsAgo = now.getFullYear() - showtime.getFullYear()
     if (!(yearsAgo > 0) || showtime.getMonth() !== now.getMonth() || showtime.getDate() !== now.getDate()) continue
+    tsCache.set(outing, showtime.getTime())
     memories.push({
       outing,
       title,
@@ -28,7 +30,5 @@ export function computeOutingMemories(outings: CinemaOuting[], titles: Title[], 
         ?? title.viewings.find((viewing) => viewing.outingId === outing.id),
     })
   }
-  return memories.sort((a, b) =>
-    b.outing.showtime < a.outing.showtime ? -1 : b.outing.showtime > a.outing.showtime ? 1 : 0
-  )
+  return memories.sort((a, b) => (tsCache.get(b.outing) ?? 0) - (tsCache.get(a.outing) ?? 0))
 }

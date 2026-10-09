@@ -7,10 +7,10 @@ function makeOuting(overrides: Partial<CinemaOuting> = {}): CinemaOuting {
   return {
     id: 'outing-1',
     titleId: 't1',
-    showtime: new Date(2026, 6, 17, 19, 30).toISOString(),
+    showtime: '2026-07-17T19:30:00.000-06:00',
     previewsMinutes: 20,
     runtimeMinutes: 166,
-    endsAt: new Date(2026, 6, 17, 22, 36).toISOString(),
+    endsAt: '2026-07-17T22:36:00.000-06:00',
     companions: [],
     seats: [],
     status: 'scheduled',
@@ -21,7 +21,7 @@ function makeOuting(overrides: Partial<CinemaOuting> = {}): CinemaOuting {
 
 describe('outingIcsFilename', () => {
   it('slugifies the title and appends the showtime local date', () => {
-    expect(outingIcsFilename('Dune: Part Three', new Date(2026, 6, 17, 19, 30).toISOString())).toBe(
+    expect(outingIcsFilename('Dune: Part Three', '2026-07-17T19:30:00.000-06:00')).toBe(
       'dune-part-three-2026-07-17.ics'
     )
   })
@@ -41,12 +41,8 @@ describe('buildOutingIcs', () => {
     expect(ics).toContain('LOCATION:AMC Georgetown')
     expect(ics).toContain('DESCRIPTION:With Alex & Sam')
     expect(ics).toContain('TRIGGER:-PT2H')
-    const showtime = new Date(2026, 6, 17, 19, 30).toISOString()
-    const endsAt = new Date(2026, 6, 17, 22, 36).toISOString()
-    const dtStart = showtime.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
-    const dtEnd = endsAt.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
-    expect(ics).toContain(`DTSTART:${dtStart}`)
-    expect(ics).toContain(`DTEND:${dtEnd}`)
+    expect(ics).toContain('DTSTART:20260718T013000Z')
+    expect(ics).toContain('DTEND:20260718T043600Z')
     expect(ics).toContain(`UID:${outing.id}@cinemarchive`)
   })
 
@@ -75,20 +71,19 @@ describe('buildOutingIcsFromSharePayload', () => {
       tmdbId: 42,
       type: 'movie',
       title: 'Dune Part Three',
-      showtime: new Date(2026, 6, 17, 19, 30).toISOString(),
-      endsAt: new Date(2026, 6, 17, 22, 36).toISOString(),
+      showtime: '2026-07-17T19:30:00.000-06:00',
+      endsAt: '2026-07-17T22:36:00.000-06:00',
       companions: [],
       ...overrides,
     }
   }
 
   it('builds a VEVENT from the snapshot alone, with a tmdbId+showtime UID', () => {
-    const showtime = new Date(2026, 6, 17, 19, 30).toISOString()
     const ics = buildOutingIcsFromSharePayload(makePayload({ venue: 'AMC Georgetown', companions: ['Alex', 'Sam'] }))
     expect(ics).toContain('SUMMARY:🎬 Dune Part Three — AMC Georgetown')
     expect(ics).toContain('LOCATION:AMC Georgetown')
     expect(ics).toContain('DESCRIPTION:With Alex & Sam')
-    expect(ics).toContain(`UID:share-42-${showtime}@cinemarchive`)
+    expect(ics).toContain('UID:share-42-2026-07-17T19:30:00.000-06:00@cinemarchive')
   })
 
   it('omits LOCATION/DESCRIPTION when the snapshot has neither venue nor companions', () => {
@@ -104,7 +99,7 @@ describe('formatOutingShareSnippet', () => {
   it('reads like a text a friend would send, omitting blank fields', () => {
     const snippet = formatOutingShareSnippet(
       'Dune Part Three',
-      new Date(2026, 6, 17, 19, 30).toISOString(),
+      '2026-07-17T19:30:00.000-06:00',
       'AMC Georgetown',
       'IMAX',
       'H12'
@@ -113,12 +108,12 @@ describe('formatOutingShareSnippet', () => {
   })
 
   it('omits venue/format/seat when unset', () => {
-    const snippet = formatOutingShareSnippet('The Long Reel', new Date(2026, 6, 17, 19, 30).toISOString())
+    const snippet = formatOutingShareSnippet('The Long Reel', '2026-07-17T19:30:00.000-06:00')
     expect(snippet).toBe('🎬 The Long Reel — Fri Jul 17, 7:30 PM')
   })
 
   it('omits the Standard format (the default, not worth mentioning)', () => {
-    const snippet = formatOutingShareSnippet('The Long Reel', new Date(2026, 6, 17, 19, 30).toISOString(), 'AMC Georgetown', 'Standard')
+    const snippet = formatOutingShareSnippet('The Long Reel', '2026-07-17T19:30:00.000-06:00', 'AMC Georgetown', 'Standard')
     expect(snippet).toBe('🎬 The Long Reel — Fri Jul 17, 7:30 PM · AMC Georgetown')
   })
 })

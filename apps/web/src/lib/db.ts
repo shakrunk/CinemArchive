@@ -184,18 +184,16 @@ function mapDbTitleToLocal(row: any): Title {
                   colorMode: we.color_mode || undefined,
                 })),
               ratings: (ep.episode_ratings || [])
-                .sort((a: any, b: any) =>
-                  a.rated_at < b.rated_at ? -1 : a.rated_at > b.rated_at ? 1 : 0
-                )
+                .map((r: any) => ({ ...r, _ts: r.rated_at ? Date.parse(r.rated_at) : -Infinity }))
+                .sort((a: any, b: any) => a._ts - b._ts)
                 .map((er: any) => ({
                   id: er.id,
                   rating: parseFloat(er.rating),
                   ratedAt: er.rated_at,
                 })),
               reviews: (ep.episode_reviews || [])
-                .sort((a: any, b: any) =>
-                  a.reviewed_at < b.reviewed_at ? -1 : a.reviewed_at > b.reviewed_at ? 1 : 0
-                )
+                .map((r: any) => ({ ...r, _ts: r.reviewed_at ? Date.parse(r.reviewed_at) : -Infinity }))
+                .sort((a: any, b: any) => a._ts - b._ts)
                 .map((rv: any) => ({
                   id: rv.id,
                   reviewText: rv.review_text,

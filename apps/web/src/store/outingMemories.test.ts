@@ -23,6 +23,15 @@ describe('cinema memories', () => {
     expect(entries.map((entry) => [entry.outing.id, entry.yearsAgo])).toEqual([['newer', 1], ['older', 3]])
   })
 
+  it('correctly sorts mixed-offset times chronologically', () => {
+    // 20:00+00:00 (14:00 MDT) vs 23:00-06:00 (23:00 MDT)
+    const tripA = outing('tripA', 2025, { showtime: '2025-10-08T23:00:00-06:00' })
+    const tripB = outing('tripB', 2025, { showtime: '2025-10-08T20:00:00+00:00' })
+    // computeOutingMemories descending sort: tripA (later in time) comes first.
+    const entries = computeOutingMemories([tripB, tripA], [title], today)
+    expect(entries.map(e => e.outing.id)).toEqual(['tripA', 'tripB'])
+  })
+
   it('excludes this year, future years, other days, invalid dates, missing titles, and uncompleted trips', () => {
     const candidates = [
       outing('current', 2026), outing('future', 2027),

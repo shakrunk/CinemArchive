@@ -52,7 +52,7 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, SHARING, APPEARANCE, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
+enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, SHARING, APPEARANCE, NAVIGATION, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
@@ -91,6 +91,7 @@ fun ProfileRoute(
     ticketChangesContent: (@Composable () -> Unit)? = null,
     moviegoingContent: (@Composable () -> Unit)? = null,
     lifecycleChangesContent: (@Composable () -> Unit)? = null,
+    onOpenNavigation: (() -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -131,6 +132,7 @@ fun ProfileRoute(
         ticketChangesContent = ticketChangesContent,
         moviegoingContent = moviegoingContent,
         lifecycleChangesContent = lifecycleChangesContent,
+        onOpenNavigation = onOpenNavigation,
     )
 }
 
@@ -199,6 +201,7 @@ private fun ProfileScreen(
     ticketChangesContent: (@Composable () -> Unit)? = null,
     moviegoingContent: (@Composable () -> Unit)? = null,
     lifecycleChangesContent: (@Composable () -> Unit)? = null,
+    onOpenNavigation: (() -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -311,6 +314,20 @@ private fun ProfileScreen(
                         subtitle = appearanceSummary,
                         onClick = onOpenAppearance,
                         selected = selectedCategory == SettingsCategory.APPEARANCE,
+                    )
+                }
+            }
+            if (onOpenNavigation != null) item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Palette,
+                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        title = "Navigation",
+                        subtitle = "Tab order, visibility & compact labels",
+                        onClick = onOpenNavigation,
+                        selected = selectedCategory == SettingsCategory.NAVIGATION,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
             }

@@ -361,7 +361,7 @@ private fun DebugBuildBanner(isDebugBuild: Boolean) {
     }
 }
 
-private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER, LISTS }
+private typealias Tab = work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 
 private sealed interface Overlay {
     data class Detail(val titleId: String) : Overlay
@@ -382,6 +382,7 @@ private sealed interface Overlay {
     data object Friends : Overlay
     data class FriendLibrary(val friendUserId: String, val label: String) : Overlay
     data object Appearance : Overlay
+    data object Navigation : Overlay
     data object ImportSync : Overlay
     data object About : Overlay
     data object Permissions : Overlay
@@ -449,6 +450,9 @@ private fun CinemArchiveApp(
     // flash once, on cold start.
     val libraryViewMode by preferencesRepository.observeLibraryViewMode()
         .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
+    val navigationFlow = remember(preferencesRepository) { preferencesRepository.observeNavigation() }
+    val navigationPreferences by navigationFlow.collectAsStateWithLifecycle(
+        initialValue = work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences())
 
     // Hoisted for the same reason, and shared by both poster grids: pinching the density on
     // Discover and finding Library unchanged would be the surprising behaviour.
@@ -602,7 +606,7 @@ private fun CinemArchiveApp(
             // foldable, a tablet — a bottom bar stretched across the full width reads as a
             // phone control blown up rather than adapted, so nav moves to a leading-edge rail.
             val useNavigationRail = maxWidth >= MediumWindowBreakpoint
-            val navDestinations = listOf(
+            val allNavDestinations = listOf(
                 NavDestination(Tab.DISCOVER, "Discover", Icons.Outlined.Explore, Icons.Filled.Explore),
                 NavDestination(
                     Tab.LIBRARY,
@@ -616,6 +620,7 @@ private fun CinemArchiveApp(
                 // the two tabs sitting side by side with the same icon would be confusing.
                 NavDestination(Tab.LISTS, "Lists", Icons.Outlined.Bookmarks, Icons.Filled.Bookmarks),
             )
+            val navDestinations = navigationPreferences.visible.map { destination -> allNavDestinations.first { it.value == destination } }
 
             @Composable
             fun TabScaffoldContent(innerPadding: PaddingValues) {
@@ -705,6 +710,7 @@ private fun CinemArchiveApp(
                         destinations = navDestinations,
                         selected = tab,
                         onSelect = { tab = it },
+                        compact = navigationPreferences.compact,
                     )
                     Scaffold(
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -719,6 +725,7 @@ private fun CinemArchiveApp(
                             destinations = navDestinations,
                             selected = tab,
                             onSelect = { tab = it },
+                            compact = navigationPreferences.compact,
                         )
                     },
                 ) { innerPadding -> TabScaffoldContent(innerPadding) }
@@ -747,6 +754,7 @@ private fun CinemArchiveApp(
                 Overlay.Notifications -> SettingsCategory.NOTIFICATIONS
                 Overlay.Sharing -> SettingsCategory.SHARING
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
+                Overlay.Navigation -> SettingsCategory.NAVIGATION
                 Overlay.ImportSync -> SettingsCategory.IMPORT_SYNC
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
                 Overlay.About -> SettingsCategory.ABOUT
@@ -790,6 +798,7 @@ private fun CinemArchiveApp(
                             onOpenFriends = { overlay = Overlay.Friends },
                             onOpenSharing = { selectedSettingsCategory = SettingsCategory.SHARING },
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
+                            onOpenNavigation = { selectedSettingsCategory = SettingsCategory.NAVIGATION },
                             onOpenImportSync = { selectedSettingsCategory = SettingsCategory.IMPORT_SYNC },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
                             onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
@@ -827,6 +836,7 @@ private fun CinemArchiveApp(
                                 showBack = false,
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.NAVIGATION -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
                                 backupContent = { Column {
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
@@ -908,6 +918,7 @@ private fun CinemArchiveApp(
                     onOpenFriends = { overlay = Overlay.Friends },
                     onOpenSharing = { overlay = Overlay.Sharing },
                     onOpenAppearance = { overlay = Overlay.Appearance },
+                    onOpenNavigation = { overlay = Overlay.Navigation },
                     onOpenImportSync = { overlay = Overlay.ImportSync },
                     onOpenAbout = { overlay = Overlay.About },
                     onOpenPermissions = { overlay = Overlay.Permissions },
@@ -950,6 +961,7 @@ private fun CinemArchiveApp(
                     onBack = { overlay = Overlay.Friends },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
+                Overlay.Navigation -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = openProfile)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
                     backupContent = { Column {
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)

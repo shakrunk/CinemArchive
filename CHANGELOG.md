@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android navigation now supports device-local tab ordering, visibility, compact icons and reset, including phone and wide layouts.
 - Android can restore JSON backups through the system picker, with previews, duplicate skips, recoverable failures and preserved title, episode and outing history.
 - Android outing completion, post-show ratings and notes, and undo now use durable actions with explicit conflict recovery and protection against duplicate viewing history.
 - Android backup validation now retains completed outings after their viewing history was deleted and matches the shared storage limits for preview and runtime minutes.

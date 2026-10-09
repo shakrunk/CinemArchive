@@ -13,6 +13,8 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
+import work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
+import work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences
 
 private val Context.preferencesDataStore by preferencesDataStore(name = "cinemarchive_prefs")
 
@@ -33,6 +35,29 @@ class PreferencesRepository(context: Context) {
     private val posterGridColumnsKey = intPreferencesKey("poster_grid_columns")
     private val devSettingsUnlockedKey = booleanPreferencesKey("dev_settings_unlocked")
     private val devShowBuildBannerKey = booleanPreferencesKey("dev_show_build_banner")
+    private val navigationOrderKey = stringPreferencesKey("navigation_order")
+    private val navigationHiddenKey = stringPreferencesKey("navigation_hidden")
+    private val navigationCompactKey = booleanPreferencesKey("navigation_compact")
+
+    fun observeNavigation(): Flow<NavigationPreferences> = dataStore.data.map(::navigation)
+
+    private fun navigation(prefs: androidx.datastore.preferences.core.Preferences) = NavigationPreferences.restore(
+        prefs[navigationOrderKey].orEmpty().split(','), prefs[navigationHiddenKey].orEmpty().split(',').toSet(),
+        prefs[navigationCompactKey] ?: false)
+
+    private suspend fun updateNavigation(change: (NavigationPreferences) -> NavigationPreferences) {
+        dataStore.edit { prefs ->
+            val next = change(navigation(prefs))
+            prefs[navigationOrderKey] = next.order.joinToString(",") { it.key }
+            prefs[navigationHiddenKey] = next.hidden.joinToString(",") { it.key }
+            prefs[navigationCompactKey] = next.compact
+        }
+    }
+
+    suspend fun moveNavigation(destination: NavigationDestination, direction: Int) = updateNavigation { it.move(destination, direction) }
+    suspend fun showNavigation(destination: NavigationDestination, visible: Boolean) = updateNavigation { it.show(destination, visible) }
+    suspend fun setNavigationCompact(compact: Boolean) = updateNavigation { it.copy(compact = compact) }
+    suspend fun resetNavigation() = updateNavigation { NavigationPreferences() }
 
     fun observeThemeMode(): Flow<ArchiveThemeMode> = dataStore.data.map { preferences ->
         preferences[themeModeKey]?.let { stored ->

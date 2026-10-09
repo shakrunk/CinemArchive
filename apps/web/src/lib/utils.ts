@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 export const SECONDARY_AMBER_BUTTON =
   'text-xs font-mono text-amber border border-amber/30 rounded-md px-3 py-1.5 hover:bg-amber/10 transition-colors'
 export const SECONDARY_AMBER_BUTTON_LG =
-  'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60'
+  'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-sans border border-amber/30 text-amber hover:bg-amber/10 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60'
 
 const SHORT_DATE_FORMAT: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
 

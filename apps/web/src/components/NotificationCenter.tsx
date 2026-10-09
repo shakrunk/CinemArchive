@@ -136,15 +136,15 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
         aria-label={unreadNotificationCount > 0 ? `Notifications — ${unreadNotificationCount} unread` : 'Notifications'}
         aria-expanded={open}
         className={cn(
-          'icon-btn relative w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
-          open && '!bg-amber/15 border-amber/50 text-amber'
+          'icon-btn relative w-9 h-9 border rounded-md text-paper-dim hover:text-amber transition-colors flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
+          open && 'bg-amber/15! border-amber/50 text-amber'
         )}
         style={{ borderColor: 'var(--line)', background: 'var(--inset)' }}
       >
         <Bell className="w-[17px] h-[17px]" />
         {unreadNotificationCount > 0 && (
           <span
-            className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber text-[color:var(--on-amber)] text-[9px] font-mono font-bold flex items-center justify-center"
+            className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber text-(--on-amber) text-[9px] font-mono font-bold flex items-center justify-center"
             aria-hidden="true"
           >
             {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
@@ -156,7 +156,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
         <div
           role="menu"
           aria-label="Notifications"
-          className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl overflow-hidden z-[220] shadow-xl"
+          className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl overflow-hidden z-220 shadow-xl"
           style={{ background: 'rgb(var(--ink-1-rgb))', border: '1px solid var(--line)' }}
         >
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--line)' }}>
@@ -164,7 +164,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
             {unreadNotificationCount > 0 && (
               <button type="button"
                 onClick={() => markAllNotificationsSeen()}
-                className="font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                className="font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 Mark all read
               </button>
@@ -194,7 +194,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                       <button type="button"
                         role="menuitem"
                         onClick={() => handleItemClick(n)}
-                        className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30 focus-visible:outline-none focus-visible:bg-secondary/50"
+                        className="w-full text-left flex items-start gap-2.5 pl-4 pr-9 py-3 transition-colors hover:bg-secondary/30 focus-visible:outline-hidden focus-visible:bg-secondary/50"
                       >
                         <Icon className="w-4 h-4 mt-0.5 shrink-0 text-amber" />
                         <div className="min-w-0 flex-1">
@@ -213,7 +213,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                           void deleteNotificationItem(n.id)
                         }}
                         aria-label="Dismiss notification"
-                        className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                        className="absolute right-2 top-2.5 w-5 h-5 rounded flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-paper hover:bg-secondary/50 transition-opacity focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                       >
                         <X className="w-3 h-3" aria-hidden="true" />
                       </button>
@@ -222,14 +222,14 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
                       <div className="flex gap-3 pl-[34px] pr-4 pb-2.5 -mt-1">
                         <button type="button"
                           onClick={() => handleGotTicketsToo(n)}
-                          className="flex items-center gap-1 font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                          className="flex items-center gap-1 font-mono text-[10px] text-amber hover:opacity-80 transition-opacity focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <Ticket className="w-3 h-3" />
                           I've got tickets too
                         </button>
                         <button type="button"
                           onClick={() => handleAddSharedToCalendar(n)}
-                          className="flex items-center gap-1 font-mono text-[10px] text-paper-faint hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                          className="flex items-center gap-1 font-mono text-[10px] text-paper-faint hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                         >
                           <CalendarPlus className="w-3 h-3" />
                           Add to calendar

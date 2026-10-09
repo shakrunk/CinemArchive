@@ -62,11 +62,11 @@ function CardFrame({
         ...(delayMs !== undefined ? { ['--poster-delay' as string]: `${delayMs}ms` } : {}),
       }}
     >
-      <button onClick={onOpen} className="w-16 sm:w-20 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm" aria-label={`Open ${title.title}`}>
+      <button onClick={onOpen} className="w-16 sm:w-20 shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm" aria-label={`Open ${title.title}`}>
         <DynamicPoster title={title} hideBadges />
       </button>
       <div className="flex-1 min-w-0 flex flex-col">
-        <button onClick={onOpen} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm">
+        <button onClick={onOpen} className="text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm">
           <h3
             className="font-serif text-lg sm:text-xl font-medium text-paper truncate"
             style={{ fontVariationSettings: '"opsz" 30' }}
@@ -216,7 +216,7 @@ function LiveCard({
               <button
                 onClick={handleUndo}
                 aria-label={`Undo marking ${title.title} as watched`}
-                className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 <Undo2 className="w-3.5 h-3.5" /> Undo
               </button>
@@ -297,14 +297,14 @@ function CaughtUpCard({
         <div className="mt-auto pt-3 flex items-center justify-between gap-2">
           <button
             onClick={handleMarkSeriesWatched}
-            className="font-mono text-xs text-amber hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+            className="font-mono text-xs text-amber hover:opacity-80 transition-opacity focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
             Mark series watched
           </button>
           <button
             onClick={handleUndo}
             aria-label={`Undo marking ${title.title} series as watched`}
-            className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+            className="font-mono text-xs text-paper-faint hover:text-paper inline-flex items-center gap-1 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
             <Undo2 className="w-3.5 h-3.5" /> Undo
           </button>
@@ -356,7 +356,7 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
         <button
           onClick={() => openOutingSchedule(title.id)}
           aria-label={`I've got tickets for ${title.title}`}
-          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--inset)] backdrop-blur-sm text-amber/80 hover:text-amber hover:bg-[var(--inset-strong)] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-(--inset) backdrop-blur-xs text-amber/80 hover:text-amber hover:bg-(--inset-strong) transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <Ticket className="w-3.5 h-3.5" />
         </button>
@@ -412,7 +412,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                 <span className="font-mono text-xs text-paper-faint">Cancel these tickets?</span>
                 <button
                   onClick={() => cancelOuting(outing.id)}
-                  className="font-mono text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                  className="font-mono text-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                   style={{ color: 'var(--ember)' }}
                   aria-label="Yes, cancel these tickets"
                 >
@@ -420,7 +420,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                 </button>
                 <button
                   onClick={() => setConfirmingCancel(false)}
-                  className="font-mono text-xs text-paper-faint hover:text-paper transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                  className="font-mono text-xs text-paper-faint hover:text-paper transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                   aria-label="No, keep these tickets"
                 >
                   No
@@ -431,7 +431,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                 <button
                   type="button"
                   onClick={handleAddToCalendar}
-                  className="flex items-center gap-1.5 font-mono text-xs text-amber/80 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                  className="flex items-center gap-1.5 font-mono text-xs text-amber/80 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                 >
                   <CalendarPlus className="w-3.5 h-3.5" />
                   Add to calendar
@@ -442,7 +442,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                     onClick={() => setMenuOpen((v) => !v)}
                     aria-label={`More options for ${title.title}'s tickets`}
                     aria-expanded={menuOpen}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-paper-faint hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-paper-faint hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
                     <MoreVertical className="w-4 h-4" />
                   </button>
@@ -463,7 +463,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                           setMenuOpen(false)
                           setSharePanelOpen(true)
                         }}
-                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-hidden focus-visible:bg-secondary/30"
                       >
                         Share plans
                       </button>
@@ -474,7 +474,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                           setMenuOpen(false)
                           openOutingSchedule(title.id, outing.id)
                         }}
-                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-amber hover:bg-secondary/30 transition-colors focus-visible:outline-hidden focus-visible:bg-secondary/30"
                       >
                         Edit tickets
                       </button>
@@ -485,7 +485,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
                           setMenuOpen(false)
                           setConfirmingCancel(true)
                         }}
-                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-ember transition-colors focus-visible:outline-none focus-visible:bg-secondary/30"
+                        className="w-full text-left px-3 py-2 font-mono text-xs text-paper-faint hover:text-ember transition-colors focus-visible:outline-hidden focus-visible:bg-secondary/30"
                       >
                         Cancel outing
                       </button>
@@ -534,7 +534,7 @@ function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?:
         <button
           onClick={() => dismissOutingFollowUp(outing.id)}
           aria-label={`Dismiss the "how was it" prompt for ${title.title}`}
-          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-[var(--inset)] backdrop-blur-sm text-paper-faint hover:text-paper hover:bg-[var(--inset-strong)] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center bg-(--inset) backdrop-blur-xs text-paper-faint hover:text-paper hover:bg-(--inset-strong) transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
         >
           <X className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
@@ -561,7 +561,7 @@ function OutingMemoryCard({ entry, delayMs }: { entry: OutingMemory; delayMs?: n
           <span aria-hidden="true">★ {viewing.rating.toFixed(1)}</span>
         </p>
       )}
-      {viewing?.notes && <p className="font-sans text-sm text-paper-dim break-words mt-1">“{viewing.notes}”</p>}
+      {viewing?.notes && <p className="font-sans text-sm text-paper-dim wrap-break-word mt-1">“{viewing.notes}”</p>}
       <TicketButton outingId={outing.id} />
     </CardFrame>
   )

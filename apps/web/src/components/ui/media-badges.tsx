@@ -170,7 +170,7 @@ export function HeroScores({ imdb, rt, meta }: { imdb?: number; rt?: number; met
         <div
           key={c.key}
           title={c.name}
-          className="h-8 flex items-center gap-1.5 rounded-md px-2.5 bg-black/55 backdrop-blur-sm border border-white/10"
+          className="h-8 flex items-center gap-1.5 rounded-md px-2.5 bg-black/55 backdrop-blur-xs border border-white/10"
         >
           <span className="font-mono font-bold text-[10px]" style={{ color: c.color }}>{c.label}</span>
           <span className="font-mono text-xs text-white tabular-nums">{c.value}</span>

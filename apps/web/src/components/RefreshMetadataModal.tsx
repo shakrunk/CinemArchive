@@ -120,7 +120,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
           {!showSearch ? (
             <div className="space-y-3">
               <Button
-                className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium disabled:opacity-40"
+                className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium disabled:opacity-40"
                 onClick={() => applyFrom(titleToSearchResult(title))}
                 disabled={!title.tmdbId}
               >
@@ -134,7 +134,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
               )}
               <button type="button"
                 onClick={startSearch}
-                className="w-full text-xs font-mono text-muted-foreground hover:text-amber transition-colors py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                className="w-full text-xs font-mono text-muted-foreground hover:text-amber transition-colors py-1 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 Wrong entry? Search for the correct one →
               </button>
@@ -168,7 +168,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
                       setQuery('')
                     }}
                     aria-label="Clear search"
-                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
                     <X className="w-3.5 h-3.5" aria-hidden="true" />
                     Clear search
@@ -206,7 +206,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
 
               <button type="button"
                 onClick={() => setShowSearch(false)}
-                className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
               >
                 ← Back
               </button>

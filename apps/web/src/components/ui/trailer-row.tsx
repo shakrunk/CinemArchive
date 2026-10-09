@@ -65,7 +65,7 @@ function IconBtn({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm transition-colors"
+      className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-sm transition-colors"
       style={{ color: amber ? 'var(--amber)' : 'var(--paper-faint)', lineHeight: 0 }}
       onMouseEnter={(e) => { if (!amber) e.currentTarget.style.color = 'var(--paper)' }}
       onMouseLeave={(e) => { if (!amber) e.currentTarget.style.color = 'var(--paper-faint)' }}
@@ -277,7 +277,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
       role="dialog"
       aria-modal="true"
       aria-label={`${video.name} — trailer`}
-      className="fixed inset-0 z-[215] flex items-center justify-center"
+      className="fixed inset-0 z-215 flex items-center justify-center"
       style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(11,9,7,0.9) 0%, rgba(4,3,2,0.98) 100%)' }}
       onClick={onClose}
     >
@@ -430,7 +430,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
             onClick={onPrev}
             disabled={videoIndex === 0}
             aria-label="Previous trailer"
-            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
               background: 'rgba(11,9,7,0.6)',
               color: 'var(--paper-dim)',
@@ -468,7 +468,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
             onClick={onNext}
             disabled={videoIndex === totalVideos - 1}
             aria-label="Next trailer"
-            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
               background: 'rgba(11,9,7,0.6)',
               color: 'var(--paper-dim)',
@@ -560,7 +560,7 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
               type="button"
               onClick={() => setActiveIndex(i)}
               aria-label={`Watch ${v.name}`}
-              className="group shrink-0 w-[220px] sm:w-[260px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg"
+              className="group shrink-0 w-[220px] sm:w-[260px] text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg"
             >
               <div
                 className="relative w-full rounded-lg overflow-hidden group-hover:shadow-[0_0_0_1.5px_rgba(233,178,102,0.5)]"

@@ -77,7 +77,7 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
       <div ref={setScrollBody} className="overflow-y-auto flex-1 min-h-0 scrollbar-thin">
         {/* Backdrop */}
         {hasBackdrop ? (
-          <div className="relative aspect-[16/8] overflow-hidden shrink-0">
+          <div className="relative aspect-16/8 overflow-hidden shrink-0">
             <img
               src={data.backdropUrl}
               alt=""
@@ -108,9 +108,9 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
               style={{ borderColor: 'var(--line)' }}
             >
               {data.posterUrl ? (
-                <img src={data.posterUrl} alt={data.title} className="w-full aspect-[2/3] object-cover" />
+                <img src={data.posterUrl} alt={data.title} className="w-full aspect-2/3 object-cover" />
               ) : (
-                <div className="aspect-[2/3] flex items-center justify-center" style={{ background: 'var(--inset)' }}>
+                <div className="aspect-2/3 flex items-center justify-center" style={{ background: 'var(--inset)' }}>
                   {data.type === 'tv'
                     ? <Tv className="w-6 h-6 text-paper-faint opacity-30" />
                     : <Film className="w-6 h-6 text-paper-faint opacity-30" />}
@@ -263,7 +263,7 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
 
         </div>
       </div>
-      <div className="shrink-0 border-t border-[var(--line)] px-5 py-3">
+      <div className="shrink-0 border-t border-(--line) px-5 py-3">
           {/* Add / In Library */}
           {isOwned ? (
             <div className="flex items-center gap-2 text-amber font-mono text-sm py-2.5">

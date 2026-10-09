@@ -62,7 +62,7 @@ export function SecondOpinions({ className, settings, width = 'lg' }: { classNam
                   <div className={cn('flex flex-col gap-1', width === 'sm' && 'col-span-2 row-start-2')}>
                     <span className="flex items-center gap-1.5">
                       <Eyebrow as="span" size="xs" className="w-7 shrink-0">you</Eyebrow>
-                      <span className="flex-1 h-[6px] rounded-full bg-[var(--wash)] overflow-hidden">
+                      <span className="flex-1 h-[6px] rounded-full bg-(--wash) overflow-hidden">
                         <span
                           className="block h-full rounded-full bar-fill"
                           style={{ width: `${r.mine * 10}%`, background: 'var(--amber-bright)', animationDelay: `${i * 60}ms` }}
@@ -71,7 +71,7 @@ export function SecondOpinions({ className, settings, width = 'lg' }: { classNam
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Eyebrow as="span" size="xs" className="w-7 shrink-0">imdb</Eyebrow>
-                      <span className="flex-1 h-[6px] rounded-full bg-[var(--wash)] overflow-hidden">
+                      <span className="flex-1 h-[6px] rounded-full bg-(--wash) overflow-hidden">
                         <span
                           className="block h-full rounded-full bar-fill"
                           style={{ width: `${r.critics * 10}%`, background: 'var(--moon)', animationDelay: `${i * 60 + 40}ms` }}

@@ -89,7 +89,7 @@ export function StarRating({
             onMouseLeave={() => !readonly && setHovered(null)}
             onClick={(e) => handleClick(e, star)}
             className={cn(
-              'relative focus:outline-none',
+              'relative focus:outline-hidden',
               readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110 transition-transform'
             )}
             aria-label={`${star} stars`}

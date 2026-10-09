@@ -21,7 +21,7 @@ export function LedgerSkeleton() {
         <div className="skeleton-shimmer h-4 w-[min(420px,65%)] rounded-md mt-4" />
       </div>
       {/* Ribbon stubs */}
-      <div className="flex items-start gap-12 overflow-hidden pb-3 mb-[clamp(24px,4vw,40px)] border-b border-[var(--line)]">
+      <div className="flex items-start gap-12 overflow-hidden pb-3 mb-[clamp(24px,4vw,40px)] border-b border-(--line)">
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="shrink-0">
             <div className="skeleton-shimmer h-9 w-16 rounded-md" />
@@ -34,7 +34,7 @@ export function LedgerSkeleton() {
         {SKELETON_SPANS.map((span, i) => (
           <div
             key={i}
-            className={`${span} skeleton-shimmer rounded-xl border border-[var(--line)]`}
+            className={`${span} skeleton-shimmer rounded-xl border border-(--line)`}
             style={{ height: LEDGER_PANEL_STANDARD_HEIGHT }}
           />
         ))}

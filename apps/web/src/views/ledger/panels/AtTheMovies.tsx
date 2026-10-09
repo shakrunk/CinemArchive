@@ -193,7 +193,7 @@ function CountList({ title, entries }: { title: string; entries: { label: string
       <ul className="space-y-2">
         {entries.map((entry) => (
           <li key={entry.label} className="flex justify-between gap-4 text-sm text-paper">
-            <span className="min-w-0 break-words">{entry.label}</span>
+            <span className="min-w-0 wrap-break-word">{entry.label}</span>
             <span className="shrink-0 font-mono text-paper-faint">{entry.count} {entry.count === 1 ? 'trip' : 'trips'}</span>
           </li>
         ))}

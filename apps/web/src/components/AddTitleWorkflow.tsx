@@ -170,20 +170,20 @@ function SeasonEditor({ seasons, onChange }: SeasonEditorProps) {
                 type="button"
                 onClick={() => toggleEpisodes(i, -1)}
                 aria-label={`Decrease episodes watched for ${seasonLabel(s.seasonNumber).toLowerCase()}`}
-                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               >−</button>
               <button
                 type="button"
                 onClick={() => toggleEpisodes(i, 1)}
                 aria-label={`Increase episodes watched for ${seasonLabel(s.seasonNumber).toLowerCase()}`}
-                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                className="w-5 h-5 rounded bg-secondary text-muted-foreground hover:text-foreground font-mono text-xs flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
               >+</button>
               <button
                 type="button"
                 onClick={() => markSeasonComplete(i)}
                 aria-label={complete ? `Mark ${seasonLabel(s.seasonNumber).toLowerCase()} incomplete` : `Mark ${seasonLabel(s.seasonNumber).toLowerCase()} complete`}
                 className={cn(
-                  'w-5 h-5 rounded flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+                  'w-5 h-5 rounded flex items-center justify-center transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
                   complete ? 'bg-amber/20 text-amber' : 'bg-secondary text-muted-foreground hover:text-amber'
                 )}
               >
@@ -210,7 +210,7 @@ function StepIndicator({ step }: { step: 'search' | 'log' }) {
         <div className={cn(
           'w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono border transition-all',
           step === 'search'
-            ? 'bg-amber text-[color:var(--on-amber)] border-amber'
+            ? 'bg-amber text-(--on-amber) border-amber'
             : 'bg-amber/15 border-amber/40 text-amber'
         )}>
           {step === 'log' ? <Check className="w-3 h-3" /> : '1'}
@@ -232,7 +232,7 @@ function StepIndicator({ step }: { step: 'search' | 'log' }) {
         <div className={cn(
           'w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono border transition-all',
           step === 'log'
-            ? 'bg-amber text-[color:var(--on-amber)] border-amber'
+            ? 'bg-amber text-(--on-amber) border-amber'
             : 'border-border text-muted-foreground'
         )}>
           2
@@ -284,7 +284,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); removeTag(tag) }}
-            className="hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
+            className="hover:text-amber-bright transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-full"
             aria-label={`Remove tag ${tag}`}
           >
             <X className="w-2.5 h-2.5" aria-hidden="true" />
@@ -299,7 +299,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
         onKeyDown={handleKey}
         onBlur={commit}
         placeholder={tags.length === 0 ? 'Add tags…  Enter or comma to add' : ''}
-        className="flex-1 min-w-[120px] bg-transparent text-sm font-sans text-foreground placeholder:text-muted-foreground focus:outline-none"
+        className="flex-1 min-w-[120px] bg-transparent text-sm font-sans text-foreground placeholder:text-muted-foreground focus:outline-hidden"
       />
     </div>
   )
@@ -543,7 +543,7 @@ function AddTitleForm() {
                       search('')
                     }}
                     aria-label="Clear search"
-                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                    className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber rounded focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                   >
                     <X className="w-3.5 h-3.5" aria-hidden="true" />
                     Clear search
@@ -557,7 +557,7 @@ function AddTitleForm() {
                     <button type="button"
                       key={r.tmdbId}
                       onClick={() => selectResult(r)}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60"
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
                     >
                       <PosterThumb src={r.posterUrl} alt={r.title} type={r.type} />
                       <div className="flex-1 min-w-0">
@@ -598,7 +598,7 @@ function AddTitleForm() {
         <div className="space-y-6">
           <button type="button"
             onClick={() => setStep('search')}
-            className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+            className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
           >
             ← Back to search
           </button>
@@ -641,7 +641,7 @@ function AddTitleForm() {
                   key={opt.value}
                   onClick={() => setLog((l) => ({ ...l, status: opt.value }))}
                   className={cn(
-                    'px-3 py-1.5 rounded-md text-xs font-sans border transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60',
+                    'px-3 py-1.5 rounded-md text-xs font-sans border transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
                     log.status === opt.value
                       ? 'bg-amber/20 border-amber/50 text-amber'
                       : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'
@@ -710,7 +710,7 @@ function AddTitleForm() {
                       seasons: l.seasons.map((s) => (isSpecialsSeason(s) ? s : { ...s, episodesWatched: s.episodeCount })),
                     }))
                   }}
-                  className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+                  className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
                 >
                   Mark All Complete
                 </button>
@@ -746,13 +746,13 @@ function AddTitleForm() {
               onChange={(e) => setLog((l) => ({ ...l, notes: e.target.value }))}
               placeholder="Your thoughts…"
               rows={3}
-              className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber/30"
+              className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
             />
           </div>
 
           {/* Save */}
           <Button
-            className="w-full bg-amber hover:bg-amber-muted text-[color:var(--on-amber)] font-sans font-medium"
+            className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
             onClick={handleSave}
             disabled={saving}
           >
@@ -772,7 +772,7 @@ function AddTitleForm() {
           <div className="flex flex-col gap-2 items-center pt-2">
             <button type="button"
               onClick={handleGotTickets}
-              className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+              className="flex items-center gap-1.5 text-sm font-mono text-amber hover:text-amber-bright transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
             >
               🎟 Got tickets already?
             </button>

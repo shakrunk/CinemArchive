@@ -30,7 +30,7 @@ function InterestButton({ titleId }: { titleId: string }) {
   return <div className="space-y-1.5">
     <button type="button" aria-pressed={selected} disabled={busy || !supported || !hydrated}
       onClick={() => { void perform(() => save(titleId, !selected)) }}
-      className="inline-flex items-center gap-2 rounded-full border border-amber/30 px-3 py-2 text-sm text-amber disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
+      className="inline-flex items-center gap-2 rounded-full border border-amber/30 px-3 py-2 text-sm text-amber disabled:opacity-60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber">
       <Film className="h-4 w-4" />{busy ? 'Saving…' : selected ? 'Want to see in theaters' : 'Want to see in theaters?'}
     </button>
     {!supported && <p className="text-xs text-paper-dim">Sync with the updated server to edit this preference. Saved preferences remain on this device.</p>}

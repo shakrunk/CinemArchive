@@ -25,12 +25,11 @@ describe('text scaling', () => {
       result.root.walkRules(selector, rule => rule.walkDecls(property, decl => values.push(decl.value)))
       return values
     }
-    // v4 resolves text-sm / @apply text-sm through the theme variable, so the variable carries the scale.
-    const themeVar = []
-    result.root.walkDecls('--text-sm', decl => themeVar.push(decl.value))
-    expect(themeVar).toEqual(['calc(0.875rem * var(--text-scale, 1))'])
-    expect(declarations('.text-sm', 'font-size')).toEqual(['var(--text-sm)'])
-    expect(declarations('.label', 'font-size')).toEqual(['var(--text-sm)'])
+    // v4 emits text-sm / @apply text-sm as var(--text-sm); wrapping per declaration keeps the scale
+    // resolving at each element, so a --text-scale set on a subtree (the preferences preview) still applies.
+    expect(declarations('.text-sm', 'font-size')).toEqual(['calc(var(--text-sm) * var(--text-scale, 1))'])
+    expect(declarations('.text-sm', 'line-height')).toEqual(['var(--tw-leading, var(--text-sm--line-height))'])
+    expect(declarations('.label', 'font-size')).toEqual(['calc(var(--text-sm) * var(--text-scale, 1))'])
     expect(declarations('.text-\\[11px\\]', 'font-size')).toEqual(['calc(0.6875rem * var(--text-scale, 1))'])
     expect(declarations('.leading-6', 'line-height')).toEqual(['calc(calc(var(--spacing) * 6) * var(--text-scale, 1))'])
     expect(declarations('.w-6', 'width')).toEqual(['calc(var(--spacing) * 6)'])

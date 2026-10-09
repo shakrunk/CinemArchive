@@ -152,11 +152,11 @@ rejections[]` — each issue is `{path, message, fatal}`.
   descriptors or ids are ever re-activated from them).
 * Skip-with-report dedupe matches current web and is NOT a lossless restore of existing-title histories:
   every omitted title, history row and list reference is reported and the source archive is preserved.
-  Merging histories into an existing title is a required follow-up for a complete restore path.
+  Merging histories into an existing title is an enhancement beyond current web parity, not a requirement for matching the shipped web restore flow.
 * Companion friend links must not be permanently dropped as final parity: companion identity storage is
   owned by the outing-integrity worker; this contract consumes whatever API/storage it provides.
 * Archive identities stay separate from copy-admission identities; the archive is never rewritten.
-* Ticket photos: no "complete portable backup" claim until explicit byte inclusion + recapture exists.
+* Ticket photos: no "complete portable backup" claim until explicit byte inclusion + recapture exists. The shipped web JSON backup excludes photo bytes, so that enhancement is separate from JSON backup parity and ordinary per-ticket original export.
 
 ## Read bounds
 

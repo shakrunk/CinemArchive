@@ -9,10 +9,10 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 - Astra oversees integration and Git commits. Full parity is incomplete; see full-parity-execution.md. Keep batches small and stop for a verified commit before the next slice.
 - Sonnet is DISMISSED following its unverified title-mapper handoff. No further work is assigned; the Codex coordination watcher is disabled. Codex owns corrections, verification and integration.
 - The mapper correction is committed as 92199b6; completion title-revision parsing is committed as d91b2c4. Compiler, assembly and lint passed, with mapper19/parser23 unit cases and6 actual Android backup cases passing. Installed-app restore remains incomplete.
-- Reverse worker owns Library history editor admission and the sole native runner. Captured viewing commands are committed as 7186755 and outing revision recovery as ba0b914. Automatic completion, post-show and reversal lifecycle activation remain a later coherent batch.
+- Library history editor admission and compound recovery are committed as f5672ec. Automatic completion, post-show and reversal lifecycle activation remain unfinished.
 - Discover genre/type/pagination is committed as b630970 on Android and a2b498e on web. Shared viewing insert identity checks are committed as b438918.
-- Android Room 19 and protected metadata backfill are committed as 0ceb38b. The metadata worker is finishing credit refresh/rekey retention; the web worker is integrating the authenticated friend archive route. All native writers coordinate a source freeze before the single runner starts.
-- Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. Astra is closing the known backup mapper text-representability defect and integrating verified batches. Full parity remains incomplete.
+- Android Room 19 and protected metadata backfill are committed as 0ceb38b; credit refresh/rekey retention is e2013b8. Authenticated friend archives and Ledger are ba2dac0. Backup text mapping correction is 91abec8.
+- Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. All current worker assignments have finished, with no active runner or file claims. Full parity remains incomplete; the execution inventory records the remaining work.
 
 ## New messages
 

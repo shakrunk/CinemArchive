@@ -86,6 +86,45 @@ restore reports "friend links dropped: N" until companion identity lands in Room
    Future restore must follow `moviegoing-preferences.md` for the shared private tables, preserving
    existing local data and requiring proven revisions for replacements.
 
+## Restore mapping: titles (`BackupRestoreMapper`, foundation only)
+
+Pure function from one `planCopy` title row (fresh identity already admitted) plus a caller-supplied,
+frozen `admittedAt` instant to a Room `TitleEntity` draft and one canonical
+`{table:"titles",action:"insert",key:{id},values}` operation (golden:
+`docs/fixtures/library-backup/expected-restore-title.json`). It does not generate ids, choose operation
+ids, chunk, persist or activate anything; the repository owns those and must freeze the exact operation
+bytes with the admitted plan. An operation id is never derived from archive hash/owner/chunk alone, and one
+id is never reused with different bytes.
+
+`TitleMapping.operationJson` is the immutable canonical JSON to encode as UTF-8 for future queue
+admission. `operation` returns a detached inspection tree, not the byte serialization contract. Both
+the operation and Room's physical-media JSON use the codec's exact writer rather than Android
+`JSONObject.toString()`, preserving opaque `BigInteger`/`BigDecimal` values recursively without mutating
+the input. No parser/serializer is duplicated in the mapper.
+
+* `values` is limited to the server `titles` allowlist (snake_case; lower-case `type`/`status`; no
+  `user_id`, `id` or `updated_at`). Room stores the same facts (upper-case enums, `updatedAt = admittedAt`).
+  That draft timestamp is local bookkeeping, **not an observed server revision or CAS proof**; activation
+  must reconcile the insert receipt before dependent edits can use a server baseline.
+* Required: UUID id, `tmdbId`>0, `type`, `status` (never defaulted), non-blank `title` without NUL, and an
+  32-bit integer `year` (server column is NOT NULL; `0` is the clients' valid unknown-year value; no
+  invented 1–9999 restriction). Failure ⇒ `REJECTED`, no entity, no operation.
+* Optional fields keep `null`/`false`/`0`/`""`/`[]` distinctions. A value of the wrong type, out of range, with
+  NUL, or beyond `numeric(3,1)` precision (e.g. rating 4.25) is **never coerced or rounded**: it is left out of
+  both outputs and reported `LOSSY` with its path. `releaseDate` must be `YYYY-MM-DD`; datetimes are not truncated.
+* `addedAt` must be an ISO-8601 instant with offset and is kept verbatim. Missing or date-only values are not
+  reinterpreted in any timezone: the frozen admission time is used and reported `LOSSY`.
+* `physicalMedia` is the complete array verbatim (all raw element fields, regenerated element ids from the plan).
+  Absent `inHomeCollection` is `false` (server NOT NULL default).
+* Reported by path, never written: `DEFERRED` seasons, viewings, cast, crew (non-empty), plan outings
+  (completed outings need a reviewed restore contract and are never downgraded) and lists; `UNMAPPED` `ext` and
+  unknown fields. Ticket bytes, authority keys, receipts and operation ids are never part of the mapping.
+* This mapping does not make a restore complete or lossless; the UI must still list everything reported.
+* `mapPlan` requires the original `BackupDocument` alongside its `CopyPlan`: it reports each
+  `localOnly.<key>` and unknown top-level path as `UNMAPPED`, and retains the original admission
+  `copyReport` (including skipped/rejected rows and stripped authority fields). Neither report may be
+  omitted by future restore UI. Private data remains in the original archive, never in title operations.
+
 ## Report
 
 `titlesNew, titlesSkippedExisting, titlesRejected, outingsNew, outingsRejected, listsNew,

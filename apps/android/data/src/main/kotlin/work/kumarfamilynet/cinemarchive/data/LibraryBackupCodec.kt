@@ -516,10 +516,11 @@ object LibraryBackupCodec {
         root.put("outings", JSONArray(document.outings))
         root.put("lists", JSONArray(document.lists))
         document.localOnly?.let { root.put("localOnly", it) }
-        val sb = StringBuilder()
-        writeValue(sb, root, 0)
-        return sb.append('\n').toString()
+        return encodeJsonValue(root) + '\n'
     }
+
+    /** Exact canonical JSON for admitted trees; never round opaque numbers through org.json. */
+    internal fun encodeJsonValue(value: Any?): String = StringBuilder().also { writeValue(it, value, 0) }.toString()
 
     private fun writeValue(sb: StringBuilder, value: Any?, depth: Int) {
         if (depth > Limits.MAX_DEPTH + 4) throw IllegalArgumentException("Backup tree is nested too deeply to encode.")

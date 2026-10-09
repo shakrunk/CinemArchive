@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import work.kumarfamilynet.cinemarchive.data.LibraryBackupCodec
+import work.kumarfamilynet.cinemarchive.data.BackupRestoreMapper
 import work.kumarfamilynet.cinemarchive.data.LibraryBackupCodec.ExistingLibrary
 import work.kumarfamilynet.cinemarchive.data.LibraryBackupCodec.ParseResult
 
@@ -20,6 +21,30 @@ import work.kumarfamilynet.cinemarchive.data.LibraryBackupCodec.ParseResult
  */
 @RunWith(AndroidJUnit4::class)
 class LibraryBackupCodecDeviceTest {
+    @Test fun restoreMapperPreservesExactFrameworkNumbersAndImmutableBytes() {
+        val big = "9223372036854775809"
+        val decimal = "0.12345678901234567890123456789"
+        val doc = parse(titleJson(""","physicalMedia":[{"id":"copy","format":"Other","notes":"keep","future":{"big":$big,"decimal":$decimal}}]"""))
+        var next = 0
+        val plan = LibraryBackupCodec.planCopy(doc, ExistingLibrary()) { "00000000-0000-4000-8000-${(++next).toString().padStart(12, '0')}" }
+        val input = plan.titles.single().put("year", 0).put("addedAt", "2026-01-01T00:00:00Z")
+        val original = LibraryBackupCodec.encode(doc, "2026-01-01T00:00:00Z")
+        val mapped = BackupRestoreMapper.mapPlan(doc, plan, "2026-10-08T00:00:00Z").titles.single()
+        assertTrue(mapped.issues.none { it.kind == BackupRestoreMapper.Kind.REJECTED || it.kind == BackupRestoreMapper.Kind.LOSSY })
+        assertEquals(0, mapped.entity!!.year)
+        val frozen = mapped.operationJson!!
+        val decoded = parse("{\"titles\":[],\"operation\":$frozen}").extra.getJSONObject("operation")
+        val raw = decoded.getJSONObject("values").getJSONArray("physical_media").getJSONObject(0).getJSONObject("future")
+        assertEquals(BigInteger(big), raw.get("big")); assertEquals(BigDecimal(decimal), raw.get("decimal"))
+        val room = parse("{\"titles\":[],\"shelf\":${mapped.entity!!.physicalMediaJson}}")
+            .extra.getJSONArray("shelf").getJSONObject(0).getJSONObject("future")
+        assertEquals(BigInteger(big), room.get("big")); assertEquals(BigDecimal(decimal), room.get("decimal"))
+        mapped.operation!!.getJSONObject("values").getJSONArray("physical_media").getJSONObject(0).put("notes", "changed")
+        assertEquals("keep", input.getJSONArray("physicalMedia").getJSONObject(0).getString("notes"))
+        input.getJSONArray("physicalMedia").getJSONObject(0).getJSONObject("future").put("decimal", 0)
+        assertEquals(frozen, mapped.operationJson)
+        assertEquals(original, LibraryBackupCodec.encode(doc, "2026-01-01T00:00:00Z"))
+    }
     private fun titleJson(extra: String) =
         """{"version":2,"titles":[{"id":"d1","tmdbId":5,"type":"movie","title":"Dev","year":2000,"genres":[],"status":"watched","rating":4.5,"tags":[],"addedAt":"2026-01-01","viewings":[]$extra}],"outings":[]}"""
 

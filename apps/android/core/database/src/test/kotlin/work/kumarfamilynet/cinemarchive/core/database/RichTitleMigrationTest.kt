@@ -22,9 +22,7 @@ class RichTitleMigrationTest {
         try {
             val old = fixture.openHelper.writableDatabase
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/17.json").readText()).getJSONObject("database")
-            restoreEmptyFixtureTable(old, schema, "titles")
-            val setup = schema.getJSONArray("setupQueries")
-            for (i in 0 until setup.length()) old.execSQL(setup.getString(i))
+            restoreEmptyFixtureSchema(old, schema)
             old.execSQL("INSERT INTO titles (id,tmdbId,type,title,genres,status,addedAt,updatedAt,tags,studios) VALUES ('title',42,'MOVIE','Film','','WATCHED','2026-01-01','2026-01-01','Keep tag','Studio')")
             old.execSQL("INSERT INTO viewings (id,titleId,date,rating,notes,venue,companions,outingId,updatedAt) VALUES ('viewing','title',NULL,4.5,'Keep history','Cinema','','outing','2026-10-08T13:30:00Z')")
             old.execSQL("INSERT INTO viewing_completion_aliases VALUES ('provisional','viewing','title','outing','completion-op','2026-10-08T13:30:00Z')")
@@ -35,7 +33,7 @@ class RichTitleMigrationTest {
             old.execSQL("INSERT INTO ticket_intents VALUES ('ticket-op','project','owner','outing','{\"unchanged\":true}',1,NULL)")
             old.version = 17
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_17_18).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19).build()
         try {
             val row = upgraded.titleDao().getById("title")!!
             assertEquals(listOf("Keep tag"), row.tags)

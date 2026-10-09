@@ -87,7 +87,8 @@ private const val PAGE_SIZE = 500
 // 7: episode watch notes. Re-read existing events while preserving queued local edits/deletes.
 // 8: title tags, studios, and franchise metadata used by Library filters and grouping.
 // 9: season cast and episode crew, gated by the RPC's explicit personCreditsVersion marker.
-private const val SYNC_SCHEMA_VERSION = 10
+// 10: rich title fields. 11: credit profiles/counts and watch/review color modes.
+private const val SYNC_SCHEMA_VERSION = 11
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -183,6 +184,8 @@ class LibrarySyncRepository(
         var sawMetadataTitle = false
         var personSchemaAvailable = true
         var richTitleSchemaAvailable = true
+        var backupGraphSchemaAvailable = true
+        var skippedBackfillRows = false
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
@@ -199,10 +202,11 @@ class LibrarySyncRepository(
                         }
                         if (payload.optInt("personCreditsVersion", 0) < 1) personSchemaAvailable = false
                         if (payload.optInt("titleMetadataVersion", 0) < 1) richTitleSchemaAvailable = false
+                        if (payload.optInt("backupGraphVersion", 0) < 1) backupGraphSchemaAvailable = false
                     }
                 }
             }
-            transactor.run { applyPage(rows, deferred) }
+            transactor.run { if (applyPage(rows, deferred)) skippedBackfillRows = true }
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
             dataStore.edit { it[cursorKey] = cursor }
             // A page may overshoot PAGE_SIZE — the RPC widens it to avoid splitting a group of
@@ -210,7 +214,7 @@ class LibrarySyncRepository(
             // nothing left to send, so a short page is still a reliable "that was the last one".
             if (rows.length() < PAGE_SIZE) break
         }
-        transactor.run { deferred.flush() }
+        transactor.run { if (deferred.flush()) skippedBackfillRows = true }
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
         // idempotently) does the full resync again rather than settling for a partial one.
@@ -221,6 +225,7 @@ class LibrarySyncRepository(
             val acknowledged = when {
                 !personSchemaAvailable -> maxOf(storedSchemaVersion, 8)
                 !richTitleSchemaAvailable || pendingKeys().any { it.startsWith("title:") } -> maxOf(storedSchemaVersion, 9)
+                !backupGraphSchemaAvailable || skippedBackfillRows -> maxOf(storedSchemaVersion, 10)
                 else -> SYNC_SCHEMA_VERSION
             }
             if (acknowledged > storedSchemaVersion) dataStore.edit { it[schemaVersionKey] = acknowledged }
@@ -336,7 +341,29 @@ class LibrarySyncRepository(
             }
         }
 
-        suspend fun flush() {
+        suspend fun flush(): Boolean {
+            // A title can arrive pages after a child. While the next HTTP page is loading,
+            // the user may edit its now-visible graph; final deferred writes need the same
+            // transactional protection check as ordinary page writes.
+            val pending = pendingKeys()
+            var skipped = false
+            fun protected(type: String, id: String, titleId: String? = null, listId: String? = null): Boolean {
+                val row = JSONObject().put("entity_type", type).put("entity_id", id)
+                    .put("payload", JSONObject().put("titleId", titleId).put("listId", listId))
+                return isProtectedFromPull(row, pending).also { if (it) skipped = true }
+            }
+            seasons.removeAll { protected("season", it.id, it.titleId) }
+            episodes.removeAll { protected("episode", it.getString("id"), it.getString("titleId")) }
+            viewings.removeAll { protected("viewing", it.id, it.titleId) }
+            cinemaOutings.removeAll { protected("cinema_outing", it.id, it.titleId) }
+            cast.removeAll { protected("title_cast", it.id, it.titleId) }
+            crew.removeAll { protected("title_crew", it.id, it.titleId) }
+            seasonCast.removeAll { protected("season_cast", it.id, it.titleId) }
+            episodeCrew.removeAll { protected("episode_crew", it.id, it.titleId) }
+            watchEvents.removeAll { protected("episode_watch_event", it.id) }
+            ratings.removeAll { protected("episode_rating", it.id) }
+            reviews.removeAll { protected("episode_review", it.id) }
+            listItems.removeAll { protected("list_item", it.id, it.titleId, it.listId) }
             seasonDao.upsertAll(seasons.filter { titleDao.getById(it.titleId) != null })
             viewingDao.upsertAll(viewings.filter { titleDao.getById(it.titleId) != null })
             cinemaOutings.filter { titleDao.getById(it.titleId) != null }.forEach { cinemaOutingDao.upsert(it) }
@@ -356,6 +383,7 @@ class LibrarySyncRepository(
             reviewDao.upsertAll(reviews.filter { episodeDao.getById(it.episodeId) != null })
 
             listItemDao.upsertAll(listItems.filter { listDao.getById(it.listId) != null && titleDao.getById(it.titleId) != null })
+            return skipped
         }
     }
 
@@ -366,10 +394,12 @@ class LibrarySyncRepository(
      *  Anything whose parent isn't in the local DB yet goes through [deferred] instead of a
      *  direct DAO call — see [DeferredRows]'s kdoc for why that's necessary even though title
      *  is always applied first *within* a page. */
-    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows) {
+    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows): Boolean {
         // Re-read per page: edits enqueued while an earlier page was applying are protected too.
         val pending = pendingKeys()
-        val byType = (0 until rows.length()).map { rows.getJSONObject(it) }
+        val allRows = (0 until rows.length()).map { rows.getJSONObject(it) }
+        val skipped = allRows.any { isProtectedFromPull(it, pending) }
+        val byType = allRows
             .filterNot { isProtectedFromPull(it, pending) }
             .groupBy { it.getString("entity_type") }
 
@@ -380,9 +410,23 @@ class LibrarySyncRepository(
         }
         byType["season"]?.forEach { deferred.addSeason(it.payload().toSeasonEntity()) }
         byType["episode"]?.forEach { deferred.addEpisode(it.payload()) }
-        byType["title_cast"]?.forEach { deferred.addCast(it.payload().toTitleCastEntity()) }
-        byType["title_crew"]?.forEach { deferred.addCrew(it.payload().toTitleCrewEntity()) }
-        byType["season_cast"]?.forEach { deferred.addSeasonCast(it.payload().toSeasonCastEntity()) }
+        // Older servers omit these keys; preserve retained values until an explicit clear.
+        // Read each old-server collection at most once per page, not once per credit.
+        byType["title_cast"]?.let { credits ->
+            val previous = if (credits.any { !it.payload().has("profileUrl") || !it.payload().has("episodeCount") })
+                titleCastDao.observeAllCast().first().associateBy { it.id } else emptyMap()
+            credits.forEach { deferred.addCast(it.payload().toTitleCastEntity(previous[it.getString("entity_id")])) }
+        }
+        byType["title_crew"]?.let { credits ->
+            val previous = if (credits.any { !it.payload().has("profileUrl") })
+                titleCrewDao.observeAllCrew().first().associateBy { it.id } else emptyMap()
+            credits.forEach { deferred.addCrew(it.payload().toTitleCrewEntity(previous[it.getString("entity_id")])) }
+        }
+        byType["season_cast"]?.let { credits ->
+            val previous = if (credits.any { !it.payload().has("profileUrl") || !it.payload().has("episodeCount") })
+                personCreditsDao.observeSeasonCast().first().associateBy { it.id } else emptyMap()
+            credits.forEach { deferred.addSeasonCast(it.payload().toSeasonCastEntity(previous[it.getString("entity_id")])) }
+        }
         byType["episode_crew"]?.forEach { deferred.addEpisodeCrew(it.payload().toEpisodeCrewEntity()) }
         byType["viewing"]?.forEach { row ->
             // The sync envelope has always carried the server revision, including on older
@@ -390,9 +434,21 @@ class LibrarySyncRepository(
             val revision = row.getString("updated_at").also { java.time.Instant.parse(it) }
             deferred.addViewing(row.payload().toViewingEntity(revision))
         }
-        byType["episode_watch_event"]?.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity()) }
+        byType["episode_watch_event"]?.let { events ->
+            val previous = if (events.any { !it.payload().has("colorMode") })
+                watchEventDao.observeAllWatchEvents().first().associateBy { it.id } else emptyMap()
+            events.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity(previous[it.getString("entity_id")])) }
+        }
         byType["episode_rating"]?.forEach { deferred.addRating(it.payload().toRatingEntity()) }
-        byType["episode_review"]?.forEach { deferred.addReview(it.payload().toReviewEntity()) }
+        byType["episode_review"]?.let { reviews ->
+            val previous = mutableMapOf<String, EpisodeReviewEntity>()
+            val readTitles = mutableSetOf<String>()
+            for (row in reviews.filter { !it.payload().has("colorMode") }) {
+                val titleId = episodeDao.getById(row.payload().getString("episodeId"))?.titleId ?: continue
+                if (readTitles.add(titleId)) reviewDao.observeReviews(titleId).first().forEach { previous[it.id] = it }
+            }
+            reviews.forEach { deferred.addReview(it.payload().toReviewEntity(previous[it.getString("entity_id")])) }
+        }
         byType["cinema_outing"]?.forEach { deferred.addCinemaOuting(it.payload().toCinemaOutingEntity()) }
         byType["list"]?.forEach { listDao.upsertAll(listOf(it.payload().toListEntity())) }
         byType["list_item"]?.forEach { deferred.addListItem(it.payload().toListItemEntity()) }
@@ -418,6 +474,7 @@ class LibrarySyncRepository(
             }
             deferred.forget(entityType, entityId)
         }
+        return skipped
     }
 
     private fun JSONObject.payload(): JSONObject = getJSONObject("payload")
@@ -483,32 +540,33 @@ class LibrarySyncRepository(
         collectionName = if (has("collectionName")) optStringOrNull("collectionName") else existing?.collectionName,
     ).withRichMetadata(this, previous = existing)
 
-    // `castOrder`/`department` are the only fields either Ledger credits widget reads
-    // (The Ensemble filters on castOrder < 5, The Auteurs no longer touches crew at all —
-    // see LedgerRepository.buildBoard). The RPC deliberately omits profile_url/episode_count,
-    // which this mirror has no column for.
-    private fun JSONObject.toTitleCastEntity() = TitleCastEntity(
+    private fun JSONObject.toTitleCastEntity(previous: TitleCastEntity? = null) = TitleCastEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         tmdbPersonId = getInt("tmdbPersonId"),
         name = getString("name"),
         characterName = optStringOrNull("characterName"),
         castOrder = optIntOrNull("castOrder") ?: 0,
+        profileUrl = if (has("profileUrl")) optStringOrNull("profileUrl") else previous?.profileUrl,
+        episodeCount = if (has("episodeCount")) optIntOrNull("episodeCount") else previous?.episodeCount,
     )
 
-    private fun JSONObject.toTitleCrewEntity() = TitleCrewEntity(
+    private fun JSONObject.toTitleCrewEntity(previous: TitleCrewEntity? = null) = TitleCrewEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         tmdbPersonId = getInt("tmdbPersonId"),
         name = getString("name"),
         job = getString("job"),
         department = optStringOrNull("department"),
+        profileUrl = if (has("profileUrl")) optStringOrNull("profileUrl") else previous?.profileUrl,
     )
 
-    private fun JSONObject.toSeasonCastEntity() = SeasonCastEntity(
+    private fun JSONObject.toSeasonCastEntity(previous: SeasonCastEntity? = null) = SeasonCastEntity(
         id = getString("id"), titleId = getString("titleId"), seasonId = getString("seasonId"),
         tmdbPersonId = getInt("tmdbPersonId"), name = getString("name"),
         characterName = optStringOrNull("characterName"), castOrder = optInt("castOrder", 0),
+        profileUrl = if (has("profileUrl")) optStringOrNull("profileUrl") else previous?.profileUrl,
+        episodeCount = if (has("episodeCount")) optIntOrNull("episodeCount") else previous?.episodeCount,
     )
 
     private fun JSONObject.toEpisodeCrewEntity() = EpisodeCrewEntity(
@@ -581,11 +639,12 @@ class LibrarySyncRepository(
         updatedAt = getString("updatedAt"),
     )
 
-    private fun JSONObject.toWatchEventEntity() = EpisodeWatchEventEntity(
+    private fun JSONObject.toWatchEventEntity(previous: EpisodeWatchEventEntity? = null) = EpisodeWatchEventEntity(
         id = getString("id"),
         episodeId = getString("episodeId"),
         watchedAt = optStringOrNull("watchedAt"),
         notes = optStringOrNull("notes"),
+        colorMode = if (has("colorMode")) optStringOrNull("colorMode") else previous?.colorMode,
     )
 
     private fun JSONObject.toRatingEntity() = EpisodeRatingEntity(
@@ -595,11 +654,12 @@ class LibrarySyncRepository(
         ratedAt = getString("ratedAt"),
     )
 
-    private fun JSONObject.toReviewEntity() = EpisodeReviewEntity(
+    private fun JSONObject.toReviewEntity(previous: EpisodeReviewEntity? = null) = EpisodeReviewEntity(
         id = getString("id"),
         episodeId = getString("episodeId"),
         reviewText = getString("reviewText"),
         reviewedAt = getString("reviewedAt"),
+        colorMode = if (has("colorMode")) optStringOrNull("colorMode") else previous?.colorMode,
     )
 
     private fun JSONObject.toListEntity() = ListEntity(

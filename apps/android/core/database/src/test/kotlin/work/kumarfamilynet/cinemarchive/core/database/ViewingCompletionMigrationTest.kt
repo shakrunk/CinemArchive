@@ -23,28 +23,15 @@ class ViewingCompletionMigrationTest {
         val fixture = builder(name).build()
         try {
             val old = fixture.openHelper.writableDatabase
-            old.execSQL("DROP TABLE viewing_completion_aliases")
-            old.execSQL("DROP TABLE viewings")
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/15.json").readText()).getJSONObject("database")
-            restoreEmptyFixtureTable(old, schema, "titles")
-            val entities = schema.getJSONArray("entities")
-            for (index in 0 until entities.length()) {
-                val entity = entities.getJSONObject(index)
-                if (entity.getString("tableName") != "viewings") continue
-                fun String.tableSql() = replace("\${TABLE_NAME}", "viewings")
-                old.execSQL(entity.getString("createSql").tableSql())
-                val indices = entity.getJSONArray("indices")
-                for (i in 0 until indices.length()) old.execSQL(indices.getJSONObject(i).getString("createSql").tableSql())
-            }
-            val setup = schema.getJSONArray("setupQueries")
-            for (index in 0 until setup.length()) old.execSQL(setup.getString(index))
+            restoreEmptyFixtureSchema(old, schema)
             old.execSQL("INSERT INTO titles (id,tmdbId,type,title,genres,status,addedAt,updatedAt,tags,studios) VALUES ('title',42,'MOVIE','A movie','','WATCHED','2026-01-01','2026-01-01','','')")
             old.execSQL("INSERT INTO viewings (id,titleId,date,rating,notes,venue,companions,outingId) VALUES ('viewing','title',NULL,4.5,'Keep this history','Cinema','','outing')")
             old.execSQL("INSERT INTO mutation_outbox (id,entityType,entityId,operation,payloadJson,createdAt,attemptCount) VALUES ('pending','viewing','viewing','update','{\"notes\":\"Pending note\"}',1,2)")
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 15
         } finally { fixture.close() }
-        val upgraded = builder(name).addMigrations(LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18).build()
+        val upgraded = builder(name).addMigrations(LibraryDatabase.MIGRATION_15_16, LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19).build()
         try {
             val viewing = upgraded.viewingDao().getById("viewing")!!
             assertEquals("Keep this history", viewing.notes)

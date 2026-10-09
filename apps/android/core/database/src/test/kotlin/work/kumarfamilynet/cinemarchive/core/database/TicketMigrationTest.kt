@@ -22,11 +22,8 @@ class TicketMigrationTest {
         val fixture = builder().build()
         try {
             val old = fixture.openHelper.writableDatabase
-            listOf("ticket_intents", "ticket_originals", "ticket_associations").forEach { old.execSQL("DROP TABLE $it") }
             val schema = JSONObject(File("schemas/work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase/16.json").readText()).getJSONObject("database")
-            restoreEmptyFixtureTable(old, schema, "titles")
-            val setup = schema.getJSONArray("setupQueries")
-            for (index in 0 until setup.length()) old.execSQL(setup.getString(index))
+            restoreEmptyFixtureSchema(old, schema)
             old.execSQL("INSERT INTO titles (id,tmdbId,type,title,genres,status,addedAt,updatedAt,tags,studios) VALUES ('title',42,'MOVIE','Film','','WATCHED','2026-01-01','2026-01-01','','')")
             old.execSQL("INSERT INTO cinema_outings (id,titleId,showtime,previewsMinutes,runtimeMinutes,endsAt,companions,seats,status,createdAt,updatedAt,ticketImagePath,ticketBarcodePayload,ticketBarcodeFormat) VALUES ('outing','title','2026-10-08T12:00:00Z',0,90,'2026-10-08T13:30:00Z','','','COMPLETED','2026-01-01','2026-01-01','/legacy/tickets/original.png','Real payload','QR_CODE')")
             old.execSQL("INSERT INTO viewings (id,titleId,date,rating,notes,venue,companions,outingId,updatedAt) VALUES ('canonical','title',NULL,4.5,'Keep history','Cinema','','outing','2026-10-08T13:30:00Z')")
@@ -35,7 +32,7 @@ class TicketMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 16
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19).build()
         try {
             assertEquals("/legacy/tickets/original.png", upgraded.cinemaOutingDao().getById("outing")!!.ticketImagePath)
             assertEquals("Real payload", upgraded.cinemaOutingDao().getById("outing")!!.ticketBarcodePayload)

@@ -133,6 +133,7 @@ data class EpisodeWatchEventEntity(
     val episodeId: String,
     val watchedAt: String?, // null = watched before joining the platform
     val notes: String? = null,
+    val colorMode: String? = null,
 )
 
 /** Independent rating log — deliberately not 1:1 with watch events. */
@@ -173,6 +174,7 @@ data class EpisodeReviewEntity(
     val episodeId: String,
     val reviewText: String,
     val reviewedAt: String,
+    val colorMode: String? = null,
 )
 
 /** Re-watch timeline entry — see docs/android-contracts/title-detail.md §1 (Viewings). */
@@ -230,6 +232,8 @@ data class TitleCastEntity(
     val name: String,
     val characterName: String?,
     val castOrder: Int,
+    val profileUrl: String? = null,
+    val episodeCount: Int? = null,
 )
 
 /**
@@ -258,6 +262,7 @@ data class TitleCrewEntity(
     val name: String,
     val job: String,
     val department: String?,
+    val profileUrl: String? = null,
 )
 
 /** Season-billed people participate in person filtering even when absent from series cast. */
@@ -277,6 +282,8 @@ data class SeasonCastEntity(
     val name: String,
     val characterName: String?,
     val castOrder: Int,
+    val profileUrl: String? = null,
+    val episodeCount: Int? = null,
 )
 
 /** Director and writing credits for an individual episode, keyed by stable provider identity. */

@@ -605,6 +605,7 @@ class TransactionalRuntimeTest {
         val upgradedRow = titleRow("t1", "watched", "2026-01-01T00:00:00Z").apply {
             getJSONObject("payload").put("tags", JSONArray().put("Backfilled"))
                 .put("studios", JSONArray()).put("collectionId", JSONObject.NULL).put("collectionName", JSONObject.NULL).put("personCreditsVersion", 1).put("titleMetadataVersion", 1)
+                .put("backupGraphVersion", 1)
         }
         val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(oldRow), JSONArray().put(upgradedRow), JSONArray())))
         val file = tmpFile("metadata-rollout")
@@ -618,7 +619,7 @@ class TransactionalRuntimeTest {
         sync.syncNow()
         assertEquals(List(3) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
         assertEquals(listOf("Backfilled"), db.titleDao().getById("t1")!!.tags)
-        assertEquals(10, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        assertEquals(11, prefs.data.first()[intPreferencesKey("sync_schema_version")])
         sync.syncNow()
         assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
     }
@@ -665,6 +666,7 @@ class TransactionalRuntimeTest {
         val cleared = db.titleDao().getById("pending")!!
         assertNull(cleared.contentRating); assertNull(cleared.customWatchUrl)
         assertEquals(false, cleared.inHomeCollection); assertEquals("[]", cleared.physicalMediaJson); assertEquals(0, cleared.rtScore)
-        assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
+        // This fixture advertises rich titles but not the newer backup graph capability.
+        assertEquals("1970-01-01T00:00:00Z", http.requests.last().getString("p_since"))
     }
 }

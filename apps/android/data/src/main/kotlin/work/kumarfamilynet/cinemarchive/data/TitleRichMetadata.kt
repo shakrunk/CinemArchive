@@ -25,7 +25,7 @@ internal fun TitleEntity.withRichMetadata(payload: JSONObject, snakeCase: Boolea
         rtScore = number("rtScore", "rt_score", prior.rtScore), metacriticScore = number("metacriticScore", "metacritic_score", prior.metacriticScore),
         customWatchUrl = string("customWatchUrl", "custom_watch_url", prior.customWatchUrl),
         inHomeCollection = if (!payload.has(home)) prior.inHomeCollection else if (payload.isNull(home)) null else payload.getBoolean(home),
-        physicalMediaJson = if (!payload.has(shelf)) prior.physicalMediaJson else if (payload.isNull(shelf)) null else payload.getJSONArray(shelf).toString(),
+        physicalMediaJson = if (!payload.has(shelf)) prior.physicalMediaJson else if (payload.isNull(shelf)) null else metadataJson(payload.getJSONArray(shelf)),
         awardsCount = number("awardsCount", "awards_count", prior.awardsCount),
         bechdelOutcome = string("bechdelOutcome", "bechdel_outcome", prior.bechdelOutcome),
         bechdelScore = string("bechdelScore", "bechdel_score", prior.bechdelScore),
@@ -35,11 +35,11 @@ internal fun TitleEntity.withRichMetadata(payload: JSONObject, snakeCase: Boolea
 /** Malformed legacy copies stay in raw storage for recovery; valid siblings remain visible. */
 internal fun physicalMediaItems(raw: String?): List<PhysicalMediaItem> {
     if (raw == null) return emptyList()
-    val items = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+    val items = runCatching { exactMetadataArray(raw) }.getOrNull() ?: return emptyList()
     return (0 until items.length()).mapNotNull { index ->
         val item = items.optJSONObject(index) ?: return@mapNotNull null
         val id = item.opt("id") as? String ?: return@mapNotNull null
         val format = item.opt("format") as? String ?: return@mapNotNull null
-        PhysicalMediaItem(id, format, item.opt("edition") as? String, item.opt("notes") as? String, item.toString())
+        PhysicalMediaItem(id, format, item.opt("edition") as? String, item.opt("notes") as? String, metadataJson(item))
     }
 }

@@ -50,18 +50,24 @@ class TitleMetadataRepository(
         val saved = JSONObject().put("tags", current?.optJSONArray("tags") ?: JSONArray(local?.tags ?: emptyList<String>()))
             .put("status", current?.optString("status") ?: local?.status?.lowercase() ?: "unknown")
             .put("rating", current?.opt("rating") ?: local?.rating ?: JSONObject.NULL)
+        for ((key, fallback) in listOf(
+            "custom_watch_url" to local?.customWatchUrl,
+            "in_home_collection" to local?.inHomeCollection,
+            "physical_media" to local?.physicalMediaJson?.let(::exactMetadataArray))) {
+            saved.put(key, if (current?.has(key) == true) current.get(key) else fallback ?: JSONObject.NULL)
+        }
         patch.keys().forEach { saved.put(it, patch.get(it)) }
         val comparison = TitleMetadataComparison(titleId, local?.title ?: current?.optString("title") ?: "Removed title",
-            saved.titleMetadataValues(), current?.titleMetadataValues(), snapshot(entries), patch.toString(), current?.toString())
+            saved.titleMetadataValues(), current?.titleMetadataValues(), snapshot(entries), metadataJson(patch), current?.let(::metadataJson))
         verify(comparison)
         comparison
     }
 
     override suspend fun applySaved(comparison: TitleMetadataComparison) = outbox.withFlushPaused {
         active()
-        val current = comparison.currentJson?.let(::JSONObject) ?: error("The title is no longer on the server. Discard these edits or keep them for review.")
+        val current = comparison.currentJson?.let(::exactMetadataObject) ?: error("The title is no longer on the server. Discard these edits or keep them for review.")
         checkedCurrentTitle(current, comparison.titleId, ownerId)
-        val patch = checkedTitlePatch(JSONObject(comparison.patchJson))
+        val patch = checkedTitlePatch(exactMetadataObject(comparison.patchJson))
         outbox.atomically {
             active()
             val entries = verify(comparison)
@@ -70,7 +76,7 @@ class TitleMetadataRepository(
             val replacementId = UUID.randomUUID().toString()
             val payload = titleMetadataPayload(ownerId, comparison.titleId, patch, current.getString("updated_at"), null)
             // Replacing the slot retains FIFO order; no unrelated/later legacy edit overtakes this intent.
-            check(database.outboxDao().replaceReviewedTitle(first.id, first.payloadJson, replacementId, TITLE_METADATA_COMMAND, payload.toString()) == 1)
+            check(database.outboxDao().replaceReviewedTitle(first.id, first.payloadJson, replacementId, TITLE_METADATA_COMMAND, metadataJson(payload)) == 1)
             entries.drop(1).forEach { database.outboxDao().remove(it.id) }
             val remaining = pendingTitleIntents(database.outboxDao().getPending(), comparison.titleId)
             database.titleDao().upsertAll(listOf(overlayTitleIntents(current.toMetadataTitle(local), remaining, ownerId)))

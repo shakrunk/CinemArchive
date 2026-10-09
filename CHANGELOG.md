@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android title details now edit watch links, home-collection status and physical copies with durable saves, preserved opaque metadata and explicit conflict recovery.
 - Android now keeps viewing changes held for review or pending outing confirmation queued without sending them through the legacy upload path.
 - Android can export its complete local title and outing graph as web-compatible JSON, including pending edits, history and companion links, using the system document picker.
 - Android venue notes and theater interest now sync through durable account-scoped commands with explicit conflict recovery; viewing and outing edits preserve companion friend identities.

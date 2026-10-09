@@ -14,7 +14,7 @@ interface TitleMetadataRemote {
 class TitleMetadataTransport(private val client: SupabaseRestClient, private val session: SessionSource) : TitleMetadataRemote {
     override suspend fun current(titleId: String): JSONObject? = withContext(Dispatchers.IO) {
         val before = session.currentSession() ?: error("This sign-in has ended")
-        val rows = JSONArray(client.get("titles", "id=eq.$titleId&user_id=eq.${before.userId}&select=*", before.accessToken))
+        val rows = exactMetadataArray(client.get("titles", "id=eq.$titleId&user_id=eq.${before.userId}&select=*", before.accessToken))
         ensureActive(); check(session.currentSession()?.userId == before.userId) { "This sign-in has ended" }
         require(rows.length() <= 1)
         if (rows.length() == 0) null else rows.getJSONObject(0).also { checkedCurrentTitle(it, titleId, before.userId) }
@@ -27,8 +27,8 @@ class TitleMetadataTransport(private val client: SupabaseRestClient, private val
             require(entry.operation == TITLE_METADATA_COMMAND)
             val before = session.currentSession() ?: error("This sign-in has ended")
             val operation = titleMetadataOperation(entry, before.userId)
-            val receipt = JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
-                .put("p_operations", JSONArray().put(operation)).toString(), before.accessToken))
+            val receipt = exactMetadataObject(client.rpc("apply_library_command", metadataJson(JSONObject().put("p_operation_id", entry.id)
+                .put("p_operations", JSONArray().put(operation))), before.accessToken))
             received = true
             ensureActive(); check(session.currentSession()?.userId == before.userId) { "This sign-in has ended" }
             checkedTitleMetadataReceipt(entry, receipt, before.userId)

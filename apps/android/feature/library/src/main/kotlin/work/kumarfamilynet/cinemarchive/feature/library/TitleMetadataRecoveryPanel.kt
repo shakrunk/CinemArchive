@@ -76,5 +76,8 @@ private fun MetadataValues(label: String, values: TitleMetadataValues?, fields: 
         if ("tags" in fields) Text("Tags: ${values.tags.joinToString(", ").ifEmpty { "None" }}")
         if ("status" in fields) Text("Status: ${values.status.replace('_', ' ')}")
         if ("rating" in fields) Text("Rating: ${values.rating?.let { "$it/5" } ?: "Unrated"}")
+        if ("custom_watch_url" in fields) Text("Watch link: ${values.watchUrl ?: "None"}")
+        if ("in_home_collection" in fields) Text("Home collection: ${if (values.homeCollection == true) "Yes" else "No"}")
+        if ("physical_media" in fields) Text("Physical copies: ${values.physicalCopies.joinToString("; ").ifEmpty { "None" }}")
     } else Text("Unavailable")
 }

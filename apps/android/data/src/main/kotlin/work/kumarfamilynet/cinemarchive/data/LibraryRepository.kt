@@ -953,6 +953,14 @@ class LibraryRepository(
     suspend fun updateTitleRating(titleId: String, rating: Double, updatedAt: String) =
         updateTitleMetadata(titleId, JSONObject().put("rating", rating))
 
+    suspend fun prepareTitleSources(titleId: String): String = titleSourcesEditor().capture(titleId)
+
+    suspend fun saveTitleSources(titleId: String, opening: String, desired: TitleSourcesValues) =
+        titleSourcesEditor().save(titleId, opening, desired)
+
+    private fun titleSourcesEditor() = TitleSourcesEditing(titleDao, outbox,
+        checkNotNull(mutationOwnerId) { "Title edits require an account runtime." }, isCurrentOwner)
+
     suspend fun updateTitleTags(titleId: String, tags: List<String>) =
         updateTitleMetadata(titleId, JSONObject().put("tags", org.json.JSONArray(tags)))
 

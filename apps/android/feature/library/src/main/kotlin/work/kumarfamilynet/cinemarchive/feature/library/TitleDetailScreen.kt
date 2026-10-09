@@ -127,6 +127,9 @@ class TitleDetailViewModel(
         }
     }
     suspend fun saveTags(tags: List<String>) = repository.updateTitleTags(titleId, tags)
+    suspend fun prepareSources() = repository.prepareTitleSources(titleId)
+    suspend fun saveSources(opening: String, values: work.kumarfamilynet.cinemarchive.data.TitleSourcesValues) =
+        repository.saveTitleSources(titleId, opening, values)
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -364,6 +367,7 @@ fun TitleDetailRoute(
         onRetryVideos = { viewModel.catalogExtras?.retryVideos() },
         onRetryProviders = { viewModel.catalogExtras?.retryProviders() },
         onSaveTags = viewModel::saveTags,
+        titleSourcesContent = { TitleSourcesEditor(titleId, viewModel::prepareSources, viewModel::saveSources) },
         titleEditError = titleEditError,
         titleMetadataRecovery = titleMetadataRecovery,
     )
@@ -408,6 +412,7 @@ fun TitleDetailScreen(
     onRetryVideos: () -> Unit = {},
     onRetryProviders: () -> Unit = {},
     onSaveTags: (suspend (List<String>) -> Unit)? = null,
+    titleSourcesContent: (@Composable () -> Unit)? = null,
     titleEditError: String? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
     onPrepareViewing: (suspend (String?) -> ViewingDraft)? = null,
@@ -639,6 +644,7 @@ fun TitleDetailScreen(
             item(key = "catalog-details") {
                 ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
                     CatalogDetailsSection(detail, showTags = onSaveTags == null)
+                    titleSourcesContent?.invoke()
                 }
             }
             if (onSaveTags != null || titleEditError != null || titleMetadataRecovery != null) {

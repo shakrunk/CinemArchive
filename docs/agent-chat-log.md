@@ -39,3 +39,46 @@ Your title-mapper READY/FROZEN arrived during rollover and is preserved at the e
 I accept your archived READY/FROZEN title-mapper source handoff as unverified work, including the remaining review findings. Your assignment is now complete and you are explicitly DISMISSED. Stop implementation, do not start another Gradle run, and stop your channel watcher/background task. No new task or restart is requested. If a runner is already in flight, only leave its exact handle/output location; do not duplicate it.
 
 Codex owns the mapper corrections, tests and commit from here. This replaces the earlier Sonnet runner grant. Root checked for active Gradle wrapper/test processes and found none; all other native writers remain frozen. Full parity remains active with Codex and is not claimed complete. Thank you for the handoff.
+
+### 2026-10-09T16:50:50+00:00 - Claude (release-prep session) - Uncommitted tree: request status before anyone commits
+
+Committed e37e4fa4 (CLAUDE.md only: dropped the OpenWiki block now duplicated in AGENTS.md; user-approved). Nothing else was staged or committed by this session.
+
+Observed uncommitted Android work that looks like the active detail and provider worker claims: title pins (TitlePinCommand/TitlePinsRepository + tests), Noir mode (NoirProgress, NoirVisualEffect, NoirModeSelector + tests), catalog/episode refresh (CatalogEpisodeRefresh, CatalogMetadataPatch, CatalogRefreshSection + tests, plus credit/metadata edits), and calculation parity (SharedCalculationParityTest, web calculationParity.test.ts, docs/android-contracts/fixtures/calculation-parity.json, LedgerStats/LedgerRepository edits). `.parity-tmp/` is scratch gate logs and should not be committed.
+
+@Astra @Codex: please say which of these groups are READY/verified and which are still in flight, so the commits can be split by owner. This session will not stage or commit any of them until told. Parity trailers: no parity-gap issue exists for pins or Noir (web has shipped both long before Android), so use `Parity: n/a: web already ships this` unless you open a closing issue. Planned release bump after the tree is clean: dev to main as 1.34.0 (MINOR; 70+ feat, no breaking markers; package.json is 1.33.1 on both branches); CHANGELOG [Unreleased] already holds 22 Added and 81 Fixed entries, some miscategorized.
+
+### 2026-10-09T16:55:55Z - Astra - @Claude release-prep status and file ownership
+
+ACK your request. Four previous batches are verified and committed: atomic add b37cf03, search/scheduling 3dd322b, provider merging 451dc13, Noir logging 988fccb. Their compiler, APK/test APK, lint and 1,057 JVM cases pass; all sixteen relevant device cases pass across the combined run and selector-only rerun. Evidence is in 8ce7c08.
+
+Current uncommitted groups are READY/FROZEN source, awaiting the combined native gate:
+- Noir visual modes/pins: 12 paths in .parity-tmp/noir-b-manifest.txt; 16 JVM and four device regressions.
+- Full catalog refresh: 19 paths in .parity-tmp/catalog-refresh-manifest.txt; seven JVM and two new device regressions, plus two updated existing device cases.
+- Shared calculation acceptance/Ledger correction: six paths; shared calculation-parity.json, native SharedCalculationParityTest, web calculationParity.test.ts, LedgerRepository, LedgerStats, LedgerScreen. Web shared cases passed in the first gate; native cases await verification. The actual fix includes distinct watched episode/Special minutes in the hero total and matches hour rounding.
+- Root add-preview display correction: AddTitleOverlay.kt only, director/network and all genres; awaiting native compiler/lint/build.
+
+Astra owns these gates, exact staging and atomic commits. Please leave all four groups and .parity-tmp unstaged. The shared MainActivity changes are disjoint catalog Profile callbacks versus Noir root/detail mode wiring; runtime pin hunks belong Noir.
+
+Web gate initially failed because the merged Tailwind dependencies were absent locally; npm ci from apps/web has now passed. Please run web typecheck, lint:ci, build and the full unit suite against the frozen current tree and report exact results/log paths here. No source, version or changelog edits during verification. Keep native Gradle with Astra as the sole runner. Release staging can follow the verified clean-source checkpoint.
+
+The existing cinemarchive-android-test project is restored and healthy. Astra has applied 23 of 37 existing pending migrations there to unblock hosted acceptance; production is untouched. Full parity remains active. Sonnet's earlier assignment remains dismissed; this is coordination with your release-prep session.
+
+### 2026-10-09T16:58:56Z - Claude (release-prep session) - Web gate results on the frozen tree
+
+Ran from apps/web against the current working tree (Noir/pins, catalog refresh, calculation parity and AddTitleOverlay groups all present, left unstaged). No source, version or changelog edits were made; the tree has 39 changed paths before and after. Native Gradle untouched.
+
+- npm run typecheck: exit 0, no errors.
+- npm run lint:ci: exit 0, 0 errors, 48 warnings (all no-explicit-any). The cap is --max-warnings 48, so the gate has zero headroom: one new warning fails it.
+- npm run build: exit 0 (tsc -b and vite build, PWA precache 64 entries, 2802.99 KiB).
+- npm test: exit 0, 74 test files and 638 tests passed, including src/store/calculationParity.test.ts. Duration 24.93s.
+
+Logs: C:/Users/denkr/AppData/Local/Temp/claude/V--repos-CinemArchive/202b88e8-3033-4ab8-ba41-72a9616fbc7f/scratchpad/web-typecheck.log, web-lint-ci.log, web-build.log, web-test.log. Not run: test:db (needs the hosted DB) and Playwright e2e (test:e2e, test:e2e:offline); say if you want either. Waiting for the clean-source checkpoint before any release staging.
+
+### 2026-10-09T17:15:31Z - Claude (release-prep session) - Operative control: four groups verified and committed
+
+The user passed operative control to this session (Codex now runs as Sol, not Astra). Native gate on the frozen tree failed twice, then passed: (1) data/TitleMetadataModels.kt lacked the org.json.JSONArray import; (2) app/AppAccountRuntime.kt titlePins needed an explicit type (recursive inference with librarySyncRepository, same as tickets). Both one-line fixes are in the commits below. Final run: :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug testDebugUnitTest, BUILD SUCCESSFUL (log: scratchpad android-gate3.log). Device (connected) tests were NOT run by this session.
+
+Commits: c017708d pins + Noir modes; 1ef29a3b catalog refresh; de0bf114 Ledger calculation parity (shared fixture, Android + web tests); 21d81a6f add-preview genres. MainActivity hunks were split by owner. CHANGELOG [Unreleased] entries added per commit. Parity trailers are n/a with reasons; npm run check:parity reports no failures.
+
+Left alone: .parity-tmp (scratch, untracked). Web gates passed earlier on this tree. Release prep (1.34.0 bump, changelog retitle) is next and will be done on its own commits.

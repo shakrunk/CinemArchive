@@ -184,21 +184,21 @@ function mapDbTitleToLocal(row: any): Title {
                   colorMode: we.color_mode || undefined,
                 })),
               ratings: (ep.episode_ratings || [])
-                .map((r: any) => ({ ...r, _ts: r.rated_at ? Date.parse(r.rated_at) : -Infinity }))
-                .sort((a: any, b: any) => a._ts - b._ts)
-                .map((er: any) => ({
-                  id: er.id,
-                  rating: parseFloat(er.rating),
-                  ratedAt: er.rated_at,
+                .map((r: any) => ({ r, _ts: r.rated_at ? Date.parse(r.rated_at) : -Infinity }))
+                .sort((a: { _ts: number }, b: { _ts: number }) => a._ts - b._ts)
+                .map(({ r }: any) => ({
+                  id: r.id,
+                  rating: parseFloat(r.rating),
+                  ratedAt: r.rated_at,
                 })),
               reviews: (ep.episode_reviews || [])
-                .map((r: any) => ({ ...r, _ts: r.reviewed_at ? Date.parse(r.reviewed_at) : -Infinity }))
-                .sort((a: any, b: any) => a._ts - b._ts)
-                .map((rv: any) => ({
-                  id: rv.id,
-                  reviewText: rv.review_text,
-                  reviewedAt: rv.reviewed_at,
-                  colorMode: rv.color_mode || undefined,
+                .map((r: any) => ({ r, _ts: r.reviewed_at ? Date.parse(r.reviewed_at) : -Infinity }))
+                .sort((a: { _ts: number }, b: { _ts: number }) => a._ts - b._ts)
+                .map(({ r }: any) => ({
+                  id: r.id,
+                  reviewText: r.review_text,
+                  reviewedAt: r.reviewed_at,
+                  colorMode: r.color_mode || undefined,
                 })),
             }
           })

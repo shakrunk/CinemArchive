@@ -97,6 +97,75 @@ async function installCompletionDefinition(migration) {
 }
 
 function titleEffect(snapshot) { return snapshot.rows.find(row => row.table === 'titles') }
+
+async function restoreHistoricalTrip({ rating = null } = {}) {
+  await as('authenticated', owner)
+  const title = randomUUID(), outing = randomUUID(), viewing = randomUUID(), operation = randomUUID()
+  const operations = [
+    { table: 'titles', action: 'insert', key: { id: title }, values: {
+      tmdb_id: Math.floor(Math.random() * 1e8), type: 'movie', title: 'Restored trip', year: 2020,
+      status: 'watched', notes: 'Preserved archive notes', added_at: '2020-01-01T00:00:00Z',
+    } },
+    { table: 'viewings', action: 'insert', key: { id: viewing }, values: {
+      title_id: title, viewed_at: null, rating, notes: 'Undated historical viewing', outing_id: null,
+    } },
+    { table: 'cinema_outings', action: 'insert', key: { id: outing }, values: {
+      title_id: title, showtime: '2020-01-01T20:00:00Z', ends_at: '2020-01-01T22:00:00Z',
+      previews_minutes: 20, runtime_minutes: 100, status: 'completed', previous_status: 'watchlist',
+      completed_viewing_id: viewing, companions: [], seats: [], created_at: '2019-12-01T00:00:00Z',
+    } },
+    { table: 'viewings', action: 'update', key: { id: viewing }, values: { outing_id: outing } },
+  ]
+  const receipt = (await db.query('select apply_library_command($1,$2::jsonb) as result', [operation, JSON.stringify(operations)])).rows[0].result
+  const snapshot = {
+    outing: (await db.query('select to_jsonb(o) as row from cinema_outings o where id=$1', [outing])).rows[0].row,
+    viewing: (await db.query('select to_jsonb(v) as row from viewings v where id=$1', [viewing])).rows[0].row,
+    canonicalViewingId: viewing,
+  }
+  return { ...snapshot, titleId: title, operation, operations, receipt }
+}
+
+test('historical trip restore keeps explicit history without claiming a new completion effect', async () => {
+  const restored = await restoreHistoricalTrip()
+  assert.equal(restored.viewing.viewed_at, null)
+  assert.equal(restored.viewing.notes, 'Undated historical viewing')
+  assert.equal(restored.viewing.outing_id, restored.outing.id)
+  await as('postgres')
+  assert.equal(Number((await db.query('select count(*) as n from cinemarchive_private.outing_completions where outing_id=$1', [restored.outing.id])).rows[0].n), 0)
+  await as('authenticated', owner)
+  const adopted = await complete(restored.outing)
+  assert.equal(adopted.status, 'already_completed')
+  assert.equal(adopted.canonicalViewingId, restored.canonicalViewingId)
+  assert.equal(adopted.completionTitleVersion, null)
+  assert.equal(adopted.completionOutingVersion, null)
+  assert.equal(viewingEffect(adopted), undefined)
+  assert.equal(titleEffect(adopted), undefined)
+  assert.equal(await countViewings(restored.outing.id), 1)
+  assert.equal(Number((await db.query('select count(*) as n from notifications where title_id=$1', [restored.titleId])).rows[0].n), 0)
+  const undone = await revert(adopted)
+  assert.equal(undone.status, 'applied')
+  assert.equal(undone.titleStatusRestored, false)
+  assert.equal(undone.title.status, 'watched')
+  assert.equal((await db.query('select notes from titles where id=$1', [restored.titleId])).rows[0].notes, 'Preserved archive notes')
+  assert.equal(undone.outing.status, 'missed')
+  assert.equal(await countViewings(restored.outing.id), 0)
+  // Reconfirming the original import cannot recreate history that was deliberately removed.
+  const replay = (await db.query('select apply_library_command($1,$2::jsonb) as result', [restored.operation, JSON.stringify(restored.operations)])).rows[0].result
+  assert.deepEqual(replay, restored.receipt)
+  assert.equal(await countViewings(restored.outing.id), 0)
+})
+
+test('restored completion undo preserves rated history and later edits without private provenance', async () => {
+  const rated = await restoreHistoricalTrip({ rating: 4.5 })
+  assert.equal((await revert(rated)).status, 'conflict')
+  assert.equal(await countViewings(rated.outing.id), 1)
+  const edited = await restoreHistoricalTrip()
+  await patchReceipt('viewings', edited.canonicalViewingId, { notes: 'Edited after restore' })
+  assert.equal((await revert(edited)).status, 'conflict')
+  assert.equal((await db.query('select notes from viewings where id=$1', [edited.canonicalViewingId])).rows[0].notes, 'Edited after restore')
+  assert.equal((await db.query('select status from titles where id=$1', [edited.titleId])).rows[0].status, 'watched')
+})
+
 async function dependentTitle(snapshot, values = { rating: 4.5 }, id = randomUUID(), titleId = snapshot.title?.id ?? titleEffect(snapshot)?.key.id) {
   return (await db.query('select apply_library_command($1,$2) as result', [id, [{
     table: 'titles', action: 'update', key: { id: titleId }, values, expectedOperationId: snapshot.operationId,

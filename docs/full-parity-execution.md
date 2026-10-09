@@ -176,11 +176,18 @@ Material You colors, APK updating, OS permission UI, predictive back, exact alar
 
 - Add-flow admission b37cf03 saves tags and previously watched season progress through the same durable atomic title-graph command as other additions, preserving undated history and catalog metadata. Its focused `AddTitleAdmissionTest` cases cover the graph; the full gate for this slice is not recorded here.
 
+## Command search, provider merging and Noir logging checkpoint
+
+- Atomic add-flow b37cf03 passes all five real Room admission cases, including rollback, owner cutover, duplicate identity and a removed pending graph. Global search/scheduling 3dd322b adds keyboard actions and captured ticket forms with durable duplicate prevention through Room 22. Existing-title provider merging 451dc13 adds optimistic atomic commands, exact retry/current-state ACK, explicit recovery/export and cross-path provider identity protection. Noir logging 988fccb captures watch/review modes and preserves exact failed-submit retries.
+- Compiler, debug APK/test APK assembly and lint pass. The final full JVM run passes 1,057 tests across 137 suites, zero failures/errors and three existing live-service skips. All sixteen relevant device cases pass across the final combined run and one selector-correction rerun: search four, schedule two, existing outing integrity two, provider four and Noir four. The selector correction scopes rating controls to the episode dialog; it does not change production behavior.
+- Corrections include shared database scheduling bounds, explicit local unproven-revision handling that cannot become CAS authority, a real queued-import predecessor after ACK, and provider identity collision rejection in both import directions. Parity trailers pass all 153 commits through 988fccb, including externally integrated web commits.
+- Remaining implementation claims are Noir visual selection/synced pins and full single/bulk catalog refresh. Root is closing the small add-preview display gap against the actual web preview. Live signed-in cross-client acceptance still lacks configured non-production test credentials. Sonnet remains dismissed and its watcher disabled. This task has not pushed, released, deployed or written production data.
+
 ## Remaining work
 
-Full parity remains incomplete. The acceptance inventory above stays authoritative; the following are the largest unfinished implementation groups, not a replacement or reduction of the goal:
+Full parity remains incomplete. The complete acceptance inventory above remains authoritative.
 
-- Existing-title provider merge durability and provenance (new-title import is committed in 06eb77a).- Noir episode logging, rich add preview, and native global search.
-- Complete account/auth/invite/notification/deep-link acceptance, pooled backend concurrency and live signed-in cross-client/device journeys.
+- Noir visual selection and synced pins, full title/episode catalog refresh, and add-preview display parity.
+- Complete account/auth/invite/notification/deep-link acceptance, shared Library/Ledger fixture comparison, pooled backend concurrency and live signed-in cross-client/device journeys.
 
 The backup contract distinguishes current web parity from enhancements absent on both clients, including merged duplicate histories and embedded photo bytes. Current local checks do not prove the remaining requirements.

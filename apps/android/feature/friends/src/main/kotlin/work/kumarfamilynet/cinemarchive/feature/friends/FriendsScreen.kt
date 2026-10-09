@@ -62,6 +62,7 @@ fun FriendsRoute(
     onBack: () -> Unit,
     onOpenFriendLibrary: (friendUserId: String, label: String) -> Unit,
     showBack: Boolean = true,
+    onEditFriendAccess: ((friendUserId: String, label: String) -> Unit)? = null,
 ) {
     var section by remember { mutableStateOf(FriendsSection.FRIENDS) }
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -81,7 +82,7 @@ fun FriendsRoute(
             )
         }
         when (section) {
-            FriendsSection.FRIENDS -> FriendsList(repository, viewerUserId, onOpenFriendLibrary)
+            FriendsSection.FRIENDS -> FriendsList(repository, viewerUserId, onOpenFriendLibrary, onEditFriendAccess)
             FriendsSection.INBOX -> InboxList(repository)
             FriendsSection.ACTIVITY -> ActivityList(repository, onOpenFriendLibrary)
         }
@@ -121,6 +122,7 @@ private fun FriendsList(
     repository: FriendsRepository,
     viewerUserId: String,
     onOpenFriendLibrary: (String, String) -> Unit,
+    onEditFriendAccess: ((String, String) -> Unit)?,
 ) {
     var friendships by remember { mutableStateOf<List<Friendship>>(emptyList()) }
     var suggestions by remember { mutableStateOf<List<InviteConnection>>(emptyList()) }
@@ -192,6 +194,7 @@ private fun FriendsList(
                     onBlock = { confirmBlock = f },
                     onUnblock = { scope.runAction(report, null, ::reload) { repository.unblockFriend(f.friendUserId) } },
                     onViewLibrary = { onOpenFriendLibrary(f.friendUserId, f.libraryLabel) },
+                    onEditAccess = onEditFriendAccess?.let { edit -> { edit(f.friendUserId, f.libraryLabel) } },
                 )
             }
         }
@@ -244,7 +247,7 @@ private fun FriendsList(
 }
 
 @Composable
-private fun FriendRow(
+fun FriendRow(
     f: Friendship,
     relation: FriendshipRelation,
     onAccept: () -> Unit,
@@ -253,12 +256,13 @@ private fun FriendRow(
     onBlock: () -> Unit,
     onUnblock: () -> Unit,
     onViewLibrary: () -> Unit,
+    onEditAccess: (() -> Unit)?,
 ) {
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Column(modifier = Modifier.padding(14.dp, 10.dp)) {
             Text(f.name, style = MaterialTheme.typography.titleSmall)
             Text(relation.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                 when (relation) {
                     FriendshipRelation.REQUEST_RECEIVED -> {
                         Button(onClick = onAccept) { Text("Accept") }
@@ -267,6 +271,7 @@ private fun FriendRow(
                     FriendshipRelation.REQUEST_SENT -> OutlinedButton(onClick = onCancel) { Text("Cancel request") }
                     FriendshipRelation.FRIENDS -> {
                         Button(onClick = onViewLibrary) { Text("View library") }
+                        if (onEditAccess != null) OutlinedButton(onClick = onEditAccess) { Text("Edit access") }
                         OutlinedButton(onClick = onBlock) { Text("Block") }
                     }
                     FriendshipRelation.BLOCKED_BY_ME -> OutlinedButton(onClick = onUnblock) { Text("Unblock") }

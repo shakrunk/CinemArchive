@@ -2,11 +2,8 @@ package work.kumarfamilynet.cinemarchive.feature.settings
 
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +41,6 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.data.ShareExpiry
-import work.kumarfamilynet.cinemarchive.data.ShareScope
 import work.kumarfamilynet.cinemarchive.data.ShareScopeTarget
 import work.kumarfamilynet.cinemarchive.data.SharedAccessKey
 import work.kumarfamilynet.cinemarchive.data.SharingRepository
@@ -209,82 +204,8 @@ fun SharingRoute(
     }
 
     editing?.let { k ->
-        ScopeEditorDialog(repository, k, availableGenres, onClose = { editing = null }, onError = { status = it to true })
+        val source = remember(repository) { RepositoryShareScopeSource(repository) }
+        ShareScopeEditorDialog(source, ShareScopeTarget.Link(k.id), k.label ?: "Untitled link", availableGenres,
+            onClose = { editing = null })
     }
-}
-
-@Composable
-private fun ScopeEditorDialog(
-    repository: SharingRepository,
-    key: SharedAccessKey,
-    availableGenres: List<String>,
-    onClose: () -> Unit,
-    onError: (String) -> Unit,
-) {
-    val statuses = listOf("watchlist", "watching", "watched", "dropped")
-    var loaded by remember { mutableStateOf(false) }
-    var restrictGenres by remember { mutableStateOf(false) }
-    var restrictStatuses by remember { mutableStateOf(false) }
-    var genres by remember { mutableStateOf(setOf<String>()) }
-    var allowed by remember { mutableStateOf(setOf<String>()) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(key.id) {
-        try {
-            repository.getShareScope(ShareScopeTarget.Link(key.id))?.let { s ->
-                s.allowedGenres?.let { restrictGenres = true; genres = it.toSet() }
-                s.allowedStatuses?.let { restrictStatuses = true; allowed = it.toSet() }
-            }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            onError(e.message ?: "Couldn't load the scope.")
-            onClose()
-            return@LaunchedEffect
-        }
-        loaded = true
-    }
-
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text("What this link shows") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                if (!loaded) Text("Loading…") else {
-                    Text("Statuses", style = MaterialTheme.typography.labelLarge)
-                    FilterChip(selected = !restrictStatuses, onClick = { restrictStatuses = !restrictStatuses }, label = { Text("All statuses") })
-                    if (restrictStatuses) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        statuses.forEach { s ->
-                            FilterChip(selected = s in allowed, onClick = { allowed = if (s in allowed) allowed - s else allowed + s }, label = { Text(s) })
-                        }
-                    }
-                    Text("Genres", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
-                    FilterChip(selected = !restrictGenres, onClick = { restrictGenres = !restrictGenres }, label = { Text("All genres") })
-                    if (restrictGenres) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        (availableGenres + genres).distinct().sorted().forEach { g ->
-                            FilterChip(selected = g in genres, onClick = { genres = if (g in genres) genres - g else genres + g }, label = { Text(g) })
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = loaded, onClick = {
-                scope.launch {
-                    try {
-                        val scopeValue = ShareScope(
-                            allowedGenres = if (restrictGenres) genres.toList() else null,
-                            allowedStatuses = if (restrictStatuses) allowed.toList() else null,
-                        )
-                        repository.setShareScope(ShareScopeTarget.Link(key.id), scopeValue)
-                        onClose()
-                    } catch (e: Exception) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
-                        onError(e.message ?: "Couldn't save the scope.")
-                        onClose()
-                    }
-                }
-            }) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
-    )
 }

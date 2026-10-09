@@ -55,6 +55,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -919,9 +920,8 @@ private fun CinemArchiveApp(
                     onOpenProfile = openProfile,
                     onOpenFriends = { overlay = Overlay.Friends },
                 )
-                Overlay.Friends -> FriendsRoute(
-                    runtime.friendsRepository,
-                    viewerUserId = runtime.ownerId,
+                Overlay.Friends -> FriendsWithAccessEditor(
+                    runtime, titleSocialSource,
                     onBack = openProfile,
                     onOpenFriendLibrary = { id, label -> overlay = Overlay.FriendLibrary(id, label) },
                 )
@@ -970,6 +970,30 @@ private const val BACK_SLIDE_FRACTION = 0.10f
  *  with the window but a list pane that also grew would leave the category rows looking
  *  stretched well past what their short titles need. */
 private val SettingsListPaneWidth = 320.dp
+
+@Composable
+private fun FriendsWithAccessEditor(
+    runtime: AppAccountRuntime,
+    socialSource: work.kumarfamilynet.cinemarchive.feature.friends.TitleSocialSource,
+    onBack: () -> Unit,
+    onOpenFriendLibrary: (String, String) -> Unit,
+) {
+    key(runtime) {
+        val titles by runtime.libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
+        val source = remember(runtime, socialSource) {
+            work.kumarfamilynet.cinemarchive.feature.settings.RepositoryShareScopeSource(
+                runtime.sharingRepository, socialSource::isActive)
+        }
+        var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
+        FriendsRoute(runtime.friendsRepository, runtime.ownerId, onBack, onOpenFriendLibrary,
+            onEditFriendAccess = { id, label -> editing = id to label })
+        editing?.let { (id, label) ->
+            work.kumarfamilynet.cinemarchive.feature.settings.ShareScopeEditorDialog(
+                source, work.kumarfamilynet.cinemarchive.data.ShareScopeTarget.Friend(id), label,
+                titles.flatMap { it.genres }.distinct().sorted(), onClose = { editing = null })
+        }
+    }
+}
 
 @Composable
 private fun SharingSettings(runtime: AppAccountRuntime, onBack: () -> Unit, onOpenSharedLink: (String) -> Unit, showBack: Boolean = true) {

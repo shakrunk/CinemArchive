@@ -44,6 +44,9 @@ before(async () => {
   const ensure = (await readFile(new URL('../../../supabase/migrations/20261008214554_ensure_episode_catalog_parents.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(ensure.trim()), 'canonical schema includes episode catalog ensure')
   await database.exec(ensure)
+  const viewingIntent = (await readFile(new URL('../../../supabase/migrations/20261009012801_viewing_insert_intent_guard.sql', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
+  assert.ok(schema.includes(viewingIntent.trim()), 'canonical schema includes viewing insert intent guard')
+  await database.exec(viewingIntent)
   await database.query('insert into auth.users(id,email) values ($1,$2),($3,$4)', [owner,'owner@example.test',other,'other@example.test'])
   await database.exec('grant select on all tables in schema public to authenticated;')
 }, { timeout: 60000 })
@@ -136,6 +139,159 @@ test('stale revision aborts the whole command', async () => {
   const otherTitle=titleOperation()
   await assert.rejects(command([otherTitle,{table:'titles',action:'update',key:title.key,values:{rating:1},expectedUpdatedAt:'2000-01-01T00:00:00Z'}]),{code:'40001'})
   assert.equal((await rows('titles')).some(row=>row.id===otherTitle.key.id),false)
+})
+
+for (const action of ['insert', 'update']) {
+  test(`a stale captured title revision rolls back its compound viewing ${action}`, async () => {
+    const title = titleOperation()
+    const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() },
+      values: { title_id: title.key.id, viewed_at: '2026-01-01', rating: 2, notes: 'Original history' } }
+    const initial = await command(action === 'insert' ? [title] : [title, viewing])
+    const capturedTitle = initial.rows.find(row => row.table === 'titles').row
+    const capturedViewing = initial.rows.find(row => row.table === 'viewings')?.row
+    await command([{ table: 'titles', action: 'update', key: title.key, values: { notes: 'Newer title edit', rating: 4 } }])
+    const beforeTitle = (await rows('titles')).find(row => row.id === title.key.id)
+    const beforeViewing = (await rows('viewings')).find(row => row.id === viewing.key.id)
+    const historyOperation = action === 'insert'
+      ? { ...viewing, values: { ...viewing.values, rating: 3, notes: 'Submitted history' } }
+      : { table: 'viewings', action: 'update', key: viewing.key,
+        values: { viewed_at: null, rating: 3, notes: 'Submitted history' }, expectedUpdatedAt: capturedViewing.updated_at }
+    const titlePatch = { table: 'titles', action: 'update', key: title.key,
+      values: { status: 'watched', rating: 3 }, expectedUpdatedAt: capturedTitle.updated_at }
+    // Native submits history first: rejecting the later title guard must undo that first effect.
+    await assert.rejects(command([historyOperation, titlePatch]), { code: '40001' })
+    assert.deepEqual((await rows('titles')).find(row => row.id === title.key.id), beforeTitle)
+    assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), beforeViewing)
+    const fresh = await command([{ table: 'titles', action: 'update', key: title.key, values: {} }])
+    const accepted = await command([historyOperation, { ...titlePatch, expectedUpdatedAt: fresh.rows[0].row.updated_at }])
+    assert.deepEqual(accepted.rows.map(row => row.table), ['viewings', 'titles'])
+    const savedHistory = (await rows('viewings')).find(row => row.id === viewing.key.id)
+    const savedTitle = (await rows('titles')).find(row => row.id === title.key.id)
+    assert.equal(savedHistory.notes, 'Submitted history')
+    assert.equal(Number(savedHistory.rating), 3)
+    if (action === 'update') assert.equal(savedHistory.viewed_at, null)
+    assert.equal(savedTitle.status, 'watched')
+    assert.equal(Number(savedTitle.rating), 3)
+    assert.equal(savedTitle.notes, 'Newer title edit')
+  })
+}
+
+test('compound viewing and title retries return original receipts without reverting newer edits', async () => {
+  for (const action of ['insert', 'update']) {
+    const title = titleOperation()
+    const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() },
+      values: { title_id: title.key.id, rating: 2, notes: 'Original history' } }
+    const initial = await command(action === 'insert' ? [title] : [title, viewing])
+    const titleRow = initial.rows.find(row => row.table === 'titles').row
+    const viewingRow = initial.rows.find(row => row.table === 'viewings')?.row
+    const operations = [action === 'insert' ? viewing : { table: 'viewings', action: 'update', key: viewing.key,
+      values: { notes: 'Accepted edit', rating: 3 }, expectedUpdatedAt: viewingRow.updated_at },
+    { table: 'titles', action: 'update', key: title.key, values: { status: 'watched', rating: 3 }, expectedUpdatedAt: titleRow.updated_at }]
+    const operationId = randomUUID()
+    const receipt = await command(operations, operationId)
+    await command([
+      { table: 'viewings', action: 'update', key: viewing.key, values: { notes: 'Later history', rating: 4.5 }, expectedOperationId: operationId },
+      { table: 'titles', action: 'update', key: title.key, values: { status: 'watchlist', rating: 1 }, expectedOperationId: operationId },
+    ])
+    const currentTitle = (await rows('titles')).find(row => row.id === title.key.id)
+    const currentHistory = (await rows('viewings')).find(row => row.id === viewing.key.id)
+    assert.deepEqual(await command(operations, operationId), receipt)
+    assert.deepEqual((await rows('titles')).find(row => row.id === title.key.id), currentTitle)
+    assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), currentHistory)
+    assert.equal(currentHistory.notes, 'Later history')
+    assert.equal(Number(currentHistory.rating), 4.5)
+    assert.equal(currentTitle.status, 'watchlist')
+    assert.equal(Number(currentTitle.rating), 1)
+  }
+})
+
+test('a conflicting viewing insert cannot silently commit its companion title patch', async () => {
+  const title = titleOperation()
+  const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() },
+    values: { title_id: title.key.id, rating: 2, notes: 'Existing history' } }
+  const original = await command([title, viewing])
+  const beforeTitle = (await rows('titles')).find(row => row.id === title.key.id)
+  const beforeHistory = (await rows('viewings')).find(row => row.id === viewing.key.id)
+  const conflicting = { ...viewing, values: { ...viewing.values, rating: 5, notes: 'Different submission' } }
+  const titlePatch = { table: 'titles', action: 'update', key: title.key, values: { status: 'watched', rating: 5 },
+    expectedUpdatedAt: original.rows.find(row => row.table === 'titles').row.updated_at }
+  await assert.rejects(command([conflicting, titlePatch]), { code: '23505' })
+  assert.deepEqual((await rows('titles')).find(row => row.id === title.key.id), beforeTitle)
+  assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), beforeHistory)
+})
+
+test('an identical viewing insert may accompany a title update without rewriting history', async () => {
+  const title = titleOperation()
+  const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() },
+    values: { title_id: title.key.id, viewed_at: null, rating: 4, notes: 'Same intended history', venue: 'Cinema', companions: [] } }
+  const original = await command([title, viewing])
+  const beforeHistory = (await rows('viewings')).find(row => row.id === viewing.key.id)
+  const result = await command([viewing, { table: 'titles', action: 'update', key: title.key,
+    values: { status: 'watched', rating: 4 }, expectedUpdatedAt: original.rows[0].row.updated_at }])
+  assert.deepEqual(result.rows.map(row => row.table), ['viewings', 'titles'])
+  assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), beforeHistory)
+  assert.equal((await rows('titles')).find(row => row.id === title.key.id).status, 'watched')
+})
+
+test('viewing insert omission preserves stored fields while an explicit null mismatch conflicts', async () => {
+  const title = titleOperation()
+  const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() },
+    values: { title_id: title.key.id, rating: 4, notes: 'Retain this note' } }
+  await command([title, viewing])
+  const before = (await rows('viewings')).find(row => row.id === viewing.key.id)
+  await command([{ ...viewing, values: { title_id: title.key.id } }])
+  assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), before)
+  await assert.rejects(command([{ ...viewing, values: { title_id: title.key.id, notes: null } }]), { code: '23505' })
+  await assert.rejects(command([{ ...viewing, values: { title_id: title.key.id, rating: null } }]), { code: '23505' })
+  assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), before)
+})
+
+test('viewing intent comparison uses stored timestamp numeric and JSONB semantics', async () => {
+  const title = titleOperation()
+  const friend = randomUUID()
+  const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() }, values: {
+    title_id: title.key.id, rating: 4, created_at: '2026-01-01T12:00:00.123456Z',
+    companions: [{ name: 'Sam', friendUserId: friend }],
+  } }
+  await command([title, viewing])
+  const before = (await rows('viewings')).find(row => row.id === viewing.key.id)
+  await command([{ ...viewing, values: { ...viewing.values, rating: '4.0',
+    created_at: '2026-01-01T07:00:00.123456-05:00', companions: [{ friendUserId: friend, name: 'Sam' }] } }])
+  assert.deepEqual((await rows('viewings')).find(row => row.id === viewing.key.id), before)
+  await assert.rejects(command([{ ...viewing, values: { ...viewing.values, created_at: '2026-01-01T12:00:00.123457Z' } }]), { code: '23505' })
+  await assert.rejects(command([{ ...viewing, values: { ...viewing.values, companions: [{ name: 'Different person', friendUserId: friend }] } }]), { code: '23505' })
+})
+
+test('a viewing identity collision discovered during insert rolls back the entire compound command', async () => {
+  const title = titleOperation()
+  const initial = await command([title])
+  const viewing = { table: 'viewings', action: 'insert', key: { id: randomUUID() },
+    values: { title_id: title.key.id, rating: 4, notes: 'Intended history' } }
+  const beforeTitle = (await rows('titles')).find(row => row.id === title.key.id)
+  // PGlite is single-connection: a BEFORE trigger deterministically exercises the
+  // insertion-conflict branch after its initial lookup, without claiming concurrency proof.
+  await database.exec('reset role')
+  await database.exec(`
+    create function public.test_viewing_insert_collision() returns trigger language plpgsql as $$
+    begin
+      if pg_trigger_depth() = 1 and new.id = tg_argv[0]::uuid then
+        insert into public.viewings select (jsonb_populate_record(null::public.viewings,
+          to_jsonb(new) || jsonb_build_object('notes','Conflicting inserted history'))).*;
+      end if;
+      return new;
+    end $$;
+    create trigger test_viewing_insert_collision before insert on public.viewings
+      for each row execute function public.test_viewing_insert_collision('${viewing.key.id}');
+    set role authenticated;
+  `)
+  try {
+    await assert.rejects(command([viewing, { table: 'titles', action: 'update', key: title.key,
+      values: { status: 'watched', rating: 4 }, expectedUpdatedAt: initial.rows[0].row.updated_at }]), { code: '23505' })
+    assert.deepEqual((await rows('titles')).find(row => row.id === title.key.id), beforeTitle)
+    assert.equal((await rows('viewings')).some(row => row.id === viewing.key.id), false)
+  } finally {
+    await database.exec('reset role; drop trigger test_viewing_insert_collision on public.viewings; drop function public.test_viewing_insert_collision(); set role authenticated;')
+  }
 })
 
 test('owner cannot mutate or attach records to another owner graph', async () => {

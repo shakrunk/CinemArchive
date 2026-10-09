@@ -15,18 +15,33 @@ class EpisodeCatalogFillApplier(private val database: LibraryDatabase, private v
         val current = currentEpisodeCatalogRows(entry, receipt, ownerId)
         if (database.titleDao().getById(entry.entityId) == null) return
         val catalog = JSONObject(entry.payloadJson).getJSONArray("catalog")
+        val queue = database.outboxDao().getPending()
+        val laterCatalog = queue.dropWhile { it.id != entry.id }.drop(1).any { it.entityType == "title_catalog" && it.entityId == entry.entityId }
+        if (!laterCatalog) current.filter { it.getString("table") == "episodes" && it.getJSONObject("key").has("id") }.forEach { item ->
+            val row = item.getJSONObject("row")
+            val local = database.episodeDao().getById(row.getString("id"))
+            if (local != null) {
+                require(local.titleId == entry.entityId && row.getString("season_id") == local.seasonId && row.getInt("episode_number") == local.episodeNumber)
+                database.episodeDao().upsertAll(listOf(local.copy(episodeName = row.nullText("episode_name"), airDate = row.nullText("air_date"),
+                    runtime = row.nullInt("runtime"), synopsis = row.nullText("synopsis"), stillUrl = row.nullText("still_url"))))
+            }
+        }
         val pendingCreditOps = database.outboxDao().getPending().filter { it.entityType == "title_credits" && it.entityId == entry.entityId }
             .flatMap { queued -> JSONObject(queued.payloadJson).getJSONArray("operations").let { ops ->
                 (0 until ops.length()).map(ops::getJSONObject)
             } }
         val old = readCreditRows(database, entry.entityId)
         val changed = mutableListOf<CreditRow>()
+        val fetchedProfiles = mutableSetOf<String>()
+        val fetchedCounts = mutableSetOf<String>()
         fun credit(row: CreditRow) {
             // A newer local refresh/removal retains priority over this fetched snapshot.
             if (pendingCreditOps.any { it.getString("table") == row.table && sameCommandJson(it.getJSONObject("key"), row.key()) }) return
             val previous = old.firstOrNull { it.identity == row.identity }
+            if (row.profileUrl != null) fetchedProfiles += row.identity
+            if (row.episodeCount != null) fetchedCounts += row.identity
             val next = row.copy(id = previous?.id ?: UUID.randomUUID().toString(),
-                profileUrl = previous?.profileUrl, episodeCount = previous?.episodeCount)
+                profileUrl = row.profileUrl ?: previous?.profileUrl, episodeCount = row.episodeCount ?: previous?.episodeCount)
             if (next != previous) changed += next
         }
         for (index in 0 until catalog.length()) {
@@ -48,7 +63,8 @@ class EpisodeCatalogFillApplier(private val database: LibraryDatabase, private v
             for (castIndex in 0 until cast.length()) {
                 val person = cast.getJSONObject(castIndex)
                 credit(CreditRow("season_cast", "", entry.entityId, seasonId, person.getInt("personId"),
-                    person.getString("name"), person.nullText("character"), person.getInt("order")))
+                    person.getString("name"), person.nullText("character"), person.getInt("order"),
+                    profileUrl = person.nullText("profileUrl"), episodeCount = person.nullInt("episodeCount")))
             }
             val plannedEpisodes = planned.getJSONArray("episodes")
             for (episodeIndex in 0 until plannedEpisodes.length()) {
@@ -75,7 +91,8 @@ class EpisodeCatalogFillApplier(private val database: LibraryDatabase, private v
         if (changed.isEmpty()) return
         val operations = JSONArray().put(JSONObject().put("table", "titles").put("action", "update")
             .put("key", JSONObject().put("id", entry.entityId)).put("values", JSONObject()))
-        changed.forEach { operations.put(JSONObject().put("table", it.table).put("action", "put").put("key", it.key()).put("values", it.values())) }
+        changed.forEach { operations.put(JSONObject().put("table", it.table).put("action", "put").put("key", it.key())
+            .put("values", it.values(it.identity in fetchedProfiles, it.identity in fetchedCounts))) }
         writeCreditRows(database, changed)
         database.outboxDao().enqueue(OutboxEntity(UUID.randomUUID().toString(), "title_credits", entry.entityId, "refresh",
             JSONObject().put("ownerId", ownerId).put("titleId", entry.entityId).put("operations", operations)

@@ -861,6 +861,7 @@ private fun CinemArchiveApp(
                             outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                             lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
+                            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
                             listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
                             titleChangesContent = {
@@ -945,7 +946,7 @@ private fun CinemArchiveApp(
                         overlay = null
                         tab = Tab.LIBRARY
                     },
-                    onRefreshCredits = { runtime.creditRefreshRepository.refresh(current.titleId) },
+                    onRefreshCredits = { runtime.creditRefreshRepository.refreshMetadata(current.titleId) },
                     noirPins = runtime.titlePins,
                     onNoirMode = { mode ->
                         if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)
@@ -994,6 +995,7 @@ private fun CinemArchiveApp(
                     outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
                     lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
                         subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
+                            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
                             listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
                     titleChangesContent = {

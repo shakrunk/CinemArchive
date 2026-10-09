@@ -92,6 +92,7 @@ fun ProfileRoute(
     moviegoingContent: (@Composable () -> Unit)? = null,
     lifecycleChangesContent: (@Composable () -> Unit)? = null,
     listChangesContent: (@Composable () -> Unit)? = null,
+    catalogRefreshContent: (@Composable () -> Unit)? = null,
     onOpenNavigation: (() -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -134,6 +135,7 @@ fun ProfileRoute(
         moviegoingContent = moviegoingContent,
         lifecycleChangesContent = lifecycleChangesContent,
         listChangesContent = listChangesContent,
+        catalogRefreshContent = catalogRefreshContent,
         onOpenNavigation = onOpenNavigation,
     )
 }
@@ -204,6 +206,7 @@ private fun ProfileScreen(
     moviegoingContent: (@Composable () -> Unit)? = null,
     lifecycleChangesContent: (@Composable () -> Unit)? = null,
     listChangesContent: (@Composable () -> Unit)? = null,
+    catalogRefreshContent: (@Composable () -> Unit)? = null,
     onOpenNavigation: (() -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
@@ -412,6 +415,7 @@ private fun ProfileScreen(
                     if (signedInEmail != null) viewingChangesContent?.invoke()
                     if (signedInEmail != null) ticketChangesContent?.invoke()
                     if (signedInEmail != null) moviegoingContent?.invoke()
+                    if (signedInEmail != null) catalogRefreshContent?.invoke()
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

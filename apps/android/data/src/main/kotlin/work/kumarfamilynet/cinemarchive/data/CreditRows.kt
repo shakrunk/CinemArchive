@@ -12,9 +12,10 @@ internal data class CreditRow(
     val identity: String get() = "$table:$parentId:$personId:${if (table.endsWith("crew")) role else ""}"
     fun key() = JSONObject().put(when (table) { "season_cast" -> "season_id"; "episode_crew" -> "episode_id"; else -> "title_id" }, parentId)
         .put("tmdb_person_id", personId).apply { if (table.endsWith("crew")) put("job", role) }
-    fun values() = JSONObject().put("name", name).apply {
-        // These refresh snapshots do not fetch profile/count metadata yet. Retain it locally,
-        // but omit it here so stale cached values cannot overwrite a newer server value.
+    fun values(includeProfile: Boolean = false, includeCount: Boolean = false) = JSONObject().put("name", name).apply {
+        // Retained cache values are omitted; only freshly fetched fields may replace server data.
+        if (includeProfile && table != "episode_crew") put("profile_url", profileUrl ?: JSONObject.NULL)
+        if (includeCount && table.endsWith("cast")) put("episode_count", episodeCount ?: JSONObject.NULL)
         if (table == "season_cast" || table == "episode_crew") put("title_id", titleId)
         if (table.endsWith("cast")) { put("character_name", role ?: JSONObject.NULL); put("cast_order", order) }
         if (table == "title_crew") put("department", department ?: JSONObject.NULL)

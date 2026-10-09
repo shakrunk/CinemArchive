@@ -8,6 +8,11 @@ import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 class CreditReceiptApplier(private val database: LibraryDatabase, private val ownerId: String) : AppliedMutationHandler {
     /** Earlier receipts can rekey a row while a later immutable refresh still names its old ID. */
     suspend fun protectionKeys(entries: List<OutboxEntity>): Set<String> = buildSet {
+        entries.filter { it.entityType == "title_catalog" }.forEach { entry ->
+            episodeCatalogOperations(entry, ownerId).importObjects().filter {
+                it.getString("table") == "episodes" && it.getJSONObject("key").has("id")
+            }.forEach { add("episode:${it.getJSONObject("key").getString("id")}") }
+        }
         entries.filter { it.entityType == "title_credits" }.map { it.entityId }.distinct().forEach { titleId ->
             readCreditRows(database, titleId).forEach { add("${it.table}:${it.id}") }
         }

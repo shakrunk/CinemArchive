@@ -56,6 +56,9 @@ class TitleMetadataRepository(
             "physical_media" to local?.physicalMediaJson?.let(::exactMetadataArray))) {
             saved.put(key, if (current?.has(key) == true) current.get(key) else fallback ?: JSONObject.NULL)
         }
+        val localCatalog = local?.catalogValues()
+        catalogFields.forEach { key -> saved.put(key,
+            if (current?.has(key) == true) current.get(key) else localCatalog?.opt(key) ?: JSONObject.NULL) }
         patch.keys().forEach { saved.put(it, patch.get(it)) }
         val comparison = TitleMetadataComparison(titleId, local?.title ?: current?.optString("title") ?: "Removed title",
             saved.titleMetadataValues(), current?.titleMetadataValues(), snapshot(entries), metadataJson(patch), current?.let(::metadataJson))

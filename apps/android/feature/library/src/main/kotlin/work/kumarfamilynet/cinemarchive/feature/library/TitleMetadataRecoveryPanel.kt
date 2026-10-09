@@ -79,5 +79,6 @@ private fun MetadataValues(label: String, values: TitleMetadataValues?, fields: 
         if ("custom_watch_url" in fields) Text("Watch link: ${values.watchUrl ?: "None"}")
         if ("in_home_collection" in fields) Text("Home collection: ${if (values.homeCollection == true) "Yes" else "No"}")
         if ("physical_media" in fields) Text("Physical copies: ${values.physicalCopies.joinToString("; ").ifEmpty { "None" }}")
+        values.catalog.filterKeys { it in fields }.forEach { (field, value) -> Text("${field.replace('_', ' ')}: $value") }
     } else Text("Unavailable")
 }

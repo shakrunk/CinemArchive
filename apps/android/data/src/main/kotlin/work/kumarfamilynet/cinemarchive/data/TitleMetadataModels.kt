@@ -1,11 +1,13 @@
 package work.kumarfamilynet.cinemarchive.data
 
 import kotlinx.coroutines.flow.Flow
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class SavedTitleChange(val titleId: String, val title: String, val count: Int, val needsReview: Boolean, val error: String?)
 data class TitleMetadataValues(val tags: List<String>, val status: String, val rating: Double?,
-    val watchUrl: String? = null, val homeCollection: Boolean? = null, val physicalCopies: List<String> = emptyList())
+    val watchUrl: String? = null, val homeCollection: Boolean? = null, val physicalCopies: List<String> = emptyList(),
+    val catalog: Map<String, String> = emptyMap())
 
 /** The displayed revision and exact queue snapshot are retained until the user acts. */
 class TitleMetadataComparison internal constructor(
@@ -36,5 +38,9 @@ internal fun JSONObject.titleMetadataValues() = TitleMetadataValues(
     if (isNull("in_home_collection")) null else getBoolean("in_home_collection"),
     if (isNull("physical_media")) emptyList() else physicalMediaItems(metadataJson(getJSONArray("physical_media"))).map {
         listOfNotNull(it.format, it.edition, it.notes).joinToString(" · ")
+    },
+    catalogFields.filter { has(it) }.associateWith { key ->
+        if (isNull(key)) "None" else if (get(key) is JSONArray) getJSONArray(key).let { a -> (0 until a.length()).joinToString(", ") { a.getString(it) }.ifEmpty { "None" } }
+        else get(key).toString()
     },
 )

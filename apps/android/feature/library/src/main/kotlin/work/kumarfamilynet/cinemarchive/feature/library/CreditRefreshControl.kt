@@ -22,15 +22,15 @@ internal fun CreditRefreshControl(titleId: String, refresh: suspend () -> Boolea
                 try {
                     val changed = refresh()
                     failed = false
-                    message = if (changed) "Credit refresh saved. Missing episodes will appear after sync." else "Credits are up to date."
+                    message = if (changed) "Metadata refresh saved. Missing episodes will appear after sync." else "Metadata is up to date."
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
                     failed = true
-                    message = error.message ?: "Could not refresh credits. Try again."
+                    message = error.message ?: "Could not refresh metadata. Try again."
                 } finally { busy = false }
             }
-        }) { Text(if (busy) "Refreshing credits…" else "Refresh credits") }
+        }) { Text(if (busy) "Refreshing metadata…" else "Refresh metadata") }
         message?.let { Text(it, style = MaterialTheme.typography.bodySmall,
             color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }
     }

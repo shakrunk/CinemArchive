@@ -48,6 +48,7 @@ internal suspend fun enqueueMissingEpisodeCatalog(
             .put("episodes", episodeCredits).put("cast", JSONArray(season.cast.distinctBy { it.tmdbPersonId }.map {
                 JSONObject().put("personId", it.tmdbPersonId).put("name", it.name)
                     .put("character", it.characterName ?: JSONObject.NULL).put("order", it.order)
+                    .apply { it.profileUrl?.let { value -> put("profileUrl", value) }; it.episodeCount?.let { value -> put("episodeCount", value) } }
             })))
     }
     outbox.enqueue("title_catalog", titleId, "ensure", JSONObject().put("ownerId", ownerId).put("titleId", titleId)
@@ -65,7 +66,18 @@ internal fun episodeCatalogOperations(entry: OutboxEntity, ownerId: String): JSO
         val op = operations.getJSONObject(index)
         if (index == 0) require(op.getString("table") == "titles" && op.getString("action") == "update" &&
             op.getJSONObject("key").getString("id") == entry.entityId && op.getJSONObject("values").length() == 0)
-        else require(op.getString("table") in setOf("seasons", "episodes") && op.getString("action") == "ensure" &&
+        else if (op.getString("action") == "update") {
+            require(op.getString("table") == "episodes")
+            require(op.getJSONObject("key").keys().asSequence().toSet() == setOf("id"))
+            java.util.UUID.fromString(op.getJSONObject("key").getString("id"))
+            val values = op.getJSONObject("values")
+            require(values.length() > 0 && values.keys().asSequence().all { it in setOf("episode_name", "air_date", "runtime", "synopsis", "still_url") })
+            values.keys().forEach { key ->
+                val value = values.get(key)
+                if (key == "runtime") require(value == JSONObject.NULL || value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0)
+                else require(value == JSONObject.NULL || value is String)
+            }
+        } else require(op.getString("table") in setOf("seasons", "episodes") && op.getString("action") == "ensure" &&
             op.getJSONObject("key").getString("title_id") == entry.entityId)
     }
     return operations
@@ -84,6 +96,7 @@ internal fun currentEpisodeCatalogRows(entry: OutboxEntity, envelope: JSONObject
             val original = confirmed.singleOrNull { it.getString("table") == table && sameCommandJson(it.getJSONObject("key"), item.getJSONObject("key")) }
                 ?: error("Current catalog row was not requested")
             require(row.getString("id") == original.getJSONObject("row").getString("id") && row.getString("user_id") == ownerId)
+            if (item.getJSONObject("key").has("id")) require(row.getString("title_id") == entry.entityId)
             val key = item.getJSONObject("key")
             key.keys().forEach { require(sameCommandJson(key.get(it), row.opt(it))) }
             require(seen.add(table to row.getString("id"))) { "Duplicate current catalog row" }

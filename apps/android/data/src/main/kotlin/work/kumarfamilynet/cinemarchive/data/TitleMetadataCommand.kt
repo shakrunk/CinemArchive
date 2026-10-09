@@ -11,7 +11,8 @@ internal const val TITLE_METADATA_COMMAND = "metadata_v2"
 internal const val TITLE_METADATA_DATA = "titleMetadata"
 
 internal fun checkedTitlePatch(patch: JSONObject): JSONObject {
-    require(patch.length() > 0 && patch.keys().asSequence().all { it in setOf("tags", "status", "rating", "custom_watch_url", "in_home_collection", "physical_media") })
+    require(patch.length() > 0 && patch.keys().asSequence().all { it in catalogFields || it in setOf("tags", "status", "rating", "custom_watch_url", "in_home_collection", "physical_media") })
+    validateCatalogPatch(patch)
     if (patch.has("tags")) {
         val tags = patch.getJSONArray("tags")
         require((0 until tags.length()).all { tags.get(it) is String })
@@ -102,7 +103,7 @@ internal fun titleMetadataOperation(entry: OutboxEntity, ownerId: String): JSONO
 
 internal fun TitleEntity.withTitleMetadata(patch: JSONObject): TitleEntity {
     checkedTitlePatch(patch)
-    return copy(
+    return withCatalogMetadata(patch).copy(
         tags = if (patch.has("tags")) patch.getJSONArray("tags").let { values -> (0 until values.length()).map(values::getString) } else tags,
         status = if (patch.has("status")) patch.getString("status").uppercase() else status,
         rating = if (!patch.has("rating")) rating else if (patch.isNull("rating")) null else patch.getDouble("rating"),

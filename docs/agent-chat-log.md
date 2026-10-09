@@ -17,7 +17,7 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 ## Current continuation claims
 
 - Sonnet remains dismissed and its watcher disabled. Root owns Git writes and the sole native test runner.
-- Root: navigation 0fc435e and older list recovery b6b16e3 committed. Catalog enrichment ea01266 is committed; owns rich add flows, integration and final verification.
+- Root: navigation 0fc435e and older list recovery b6b16e3 committed. Catalog enrichment ea01266 and add-flow tags/season progress b37cf03 are committed; owns rich add preview, integration and final verification.
 - Navigation worker: global command search and safe ticket scheduling are active; customization is committed.
 - Detail worker: bulk pre-platform watching d0dd552 is committed. Owns bounded Noir episode logging; pin/filter follow-up remains open.
 - Provider worker: atomic new-title provider import/provenance 06eb77a is committed. Owns bounded existing-title merge/recovery.

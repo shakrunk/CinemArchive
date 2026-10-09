@@ -103,6 +103,11 @@ class AppAccountRuntime(
     private val ordinaryWriter = SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") }
     private val importOwner = work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId)
     private val importWriter = work.kumarfamilynet.cinemarchive.data.BackupImportTransport(client, session, importOwner, ::isCurrent)
+    private val providerMergeWriter = work.kumarfamilynet.cinemarchive.data.ProviderMergeTransport(client, session, importOwner, ::isCurrent)
+    val providerMerges by lazy {
+        work.kumarfamilynet.cinemarchive.data.ProviderMergeRepository(database, outbox, importOwner, ::isCurrent,
+            providerMergeWriter, { librarySyncRepository.syncNow() }, { action -> librarySyncRepository.withDurableReplay(action) })
+    }
     val restoreRepository: work.kumarfamilynet.cinemarchive.data.BackupImportRepository by lazy {
         work.kumarfamilynet.cinemarchive.data.BackupImportRepository(database, outbox, importOwner, ::isCurrent,
             sync = {
@@ -128,6 +133,7 @@ class AppAccountRuntime(
             override suspend fun push(entry: work.kumarfamilynet.cinemarchive.core.database.OutboxEntity) =
                 if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry)) importWriter.push(entry) else when (entry.entityType) {
                     "ticket_attachment" -> tickets.push(entry)
+                    "provider_merge" -> providerMergeWriter.push(entry)
                     "venue_note", "theater_interest" -> moviegoingPreferences.push(entry)
                     else -> ordinaryWriter.push(entry)
                 }
@@ -142,6 +148,7 @@ class AppAccountRuntime(
                 "outing_reversal" -> work.kumarfamilynet.cinemarchive.data.OutingReversalApplier(database, ownerId).apply(entry, receipt)
                 "venue_note", "theater_interest" -> moviegoingPreferences.apply(entry, receipt)
                 "ticket_attachment" -> tickets.apply(entry, receipt)
+                "provider_merge" -> work.kumarfamilynet.cinemarchive.data.ProviderMergeApplier(database, importOwner).apply(entry, receipt)
                 "title" -> if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry))
                     work.kumarfamilynet.cinemarchive.data.BackupImportApplier(database, importOwner).apply(entry, receipt)
                 else work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
@@ -162,6 +169,7 @@ class AppAccountRuntime(
             work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries) + tickets.protectionKeys(entries) +
                 work.kumarfamilynet.cinemarchive.data.viewingHistoryProtectionKeys(entries, ownerId) + moviegoingPreferences.protectionKeys(entries) +
                 work.kumarfamilynet.cinemarchive.data.backupImportProtectionKeys(entries, importOwner) +
+                work.kumarfamilynet.cinemarchive.data.providerMergeProtectionKeys(entries, importOwner) +
                 work.kumarfamilynet.cinemarchive.data.outingLifecycleProtectionKeys(entries, ownerId)
         },
     )
@@ -248,6 +256,7 @@ class AppAccountRuntime(
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId,
         work.kumarfamilynet.cinemarchive.data.ProviderImportAdmission(database, outbox, importOwner, ::isCurrent),
+        providerMerges,
         ::isCurrent, { librarySyncRepository.syncNow() })
 
     val backupRepository by lazy {

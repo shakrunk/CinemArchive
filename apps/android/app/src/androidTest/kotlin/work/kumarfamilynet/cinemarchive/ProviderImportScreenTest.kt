@@ -89,7 +89,9 @@ class ProviderImportScreenTest {
             db.episodeRatingDao(), db.episodeReviewDao(), db.viewingDao(), db.cinemaOutingDao(), db.titleCastDao(),
             db.titleCrewDao(), db.theaterInterestDao(), box, discover, db.personCreditsDao(), mutationOwnerId = owner.ownerId)
         val services = SyncServices.create(library, discover, auth, client, "fixture",
-            ProviderImportAdmission(db, box, owner, { active.value }), { active.value }, {})
+            ProviderImportAdmission(db, box, owner, { active.value }),
+            ProviderMergeRepository(db, box, owner, { active.value }, ProviderMergeTransport(client, auth, owner, { active.value }), {}, { it() }),
+            { active.value }, {})
         compose.setContent { CompositionLocalProvider(LocalActivityResultRegistryOwner provides object : ActivityResultRegistryOwner {
             override val activityResultRegistry = registry
         }) { MaterialTheme { ImportSyncRoute(services, {}) } } }
@@ -125,6 +127,23 @@ class ProviderImportScreenTest {
         compose.waitUntil(15_000) { compose.onAllNodes(hasText("not saved", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasText("couldn't match", substring = true)).assertDoesNotExist()
         runBlocking { assertEquals(0, db.titleDao().count()); assertTrue(db.outboxDao().getPending().isEmpty()) }
+    }
+    @Test fun csvMergesExistingTitleOptimisticallyWithOneProviderRequest() {
+        val id = "10000000-0000-4000-8000-000000000042"
+        runBlocking { db.titleDao().upsertAll(listOf(TitleEntity(id, 42, "MOVIE", "Provider film", 2026,
+            null, emptyList(), null, null, null, 90, null, "WATCHLIST", null, null,
+            "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"))) }
+        show(); launchPicker(); deliver(); showImportReport()
+        compose.waitUntil(15_000) { compose.onAllNodes(hasText("updated 1", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        runBlocking {
+            assertEquals(1, db.titleDao().count()); assertEquals("WATCHED", db.titleDao().getById(id)!!.status)
+            assertEquals(4.0, db.titleDao().getById(id)!!.rating!!, 0.0)
+            val entry = db.outboxDao().getPending().single()
+            assertEquals("provider_merge", entry.entityType)
+            val body = JSONObject(entry.payloadJson)
+            assertEquals(id, body.getString("titleId")); assertEquals(2, body.getJSONArray("viewings").length())
+            assertEquals("letterboxd", body.getJSONObject("link").getString("provider"))
+        }
     }
     @Test fun lateCsvPickerResultCannotImportIntoEndedAccount() {
         show(); launchPicker()

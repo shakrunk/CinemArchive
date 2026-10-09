@@ -25,10 +25,12 @@ internal fun captureViewingGuard(previous: ViewingEntity, alias: ViewingCompleti
     val completion = pending.firstOrNull { it.entityType == "outing_completion" && it.operation == OUTING_COMPLETION &&
         runCatching { completionCommand(it).provisionalViewingId == previous.id }.getOrDefault(false) }
     val related = pending.filter { (it.entityType == "viewing" && it.entityId in setOf(previous.id, alias?.provisionalViewingId)) ||
-        (isBackupImport(it) && it.entityId == previous.titleId) }
+        (isBackupImport(it) && it.entityId == previous.titleId) || (it.entityType == PROVIDER_MERGE && it.entityId == previous.titleId) }
     var predecessor: String? = null
     if (related.any { entry -> runCatching {
-            if (isBackupImport(entry)) {
+            if (entry.entityType == PROVIDER_MERGE) {
+                providerMergePredecessor(entry, "viewings", previous.id, checkNotNull(ownerId))?.let { predecessor = it }
+            } else if (isBackupImport(entry)) {
                 importPredecessorFor(entry, "viewings", previous.id, checkNotNull(ownerId))?.let { predecessor = it }
             } else {
             val it = entry

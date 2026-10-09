@@ -24,7 +24,8 @@ class TitleMetadataApplier(private val database: LibraryDatabase, private val ow
 internal fun overlayTitleIntents(base: TitleEntity, pending: List<OutboxEntity>, ownerId: String): TitleEntity =
     pending.fold(base) { row, entry ->
         val payload = JSONObject(entry.payloadJson)
-        if (entry.entityType == EPISODE_BULK) row.withTitleMetadata(titleMetadataPatch(checkNotNull(bulkTitleEntry(entry)), ownerId))
+        if (entry.entityType == PROVIDER_MERGE) row.withTitleMetadata(checkedProviderMerge(entry).also { require(it.owner.ownerId == ownerId) }.patch)
+        else if (entry.entityType == EPISODE_BULK) row.withTitleMetadata(titleMetadataPatch(checkNotNull(bulkTitleEntry(entry)), ownerId))
         else if (entry.entityType == "viewing") row.withTitleMetadata(titleMetadataPatch(checkNotNull(viewingTitleEntry(entry, ownerId)), ownerId))
         else if (payload.has(TITLE_METADATA_DATA)) row.withTitleMetadata(titleMetadataPatch(entry, ownerId))
         else if (entry.operation == "update") {
@@ -38,6 +39,7 @@ internal fun overlayTitleIntents(base: TitleEntity, pending: List<OutboxEntity>,
 
 internal fun pendingTitleIntents(queue: List<OutboxEntity>, titleId: String): List<OutboxEntity> =
     queue.filter { (it.entityType == "title" && it.entityId == titleId) || hasViewingTitleEffect(it, titleId) ||
+        (it.entityType == PROVIDER_MERGE && it.entityId == titleId && checkedProviderMerge(it).patch.length() > 0) ||
         (it.entityType == EPISODE_BULK && it.entityId == titleId && bulkTitleEntry(it) != null) ||
         (it.entityType in setOf("outing_completion", "outing_reversal") && JSONObject(it.payloadJson).optString("titleId") == titleId) }
 

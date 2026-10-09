@@ -40,13 +40,22 @@ rejection recovery as installed JSON restore. Unknown outcomes cannot be removed
 Removing a definitively rejected new title requires reviewing its never-dispatched
 dependent changes; original provider data and any archive files are untouched.
 
-## Remaining existing-title work
+## Existing titles
 
-This checkpoint changes new-title imports only. Existing-title provider merges
-still use the older separate title-rating/status and viewing mutations and do not
-yet atomically journal their provider link. Matching this part of web requires a
-separate guarded, optimistic merge command and recovery path; provider-import
-parity is not complete until that path is installed and verified.
+Existing-title imports save their non-overwriting rating/status patch, fresh
+viewing dates and provider identity in one owner/project-scoped immutable
+`provider_merge` command. The Room transaction publishes all optimism together.
+The original title revision or validated predecessor is captured once; retries
+retain the same request. A provenance-only import does not claim a title revision.
+Later title/history edits can depend on the exact row affected by the command.
+
+**Saved provider changes** in Import & sync provides exact retry, saved-request
+export, and comparison of definite rejections with current owner state. Removing
+a rejected merge retains later dependent drafts for explicit review, preserving
+their IDs and payloads. Unknown outcomes and attempted descendants cannot be
+discarded as rejected. Fresh acknowledgement preserves later optimism and never
+resurrects a deleted title. A durable sync rewind recovers protected remote rows
+after acknowledgement or explicit recovery.
 
 ## Verification boundaries
 

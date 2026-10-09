@@ -29,13 +29,13 @@ class ProviderImportAdmission(
         val command = checkedImportCommand(entry, owner)
         outbox.atomically {
             fence()
-            val pending = database.outboxDao().getPending().filter(::isBackupImport).map { checkedImportCommand(it, owner) }
-            require(pending.none { previous ->
-                link in previous.providerLinks && (previous.title.getInt("tmdbId") != details.tmdbId ||
-                    previous.title.getString("type") != details.type.name.lowercase())
-            }) { "This provider identity already belongs to another saved title. Review its pending import first." }
-            val exists = database.titleDao().findIdByTmdbKey(details.tmdbId, details.type.name) != null ||
-                pending.any { it.title.getInt("tmdbId") == details.tmdbId && it.title.getString("type") == details.type.name.lowercase() }
+            val queue = database.outboxDao().getPending()
+            val pending = queue.filter(::isBackupImport).map { checkedImportCommand(it, owner) }
+            val existingId = database.titleDao().findIdByTmdbKey(details.tmdbId, details.type.name) ?:
+                pending.firstOrNull { it.title.getInt("tmdbId") == details.tmdbId &&
+                    it.title.getString("type") == details.type.name.lowercase() }?.title?.getString("id")
+            requirePendingProviderTarget(pendingProviderLinks(queue, owner), link, existingId ?: entry.entityId)
+            val exists = existingId != null
             if (exists) false else {
                 writeImportGraph(database, command.mapping.graph)
                 outbox.enqueueCaptured(entry.id, entry.entityType, entry.entityId, entry.operation, entry.payloadJson)

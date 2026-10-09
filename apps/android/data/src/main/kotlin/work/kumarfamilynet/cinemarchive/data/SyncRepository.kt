@@ -41,6 +41,7 @@ class SyncRepository(
     private val authRepository: SessionSource,
     private val client: SupabaseRestClient,
     private val newTitles: ProviderImportAdmission,
+    val merges: ProviderMergeRepository,
     private val current: () -> Boolean,
     private val sync: suspend () -> Unit,
 ) {
@@ -134,13 +135,8 @@ class SyncRepository(
 
     /** True when something changed. */
     private suspend fun mergeInto(titleId: String, type: MediaType, item: SyncItem): Boolean {
-        val snapshot = libraryRepository.syncSnapshot(titleId) ?: return false
-        val patch = planMerge(snapshot, type, item) ?: return false
-        val now = Instant.now().toString()
-        patch.rating?.let { libraryRepository.updateTitleRating(titleId, it, now) }
-        patch.status?.let { libraryRepository.updateTitleStatus(titleId, it, now) }
-        patch.newViewingDates.forEach { libraryRepository.logViewing(titleId, it) }
-        return true
+        require(type == item.type)
+        return merges.merge(titleId, item)
     }
 
     // ─── Connections (owner-only rows; no secrets) ───────────────────────────
@@ -205,12 +201,13 @@ class SyncServices(
             client: SupabaseRestClient,
             plexClientId: String,
             newTitles: ProviderImportAdmission,
+            merges: ProviderMergeRepository,
             current: () -> Boolean,
             synchronize: suspend () -> Unit,
         ): SyncServices {
             val http = okhttp3.OkHttpClient()
             return SyncServices(
-                repository = SyncRepository(library, discover, auth, client, newTitles, current, synchronize),
+                repository = SyncRepository(library, discover, auth, client, newTitles, merges, current, synchronize),
                 simkl = SimklApi(client, auth),
                 plex = PlexClient(http, plexClientId),
                 emby = EmbyClient(http),

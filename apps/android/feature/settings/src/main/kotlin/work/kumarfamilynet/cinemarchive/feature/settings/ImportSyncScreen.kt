@@ -143,7 +143,7 @@ private fun ImportSyncContent(
         )
         ensureCurrent()
         message = result.failed.isNotEmpty() to describe(result)
-        if (result.added > 0 || result.updated > 0) scope.launch {
+        if (result.added > 0 || result.updated > 0 || result.unchanged > 0) scope.launch {
             try { services.repository.synchronize() } catch (error: CancellationException) { throw error }
             catch (_: Exception) { /* Durable commands remain available in Saved imports. */ }
         }
@@ -293,6 +293,7 @@ private fun ImportSyncContent(
             modifier = Modifier.weight(1f),
         ) {
             item { backupContent() }
+            item { ProviderMergeSection(services.repository.merges) }
             item {
                 ReadingWidthColumn {
                     Text(

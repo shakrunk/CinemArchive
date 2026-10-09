@@ -120,7 +120,7 @@ class TitleMetadataRepository(
     private fun reviewEntries(queue: List<OutboxEntity>, titleId: String): List<OutboxEntity> {
         val first = queue.indexOfFirst { it.entityId == titleId && isMetadata(it) }
         if (first < 0) return emptyList()
-        return queue.drop(first).takeWhile { !hasViewingTitleEffect(it, titleId) && !(it.entityType == EPISODE_BULK && it.entityId == titleId) }
+        return queue.drop(first).takeWhile { !hasViewingTitleEffect(it, titleId) && !(it.entityType in setOf(EPISODE_BULK, PROVIDER_MERGE) && it.entityId == titleId) }
             .filter { it.entityId == titleId && isMetadata(it) }
     }
     private fun isMetadata(entry: OutboxEntity): Boolean = entry.entityType == "title" &&

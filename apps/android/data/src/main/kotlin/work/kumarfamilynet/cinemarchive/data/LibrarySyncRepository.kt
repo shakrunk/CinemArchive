@@ -166,7 +166,7 @@ class LibrarySyncRepository(
         val session = authRepository.currentSession() ?: return
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
         // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
-        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
+        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
             dataStore.edit { it[cursorKey] = EPOCH }
         }
         // Push first (best effort — offline just leaves entries queued and protected below).

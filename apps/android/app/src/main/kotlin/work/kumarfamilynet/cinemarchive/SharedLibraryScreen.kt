@@ -4,8 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,6 +15,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.data.*
+import work.kumarfamilynet.cinemarchive.core.model.LibraryFilters
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerScreen
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerUiState
 
@@ -80,6 +79,7 @@ internal fun ArchiveViewer(
     var selectedId by remember(scopeKey) { mutableStateOf<String?>(null) }
     var ledger by remember(scopeKey) { mutableStateOf(false) }
     var expanded by remember(scopeKey) { mutableStateOf(emptySet<String>()) }
+    var filters by remember(scopeKey) { mutableStateOf(LibraryFilters()) }
     val back = { if (selectedId != null) selectedId = null else onClose() }
     BackHandler(onBack = back)
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -108,45 +108,9 @@ internal fun ArchiveViewer(
                     readOnly = true, viewedDisplayName = displayName, expandedWidgets = expanded,
                     onToggleExpanded = { id -> expanded = if (id in expanded) expanded - id else expanded + id },
                     onTitleClick = { selectedId = it },
-                ) else SharedTitleList(current.library.titles, emptyMessage, onSelect = { selectedId = it })
-            }
-        }
-    }
-}
-
-@Composable
-private fun SharedTitleList(titles: List<SharedLibraryTitle>, emptyMessage: String, onSelect: (String) -> Unit) {
-    var query by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf<String?>(null) }
-    val shown = remember(titles, query, status) {
-        titles.filter { (status == null || it.status == status) &&
-            (it.title.contains(query, true) || it.genres.any { genre -> genre.contains(query, true) }) }
-            .sortedBy { it.title.lowercase() }
-    }
-    Column {
-        OutlinedTextField(query, { query = it }, label = { Text("Search titles or genres") },
-            singleLine = true, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (listOf<String?>(null) + titles.map { it.status }.distinct().sorted()).forEach { choice ->
-                FilterChip(selected = choice == status, onClick = { status = choice },
-                    label = { Text(choice?.replace('_', ' ') ?: "All") })
-            }
-        }
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (shown.isEmpty()) item { Text(if (titles.isEmpty()) emptyMessage else "No matching titles.") }
-            items(shown, key = { it.id }) { title ->
-                Surface(onClick = { onSelect(title.id) }, shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(title.posterUrl, contentDescription = null, modifier = Modifier.size(48.dp, 72.dp))
-                        Column(Modifier.padding(start = 12.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(title.title, style = MaterialTheme.typography.titleMedium)
-                            Text(listOfNotNull(title.year?.toString(), title.mediaType.uppercase(),
-                                title.rating?.let { "$it / 5" }).joinToString(" · "))
-                            Text(title.status.replace('_', ' '), style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
+                ) else key(scopeKey) {
+                    ArchiveLibraryList(current.library.titles, filters, { filters = it }, emptyMessage,
+                        onSelect = { selectedId = it })
                 }
             }
         }

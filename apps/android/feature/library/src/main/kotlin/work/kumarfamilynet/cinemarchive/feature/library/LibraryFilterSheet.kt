@@ -84,7 +84,7 @@ fun rememberAccountLibraryFilters(accountKey: String): MutableState<LibraryFilte
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LibraryFilterSheet(
+fun LibraryFilterSheet(
     filters: LibraryFilters,
     choices: LibraryFilterChoices,
     onChange: (LibraryFilters) -> Unit,

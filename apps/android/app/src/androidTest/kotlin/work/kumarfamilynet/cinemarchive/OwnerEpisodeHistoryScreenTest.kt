@@ -77,7 +77,7 @@ class OwnerEpisodeHistoryScreenTest {
             }
             val state by actions.state.collectAsState()
             CinemArchiveTheme {
-                UpNextScreen(board, {}, {}, actions::mark, {}, { _, _, _ -> }, { _, _ -> }, {}, {},
+                UpNextScreen(board, {}, {}, actions::mark, {}, {},
                     episodeActions = state, onUndoEpisode = actions::undo, onMarkSeriesWatched = actions::finishSeries)
             }
         }

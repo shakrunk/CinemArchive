@@ -141,6 +141,17 @@ class ViewingRecoveryRepository(
                 val originalPayload = JSONObject(original.payloadJson)
                 payload.put("linkedOutings", originalPayload.getJSONArray("linkedOutings"))
                     .put(VIEWING_OPENING, originalPayload.getJSONObject(VIEWING_OPENING))
+                val opening = originalPayload.getJSONObject(VIEWING_OPENING)
+                if (opening.getString("id") != target.id) {
+                    val alias = checkNotNull(database.viewingCompletionAliasDao().byProvisionalId(opening.getString("id")))
+                    val completion = restoredCompletion(opening.getJSONObject("completion"))
+                    val command = completionCommand(completion)
+                    require(alias.canonicalViewingId == target.id && alias.titleId == target.titleId &&
+                        alias.completionOperationId == completion.id && alias.outingId == command.outingId &&
+                        command.provisionalViewingId == opening.getString("id"))
+                    payload.put("completionSource", originalPayload.optJSONObject("completionSource") ?: originalPayload)
+                        .put("completionCanonicalViewingId", target.id)
+                }
             }
             val command = OutboxEntity(UUID.randomUUID().toString(), "viewing", target.id, VIEWING_COMMAND, payload.toString(), System.currentTimeMillis())
             attempt = command.originalRecord().getJSONObject("original")
@@ -267,6 +278,7 @@ class ViewingRecoveryRepository(
         require(entry.id != original.id && entry.entityId == target.id)
         val operation = viewingCommandOperations(entry).getJSONObject(0)
         val payload = JSONObject(entry.payloadJson)
+        require(viewingLinkedOutingIds(entry, ownerId) == viewingLinkedOutingIds(original, ownerId))
         require(target.titleId == null || payload.getString("titleId") == target.titleId)
         require(operation.has("expectedUpdatedAt") && !operation.has("expectedOperationId"))
         if (saved.action == "delete") require(operation.getString("action") == "delete")

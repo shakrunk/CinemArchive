@@ -67,7 +67,7 @@ internal suspend fun applyViewingLinkedOutings(database: LibraryDatabase, titleI
             database.cinemaOutingDao().deleteById(id)
             continue // later intent remains queued for review, never a remote resurrection
         }
-        val pending = later.filter { it.entityId == id && it.entityType in setOf("cinema_outing", "outing_completion", TICKET_COMMAND_ENTITY) }
+        val pending = later.filter { it.entityId == id && it.entityType in setOf("cinema_outing", "outing_completion", "outing_reversal", TICKET_COMMAND_ENTITY) }
         val projected = runCatching {
             val result = JSONObject(row.toString())
             pending.filter { it.entityType != TICKET_COMMAND_ENTITY }.forEach {

@@ -69,6 +69,14 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
+import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
+import work.kumarfamilynet.cinemarchive.core.model.PostShowOpening
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.isActive
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
@@ -128,21 +136,17 @@ class UpNextViewModel(
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
     }
 
-    fun onRatePostShow(viewingId: String, titleId: String, rating: Double) {
-        viewModelScope.launch { repository.rateViewing(viewingId, titleId, rating) }
-    }
+    suspend fun preparePostShow(titleId: String, viewingId: String): PostShowOpening = repository.preparePostShow(titleId, viewingId)
 
-    fun onSaveFollowUpNotes(viewingId: String, notes: String) {
-        viewModelScope.launch { repository.updateViewingNotes(viewingId, notes) }
-    }
+    suspend fun savePostShow(opening: PostShowOpening, rating: Double?, notes: String) = repository.savePostShow(opening, rating, notes)
+
+    suspend fun revertPostShow(opening: PostShowOpening) = outingsRepository.revertPostShow(opening)
 
     fun onDismissFollowUp(outingId: String) {
         viewModelScope.launch { outingsRepository.dismissFollowUp(outingId) }
     }
 
-    fun onDidntMakeIt(outingId: String) {
-        viewModelScope.launch { outingsRepository.revertCompletion(outingId) }
-    }
+
 }
 
 private class UpNextViewModelFactory(
@@ -179,10 +183,11 @@ fun UpNextRoute(
         onViewTicket = onViewTicket,
         onMarkWatched = viewModel::onMarkEpisodeWatched,
         onCancelOuting = viewModel::onCancelOuting,
-        onRatePostShow = viewModel::onRatePostShow,
-        onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
+        onPreparePostShow = viewModel::preparePostShow,
+        onSavePostShow = viewModel::savePostShow,
+        onRevertPostShow = viewModel::revertPostShow,
+        postShowOwnerId = repository.viewingOwnerId,
         onDismissFollowUp = viewModel::onDismissFollowUp,
-        onDidntMakeIt = viewModel::onDidntMakeIt,
         episodeActions = episodeActions,
         onUndoEpisode = viewModel::onUndoEpisode,
         onMarkSeriesWatched = viewModel::onMarkSeriesWatched,
@@ -203,10 +208,11 @@ fun UpNextScreen(
     onViewTicket: (UpNextOuting) -> Unit,
     onMarkWatched: (UpNextWatching) -> Unit,
     onCancelOuting: (String) -> Unit,
-    onRatePostShow: (String, String, Double) -> Unit,
-    onSaveFollowUpNotes: (String, String) -> Unit,
     onDismissFollowUp: (String) -> Unit,
-    onDidntMakeIt: (String) -> Unit,
+    onPreparePostShow: (suspend (String, String) -> PostShowOpening)? = null,
+    onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
+    onRevertPostShow: suspend (PostShowOpening) -> Unit = { error("Post-show reversal unavailable") },
+    postShowOwnerId: String? = null,
     episodeActions: Map<String, EpisodeActionState> = emptyMap(),
     onUndoEpisode: (String) -> Unit = {},
     onMarkSeriesWatched: (String) -> Unit = {},
@@ -227,7 +233,28 @@ fun UpNextScreen(
             now = Instant.now()
         }
     }
-    var postShowEntry by remember { mutableStateOf<UpNextOuting?>(null) }
+    var postShowState by rememberSaveable(postShowOwnerId) { mutableStateOf<String?>(null) }
+    val postShow = restorePostShow(postShowState, postShowOwnerId)
+    var preparingPostShow by remember { mutableStateOf(false) }
+    var postShowError by remember { mutableStateOf<String?>(null) }
+    val currentOwner by rememberUpdatedState(postShowOwnerId)
+    val postShowScope = rememberCoroutineScope()
+    fun openPostShow(entry: UpNextOuting) {
+        val viewingId = entry.outing.completedViewingId ?: return
+        if (preparingPostShow) return
+        val owner = postShowOwnerId
+        preparingPostShow = true
+        postShowError = null
+        postShowScope.launch {
+            try {
+                val opening = checkNotNull(onPreparePostShow) { "Post-show editing is unavailable." }(entry.outing.titleId, viewingId)
+                if (!isActive) return@launch
+                if (currentOwner == owner) postShowState = savePostShow(owner, entry.outing.titleId, entry.titleName, opening, entry.outing.id)
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (_: Exception) { if (currentOwner == owner) postShowError = "Couldn't open this viewing. Try again."
+            } finally { preparingPostShow = false }
+        }
+    }
     val finales = episodeActions.values.filter { it.receipt?.caughtUp == true }
     val finaleIds = finales.map { it.snapshot.id }.toSet()
     val watching = board.watching.filterNot { it.id in finaleIds }
@@ -270,7 +297,7 @@ fun UpNextScreen(
                     FreshFromTheLobbyCard(
                         entry,
                         shape = groupShape(index, board.freshFromTheLobby.size),
-                        onOpen = { postShowEntry = entry },
+                        onOpen = { openPostShow(entry) },
                     )
                 }
             }
@@ -378,29 +405,29 @@ fun UpNextScreen(
         }
     }
 
-    postShowEntry?.let { entry ->
-        val viewingId = entry.outing.completedViewingId
-        if (viewingId != null) {
+    postShow?.let { captured ->
+        androidx.compose.runtime.key(postShowOwnerId, captured.titleId, captured.opening.viewing.id) {
             PostShowSheet(
-                titleName = entry.titleName,
-                venue = entry.outing.venue,
-                companions = entry.outing.companions,
-                initialRating = 0.0,
-                initialNotes = "",
-                onRecommend = onRecommendTitle?.let { recommend -> { recommend(entry.outing.titleId) } },
-                onRate = { onRatePostShow(viewingId, entry.outing.titleId, it) },
-                onSaveNotes = { onSaveFollowUpNotes(viewingId, it) },
-                onDidntMakeIt = {
-                    onDidntMakeIt(entry.outing.id)
-                    postShowEntry = null
-                },
+                titleName = captured.titleName,
+                opening = captured.opening,
+                onSave = onSavePostShow,
+                onRevert = onRevertPostShow,
+                onRecommend = onRecommendTitle?.let { recommend -> { recommend(captured.titleId) } },
                 onDismiss = {
-                    onDismissFollowUp(entry.outing.id)
-                    postShowEntry = null
+                    captured.followUpOutingId?.let(onDismissFollowUp)
+                    postShowState = null
                 },
+                onReverted = { postShowState = null },
             )
         }
     }
+    if (preparingPostShow) androidx.compose.material3.AlertDialog(onDismissRequest = {}, title = { Text("Opening viewing…") },
+        text = { androidx.compose.material3.CircularProgressIndicator() }, confirmButton = {})
+    postShowError?.let { message -> androidx.compose.material3.AlertDialog(onDismissRequest = { postShowError = null },
+        title = { Text("Viewing unavailable") }, text = { Text(message) }, confirmButton = {
+            TextButton(onClick = { postShowError = null }) { Text("Close") }
+        }) }
+
 }
 
 private val GroupOuterCorner = 24.dp

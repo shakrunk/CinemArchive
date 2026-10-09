@@ -26,6 +26,10 @@ class SupabaseRemoteMutationWriter(
         val payload = JSONObject(entry.payloadJson)
         return try {
             when (entry.entityType) {
+                "outing_completion" -> if (entry.operation == OUTING_COMPLETION) OutingCompletionTransport(client, sessionProvider).push(entry)
+                    else PushResult.Retry("Open Profile > Saved outing completions to review this preserved action.")
+                "outing_reversal" -> if (entry.operation == OUTING_REVERSAL) OutingReversalTransport(client, sessionProvider).push(entry)
+                    else PushResult.Retry("Open Profile > Saved outing completions to review this preserved action.")
                 "title_credits" -> pushCreditRefresh(entry, payload)
                 "title_catalog" -> EpisodeCatalogFillTransport(client, sessionProvider).push(entry)
                 "title" -> when (entry.operation) {

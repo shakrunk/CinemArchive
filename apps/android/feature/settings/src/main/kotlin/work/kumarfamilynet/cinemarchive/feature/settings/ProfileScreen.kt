@@ -90,6 +90,7 @@ fun ProfileRoute(
     viewingChangesContent: (@Composable () -> Unit)? = null,
     ticketChangesContent: (@Composable () -> Unit)? = null,
     moviegoingContent: (@Composable () -> Unit)? = null,
+    lifecycleChangesContent: (@Composable () -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -129,6 +130,7 @@ fun ProfileRoute(
         viewingChangesContent = viewingChangesContent,
         ticketChangesContent = ticketChangesContent,
         moviegoingContent = moviegoingContent,
+        lifecycleChangesContent = lifecycleChangesContent,
     )
 }
 
@@ -196,6 +198,7 @@ private fun ProfileScreen(
     viewingChangesContent: (@Composable () -> Unit)? = null,
     ticketChangesContent: (@Composable () -> Unit)? = null,
     moviegoingContent: (@Composable () -> Unit)? = null,
+    lifecycleChangesContent: (@Composable () -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -383,6 +386,7 @@ private fun ProfileScreen(
                 ReadingWidthColumn {
                     if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
                     if (signedInEmail != null) outingRecovery?.invoke()
+                    if (signedInEmail != null) lifecycleChangesContent?.invoke()
                     if (signedInEmail != null) titleChangesContent?.invoke()
                     if (signedInEmail != null) viewingChangesContent?.invoke()
                     if (signedInEmail != null) ticketChangesContent?.invoke()

@@ -21,7 +21,7 @@ data class OutingRecoveryState(
 )
 
 enum class RecoverySubject(val label: String, val item: String) {
-    OUTING("outing", "plan"), VIEWING("viewing", "viewing"),
+    OUTING("outing", "plan"), VIEWING("viewing", "viewing"), LIFECYCLE("outing completion", "outing"),
 }
 
 class OutingRecoveryController(private val source: OutingRecoverySource, private val scope: CoroutineScope,
@@ -62,6 +62,7 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
     }
     fun select(key: String, selected: Boolean) {
         val value = state.value
+        if (subject == RecoverySubject.LIFECYCLE && key != "lifecycleAction") return
         if (!active() || value.busy || value.review?.pendingAttempt == true || value.review?.resolved == true ||
             value.review?.fields?.none { it.key == key && it.selectable } != false) return
         mutable.value = value.copy(selected = if (selected) value.selected + key else value.selected - key)
@@ -90,14 +91,17 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
             mutable.value = state.value.copy(review = updated, cards = cards, message = when (result) {
                 OutingRecoveryOutcome.APPLIED -> if (subject == RecoverySubject.VIEWING && "delete" in value.selected)
                     "Selected viewing deleted. Other history is preserved and the original remains available to export."
+                    else if (subject == RecoverySubject.LIFECYCLE) "Saved outing action applied. The original remains available to export."
                     else "Selected fields applied. The original remains available to export."
                 OutingRecoveryOutcome.CONFIRMED -> "Original " + subject.label + " change confirmed. The current " + subject.item + " has been refreshed and the original remains available to export."
-                OutingRecoveryOutcome.CHANGED -> "The current " + subject.item + " changed. Review its latest values and select fields again."
+                OutingRecoveryOutcome.CHANGED -> "The current " + subject.item + " changed. Review its latest values and " +
+                    if (subject == RecoverySubject.LIFECYCLE) "select the action again." else "select fields again."
                 OutingRecoveryOutcome.MISSING -> "The " + subject.item + " is no longer available. No replacement was created."
             })
         }
     }
     fun discard() {
+        if (state.value.review?.pendingAttempt == true || state.value.review?.resolved == true) return
         val id = state.value.focusedId ?: return
         run {
             source.discard(id)

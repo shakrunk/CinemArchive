@@ -51,7 +51,9 @@ internal suspend fun MutationOutbox.enqueueTitleMetadata(previous: TitleEntity, 
 }
 
 internal fun checkedTitlePredecessor(entry: OutboxEntity, ownerId: String) {
-    if (entry.entityType == "viewing") {
+    if (isBackupImport(entry)) {
+        require(importPredecessorFor(entry, "titles", entry.entityId, ownerId) == entry.id)
+    } else if (entry.entityType == "viewing") {
         viewingCommandOperations(entry)
         titleMetadataOperation(checkNotNull(viewingTitleEntry(entry, ownerId)), ownerId)
     } else {

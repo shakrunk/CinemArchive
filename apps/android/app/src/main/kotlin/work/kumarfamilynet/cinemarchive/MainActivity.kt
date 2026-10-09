@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive
 
+
 import android.Manifest
 import android.content.Intent
 import android.animation.ObjectAnimator
@@ -24,6 +25,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -796,6 +798,8 @@ private fun CinemArchiveApp(
                             legacyLoadStatus = runtime::legacyStatus,
                             legacyRestore = runtime::restoreLegacy,
                             outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+                            lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
+                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
                             titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
                             ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
                             moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
@@ -824,7 +828,10 @@ private fun CinemArchiveApp(
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
-                                backupContent = { work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository) })
+                                backupContent = { Column {
+                                    work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
+                                    work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
+                                } })
                             SettingsCategory.ABOUT -> AboutRoute(
                                 appVersionName,
                                 appUpdateRepository,
@@ -909,6 +916,8 @@ private fun CinemArchiveApp(
                     legacyLoadStatus = runtime::legacyStatus,
                     legacyRestore = runtime::restoreLegacy,
                     outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+                    lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
+                        subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
                     titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
                     ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
                     moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
@@ -942,7 +951,10 @@ private fun CinemArchiveApp(
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
-                    backupContent = { work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository) })
+                    backupContent = { Column {
+                        work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
+                        work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
+                    } })
                 Overlay.About -> AboutRoute(
                     appVersionName,
                     appUpdateRepository,

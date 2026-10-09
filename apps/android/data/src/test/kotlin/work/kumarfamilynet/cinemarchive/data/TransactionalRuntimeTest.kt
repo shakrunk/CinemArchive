@@ -118,10 +118,11 @@ class TransactionalRuntimeTest {
     private fun syncRepository(db: LibraryDatabase, outbox: MutationOutbox, http: SyncHttp, file: File,
         preferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>? = null,
         pushPending: suspend () -> Unit = outbox::flush,
+        sessionUserId: String = "user-a",
     ) = LibrarySyncRepository(
         dataStore = preferences ?: PreferenceDataStoreFactory.create(scope = scope) { file },
         client = SupabaseRestClient("https://x.supabase.co", "anon", http.client),
-        authRepository = SessionSource { SupabaseSession("tok", "user-a") },
+        authRepository = SessionSource { SupabaseSession("tok", sessionUserId) },
         titleDao = db.titleDao(), seasonDao = db.seasonDao(), episodeDao = db.episodeDao(),
         watchEventDao = db.episodeWatchEventDao(), ratingDao = db.episodeRatingDao(), reviewDao = db.episodeReviewDao(),
         viewingDao = db.viewingDao(), cinemaOutingDao = db.cinemaOutingDao(), titleCastDao = db.titleCastDao(),
@@ -134,6 +135,63 @@ class TransactionalRuntimeTest {
 
     private fun creditRow(type: String, id: String, payload: JSONObject) = JSONObject()
         .put("entity_type", type).put("entity_id", id).put("updated_at", "2026-01-01T00:00:00Z").put("payload", payload.put("id", id))
+
+    @Test fun pendingCompletionDelaysUnknownCanonicalViewingAndReplaysAfterAckWithoutDoubleCounting() = runBlocking {
+        val db = memoryDb()
+        val owner = OutingCommandFixture.owner
+        val movie = OutingCommandFixture.title
+        val other = "20000000-0000-4000-8000-000000000099"
+        val canonical = "50000000-0000-4000-8000-000000000001"
+        val independent = "50000000-0000-4000-8000-000000000002"
+        val deleted = "50000000-0000-4000-8000-000000000003"
+        val otherViewing = "50000000-0000-4000-8000-000000000004"
+        db.titleDao().upsertAll(listOf(title(movie), title(other)))
+        db.cinemaOutingDao().upsert(OutingCommandFixture.entity())
+        fun local(id: String) = work.kumarfamilynet.cinemarchive.core.database.ViewingEntity(
+            id, movie, "2020-01-01", 4.0, "Independent local history", null)
+        db.viewingDao().upsertAll(listOf(local(independent), local(deleted)))
+        val file = tmpFile("lifecycle-viewing-replay")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 12; it[cursor] = "2026-10-08T00:00:00Z" }
+        var acknowledged = false
+        val queue = MutationOutbox(db.outboxDao(), object : RemoteMutationWriter {
+            override suspend fun push(entry: OutboxEntity): PushResult {
+                if (!acknowledged) return PushResult.Retry("Awaiting completion confirmation")
+                assertEquals("Replay is durable before the ACK removes protection", "1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+                return PushResult.Applied(JSONObject())
+            }
+        }, TitleConflictHandler(db.titleDao(), db.titleReconcileDao()), RoomTransactor(db),
+            outingOwnerScope = work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope("https://x.supabase.co", owner),
+            appliedHandler = AppliedMutationHandler { entry, _ ->
+                // Canonical receipt projection has separate tests. Here its provisional removal
+                // shares the real queue ACK transaction so the following epoch pull can be proven.
+                db.viewingDao().deleteById(completionCommand(entry).provisionalViewingId)
+            }, pendingProjectionKeys = { outingLifecycleProtectionKeys(it, owner) })
+        val provisional = OutingLifecycleRepository(db, queue, owner) { true }
+            .completeDue(java.time.Instant.parse("2100-01-01T00:00:00Z"), java.time.ZoneId.of("UTC")).single().viewingId
+        fun remote(id: String, titleId: String, note: String) = creditRow("viewing", id, JSONObject()
+            .put("titleId", titleId).put("date", "2026-01-01").put("notes", note)
+            .put("outingId", if (id == canonical) OutingCommandFixture.outing else JSONObject.NULL))
+        fun page() = JSONArray().put(remote(canonical, movie, "Canonical completed viewing"))
+            .put(remote(independent, movie, "Updated independent history"))
+            .put(remote(otherViewing, other, "Other title history"))
+            .put(creditRow("tombstone", deleted, JSONObject().put("entityType", "viewing")))
+        val http = SyncHttp(ArrayDeque(listOf(page(), page())))
+        syncRepository(db, queue, http, file, prefs, sessionUserId = owner).syncNow()
+        assertNull("The unknown canonical identity cannot appear beside its provisional viewing", db.viewingDao().getById(canonical))
+        assertTrue(db.viewingDao().getById(provisional) != null)
+        assertEquals("Independent local history", db.viewingDao().getById(independent)!!.notes)
+        assertEquals("Other title history", db.viewingDao().getById(otherViewing)!!.notes)
+        assertNull("Unprotected exact tombstones still apply", db.viewingDao().getById(deleted))
+        acknowledged = true
+        syncRepository(db, queue, http, file, prefs, sessionUserId = owner).syncNow()
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertNull(db.viewingDao().getById(provisional))
+        assertEquals("Canonical completed viewing", db.viewingDao().getById(canonical)!!.notes)
+        assertEquals("Updated independent history", db.viewingDao().getById(independent)!!.notes)
+        assertEquals(List(2) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
+    }
 
     @Test fun pendingCreditRefreshRewindsAndReplaysUnchangedRowsAndNullParentTombstonesAfterAck() = runBlocking {
         val db = memoryDb()

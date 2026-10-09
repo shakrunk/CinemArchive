@@ -719,38 +719,16 @@ class LibraryRepository(
         return episodeMetadataFetcher.fetchEpisodeCast(title.tmdbId, seasonNumber, episodeNumber)
     }
 
-    /** Rates the outing's auto-logged viewing (the post-show sheet's ★ control) and, matching
-     *  [updateTitleRating]'s semantics, bumps the title's own rating too — the web plan's §4.4
-     *  "writes viewing.rating and updates title.rating (same semantics as logViewing)". Notes
-     *  are a separate action ([updateViewingNotes]): the sheet's "Done" button always fires
-     *  regardless of whether the user actually touched the star control, and coupling it to
-     *  rating would silently stamp a fake 0★ rating on a still-unrated viewing. */
-    suspend fun rateViewing(viewingId: String, titleId: String, rating: Double) {
-        outbox.atomically {
-            val existing = viewingDao.getById(viewingId) ?: return@atomically
-            val updated = existing.copy(rating = rating)
-            viewingDao.upsert(updated)
-            outbox.enqueue(
-                entityType = "viewing",
-                entityId = viewingId,
-                operation = "update",
-                payload = JSONObject().apply { put("id", viewingId); put("rating", rating) },
-            )
-            updateTitleRating(titleId, rating, Instant.now().toString())
-        }
+    /** Non-UI convenience callers still enter the same atomic guarded viewing/title command. */
+    suspend fun rateViewing(viewingId: String, titleId: String, rating: Double) = outbox.atomically {
+        val opening = preparePostShow(titleId, viewingId)
+        savePostShow(opening, rating, opening.viewing.notes.orEmpty())
     }
 
-    suspend fun updateViewingNotes(viewingId: String, notes: String) {
-        outbox.atomically {
-            val existing = viewingDao.getById(viewingId) ?: return@atomically
-            viewingDao.upsert(existing.copy(notes = notes))
-            outbox.enqueue(
-                entityType = "viewing",
-                entityId = viewingId,
-                operation = "update",
-                payload = JSONObject().apply { put("id", viewingId); put("notes", notes) },
-            )
-        }
+    suspend fun updateViewingNotes(viewingId: String, notes: String) = outbox.atomically {
+        val viewing = checkNotNull(viewingDao.getById(viewingId)) { "This viewing was removed." }
+        val opening = preparePostShow(viewing.titleId, viewingId)
+        savePostShow(opening, opening.viewing.rating, notes)
     }
 
     /** One form submission may create independent watch, rating and review rows. */
@@ -874,10 +852,12 @@ class LibraryRepository(
         val draft = existing?.let { ViewingDraft(it.id, it.date?.take(10), it.rating, it.notes, it.venue, savedCompanionNames(it.companionsJson, it.companions)) }
             ?: ViewingDraft(UUID.randomUUID().toString(), java.time.LocalDate.now().toString(), null, null, null)
         val pending = outbox.pendingEntries()
+        val pendingCompletion = pending.firstOrNull { entry -> entry.entityType == "outing_completion" &&
+            entry.operation == OUTING_COMPLETION && runCatching { completionCommand(entry).provisionalViewingId == draft.id }.getOrDefault(false) }
         val linked = cinemaOutingDao.observeOutingsForTitle(titleId).first().filter { it.completedViewingId == draft.id }.map { it.id }
         val context = viewingOpening(owner, titleId, requestedId, draft,
-            existing?.let { captureViewingGuard(it, alias, pending) } ?: ViewingGuard(),
-            captureViewingTitleGuard(title, pending, owner), linked, existing?.companionsJson)
+            existing?.let { captureViewingGuard(it, alias, pending, owner) } ?: ViewingGuard(),
+            captureViewingTitleGuard(title, pending, owner), linked, existing?.companionsJson, pendingCompletion)
         activeViewingOwner()
         draft.copy(openingContext = context)
     }
@@ -885,6 +865,21 @@ class LibraryRepository(
     /** Every field diff is against the opening snapshot, never rebased from a refreshed Room row. */
     suspend fun saveViewing(titleId: String, draft: ViewingDraft, isNew: Boolean) =
         saveCapturedViewing(titleId, draft, isNew, updateTitle = true)
+
+    suspend fun preparePostShow(titleId: String, viewingId: String): work.kumarfamilynet.cinemarchive.core.model.PostShowOpening = outbox.atomically {
+        val draft = prepareViewingEdit(titleId, viewingId)
+        val viewing = checkNotNull(viewingDao.getById(draft.id)) { "This viewing was removed." }
+        val outing = viewing.outingId?.let { cinemaOutingDao.getById(it) }
+        val reversal = outing?.let { captureReversalContext(it, viewing, outbox.pendingEntries(), checkNotNull(outbox.outingOwnerScope)) }
+        activeViewingOwner()
+        work.kumarfamilynet.cinemarchive.core.model.PostShowOpening(draft, reversal)
+    }
+
+    suspend fun savePostShow(opening: work.kumarfamilynet.cinemarchive.core.model.PostShowOpening, rating: Double?, notes: String) {
+        val context = JSONObject(checkNotNull(opening.viewing.openingContext))
+        val titleId = context.getString("titleId")
+        saveViewing(titleId, opening.viewing.copy(rating = rating, notes = notes), isNew = false)
+    }
 
     private suspend fun saveCapturedViewing(titleId: String, draft: ViewingDraft, isNew: Boolean, updateTitle: Boolean) {
         val owner = activeViewingOwner()
@@ -901,10 +896,15 @@ class LibraryRepository(
         outbox.atomically {
             activeViewingOwner()
             val title = checkNotNull(titleDao.getById(titleId)) { "Title is no longer in your library." }
-            val existing = viewingDao.getById(draft.id)
+            if (outbox.pendingEntries().any { it.id == operationId }) {
+                outbox.enqueueCaptured(operationId, "viewing", draft.id, operation, payload)
+                return@atomically
+            }
+            val admittedEntry = resolveCapturedCompletionEntry(operationId, draft.id, operation, payload, owner)
+            val existing = viewingDao.getById(admittedEntry.entityId)
             require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title." }
             check(isNew || existing != null) { "Viewing was removed. Reopen the history to continue." }
-            val admitted = outbox.enqueueCaptured(operationId, "viewing", draft.id, operation, payload)
+            val admitted = outbox.enqueueCaptured(operationId, "viewing", admittedEntry.entityId, admittedEntry.operation, admittedEntry.payloadJson)
             if (admitted && !(isNew && existing != null)) {
                 val base = existing ?: ViewingEntity(draft.id, titleId, null, null, null, null)
                 viewingDao.upsert(base.copy(
@@ -930,15 +930,29 @@ class LibraryRepository(
         val id = capturedViewingOperationId(owner, captured.token, "delete", payload)
         outbox.atomically {
             activeViewingOwner()
-            val existing = viewingDao.getById(draft.id)
+            if (outbox.pendingEntries().any { it.id == id }) {
+                outbox.enqueueCaptured(id, "viewing", draft.id, operation, payload)
+                return@atomically
+            }
+            val admittedEntry = resolveCapturedCompletionEntry(id, draft.id, operation, payload, owner)
+            val existing = viewingDao.getById(admittedEntry.entityId)
             require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title." }
-            if (outbox.enqueueCaptured(id, "viewing", draft.id, operation, payload)) {
-                viewingDao.deleteById(draft.id)
-                cinemaOutingDao.observeOutingsForTitle(titleId).first().filter { it.completedViewingId == draft.id && it.id in captured.linkedOutings }.forEach {
+            if (outbox.enqueueCaptured(id, "viewing", admittedEntry.entityId, admittedEntry.operation, admittedEntry.payloadJson)) {
+                viewingDao.deleteById(admittedEntry.entityId)
+                cinemaOutingDao.observeOutingsForTitle(titleId).first().filter { it.completedViewingId == admittedEntry.entityId && it.id in captured.linkedOutings }.forEach {
                     cinemaOutingDao.upsert(it.copy(completedViewingId = null))
                 }
             }
             activeViewingOwner()
+        }
+    }
+
+    private suspend fun resolveCapturedCompletionEntry(id: String, viewingId: String, operation: String, payload: String, owner: String): work.kumarfamilynet.cinemarchive.core.database.OutboxEntity {
+        val original = work.kumarfamilynet.cinemarchive.core.database.OutboxEntity(id, "viewing", viewingId, operation, payload, 0)
+        if (operation != AWAITING_COMPLETION) return original
+        val alias = checkNotNull(viewingAliases).byProvisionalId(viewingId) ?: return original
+        return runCatching { convertCapturedCompletionViewing(original, alias, owner) }.getOrElse {
+            original.copy(operation = "review")
         }
     }
 

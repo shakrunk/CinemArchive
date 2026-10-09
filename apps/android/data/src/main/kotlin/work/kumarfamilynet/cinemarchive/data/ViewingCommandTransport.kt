@@ -62,7 +62,15 @@ internal fun viewingLinkedOutingIds(entry: OutboxEntity, ownerId: String): List<
     val payload = JSONObject(entry.payloadJson)
     val opening = payload.optJSONObject(VIEWING_OPENING)
     if (opening != null) {
-        require(opening.getString("ownerId") == ownerId && opening.getString("id") == entry.entityId &&
+        val converted = payload.optJSONObject("completionSource")?.let { original ->
+            val completion = restoredCompletion(opening.getJSONObject("completion"))
+            val command = completionCommand(completion)
+            require(JSONObject(completion.payloadJson).getString("ownerId") == ownerId &&
+                sameCommandJson(original.getJSONObject(VIEWING_OPENING), opening))
+            command.provisionalViewingId == opening.getString("id") && command.titleId == opening.getString("titleId") &&
+                payload.getString("completionCanonicalViewingId") == entry.entityId
+        } ?: false
+        require(opening.getString("ownerId") == ownerId && (opening.getString("id") == entry.entityId || converted) &&
             opening.getString("titleId") == payload.getString("titleId")) { "Saved viewing belongs to another account or title." }
     }
     if (!payload.has("linkedOutings")) return emptyList()
@@ -144,7 +152,7 @@ private fun validateViewingCommandRow(entry: OutboxEntity, row: JSONObject, owne
 internal suspend fun fetchViewingTitle(client: SupabaseRestClient, session: SupabaseSession, titleId: String, checkOwner: () -> Unit): JSONObject? {
     java.util.UUID.fromString(titleId)
     currentCoroutineContext().ensureActive(); checkOwner()
-    val rows = JSONArray(client.get("titles", "id=eq.$titleId&user_id=eq.${session.userId}&select=*", session.accessToken))
+    val rows = exactMetadataArray(client.get("titles", "id=eq.$titleId&user_id=eq.${session.userId}&select=*", session.accessToken))
     require(rows.length() <= 1)
     currentCoroutineContext().ensureActive(); checkOwner()
     return if (rows.length() == 0) null else checkedCurrentTitle(rows.getJSONObject(0), titleId, session.userId)

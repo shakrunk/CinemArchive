@@ -15,14 +15,14 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
         require(queue.firstOrNull()?.let { it.id == entry.id && it.payloadJson == entry.payloadJson && it.operation == entry.operation } == true)
         val related = queue.drop(1).filter {
             (it.entityType == "viewing" && it.entityId in setOf(command.provisionalViewingId, alias.canonicalViewingId)) ||
-                (it.entityType == "cinema_outing" && it.entityId == command.outingId)
+                (it.entityType in setOf("cinema_outing", "outing_reversal") && it.entityId == command.outingId)
         }
         // HTTP-capable intent is immutable even if its first response was lost before an
         // attempt counter was stored. Only the never-dispatchable typed state can be rewritten.
-        require(related.all { it.operation == AWAITING_COMPLETION && it.attemptCount == 0 }) {
+        require(related.all { it.operation == "review" || (it.operation == AWAITING_COMPLETION && it.attemptCount == 0) }) {
             "Existing viewing or outing delivery must be resolved before completion can be reconciled."
         }
-        val intents = related.map { checkedCompletionIntent(it, entry) }
+        val intents = related.filter { it.operation == AWAITING_COMPLETION }.map { checkedCompletionIntent(it, entry) }
         val viewings = database.viewingDao()
         val provisional = viewings.getById(command.provisionalViewingId)
         val canonical = viewings.getById(alias.canonicalViewingId)
@@ -34,10 +34,11 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
         val currentViewing = checked.viewing?.let { JSONObject(it.toString()) }
         val currentOuting = checked.outing?.let { JSONObject(it.toString()) }
         var viewingDeleted = false
-        var retainProvisional = false
-        var retainOuting = false
+        var retainProvisional = related.any { it.entityType == "viewing" && it.operation == "review" }
+        var retainOuting = related.any { it.entityType != "viewing" && it.operation == "review" }
         var viewingPredecessor = entry.id
         var outingPredecessor = entry.id
+        var titlePredecessor = entry.id
 
         val aliases = database.viewingCompletionAliasDao()
         val existing = aliases.byProvisionalId(alias.provisionalViewingId)
@@ -49,8 +50,19 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
         for (intent in intents) {
             val pending = intent.entry
             val isViewing = pending.entityType == "viewing"
-            val needsReview = if (isViewing) currentViewing == null || alias.canonicalViewingVersion == null || viewingDeleted
-                else currentOuting == null || checked.completionOutingVersion == null
+            val isReversal = pending.entityType == "outing_reversal"
+            val titleEffect = if (isViewing) viewingTitleEntry(pending, ownerId) else null
+            val savedOpening = JSONObject(pending.payloadJson).optJSONObject(VIEWING_OPENING)
+            val titleGuardValid = titleEffect == null || runCatching { titleMetadataOperation(titleEffect, ownerId) }.isSuccess
+            val titleDependsOnCompletion = titleEffect?.takeIf { titleGuardValid }?.let {
+                titleMetadataOperation(it, ownerId).optString("expectedOperationId") == entry.id
+            } ?: false
+            val needsReview = if (isViewing) currentViewing == null || alias.canonicalViewingVersion == null || viewingDeleted ||
+                !titleGuardValid || (titleDependsOnCompletion && checked.completionTitleVersion == null) ||
+                (savedOpening != null && runCatching { convertCapturedCompletionViewing(pending, alias, ownerId) }.isFailure)
+                else currentOuting == null || checked.completionOutingVersion == null ||
+                    (isReversal && (currentViewing == null || alias.canonicalViewingVersion == null || viewingDeleted ||
+                        runCatching { convertCapturedReversal(pending, alias, ownerId) }.isFailure))
             if (needsReview) {
                 if (isViewing) retainProvisional = true else retainOuting = true
                 check(database.completionQueueDao().resolveAwaiting(pending.id, pending.payloadJson, pending.entityId,
@@ -60,9 +72,29 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
             val payload: JSONObject
             val target: String
             val operation: String
-            if (isViewing) {
+            if (isReversal) {
+                val original = JSONObject(pending.payloadJson)
+                val opening = original.getJSONObject("reversalOpening")
+                val saved = reversalFromOpening(canonicalViewingJson(opening), ownerId).second
+                val reversal = reversalCommand(pending.copy(operation = OUTING_REVERSAL, payloadJson = saved.toString()))
+                payload = JSONObject(saved.toString()).put("reversalCommand", reversal.copy(viewingId = alias.canonicalViewingId).persisted())
+                payload.remove("completionIntent")
+                target = command.outingId
+                operation = OUTING_REVERSAL
+                outingPredecessor = pending.id
+                currentOuting!!.put("status", "missed").put("completed_viewing_id", JSONObject.NULL)
+                viewingDeleted = true
+            } else if (isViewing) {
                 target = alias.canonicalViewingId
-                payload = viewingCommandPayload(target, command.titleId, intent.action, intent.fields, null, viewingPredecessor)
+                payload = if (savedOpening != null) JSONObject(convertCapturedCompletionViewing(pending, alias, ownerId).payloadJson)
+                    else viewingCommandPayload(target, command.titleId, intent.action, intent.fields, null, viewingPredecessor)
+                if (titleEffect != null && savedOpening == null) {
+                    attachViewingTitleEffect(payload, titleMetadataPayload(ownerId, command.titleId,
+                        titleMetadataPatch(titleEffect, ownerId), null, titlePredecessor))
+                    titlePredecessor = pending.id
+                }
+                val original = JSONObject(pending.payloadJson)
+                for (key in listOf(VIEWING_OPENING, "linkedOutings")) if (original.has(key)) payload.put(key, original.get(key))
                 operation = VIEWING_COMMAND
                 viewingPredecessor = pending.id
                 if (intent.action == "delete") viewingDeleted = true
@@ -75,7 +107,7 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
                 outingWireBody(intent.fields, ownerId, false).let { patch -> patch.keys().forEach { currentOuting!!.put(it, patch.get(it)) } }
             }
             payload.put("completionSource", JSONObject(pending.payloadJson))
-            check(database.completionQueueDao().resolveAwaiting(pending.id, pending.payloadJson, target, operation, payload.toString(), null) == 1)
+            check(database.completionQueueDao().resolveAwaiting(pending.id, pending.payloadJson, target, operation, canonicalViewingJson(payload), null) == 1)
         }
 
         // Parse every new projection before touching local history. A malformed current row
@@ -98,8 +130,8 @@ class OutingCompletionApplier(private val database: LibraryDatabase, private val
                 else database.cinemaOutingDao().deleteById(command.outingId)
             }
             // The exact owner viewing GET may be newer than the RPC's outing snapshot.
-            if (checked.viewing == null) database.completionQueueDao().clearViewingLink(alias.canonicalViewingId)
-            if (checked.title != null && queue.drop(1).none { it.entityType == "title" && it.entityId == command.titleId }) {
+            if (checked.viewing == null || viewingDeleted) database.completionQueueDao().clearViewingLink(alias.canonicalViewingId)
+            if (checked.title != null && queue.drop(1).none { (it.entityType == "title" && it.entityId == command.titleId) || hasViewingTitleEffect(it, command.titleId) }) {
                 database.titleDao().updateStatus(command.titleId, checked.title.getString("status").uppercase(), checked.title.getString("updated_at"))
             }
         }

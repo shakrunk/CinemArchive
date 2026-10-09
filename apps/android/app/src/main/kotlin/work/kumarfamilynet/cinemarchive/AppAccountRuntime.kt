@@ -101,6 +101,17 @@ class AppAccountRuntime(
     }
 
     private val ordinaryWriter = SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") }
+    private val importOwner = work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId)
+    private val importWriter = work.kumarfamilynet.cinemarchive.data.BackupImportTransport(client, session, importOwner, ::isCurrent)
+    val restoreRepository: work.kumarfamilynet.cinemarchive.data.BackupImportRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.BackupImportRepository(database, outbox, importOwner, ::isCurrent,
+            sync = {
+                outingsRepository.refreshAlarm()
+                librarySyncRepository.syncNow()
+                outingsRepository.refreshAlarm()
+            },
+            replay = { action -> librarySyncRepository.withDurableReplay(action) })
+    }
 
     val moviegoingPreferences: work.kumarfamilynet.cinemarchive.data.MoviegoingPreferencesRepository by lazy {
         work.kumarfamilynet.cinemarchive.data.MoviegoingPreferencesRepository(database, outbox, ownerId, ::isCurrent,
@@ -115,7 +126,7 @@ class AppAccountRuntime(
         database.outboxDao(),
         object : work.kumarfamilynet.cinemarchive.data.RemoteMutationWriter {
             override suspend fun push(entry: work.kumarfamilynet.cinemarchive.core.database.OutboxEntity) =
-                when (entry.entityType) {
+                if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry)) importWriter.push(entry) else when (entry.entityType) {
                     "ticket_attachment" -> tickets.push(entry)
                     "venue_note", "theater_interest" -> moviegoingPreferences.push(entry)
                     else -> ordinaryWriter.push(entry)
@@ -127,9 +138,13 @@ class AppAccountRuntime(
         appliedHandler = work.kumarfamilynet.cinemarchive.data.AppliedMutationHandler { entry, receipt ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             when (entry.entityType) {
+                "outing_completion" -> work.kumarfamilynet.cinemarchive.data.OutingCompletionApplier(database, ownerId).apply(entry, receipt)
+                "outing_reversal" -> work.kumarfamilynet.cinemarchive.data.OutingReversalApplier(database, ownerId).apply(entry, receipt)
                 "venue_note", "theater_interest" -> moviegoingPreferences.apply(entry, receipt)
                 "ticket_attachment" -> tickets.apply(entry, receipt)
-                "title" -> work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
+                "title" -> if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry))
+                    work.kumarfamilynet.cinemarchive.data.BackupImportApplier(database, importOwner).apply(entry, receipt)
+                else work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
                 "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
                 "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
                 "list_item" -> work.kumarfamilynet.cinemarchive.data.ListMembershipApplier(database, ownerId).apply(entry, receipt)
@@ -139,11 +154,14 @@ class AppAccountRuntime(
                 }.apply(entry, receipt)
                 else -> error("No canonical receipt handler for ${entry.entityType}")
             }
+            check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
         },
         pendingProjectionKeys = { entries ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries) + tickets.protectionKeys(entries) +
-                work.kumarfamilynet.cinemarchive.data.viewingHistoryProtectionKeys(entries, ownerId) + moviegoingPreferences.protectionKeys(entries)
+                work.kumarfamilynet.cinemarchive.data.viewingHistoryProtectionKeys(entries, ownerId) + moviegoingPreferences.protectionKeys(entries) +
+                work.kumarfamilynet.cinemarchive.data.backupImportProtectionKeys(entries, importOwner) +
+                work.kumarfamilynet.cinemarchive.data.outingLifecycleProtectionKeys(entries, ownerId)
         },
     )
 
@@ -236,6 +254,9 @@ class AppAccountRuntime(
         }, ownerId, isCurrentOwner = { auth.observeIdentity().value == identity },
     )
 
+    private val outingLifecycle = work.kumarfamilynet.cinemarchive.data.OutingLifecycleRepository(database, outbox, ownerId) {
+        auth.observeIdentity().value == identity
+    }
     val outingsRepository = OutingsRepository(
         cinemaOutingDao = database.cinemaOutingDao(),
         viewingDao = database.viewingDao(),
@@ -244,6 +265,7 @@ class AppAccountRuntime(
         venueNoteDao = database.venueNoteDao(),
         alarmScheduler = alarmScheduler,
         moviegoingPreferences = moviegoingPreferences,
+        lifecycle = outingLifecycle,
     )
 
     val outingPlansRepository = work.kumarfamilynet.cinemarchive.data.OutingPlansRepository.create(
@@ -259,6 +281,12 @@ class AppAccountRuntime(
         database.titleDao(), outbox,
         work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_outing_recovery")),
         work.kumarfamilynet.cinemarchive.data.OutingRecoveryRepository.remote(client, ownerId, session::currentSession),
+    )
+    val outingLifecycleRecovery: work.kumarfamilynet.cinemarchive.data.OutingRecoverySource = work.kumarfamilynet.cinemarchive.data.OutingLifecycleRecovery(
+        database, outbox, ownerId, client, session::currentSession,
+        work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_outing_lifecycle_recovery")),
+        replayBoundary = { action -> librarySyncRepository.withDurableReplay(action) },
+        synchronize = { librarySyncRepository.syncNow(); outingsRepository.refreshAlarm() },
     )
     val viewingRecoveryRepository = work.kumarfamilynet.cinemarchive.data.ViewingRecoveryRepository(
         database, ownerId, session::currentSession, outbox,

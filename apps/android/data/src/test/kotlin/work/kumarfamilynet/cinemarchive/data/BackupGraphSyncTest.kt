@@ -140,6 +140,22 @@ class BackupGraphSyncTest {
         assertEquals(List(2) { "1970-01-01T00:00:00Z" }, requests.map { it.getString("p_since") })
     }
 
+    @Test fun epochPullRetainsExactOpaquePhysicalCopyNumbers() = runBlocking {
+        prefs.edit { it[version] = 12; it[cursor] = "2026-10-09T00:00:00Z" }
+        pending = { setOf("library_import:another-title") }
+        page = graph()
+        val copies = JSONArray().put(JSONObject().put("id", "copy").put("format", "DVD")
+            .put("opaqueInteger", java.math.BigInteger("123456789012345678901234567890"))
+            .put("opaqueDecimal", java.math.BigDecimal("0.12345678901234567890123456789")))
+        page.getJSONObject(0).getJSONObject("payload").put("physicalMedia", copies)
+        repository().syncNow()
+        assertEquals("1970-01-01T00:00:00Z", requests.single().getString("p_since"))
+        val retained = exactMetadataArray(db.titleDao().getById("title")!!.physicalMediaJson!!).getJSONObject(0)
+        assertEquals("123456789012345678901234567890", retained.get("opaqueInteger").toString())
+        assertEquals("0.12345678901234567890123456789", retained.get("opaqueDecimal").toString())
+    }
+
+
     private fun fullPage(rows: JSONArray): JSONArray = rows.apply {
         val stamp = getJSONObject(0).getString("updated_at")
         repeat(500 - length()) { index ->

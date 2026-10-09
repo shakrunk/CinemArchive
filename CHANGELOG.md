@@ -10,6 +10,8 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android can restore JSON backups through the system picker, with previews, duplicate skips, recoverable failures and preserved title, episode and outing history.
+- Android outing completion, post-show ratings and notes, and undo now use durable actions with explicit conflict recovery and protection against duplicate viewing history.
 - Android backup validation now retains completed outings after their viewing history was deleted and matches the shared storage limits for preview and runtime minutes.
 - Android Discover now offers recommendations based on library titles and More starring shelves, with searchable choices, independent retries and media-aware duplicate filtering.
 - Android title details now edit watch links, home-collection status and physical copies with durable saves, preserved opaque metadata and explicit conflict recovery.

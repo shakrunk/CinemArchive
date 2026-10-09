@@ -230,4 +230,71 @@ class OutingCompletionRoomTest {
         assertEquals(canonical, db.viewingCompletionAliasDao().byProvisionalId(provisional)!!.canonicalViewingId)
         assertEquals(completion.id, viewingCommandOperations(before).getJSONObject(0).getString("expectedOperationId"))
     }
+
+    private fun ownedCompletion() = completion.copy(payloadJson = JSONObject(completion.payloadJson)
+        .put("ownerId", owner).put("titleId", title).put("localTitleChanged", false).toString())
+
+    private fun captured(n: Int, completion: OutboxEntity, predecessor: String = completion.id, rating: Double? = null,
+        titleGuard: ViewingGuard = ViewingGuard(revision = OutingCommandFixture.baseline)): OutboxEntity {
+        val draft = work.kumarfamilynet.cinemarchive.core.model.ViewingDraft(provisional, "2026-10-07", null, "Before", null)
+        val opened = draft.copy(openingContext = viewingOpening(owner, title, provisional, draft,
+            ViewingGuard(operationId = predecessor), titleGuard, listOf(outing), completion = completion))
+        val saved = checkedViewingOpening(opened, owner, title)
+        val fields = JSONObject().put("notes", "Edit $n").also { if (rating != null) it.put("rating", rating) }
+        val (operation, payload) = saved.payload("update", fields, rating?.let { JSONObject().put("rating", it) })
+        return OutboxEntity(id(n), "viewing", provisional, operation, payload, n.toLong())
+    }
+
+    @Test fun twoFormsOpenedBeforeEitherSaveKeepTheirOriginalGuardAfterAliasAck() = runBlocking {
+        val original = ownedCompletion()
+        db.outboxDao().remove(completion.id); db.outboxDao().enqueue(original)
+        val first = captured(1, original)
+        val staleSecond = captured(2, original)
+        db.outboxDao().enqueue(first); db.outboxDao().enqueue(staleSecond)
+        db.withTransaction { OutingCompletionApplier(db, owner).apply(original, envelope()); db.outboxDao().remove(original.id) }
+        val pending = db.outboxDao().getPending()
+        assertEquals(listOf(original.id, original.id), pending.map { viewingCommandOperations(it).getJSONObject(0).getString("expectedOperationId") })
+        val alias = db.viewingCompletionAliasDao().byProvisionalId(provisional)!!
+        assertEquals(pending[1].payloadJson, convertCapturedCompletionViewing(staleSecond, alias, owner).payloadJson)
+        assertEquals(emptyList<String>(), viewingLinkedOutingIds(pending[1], owner))
+        // A restored same-operation retry after local ACK removal still sends exactly the prior canonical bytes.
+        db.outboxDao().remove(pending[1].id)
+        val restored = convertCapturedCompletionViewing(staleSecond, alias, owner)
+        assertEquals(pending[1], restored.copy(createdAt = pending[1].createdAt))
+    }
+
+    @Test fun compoundCapturedLiteralTitleGuardIsNotRebasedToCompletionTitleEffect() = runBlocking {
+        val original = ownedCompletion()
+        db.outboxDao().remove(completion.id); db.outboxDao().enqueue(original)
+        db.outboxDao().enqueue(captured(1, original, rating = 4.0))
+        db.withTransaction { OutingCompletionApplier(db, owner).apply(original, envelope()); db.outboxDao().remove(original.id) }
+        val converted = db.outboxDao().getPending().single()
+        val titleOperation = viewingCommandOperations(converted).getJSONObject(1)
+        assertEquals(OutingCommandFixture.baseline, titleOperation.getString("expectedUpdatedAt"))
+        assertFalse(titleOperation.has("expectedOperationId"))
+        assertEquals(4.0, titleOperation.getJSONObject("values").getDouble("rating"), 0.0)
+    }
+
+    @Test fun missingCompletionTitleEffectOrUnknownCapturedTitleGuardPreservesReviewWithoutBlockingAck() = runBlocking {
+        val original = ownedCompletion()
+        db.outboxDao().remove(completion.id); db.outboxDao().enqueue(original)
+        val dependsOnCompletion = captured(1, original, rating = 4.0, titleGuard = ViewingGuard(operationId = original.id))
+        val unknown = captured(2, original, rating = 3.0, titleGuard = ViewingGuard())
+        db.outboxDao().enqueue(dependsOnCompletion); db.outboxDao().enqueue(unknown)
+        db.withTransaction { OutingCompletionApplier(db, owner).apply(original, envelope()); db.outboxDao().remove(original.id) }
+        assertEquals(listOf("review", "review"), db.outboxDao().getPending().map { it.operation })
+        assertEquals(listOf(dependsOnCompletion.payloadJson, unknown.payloadJson), db.outboxDao().getPending().map { it.payloadJson })
+        assertNotNull(db.viewingCompletionAliasDao().byProvisionalId(provisional))
+    }
+
+    @Test fun rejectedLifecycleReplacementRetainsFifoAndFailsOnChangedOriginal() = runBlocking {
+        val rejected = completion.copy(operation = "review")
+        db.outboxDao().remove(completion.id); db.outboxDao().enqueue(rejected)
+        db.outboxDao().enqueue(awaiting(1))
+        assertEquals(0, db.completionQueueDao().replaceReviewedLifecycle(rejected.id, rejected.entityType, "changed", id(90), OUTING_COMPLETION, rejected.payloadJson))
+        db.withTransaction {
+            assertEquals(1, db.completionQueueDao().replaceReviewedLifecycle(rejected.id, rejected.entityType, rejected.payloadJson, id(90), OUTING_COMPLETION, rejected.payloadJson))
+        }
+        assertEquals(listOf(id(90), id(1)), db.outboxDao().getPending().map { it.id })
+    }
 }

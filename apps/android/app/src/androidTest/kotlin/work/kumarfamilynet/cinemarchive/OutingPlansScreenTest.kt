@@ -53,7 +53,7 @@ class OutingPlansScreenTest {
         compose.runOnIdle { assertEquals(2, calls) }
     }
 
-    @Test fun titlePostShowRecommendationShortcutSavesDraftAndTargetsExactTitle() {
+    @Test fun titlePostShowRecommendationKeepsDraftUntilExplicitSaveAndTargetsExactTitle() {
         var recommended: String? = null
         var savedNotes: String? = null
         val detail = TitleDetail(
@@ -62,15 +62,20 @@ class OutingPlansScreenTest {
             listOf(Viewing("viewing", "2026-10-08", null, null, "Cinema", outingId = "outing")), tmdbId = 42,
         )
         compose.setContent { CinemArchiveTheme {
-            TitleDetailScreen(detail, {}, onRecommendTitle = { recommended = it }, onSaveFollowUpNotes = { id, notes ->
-                assertEquals("viewing", id); savedNotes = notes
+            TitleDetailScreen(detail, {}, onRecommendTitle = { recommended = it },
+                onPreparePostShow = { PostShowOpening(ViewingDraft(it, "2026-10-08", null, null, "Cinema", openingContext = "captured")) },
+                onSavePostShow = { opening, _, notes ->
+                assertEquals("viewing", opening.viewing.id); assertEquals("captured", opening.viewing.openingContext); savedNotes = notes
             })
         } }
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("How was it?"))
         compose.onNodeWithText("How was it?").performClick()
         compose.onNodeWithText("Quick note").performTextInput("Great with friends")
         compose.onNodeWithText("Recommend to a friend").performScrollTo().performClick()
-        compose.runOnIdle { assertEquals("title", recommended); assertEquals("Great with friends", savedNotes) }
+        compose.runOnIdle { assertEquals("title", recommended); assertNull(savedNotes) }
+        compose.onNodeWithText("Film just let out").assertExists()
+        compose.onNodeWithText("Save", substring = false).performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("Great with friends", savedNotes) }
         compose.onAllNodesWithText("Film just let out").assertCountEquals(0)
     }
 }

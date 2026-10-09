@@ -166,7 +166,7 @@ class LibrarySyncRepository(
         val session = authRepository.currentSession() ?: return
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
         // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
-        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:").any(key::startsWith) }) {
+        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "outing_lifecycle:").any(key::startsWith) }) {
             dataStore.edit { it[cursorKey] = EPOCH }
         }
         // Push first (best effort — offline just leaves entries queued and protected below).
@@ -192,7 +192,7 @@ class LibrarySyncRepository(
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
-            val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
+            val rows = exactMetadataArray(client.rpc("sync_library_changes", params, session.accessToken))
             check(authRepository.currentSession()?.userId == session.userId) { "This sign-in has ended" }
             if (rows.length() == 0) break
             if (storedSchemaVersion < SYNC_SCHEMA_VERSION) {
@@ -717,6 +717,7 @@ class LibrarySyncRepository(
 internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean {
     if (pending.isEmpty()) return false
     val entityType = row.getString("entity_type")
+    if (entityType == "viewing" && "outing_lifecycle_title:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
     if (entityType == "venue_note" && "venue_note_name:${row.getJSONObject("payload").getString("venue")}" in pending) return true
     if (entityType == "list_item") {
         val payload = row.optJSONObject("payload")

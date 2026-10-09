@@ -4,7 +4,32 @@ Status: **codec verified** (`data/.../LibraryBackupCodec.kt`): 91 JVM cases and 
 cases passed on Android API 36, along with app build and lint. Shared fixtures live in
 `docs/fixtures/library-backup/`. Installed-app JSON export is wired through **Import & sync →
 Library JSON backup → Export JSON**; final checkpoint verification is recorded with its commit.
-Installed-app JSON restore remains *PLANNED*.
+Installed-app JSON restore is wired through **Import & sync → Restore JSON**.
+
+## Installed restore
+
+The platform document picker opens a bounded archive for preview before any writes. Confirmation
+saves each new title, its complete supported graph and one immutable owner/project-scoped
+`apply_library_command` request in the same Room transaction. A later storage failure reports
+earlier saved titles and the remaining count. Reopening the original file skips those titles.
+
+The installed flow skips the **entire duplicate title graph, including every associated outing**,
+matching shipped web behavior; the codec's generic outing-retargeting mode is not used. It rejects
+an individual title graph before admission when references or values cannot be represented without
+loss. Notices identify unsupported envelope data. Lists, settings, ticket photos and unknown row
+fields are not silently restored. The original file is never modified. Original companion objects,
+literal names and repeated same-name friend links are retained after copy identities are generated.
+
+Delivery retries the exact saved operation, then validates its receipt and current owned rows.
+A deleted current title is not resurrected by an old receipt. Later queued edits use the import's
+exact row receipt as their predecessor; protected changes are replayed through a durable sync epoch.
+Unknown outcomes allow retry and export of the saved original graph. A definitively rejected import
+can be explicitly removed with its reviewed, never-dispatched dependent edits; changed comparisons,
+unknown later payloads and potentially dispatched dependencies prevent removal.
+
+Each title is bounded to 50,000 operations and a conservative 16 MiB PostgreSQL JSONB request,
+including exponent expansion and exact numeric range checks. This is a per-title atomic restore,
+not history merging or a portable backup of private photos.
 
 The backup is a JSON archive of one account's library, readable and writable by both clients. It is
 **untrusted input on restore** — it may be hand-edited, come from another account, or be hostile.
@@ -34,7 +59,7 @@ The backup is a JSON archive of one account's library, readable and writable by 
   reference through the same maps: `viewing.titleId`, `outing.titleId`, `outing.completedViewingId`,
   `viewing.outingId`, `list.items[].titleId`. No archive id appears in the restored data.
 * **Ambiguous identities**: if an id appears more than once in a table (title, season, episode, watch, rating, review, viewing, outing, list) EVERY row carrying it is rejected, nothing is bound to it, and rows referencing it are rejected (outings) or have the reference dropped and counted (viewing.outingId, list items). Distinct title ids that share `(tmdbId,type)` are not ambiguous: the later one is skipped with an explicit mapping to the first/existing title.
-* **Completed outings** must reference a viewing nested in the same title; otherwise (or when their title is skipped) they are rejected with a reason. Non-completed outings/list items on a skipped title are re-pointed and counted. Histories of a skipped title are omitted and counted, never silently bound to another title.
+* **Completed outings** may have no surviving viewing pointer after a history deletion. A present pointer must reference a viewing nested in the same title; otherwise it is rejected. Generic codec planning may re-point non-completed outings/list items on a skipped title; installed restore instead skips that entire graph. Histories of a skipped title are never silently bound to another title.
 * `physicalMedia[].id` is owner-authored logical identity: preserved in the archive, regenerated in admitted copies (format/edition/notes retained). Ids inside opaque `ext` data are kept verbatim as inert data.
 * **Dedupe** by `(tmdbId, type)` against the library: an existing title is **skipped with a report**
   (not merged — merge is a later option). Outings and list items that referenced the archive's copy
@@ -52,7 +77,8 @@ The backup is a JSON archive of one account's library, readable and writable by 
 * Per row: title needs `tmdbId` (positive int), `type` ∈ {movie,tv}, non-blank `title`; `status` ∈
   {watched,watchlist,watching,dropped} (unknown ⇒ **reject the row**, never default); ratings ∈ [0,5];
   outing needs a string `titleId`, ISO `showtime`/`endsAt`, status ∈ {scheduled,completed,missed,cancelled},
-  minutes ∈ [0,1440]. Unknown outing `format` and odd date forms are *warnings* (kept as-is).
+  previews ∈ [0,120], runtime is a positive integer. Unknown outing `format` and odd date forms are
+  codec warnings; installed admission additionally checks concrete database representations.
 * A rejected row never aborts the rest; every rejection carries a path and reason in the report.
 
 ## Dates
@@ -161,7 +187,7 @@ rejections[]` — each issue is `{path, message, fatal}`.
 | Data | Web export | Android Room today |
 | --- | --- | --- |
 | lists + membership | **not exported/imported** | stored; v2 adds them |
-| companion friend ids | kept | **dropped** (names only) |
+| companion friend ids | kept | Room 20 retains original arrays; installed export/restore preserves links |
 | physicalMedia, customWatchUrl, inHomeCollection, rtUrl, awardsCount, bechdel*, contentRating, imdbId, scores | kept | Room v18 retains rich title metadata; restore and re-export mappings still require verification per field |
 | tags | kept | column exists |
 | ticket bytes | not exported | managed by ticket repository |

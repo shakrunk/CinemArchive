@@ -37,6 +37,7 @@ class OutingsRepository(
     private val venueNoteDao: VenueNoteDao,
     private val alarmScheduler: OutingAlarmScheduler = NoOpOutingAlarmScheduler,
     val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
+    private val lifecycle: OutingLifecycleRepository? = null,
 ) {
     fun observeOutingsForTitle(titleId: String): Flow<List<CinemaOuting>> =
         cinemaOutingDao.observeOutingsForTitle(titleId).map { rows -> rows.map { it.toDomain() } }
@@ -235,146 +236,22 @@ class OutingsRepository(
         }
     }
 
-    /** "Didn't make it" — reverts a completion: deletes the auto-logged viewing, restores the
-     *  title's [CinemaOutingEntity.previousStatus] iff it's still `WATCHED` (a manual status
-     *  change in between is left alone, per the web plan's rule 6), and moves the outing to
-     *  `MISSED`. Hidden by the UI once the viewing has a rating — enforced by the caller, not
-     *  here, so this stays a pure revert regardless of who calls it. */
-    suspend fun revertCompletion(outingId: String) {
-        outbox.atomically {
-            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
-            if (existing.status != OutingStatus.COMPLETED.name) return@atomically
-
-            existing.completedViewingId?.let { viewingId ->
-                viewingDao.deleteById(viewingId)
-                outbox.enqueue(
-                    entityType = "viewing",
-                    entityId = viewingId,
-                    operation = "delete",
-                    payload = JSONObject().put("id", viewingId),
-                )
-            }
-
-            // One-shot read (not observeTitle().first()): don't collect a Room Flow inside a transaction.
-            val title = titleDao.getById(existing.titleId)
-            val previousStatus = existing.previousStatus
-            if (title != null && previousStatus != null && title.status == LibraryStatus.WATCHED.name) {
-                val nowIso = Instant.now().toString()
-                titleDao.updateStatus(existing.titleId, previousStatus, nowIso)
-                outbox.enqueue(
-                    entityType = "title",
-                    entityId = existing.titleId,
-                    operation = "update",
-                    payload = JSONObject().put("id", existing.titleId).put("status", previousStatus).put("updatedAt", nowIso),
-                )
-            }
-
-            val reverted = existing.copy(
-                status = OutingStatus.MISSED.name,
-                completedViewingId = null,
-                updatedAt = Instant.now().toString(),
-            )
-            cinemaOutingDao.upsert(reverted)
-            enqueueOutingMutation(reverted, existing)
-        }
+    /** All new lifecycle writes use the same canonical, receipt-backed command on both clients. */
+    suspend fun completeDueOutings(now: Instant = Instant.now()): List<OutingTransition> {
+        val transitions = checkNotNull(lifecycle) { "Outing completion requires the current account runtime." }.completeDue(now)
+        refreshAlarm()
+        return transitions
     }
 
-    /**
-     * The local completion choke point (see this class's kdoc). Safe to call redundantly —
-     * from app launch, resume, and the exact-alarm receiver alike — because:
-     * 1. it only ever reads outings still `SCHEDULED` (a completed one drops out immediately);
-     * 2. the viewing insert is deduped by [ViewingDao.getByOutingId], so a re-run after a
-     *    process death between the viewing insert and the outing's status flip can't double-log.
-     *
-     * For each due outing: inserts a `viewings` row (date = the showtime's calendar date in
-     * the device's own zone — Android has no per-outing IANA zone to pass through, unlike the
-     * web RPC's `p_tz` argument, since this never crosses devices in v1), flips the title to
-     * `WATCHED` iff it isn't already, marks the outing `COMPLETED`, and returns a transition
-     * per outing so the UI can show a toast / "Fresh from the lobby" card without a re-query.
-     */
-    suspend fun completeDueOutings(now: Instant = Instant.now()): List<OutingTransition> {
-        val due = cinemaOutingDao.getScheduledOutings().filter { Instant.parse(it.endsAt) <= now }
-        if (due.isEmpty()) {
-            rearmAlarm()
-            return emptyList()
-        }
+    suspend fun revertPostShow(opening: work.kumarfamilynet.cinemarchive.core.model.PostShowOpening) {
+        checkNotNull(lifecycle) { "Outing reversal requires the current account runtime." }.revert(opening)
+        refreshAlarm()
+    }
 
-        val transitions = mutableListOf<OutingTransition>()
-        for (entity in due) {
-            val title = titleDao.observeTitle(entity.titleId).first() ?: continue
-            val nowIso = now.toString()
-
-            val previousStatus = title.status
-            val newStatus = if (previousStatus == LibraryStatus.WATCHED.name) previousStatus else LibraryStatus.WATCHED.name
-
-            // One transaction per outing: the viewing insert, title status flip, outing status
-            // flip and their outbox entries commit together (or not at all).
-            val viewingId = outbox.atomically {
-                val resolvedViewingId = viewingDao.getByOutingId(entity.id)?.id ?: run {
-                    val id = UUID.randomUUID().toString()
-                    val viewedDate = Instant.parse(entity.showtime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
-                    viewingDao.upsert(
-                        ViewingEntity(
-                            id = id,
-                            titleId = entity.titleId,
-                            date = viewedDate,
-                            rating = null,
-                            notes = null,
-                            venue = entity.venue,
-                            companions = entity.companions,
-                            companionsJson = entity.companionsJson,
-                            outingId = entity.id,
-                        ),
-                    )
-                    outbox.enqueue(
-                        entityType = "viewing",
-                        entityId = id,
-                        operation = "upsert",
-                        payload = JSONObject().apply {
-                            put("id", id)
-                            put("titleId", entity.titleId)
-                            put("date", viewedDate)
-                            put("venue", entity.venue ?: JSONObject.NULL)
-                            put("companions", companionObjects(entity.companionsJson, entity.companions))
-                            put("outingId", entity.id)
-                        },
-                    )
-                    id
-                }
-
-                if (previousStatus != newStatus) {
-                    titleDao.updateStatus(entity.titleId, newStatus, nowIso)
-                    outbox.enqueue(
-                        entityType = "title",
-                        entityId = entity.titleId,
-                        operation = "update",
-                        payload = JSONObject().put("id", entity.titleId).put("status", newStatus).put("updatedAt", nowIso),
-                    )
-                }
-
-                val completed = entity.copy(
-                    status = OutingStatus.COMPLETED.name,
-                    previousStatus = previousStatus,
-                    completedViewingId = resolvedViewingId,
-                    updatedAt = nowIso,
-                )
-                cinemaOutingDao.upsert(completed)
-                enqueueOutingMutation(completed, entity)
-                resolvedViewingId
-            }
-
-            transitions += OutingTransition(
-                outingId = entity.id,
-                titleId = entity.titleId,
-                titleName = title.title,
-                posterUrl = title.posterUrl,
-                viewingId = viewingId,
-                newTitleStatus = LibraryStatus.valueOf(newStatus),
-                previousStatus = LibraryStatus.valueOf(previousStatus),
-            )
-        }
+    /** Restore may re-arm notifications without performing any completion side effects. */
+    suspend fun refreshAlarm() {
+        lifecycle?.active()
         rearmAlarm()
-        return transitions
     }
 
     private suspend fun rearmAlarm() {

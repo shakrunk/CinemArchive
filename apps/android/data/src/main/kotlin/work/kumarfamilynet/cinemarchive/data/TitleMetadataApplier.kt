@@ -36,7 +36,8 @@ internal fun overlayTitleIntents(base: TitleEntity, pending: List<OutboxEntity>,
     }
 
 internal fun pendingTitleIntents(queue: List<OutboxEntity>, titleId: String): List<OutboxEntity> =
-    queue.filter { (it.entityType == "title" && it.entityId == titleId) || hasViewingTitleEffect(it, titleId) }
+    queue.filter { (it.entityType == "title" && it.entityId == titleId) || hasViewingTitleEffect(it, titleId) ||
+        (it.entityType in setOf("outing_completion", "outing_reversal") && JSONObject(it.payloadJson).optString("titleId") == titleId) }
 
 internal suspend fun applyCurrentViewingTitle(database: LibraryDatabase, titleId: String, current: JSONObject?,
     later: List<OutboxEntity>, ownerId: String) {

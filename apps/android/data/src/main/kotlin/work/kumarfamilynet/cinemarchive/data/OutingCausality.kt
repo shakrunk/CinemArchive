@@ -19,10 +19,23 @@ internal fun resolveOutingPrecondition(
     pendingEntries: List<OutboxEntity>,
     ownerScope: TicketOwnerScope?,
 ): OutingPrecondition {
-    val related = pendingEntries.filter { it.entityId == outing.id &&
-        it.entityType in setOf("cinema_outing", "outing_completion", TICKET_COMMAND_ENTITY) }
+    val related = pendingEntries.filter { (it.entityId == outing.id &&
+        it.entityType in setOf("cinema_outing", "outing_completion", "outing_reversal", TICKET_COMMAND_ENTITY)) ||
+        (isBackupImport(it) && it.entityId == outing.titleId) }
     var predecessor: String? = null
     for (entry in related) {
+        if (isBackupImport(entry)) {
+            val proof = runCatching {
+                val scope = requireNotNull(ownerScope) { "The import owner could not be verified." }
+                checkedImportCommand(entry, scope)
+                importPredecessorFor(entry, "cinema_outings", outing.id, scope.ownerId)
+            }.getOrElse { return OutingPrecondition.Review(it.message ?: "Review the earlier import first.") }
+            if (proof != null) {
+                if (predecessor != null) return OutingPrecondition.Review("The import does not follow the earlier outing change.")
+                predecessor = proof
+            }
+            continue
+        }
         val dependency = runCatching {
             when (entry.entityType) {
                 "cinema_outing" -> {
@@ -34,6 +47,12 @@ internal fun resolveOutingPrecondition(
                     require(ownerScope != null && ticket.scope == ownerScope) { "Ticket owner or project could not be verified." }
                     require(ticket.revisionGuarded) { "The saved ticket change did not check the outing revision." }
                     ticket.expectedOperationId
+                }
+                "outing_reversal" -> {
+                    val reversal = reversalCommand(entry)
+                    require(ownerScope != null && org.json.JSONObject(entry.payloadJson).getString("ownerId") == ownerScope.ownerId)
+                    require(reversal.titleId == outing.titleId)
+                    reversal.outingGuard.operationId
                 }
                 else -> error("Wait for completion confirmation before changing this outing.")
             }

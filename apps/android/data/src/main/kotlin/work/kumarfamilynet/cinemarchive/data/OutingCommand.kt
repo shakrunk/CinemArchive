@@ -14,6 +14,16 @@ internal suspend fun MutationOutbox.enqueueOutingCommand(entity: CinemaOutingEnt
     val payload = entity.mutationPayload(previous)
     if (previous != null && payload.length() == 2) return
     val pending = pendingEntries()
+    val completion = pending.firstOrNull { it.entityType == "outing_completion" && it.entityId == entity.id && it.operation == OUTING_COMPLETION }
+    if (previous != null && completion != null) {
+        val fields = JSONObject(payload.toString()).also { it.remove("id"); it.remove("updatedAt") }
+        val typed = runCatching { awaitingCompletionPayload(completion, "cinema_outing", "update", fields) }.getOrNull()
+        if (typed != null) {
+            typed.put("id", entity.id).put("titleId", entity.titleId)
+            enqueue("cinema_outing", entity.id, AWAITING_COMPLETION, typed)
+        } else enqueue("cinema_outing", entity.id, "review", payload)
+        return
+    }
     require(outingOwnerScope != null || pending.none { it.entityType == TICKET_COMMAND_ENTITY && it.entityId == entity.id }) {
         "The ticket owner scope is unavailable; this change was not saved."
     }

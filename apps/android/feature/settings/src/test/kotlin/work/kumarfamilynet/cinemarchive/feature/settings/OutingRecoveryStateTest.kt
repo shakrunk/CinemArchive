@@ -88,6 +88,31 @@ class OutingRecoveryStateTest {
         assertFalse(exported)
     }
 
+    @Test fun lifecycleAllowsOnlyExplicitWholeActionAndRequiresNewChoiceAfterConflict() = runTest {
+        val source = FakeSource().apply { lifecycle = true; outcome = OutingRecoveryOutcome.CHANGED }
+        val controller = OutingRecoveryController(source, this, RecoverySubject.LIFECYCLE)
+        controller.open("one"); advanceUntilIdle()
+        controller.select("venue", true); controller.apply(); advanceUntilIdle()
+        assertEquals(0, source.calls)
+        controller.select("lifecycleAction", true); controller.apply(); advanceUntilIdle()
+        assertEquals(setOf("lifecycleAction"), source.selected)
+        assertTrue(controller.state.value.selected.isEmpty())
+        assertTrue(controller.state.value.message!!.endsWith("select the action again."))
+    }
+
+    @Test fun lifecycleUnconfirmedAttemptCannotBeDiscardedOrChanged() = runTest {
+        val source = FakeSource().apply { lifecycle = true; pending = true; outcome = OutingRecoveryOutcome.CONFIRMED }
+        val controller = OutingRecoveryController(source, this, RecoverySubject.LIFECYCLE)
+        controller.open("one"); advanceUntilIdle()
+        controller.discard(); controller.select("lifecycleAction", true); advanceUntilIdle()
+        assertEquals(0, source.discards)
+        assertTrue(controller.state.value.selected.isEmpty())
+        controller.apply(); advanceUntilIdle()
+        assertEquals(1, source.calls)
+        assertTrue(source.selected.isEmpty())
+        assertTrue(controller.state.value.review!!.resolved)
+    }
+
     private class FakeSource : OutingRecoverySource {
         override val changes = flowOf(Unit)
         var active = true
@@ -95,6 +120,8 @@ class OutingRecoveryStateTest {
         var failApply = false
         var pending = false
         var calls = 0
+        var lifecycle = false
+        var discards = 0
         var selected = emptySet<String>()
         var wait: CompletableDeferred<Unit>? = null
         var outcome = OutingRecoveryOutcome.APPLIED
@@ -103,7 +130,9 @@ class OutingRecoveryStateTest {
         override suspend fun review(id: String): OutingRecoveryReview {
             wait?.await()
             check(!failReview) { "Offline" }
-            return OutingRecoveryReview(id, "Film", listOf(
+            return OutingRecoveryReview(id, "Film", (if (lifecycle) listOf(
+                OutingRecoveryField("lifecycleAction", "Complete outing", "Complete", "Scheduled", true),
+            ) else emptyList()) + listOf(
                 OutingRecoveryField("venue", "Theater", "Saved", "Current", true),
                 OutingRecoveryField("notes", "Notes", "Saved notes", "Current notes", true),
             ), "version", true, pending, false)
@@ -115,7 +144,7 @@ class OutingRecoveryStateTest {
             check(!failApply) { "Unconfirmed" }
             return outcome
         }
-        override suspend fun discard(id: String) = Unit
+        override suspend fun discard(id: String) { discards++ }
         override suspend fun exportOriginal(id: String) = "Original $id"
     }
 }

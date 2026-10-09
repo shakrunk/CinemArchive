@@ -41,6 +41,7 @@ class ViewingRecoveryRepositoryTest {
         }
         override suspend fun confirm(entry: OutboxEntity): PushResult {
             boundary += "confirm"; attempted += entry
+            val linkedIds = viewingLinkedOutingIds(entry, ViewingCommandFixture.owner)
             nextResult?.let { nextResult = null; return it }
             val operations = viewingCommandOperations(entry)
             val operation = operations.getJSONObject(0)
@@ -55,7 +56,8 @@ class ViewingRecoveryRepositoryTest {
             else { result.put("row", effect); current = effect }
             afterConfirm()
             return PushResult.Applied(JSONObject().put("receipt", JSONObject().put("operationId", entry.id)
-                .put("rows", JSONArray().put(result))).put("current", current ?: JSONObject.NULL))
+                .put("rows", JSONArray().put(result))).put("current", current ?: JSONObject.NULL)
+                .put("currentOutings", JSONObject().apply { linkedIds.forEach { put(it, JSONObject.NULL) } }))
         }
     }
     private fun source() = ViewingRecoveryRepository(db, ViewingCommandFixture.owner, { session }, outbox, archive, remote) { action ->
@@ -221,5 +223,41 @@ class ViewingRecoveryRepositoryTest {
         assertEquals(canonical, attempted.single().entityId)
         assertNull(db.viewingDao().getById(ViewingCommandFixture.viewing))
         assertEquals("Saved note", db.viewingDao().getById(canonical)!!.notes)
+    }
+
+    @Test fun reviewedProvisionalDeleteRetainsCanonicalProofAcrossUnknownRetry() = runBlocking {
+        val owner = ViewingCommandFixture.owner
+        val title = ViewingCommandFixture.title
+        val provisional = ViewingCommandFixture.viewing
+        val canonical = "66666666-6666-4666-8666-666666666666"
+        val outing = "77777777-7777-4777-8777-777777777777"
+        val completion = OutboxEntity(ViewingCommandFixture.nextOperation, "outing_completion", outing, OUTING_COMPLETION,
+            JSONObject().put("ownerId", owner).put("titleId", title).put(COMPLETION_COMMAND_DATA,
+                OutingCompletionCommand(outing, title, provisional, ViewingCommandFixture.baseline, null, "UTC").persisted()).toString(), 1)
+        val draft = work.kumarfamilynet.cinemarchive.core.model.ViewingDraft(provisional, "2026-10-08", null, null, null)
+        val opened = draft.copy(openingContext = viewingOpening(owner, title, provisional, draft,
+            ViewingGuard(operationId = completion.id), ViewingGuard(), listOf(outing), completion = completion))
+        val payload = checkedViewingOpening(opened, owner, title).payload("delete", JSONObject()).second
+        val original = saved("delete").copy(payloadJson = payload)
+        db.outboxDao().enqueue(original)
+        db.viewingCompletionAliasDao().insert(ViewingCompletionAliasEntity(provisional, canonical, title, outing, completion.id, null))
+        current!!.put("id", canonical)
+        db.viewingDao().upsert(current!!.toCompletionViewing())
+        val unrelated = db.viewingDao().getById(provisional)!!.copy(id = "88888888-8888-4888-8888-888888888888")
+        db.viewingDao().upsert(unrelated)
+        val review = repository.review(original.id)
+        nextResult = PushResult.Retry("Response was lost")
+        assertTrue(runCatching { repository.apply(original.id, review.remoteVersion, setOf("delete")) }.isFailure)
+        val first = attempted.single()
+        assertEquals(canonical, first.entityId)
+        assertEquals(listOf(outing), viewingLinkedOutingIds(first, owner))
+        assertTrue(sameCommandJson(JSONObject(payload), JSONObject(first.payloadJson).getJSONObject("completionSource")))
+        repository = source()
+        assertEquals(OutingRecoveryOutcome.APPLIED, repository.apply(original.id, null, emptySet()))
+        assertEquals(first.id, attempted.last().id)
+        assertEquals(first.payloadJson, attempted.last().payloadJson)
+        assertNull(db.viewingDao().getById(canonical))
+        assertNull(db.viewingDao().getById(provisional))
+        assertEquals(unrelated, db.viewingDao().getById(unrelated.id))
     }
 }

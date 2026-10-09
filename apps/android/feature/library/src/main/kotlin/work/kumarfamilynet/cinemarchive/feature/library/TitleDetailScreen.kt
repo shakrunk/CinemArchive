@@ -78,6 +78,10 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
 import work.kumarfamilynet.cinemarchive.core.designsystem.ListMembershipOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
+import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
+import work.kumarfamilynet.cinemarchive.core.model.PostShowOpening
+import kotlinx.coroutines.isActive
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
@@ -236,17 +240,11 @@ class TitleDetailViewModel(
     }
 
 
-    fun onRatePostShow(viewingId: String, rating: Double) {
-        viewModelScope.launch { repository.rateViewing(viewingId, titleId, rating) }
-    }
+    suspend fun preparePostShow(viewingId: String): PostShowOpening = repository.preparePostShow(titleId, viewingId)
 
-    fun onSaveFollowUpNotes(viewingId: String, notes: String) {
-        viewModelScope.launch { repository.updateViewingNotes(viewingId, notes) }
-    }
+    suspend fun savePostShow(opening: PostShowOpening, rating: Double?, notes: String) = repository.savePostShow(opening, rating, notes)
 
-    fun onDidntMakeIt(outingId: String) {
-        viewModelScope.launch { outingsRepository.revertCompletion(outingId) }
-    }
+    suspend fun revertPostShow(opening: PostShowOpening) = outingsRepository.revertPostShow(opening)
 
     /** Toggles this title's membership in one list — mirrors [AddToListSheet]'s checkbox rows
      *  1:1, so the caller doesn't need to know current membership state itself. */
@@ -345,9 +343,9 @@ fun TitleDetailRoute(
         onCancelOuting = viewModel::onCancelOuting,
         onViewTicket = onViewTicket,
         ticketOutings = ticketOutings,
-        onRatePostShow = viewModel::onRatePostShow,
-        onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
-        onDidntMakeIt = viewModel::onDidntMakeIt,
+        onPreparePostShow = viewModel::preparePostShow,
+        onSavePostShow = viewModel::savePostShow,
+        onRevertPostShow = viewModel::revertPostShow,
         onRequestNotificationPermission = onRequestNotificationPermission,
         venueSuggestions = venueSuggestions,
         companionSuggestions = companionSuggestions,
@@ -390,9 +388,9 @@ fun TitleDetailScreen(
     onCancelOuting: (String) -> Unit = {},
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
     ticketOutings: List<CinemaOuting> = emptyList(),
-    onRatePostShow: (String, Double) -> Unit = { _, _ -> },
-    onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
-    onDidntMakeIt: (String) -> Unit = {},
+    onPreparePostShow: (suspend (String) -> PostShowOpening)? = null,
+    onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
+    onRevertPostShow: suspend (PostShowOpening) -> Unit = { error("Post-show reversal unavailable") },
     onRequestNotificationPermission: () -> Unit = {},
     venueSuggestions: List<String> = emptyList(),
     companionSuggestions: List<String> = emptyList(),
@@ -421,7 +419,9 @@ fun TitleDetailScreen(
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
-    var postShowViewing by remember { mutableStateOf<Viewing?>(null) }
+    var postShowState by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
+    val postShow = restorePostShow(postShowState, viewingOwnerId, viewingTitleId)
+    var preparingPostShow by remember { mutableStateOf(false) }
     var editingViewingState by rememberSaveable(viewingTitleId, viewingOwnerId) { mutableStateOf<String?>(null) }
     var deletingViewingState by rememberSaveable(viewingTitleId, viewingOwnerId) { mutableStateOf<String?>(null) }
     val editingViewing = restoreViewingEditor(editingViewingState, viewingOwnerId, viewingTitleId)
@@ -449,6 +449,25 @@ fun TitleDetailScreen(
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (currentHistoryOwner == openingOwner) viewingOpenError = e.message ?: "Couldn't open this viewing." }
             finally { preparingViewing = false }
+        }
+    }
+    fun openPostShow(viewing: Viewing) {
+        val current = detail ?: return
+        if (preparingPostShow) return
+        val owner = viewingOwnerId
+        preparingPostShow = true
+        viewingOpenError = null
+        historyScope.launch {
+            try {
+                val opening = checkNotNull(onPreparePostShow) { "Post-show editing is unavailable." }(viewing.id)
+                if (!isActive) return@launch
+                if (currentHistoryOwner == owner && currentHistoryTitle == current.id) {
+                    postShowState = savePostShow(owner, current.id, current.title, opening)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (_: Exception) {
+                if (currentHistoryOwner == owner && currentHistoryTitle == current.id) viewingOpenError = "Couldn't open this viewing. Try again."
+            } finally { preparingPostShow = false }
         }
     }
     var showRemoveConfirm by rememberSaveable { mutableStateOf(false) }
@@ -745,7 +764,7 @@ fun TitleDetailScreen(
                 ReadingWidthColumn {
                     ViewingRow(
                         viewing,
-                        onRateClick = { postShowViewing = viewing },
+                        onRateClick = { openPostShow(viewing) },
                         onEditClick = { if (!preparingViewing) openViewing(viewing) },
                         onDeleteClick = { if (!preparingViewing) openViewing(viewing, deleting = true) },
                         modifier = Modifier.padding(horizontal = 22.dp),
@@ -803,23 +822,20 @@ fun TitleDetailScreen(
         )
     }
 
-    postShowViewing?.let { viewing ->
-        PostShowSheet(
-            titleName = detail?.title ?: "",
-            venue = viewing.venue,
-            companions = viewing.companions,
-            initialRating = viewing.rating ?: 0.0,
-            initialNotes = viewing.notes ?: "",
-            onRate = { onRatePostShow(viewing.id, it) },
-            onSaveNotes = { onSaveFollowUpNotes(viewing.id, it) },
-            onDidntMakeIt = {
-                viewing.outingId?.let(onDidntMakeIt)
-                postShowViewing = null
-            },
-            onDismiss = { postShowViewing = null },
-            onRecommend = if (detail?.tmdbId != null && onRecommendTitle != null) ({ onRecommendTitle(detail.id) }) else null,
-        )
+    postShow?.let { captured ->
+        androidx.compose.runtime.key(viewingOwnerId, captured.titleId, captured.opening.viewing.id) {
+            PostShowSheet(
+                titleName = captured.titleName,
+                opening = captured.opening,
+                onSave = onSavePostShow,
+                onRevert = onRevertPostShow,
+                onDismiss = { postShowState = null },
+                onRecommend = if (detail?.tmdbId != null && onRecommendTitle != null) ({ onRecommendTitle(captured.titleId) }) else null,
+            )
+        }
     }
+    if (preparingPostShow) AlertDialog(onDismissRequest = {}, title = { Text("Opening viewing…") },
+        text = { CircularProgressIndicator() }, confirmButton = {})
 
     viewingOpenError?.let { message ->
         AlertDialog(onDismissRequest = { viewingOpenError = null }, title = { Text("Viewing unavailable") }, text = { Text(message) },

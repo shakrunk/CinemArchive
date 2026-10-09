@@ -66,8 +66,11 @@ class MutationOutbox(
         UUID.fromString(id)
         val existing = outboxDao.getPending().firstOrNull { it.id == id }
         if (existing != null) {
-            require(existing.entityType == entityType && existing.entityId == entityId && existing.payloadJson == payload &&
-                (existing.operation == operation || existing.operation == "review")) { "A saved operation ID was reused with different intent." }
+            val converted = operation == AWAITING_COMPLETION && runCatching {
+                sameCommandJson(JSONObject(existing.payloadJson).getJSONObject("completionSource"), JSONObject(payload))
+            }.getOrDefault(false)
+            require(existing.entityType == entityType && (converted || existing.entityId == entityId && existing.payloadJson == payload &&
+                (existing.operation == operation || existing.operation == "review"))) { "A saved operation ID was reused with different intent." }
             return false // Keep its FIFO position, attempts and known rejection/review state.
         }
         outboxDao.enqueue(OutboxEntity(id, entityType, entityId, operation, payload, System.currentTimeMillis()))

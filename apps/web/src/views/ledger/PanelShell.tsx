@@ -42,7 +42,7 @@ function PanelDataButton({ title, hint, data }: { title: string; hint: string; d
   const trigger = useRef<HTMLButtonElement>(null)
   return <>
     <button ref={trigger} type="button" data-ledger-control
-      className="mt-2 rounded text-xs text-amber underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+      className="mt-2 rounded text-xs text-amber underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber"
       aria-label={`View data for ${title}`} onClick={() => setOpenedFor(session)}>
       View data
     </button>

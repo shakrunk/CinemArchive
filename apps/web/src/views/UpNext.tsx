@@ -561,7 +561,7 @@ function OutingMemoryCard({ entry, delayMs }: { entry: OutingMemory; delayMs?: n
           <span aria-hidden="true">★ {viewing.rating.toFixed(1)}</span>
         </p>
       )}
-      {viewing?.notes && <p className="font-sans text-sm text-paper-dim break-words mt-1">“{viewing.notes}”</p>}
+      {viewing?.notes && <p className="font-sans text-sm text-paper-dim wrap-break-word mt-1">“{viewing.notes}”</p>}
       <TicketButton outingId={outing.id} />
     </CardFrame>
   )

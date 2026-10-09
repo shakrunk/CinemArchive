@@ -18,7 +18,7 @@ export function TicketButton({ outingId }: { outingId: string }) {
   if (!privateView || !outing) return null
   return <>
     <button type="button" onClick={(event) => { event.stopPropagation(); setOpenedSession(session) }}
-      className="inline-flex items-center gap-1.5 rounded-sm text-sm font-sans text-amber hover:text-amber-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/60">
+      className="inline-flex items-center gap-1.5 rounded-sm text-sm font-sans text-amber hover:text-amber-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60">
       <Ticket className="h-4 w-4" aria-hidden="true" />Ticket & seats
     </button>
     {openedSession === session && <TicketViewer key={`${session}:${outingId}`} outing={outing} onClose={() => setOpenedSession(null)} />}
@@ -160,7 +160,7 @@ function TicketViewer({ outing, onClose }: { outing: CinemaOuting; onClose: () =
         {(['photo', 'scan', 'seats'] as const).map((value) => <Button key={value} type="button" variant={mode === value ? 'secondary' : 'outline'} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'photo' ? 'Photo' : value === 'scan' ? 'Scan' : 'Seats'}</Button>)}
       </div>
       <section className="rounded-lg p-4 space-y-3 text-center" style={mode === 'scan' ? { background: '#fff', color: '#111' } : mode === 'seats' ? { background: '#050403', color: '#be8844' } : undefined}>
-        {mode === 'seats' ? <><p className="text-xs uppercase tracking-widest">Your seats</p><p className="text-3xl font-mono break-words">{seatLine || 'No seats saved'}</p><p className="text-sm">{outing.venue}</p></>
+        {mode === 'seats' ? <><p className="text-xs uppercase tracking-widest">Your seats</p><p className="text-3xl font-mono wrap-break-word">{seatLine || 'No seats saved'}</p><p className="text-sm">{outing.venue}</p></>
           : outing.ticketAttachment ? <TicketPhoto key={`${session}:${outing.ticketAttachment.id}`} outing={outing} scan={mode === 'scan'} />
             : <p className="text-sm">{hasLegacy && !outing.ticketManaged ? 'This ticket photo is stored on your original device. Add the original photo here to make it available across your devices.' : 'Add the original ticket photo to keep it handy at the cinema.'}</p>}
         {outing.bookingRef && <p className="font-mono text-sm break-all">Booking reference: {outing.bookingRef}</p>}

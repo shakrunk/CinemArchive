@@ -29,7 +29,7 @@ npm run lint       # ESLint
 ## Architecture
 
 ### Stack
-- **Frontend:** Vite + React + TypeScript + Tailwind CSS
+- **Frontend:** Vite + React + TypeScript + Tailwind CSS v4 (CSS-first config in `src/index.css`)
 - **UI Components:** shadcn-ui (pre-configured in Phase 0)
 - **State:** Zustand (`src/store/useAppStore.ts`) — slices for `library`, `ledger`, `ui`
 - **Backend:** Supabase (Postgres + RLS + Auth + Edge Functions)

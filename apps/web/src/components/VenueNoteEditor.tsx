@@ -39,7 +39,7 @@ function Editor({ venue }: { venue: string }) {
   return <section aria-label={`Private notes for ${venue}`} className="mt-3 space-y-2 rounded-md border border-border p-3">
     <p className="text-sm font-medium">Private venue notes</p>
     <p className="text-xs text-paper-dim">Parking, accessibility, or other details for {venue}. These notes are not shared with friends.</p>
-    <p className="whitespace-pre-wrap break-words text-sm">{current ? current.notes || 'Empty note' : 'No saved venue note'}</p>
+    <p className="whitespace-pre-wrap wrap-break-word text-sm">{current ? current.notes || 'Empty note' : 'No saved venue note'}</p>
     {!supported && <p className="text-xs text-paper-dim">Sync with the updated server to edit notes. Existing notes remain saved on this device.</p>}
     {!draft && <button type="button" className={button} disabled={!supported || busy} onClick={start}>{current ? 'Edit venue note' : 'Add venue note'}</button>}
     {draft && <div className="space-y-2">
@@ -55,8 +55,8 @@ function Editor({ venue }: { venue: string }) {
         try { setLocalComparison(open(venue)) } catch { /* The original failure and draft remain visible. */ }
       }}>Keep my draft and compare the latest note</button>}
       {localComparison && <div className="space-y-2 border-t border-border pt-2">
-        <p className="whitespace-pre-wrap break-words text-sm">Latest saved note: {localComparison.baseline ? localComparison.baseline.notes || 'Empty note' : 'No saved note'}</p>
-        <p className="whitespace-pre-wrap break-words text-sm">Your unsaved draft: {text || 'Empty note'}</p>
+        <p className="whitespace-pre-wrap wrap-break-word text-sm">Latest saved note: {localComparison.baseline ? localComparison.baseline.notes || 'Empty note' : 'No saved note'}</p>
+        <p className="whitespace-pre-wrap wrap-break-word text-sm">Your unsaved draft: {text || 'Empty note'}</p>
         <button type="button" className={button} disabled={busy} onClick={() => { void run(async () => {
           await save(localComparison, text); setDraft(null); setLocalComparison(null)
         }) }}>Save my draft instead</button>
@@ -70,8 +70,8 @@ function Editor({ venue }: { venue: string }) {
     </div>}
     {review && <div className="space-y-2 border-t border-border pt-2">
       <p className="text-sm font-medium">Compare venue notes</p>
-      <p className="whitespace-pre-wrap break-words text-sm">Server: {review.current ? review.current.notes || 'Empty note' : 'No saved note'}</p>
-      <p className="whitespace-pre-wrap break-words text-sm">Your latest saved change: {review.notes === null ? 'Remove note' : review.notes || 'Empty note'}</p>
+      <p className="whitespace-pre-wrap wrap-break-word text-sm">Server: {review.current ? review.current.notes || 'Empty note' : 'No saved note'}</p>
+      <p className="whitespace-pre-wrap wrap-break-word text-sm">Your latest saved change: {review.notes === null ? 'Remove note' : review.notes || 'Empty note'}</p>
       <p className="text-xs text-paper-dim">This resolves {review.commands.length} saved change(s). The server note is checked again before saving.</p>
       <div className="flex flex-wrap gap-3">{[false, true].map((keepLocal) => <button key={String(keepLocal)} type="button" className={button} disabled={busy}
         onClick={() => { void run(async () => { await resolve(review, keepLocal); setReview(null); setDraft(null) }) }}>{keepLocal ? 'Use my saved change' : 'Keep server note'}</button>)}</div>

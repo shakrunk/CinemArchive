@@ -251,7 +251,7 @@ function TitleSetting({ value, placeholder, onSave }: {
     <input type="text" aria-label="Custom widget title" value={draft ?? value} maxLength={40}
       placeholder={placeholder} onChange={(event) => setDraft(event.target.value)}
       onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void commit() } }}
-      className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-transparent px-2.5 py-1.5 font-mono text-[12px] text-paper placeholder:text-paper-faint focus:border-amber/40 focus:outline-none transition-colors" />
+      className="min-w-0 flex-1 rounded-md border border-(--line) bg-transparent px-2.5 py-1.5 font-mono text-[12px] text-paper placeholder:text-paper-faint focus:border-amber/40 focus:outline-hidden transition-colors" />
     <button type="button" disabled={draft === null} onClick={() => void commit()} className={editorBtnClass}>Save title</button>
   </div>
 }

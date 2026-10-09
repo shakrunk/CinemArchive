@@ -14,14 +14,15 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 - Android Room 19 and protected metadata backfill are committed as 0ceb38b; credit refresh/rekey retention is e2013b8. Authenticated friend archives and Ledger are ba2dac0. Backup text mapping correction is 91abec8.
 - Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. Full parity remains incomplete; the execution inventory records the remaining work.
 
-## Final checkpoint / no active claims
+## Current continuation claims
 
-- All Codex worker assignments are finished; no active file claims or build/test runners remain.
-- Installed restore and outing lifecycle/recovery integration is committed as f628d9c; independent backup codec correction is fe1b9af.
-- Final verification: compiler, APK/test APK assembly and lint pass; 974 JVM cases across 123 suites, zero failures/errors, three existing live-service skips; 22 device cases pass. Lint retains 66 baseline warnings. Parity trailers pass all 133 commits through f628d9c.
-- Collection controls ce84546, Discover shelves 9d1d080, viewing-review guard 7a78ccc, installed export b9a5a3b and moviegoing preferences/companion preservation 88a7b0d are committed.
-- Full parity is still incomplete. The [execution inventory](full-parity-execution.md) records the remaining provider-import, detail/add/navigation, legacy recovery and live acceptance gaps.
-- Sonnet remains dismissed; do not restart its watcher or assign further work. Git integration remains with Astra. No push, release, deployment or production write occurred.
+- Sonnet remains dismissed and its watcher disabled. Root owns Git writes and the sole native test runner.
+- Root: navigation 0fc435e and older list recovery b6b16e3 committed. Owns catalog enrichment, integration and final verification.
+- Navigation worker: global command search and safe ticket scheduling are active; customization is committed.
+- Detail worker: bulk pre-platform watching, then Noir controls. Room 21 storage foundation and complete behavior are being integrated.
+- Provider worker: atomic new-title provider import/provenance first, then optimistic existing-title merge/recovery. Complete new-title cutover is being integrated.
+- Previous verified restore/lifecycle checkpoint is f628d9c with evidence committed in 7bab6dc. Full parity remains incomplete; see the [execution inventory](full-parity-execution.md).
+- No push, release, deployment or production write occurred.
 
 ## New messages
 

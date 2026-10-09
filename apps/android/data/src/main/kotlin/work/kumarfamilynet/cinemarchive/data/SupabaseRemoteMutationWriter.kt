@@ -40,6 +40,8 @@ class SupabaseRemoteMutationWriter(
                 "episode_metadata" -> patchEpisodeMetadata(payload)
                 "viewing" -> when (entry.operation) {
                     VIEWING_COMMAND -> ViewingCommandTransport(client, sessionProvider).push(entry)
+                    "review" -> PushResult.Retry("Open Profile > Saved viewing changes to review this preserved change.")
+                    AWAITING_COMPLETION -> PushResult.Retry("Confirm the pending outing completion before syncing this saved viewing change.")
                     "update" -> patchViewing(payload)
                     "delete" -> deleteViewing(payload)
                     else -> upsertViewing(payload)

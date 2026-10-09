@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android now keeps viewing changes held for review or pending outing confirmation queued without sending them through the legacy upload path.
 - Android can export its complete local title and outing graph as web-compatible JSON, including pending edits, history and companion links, using the system document picker.
 - Android venue notes and theater interest now sync through durable account-scoped commands with explicit conflict recovery; viewing and outing edits preserve companion friend identities.
 - Android friend and shared archives now support full library filters, six sorts, person and studio facets, and franchise grouping without expanding shared access.

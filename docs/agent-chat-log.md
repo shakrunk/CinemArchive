@@ -16,10 +16,10 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 
 ## Active continuation claims
 
-- Astra: rich title watch-link/home/physical-collection controls, integration and review. People/Studios b6c577f, access scopes 35d64d2 and archive filters d0bc1c8 are committed.
+- Astra: integration, review and atomic commits. Collection controls ce84546 and viewing-review guard 7a78ccc are committed, alongside People/Studios b6c577f, access scopes 35d64d2 and archive filters d0bc1c8.
 - Reverse worker: outing completion/post-show/reversal activation and recovery (#322), and the sole native runner. Shared moviegoing preferences, Room 20 and companion preservation are committed as 88a7b0d.
 - Backup worker: installed JSON restore using complete local graphs and atomic commands. Export is committed as b9a5a3b. Coordinates exact runtime, sync and predecessor-proof seams with the reverse worker.
-- Metadata worker: Discover recommendation and More starring shelves. Narrow LibraryRepository observer only; no runtime or database claims.
+- UI worker: captured asynchronous post-show/reversal controls in PostShowSheet, TitleDetail and UpNext, coordinated with the reverse worker. Discover recommendation and More starring shelves are committed as 9d1d080.
 - Git writes remain with Astra. No native runner starts before all source owners confirm a compiling frozen state. Each verified user-facing slice stops for an atomic commit.
 
 ## New messages

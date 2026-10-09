@@ -2,7 +2,9 @@
 
 Status: **codec verified** (`data/.../LibraryBackupCodec.kt`): 91 JVM cases and 5 instrumented
 cases passed on Android API 36, along with app build and lint. Shared fixtures live in
-`docs/fixtures/library-backup/`. Installed-app export, restore and UI remain *PLANNED*.
+`docs/fixtures/library-backup/`. Installed-app JSON export is wired through **Import & sync →
+Library JSON backup → Export JSON**; final checkpoint verification is recorded with its commit.
+Installed-app JSON restore remains *PLANNED*.
 
 The backup is a JSON archive of one account's library, readable and writable by both clients. It is
 **untrusted input on restore** — it may be hand-edited, come from another account, or be hostile.
@@ -11,9 +13,9 @@ The backup is a JSON archive of one account's library, readable and writable by 
 
 | Format | Shape | Reader | Writer |
 | --- | --- | --- | --- |
-| v1 (web today) | `{version:1, exportedAt:"YYYY-MM-DD", titles:Title[], outings?:CinemaOuting[]}` | both | web (until it adopts v2) |
+| v1 (installed clients) | `{version:1, exportedAt:"YYYY-MM-DD", titles:Title[], outings?:CinemaOuting[]}` | both | web and Android |
 | bare array | `Title[]` | both | — |
-| v2 | v1 + `format:"cinemarchive-library"`, `version:2`, ISO-datetime `exportedAt`, `client:{platform,version}`, `lists:List[]`, `localOnly:{venueNotes,theaterInterest}` | both | Android (new); web when it adopts v2 |
+| v2 (codec only) | v1 + `format:"cinemarchive-library"`, `version:2`, ISO-datetime `exportedAt`, `client:{platform,version}`, `lists:List[]`, `localOnly:{venueNotes,theaterInterest}` | Android codec | Android codec; no installed export flow |
 
 * A reader MUST accept v1 and bare arrays, MUST tolerate a missing `outings`/`lists`, and MUST reject
   `version` greater than it understands (message names the version).
@@ -62,8 +64,31 @@ preserved exactly as written.
 ## Companions
 
 Canonical `{name, friendUserId?}` (web `normalizeCompanions`): strings become `{name}`, objects keep
-`friendUserId`, blank names are dropped, names trimmed. Android's Room stores names only today, so a
-restore reports "friend links dropped: N" until companion identity lands in Room.
+`friendUserId`, blank names are dropped, names trimmed. Android Room 20 retains the original array
+alongside display names; sync schema 12 backfills it without replacing pending owner edits. Export
+uses that array, preserving duplicate names and linked friend identities. A nonempty legacy name list
+with no original array blocks export with a **Sync and try export again** action; empty lists and new
+empty libraries do not require backfill. Unknown pending data may need its existing recovery flow
+before sync can recover the original array. Name edits retain matching occurrences; retaining an
+unknown old name while changing the list requires sync first. Unrelated edits remain available.
+
+## Installed Android export
+
+`LibraryBackupRepository` reads the current owner's complete Room graph in one transaction, including
+optimistic pending changes. It does not fetch a server-only replacement or change the outbox. Titles,
+Specials and regular seasons, episodes, independent watch/rating/review logs, retained credits,
+viewings and outings use the shipped web v1 field names. Missing dates stay missing. Physical-media
+JSON uses the codec's exact-number parser; opaque retained values are not rounded by `org.json`.
+
+The system `CreateDocument(application/json)` picker selects the destination. Bytes are prepared for
+that exact runtime, checked again before opening/writing the destination, and written off the main
+thread. Success appears only after write, flush and close succeed. Cancellation is not success;
+write errors warn that the chosen file may be incomplete and allow a new export attempt. Account
+switches invalidate prepared exports. The existing 64 MiB / depth / node bounds apply.
+
+Ticket photos, managed attachment authority, device-local photo paths, lists and account settings
+are excluded. Actual retained barcode data is portable; a managed removal suppresses old legacy
+barcode fallback. Archive files contain no outbox, sync cursors, local completion aliases or receipts.
 
 ## Tickets
 

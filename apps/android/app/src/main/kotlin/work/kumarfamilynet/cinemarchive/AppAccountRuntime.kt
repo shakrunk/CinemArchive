@@ -221,6 +221,12 @@ class AppAccountRuntime(
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)
 
+    val backupRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.LibraryBackupRepository(database,
+            work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId),
+            ::isCurrent, synchronize = { librarySyncRepository.syncNow() })
+    }
+
     val creditRefreshRepository = work.kumarfamilynet.cinemarchive.data.CreditRefreshRepository(
         database, outbox,
         work.kumarfamilynet.cinemarchive.data.CreditMetadataFetcher { title ->

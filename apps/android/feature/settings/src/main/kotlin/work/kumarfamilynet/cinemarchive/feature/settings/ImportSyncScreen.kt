@@ -69,6 +69,7 @@ fun ImportSyncRoute(
     services: SyncServices,
     onBack: () -> Unit,
     showBack: Boolean = true,
+    backupContent: @Composable () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -239,6 +240,7 @@ fun ImportSyncRoute(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.weight(1f),
         ) {
+            item { backupContent() }
             item {
                 ReadingWidthColumn {
                     Text(

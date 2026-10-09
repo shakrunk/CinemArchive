@@ -823,7 +823,8 @@ private fun CinemArchiveApp(
                                 showBack = false,
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
-                            SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
+                                backupContent = { work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository) })
                             SettingsCategory.ABOUT -> AboutRoute(
                                 appVersionName,
                                 appUpdateRepository,
@@ -940,7 +941,8 @@ private fun CinemArchiveApp(
                     onBack = { overlay = Overlay.Friends },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
-                Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile)
+                Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
+                    backupContent = { work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository) })
                 Overlay.About -> AboutRoute(
                     appVersionName,
                     appUpdateRepository,

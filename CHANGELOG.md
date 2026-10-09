@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android backup validation now retains completed outings after their viewing history was deleted and matches the shared storage limits for preview and runtime minutes.
 - Android Discover now offers recommendations based on library titles and More starring shelves, with searchable choices, independent retries and media-aware duplicate filtering.
 - Android title details now edit watch links, home-collection status and physical copies with durable saves, preserved opaque metadata and explicit conflict recovery.
 - Android now keeps viewing changes held for review or pending outing confirmation queued without sending them through the legacy upload path.

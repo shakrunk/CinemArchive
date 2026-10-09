@@ -823,7 +823,9 @@ object LibraryBackupCodec {
                 val raw = o.opt(k)
                 if (isNull(raw)) continue
                 val n = raw as? Number
-                if (n == null || n.toDouble().isNaN() || n.toDouble() < 0 || n.toDouble() > 24 * 60) { fatal("$p.$k", "Out of range."); return }
+                val min = if (k == "runtimeMinutes") 1 else 0
+                val max = if (k == "previewsMinutes") 120 else Int.MAX_VALUE
+                if (n == null || !n.toDouble().isFinite() || n.toDouble() % 1.0 != 0.0 || n.toDouble() < min || n.toDouble() > max) { fatal("$p.$k", "Out of range."); return }
             }
             (o.opt("format") as? String)?.let { if (it !in KNOWN_FORMATS) warn("$p.format", "Unknown format \"$it\" kept as-is.") }
             checkStrings(o, p, ::fatal)
@@ -859,10 +861,7 @@ object LibraryBackupCodec {
                     if (completed) { fatal(cp, "Completed outing's viewing belongs to a different title."); completedRejected[i] = true; return }
                     warn(cp, "completedViewingId references a viewing of a different title; the reference is dropped.")
                 }
-            } else if (completed) {
-                fatal(cp, "Completed outing has no completedViewingId (its history is required).")
-                completedRejected[i] = true
-            }
+            } // A completed outing can remain after its viewing was explicitly deleted.
         }
 
         document.outings.forEachIndexed { i, o ->
@@ -1118,7 +1117,7 @@ object LibraryBackupCodec {
             val cvRaw = o.opt("completedViewingId") as? String
             val vt = cvRaw?.let { viewingMap[it] }
             val vtOk = vt != null && vt.titleIdx == titleIdx
-            if (completed && (!target.restored || !vtOk)) {
+            if (completed && (!target.restored || (cvRaw != null && !vtOk))) {
                 outingsRejected++
                 completedRejected++
                 rejections += Issue(
@@ -1135,7 +1134,7 @@ object LibraryBackupCodec {
             copy.put("titleId", target.id)
             copy.put("companions", normalizeCompanions(o.opt("companions")))
             copy.remove("completedViewingId")
-            if (vtOk && vt != null) {
+            if (vtOk) {
                 copy.put("completedViewingId", vt.freshId)
             } else if (!isNull(o.opt("completedViewingId"))) {
                 cvDropped++

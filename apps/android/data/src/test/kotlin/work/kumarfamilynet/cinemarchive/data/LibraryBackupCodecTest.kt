@@ -728,18 +728,19 @@ class LibraryBackupCodecTest {
     @Test fun completedWithoutHistoryFixture() {
         val d = load("completed-without-history.json")
         val fatal = fatalPaths(d)
-        for (i in 0..2) assertFatalAt(fatal, "outings[$i]")
+        assertNotFatalAt(fatal, "outings[0]")
+        for (i in 1..2) assertFatalAt(fatal, "outings[$i]")
         assertNotFatalAt(fatal, "outings[3]")
         assertNotFatalAt(fatal, "outings[4]")
         val p = plan(d)
         val r = p.report
         assertEquals(2, r.titlesNew)
-        assertEquals(2, r.outingsNew)
-        assertEquals(3, r.outingsRejected)
-        assertEquals(3, r.completedOutingsRejected)
+        assertEquals(3, r.outingsNew)
+        assertEquals(2, r.outingsRejected)
+        assertEquals(2, r.completedOutingsRejected)
         assertEquals(1, r.outingViewingRefsDropped)
         assertEquals(1, r.viewingOutingRefsDropped)
-        val completed = p.outings.single { it.getString("status") == "completed" }
+        val completed = p.outings.single { it.getString("status") == "completed" && it.has("completedViewingId") }
         val scheduled = p.outings.single { it.getString("status") == "scheduled" }
         assertFalse(scheduled.has("completedViewingId"))
         val v1 = p.titles[0].getJSONArray("viewings").getJSONObject(0)
@@ -750,8 +751,8 @@ class LibraryBackupCodecTest {
         assertFalse(p.titles[1].getJSONArray("viewings").getJSONObject(0).has("outingId"))
         assertTrue(r.warnings.any { it.path == "outings[3].completedViewingId" })
         assertTrue(r.warnings.any { it.path == "titles[1].viewings[0].outingId" })
-        // never a completed outing without its history
-        assertTrue(p.outings.all { it.getString("status") != "completed" || it.has("completedViewingId") })
+        // Explicitly removed history leaves a legitimate completed outing, without invented provenance.
+        assertEquals(1, p.outings.count { it.getString("status") == "completed" && !it.has("completedViewingId") })
     }
 
     @Test fun skippedTitleExistingFixture() {

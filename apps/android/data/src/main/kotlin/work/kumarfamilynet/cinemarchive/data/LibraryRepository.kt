@@ -167,6 +167,8 @@ class LibraryRepository(
                 name = credit.name,
                 characterName = credit.characterName,
                 castOrder = credit.order,
+                profileUrl = credit.profileUrl,
+                episodeCount = credit.episodeCount,
             )
         }
         val crew = details.crew.map { credit ->
@@ -177,6 +179,7 @@ class LibraryRepository(
                 name = credit.name,
                 job = credit.job,
                 department = credit.department,
+                profileUrl = credit.profileUrl,
             )
         }
         val seasonIds = seasons.associate { it.first.seasonNumber to it.first.id }
@@ -185,7 +188,7 @@ class LibraryRepository(
             val seasonId = seasonIds.getValue(season.seasonNumber)
             season.cast.distinctBy { it.tmdbPersonId }.map { credit ->
                 SeasonCastEntity(UUID.randomUUID().toString(), titleId, seasonId, credit.tmdbPersonId,
-                    credit.name, credit.characterName, credit.order)
+                    credit.name, credit.characterName, credit.order, credit.profileUrl, credit.episodeCount)
             }
         }
         val episodeCrew = details.seasons.flatMap { season ->
@@ -240,6 +243,10 @@ class LibraryRepository(
             imdbId = details.imdbId,
             rtScore = details.rtScore,
             metacriticScore = details.metacriticScore,
+            rtUrl = details.rtUrl,
+            awardsCount = details.awardsCount,
+            bechdelOutcome = details.bechdelOutcome,
+            bechdelScore = details.bechdelScore,
         )
 
         outbox.atomically {

@@ -127,6 +127,10 @@ class SupabaseRemoteMutationWriter(
             .putNullable("imdb_rating", payload, "imdbRating")
             .putNullable("rt_score", payload, "rtScore")
             .putNullable("metacritic_score", payload, "metacriticScore")
+            .putCatalogField("rt_url", payload, "rtUrl")
+            .putCatalogField("awards_count", payload, "awardsCount")
+            .putCatalogField("bechdel_outcome", payload, "bechdelOutcome")
+            .putCatalogField("bechdel_score", payload, "bechdelScore")
             .put("studios", payload.getJSONArray("studios"))
             .putNullable("collection_id", payload, "collectionId")
             .putNullable("collection_name", payload, "collectionName")
@@ -168,6 +172,8 @@ class SupabaseRemoteMutationWriter(
                 .put("name", member.getString("name"))
                 .putNullable("character_name", member, "characterName")
                 .put("cast_order", member.getInt("castOrder"))
+                .putCatalogField("profile_url", member, "profileUrl")
+                .putCatalogField("episode_count", member, "episodeCount")
         }?.let { client.upsert("title_cast", session.accessToken, it.toString()) }
 
         payload.rows("crew") { member ->
@@ -179,6 +185,7 @@ class SupabaseRemoteMutationWriter(
                 .put("name", member.getString("name"))
                 .put("job", member.getString("job"))
                 .putNullable("department", member, "department")
+                .putCatalogField("profile_url", member, "profileUrl")
         }?.let { client.upsert("title_crew", session.accessToken, it.toString()) }
 
         // Optional arrays preserve compatibility with title inserts queued by older clients.
@@ -187,6 +194,8 @@ class SupabaseRemoteMutationWriter(
                 .put("season_id", member.getString("seasonId")).put("tmdb_person_id", member.getInt("tmdbPersonId"))
                 .put("name", member.getString("name")).putNullable("character_name", member, "characterName")
                 .put("cast_order", member.getInt("castOrder"))
+                .putCatalogField("profile_url", member, "profileUrl")
+                .putCatalogField("episode_count", member, "episodeCount")
         }?.let { client.upsert("season_cast", session.accessToken, it.toString()) }
         payload.rows("episodeCrew") { member ->
             JSONObject().put("id", member.getString("id")).put("title_id", titleId).put("user_id", userId)
@@ -409,6 +418,10 @@ class SupabaseRemoteMutationWriter(
  *  as "leave this column alone" rather than "set it to null". */
 private fun JSONObject.putNullable(column: String, source: JSONObject, key: String): JSONObject =
     put(column, source.opt(key).takeUnless { it == null || it == JSONObject.NULL } ?: JSONObject.NULL)
+
+/** Old queued title graphs never fetched these fields; leave remote enrichment alone. */
+private fun JSONObject.putCatalogField(column: String, source: JSONObject, key: String): JSONObject =
+    if (source.has(key)) putNullable(column, source, key) else this
 
 /** Older queued outing completions store names; web and Postgres use companion objects. */
 private fun JSONArray.viewingCompanions(): JSONArray = JSONArray().also { result ->

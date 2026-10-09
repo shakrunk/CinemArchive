@@ -61,6 +61,10 @@ internal fun buildAddTitlePayload(
         putOrNull("imdbId", details.imdbId)
         putOrNull("rtScore", details.rtScore)
         putOrNull("metacriticScore", details.metacriticScore)
+        putOrNull("rtUrl", details.rtUrl)
+        putOrNull("awardsCount", details.awardsCount)
+        putOrNull("bechdelOutcome", details.bechdelOutcome)
+        putOrNull("bechdelScore", details.bechdelScore)
         put("studios", JSONArray(details.studios))
         putOrNull("collectionId", details.collectionId)
         putOrNull("collectionName", details.collectionName)
@@ -68,6 +72,7 @@ internal fun buildAddTitlePayload(
             seasonCast.forEach { credit -> put(JSONObject().apply {
                 put("id", credit.id); put("seasonId", credit.seasonId); put("tmdbPersonId", credit.tmdbPersonId)
                 put("name", credit.name); putOrNull("characterName", credit.characterName); put("castOrder", credit.castOrder)
+                putOrNull("profileUrl", credit.profileUrl); putOrNull("episodeCount", credit.episodeCount)
             }) }
         })
         put("episodeCrew", JSONArray().apply {
@@ -126,6 +131,8 @@ internal fun buildAddTitlePayload(
                             put("name", member.name)
                             putOrNull("characterName", member.characterName)
                             put("castOrder", member.castOrder)
+                            putOrNull("profileUrl", member.profileUrl)
+                            putOrNull("episodeCount", member.episodeCount)
                         },
                     )
                 }
@@ -142,6 +149,7 @@ internal fun buildAddTitlePayload(
                             put("name", member.name)
                             put("job", member.job)
                             putOrNull("department", member.department)
+                            putOrNull("profileUrl", member.profileUrl)
                         },
                     )
                 }

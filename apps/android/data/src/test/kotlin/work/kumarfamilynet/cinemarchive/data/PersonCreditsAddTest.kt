@@ -23,11 +23,13 @@ import work.kumarfamilynet.cinemarchive.core.model.*
 @RunWith(RobolectricTestRunner::class)
 class PersonCreditsAddTest {
     private val details = MediaDetails(42, MediaType.TV, "A show", 2020, "2020-01-01", null, emptyList(), null, null, null, null, null, "en", null, null,
-        cast = (1..60).map { MediaCredit(it, "Person $it", null, it) },
-        crew = listOf(MediaCrewCredit(42, "Person 42", "Creator", "Writing")),
+        cast = (1..60).map { MediaCredit(it, "Person $it", null, it, "https://cast/$it", 12) },
+        crew = listOf(MediaCrewCredit(42, "Person 42", "Creator", "Writing", "https://crew")),
         seasons = listOf(MediaSeason(0, 1, 2020, listOf(MediaEpisode(3, "Special", "2020-01-01", 30,
             crew = listOf(MediaCrewCredit(84, "Same name", "Writer", null), MediaCrewCredit(85, "Same name", "Director", null)))),
-            cast = listOf(MediaCredit(90, "Season only", null, 0)))))
+            cast = listOf(MediaCredit(90, "Season only", null, 0, "https://season")))),
+        rtUrl = "https://www.rottentomatoes.com/tv/show", awardsCount = 4,
+        bechdelOutcome = "pass", bechdelScore = "3/3")
 
     private fun repository(db: LibraryDatabase, outbox: MutationOutbox, credits: PersonCreditsDao = db.personCreditsDao()) =
         LibraryRepository(db.titleDao(), db.seasonDao(), db.episodeDao(), db.episodeWatchEventDao(), db.episodeRatingDao(), db.episodeReviewDao(),
@@ -89,10 +91,29 @@ class PersonCreditsAddTest {
             assertEquals(listOf(seasonCast.id, seasonCast.id), seasonSends.map { it.getString("id") })
             assertTrue(seasonSends.all { it.getString("user_id") == "owner" && it.getString("title_id") == id && it.getString("season_id") == seasonCast.seasonId })
             assertTrue(requests.indexOfFirst { it.first == "episodes" } < requests.indexOfFirst { it.first == "episode_crew" })
-            val old = JSONObject(payload.toString()).apply { remove("seasonCast"); remove("episodeCrew") }
+            val sentTitle = JSONObject(requests.first { it.first == "titles" }.second)
+            assertEquals(details.rtUrl, sentTitle.getString("rt_url"))
+            assertEquals(4, sentTitle.getInt("awards_count"))
+            assertEquals("pass", sentTitle.getString("bechdel_outcome"))
+            assertEquals("3/3", sentTitle.getString("bechdel_score"))
+            assertEquals("https://season", seasonSends.first().getString("profile_url"))
+            val sentCast = JSONArray(requests.first { it.first == "title_cast" }.second).getJSONObject(0)
+            assertEquals("https://cast/1", sentCast.getString("profile_url"))
+            assertEquals(12, sentCast.getInt("episode_count"))
+            assertEquals("https://crew", JSONArray(requests.first { it.first == "title_crew" }.second).getJSONObject(0).getString("profile_url"))
+            val old = JSONObject(payload.toString()).apply {
+                remove("seasonCast"); remove("episodeCrew")
+                listOf("rtUrl", "awardsCount", "bechdelOutcome", "bechdelScore").forEach { remove(it) }
+                for (key in listOf("cast", "crew")) {
+                    val rows = getJSONArray(key)
+                    for (i in 0 until rows.length()) { rows.getJSONObject(i).remove("profileUrl"); rows.getJSONObject(i).remove("episodeCount") }
+                }
+            }
             requests.clear()
             assertEquals(PushResult.Success, writer.push(queued.copy(payloadJson = old.toString())))
             assertFalse(requests.any { it.first == "season_cast" || it.first == "episode_crew" })
+            assertFalse(JSONObject(requests.first { it.first == "titles" }.second).has("rt_url"))
+            assertFalse(JSONArray(requests.first { it.first == "title_cast" }.second).getJSONObject(0).has("profile_url"))
         } finally { db.close() }
     }
 }

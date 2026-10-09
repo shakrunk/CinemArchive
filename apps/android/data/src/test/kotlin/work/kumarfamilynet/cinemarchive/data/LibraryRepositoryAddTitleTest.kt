@@ -247,6 +247,31 @@ class LibraryRepositoryAddTitleTest {
     )
 
     @Test
+    fun `catalog enrichment survives local admission and queued graph`() = runTest {
+        val titleDao = AddTitleTitleDao()
+        val details = movie.copy(
+            rtUrl = "https://www.rottentomatoes.com/m/inception", awardsCount = 4,
+            bechdelOutcome = "fail", bechdelScore = "1/3",
+            cast = movie.cast.map { it.copy(profileUrl = "https://cast", episodeCount = 12) },
+            crew = movie.crew.map { it.copy(profileUrl = "https://crew") },
+        )
+        repository(titleDao = titleDao).addTitle(AddTitleRequest(details, LibraryStatus.WATCHLIST, null, null))
+        val written = titleDao.written.single()
+        assertEquals(details.rtUrl, written.rtUrl)
+        assertEquals(4, written.awardsCount)
+        assertEquals("fail", written.bechdelOutcome)
+        assertEquals("1/3", written.bechdelScore)
+        val graph = JSONObject(outboxDao.entries.single().payloadJson)
+        assertEquals(details.rtUrl, graph.getString("rtUrl"))
+        assertEquals(4, graph.getInt("awardsCount"))
+        assertEquals("fail", graph.getString("bechdelOutcome"))
+        assertEquals("1/3", graph.getString("bechdelScore"))
+        assertEquals("https://cast", graph.getJSONArray("cast").getJSONObject(0).getString("profileUrl"))
+        assertEquals(12, graph.getJSONArray("cast").getJSONObject(0).getInt("episodeCount"))
+        assertEquals("https://crew", graph.getJSONArray("crew").getJSONObject(0).getString("profileUrl"))
+    }
+
+    @Test
     fun `adding a movie writes the title row and one outbox entry`() = runTest {
         val titleDao = AddTitleTitleDao()
         val repo = repository(titleDao = titleDao)

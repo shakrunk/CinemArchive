@@ -75,6 +75,10 @@ data class MediaDetails(
     /** Empty for movies. Includes season 0 (TMDB "Specials") only when it has episodes,
      *  matching the web app — see Specials.kt. */
     val seasons: List<MediaSeason> = emptyList(),
+    val rtUrl: String? = null,
+    val awardsCount: Int? = null,
+    val bechdelOutcome: String? = null,
+    val bechdelScore: String? = null,
 )
 
 data class MediaSeason(
@@ -125,6 +129,8 @@ data class MediaCredit(
     val name: String,
     val characterName: String?,
     val order: Int,
+    val profileUrl: String? = null,
+    val episodeCount: Int? = null,
 )
 
 data class MediaCrewCredit(
@@ -132,6 +138,7 @@ data class MediaCrewCredit(
     val name: String,
     val job: String,
     val department: String?,
+    val profileUrl: String? = null,
 )
 
 /** What the Add overlay's second step collects, on top of the TMDB metadata itself. */

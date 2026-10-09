@@ -105,12 +105,8 @@ class DiscoverRepository(
             result,
         )
         coroutineScope {
-            val scores = async {
-                base.imdbId?.let { imdbId ->
-                    runCatching {
-                        parseCriticScores(client.invokeFunction("media-proxy", "action=ratings&imdb=$imdbId", accessToken))
-                    }.getOrNull()
-                }
+            val enriched = async {
+                enrichCatalogDetails(base) { query -> client.invokeFunction("media-proxy", query, accessToken) }
             }
             val seasons = base.seasons.map { season ->
                 async {
@@ -131,11 +127,7 @@ class DiscoverRepository(
                     }
                 }
             }
-            val critics = scores.await()
-            base.copy(
-                imdbRating = critics?.imdbRating,
-                rtScore = critics?.rtScore,
-                metacriticScore = critics?.metacriticScore,
+            enriched.await().copy(
                 // A Specials season whose episode fetch came back empty is dropped rather
                 // than stored as an empty shell.
                 seasons = seasons.map { it.await() }.filterNot { it.isSpecials && it.episodes.isEmpty() },

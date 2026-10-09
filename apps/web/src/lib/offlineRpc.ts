@@ -128,6 +128,8 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
       case 'list.patch': return [update('lists',mutation.listId,mapped(mutation.patch,{name:'name',description:'description'}))]
       case 'list.delete': return [remove('lists',{id:mutation.listId})]
       case 'membership.set': return [{table:'list_items',action:mutation.present ? 'insert' : 'delete',key:{list_id:mutation.listId,title_id:mutation.titleId},...(mutation.present ? {values:{added_at:command.createdAt}} : {})}]
+      case 'theaterInterest.set': return [{table:'theater_interest',action:mutation.present ? 'insert' : 'delete',key:{id:mutation.titleId},
+        ...(mutation.present ? {values:{title_id:mutation.titleId,created_at:mutation.createdAt}} : {})}]
       case 'pin.set': return [{table:'user_title_pins',action:mutation.variant === null ? 'delete' : 'put',key:{title_id:mutation.titleId,easter_egg_key:mutation.easterEggKey},...(mutation.variant === null ? {} : {values:{pinned_variant:mutation.variant}})}]
       case 'ledger.set': return [{table:'user_prefs',action:'put',key:{},values:{ledger_layout:mutation.widgets}}]
       case 'external.link': return [{table:'external_title_links',action:'insert',key:{provider:mutation.provider,external_id:mutation.externalId},values:{title_id:mutation.titleId}}]
@@ -210,6 +212,10 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
     // Receipts intentionally describe the ORIGINAL result. A fresh snapshot
     // preserves edits made on another device after that command was committed.
     const canonicalBase=await fetchBase(context)
+    const interests = command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]
+    if (interests.some((mutation) => mutation.kind === 'theaterInterest.set') && canonicalBase.moviegoingPreferencesSupport !== 'authoritative') {
+      return { kind: 'retry', message: 'The saved theater preference needs an authoritative server read before confirmation. Retry when moviegoing preference sync is available.' }
+    }
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed during refresh.'}
     if (command.mutation.kind === 'outing.revert') onOutingReverted?.(command.mutation.outingId)
     return {kind:'success',canonicalBase}

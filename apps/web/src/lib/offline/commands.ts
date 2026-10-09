@@ -32,6 +32,7 @@ export type TrackingMutation =
   | { kind: 'list.patch'; listId: string; patch: Partial<Pick<List, 'name' | 'description'>>; updatedAt: string }
   | { kind: 'list.delete'; listId: string }
   | { kind: 'membership.set'; listId: string; titleId: string; present: boolean }
+  | { kind: 'theaterInterest.set'; titleId: string; userId: string; present: boolean; createdAt: string }
   | { kind: 'pin.set'; titleId: string; easterEggKey: string; variant: 'bw' | 'color' | null }
   | { kind: 'ledger.set'; widgets: LedgerWidget[] }
   | { kind: 'external.link'; titleId: string; provider: 'letterboxd' | 'simkl' | 'plex' | 'emby'; externalId: string }

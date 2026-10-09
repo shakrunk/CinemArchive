@@ -330,10 +330,12 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
   const isSharedView = useAppStore((s) => s.isSharedView)
+  const interested = useAppStore((s) => !!s.user && s.viewerContext.kind === 'owner' && s.theaterInterest.some((row) => row.titleId === entry.title.id))
   const { title, releaseDate } = entry
+  const readyToSchedule = !isSharedView && interested && title.type === 'movie' && !releaseDate
   return (
     <div className="relative">
-      <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+      <CardFrame title={title} onOpen={() => readyToSchedule ? openOutingSchedule(title.id) : openDetailDrawer(title.id)} delayMs={delayMs}>
         {releaseDate ? (
           <>
             <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
@@ -345,7 +347,7 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
           </>
         ) : (
           <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
-            <Bookmark className="w-3.5 h-3.5" /> On your watchlist
+            <Bookmark className="w-3.5 h-3.5" /> {readyToSchedule ? 'Now playing — tap to schedule an outing' : 'On your watchlist'}
           </p>
         )}
       </CardFrame>

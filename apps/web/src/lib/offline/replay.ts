@@ -91,6 +91,7 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMu
     case 'title.delete': {
       const pinnedModes = Object.fromEntries(Object.entries(state.pinnedModes).filter(([key]) => !key.startsWith(`${mutation.titleId}:`)))
       return { ...state, pinnedModes, titles: state.titles.filter((t) => t.id !== mutation.titleId),
+        ...(state.theaterInterest ? { theaterInterest: state.theaterInterest.filter((row) => row.titleId !== mutation.titleId) } : {}),
         outings: state.outings.filter((o) => o.titleId !== mutation.titleId),
         listMemberships: Object.fromEntries(Object.entries(state.listMemberships).map(([key, ids]) => [key, ids.filter((id) => id !== mutation.titleId)])),
       }
@@ -102,6 +103,13 @@ function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMu
       seasons: t.seasons?.map((season) => season.id === mutation.seasonId ? { ...season, episodesWatched: mutation.episodesWatched } : season),
     }))
     case 'external.link': return state // Provenance has no library-facing projection.
+    case 'theaterInterest.set': {
+      const remaining = (state.theaterInterest ?? []).filter((row) => row.titleId !== mutation.titleId)
+      const existing = state.theaterInterest?.find((row) => row.titleId === mutation.titleId)
+      return { ...state, theaterInterest: mutation.present && state.titles.some((title) => title.id === mutation.titleId)
+        ? [...remaining, existing ?? { id: mutation.titleId, titleId: mutation.titleId, userId: mutation.userId, createdAt: mutation.createdAt, updatedAt: mutation.createdAt }]
+        : remaining }
+    }
     case 'episode.metadata': return episode(state, mutation.titleId, mutation.episodeId, (ep) => fields(ep, mutation.patch))
     case 'episode.log': return episode(state, mutation.titleId, mutation.episodeId, (ep) => ({ ...ep,
       watchEvents: mutation.watchEvent ? put(ep.watchEvents, mutation.watchEvent) : ep.watchEvents,

@@ -102,6 +102,21 @@ describe('atomic command payloads',()=>{
 })
 
 describe('account-fenced delivery',()=>{
+  it('retains accepted interest until an authoritative read and retries the exact original operation', async () => {
+    const interestScope = { ...scope, userId: '10000000-0000-4000-8000-000000000001' }
+    getSession.mockResolvedValue({ data: { session: { user: { id: interestScope.userId }, access_token: 'captured' } }, error: null })
+    const pending = createCommand(interestScope, { kind: 'theaterInterest.set', titleId: '20000000-0000-4000-8000-000000000001', userId: interestScope.userId, present: true, createdAt: '2026-10-08T00:00:00Z' })
+    const request = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ operationId: pending.id, rows: [{ table: 'theater_interest', row: { id: pending.mutation } }] })))
+    vi.stubGlobal('fetch', request)
+    const canonical = { ...snapshot, moviegoingPreferencesSupport: 'authoritative', venueNotes: [], theaterInterest: [] }
+    const fetchBase = vi.fn().mockResolvedValueOnce({ ...snapshot, moviegoingPreferencesSupport: 'unsupported' }).mockResolvedValueOnce(canonical)
+    const deliver = createLibraryCommandDelivery(fetchBase), deliveryContext = { ...context(), scope: interestScope }
+    expect((await deliver(pending, deliveryContext)).kind).toBe('retry')
+    expect(await deliver(pending, deliveryContext)).toEqual({ kind: 'success', canonicalBase: canonical })
+    expect(request.mock.calls[0][1].body).toBe(request.mock.calls[1][1].body)
+    // The original insert receipt cannot resurrect an interest removed on another device.
+    expect(canonical.theaterInterest).toEqual([])
+  })
   it('captures the matching token and returns fresh canonical state',async()=>{
     const pending=command(), fetchBase=vi.fn().mockResolvedValue(snapshot)
     const request=vi.fn().mockResolvedValue(new Response(JSON.stringify({operationId:pending.id,rows:[]})))

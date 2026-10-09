@@ -4,6 +4,7 @@ import { useAppStore } from './useAppStore'
 import { fetchUserLibrary, shareOutingPlans } from '../lib/db'
 import { outing, title } from '../lib/offline/fixtures.test-support'
 import type { SharedOutingSnapshot } from '../lib/outingSharing'
+import { IndexedDbOfflineStore } from '../lib/offline/storage'
 
 vi.mock('../lib/offlineRpc', async (original) => ({ ...await original<typeof import('../lib/offlineRpc')>(), createLibraryCommandDelivery: () => vi.fn() }))
 vi.mock('../lib/tickets/remote', async (original) => ({ ...await original<typeof import('../lib/tickets/remote')>(), ticketRemote: { descriptors: vi.fn().mockResolvedValue({ support: 'authoritative', outings: [] }) } }))
@@ -53,6 +54,30 @@ afterEach(() => {
 })
 
 describe('owner library loading', () => {
+  it('journals rapid theater toggles, keeps failed saves unchanged, and clears them on account switch', async () => {
+    const ownedMovie = { ...title, id: '20000000-0000-4000-8000-000000000001', type: 'movie' as const }
+    fetchLibrary.mockResolvedValue({ titles: [ownedMovie], outings: [] })
+    const ownerId = '10000000-0000-4000-8000-000000000001'
+    useAppStore.getState().setUser({ id: ownerId } as User)
+    await useAppStore.getState().loadUserLibrary()
+    const append = vi.spyOn(IndexedDbOfflineStore.prototype, 'append').mockRejectedValueOnce(new Error('Device storage is full'))
+    await expect(useAppStore.getState().setTheaterInterest(ownedMovie.id, true)).rejects.toThrow('storage is full')
+    expect(useAppStore.getState().theaterInterest).toEqual([])
+    const first = useAppStore.getState().setTheaterInterest(ownedMovie.id, true)
+    const second = useAppStore.getState().setTheaterInterest(ownedMovie.id, false)
+    await Promise.all([first, second])
+    expect(append).toHaveBeenCalledTimes(3)
+    expect(useAppStore.getState().theaterInterest).toEqual([])
+    const commands = useAppStore.getState().offlineStatus.commands
+    expect(commands.map((command) => command.mutation)).toMatchObject([{ present: true, userId: ownerId }, { present: false, userId: ownerId }])
+    expect(commands[1].dependsOn).toContain(commands[0].id)
+    const switching = useAppStore.getState().setTheaterInterest(ownedMovie.id, true)
+    useAppStore.getState().setUser({ id: '30000000-0000-4000-8000-000000000001' } as User)
+    await expect(switching).rejects.toThrow('Account changed')
+    expect(useAppStore.getState().theaterInterest).toEqual([])
+    expect(useAppStore.getState().moviegoingPreferencesSupport).toBeUndefined()
+    await useAppStore.getState().loadUserLibrary()
+  })
   it('does not share a stale server plan while a durable local title edit is pending', async () => {
     const upcoming = { ...outing, endsAt: '2099-01-01T20:00:00Z' }
     fetchLibrary.mockResolvedValue({ titles: [title], outings: [upcoming] })

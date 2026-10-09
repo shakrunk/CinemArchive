@@ -73,6 +73,11 @@ function appendToDocument(d: OwnerDocument, command: PendingCommand): void {
   }
   if (command.dependsOn.some((id) => !d.commands.some((c) => c.id === id))) throw new Error('Unknown command dependency')
   const projection = replayPending(d.base, d.commands)
+  for (const leaf of command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]) {
+    if (leaf.kind !== 'theaterInterest.set') continue
+    if (d.base.moviegoingPreferencesSupport !== 'authoritative') throw new Error('Sync moviegoing preferences with the updated server before editing theater interest')
+    if (!projection.titles.some((title) => title.id === leaf.titleId && title.type === 'movie')) throw new Error('This movie is no longer in your library')
+  }
   const entities = mutationEntities(command.mutation, projection)
   const prerequisites = new Set<string>()
   for (const key of entities) {

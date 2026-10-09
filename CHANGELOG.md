@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web movie details now save private theater-interest preferences durably and offer an Up Next scheduling prompt, with offline retry and account isolation.
 - Android backup restoration now has a verified title-mapping foundation that preserves exact archive numbers and reports unsupported values; installed-app restore remains under development.
 - Android now validates explicit title-revision proof in outing completion receipts without treating newer title state as the original completion effect.
 - Web owner caches now retain shared private venue notes and theater-interest flags across restarts and preserve them when an older server lacks support; editing controls remain in progress.

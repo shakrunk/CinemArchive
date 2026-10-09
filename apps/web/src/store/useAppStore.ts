@@ -7,6 +7,7 @@ import { computeLedgerStats } from './ledgerStats'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
+import type { TheaterInterest } from '../lib/moviegoingPreferences'
 import { assertDeliverableCommand, createLibraryCommandDelivery } from '../lib/offlineRpc'
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
 import { createTicketCommandDelivery } from '../lib/tickets/delivery'
@@ -253,6 +254,9 @@ export type ViewerContext =
   | { kind: 'friend'; userId: string; displayName: string }
 
 interface AuthSlice {
+  theaterInterest: TheaterInterest[]
+  moviegoingPreferencesSupport: OfflineSnapshot['moviegoingPreferencesSupport']
+  setTheaterInterest: (titleId: string, present: boolean) => Promise<void>
   user: User | null
   loadingUser: boolean
   // Set when the last library load failed; cleared when a load starts or
@@ -664,6 +668,7 @@ function afterOutingRevert(outingId: string, confirmed = false): void {
 
 function snapshotState(snapshot: OfflineSnapshot, s: AppStore): Partial<AppStore> {
   return { ...withDerivedTitles(snapshot.titles, s.filters), outings: snapshot.outings,
+    theaterInterest: snapshot.theaterInterest ?? [], moviegoingPreferencesSupport: snapshot.moviegoingPreferencesSupport,
     lists: snapshot.lists,
     listMemberships: Object.fromEntries(Object.entries(snapshot.listMemberships).map(([id, members]) => [id, new Set(members)])),
     pinnedModes: snapshot.pinnedModes,
@@ -982,6 +987,15 @@ export const useAppStore = create<AppStore>()(
   },
 
   // ── Auth ───────────────────────────────────────────────────
+  theaterInterest: [],
+  moviegoingPreferencesSupport: undefined,
+  setTheaterInterest: (titleId, present) => writeLocalLibrary(async (state) => {
+    if (!state.user || isDevMockUser(state.user)) throw new Error('Sign in to save a private theater preference')
+    if (state.moviegoingPreferencesSupport !== 'authoritative') throw new Error('Sync moviegoing preferences with the updated server before editing theater interest')
+    if (!state.titles.some((title) => title.id === titleId && title.type === 'movie')) throw new Error('This movie is no longer in your library')
+    if (state.theaterInterest.some((row) => row.titleId === titleId) === present) return
+    await libraryRuntime.submit({ kind: 'theaterInterest.set', titleId, userId: state.user.id, present, createdAt: new Date().toISOString() })
+  }),
   user: null,
   loadingUser: false,
   libraryLoadError: null,

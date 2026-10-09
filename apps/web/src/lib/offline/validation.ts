@@ -100,6 +100,8 @@ const checks: Record<string, Check> = {
   'list.patch': shape({ kind: text, listId: id, patch: patch({ name: text, description: nullable(text) }), updatedAt: timestamp }),
   'list.delete': shape({ kind: text, listId: id }),
   'membership.set': shape({ kind: text, listId: id, titleId: id, present: boolean }),
+  'theaterInterest.set': (v) => shape({ kind: text, titleId: isTicketId, userId: isTicketId, present: boolean, createdAt: timestamp })(v) && record(v) &&
+    isTheaterInterest({ id: v.titleId, titleId: v.titleId, userId: v.userId, createdAt: v.createdAt, updatedAt: v.createdAt }),
   'pin.set': shape({ kind: text, titleId: id, easterEggKey: id, variant: nullable(color) }),
   'ledger.set': shape({ kind: text, widgets: array(widget) }),
   'external.link': shape({ kind: text, titleId: id, provider: oneOf('letterboxd', 'simkl', 'plex', 'emby'), externalId: id }),
@@ -129,6 +131,9 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     preconditions: array(precondition),
   })(value)) throw new Error('Invalid or unsupported offline command')
   const command = value as PendingCommand
+  for (const leaf of command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]) {
+    if (leaf.kind === 'theaterInterest.set' && (leaf.userId !== command.scope.userId || command.baseRevision)) throw new Error('Theater interest requires its authenticated owner and desired-presence intent')
+  }
   if (command.mutation.kind === 'outing.revert' && command.baseRevision) throw new Error('Outing reversal requires separate outing and viewing guards')
   if (isTicketMutation(command.mutation)) {
     if (!isTicketId(command.id) || command.baseRevision || command.preconditions?.length) throw new Error('Ticket commands keep revision guards in their immutable ticket intent')

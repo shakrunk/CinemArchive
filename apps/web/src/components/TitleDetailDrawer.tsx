@@ -44,6 +44,7 @@ import { AddToListSheet } from 'src/components/AddToListSheet'
 import { Chip } from 'src/components/ui/chip'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CompanionInput } from 'src/components/OutingScheduleSheet'
+import { TheaterInterestControl } from './TheaterInterestControl'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
@@ -2072,6 +2073,7 @@ export function TitleDetailDrawer() {
           {/* ── Movie section (and TV without seasons) ─────────────── */}
           {title.type === 'movie' && (
             <>
+              <TheaterInterestControl titleId={title.id} />
               {/* Viewing History */}
               <SectionCard
                 title="Viewing History"

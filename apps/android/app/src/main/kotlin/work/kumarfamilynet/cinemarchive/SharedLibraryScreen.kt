@@ -48,9 +48,6 @@ fun SharedLibraryRoute(token: String, repository: SharingRepository, onClose: ()
     var snapshot by remember(token) { mutableStateOf<SharedLibrarySnapshot?>(null) }
     var error by remember(token) { mutableStateOf<String?>(null) }
     var attempt by remember(token) { mutableIntStateOf(0) }
-    var selectedId by remember(token) { mutableStateOf<String?>(null) }
-    var ledger by remember(token) { mutableStateOf(false) }
-    var expanded by remember(token) { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(token, attempt) {
         snapshot = null
         error = null
@@ -64,12 +61,31 @@ fun SharedLibraryRoute(token: String, repository: SharingRepository, onClose: ()
                 else "The shared archive could not be loaded. Check your connection and retry."
         }
     }
+    ArchiveViewer(token, snapshot, error, onRetry = { attempt++ }, onClose = onClose)
+}
+
+/** Shared rendering only: social content is supplied by the authenticated friend route. */
+@Composable
+internal fun ArchiveViewer(
+    scopeKey: String,
+    snapshot: SharedLibrarySnapshot?,
+    error: String?,
+    onRetry: () -> Unit,
+    onClose: () -> Unit,
+    heading: String = "Shared archive",
+    displayName: String = "This archive",
+    emptyMessage: String = "No titles are shared by this link.",
+    socialContent: (@Composable (SharedLibraryTitle) -> Unit)? = null,
+) {
+    var selectedId by remember(scopeKey) { mutableStateOf<String?>(null) }
+    var ledger by remember(scopeKey) { mutableStateOf(false) }
+    var expanded by remember(scopeKey) { mutableStateOf(emptySet<String>()) }
     val back = { if (selectedId != null) selectedId = null else onClose() }
     BackHandler(onBack = back)
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = back) { Text(if (selectedId == null) "Close" else "Back") }
-            Text("Shared archive", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(heading, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             Text("Read only", style = MaterialTheme.typography.labelMedium)
         }
         val current = snapshot
@@ -77,10 +93,10 @@ fun SharedLibraryRoute(token: String, repository: SharingRepository, onClose: ()
         when {
             error != null -> Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(error!!)
-                Button(onClick = { attempt++ }) { Text("Retry") }
+                Button(onClick = onRetry) { Text("Retry") }
             }
             current == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            selected != null -> SharedTitleDetail(selected)
+            selected != null -> SharedTitleDetail(selected, socialContent)
             else -> {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                     FilterChip(selected = !ledger, onClick = { ledger = false }, label = { Text("Library (${current.library.titles.size})") })
@@ -89,17 +105,17 @@ fun SharedLibraryRoute(token: String, repository: SharingRepository, onClose: ()
                 }
                 if (ledger) LedgerScreen(
                     uiState = LedgerUiState(current.stats, current.boards), layout = current.layout,
-                    readOnly = true, viewedDisplayName = "This archive", expandedWidgets = expanded,
+                    readOnly = true, viewedDisplayName = displayName, expandedWidgets = expanded,
                     onToggleExpanded = { id -> expanded = if (id in expanded) expanded - id else expanded + id },
                     onTitleClick = { selectedId = it },
-                ) else SharedTitleList(current.library.titles, onSelect = { selectedId = it })
+                ) else SharedTitleList(current.library.titles, emptyMessage, onSelect = { selectedId = it })
             }
         }
     }
 }
 
 @Composable
-private fun SharedTitleList(titles: List<SharedLibraryTitle>, onSelect: (String) -> Unit) {
+private fun SharedTitleList(titles: List<SharedLibraryTitle>, emptyMessage: String, onSelect: (String) -> Unit) {
     var query by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     val shown = remember(titles, query, status) {
@@ -118,7 +134,7 @@ private fun SharedTitleList(titles: List<SharedLibraryTitle>, onSelect: (String)
             }
         }
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (shown.isEmpty()) item { Text(if (titles.isEmpty()) "No titles are shared by this link." else "No matching titles.") }
+            if (shown.isEmpty()) item { Text(if (titles.isEmpty()) emptyMessage else "No matching titles.") }
             items(shown, key = { it.id }) { title ->
                 Surface(onClick = { onSelect(title.id) }, shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
@@ -141,7 +157,7 @@ private fun SharedTitleList(titles: List<SharedLibraryTitle>, onSelect: (String)
  * Content scrolls through the regular lazy surface, with no write controls.
  */
 @Composable
-private fun SharedTitleDetail(title: SharedLibraryTitle) {
+private fun SharedTitleDetail(title: SharedLibraryTitle, socialContent: (@Composable (SharedLibraryTitle) -> Unit)?) {
     val row = remember(title) { title.graph() }
     val uriHandler = LocalUriHandler.current
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -182,6 +198,7 @@ private fun SharedTitleDetail(title: SharedLibraryTitle) {
             }
         }
         item { SharedCredits("Cast", row.rows("title_cast")); SharedCredits("Crew", row.rows("title_crew")) }
+        if (socialContent != null) item(key = "discussion") { socialContent(title) }
         if (row.rows("viewings").isNotEmpty()) item { Text("Viewing history", style = MaterialTheme.typography.titleLarge) }
         items(row.rows("viewings"), key = { "viewing:" + it.getString("id") }) { viewing ->
             SharedLogCard(listOfNotNull(viewing.text("viewed_at") ?: "Date unknown",

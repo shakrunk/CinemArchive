@@ -109,7 +109,6 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 import work.kumarfamilynet.cinemarchive.data.SyncServices
 import work.kumarfamilynet.cinemarchive.feature.auth.LoginRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.AddTitleOverlayRoute
-import work.kumarfamilynet.cinemarchive.feature.friends.FriendLibraryRoute
 import work.kumarfamilynet.cinemarchive.feature.friends.FriendsRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerRoute
@@ -928,8 +927,10 @@ private fun CinemArchiveApp(
                 )
                 is Overlay.FriendLibrary -> FriendLibraryRoute(
                     runtime.friendsRepository,
+                    viewerUserId = runtime.ownerId,
                     friendUserId = current.friendUserId,
                     label = current.label,
+                    socialSource = titleSocialSource,
                     onBack = { overlay = Overlay.Friends },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)

@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android friend archives now open full title details, viewing history and a read-only Ledger, with authenticated discussions and reactions while respecting shared scopes and account changes.
 - Android viewing-history edits now retain their original versions through saved forms and retries, save linked title changes atomically, and support explicit conflict recovery without overwriting newer edits.
 - Android credit refresh now preserves synced profile images and episode counts when updating names, filling missing seasons or reconciling server identities.
 - Android backup mapping now reports nested collection text that server storage cannot represent while preserving the original archive; installed-app restore remains in progress.

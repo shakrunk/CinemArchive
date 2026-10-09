@@ -29,7 +29,10 @@ private const val FRIEND_TITLE_COLUMNS = "id,tmdb_id,type,title,year,poster_url,
 class FriendsRepository(
     private val client: SupabaseRestClient,
     private val sessionProvider: () -> SupabaseSession?,
-) {
+) : FriendLibrarySource {
+    override suspend fun loadFriendLibrary(viewerUserId: String, friendUserId: String): SharedLibrary =
+        readFriendLibrary(client, sessionProvider, viewerUserId, friendUserId)
+
     /** Runs [block] on IO with the call-time session, mapping transport/HTTP failures to a
      *  friendly [IllegalStateException]. [fixedMessage] forces [fallback] regardless of cause. */
     private suspend fun <T> call(fallback: String, fixedMessage: Boolean = false, block: (SupabaseSession) -> T): T =

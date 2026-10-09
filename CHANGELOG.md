@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-10-09
+
 ### Fixed
 - Android add-title previews now show director or network and every genre.
 

@@ -208,7 +208,7 @@ class AppAccountRuntime(
 
     val ledgerLayoutRepository = LedgerLayoutRepository(dataStore("cinemarchive_ledger_layout"), session, SupabaseLedgerLayoutWriter(client))
 
-    val librarySyncRepository = LibrarySyncRepository(
+    val librarySyncRepository: LibrarySyncRepository = LibrarySyncRepository(
         dataStore = dataStore("cinemarchive_sync"),
         client = client,
         authRepository = session,

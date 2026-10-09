@@ -10,6 +10,7 @@ import type { TicketCapture } from '../lib/tickets/types'
 import { ticketRemote, mergeOwnedTickets } from '../lib/tickets/remote'
 import { replayPending } from '../lib/offline/replay'
 import { assertTicketBytes, sameTicketAttachment } from '../lib/tickets/validation'
+import { fetchOwnedMoviegoingPreferences, mergeOwnedMoviegoingPreferences } from '../lib/moviegoingPreferences'
 
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
 export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
@@ -19,17 +20,18 @@ export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
 export async function fetchOwnerSnapshot(context: DeliveryContext, requireTickets = false): Promise<OfflineSnapshot> {
   if (!context.isCurrent()) throw new Error('Library owner changed')
   const userId = context.scope.userId
-  const [library, lists, listMemberships, pins, ledgerWidgets, tickets] = await Promise.all([
+  const [library, lists, listMemberships, pins, ledgerWidgets, tickets, moviegoing] = await Promise.all([
     fetchUserLibrary(userId), fetchLists(userId), fetchListMemberships(userId),
     fetchAllTitlePins(userId), fetchLedgerLayout(userId),
     ticketRemote.descriptors(context),
+    fetchOwnedMoviegoingPreferences(context),
   ])
   if (!context.isCurrent()) throw new Error('Library owner changed')
   if (requireTickets && tickets.support !== 'authoritative') throw new Error('Ticket sync requires the server ticket attachment update; your saved photo remains on this device')
-  return mergeOwnedTickets({ ...library, lists, listMemberships, ledgerWidgets,
+  return mergeOwnedMoviegoingPreferences(mergeOwnedTickets({ ...library, lists, listMemberships, ledgerWidgets,
     rowRevisions: { ...library.rowRevisions, ...Object.fromEntries(lists.map((list) => [`lists:${list.id}`, list.updatedAt])) },
     pinnedModes: Object.fromEntries(pins.map((pin) => [`${pin.titleId}:${pin.easterEggKey}`, pin.pinnedVariant])),
-  }, tickets)
+  }, tickets), moviegoing)
 }
 
 export interface OfflineLibraryStatus {

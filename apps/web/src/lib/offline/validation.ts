@@ -3,6 +3,7 @@ import type { OfflineSnapshot } from './snapshot'
 import { mutationRows } from './preconditions'
 import { isTicketAttachment, isTicketId, isValidTicketMutation, ticketObjectKey } from '../tickets/validation'
 import { isTicketMutation } from '../tickets/types'
+import { assertMoviegoingSnapshot, isTheaterInterest, isVenueNote } from '../moviegoingPreferences'
 
 type Check = (value: unknown) => boolean
 type Fields = Record<string, Check>
@@ -144,8 +145,11 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     guarded.add(key)
   }
 }
-export function assertSnapshot(value: unknown): asserts value is OfflineSnapshot {
+export function assertSnapshot(value: unknown, ownerId?: string): asserts value is OfflineSnapshot {
   if (!shape({ titles: array(title), outings: array(outingSnapshot), lists: array(list),
     listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
-  }, { rowRevisions: dictionary(timestamp), ticketAttachmentSupport: (v) => v === 'authoritative' || v === 'unsupported' })(value)) throw new Error('Invalid or unsupported offline snapshot')
+  }, { rowRevisions: dictionary(timestamp), ticketAttachmentSupport: (v) => v === 'authoritative' || v === 'unsupported',
+    venueNotes: array(isVenueNote), theaterInterest: array(isTheaterInterest), moviegoingPreferencesSupport: oneOf('authoritative', 'unsupported'),
+  })(value)) throw new Error('Invalid or unsupported offline snapshot')
+  assertMoviegoingSnapshot(value as OfflineSnapshot, ownerId)
 }

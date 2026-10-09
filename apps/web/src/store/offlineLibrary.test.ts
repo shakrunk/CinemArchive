@@ -6,9 +6,11 @@ import { createCommand } from '../lib/offline/commands'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
 import { deferred, snapshot, title } from '../lib/offline/fixtures.test-support'
 import { fetchAllTitlePins, fetchLedgerLayout, fetchListMemberships, fetchLists, fetchUserLibrary } from '../lib/db'
+import { fetchOwnedMoviegoingPreferences } from '../lib/moviegoingPreferences'
 
 vi.mock('../lib/db', () => ({ fetchAllTitlePins: vi.fn(), fetchLedgerLayout: vi.fn(), fetchListMemberships: vi.fn(), fetchLists: vi.fn(), fetchUserLibrary: vi.fn() }))
 vi.mock('../lib/tickets/remote', async (original) => ({ ...await original<typeof import('../lib/tickets/remote')>(), ticketRemote: { descriptors: vi.fn().mockResolvedValue({ support: 'authoritative', outings: [] }) } }))
+vi.mock('../lib/moviegoingPreferences', async (original) => ({ ...await original<typeof import('../lib/moviegoingPreferences')>(), fetchOwnedMoviegoingPreferences: vi.fn().mockResolvedValue({ support: 'authoritative', venueNotes: [], theaterInterest: [] }) }))
 
 const stores: IndexedDbOfflineStore[] = []
 const runtimes: OfflineLibraryRuntime[] = []
@@ -152,5 +154,24 @@ describe('safe cache migration and strict owner refresh', () => {
     vi.mocked(fetchLedgerLayout).mockResolvedValue(null)
     vi.mocked(fetchAllTitlePins).mockRejectedValue(new Error('pins unavailable'))
     await expect(fetchOwnerSnapshot({ scope: { projectId: 'project', userId: 'owner' }, signal: new AbortController().signal, isCurrent: () => true })).rejects.toThrow('pins unavailable')
+  })
+
+  it('includes private preferences only in the owner snapshot and fences late results', async () => {
+    vi.mocked(fetchUserLibrary).mockResolvedValue({ titles: [title], outings: [] })
+    vi.mocked(fetchLists).mockResolvedValue([])
+    vi.mocked(fetchListMemberships).mockResolvedValue({})
+    vi.mocked(fetchLedgerLayout).mockResolvedValue(null)
+    vi.mocked(fetchAllTitlePins).mockResolvedValue([])
+    const context = { scope: { projectId: 'project', userId: 'owner' }, signal: new AbortController().signal, isCurrent: () => true }
+    expect(await fetchOwnerSnapshot(context)).toMatchObject({ moviegoingPreferencesSupport: 'authoritative', venueNotes: [], theaterInterest: [] })
+    expect(fetchOwnedMoviegoingPreferences).toHaveBeenCalledWith(context)
+    let current = true
+    vi.mocked(fetchOwnedMoviegoingPreferences).mockImplementationOnce(async () => { current = false; return { support: 'unsupported' } })
+    await expect(fetchOwnerSnapshot({ ...context, isCurrent: () => current })).rejects.toThrow('owner changed')
+    const calls = vi.mocked(fetchOwnedMoviegoingPreferences).mock.calls.length
+    const { runtime } = setup()
+    await runtime.loadAnonymous()
+    runtime.deactivate() // Friend/shared navigation uses this path, never the owner reader.
+    expect(fetchOwnedMoviegoingPreferences).toHaveBeenCalledTimes(calls)
   })
 })

@@ -48,7 +48,7 @@ function validateDocument(raw: unknown, scope: OfflineScope): asserts raw is Own
   if (!Number.isSafeInteger(d.revision) || d.revision < 0 || !Number.isSafeInteger(d.nextSequence) || d.nextSequence < 1 || !Array.isArray(d.commands)) {
     throw new Error('Invalid offline owner record counters')
   }
-  assertSnapshot(d.base)
+  assertSnapshot(d.base, scope.userId)
   for (const outing of d.base.outings) {
     if (outing.ticketAttachment && outing.ticketAttachment.objectKey !== ticketObjectKey(scope, outing.ticketAttachment.id)) throw new Error('Stored ticket belongs to another owner')
   }
@@ -321,7 +321,7 @@ export class IndexedDbOfflineStore {
 
   replaceBase(scope: OfflineScope, base: OfflineSnapshot): Promise<OfflineRead> {
     const captured = omitUndefined(base)
-    assertSnapshot(captured)
+    assertSnapshot(captured, scope.userId)
     return this.transact(scope, (d) => { d.base = mergeRefreshedSnapshot(d.base, captured) })
   }
 
@@ -340,7 +340,7 @@ export class IndexedDbOfflineStore {
     if (canonicalEffect) assertMutation(canonicalEffect)
     const captured: Mutation | undefined = canonicalEffect ? JSON.parse(JSON.stringify(canonicalEffect)) : undefined
     const base = canonicalBase === undefined ? undefined : omitUndefined(canonicalBase)
-    if (base !== undefined) assertSnapshot(base)
+    if (base !== undefined) assertSnapshot(base, scope.userId)
     return this.transact(scope, (d) => {
       const command = d.commands.find((c) => c.id === commandId)
       if (!command) return

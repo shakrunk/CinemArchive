@@ -7,6 +7,7 @@ import type { SharedOutingSnapshot } from '../lib/outingSharing'
 
 vi.mock('../lib/offlineRpc', async (original) => ({ ...await original<typeof import('../lib/offlineRpc')>(), createLibraryCommandDelivery: () => vi.fn() }))
 vi.mock('../lib/tickets/remote', async (original) => ({ ...await original<typeof import('../lib/tickets/remote')>(), ticketRemote: { descriptors: vi.fn().mockResolvedValue({ support: 'authoritative', outings: [] }) } }))
+vi.mock('../lib/moviegoingPreferences', async (original) => ({ ...await original<typeof import('../lib/moviegoingPreferences')>(), fetchOwnedMoviegoingPreferences: vi.fn().mockResolvedValue({ support: 'authoritative', venueNotes: [], theaterInterest: [] }) }))
 vi.mock('./offlineLibrary', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./offlineLibrary')>()
   const { IDBFactory } = await import('fake-indexeddb')

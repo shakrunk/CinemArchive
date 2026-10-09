@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web owner caches now retain shared private venue notes and theater-interest flags across restarts and preserve them when an older server lacks support; editing controls remain in progress.
 - Android tickets now support durable photo capture, original-image export, barcode display and explicit recovery with serialized sync replay.
 - Android backup validation now preserves archive values and plans copies with fresh identities; installed-app export and restore integration remain under development.
 - Android now offers explicit review and recovery of pending viewing edits, preserving server revisions and clearing only confirmed obsolete outing links.

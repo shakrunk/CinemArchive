@@ -130,4 +130,25 @@ class EpisodeHistoryTest {
         assertTrue(payload.has("watchedAt") && payload.isNull("watchedAt"))
         assertEquals("With family", payload.getString("notes"))
     }
+    @Test fun colorModesRoundTripThroughLocalHistoryAndOnlyWatchReviewPayloads() = runBlocking {
+        repo.saveEpisodeLog("ep1", draft().copy(colorMode = "bw"))
+        repo.saveEpisodeLog("ep1", draft("color").copy(includeWatch = false, colorMode = "color"))
+        val ep = episode()
+        assertEquals("bw", ep.watchEvents.single().colorMode)
+        assertEquals(listOf("bw", "color"), ep.reviews.map { it.colorMode })
+        val queue = db.outboxDao().getPending()
+        assertTrue(queue.filter { it.entityType == "episode_rating" }.all { !JSONObject(it.payloadJson).has("colorMode") })
+        assertEquals(listOf("bw", "bw", "color"), queue.filter { it.entityType != "episode_rating" }.map { JSONObject(it.payloadJson).getString("colorMode") })
+    }
+
+    @Test fun skippedColorChoiceQueuesNullAndUnknownModesAreRejected() = runBlocking {
+        repo.saveEpisodeLog("ep1", draft())
+        val ep = episode()
+        assertNull(ep.watchEvents.single().colorMode); assertNull(ep.reviews.single().colorMode)
+        assertTrue(db.outboxDao().getPending().filter { it.entityType != "episode_rating" }.all {
+            JSONObject(it.payloadJson).let { json -> json.has("colorMode") && json.isNull("colorMode") }
+        })
+        try { draft().copy(colorMode = "sepia"); fail("Invalid mode") } catch (_: IllegalArgumentException) { }
+    }
+
 }

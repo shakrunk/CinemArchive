@@ -13,8 +13,10 @@ data class EpisodeLogDraft(
     val watchNotes: String? = null,
     val rating: Double? = null,
     val reviewText: String? = null,
+    val colorMode: String? = null,
 ) {
     init {
+        require(colorMode == null || colorMode in setOf("bw", "color")) { "Unknown episode color mode" }
         require(watchEventId.isNotBlank() && ratingId.isNotBlank() && reviewId.isNotBlank())
         watchedAt?.let { LocalDate.parse(it) }
         require(rating == null || (rating.isFinite() && rating in 0.5..5.0 && rating * 2 % 1 == 0.0))

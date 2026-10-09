@@ -24,6 +24,7 @@ internal fun EpisodeHistoryPanel(
     episode: EpisodeDetail,
     onSave: suspend (String, EpisodeLogDraft) -> Unit,
     onDelete: suspend (String, String) -> Unit,
+    isSpiderNoir: Boolean = false,
 ) {
     var showLog by rememberSaveable(episode.id) { mutableStateOf(false) }
     var deleteWatch by remember(episode.id) { mutableStateOf<EpisodeWatch?>(null) }
@@ -37,6 +38,7 @@ internal fun EpisodeHistoryPanel(
             Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f)) {
                     Text(watch.watchedAt?.take(10) ?: "Before CinemArchive", style = MaterialTheme.typography.bodySmall)
+                    EpisodeColorModeBadge(watch.colorMode)
                     watch.notes?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 }
                 TextButton(onClick = { deleteWatch = watch; error = null }) { Text("Delete watch") }
@@ -46,6 +48,7 @@ internal fun EpisodeHistoryPanel(
         episode.ratings.forEach { Text("${it.rating} / 5 · ${it.ratedAt}", style = MaterialTheme.typography.bodySmall) }
         if (episode.reviews.isNotEmpty()) Text("Reviews", style = MaterialTheme.typography.titleSmall)
         episode.reviews.forEach {
+            EpisodeColorModeBadge(it.colorMode)
             Text(it.reviewText, style = MaterialTheme.typography.bodySmall)
             Text(it.reviewedAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -53,7 +56,7 @@ internal fun EpisodeHistoryPanel(
             Text(if (episode.watchCount > 0) "Add rating, review, or rewatch" else "Log watch, rating, or review")
         }
     }
-    if (showLog) EpisodeLogSheet(episode, onSave = { onSave(episode.id, it) }, onDismiss = { showLog = false })
+    if (showLog) EpisodeLogSheet(episode, isSpiderNoir, onSave = { onSave(episode.id, it) }, onDismiss = { showLog = false })
     deleteWatch?.let { watch ->
         AlertDialog(
             onDismissRequest = { if (!deleting) deleteWatch = null },
@@ -77,7 +80,7 @@ internal fun EpisodeHistoryPanel(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EpisodeLogSheet(episode: EpisodeDetail, onSave: suspend (EpisodeLogDraft) -> Unit, onDismiss: () -> Unit) {
+private fun EpisodeLogSheet(episode: EpisodeDetail, isSpiderNoir: Boolean, onSave: suspend (EpisodeLogDraft) -> Unit, onDismiss: () -> Unit) {
     val watchId = rememberSaveable { UUID.randomUUID().toString() }
     val ratingId = rememberSaveable { UUID.randomUUID().toString() }
     val reviewId = rememberSaveable { UUID.randomUUID().toString() }
@@ -91,47 +94,69 @@ private fun EpisodeLogSheet(episode: EpisodeDetail, onSave: suspend (EpisodeLogD
     var showDate by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showModeChoice by rememberSaveable { mutableStateOf(false) }
+    var colorMode by rememberSaveable { mutableStateOf<String?>(null) }
+    // Once submitted, every retry keeps both the selected mode and original values/identities.
+    val editable = !saving && recordedAt == null
     val scope = rememberCoroutineScope()
+    fun submit(mode: String?) {
+        if (saving) return
+        colorMode = mode
+        saving = true
+        error = null
+        showModeChoice = false
+        val timestamp = recordedAt ?: Instant.now().toString().also { recordedAt = it }
+        scope.launch {
+            try {
+                onSave(EpisodeLogDraft(watchId, ratingId, reviewId, timestamp, includeWatch,
+                    if (prePlatform) null else date, watchNotes.takeIf { includeWatch && it.isNotBlank() },
+                    rating.takeIf { it > 0 }, review.trim().takeIf { it.isNotEmpty() }, colorMode))
+                onDismiss()
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = e.message ?: "Couldn't save episode log. Retry the same request." }
+            finally { saving = false }
+        }
+    }
     ModalBottomSheet(onDismissRequest = { if (!saving) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(episode.episodeName ?: "Episode ${episode.episodeNumber}", style = MaterialTheme.typography.headlineSmall)
             Row {
-                Checkbox(includeWatch, { includeWatch = it }, enabled = !saving)
+                Checkbox(includeWatch, { includeWatch = it }, enabled = editable)
                 Text("Log a watch event", Modifier.padding(top = 12.dp))
             }
             if (includeWatch) {
                 Row {
-                    Checkbox(prePlatform, { prePlatform = it }, enabled = !saving)
+                    Checkbox(prePlatform, { prePlatform = it }, enabled = editable)
                     Text("Watched before joining (no date)", Modifier.padding(top = 12.dp))
                 }
-                if (!prePlatform) TextButton(enabled = !saving, onClick = { showDate = true }) { Text("Watched on $date · Change date") }
-                OutlinedTextField(watchNotes, { watchNotes = it }, label = { Text("Watch notes (optional)") }, modifier = Modifier.fillMaxWidth(), enabled = !saving)
+                if (!prePlatform) TextButton(enabled = editable, onClick = { showDate = true }) { Text("Watched on $date · Change date") }
+                OutlinedTextField(watchNotes, { watchNotes = it }, label = { Text("Watch notes (optional)") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
             }
             Text("Rating (optional, logged independently)", style = MaterialTheme.typography.labelLarge)
-            if (!saving) DraggableStarRating(rating, { rating = it }) else Text("$rating / 5")
-            TextButton(enabled = !saving && rating > 0, onClick = { rating = 0.0 }) { Text("Clear rating") }
-            OutlinedTextField(review, { review = it }, label = { Text("Review (optional, logged independently)") }, modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = !saving)
+            if (editable) DraggableStarRating(rating, { rating = it }) else Text("$rating / 5")
+            TextButton(enabled = editable && rating > 0, onClick = { rating = 0.0 }) { Text("Clear rating") }
+            OutlinedTextField(review, { review = it }, label = { Text("Review (optional, logged independently)") }, modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = editable)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(enabled = !saving, onClick = onDismiss) { Text("Cancel") }
                 Button(enabled = !saving && (includeWatch || rating > 0 || review.isNotBlank()), onClick = {
-                    saving = true
-                    error = null
-                    val timestamp = recordedAt ?: Instant.now().toString().also { recordedAt = it }
-                    scope.launch {
-                        try {
-                            onSave(EpisodeLogDraft(watchId, ratingId, reviewId, timestamp, includeWatch,
-                                if (prePlatform) null else date, watchNotes.takeIf { includeWatch && it.isNotBlank() },
-                                rating.takeIf { it > 0 }, review.trim().takeIf { it.isNotEmpty() }))
-                            onDismiss()
-                        } catch (e: CancellationException) { throw e }
-                        catch (e: Exception) { error = e.message ?: "Couldn't save episode log. Try again." }
-                        finally { saving = false }
-                    }
-                }) { Text(if (saving) "Saving…" else "Save") }
+                    if (recordedAt != null) submit(colorMode)
+                    else if (isSpiderNoir && (includeWatch || review.isNotBlank())) showModeChoice = true
+                    else submit(null)
+                }) { Text(if (saving) "Saving…" else if (recordedAt != null) "Retry" else "Save") }
             }
         }
     }
+    if (showModeChoice) AlertDialog(
+        onDismissRequest = { if (!saving) submit(null) },
+        title = { Text("How did you experience this?") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Spider-Man: Noir")
+            Button(enabled = !saving, onClick = { submit("bw") }, modifier = Modifier.fillMaxWidth()) { Text("Authentic Black & White") }
+            Button(enabled = !saving, onClick = { submit("color") }, modifier = Modifier.fillMaxWidth()) { Text("True-Hue Full Color") }
+        } },
+        confirmButton = { TextButton(enabled = !saving, onClick = { submit(null) }) { Text("Not now") } },
+    )
     if (showDate) {
         val picker = rememberDatePickerState(initialSelectedDateMillis = LocalDate.parse(date).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli())
         DatePickerDialog(onDismissRequest = { showDate = false }, confirmButton = {
@@ -141,4 +166,10 @@ private fun EpisodeLogSheet(episode: EpisodeDetail, onSave: suspend (EpisodeLogD
             }) { Text("Choose date") }
         }, dismissButton = { TextButton(onClick = { showDate = false }) { Text("Cancel") } }) { DatePicker(picker) }
     }
+}
+
+@Composable
+private fun EpisodeColorModeBadge(mode: String?) {
+    val label = when (mode) { "bw" -> "B&W"; "color" -> "Color"; else -> return }
+    Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
 }

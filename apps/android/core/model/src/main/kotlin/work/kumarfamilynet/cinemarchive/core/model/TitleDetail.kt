@@ -90,9 +90,9 @@ data class PersonCredit(val tmdbPersonId: Int, val name: String, val role: Strin
     val person: LibraryPerson get() = LibraryPerson(tmdbPersonId, name)
 }
 
-data class EpisodeWatch(val id: String, val watchedAt: String?, val notes: String? = null)
+data class EpisodeWatch(val id: String, val watchedAt: String?, val notes: String? = null, val colorMode: String? = null)
 data class EpisodeRating(val id: String, val rating: Double, val ratedAt: String)
-data class EpisodeReview(val id: String, val reviewText: String, val reviewedAt: String)
+data class EpisodeReview(val id: String, val reviewText: String, val reviewedAt: String, val colorMode: String? = null)
 
 data class Viewing(
     val id: String,

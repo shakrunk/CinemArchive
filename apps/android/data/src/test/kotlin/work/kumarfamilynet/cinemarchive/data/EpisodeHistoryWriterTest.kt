@@ -51,4 +51,23 @@ class EpisodeHistoryWriterTest {
         assertEquals("eq.watch", request.url.queryParameter("id"))
         assertEquals("eq.owner", request.url.queryParameter("user_id"))
     }
+    @Test fun watchAndReviewColorModePreserveExplicitChoiceNullAndLegacyOmission() = runTest {
+        for (kind in listOf("episode_watch_event", "episode_review")) {
+            val payload = JSONObject().put("id", "history").put("episodeId", "episode")
+                .put("watchedAt", JSONObject.NULL).put("reviewText", "Review").put("reviewedAt", "2026-10-09T12:00:00Z")
+            for (mode in listOf("absent", "bw", "color", "null")) {
+                requests.clear()
+                if (mode == "absent") payload.remove("colorMode")
+                else payload.put("colorMode", if (mode == "null") JSONObject.NULL else mode)
+                assertEquals(PushResult.Success, writer.push(entry("upsert", payload).copy(entityType = kind)))
+                when (mode) {
+                    "absent" -> assertFalse(body().has("color_mode"))
+                    "null" -> assertTrue(body().has("color_mode") && body().isNull("color_mode"))
+                    else -> assertEquals(mode, body().getString("color_mode"))
+                }
+                assertEquals("owner", body().getString("user_id"))
+            }
+        }
+    }
+
 }

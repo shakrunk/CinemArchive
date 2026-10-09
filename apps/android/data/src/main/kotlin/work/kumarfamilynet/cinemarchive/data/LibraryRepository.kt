@@ -633,9 +633,9 @@ class LibraryRepository(
                                 stillUrl = episode.stillUrl,
                                 watchEvents = watchesByEpisode[episode.id].orEmpty()
                                     .sortedWith(compareByDescending<EpisodeWatchEventEntity> { it.watchedAt }.thenBy { it.id })
-                                    .map { EpisodeWatch(it.id, it.watchedAt, it.notes) },
+                                    .map { EpisodeWatch(it.id, it.watchedAt, it.notes, it.colorMode) },
                                 ratings = ratingsByEpisode[episode.id].orEmpty().map { EpisodeRating(it.id, it.rating, it.ratedAt) },
-                                reviews = reviewsByEpisode[episode.id].orEmpty().map { EpisodeReview(it.id, it.reviewText, it.reviewedAt) },
+                                reviews = reviewsByEpisode[episode.id].orEmpty().map { EpisodeReview(it.id, it.reviewText, it.reviewedAt, it.colorMode) },
                             )
                         },
                     )
@@ -750,11 +750,12 @@ class LibraryRepository(
             if (draft.includeWatch) {
                 val existing = watchEventDao.observeAllWatchEvents().first().find { it.id == draft.watchEventId }
                 require(existing == null || existing.episodeId == episodeId) { "Watch belongs to another episode" }
-                watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(draft.watchEventId, episodeId, draft.watchedAt, draft.watchNotes)))
+                watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(draft.watchEventId, episodeId, draft.watchedAt, draft.watchNotes, draft.colorMode)))
                 outbox.enqueue("episode_watch_event", draft.watchEventId, "upsert", JSONObject().apply {
                     put("id", draft.watchEventId); put("episodeId", episodeId)
                     put("watchedAt", draft.watchedAt ?: JSONObject.NULL)
                     put("notes", draft.watchNotes ?: JSONObject.NULL)
+                    put("colorMode", draft.colorMode ?: JSONObject.NULL)
                 })
             }
             draft.rating?.let { rating ->
@@ -765,10 +766,11 @@ class LibraryRepository(
                 })
             }
             draft.reviewText?.takeIf { it.isNotBlank() }?.let { review ->
-                reviewDao.upsertAll(listOf(EpisodeReviewEntity(draft.reviewId, episodeId, review, draft.recordedAt)))
+                reviewDao.upsertAll(listOf(EpisodeReviewEntity(draft.reviewId, episodeId, review, draft.recordedAt, draft.colorMode)))
                 outbox.enqueue("episode_review", draft.reviewId, "upsert", JSONObject().apply {
                     put("id", draft.reviewId); put("episodeId", episodeId)
                     put("reviewText", review); put("reviewedAt", draft.recordedAt)
+                    put("colorMode", draft.colorMode ?: JSONObject.NULL)
                 })
             }
         }

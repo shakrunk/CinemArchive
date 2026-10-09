@@ -767,6 +767,7 @@ fun TitleDetailScreen(
                             cast = episodeCast[episode.id],
                             onBrowsePerson = onBrowsePerson,
                             onShowCast = { onLoadEpisodeCast(episode.id, selectedSeason.seasonNumber, episode.episodeNumber) },
+                            isSpiderNoir = detail.tmdbId == 220102,
                             modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
                         )
                     }
@@ -1069,6 +1070,7 @@ private fun EpisodeRow(
     onSaveEpisodeLog: suspend (String, EpisodeLogDraft) -> Unit,
     onDeleteEpisodeWatch: suspend (String, String) -> Unit,
     cast: EpisodeCast?,
+    isSpiderNoir: Boolean,
     onShowCast: () -> Unit,
     onBrowsePerson: ((LibraryPerson) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -1144,7 +1146,7 @@ private fun EpisodeRow(
                 )
             }
             PersonCreditsSection("Episode crew", episode.crew, onBrowsePerson)
-            EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch)
+            EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch, isSpiderNoir)
             TextButton(
                 onClick = {
                     castExpanded = !castExpanded

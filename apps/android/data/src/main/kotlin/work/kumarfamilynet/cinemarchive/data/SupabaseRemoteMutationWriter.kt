@@ -269,6 +269,7 @@ class SupabaseRemoteMutationWriter(
             .put("user_id", session.userId)
             .putNullable("watched_at", payload, "watchedAt")
         if (payload.has("notes")) body.putNullable("notes", payload, "notes")
+        if (payload.has("colorMode")) body.putNullable("color_mode", payload, "colorMode")
         client.upsert("episode_watch_events", session.accessToken, body.toString())
         return PushResult.Success
     }
@@ -299,6 +300,7 @@ class SupabaseRemoteMutationWriter(
             .put("user_id", session.userId)
             .put("review_text", payload.getString("reviewText"))
             .put("reviewed_at", payload.getString("reviewedAt"))
+        if (payload.has("colorMode")) body.putNullable("color_mode", payload, "colorMode")
         client.upsert("episode_reviews", session.accessToken, body.toString())
         return PushResult.Success
     }

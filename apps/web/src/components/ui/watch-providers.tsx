@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link2, Pencil, Check, X, Home, Disc3, Plus, Trash2 } from 'lucide-react'
 import type { WatchProviders } from 'src/lib/media'
@@ -36,7 +37,7 @@ function ProviderRow({ label, providers }: { label: string; providers: WatchProv
     <div className="flex items-center gap-2.5 min-w-0">
       <span
         className="font-mono shrink-0"
-        style={{ width: '40px', color: 'var(--paper-faint)', fontSize: '10px' }}
+        style={{ width: '40px', color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}
       >
         {label}
       </span>
@@ -85,7 +86,7 @@ export function WatchProviderListings({ providers }: { providers: WatchProviders
           target="_blank"
           rel="noopener noreferrer"
           className="inline-block font-mono transition-colors hover:text-amber"
-          style={{ fontSize: '9px', color: 'var(--paper-faint)' }}
+          style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}
         >
           Streaming data provided by JustWatch
         </a>
@@ -101,7 +102,7 @@ function HomeCollectionRow() {
     <div className="flex items-center gap-2.5 flex-wrap">
       <span
         className="font-mono shrink-0"
-        style={{ width: '40px', color: 'var(--paper-faint)', fontSize: '10px' }}
+        style={{ width: '40px', color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}
       >
         Owned
       </span>
@@ -151,7 +152,7 @@ function PhysicalMediaShelf({
     <div className="flex items-start gap-2.5 flex-wrap">
       <span
         className="font-mono shrink-0 leading-8"
-        style={{ width: '40px', color: 'var(--paper-faint)', fontSize: '10px' }}
+        style={{ width: '40px', color: 'var(--paper-faint)', fontSize: scaledTextSize('10px') }}
       >
         Shelf
       </span>

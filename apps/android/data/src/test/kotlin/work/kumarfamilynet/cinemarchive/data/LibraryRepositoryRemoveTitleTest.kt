@@ -60,6 +60,7 @@ class LibraryRepositoryRemoveTitleTest {
         theaterInterestDao = NoTheaterInterestDaoRm,
         outbox = MutationOutbox(outboxDao, NoopWriterRm, NoopConflictHandlerRm),
         episodeMetadataFetcher = NoEpisodeMetadataFetcher2,
+        personCreditsDao = FakePersonCreditsDao(),
     )
 
     @Test
@@ -116,6 +117,9 @@ private class RecordingOutboxDaoRm : OutboxDao {
     override fun observePending(): Flow<List<OutboxEntity>> = MutableStateFlow(entries)
     override suspend fun getPending(): List<OutboxEntity> = entries
     override suspend fun remove(id: String) { entries.removeAll { it.id == id } }
+    override suspend fun markForReview(id: String, reason: String): Int = error("Not used by this fixture")
+    override suspend fun replaceReviewedTitle(oldId: String, originalPayload: String, newId: String, newOperation: String, newPayload: String): Int = error("Not used by this fixture")
+
     override suspend fun recordFailure(id: String, error: String?) = Unit
 }
 
@@ -157,6 +161,7 @@ private object NoRatingsDao2 : EpisodeRatingDao {
 }
 
 private object NoReviewsDao2 : EpisodeReviewDao {
+    override fun observeReviews(titleId: String): Flow<List<EpisodeReviewEntity>> = throw UnsupportedOperationException()
     override suspend fun upsertAll(reviews: List<EpisodeReviewEntity>) = throw UnsupportedOperationException()
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }

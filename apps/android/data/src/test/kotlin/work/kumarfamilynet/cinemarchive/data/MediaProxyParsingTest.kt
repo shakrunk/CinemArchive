@@ -18,6 +18,22 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
  */
 class MediaProxyParsingTest {
 
+    @Test fun `season cast keeps same name identities and episode crew keeps writing roles only`() {
+        val body = """{"credits":{"cast":[
+            {"id":42,"name":"Same name","character":"First","order":1},
+            {"id":84,"name":"Same name","character":"Second","order":0}]},
+            "episodes":[{"episode_number":3,"crew":[
+                {"id":42,"name":"Same name","job":"Director"},
+                {"id":42,"name":"Same name","job":"Writer"},
+                {"id":84,"name":"Same name","job":"Teleplay"},
+                {"id":90,"name":"Story person","job":"Story"},
+                {"id":91,"name":"Other person","job":"Editor"},
+                {"id":42,"name":"Same name","job":"Writer"}]}]}"""
+        assertEquals(listOf(84, 42), parseSeasonCast(body).map { it.tmdbPersonId })
+        assertEquals(listOf("Director", "Writer", "Teleplay", "Story"), parseSeasonEpisodes(body).single().crew.map { it.job })
+        assertEquals(listOf(42, 42, 84, 90), parseSeasonEpisodes(body).single().crew.map { it.tmdbPersonId })
+    }
+
     private val movieFallback = MediaSearchResult(27205, "Inception", 2010, MediaType.MOVIE, null, null)
     private val tvFallback = MediaSearchResult(1396, "Breaking Bad", 2008, MediaType.TV, null, null)
 

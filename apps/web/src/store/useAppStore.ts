@@ -1,40 +1,42 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mockTitles, type Title, type Viewing, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import { mockTitles, type Title, type CinemaOuting, type List, type LedgerStats, type WatchStatus, type MediaType } from './mockData'
+import type { SharedOutingSnapshot } from '../lib/outingSharing'
 import { computeLedgerStats } from './ledgerStats'
-import { normalizeCompanions } from './companions'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
-import { toCachedTitle } from './libraryCache'
-import { isSpecialsSeason, nextUnwatchedEpisode } from './episodeUtils'
+import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
+import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
+import type { TheaterInterest, VenueNote } from '../lib/moviegoingPreferences'
+import { captureVenueDraft, venueChange, type VenueNoteDraft, type VenueNoteReview } from '../lib/venueNotes'
+import { assertDeliverableCommand, createLibraryCommandDelivery } from '../lib/offlineRpc'
+import { IndexedDbOfflineStore } from '../lib/offline/storage'
+import { createTicketCommandDelivery } from '../lib/tickets/delivery'
+import { ticketRemoteOptions } from '../lib/tickets/remote'
+import type { TicketCapture } from '../lib/tickets/types'
+import { createCommand } from '../lib/offline/commands'
+import { createLibraryActions, type LibraryWrite } from './libraryActions'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
-import { localDateStr, type OutingSchedulePrefill, type OutingSharePayload } from './outings'
+import type { OutingSchedulePrefill } from './outings'
 import type { User } from '@supabase/supabase-js'
 import { isDevMockUser } from '../lib/devAuth'
 import type { AppView, NavItemId } from '../lib/navigation'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
-import type { LedgerPanelId, LedgerPanelWidth, LedgerWidget, LedgerWidgetSettings } from '../lib/ledgerPanels'
+import type { LedgerPanelId, LedgerPanelWidth, LedgerWidget } from '../lib/ledgerPanels'
 import {
   DEFAULT_LEDGER_PANEL_ORDER,
   DEFAULT_LEDGER_PANEL_WIDTHS,
   LEDGER_PANEL_LABELS,
   createLedgerWidget,
   defaultLedgerWidgets,
-  newLedgerWidgetId,
   normalizeLedgerWidgets,
 } from '../lib/ledgerPanels'
 import { decadeOf } from '../lib/utils'
 import {
-  fetchUserLibrary, fetchSharedLibrary, fetchFriendLibrary, insertTitleToDb, updateTitleInDb,
-  deleteTitleFromDb, logEpisodeToDb, deleteViewingFromDb,
-  deleteEpisodeWatchEventFromDb, insertPrePlatformWatchEventsToDb,
-  fetchAllTitlePins, upsertTitlePin, deleteTitlePin,
-  fetchLists, fetchListMemberships, insertListToDb, updateListInDb, deleteListFromDb,
-  addTitleToListInDb, removeTitleFromListInDb,
-  fetchLedgerLayout, saveLedgerLayout,
+  fetchSharedLibrary, fetchFriendLibrary, fetchLedgerLayout,
   fetchNotifications, fetchUnreadNotificationCount, markNotificationRead, markAllNotificationsRead,
   deleteNotification,
-  insertOutingToDb, updateOutingInDb, completeDueOutings,
+  completeDueOutings,
   shareOutingPlans as shareOutingPlansRpc,
   type AppNotificationItem, type OutingCompletionResult,
 } from '../lib/db'
@@ -132,35 +134,17 @@ export interface LibraryFilters {
 
 // ─── Slice Types ────────────────────────────────────────────────────────────
 
-interface EpisodeLogOpts {
-  watchedAt?: string   // ISO date — creates a WatchEvent if provided
-  prePlatform?: boolean // watched before joining — creates a WatchEvent with no date (indeterminate)
-  watchNotes?: string
-  rating?: number      // creates an EpisodeRating stamped at call-time
-  reviewText?: string  // creates an EpisodeReview stamped at call-time
-  colorMode?: 'bw' | 'color'
-}
-
 interface LibrarySlice {
   titles: Title[]
   filters: LibraryFilters
   filteredTitles: Title[]
 
-  setTitles: (titles: Title[]) => void
-  addTitle: (title: Title) => void
-  updateTitle: (id: string, patch: Partial<Title>) => void
-  removeTitle: (id: string) => void
   setFilter: <K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]) => void
   resetFilters: () => void
   applyFilters: () => void
-  logEpisode: (titleId: string, seasonNumber: number, episodeNumber: number, opts: EpisodeLogOpts) => void
   // Marks every unwatched episode of a season (or the whole series when
   // seasonNumber is omitted) as watched before joining the platform: each gets
   // a dateless watch event. Series-wide marking also sets status to 'watched'.
-  markPrePlatformWatched: (titleId: string, seasonNumber?: number) => void
-  removeViewing: (titleId: string, viewingId: string) => void
-  deleteEpisodeWatchEvent: (titleId: string, seasonNumber: number, episodeNumber: number, watchEventId: string) => void
-  logNextEpisodeWatch: (titleId: string, colorMode?: 'bw' | 'color') => { seasonNumber: number; episodeNumber: number; watchEventId: string } | null
 }
 
 interface LedgerSlice {
@@ -219,16 +203,8 @@ interface UISlice {
   toggleNavItemHidden: (id: NavItemId) => void
   setNavCompact: (compact: boolean) => void
   resetNavPrefs: () => void
-  addLedgerWidget: (panel: LedgerPanelId) => string
-  duplicateLedgerWidget: (id: string) => string | null
-  removeLedgerWidget: (id: string) => void
-  moveLedgerWidget: (id: string, direction: 'up' | 'down') => void
-  reorderLedgerWidgets: (ids: string[]) => void
-  setLedgerWidgetWidth: (id: string, width: LedgerPanelWidth) => void
   // Merge-patch a widget's settings; keys set to undefined are removed, and a
   // settings object with no remaining keys is dropped entirely.
-  setLedgerWidgetSettings: (id: string, patch: Partial<LedgerWidgetSettings>) => void
-  resetLedgerPrefs: () => void
   selectTitle: (id: string | null) => void
   openAddTitle: () => void
   openAddTitlePreselected: (result: SearchResult) => void
@@ -279,12 +255,29 @@ export type ViewerContext =
   | { kind: 'friend'; userId: string; displayName: string }
 
 interface AuthSlice {
+  venueNotes: VenueNote[]
+  openVenueNote: (venue: string) => VenueNoteDraft & { session: number }
+  saveVenueNote: (draft: VenueNoteDraft & { session: number }, notes: string | null) => Promise<void>
+  reviewVenueNote: (commandId: string) => Promise<VenueNoteReview>
+  resolveVenueNote: (review: VenueNoteReview, keepLocal: boolean) => Promise<void>
+  theaterInterest: TheaterInterest[]
+  moviegoingPreferencesSupport: OfflineSnapshot['moviegoingPreferencesSupport']
+  setTheaterInterest: (titleId: string, present: boolean) => Promise<void>
   user: User | null
   loadingUser: boolean
   // Set when the last library load failed; cleared when a load starts or
   // succeeds. Views surface it instead of a misleading empty state.
   libraryLoadError: string | null
   viewerContext: ViewerContext
+  offlineStatus: OfflineLibraryStatus
+  librarySession: number
+  offlineSyncError: string | null
+  retryPendingCommand: (id: string) => Promise<void>
+  discardPendingCommand: (id: string) => Promise<void>
+  retryLibrarySync: () => Promise<void>
+  discardDamagedCache: () => Promise<void>
+  offlineStorageError: string | null
+  legacyCacheAvailable: boolean
   setUser: (user: User | null) => void
   setLoadingUser: (loading: boolean) => void
   loadUserLibrary: () => Promise<void>
@@ -295,7 +288,6 @@ interface AuthSlice {
 
 interface PinsSlice {
   pinnedModes: Record<string, 'bw' | 'color'>
-  setPinnedMode: (titleId: string, easterEggKey: string, variant: 'bw' | 'color' | null) => void
   loadPinnedModes: () => Promise<void>
 }
 
@@ -309,11 +301,6 @@ interface ListsSlice {
   // doesn't survive JSON.stringify/parse), re-derived by loadLists() instead.
   listMemberships: Record<string, Set<string>>
   loadLists: () => Promise<void>
-  createList: (name: string, description?: string | null) => List
-  renameList: (id: string, patch: { name?: string; description?: string | null }) => void
-  deleteList: (id: string) => void
-  addTitleToList: (listId: string, titleId: string) => void
-  removeTitleFromList: (listId: string, titleId: string) => void
   listsForTitle: (titleId: string) => List[]
 }
 
@@ -326,7 +313,6 @@ interface OutingsSlice {
   // which writes new outings to the DB itself before this runs (rule §5.13:
   // an outing's row must exist before a kept title's viewing back-references
   // it).
-  setOutings: (outings: CinemaOuting[]) => void
   // "I've got tickets" sheet (plan §4.1) — a single overlay reused by every
   // entry point. titleId preselects a movie (create mode); outingId, when
   // set, switches the sheet into edit mode for that outing (titleId is then
@@ -339,23 +325,20 @@ interface OutingsSlice {
   outingSchedulePrefill: OutingSchedulePrefill | null
   openOutingSchedule: (titleId?: string, outingId?: string, prefill?: OutingSchedulePrefill) => void
   closeOutingSchedule: () => void
-  addOuting: (outing: CinemaOuting) => void
   // Edit/reschedule — recomputes endsAt from the merged showtime/previews/runtime.
-  updateOuting: (id: string, patch: Partial<CinemaOuting>) => void
   // Soft-cancel (plan §4.2): kept as a history row, hidden from all surfaces.
-  cancelOuting: (id: string) => void
   // Stamps follow_up_dismissed_at — called both on an explicit ✕ and after rating.
-  dismissOutingFollowUp: (id: string) => void
-  shareOutingPlans: (outingId: string, recipientIds: string[]) => Promise<void>
+  shareOutingPlans: (outingId: string, recipientIds: string[], operationId: string) => Promise<SharedOutingSnapshot>
+  attachOutingTicket: (outingId: string, capture: TicketCapture, blob: Blob) => Promise<void>
+  detachOutingTicket: (outingId: string) => Promise<void>
+  readOutingTicket: (outingId: string, attachmentId: string) => Promise<Blob>
   // "I've got tickets too" resolution (plan §4.10/§5.16) — if the shared
   // payload's tmdb_id isn't already in the library, adds it to the watchlist
   // first (same match-by-tmdbId+type resolution the recommendation inbox
   // uses), then returns the titleId either way for the prefilled sheet.
-  resolveSharedOutingTitle: (payload: OutingSharePayload) => string
   // "Didn't make it" (plan §5.6): deletes the auto-logged viewing, reverts the
-  // title status iff it's still 'watched', flips the outing to 'missed', and
-  // drops the now-stale outing_completed inbox item.
-  revertOutingCompletion: (outingId: string) => void
+  // title status only when its completion revision is unchanged, and marks
+  // the outing missed. Confirmed reversal removes its identified inbox item.
   // The single choke point for auto-completion (plan §4.3) — calls
   // complete_due_outings and applies whatever transitions it returns.
   reconcileOutings: () => Promise<void>
@@ -606,17 +589,6 @@ function withDerivedTitles(titles: Title[], filters: LibraryFilters) {
   }
 }
 
-// Fire-and-forget a DB write: log the failure and, if a user-facing message is
-// given, surface a retry-able notification. `retry` reruns the same call
-// raw (NotificationStack already wraps it in its own try/catch), so it must
-// not recurse back into this wrapper.
-function syncToDb(get: () => AppStore, logMessage: string, dbCall: () => Promise<unknown>, failureMessage?: string) {
-  dbCall().catch((err) => {
-    console.error(logMessage, err)
-    if (failureMessage) get().pushNotification({ message: failureMessage, retry: async () => { await dbCall() } })
-  })
-}
-
 // Swap the element at `idx` with its "up"/"down" neighbor. Returns null (no
 // change) when `idx` wasn't found or the neighbor would fall outside the list.
 function swapAdjacent<T>(list: T[], idx: number, direction: 'up' | 'down'): T[] | null {
@@ -629,7 +601,7 @@ function swapAdjacent<T>(list: T[], idx: number, direction: 'up' | 'down'): T[] 
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
-type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice & OutingsSlice & ListsSlice
+type AppStore = LibrarySlice & LedgerSlice & UISlice & AuthSlice & PinsSlice & OutingsSlice & ListsSlice & ReturnType<typeof createLibraryActions>
 
 // Bump when the persisted shape changes incompatibly; older payloads are dropped.
 const PERSIST_VERSION = 2
@@ -638,16 +610,6 @@ const PERSIST_VERSION = 2
 // so it fires exactly once, independent of PERSIST_VERSION).
 const SORT_DEFAULT_MIGRATION_KEY = 'cinemarchive-sort-default-migrated'
 
-// ─── Ledger layout write-behind ─────────────────────────────────────────────
-// Layout edits are rapid (drags fire many width/order updates), so the synced
-// copy is written on a debounce rather than per-action. localStorage persist
-// still captures every change immediately (anon/offline fallback).
-
-const LEDGER_SAVE_DEBOUNCE_MS = 800
-
-let ledgerSaveTimer: number | undefined
-let ledgerSaveGet: (() => AppStore) | null = null
-
 // Polls the unread notification count while a user is logged in — the inbox
 // has no Supabase Realtime subscription, so this is what keeps the bell
 // current for a friend's comment/reaction/request arriving mid-session.
@@ -655,35 +617,113 @@ const NOTIFICATION_POLL_MS = 45_000
 let notificationPollTimer: number | undefined
 let ownerLibraryRequest: { userId: string; promise: Promise<void> } | undefined
 const LIBRARY_ERROR_KEY = 'owner-library-load'
+let libraryGeneration = 0
+let runtimeOwnerId: string | null = null
+let libraryHydration: Promise<void> | undefined
+let localWriteTail: Promise<unknown> = Promise.resolve()
 
-function flushLedgerLayoutSave() {
-  window.clearTimeout(ledgerSaveTimer)
-  ledgerSaveTimer = undefined
-  const get = ledgerSaveGet
-  if (!get) return
-  const s = get()
-  // Viewers must never write the owner's board into their own prefs.
-  if (!s.user || s.isSharedView || s.viewerContext.kind === 'friend') return
-  const user = s.user
-  saveLedgerLayout(user.id, s.ledgerPrefs.widgets).catch(() => {
-    s.pushNotification({
-      message: "Couldn't sync your Ledger layout — it's saved on this device.",
-      retry: () => saveLedgerLayout(user.id, get().ledgerPrefs.widgets),
-    })
+function writeLocalLibrary<T>(work: (state: AppStore) => Promise<T>): Promise<T> {
+  const generation = libraryGeneration
+  const ownerId = useAppStore.getState().user?.id ?? null
+  const current = () => generation === libraryGeneration && (useAppStore.getState().user?.id ?? null) === ownerId
+  const pending = localWriteTail.catch(() => {}).then(async () => {
+    if (!current()) throw new Error('Account changed before this change could be saved')
+    if (!useAppStore.getState().offlineStatus.hydrated) await libraryHydration
+    if (!current()) throw new Error('Account changed before this change could be saved')
+    const state = useAppStore.getState()
+    if (state.isSharedView || state.viewerContext.kind !== 'owner') throw new Error('This library is read-only')
+    if (!state.offlineStatus.hydrated) throw new Error('Your local library is still loading. Please retry shortly.')
+    if (state.offlineStatus.quarantined.length) throw new Error('Recover the damaged local cache before saving more changes')
+    const result = await work(state)
+    if (!current()) throw new Error('The change was saved for the previous account; the account has now changed')
+    useAppStore.setState({ offlineStorageError: null })
+    return result
   })
+  localWriteTail = pending
+  // Handle ignored event-handler promises as well as awaited form saves. The
+  // original promise still rejects so callers never close/announce success.
+  void pending.catch((error) => {
+    if (!current()) return
+    const message = error instanceof Error ? error.message : 'This change could not be saved on this device'
+    useAppStore.setState({ offlineStorageError: message })
+    useAppStore.getState().pushNotification({ dedupeKey: 'offline-local-write', message })
+  })
+  return pending
 }
 
-function scheduleLedgerLayoutSave(get: () => AppStore) {
-  ledgerSaveGet = get
-  window.clearTimeout(ledgerSaveTimer)
-  ledgerSaveTimer = window.setTimeout(flushLedgerLayoutSave, LEDGER_SAVE_DEBOUNCE_MS)
+const writeLibrary: LibraryWrite = (prepare) => writeLocalLibrary(async (state) => {
+  const { mutation, result } = prepare(state)
+  if (mutation) {
+    const ownerId = state.user && !isDevMockUser(state.user) ? state.user.id : 'anonymous-local-only'
+    assertDeliverableCommand(createCommand({ projectId: import.meta.env.VITE_SUPABASE_URL || 'local', userId: ownerId }, mutation))
+    if (state.user && !isDevMockUser(state.user)) await libraryRuntime.submit(mutation)
+    else await libraryRuntime.submitAnonymous(mutation)
+  }
+  return result
+})
+
+function afterOutingRevert(outingId: string, confirmed = false): void {
+  const state = useAppStore.getState()
+  if (state.user && !isDevMockUser(state.user) && !confirmed) return
+  const outing = state.outings.find((row) => row.id === outingId && row.status === 'missed')
+  if (!outing) return
+  const stale = state.notificationInbox.filter((item) => item.type === 'outing_completed' && item.titleId === outing.titleId && item.payload.outingId === outingId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+  if (stale) void state.deleteNotificationItem(stale.id)
 }
 
-// A drag session followed by closing the tab shouldn't lose the layout.
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ledgerSaveTimer !== undefined) flushLedgerLayoutSave()
-  })
+function snapshotState(snapshot: OfflineSnapshot, s: AppStore): Partial<AppStore> {
+  return { ...withDerivedTitles(snapshot.titles, s.filters), outings: snapshot.outings,
+    theaterInterest: snapshot.theaterInterest ?? [], moviegoingPreferencesSupport: snapshot.moviegoingPreferencesSupport,
+    venueNotes: snapshot.venueNotes ?? [],
+    lists: snapshot.lists,
+    listMemberships: Object.fromEntries(Object.entries(snapshot.listMemberships).map(([id, members]) => [id, new Set(members)])),
+    pinnedModes: snapshot.pinnedModes,
+    ledgerPrefs: { widgets: snapshot.ledgerWidgets ?? defaultLedgerPrefs.widgets },
+  }
+}
+
+function reportOfflineStorageError(error: unknown): void {
+  console.error('Browser library persistence failed:', error)
+  const message = "Couldn't save this browser's library data. Keep this tab open and retry."
+  useAppStore.setState({ offlineStorageError: message })
+  useAppStore.getState().pushNotification({ dedupeKey: 'offline-storage-error', message })
+}
+
+const ownerOfflineStorage = new IndexedDbOfflineStore()
+const libraryRuntime = new OfflineLibraryRuntime({
+  projectId: import.meta.env.VITE_SUPABASE_URL || 'unconfigured-local',
+  ownerStorage: ownerOfflineStorage,
+  deliver: createLibraryCommandDelivery(fetchOwnerSnapshot, createTicketCommandDelivery({ ...ticketRemoteOptions,
+    readBlob: (scope, id) => ownerOfflineStorage.readTicketBlob(scope, id),
+    fetchBase: (context) => fetchOwnerSnapshot(context, true),
+  }), (outingId) => afterOutingRevert(outingId, true)),
+  onSnapshot: (snapshot) => {
+    const s = useAppStore.getState()
+    const userId = s.user && !isDevMockUser(s.user) ? s.user.id : null
+    if (s.isSharedView || s.viewerContext.kind !== 'owner' || userId !== runtimeOwnerId) return
+    useAppStore.setState(snapshotState(snapshot ?? emptySnapshot(), s))
+  },
+  onStatus: (offlineStatus) => {
+    const s = useAppStore.getState()
+    const userId = s.user && !isDevMockUser(s.user) ? s.user.id : null
+    if (s.isSharedView || s.viewerContext.kind !== 'owner' || userId !== offlineStatus.ownerId) return
+    useAppStore.setState({ offlineStatus })
+  },
+  onError: (error) => useAppStore.setState({ offlineSyncError: error instanceof Error ? error.message : 'Library sync is unavailable' }),
+})
+
+function stopLibraryRuntime(): void {
+  libraryGeneration++
+  useAppStore.setState({ librarySession: libraryGeneration, offlineSyncError: null })
+  runtimeOwnerId = null
+  libraryRuntime.deactivate()
+}
+
+async function loadAnonymousLibrary(): Promise<void> {
+  runtimeOwnerId = null
+  libraryHydration = libraryRuntime.loadAnonymous({ ...emptySnapshot(), titles: import.meta.env.DEV ? mockTitles : [] })
+  await libraryHydration
 }
 
 const browserCacheStorage = createBrowserCacheStorage(() => localStorage, (error) => {
@@ -698,47 +738,20 @@ const browserCacheStorage = createBrowserCacheStorage(() => localStorage, (error
 
 export const useAppStore = create<AppStore>()(
   persist(
-    (set, get) => ({
+    (set, get): AppStore => ({
   // ── Library ────────────────────────────────────────────────
   titles: import.meta.env.DEV ? mockTitles : [],
   filters: defaultFilters,
   filteredTitles: applyFiltersToTitles(import.meta.env.DEV ? mockTitles : [], defaultFilters),
 
-  setTitles: (titles) =>
-    set((s) => withDerivedTitles(titles, s.filters)),
-
-  addTitle: (title) =>
-    set((s) => {
-      const titles = [title, ...s.titles]
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync added title to DB:', () => insertTitleToDb(userId, title),
-          `Couldn't save "${title.title}" — check your connection.`)
-      }
-      return withDerivedTitles(titles, s.filters)
-    }),
-
-  updateTitle: (id, patch) =>
-    set((s) => {
-      const titles = s.titles.map((t) => (t.id === id ? { ...t, ...patch } : t))
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync updated title to DB:', () => updateTitleInDb(userId, id, patch),
-          'Couldn\'t save changes — check your connection.')
-      }
-      return withDerivedTitles(titles, s.filters)
-    }),
-
-  removeTitle: (id) =>
-    set((s) => {
-      const titles = s.titles.filter((t) => t.id !== id)
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync deleted title from DB:', () => deleteTitleFromDb(userId, id),
-          'Couldn\'t remove title — check your connection.')
-      }
-      return withDerivedTitles(titles, s.filters)
-    }),
+  ...createLibraryActions(writeLibrary, afterOutingRevert),
+  attachOutingTicket: (outingId, capture, blob) => writeLocalLibrary(() => libraryRuntime.attachTicket(outingId, capture, blob)),
+  detachOutingTicket: (outingId) => writeLocalLibrary(() => libraryRuntime.detachTicket(outingId)),
+  readOutingTicket: (outingId, attachmentId) => {
+    const state = get()
+    if (state.isSharedView || state.viewerContext.kind !== 'owner') return Promise.reject(new Error('Tickets are private to the library owner'))
+    return libraryRuntime.readTicketPhoto(outingId, attachmentId)
+  },
 
   setFilter: (key, value) =>
     set((s) => {
@@ -756,217 +769,6 @@ export const useAppStore = create<AppStore>()(
     set((s) => ({
       filteredTitles: applyFiltersToTitles(s.titles, s.filters),
     })),
-
-  logEpisode: (titleId, seasonNumber, episodeNumber, opts) =>
-    set((s) => {
-      // Stable UUIDs so local IDs match the DB rows — enables reliable delete/undo
-      const createsWatchEvent = Boolean(opts.watchedAt || opts.prePlatform)
-      const watchEventId = createsWatchEvent ? crypto.randomUUID() : undefined
-
-      // Sync to DB: resolve episode id from current state, then fire async
-      if (s.user) {
-        const targetTitle = s.titles.find((t) => t.id === titleId)
-        const targetSeason = targetTitle?.seasons?.find((season) => season.seasonNumber === seasonNumber)
-        const targetEpisode = targetSeason?.episodes?.find((ep) => ep.episodeNumber === episodeNumber)
-        if (targetEpisode) {
-          const userId = s.user.id
-          const episodeId = targetEpisode.id
-          const dbOpts = { ...opts, watchEventId }
-          syncToDb(get, 'Failed to sync episode log to DB:', () => logEpisodeToDb(userId, episodeId, dbOpts),
-            'Couldn\'t save watch event — check your connection.')
-        }
-      }
-
-      const now = new Date().toISOString()
-      const titles = s.titles.map((t) => {
-        if (t.id !== titleId) return t
-        const seasons = (t.seasons ?? []).map((season) => {
-          if (season.seasonNumber !== seasonNumber) return season
-          if (!season.episodes) return season
-          const episodes = season.episodes.map((ep) => {
-            if (ep.episodeNumber !== episodeNumber) return ep
-            const updated = { ...ep }
-            if (watchEventId) {
-              updated.watchEvents = [
-                ...ep.watchEvents,
-                {
-                  id: watchEventId,
-                  watchedAt: opts.prePlatform ? undefined : opts.watchedAt,
-                  notes: opts.watchNotes || undefined,
-                  colorMode: opts.colorMode,
-                },
-              ]
-            }
-            if (opts.rating && opts.rating > 0) {
-              updated.ratings = [
-                ...ep.ratings,
-                {
-                  id: crypto.randomUUID(),
-                  rating: opts.rating,
-                  ratedAt: now,
-                },
-              ]
-            }
-            if (opts.reviewText?.trim()) {
-              updated.reviews = [
-                ...ep.reviews,
-                {
-                  id: crypto.randomUUID(),
-                  reviewText: opts.reviewText.trim(),
-                  reviewedAt: now,
-                  colorMode: opts.colorMode,
-                },
-              ]
-            }
-            return updated
-          })
-          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
-          return { ...season, episodes, episodesWatched }
-        })
-        return { ...t, seasons }
-      })
-      return withDerivedTitles(titles, s.filters)
-    }),
-
-  logNextEpisodeWatch: (titleId, colorMode) => {
-    const state = get()
-    const title = state.titles.find((t) => t.id === titleId)
-    if (!title || !title.seasons) return null
-    const next = nextUnwatchedEpisode(title.seasons)
-    if (!next) return null
-
-    const seasonNumber = next.season.seasonNumber
-    const episodeNumber = next.episode.episodeNumber
-    const episodeId = next.episode.id
-    const watchEventId = crypto.randomUUID()
-    const watchedAt = new Date().toISOString().slice(0, 10)
-
-    if (state.user) {
-      const userId = state.user.id
-      const dbOpts = { watchedAt, watchEventId, colorMode }
-      syncToDb(get, 'Failed to sync quick episode log to DB:', () => logEpisodeToDb(userId, episodeId, dbOpts),
-        'Couldn\'t save watch event — check your connection.')
-    }
-
-    set((s) => {
-      const titles = s.titles.map((t) => {
-        if (t.id !== titleId) return t
-        const seasons = (t.seasons ?? []).map((season) => {
-          if (season.seasonNumber !== seasonNumber || !season.episodes) return season
-          const episodes = season.episodes.map((ep) =>
-            ep.episodeNumber === episodeNumber
-              ? { ...ep, watchEvents: [...ep.watchEvents, { id: watchEventId, watchedAt, colorMode }] }
-              : ep
-          )
-          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
-          return { ...season, episodes, episodesWatched }
-        })
-        return { ...t, seasons }
-      })
-      return withDerivedTitles(titles, s.filters)
-    })
-
-    return { seasonNumber, episodeNumber, watchEventId }
-  },
-
-  markPrePlatformWatched: (titleId, seasonNumber) =>
-    set((s) => {
-      const newEvents: Array<{ id: string; episodeId: string }> = []
-
-      const titles = s.titles.map((t) => {
-        if (t.id !== titleId) return t
-        const seasons = (t.seasons ?? []).map((season) => {
-          if (seasonNumber !== undefined && season.seasonNumber !== seasonNumber) return season
-          // Whole-series scope covers the main seasons; Specials are only
-          // marked when targeted directly.
-          if (seasonNumber === undefined && isSpecialsSeason(season)) return season
-          if (!season.episodes) return season
-          const episodes = season.episodes.map((ep) => {
-            if (ep.watchEvents.length > 0) return ep
-            const watchEventId = crypto.randomUUID()
-            newEvents.push({ id: watchEventId, episodeId: ep.id })
-            return { ...ep, watchEvents: [{ id: watchEventId }] }
-          })
-          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
-          return { ...season, episodes, episodesWatched }
-        })
-        const status = seasonNumber === undefined ? 'watched' : t.status
-        return { ...t, seasons, status }
-      })
-
-      if (newEvents.length === 0 && seasonNumber !== undefined) return s
-
-      if (s.user && newEvents.length > 0) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync pre-platform watch events to DB:', () => insertPrePlatformWatchEventsToDb(userId, newEvents),
-          'Couldn\'t save watch events — check your connection.')
-      }
-      if (s.user && seasonNumber === undefined) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync watched status to DB:', () => updateTitleInDb(userId, titleId, { status: 'watched' }))
-      }
-
-      return withDerivedTitles(titles, s.filters)
-    }),
-
-  removeViewing: (titleId, viewingId) =>
-    set((s) => {
-      const titles = s.titles.map((t) => {
-        if (t.id !== titleId) return t
-        return { ...t, viewings: t.viewings.filter((v) => v.id !== viewingId) }
-      })
-      // Rule §5.8: deleting the auto-logged viewing directly from the
-      // timeline leaves the outing 'completed' (it's history, not a claim
-      // about the library) but ends any pending follow-up — the post-show
-      // card/sheet requires the viewing to exist. Stamping
-      // followUpDismissedAt (same field the ✕/rating dismissal path uses)
-      // is what isFollowUpPending already keys off, so no other surface
-      // needs to know the viewing is gone.
-      const staleOuting = s.outings.find((o) => o.completedViewingId === viewingId)
-      const followUpDismissedAt = new Date().toISOString()
-      const outings = staleOuting
-        ? s.outings.map((o) =>
-            o.id === staleOuting.id ? { ...o, completedViewingId: undefined, followUpDismissedAt } : o
-          )
-        : s.outings
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync deleted viewing to DB:', () => deleteViewingFromDb(userId, viewingId),
-          'Couldn\'t remove viewing — check your connection.')
-        if (staleOuting) {
-          syncToDb(get, 'Failed to sync stale outing follow-up to DB:', () =>
-            updateOutingInDb(userId, staleOuting.id, { completedViewingId: undefined, followUpDismissedAt }))
-        }
-      }
-      return { ...withDerivedTitles(titles, s.filters), outings }
-    }),
-
-  deleteEpisodeWatchEvent: (titleId, seasonNumber, episodeNumber, watchEventId) =>
-    set((s) => {
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync deleted episode watch event to DB:', () => deleteEpisodeWatchEventFromDb(userId, watchEventId),
-          'Couldn\'t remove watch event — check your connection.')
-      }
-      const titles = s.titles.map((t) => {
-        if (t.id !== titleId) return t
-        const seasons = (t.seasons ?? []).map((season) => {
-          if (season.seasonNumber !== seasonNumber) return season
-          if (!season.episodes) return season
-          const episodes = season.episodes.map((ep) => {
-            if (ep.episodeNumber !== episodeNumber) return ep
-            return {
-              ...ep,
-              watchEvents: ep.watchEvents.filter((we) => we.id !== watchEventId),
-            }
-          })
-          const episodesWatched = episodes.filter((e) => e.watchEvents.length > 0).length
-          return { ...season, episodes, episodesWatched }
-        })
-        return { ...t, seasons }
-      })
-      return withDerivedTitles(titles, s.filters)
-    }),
 
   // ── Ledger ─────────────────────────────────────────────────
   stats: computeLedgerStats(import.meta.env.DEV ? mockTitles : []),
@@ -1030,86 +832,6 @@ export const useAppStore = create<AppStore>()(
   setNavCompact: (compact) => set((s) => ({ navPrefs: { ...s.navPrefs, compact } })),
 
   resetNavPrefs: () => set({ navPrefs: defaultNavPrefs }),
-
-  addLedgerWidget: (panel) => {
-    const widget = createLedgerWidget(panel)
-    set((s) => ({ ledgerPrefs: { widgets: [...s.ledgerPrefs.widgets, widget] } }))
-    scheduleLedgerLayoutSave(get)
-    return widget.id
-  },
-
-  duplicateLedgerWidget: (id) => {
-    const source = get().ledgerPrefs.widgets.find((w) => w.id === id)
-    if (!source) return null
-    const copy: LedgerWidget = { ...source, id: newLedgerWidgetId() }
-    set((s) => {
-      const widgets = [...s.ledgerPrefs.widgets]
-      const idx = widgets.findIndex((w) => w.id === id)
-      widgets.splice(idx + 1, 0, copy)
-      return { ledgerPrefs: { widgets } }
-    })
-    scheduleLedgerLayoutSave(get)
-    return copy.id
-  },
-
-  removeLedgerWidget: (id) => {
-    set((s) => ({ ledgerPrefs: { widgets: s.ledgerPrefs.widgets.filter((w) => w.id !== id) } }))
-    scheduleLedgerLayoutSave(get)
-  },
-
-  moveLedgerWidget: (id, direction) => {
-    set((s) => {
-      const widgets = swapAdjacent(s.ledgerPrefs.widgets, s.ledgerPrefs.widgets.findIndex((w) => w.id === id), direction)
-      return widgets ? { ledgerPrefs: { widgets } } : {}
-    })
-    scheduleLedgerLayoutSave(get)
-  },
-
-  reorderLedgerWidgets: (ids) => {
-    set((s) => {
-      const byId = new Map(s.ledgerPrefs.widgets.map((w) => [w.id, w]))
-      const widgets = ids.map((id) => byId.get(id)).filter((w): w is LedgerWidget => Boolean(w))
-      // Anything omitted from `ids` (shouldn't happen) is kept rather than dropped.
-      for (const w of s.ledgerPrefs.widgets) if (!ids.includes(w.id)) widgets.push(w)
-      return { ledgerPrefs: { widgets } }
-    })
-    scheduleLedgerLayoutSave(get)
-  },
-
-  setLedgerWidgetWidth: (id, width) => {
-    set((s) => ({
-      ledgerPrefs: {
-        widgets: s.ledgerPrefs.widgets.map((w) => (w.id === id ? { ...w, width } : w)),
-      },
-    }))
-    scheduleLedgerLayoutSave(get)
-  },
-
-  setLedgerWidgetSettings: (id, patch) => {
-    set((s) => ({
-      ledgerPrefs: {
-        widgets: s.ledgerPrefs.widgets.map((w) => {
-          if (w.id !== id) return w
-          const settings: LedgerWidgetSettings = { ...w.settings, ...patch }
-          for (const key of Object.keys(settings) as Array<keyof LedgerWidgetSettings>) {
-            if (settings[key] === undefined) delete settings[key]
-          }
-          if (Object.keys(settings).length === 0) {
-            const rest = { ...w }
-            delete rest.settings
-            return rest
-          }
-          return { ...w, settings }
-        }),
-      },
-    }))
-    scheduleLedgerLayoutSave(get)
-  },
-
-  resetLedgerPrefs: () => {
-    set({ ledgerPrefs: { widgets: defaultLedgerWidgets() } })
-    scheduleLedgerLayoutSave(get)
-  },
 
   selectTitle: (selectedTitleId) => set({ selectedTitleId }),
 
@@ -1193,9 +915,12 @@ export const useAppStore = create<AppStore>()(
   unreadNotificationCount: 0,
 
   refreshUnreadNotificationCount: async () => {
-    if (!get().user) return
+    const userId = get().user?.id
+    if (!userId) return
+    const generation = libraryGeneration
     try {
       const count = await fetchUnreadNotificationCount()
+      if (libraryGeneration !== generation || get().user?.id !== userId) return
       set({ unreadNotificationCount: count })
     } catch (err) {
       console.error('Failed to refresh unread notification count:', err)
@@ -1203,8 +928,12 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadNotificationInbox: async (before) => {
+    const userId = get().user?.id
+    if (!userId) return
+    const generation = libraryGeneration
     try {
       const page = await fetchNotifications(before)
+      if (libraryGeneration !== generation || get().user?.id !== userId) return
       set((s) => ({ notificationInbox: before ? [...s.notificationInbox, ...page] : page }))
     } catch (err) {
       console.error('Failed to load notification inbox:', err)
@@ -1212,6 +941,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   markOneNotificationRead: async (id) => {
+    const generation = libraryGeneration
     const prev = get().notificationInbox
     set((s) => ({
       notificationInbox: s.notificationInbox.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
@@ -1220,6 +950,7 @@ export const useAppStore = create<AppStore>()(
     try {
       await markNotificationRead(id)
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to mark notification read:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
@@ -1227,6 +958,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   markAllNotificationsSeen: async () => {
+    const generation = libraryGeneration
     const prev = get().notificationInbox
     const now = new Date().toISOString()
     set((s) => ({
@@ -1236,6 +968,7 @@ export const useAppStore = create<AppStore>()(
     try {
       await markAllNotificationsRead()
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to mark all notifications read:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
@@ -1243,6 +976,7 @@ export const useAppStore = create<AppStore>()(
   },
 
   deleteNotificationItem: async (id) => {
+    const generation = libraryGeneration
     const prev = get().notificationInbox
     const removed = prev.find((n) => n.id === id)
     set((s) => ({
@@ -1252,6 +986,7 @@ export const useAppStore = create<AppStore>()(
     try {
       await deleteNotification(id)
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to delete notification:', err)
       set({ notificationInbox: prev })
       void get().refreshUnreadNotificationCount()
@@ -1259,39 +994,89 @@ export const useAppStore = create<AppStore>()(
   },
 
   // ── Auth ───────────────────────────────────────────────────
+  venueNotes: [],
+  openVenueNote: (venue) => {
+    const state = get()
+    if (!state.user || isDevMockUser(state.user) || state.isSharedView || state.viewerContext.kind !== 'owner') throw new Error('Sign in to edit private venue notes')
+    return { ...captureVenueDraft(state, state.offlineStatus.commands, state.user.id, venue), session: libraryGeneration }
+  },
+  saveVenueNote: (draft, notes) => writeLocalLibrary(async (state) => {
+    if (!state.user || isDevMockUser(state.user) || state.user.id !== draft.userId || libraryGeneration !== draft.session) throw new Error('The venue editor belongs to an earlier sign-in')
+    const opening: VenueNoteDraft = { venue: draft.venue, userId: draft.userId, baseline: draft.baseline, previousCommandId: draft.previousCommandId }
+    await libraryRuntime.submit(venueChange(opening, notes))
+  }),
+  reviewVenueNote: (id) => libraryRuntime.reviewVenue(id),
+  resolveVenueNote: (review, keepLocal) => writeLocalLibrary(async () => { await libraryRuntime.resolveVenue(review, keepLocal) }),
+  theaterInterest: [],
+  moviegoingPreferencesSupport: undefined,
+  setTheaterInterest: (titleId, present) => writeLocalLibrary(async (state) => {
+    if (!state.user || isDevMockUser(state.user)) throw new Error('Sign in to save a private theater preference')
+    if (state.moviegoingPreferencesSupport !== 'authoritative') throw new Error('Sync moviegoing preferences with the updated server before editing theater interest')
+    if (!state.titles.some((title) => title.id === titleId && title.type === 'movie')) throw new Error('This movie is no longer in your library')
+    if (state.theaterInterest.some((row) => row.titleId === titleId) === present) return
+    await libraryRuntime.submit({ kind: 'theaterInterest.set', titleId, userId: state.user.id, present, createdAt: new Date().toISOString() })
+  }),
   user: null,
   loadingUser: false,
   libraryLoadError: null,
   viewerContext: { kind: 'owner' },
+  offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
+  librarySession: 0,
+  offlineSyncError: null,
+  retryPendingCommand: async (id) => {
+    const generation = libraryGeneration
+    set({ offlineSyncError: null })
+    await libraryRuntime.retry(id)
+    if (generation !== libraryGeneration) throw new Error('Library account changed')
+  },
+  discardPendingCommand: async (id) => {
+    const generation = libraryGeneration
+    await libraryRuntime.discard(id)
+    if (generation !== libraryGeneration) throw new Error('Library account changed')
+    await libraryRuntime.refresh()
+  },
+  retryLibrarySync: async () => {
+    const generation = libraryGeneration
+    set({ offlineSyncError: null })
+    await libraryRuntime.flush()
+    if (generation !== libraryGeneration) throw new Error('Library account changed')
+    await libraryRuntime.refresh()
+  },
+  discardDamagedCache: () => libraryRuntime.discardDamagedCache(),
+  offlineStorageError: null,
+  legacyCacheAvailable: hasLegacyLibraryCache(browserCacheStorage),
 
   setUser: (user) => {
     const previousUserId = get().user?.id
-    set({ user })
     // SIGNED_IN on tab focus and TOKEN_REFRESHED don't change library ownership.
-    if (user && user.id === previousUserId) return
+    if (user && user.id === previousUserId) { set({ user }); return }
+    stopLibraryRuntime()
     ownerLibraryRequest = undefined
     set((s) => ({
-      loadingUser: false,
-      libraryLoadError: null,
-      notifications: s.notifications.filter((n) => n.dedupeKey !== LIBRARY_ERROR_KEY),
+      ...snapshotState(emptySnapshot(), s), user, loadingUser: Boolean(user), libraryLoadError: null,
+      offlineStorageError: null, notifications: [], notificationInbox: [], unreadNotificationCount: 0,
+      offlineStatus: { ownerId: user?.id ?? null, hydrated: false, commands: [], quarantined: [] },
+      viewerContext: { kind: 'owner' }, isSharedView: false, viewedLedgerWidgets: null,
+      selectedTitleId: null, selectedListId: null, isDetailDrawerOpen: false, isAddTitleOpen: false,
+      isOutingScheduleOpen: false, isPostShowSheetOpen: false, postShowOutingId: null,
     }))
     window.clearInterval(notificationPollTimer)
     notificationPollTimer = undefined
+    if (get().legacyCacheAvailable) get().pushNotification({ dedupeKey: 'legacy-library-recovery', kind: 'tip',
+      message: 'An older library cache is preserved on this device for recovery. It has not been assigned to this account.',
+    })
     if (user && isDevMockUser(user)) {
-      // Dev-only mock session — no real Supabase auth backs this id, so skip
-      // the DB-backed loads below and keep whatever's already on screen
-      // (mockTitles in dev) rather than wiping it with an unauthenticated fetch.
+      void loadAnonymousLibrary().catch(reportOfflineStorageError).finally(() => {
+        if (get().user?.id === user.id) set({ loadingUser: false })
+      })
       return
     }
     if (user) {
-      get().loadUserLibrary()
-      get().loadPinnedModes()
+      void get().loadUserLibrary()
       get().refreshUnreadNotificationCount()
       notificationPollTimer = window.setInterval(() => get().refreshUnreadNotificationCount(), NOTIFICATION_POLL_MS)
     } else {
-      // Clear on logout — restore mock data only in dev
-      const fallback = import.meta.env.DEV ? mockTitles : []
-      set((s) => ({ ...withDerivedTitles(fallback, s.filters), pinnedModes: {}, outings: [] }))
+      void loadAnonymousLibrary().catch(reportOfflineStorageError)
     }
   },
 
@@ -1310,33 +1095,20 @@ export const useAppStore = create<AppStore>()(
       try {
         // Outings ride along with the owner's own library fetch (rule §9 —
         // owner-private; never fetched for shared/friend views).
-        const { titles: dbTitles, outings: dbOutings } = await fetchUserLibrary(user.id)
+        if (runtimeOwnerId !== user.id) {
+                  runtimeOwnerId = user.id
+          libraryHydration = libraryRuntime.activate(user.id)
+          await libraryHydration
+        }
+        if (!isCurrent()) return
+        await libraryRuntime.refresh()
         if (!isCurrent()) return
         set((s) => ({
           notifications: s.notifications.filter((n) => n.dedupeKey !== LIBRARY_ERROR_KEY),
         }))
-        // The synced board layout rides along with the library fetch. Server
-        // wins; a user who has never synced adopts their local board once.
-        void fetchLedgerLayout(user.id)
-          .then((widgets) => {
-            if (get().user?.id !== user.id || get().isSharedView || get().viewerContext.kind === 'friend') return
-            if (widgets) set({ ledgerPrefs: { widgets } })
-            else void saveLedgerLayout(user.id, get().ledgerPrefs.widgets).catch(() => {})
-          })
-          .catch((err) => console.error('Failed to load synced Ledger layout:', err))
-        // Guard: if we have local titles but DB returned empty, the session auth
-        // may not have fully propagated — skip the wipe rather than hiding data.
-        const currentTitles = get().titles
-        const hasRealLocalData = currentTitles.some((t) => !t.id.startsWith('mt-'))
-        if (dbTitles.length === 0 && hasRealLocalData) {
-          console.warn('loadUserLibrary: DB returned 0 titles but local store has user data — skipping replace. Check auth session.')
-          return
-        }
-        set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), outings: dbOutings }))
         // Reconciliation trigger: app load, right after the library lands
         // (plan §4.3) — completes anything that finished while the app was closed.
         void get().reconcileOutings()
-        void get().loadLists()
       } catch (err) {
         if (!isCurrent()) return
         console.error('Failed to load user library from DB:', err)
@@ -1361,23 +1133,22 @@ export const useAppStore = create<AppStore>()(
   },
 
   loadSharedLibrary: async (token) => {
+    stopLibraryRuntime()
+    const generation = libraryGeneration
     ownerLibraryRequest = undefined
-    set({ loadingUser: true, isSharedView: true, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null })
+    set((s) => ({ ...snapshotState(emptySnapshot(), s), loadingUser: true, isSharedView: true,
+      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
+      viewedLedgerWidgets: null, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null }))
     try {
-      const { titles: dbTitles, ownerUserId } = await fetchSharedLibrary(token)
-      set((s) => withDerivedTitles(dbTitles, s.filters))
-      // Show the owner's board arrangement (falls back to the default board
-      // when they never synced one). Never written into the viewer's prefs.
-      if (ownerUserId) {
-        void fetchLedgerLayout(ownerUserId)
-          .then((widgets) => set({ viewedLedgerWidgets: widgets }))
-          .catch(() => set({ viewedLedgerWidgets: null }))
-      }
+      const { titles: dbTitles, ledgerWidgets } = await fetchSharedLibrary(token)
+      if (libraryGeneration !== generation) return
+      set((s) => ({ ...withDerivedTitles(dbTitles, s.filters), viewedLedgerWidgets: ledgerWidgets }))
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to load shared library from DB:', err)
       set({ libraryLoadError: "Couldn't load this shared library — the link may have expired." })
     } finally {
-      set({ loadingUser: false })
+      if (libraryGeneration === generation) set({ loadingUser: false })
     }
   },
 
@@ -1385,31 +1156,38 @@ export const useAppStore = create<AppStore>()(
   // (TitleDetailDrawer, episode-card, Discover, etc.) — viewerContext just adds
   // who's being viewed, for the exit affordance and heading text.
   loadFriendLibrary: async (friendUserId, displayName) => {
+    stopLibraryRuntime()
+    const generation = libraryGeneration
     ownerLibraryRequest = undefined
-    set({
+    set((s) => ({
+      ...snapshotState(emptySnapshot(), s), viewedLedgerWidgets: null,
+      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
       loadingUser: true,
       isSharedView: true,
       libraryLoadError: null,
       viewerContext: { kind: 'friend', userId: friendUserId, displayName },
       pendingView: 'library',
-    })
+    }))
     try {
       const dbTitles = await fetchFriendLibrary(friendUserId)
+      if (libraryGeneration !== generation) return
       set((s) => withDerivedTitles(dbTitles, s.filters))
       // Show the friend's board arrangement (read-only RLS policy).
       void fetchLedgerLayout(friendUserId)
-        .then((widgets) => set({ viewedLedgerWidgets: widgets }))
-        .catch(() => set({ viewedLedgerWidgets: null }))
+        .then((widgets) => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: widgets }) })
+        .catch(() => { if (libraryGeneration === generation) set({ viewedLedgerWidgets: null }) })
     } catch (err) {
+      if (libraryGeneration !== generation) return
       console.error('Failed to load friend library from DB:', err)
       set({ libraryLoadError: "Couldn't load that friend's library — check your connection." })
       get().pushNotification({ message: "Couldn't load that friend's library — check your connection." })
     } finally {
-      set({ loadingUser: false })
+      if (libraryGeneration === generation) set({ loadingUser: false })
     }
   },
 
   exitFriendView: () => {
+    stopLibraryRuntime()
     // Clear the friend's titles before refetching — loadUserLibrary's
     // hasRealLocalData guard would otherwise see the friend's (real, non-mock)
     // titles still in state and skip the replace if the user's own library is
@@ -1426,40 +1204,8 @@ export const useAppStore = create<AppStore>()(
   // ── Pins ───────────────────────────────────────────────────
   pinnedModes: {},
 
-  setPinnedMode: (titleId, easterEggKey, variant) => {
-    const key = `${titleId}:${easterEggKey}`
-    if (variant === null) {
-      set((s) => {
-        const next = { ...s.pinnedModes }
-        delete next[key]
-        return { pinnedModes: next }
-      })
-      const user = get().user
-      if (user) {
-        deleteTitlePin(user.id, titleId, easterEggKey).catch((e) =>
-          console.error('deleteTitlePin failed:', e)
-        )
-      }
-    } else {
-      set((s) => ({ pinnedModes: { ...s.pinnedModes, [key]: variant } }))
-      const user = get().user
-      if (user) {
-        upsertTitlePin(user.id, titleId, easterEggKey, variant).catch((e) =>
-          console.error('upsertTitlePin failed:', e)
-        )
-      }
-    }
-  },
-
   loadPinnedModes: async () => {
-    const user = get().user
-    if (!user) return
-    const pins = await fetchAllTitlePins(user.id)
-    const pinnedModes: Record<string, 'bw' | 'color'> = {}
-    for (const pin of pins) {
-      pinnedModes[`${pin.titleId}:${pin.easterEggKey}`] = pin.pinnedVariant
-    }
-    set({ pinnedModes })
+    await get().loadUserLibrary()
   },
 
   // ── Lists ──────────────────────────────────────────────────
@@ -1467,84 +1213,14 @@ export const useAppStore = create<AppStore>()(
   listMemberships: {},
 
   loadLists: async () => {
-    const user = get().user
-    if (!user) return
-    const [lists, memberships] = await Promise.all([fetchLists(user.id), fetchListMemberships(user.id)])
-    const listMemberships: Record<string, Set<string>> = {}
-    for (const [listId, titleIds] of Object.entries(memberships)) listMemberships[listId] = new Set(titleIds)
-    set({ lists, listMemberships })
+    await get().loadUserLibrary()
   },
-
-  createList: (name, description = null) => {
-    const now = new Date().toISOString()
-    const list: List = { id: crypto.randomUUID(), name, description, createdAt: now, updatedAt: now }
-    set((s) => ({ lists: [list, ...s.lists] }))
-    const user = get().user
-    if (user) {
-      syncToDb(get, 'Failed to sync new list to DB:', () => insertListToDb(user.id, list),
-        `Couldn't save "${name}" — check your connection.`)
-    }
-    return list
-  },
-
-  renameList: (id, patch) =>
-    set((s) => {
-      const lists = s.lists.map((l) => (l.id === id ? { ...l, ...patch, updatedAt: new Date().toISOString() } : l))
-      const user = s.user
-      if (user) {
-        syncToDb(get, 'Failed to sync renamed list to DB:', () => updateListInDb(user.id, id, patch),
-          "Couldn't save changes — check your connection.")
-      }
-      return { lists }
-    }),
-
-  deleteList: (id) =>
-    set((s) => {
-      const lists = s.lists.filter((l) => l.id !== id)
-      const listMemberships = { ...s.listMemberships }
-      delete listMemberships[id]
-      const user = s.user
-      if (user) {
-        syncToDb(get, 'Failed to sync deleted list from DB:', () => deleteListFromDb(user.id, id),
-          "Couldn't remove list — check your connection.")
-      }
-      return { lists, listMemberships }
-    }),
-
-  addTitleToList: (listId, titleId) =>
-    set((s) => {
-      const current = s.listMemberships[listId] ?? new Set<string>()
-      if (current.has(titleId)) return {}
-      const listMemberships = { ...s.listMemberships, [listId]: new Set(current).add(titleId) }
-      const user = s.user
-      if (user) {
-        syncToDb(get, 'Failed to sync list membership to DB:', () => addTitleToListInDb(user.id, listId, titleId),
-          "Couldn't add to list — check your connection.")
-      }
-      return { listMemberships }
-    }),
-
-  removeTitleFromList: (listId, titleId) =>
-    set((s) => {
-      const current = s.listMemberships[listId]
-      if (!current?.has(titleId)) return {}
-      const next = new Set(current)
-      next.delete(titleId)
-      const listMemberships = { ...s.listMemberships, [listId]: next }
-      const user = s.user
-      if (user) {
-        syncToDb(get, 'Failed to sync list membership removal to DB:', () => removeTitleFromListInDb(user.id, listId, titleId),
-          "Couldn't remove from list — check your connection.")
-      }
-      return { listMemberships }
-    }),
 
   listsForTitle: (titleId) => get().lists.filter((l) => get().listMemberships[l.id]?.has(titleId)),
 
   // ── Cinema Outings ("I've got tickets") ─────────────────────
   outings: [],
 
-  setOutings: (outings) => set({ outings }),
 
   isOutingScheduleOpen: false,
   outingScheduleTitleId: null,
@@ -1573,199 +1249,44 @@ export const useAppStore = create<AppStore>()(
   },
   closePostShowSheet: () => set({ isPostShowSheetOpen: false, postShowOutingId: null }),
 
-  addOuting: (outing) =>
-    set((s) => {
-      const outings = [outing, ...s.outings]
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync added outing to DB:', () => insertOutingToDb(userId, outing),
-          "Couldn't save your tickets — check your connection.")
-      }
-      return { outings }
-    }),
-
-  updateOuting: (id, patch) =>
-    set((s) => {
-      const outings = s.outings.map((o) => {
-        if (o.id !== id) return o
-        const merged = { ...o, ...patch }
-        // ends_at is a plain column, not generated (timestamptz + interval
-        // isn't immutable) — the client keeps it in sync on every edit,
-        // mirroring what the schema comment on cinema_outings.ends_at says
-        // the RPC/client contract is (plan §6.1).
-        const endsAt = new Date(
-          new Date(merged.showtime).getTime() + (merged.previewsMinutes + merged.runtimeMinutes) * 60_000
-        ).toISOString()
-        return { ...merged, endsAt }
-      })
-      if (s.user) {
-        const userId = s.user.id
-        const updated = outings.find((o) => o.id === id)
-        const dbPatch = updated ? { ...patch, endsAt: updated.endsAt } : patch
-        syncToDb(get, 'Failed to sync updated outing to DB:', () => updateOutingInDb(userId, id, dbPatch),
-          "Couldn't save ticket changes — check your connection.")
-      }
-      return { outings }
-    }),
-
-  cancelOuting: (id) =>
-    set((s) => {
-      const outings = s.outings.map((o) => (o.id === id ? { ...o, status: 'cancelled' as const } : o))
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync cancelled outing to DB:', () => updateOutingInDb(userId, id, { status: 'cancelled' }),
-          "Couldn't cancel — check your connection.")
-      }
-      return { outings }
-    }),
-
-  dismissOutingFollowUp: (id) =>
-    set((s) => {
-      const followUpDismissedAt = new Date().toISOString()
-      const outings = s.outings.map((o) => (o.id === id ? { ...o, followUpDismissedAt } : o))
-      if (s.user) {
-        const userId = s.user.id
-        syncToDb(get, 'Failed to sync dismissed outing follow-up to DB:', () =>
-          updateOutingInDb(userId, id, { followUpDismissedAt }))
-      }
-      return { outings }
-    }),
-
-  shareOutingPlans: async (outingId, recipientIds) => {
+  shareOutingPlans: async (outingId, recipientIds, operationId) => {
+    const generation = libraryGeneration
+    const ownerId = get().user?.id
+    const current = () => generation === libraryGeneration && get().user?.id === ownerId && !get().isSharedView && get().viewerContext.kind === 'owner'
     try {
-      await shareOutingPlansRpc(outingId, recipientIds)
+      if (!ownerId || !current()) throw new Error('Sign in to your own library to share plans')
+      await localWriteTail.catch(() => {})
+      await libraryHydration
+      if (!current()) throw new Error('Library account changed')
+      const outing = get().outings.find((row) => row.id === outingId)
+      if (!outing) throw new Error('This outing is no longer in your library')
+      return await libraryRuntime.runSyncedRemote([`outing:${outingId}`, `title:${outing.titleId}`], async (snapshot, context, assertReady) => {
+        const latest = snapshot.outings.find((row) => row.id === outingId)
+        if (!current()) throw new Error('Library account changed')
+        if (!latest || !snapshot.titles.some((row) => row.id === latest.titleId)) throw new Error('This outing is no longer in your library')
+        if (latest.status !== 'scheduled' || !(Date.parse(latest.endsAt) > Date.now())) throw new Error('Only upcoming scheduled outings can be shared')
+        return shareOutingPlansRpc(outingId, [...new Set(recipientIds)], operationId, context, assertReady)
+      })
     } catch (err) {
-      console.error('Failed to share outing plans:', err)
-      get().pushNotification({ message: "Couldn't share your plans — check your connection." })
+      if (current()) get().pushNotification({ message: err instanceof Error ? err.message : "Sharing was not confirmed. Retry to check the same send." })
       throw err
     }
   },
 
-  resolveSharedOutingTitle: (payload) => {
-    const s = get()
-    const existing = s.titles.find((t) => t.tmdbId === payload.tmdbId && t.type === payload.type)
-    if (existing) return existing.id
-
-    // Rule §5.16: abandoning the schedule form afterward still leaves the
-    // title on the watchlist — harmless, since tapping this CTA already
-    // means they intend to see it.
-    const id = crypto.randomUUID()
-    s.addTitle({
-      id,
-      tmdbId: payload.tmdbId,
-      type: payload.type,
-      title: payload.title,
-      year: payload.year ?? 0,
-      posterUrl: payload.posterUrl,
-      genres: [],
-      status: 'watchlist',
-      tags: [],
-      addedAt: new Date().toISOString(),
-      viewings: [],
-    })
-    return id
-  },
-
-  revertOutingCompletion: (outingId) => {
-    const s0 = get()
-    const outing = s0.outings.find((o) => o.id === outingId)
-    if (!outing || outing.status !== 'completed') return
-
-    const viewingId = outing.completedViewingId
-    const title = s0.titles.find((t) => t.id === outing.titleId)
-    // Rule §5.6: only revert the title's status if it's still 'watched' — if
-    // the user changed it manually in the meantime, their choice wins.
-    const revertStatus = title?.status === 'watched' ? outing.previousStatus : undefined
-
-    set((s) => {
-      const titles = s.titles.map((t) => {
-        if (t.id !== outing.titleId) return t
-        const next = { ...t }
-        if (viewingId) next.viewings = t.viewings.filter((v) => v.id !== viewingId)
-        if (revertStatus) next.status = revertStatus
-        return next
-      })
-      const outings = s.outings.map((o) =>
-        o.id === outingId ? { ...o, status: 'missed' as const, completedViewingId: undefined } : o
-      )
-      return { ...withDerivedTitles(titles, s.filters), outings }
-    })
-
-    if (s0.user) {
-      const userId = s0.user.id
-      if (viewingId) {
-        syncToDb(get, 'Failed to sync reverted viewing deletion to DB:', () => deleteViewingFromDb(userId, viewingId),
-          "Couldn't undo that viewing — check your connection.")
-      }
-      syncToDb(get, 'Failed to sync reverted outing to DB:', () =>
-        updateOutingInDb(userId, outingId, { status: 'missed', completedViewingId: undefined }))
-      if (revertStatus) {
-        syncToDb(get, 'Failed to sync reverted title status to DB:', () =>
-          updateTitleInDb(userId, outing.titleId, { status: revertStatus }))
-      }
-    }
-
-    // Best-effort: drop the now-stale "how was it?" inbox item (rule §5.6).
-    // The notification carries titleId but not outingId (see the RPC in the
-    // Phase A migration), so this matches the most recent unread
-    // outing_completed item for the title among whatever's already loaded
-    // locally — a session that never opened the bell has nothing cached here
-    // to clean up, and simply leaves the stale item to be read/dismissed later.
-    const stale = s0.notificationInbox
-      .filter((n) => n.type === 'outing_completed' && n.titleId === outing.titleId)
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0]
-    if (stale) void get().deleteNotificationItem(stale.id)
-  },
-
   reconcileOutings: async () => {
     const user = get().user
-    if (!user) return
+    if (!user || get().isSharedView || !libraryRuntime.canReconcile) return
+    const generation = libraryGeneration
 
     let results: OutingCompletionResult[]
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-      results = await completeDueOutings(tz)
+      results = await libraryRuntime.runIdleRemote((context) => completeDueOutings(tz, context)) ?? []
     } catch (err) {
       console.error('Failed to reconcile cinema outings:', err)
       return
     }
-    if (results.length === 0) return
-
-    set((s) => {
-      let titles = s.titles
-      let outings = s.outings
-
-      for (const r of results) {
-        const outing = outings.find((o) => o.id === r.outingId)
-        const title = titles.find((t) => t.id === r.titleId)
-        // Multi-device race (§5.11): another session already applied this
-        // transition and our local copy doesn't know about the outing/title —
-        // nothing to reconcile locally; the next full load will catch up.
-        if (!outing || !title) continue
-
-        const viewing: Viewing = {
-          id: r.viewingId,
-          titleId: r.titleId,
-          // Same calendar date the RPC derived server-side from this same
-          // client's IANA zone — see localDateStr's doc comment.
-          date: localDateStr(new Date(outing.showtime)),
-          venue: outing.venue,
-          companions: outing.companions.length > 0 ? outing.companions : undefined,
-          outingId: r.outingId,
-        }
-
-        titles = titles.map((t) =>
-          t.id === r.titleId ? { ...t, status: r.newTitleStatus, viewings: [...t.viewings, viewing] } : t
-        )
-        outings = outings.map((o) =>
-          o.id === r.outingId
-            ? { ...o, status: 'completed' as const, previousStatus: r.previousStatus ?? undefined, completedViewingId: r.viewingId }
-            : o
-        )
-      }
-
-      return { ...withDerivedTitles(titles, s.filters), outings }
-    })
+    if (results.length === 0 || libraryGeneration !== generation || get().user?.id !== user.id || get().isSharedView) return
 
     // One toast per completed outing (plan §4.4).
     for (const r of results) {
@@ -1783,22 +1304,15 @@ export const useAppStore = create<AppStore>()(
   },
     }),
     {
-      name: 'cinemarchive-library',
+      name: DEVICE_PREFERENCES_KEY,
       version: PERSIST_VERSION,
-      storage: createJSONStorage(() => browserCacheStorage),
-      // Only the source of truth is persisted; derived state (filteredTitles,
-      // stats) and transient UI flags are recomputed/reset on load. While
-      // browsing a friend's library, `titles` holds THEIR data — never persist
-      // that to the viewer's localStorage. Titles are cached slim (see
-      // toCachedTitle) to stay under the browser's storage quota.
+      storage: createJSONStorage(() => ({ ...browserCacheStorage,
+        getItem: (name) => browserCacheStorage.getItem(name) ?? (name === DEVICE_PREFERENCES_KEY
+          ? JSON.stringify({ version: PERSIST_VERSION, state: readLegacyDevicePreferences(browserCacheStorage) }) : null),
+      })),
+      // Device presentation only. Authenticated and anonymous libraries live
+      // in separate IndexedDB databases; shared/friend data is never persisted.
       partialize: (s) => ({
-        titles: s.viewerContext.kind === 'friend' ? [] : s.titles.map(toCachedTitle),
-        outings: s.viewerContext.kind === 'friend' ? [] : s.outings,
-        // listMemberships is deliberately NOT persisted — it's a
-        // Record<string, Set<string>> and Set doesn't survive
-        // JSON.stringify/parse through this middleware; loadLists() re-derives
-        // it every session instead.
-        lists: s.viewerContext.kind === 'friend' ? [] : s.lists,
         filters: s.filters,
         viewMode: s.viewMode,
         gridSize: s.gridSize,
@@ -1806,22 +1320,10 @@ export const useAppStore = create<AppStore>()(
         themeMode: s.themeMode,
         unlockedThemes: s.unlockedThemes,
         navPrefs: s.navPrefs,
-        ledgerPrefs: s.ledgerPrefs,
       }),
+      merge: (persisted, current) => ({ ...current, ...pickDevicePreferences(persisted) }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        // Existing caches may contain Android's plain companion names. Repair
-        // them before any editor or dashboard reads the web object shape.
-        state.titles = state.titles.map((title) => ({
-          ...title,
-          viewings: title.viewings.map((viewing) => ({
-            ...viewing,
-            companions: viewing.companions == null ? undefined : normalizeCompanions(viewing.companions),
-          })),
-        }))
-        state.outings = state.outings.map((outing) => ({
-          ...outing, companions: normalizeCompanions(outing.companions),
-        }))
         // Older persisted payloads predate themeMode entirely — preserve their
         // persisted theme as an explicit choice rather than opting them into
         // live system-tracking they never asked for.

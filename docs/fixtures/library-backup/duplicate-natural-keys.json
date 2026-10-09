@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "n0", "tmdbId": 1, "type": "tv", "title": "dup season", "seasons": [ { "id": "a", "seasonNumber": 1 }, { "id": "b", "seasonNumber": 1 } ] },
+    { "id": "n1", "tmdbId": 2, "type": "tv", "title": "dup episode", "seasons": [ { "id": "c", "seasonNumber": 1, "episodes": [ { "id": "d", "episodeNumber": 1 }, { "id": "e", "episodeNumber": 1 } ] } ] },
+    { "id": "n2", "tmdbId": 3, "type": "tv", "title": "same episode number in two seasons is fine", "tags": [],
+      "seasons": [
+        { "id": "f", "seasonNumber": 0, "episodes": [ { "id": "g", "episodeNumber": 0, "watchEvents": [ { "id": "w1" } ] } ] },
+        { "id": "h", "seasonNumber": 1, "episodes": [ { "id": "i", "episodeNumber": 0 } ] }
+      ] },
+    { "id": "n3", "tmdbId": 4, "type": "tv", "title": "rating row bad", "seasons": [ { "id": "j", "seasonNumber": 1, "episodes": [ { "id": "k", "episodeNumber": 1, "ratings": [ { "id": "r", "rating": "five", "ratedAt": "2026-01-01T00:00:00Z" } ] } ] } ] },
+    { "id": "n4", "tmdbId": 5, "type": "tv", "title": "rating row no ratedAt", "seasons": [ { "id": "l", "seasonNumber": 1, "episodes": [ { "id": "m", "episodeNumber": 1, "ratings": [ { "id": "r2", "rating": 4 } ] } ] } ] },
+    { "id": "n5", "tmdbId": 6, "type": "tv", "title": "review row no text", "seasons": [ { "id": "n", "seasonNumber": 1, "episodes": [ { "id": "o", "episodeNumber": 1, "reviews": [ { "id": "rv", "reviewedAt": "2026-01-01T00:00:00Z" } ] } ] } ] },
+    { "id": "n6", "tmdbId": 7, "type": "movie", "title": "viewing titleId mismatch", "viewings": [ { "id": "vm", "titleId": "somebody-else" } ] },
+    { "id": "n7", "tmdbId": 8, "type": "tv", "title": "negative season", "seasons": [ { "id": "p", "seasonNumber": -1 } ] },
+    { "id": "n8", "tmdbId": 9, "type": "tv", "title": "missing episode number", "seasons": [ { "id": "q", "seasonNumber": 1, "episodes": [ { "id": "r3" } ] } ] },
+    { "id": "n9", "tmdbId": 10, "type": "tv", "title": "float season number", "seasons": [ { "id": "s9", "seasonNumber": 1.5 } ] }
+  ]
+}

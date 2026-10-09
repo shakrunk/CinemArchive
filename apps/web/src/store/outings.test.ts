@@ -451,4 +451,66 @@ describe('deriveAtTheMovies', () => {
     ])
     expect(stats.tripsTotal).toBe(3)
   })
+
+  it('groups only linked priced trips using outing venues and formats, including free tickets', () => {
+    const outings = [
+      makeOuting({ id: 'a', venue: 'Palace', format: 'IMAX', ticketPrice: 20 }),
+      makeOuting({ id: 'b', venue: 'Palace', format: 'Standard', ticketPrice: 0 }),
+      makeOuting({ id: 'c', venue: 'Palace', format: 'IMAX' }),
+      makeOuting({ id: 'd', venue: 'Ritz', format: 'IMAX', ticketPrice: 6 }),
+      makeOuting({ id: 'e', venue: 'Ritz', format: 'Standard', ticketPrice: 8 }),
+      makeOuting({ id: 'unlinked', venue: 'Future booking', format: 'Dolby', ticketPrice: 999 }),
+      makeOuting({ id: 'no-labels', ticketPrice: 5 }),
+    ]
+    const titles = [makeTitle({ viewings: [
+      ...outings.filter((outing) => outing.id !== 'unlinked').map((outing) => makeViewing({ venue: 'Viewing venue', outingId: outing.id })),
+      makeViewing({ venue: 'Manual trip' }),
+      makeViewing({ venue: 'Deleted outing', outingId: 'missing' }),
+    ] })]
+    const stats = deriveAtTheMovies(titles, outings)
+    expect(stats.totalSpent).toBe(39)
+    expect(stats.pricedTripCount).toBe(5)
+    expect(stats.venueSpend).toEqual([
+      { label: 'Palace', totalSpent: 20, pricedTripCount: 2, perTrip: 10 },
+      { label: 'Ritz', totalSpent: 14, pricedTripCount: 2, perTrip: 7 },
+    ])
+    expect(stats.formatSpend).toEqual([
+      { label: 'IMAX', totalSpent: 26, pricedTripCount: 2, perTrip: 13 },
+      { label: 'Standard', totalSpent: 8, pricedTripCount: 2, perTrip: 4 },
+    ])
+    expect(stats.bestValueVenue?.label).toBe('Ritz')
+    expect(stats.milestoneBadges).not.toContainEqual({ kind: 'format', title: 'Dolby', detail: 'First outing' })
+  })
+
+  it('requires two priced trips for best value, not two visits or a single cheap ticket', () => {
+    const outings = [
+      makeOuting({ id: 'a', venue: 'One cheap trip', ticketPrice: 0 }),
+      makeOuting({ id: 'b', venue: 'Two visits', ticketPrice: 2 }),
+      makeOuting({ id: 'c', venue: 'Two visits' }),
+    ]
+    const titles = [makeTitle({ viewings: outings.map((outing) => makeViewing({ venue: outing.venue, outingId: outing.id })) })]
+    expect(deriveAtTheMovies(titles, outings).bestValueVenue).toBeNull()
+  })
+
+  it.each([[4, null], [5, 5], [9, 5], [10, 10], [25, 25], [50, 50], [100, 100], [120, 100]])(
+    'awards only the highest venue milestone for %i visits', (visits, threshold) => {
+      const titles = [makeTitle({ viewings: Array.from({ length: visits! }, () => makeViewing({ venue: 'Palace' })) })]
+      expect(deriveAtTheMovies(titles, []).milestoneBadges).toEqual(threshold == null ? [] : [
+        { kind: 'venue', title: 'Palace', detail: `${threshold} visits` },
+      ])
+    },
+  )
+
+  it('awards a first-format badge once, even for unpriced trips, and retains every companion', () => {
+    const outing = makeOuting({ id: 'imax', format: 'IMAX' })
+    const titles = [makeTitle({ viewings: [
+      makeViewing({ venue: 'Palace', outingId: outing.id, companions: [{ name: 'Alex' }, { name: 'Sam' }] }),
+      makeViewing({ venue: 'Palace', outingId: outing.id, companions: [{ name: 'Alex' }] }),
+    ] })]
+    const stats = deriveAtTheMovies(titles, [outing])
+    expect(stats.milestoneBadges).toEqual([{ kind: 'format', title: 'IMAX', detail: 'First outing' }])
+    expect(stats.companions).toEqual([{ name: 'Alex', count: 2 }, { name: 'Sam', count: 1 }])
+    expect(stats.venueSpend).toEqual([])
+    expect(stats.formatSpend).toEqual([])
+  })
 })

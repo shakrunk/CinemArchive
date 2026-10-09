@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { ChoiceModal, ChoiceCard } from 'src/components/ui/choice-modal'
 
 interface SpiderNoirModeModalProps {
@@ -17,7 +18,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
       <h2
         style={{
           fontFamily: 'var(--serif)',
-          fontSize: 'clamp(20px, 5vw, 28px)',
+          fontSize: scaledTextSize('clamp(20px, 5vw, 28px)'),
           color: 'rgb(var(--ivory))',
           marginBottom: '8px',
           textAlign: 'center',
@@ -30,7 +31,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
       <p
         style={{
           fontFamily: 'var(--mono)',
-          fontSize: '11px',
+          fontSize: scaledTextSize('11px'),
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
           color: 'rgba(243, 234, 217, 0.5)',
@@ -50,12 +51,12 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
           background="linear-gradient(160deg, rgba(80,80,80,0.3), rgba(20,20,20,0.5))"
           filter="grayscale(1)"
         >
-          <span style={{ fontSize: '36px', lineHeight: 1, color: '#ccc' }}>◐</span>
+          <span style={{ fontSize: scaledTextSize('36px'), lineHeight: 1, color: '#ccc' }}>◐</span>
           <div style={{ textAlign: 'center' }}>
             <div
               style={{
                 fontFamily: 'var(--serif)',
-                fontSize: '15px',
+                fontSize: scaledTextSize('15px'),
                 color: '#e0e0e0',
                 marginBottom: '4px',
                 fontVariationSettings: '"opsz" 24',
@@ -66,7 +67,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
             <div
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: '10px',
+                fontSize: scaledTextSize('10px'),
                 color: '#999',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -85,12 +86,12 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
           hoverShadowColor="rgba(233, 178, 102, 0.4)"
           background="linear-gradient(160deg, rgba(192, 57, 43, 0.35), rgba(233, 178, 102, 0.2))"
         >
-          <span style={{ fontSize: '36px', lineHeight: 1, color: 'var(--amber)' }}>◈</span>
+          <span style={{ fontSize: scaledTextSize('36px'), lineHeight: 1, color: 'var(--amber)' }}>◈</span>
           <div style={{ textAlign: 'center' }}>
             <div
               style={{
                 fontFamily: 'var(--serif)',
-                fontSize: '15px',
+                fontSize: scaledTextSize('15px'),
                 color: 'var(--amber)',
                 marginBottom: '4px',
                 fontVariationSettings: '"opsz" 24',
@@ -101,7 +102,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
             <div
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: '10px',
+                fontSize: scaledTextSize('10px'),
                 color: 'var(--amber-deep)',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -119,7 +120,7 @@ export function SpiderNoirModeModal({ open, onSelect, onSkip }: SpiderNoirModeMo
         style={{
           marginTop: '24px',
           fontFamily: 'var(--mono)',
-          fontSize: '11px',
+          fontSize: scaledTextSize('11px'),
           color: 'rgba(243, 234, 217, 0.5)',
           background: 'none',
           border: 'none',

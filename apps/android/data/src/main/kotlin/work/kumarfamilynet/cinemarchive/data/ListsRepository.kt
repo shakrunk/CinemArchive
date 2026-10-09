@@ -38,80 +38,83 @@ class ListsRepository(
     suspend fun createList(name: String, description: String?): String {
         val id = UUID.randomUUID().toString()
         val now = Instant.now().toString()
-        listDao.upsert(ListEntity(id = id, name = name, description = description, createdAt = now, updatedAt = now))
-        outbox.enqueue(
-            entityType = "list",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("name", name)
-                put("description", description ?: JSONObject.NULL)
-                put("createdAt", now)
-                put("updatedAt", now)
-            },
-        )
+        outbox.atomically {
+            listDao.upsert(ListEntity(id = id, name = name, description = description, createdAt = now, updatedAt = now))
+            outbox.enqueue(
+                entityType = "list",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("name", name)
+                    put("description", description ?: JSONObject.NULL)
+                    put("createdAt", now)
+                    put("updatedAt", now)
+                },
+            )
+        }
         return id
     }
 
     suspend fun renameList(id: String, name: String, description: String?) {
-        val existing = listDao.getById(id) ?: return
-        val now = Instant.now().toString()
-        listDao.upsert(existing.copy(name = name, description = description, updatedAt = now))
-        outbox.enqueue(
-            entityType = "list",
-            entityId = id,
-            operation = "update",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("name", name)
-                put("description", description ?: JSONObject.NULL)
-                put("updatedAt", now)
-            },
-        )
+        outbox.atomically {
+            val existing = listDao.getById(id) ?: return@atomically
+            val now = Instant.now().toString()
+            listDao.upsert(existing.copy(name = name, description = description, updatedAt = now))
+            outbox.enqueue(
+                entityType = "list",
+                entityId = id,
+                operation = "update",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("name", name)
+                    put("description", description ?: JSONObject.NULL)
+                    put("updatedAt", now)
+                },
+            )
+        }
     }
 
     suspend fun deleteList(id: String) {
-        listDao.deleteById(id) // Room's FK ON DELETE CASCADE removes the local list_items rows too.
-        outbox.enqueue(
-            entityType = "list",
-            entityId = id,
-            operation = "delete",
-            payload = JSONObject().put("id", id),
-        )
+        outbox.atomically {
+            listDao.deleteById(id) // Room's FK ON DELETE CASCADE removes the local list_items rows too.
+            outbox.enqueue(
+                entityType = "list",
+                entityId = id,
+                operation = "delete",
+                payload = JSONObject().put("id", id),
+            )
+        }
     }
 
     /** Idempotent — a second call for an already-member title is a no-op, matching the
      *  server's unique(list_id, title_id) upsert contract. */
     suspend fun addTitleToList(listId: String, titleId: String) {
-        if (listItemDao.findId(listId, titleId) != null) return
-        val id = UUID.randomUUID().toString()
-        val now = Instant.now().toString()
-        listItemDao.upsert(ListItemEntity(id = id, listId = listId, titleId = titleId, position = null, addedAt = now, updatedAt = now))
-        outbox.enqueue(
-            entityType = "list_item",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("listId", listId)
-                put("titleId", titleId)
-                put("position", JSONObject.NULL)
-                put("addedAt", now)
-                put("updatedAt", now)
-            },
-        )
+        outbox.atomically {
+            if (listItemDao.findId(listId, titleId) != null) return@atomically
+            val id = UUID.randomUUID().toString()
+            val now = Instant.now().toString()
+            listItemDao.upsert(ListItemEntity(id = id, listId = listId, titleId = titleId, position = null, addedAt = now, updatedAt = now))
+            outbox.enqueue(
+                entityType = "list_item",
+                entityId = id,
+                operation = MEMBERSHIP_COMMAND,
+                payload = membershipPayload(id, listId, titleId, true, now),
+            )
+        }
     }
 
     suspend fun removeTitleFromList(listId: String, titleId: String) {
-        val id = listItemDao.findId(listId, titleId) ?: return
-        listItemDao.deleteByListAndTitle(listId, titleId)
-        outbox.enqueue(
-            entityType = "list_item",
-            entityId = id,
-            operation = "delete",
-            payload = JSONObject().put("id", id),
-        )
+        outbox.atomically {
+            val id = listItemDao.findId(listId, titleId) ?: return@atomically
+            listItemDao.deleteByListAndTitle(listId, titleId)
+            outbox.enqueue(
+                entityType = "list_item",
+                entityId = id,
+                operation = MEMBERSHIP_COMMAND,
+                payload = membershipPayload(id, listId, titleId, false, null),
+            )
+        }
     }
 }
 

@@ -63,7 +63,8 @@ class LibraryRepositoryBackfillEpisodeMetadataTest {
             theaterInterestDao = NoTheaterInterestDao2,
             outbox = MutationOutbox(outboxDao, NoopWriter2, NoopConflictHandler2),
             episodeMetadataFetcher = fetcher,
-        )
+        personCreditsDao = FakePersonCreditsDao(),
+    )
 
     @Test
     fun `fills only the null fields, preserving anything already written, and skips a fully-populated season`() = runTest {
@@ -205,6 +206,7 @@ private object NoEpisodeRatingsDao2 : EpisodeRatingDao {
 }
 
 private object NoEpisodeReviewsDao2 : EpisodeReviewDao {
+    override fun observeReviews(titleId: String): Flow<List<EpisodeReviewEntity>> = throw UnsupportedOperationException()
     override suspend fun upsertAll(reviews: List<EpisodeReviewEntity>) = throw UnsupportedOperationException()
     override suspend fun deleteById(id: String) = throw UnsupportedOperationException()
 }
@@ -255,6 +257,9 @@ private class RecordingOutboxDao2 : OutboxDao {
     override fun observePending(): Flow<List<OutboxEntity>> = MutableStateFlow(entries)
     override suspend fun getPending(): List<OutboxEntity> = entries
     override suspend fun remove(id: String) { entries.removeAll { it.id == id } }
+    override suspend fun markForReview(id: String, reason: String): Int = error("Not used by this fixture")
+    override suspend fun replaceReviewedTitle(oldId: String, originalPayload: String, newId: String, newOperation: String, newPayload: String): Int = error("Not used by this fixture")
+
     override suspend fun recordFailure(id: String, error: String?) = Unit
 }
 

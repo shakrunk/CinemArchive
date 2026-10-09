@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useState } from 'react'
 import { Loader2, Check } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -102,7 +103,7 @@ export function ShareScopeEditor({ target, label, onClose }: ShareScopeEditorPro
         <div className="px-5 pt-5 pb-4 shrink-0">
           <div
             className="font-mono uppercase tracking-widest"
-            style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+            style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
           >
             Edit access
           </div>

@@ -7,9 +7,8 @@ package work.kumarfamilynet.cinemarchive.core.model
  * customizable layout depends on `user_prefs.ledger_layout` sync, which needs a real
  * `RemoteMutationWriter` (still stubbed — see docs/android-implementation-status.md).
  *
- * [totalWatchedMovieMinutes] covers movies only, matching runtime data already mirrored
- * locally — TV watched-minutes needs a per-episode runtime sum across watched episodes,
- * which the web app computes but Android doesn't reproduce yet; deferred, not a hard blocker.
+ * Films count once when watched; each watched TV episode counts once, including Specials.
+ * Rewatches do not multiply runtime, and missing runtimes contribute no invented minutes.
  */
 data class LedgerStats(
     val totalMovies: Int,
@@ -17,4 +16,8 @@ data class LedgerStats(
     val totalViewings: Int,
     val averageRating: Double?,
     val totalWatchedMovieMinutes: Int,
-)
+    val totalWatchedEpisodeMinutes: Int = 0,
+) {
+    val totalWatchedMinutes: Int get() = totalWatchedMovieMinutes + totalWatchedEpisodeMinutes
+    val roundedHours: Int get() = kotlin.math.floor(totalWatchedMinutes / 60.0 + 0.5).toInt()
+}

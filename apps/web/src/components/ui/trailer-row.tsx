@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize } from 'lucide-react'
 import type { TitleVideo } from 'src/lib/media'
@@ -401,7 +402,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
 
                 <span
                   className="font-mono tabular-nums"
-                  style={{ fontSize: '11px', color: 'var(--paper-dim)', letterSpacing: '0.04em' }}
+                  style={{ fontSize: scaledTextSize('11px'), color: 'var(--paper-dim)', letterSpacing: '0.04em' }}
                 >
                   {fmtTime(currentTime)}
                   <span style={{ color: 'var(--paper-faint)', margin: '0 3px' }}>/</span>
@@ -444,13 +445,13 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
           <div className="flex-1 min-w-0 text-center">
             <div
               className="font-serif truncate"
-              style={{ fontSize: '14px', color: 'var(--paper)', lineHeight: 1.3 }}
+              style={{ fontSize: scaledTextSize('14px'), color: 'var(--paper)', lineHeight: 1.3 }}
             >
               {video.name}
             </div>
             <div
               className="font-mono uppercase flex items-center justify-center gap-2 mt-0.5"
-              style={{ fontSize: '9px', letterSpacing: '0.14em' }}
+              style={{ fontSize: scaledTextSize('9px'), letterSpacing: '0.14em' }}
             >
               <span style={{ color: 'var(--amber-deep)' }}>{video.type}</span>
               {totalVideos > 1 && (
@@ -603,13 +604,13 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
               <div className="mt-2 px-0.5">
                 <div
                   className="font-sans line-clamp-1"
-                  style={{ fontSize: '12.5px', color: 'var(--paper)' }}
+                  style={{ fontSize: scaledTextSize('12.5px'), color: 'var(--paper)' }}
                 >
                   {v.name}
                 </div>
                 <div
                   className="font-mono uppercase"
-                  style={{ fontSize: '10px', color: 'var(--amber-deep)', letterSpacing: '0.1em', opacity: 0.6 }}
+                  style={{ fontSize: scaledTextSize('10px'), color: 'var(--amber-deep)', letterSpacing: '0.1em', opacity: 0.6 }}
                 >
                   {v.type}
                 </div>

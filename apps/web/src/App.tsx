@@ -11,11 +11,13 @@ import { useOutingReconciler } from 'src/lib/useOutingReconciler'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
 import { NotificationStack } from 'src/components/NotificationStack'
+import { LibrarySyncStatus } from 'src/components/LibrarySyncStatus'
 import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
 import { useSmoothScroll } from 'src/lib/useSmoothScroll'
 import { useTabVisibility } from 'src/lib/useTabVisibility'
+import { watchTextPreferences } from 'src/lib/textPreferences'
 
 // Code-split everything that isn't part of the unauthenticated landing path
 // (LandingScreen + ProfileModal stay eagerly bundled — that's the actual
@@ -70,6 +72,7 @@ const A11Y_PILL =
   'px-4 py-2 rounded-md font-sans text-sm font-medium text-paper bg-secondary/60 transition-colors focus:outline-hidden focus-visible:bg-amber focus-visible:text-(--on-amber)'
 
 export default function App() {
+  useEffect(watchTextPreferences, [])
   // Smart landing unless the URL already names a view (deep link / refresh).
   const [currentView, setCurrentView] = useState<AppView>(() => {
     return parseNav(window.location.search, 'discover').view
@@ -89,6 +92,7 @@ export default function App() {
   const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
   const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
   const user = useAppStore((s) => s.user)
+  const librarySession = useAppStore((s) => s.librarySession)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const isCommandPaletteOpen = useAppStore((s) => s.isCommandPaletteOpen)
   const closeCommandPalette = useAppStore((s) => s.closeCommandPalette)
@@ -193,7 +197,10 @@ export default function App() {
   )
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return  // authChecked already true from initial state
+    if (!isSupabaseConfigured) {
+      setUser(null) // Hydrate the separate anonymous library without adopting legacy owner data.
+      return
+    }
 
     const params = new URLSearchParams(window.location.search)
     const shareToken = params.get('share')
@@ -284,6 +291,7 @@ export default function App() {
           />
 
           <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
+            <LibrarySyncStatus key={librarySession} />
             <Suspense fallback={<ViewLoadingFallback />}>
               {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
               {currentView === 'library' && <Library />}
@@ -303,19 +311,19 @@ export default function App() {
               sheet/modal's own transition doing the animating, not this
               boundary. */}
           {addTitleEverOpened && (
-            <Suspense fallback={null}><AddTitleWorkflow /></Suspense>
+            <Suspense fallback={null}><AddTitleWorkflow key={librarySession} /></Suspense>
           )}
           {detailDrawerEverOpened && (
-            <Suspense fallback={null}><TitleDetailDrawer /></Suspense>
+            <Suspense fallback={null}><TitleDetailDrawer key={librarySession} /></Suspense>
           )}
           {refreshMetadataEverOpened && (
-            <Suspense fallback={null}><RefreshMetadataModal /></Suspense>
+            <Suspense fallback={null}><RefreshMetadataModal key={librarySession} /></Suspense>
           )}
           {outingScheduleEverOpened && (
-            <Suspense fallback={null}><OutingScheduleSheet /></Suspense>
+            <Suspense fallback={null}><OutingScheduleSheet key={librarySession} /></Suspense>
           )}
           {postShowSheetEverOpened && (
-            <Suspense fallback={null}><PostShowSheet /></Suspense>
+            <Suspense fallback={null}><PostShowSheet key={librarySession} /></Suspense>
           )}
         </>
       )}

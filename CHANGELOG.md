@@ -9,6 +9,137 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-10-09
+
+### Fixed
+- Android add-title previews now show director or network and every genre.
+
+- Android Ledger hero totals now include watched episode and Special minutes and round hours like the web app, verified against shared calculation fixtures.
+- Android Spider-Noir episode watches and reviews now capture B&W or Color choices, preserve them across retries and synchronization, and show the chosen mode in history.
+- Android provider imports now merge existing titles and viewing dates atomically, preserve provider identity across pending imports, and expose exact retry, conflict review and request export.
+- Android now offers global keyboard search and owner actions, including ticket scheduling with preserved drafts, visible retries and durable duplicate prevention.
+- Android title additions now save tags and previously watched season progress through one durable atomic graph command, preserving undated history and catalog metadata.
+- Android now logs pre-platform watches for a series or season, preserving existing history and offering durable retry, conflict review, discard and original-request export from Profile.
+- Android provider imports now save new titles, supplied viewing dates and provider identity as one durable operation, with honest partial-failure reporting and account-safe document picking.
+- Android catalog additions now preserve Rotten Tomatoes links, awards, Bechdel results, credit portraits and episode counts through local storage and synchronization.
+- Android now reviews older queued list changes, preserves originals, and recovers membership by list/title identity without losing later edits.
+- Android navigation now supports device-local tab ordering, visibility, compact icons and reset, including phone and wide layouts.
+- Android can restore JSON backups through the system picker, with previews, duplicate skips, recoverable failures and preserved title, episode and outing history.
+- Android outing completion, post-show ratings and notes, and undo now use durable actions with explicit conflict recovery and protection against duplicate viewing history.
+- Android backup validation now retains completed outings after their viewing history was deleted and matches the shared storage limits for preview and runtime minutes.
+- Android Discover now offers recommendations based on library titles and More starring shelves, with searchable choices, independent retries and media-aware duplicate filtering.
+- Android title details now edit watch links, home-collection status and physical copies with durable saves, preserved opaque metadata and explicit conflict recovery.
+- Android now keeps viewing changes held for review or pending outing confirmation queued without sending them through the legacy upload path.
+- Android can export its complete local title and outing graph as web-compatible JSON, including pending edits, history and companion links, using the system document picker.
+- Android venue notes and theater interest now sync through durable account-scoped commands with explicit conflict recovery; viewing and outing edits preserve companion friend identities.
+- Android friend and shared archives now support full library filters, six sorts, person and studio facets, and franchise grouping without expanding shared access.
+- Android now edits friend access by genre and watch status; friend and link access editors retain failed drafts and treat empty selections as unrestricted.
+- Android Discover now searches people and studios, opens their movie/TV catalogs, and preserves media identity, filters and retry behavior across selections.
+- Android friend archives now open full title details, viewing history and a read-only Ledger, with authenticated discussions and reactions while respecting shared scopes and account changes.
+- Android viewing-history edits now retain their original versions through saved forms and retries, save linked title changes atomically, and support explicit conflict recovery without overwriting newer edits.
+- Android credit refresh now preserves synced profile images and episode counts when updating names, filling missing seasons or reconciling server identities.
+- Android backup mapping now reports nested collection text that server storage cannot represent while preserving the original archive; installed-app restore remains in progress.
+- Android now retains synced credit profiles, episode counts and episode watch/review color modes offline, including safe backfill that preserves pending edits.
+- Android Discover now browses movie and TV feeds by genre and loads additional pages, retaining results on retry and ignoring outdated requests.
+- Shared viewing commands now reject reused history identities with different supplied values, so linked title updates cannot partially succeed against a conflicting viewing.
+- Web Discover now keeps movies and TV shows in mixed genre pagination and prevents outdated searches or page responses from replacing a newer selection.
+- Android outing recovery now preserves the server revision while displaying pending edits, keeping unsupported saved intents available for review.
+- Android viewing-command recovery now retains original edit identities and refreshes exact linked outings after deletion; history-editor activation is being integrated separately.
+- Web outing planning now supports private venue notes with durable offline saves, explicit removal and comparison when another device changes a note.
+- Shared library sync now retains credit profiles and episode counts plus watch/review color modes for native backup parity; Android storage and export integration are still in progress.
+- Web movie details now save private theater-interest preferences durably and offer an Up Next scheduling prompt, with offline retry and account isolation.
+- Android backup restoration now has a verified title-mapping foundation that preserves exact archive numbers and reports unsupported values; installed-app restore remains under development.
+- Android now validates explicit title-revision proof in outing completion receipts without treating newer title state as the original completion effect.
+- Web owner caches now retain shared private venue notes and theater-interest flags across restarts and preserve them when an older server lacks support; editing controls remain in progress.
+- Android tickets now support durable photo capture, original-image export, barcode display and explicit recovery with serialized sync replay.
+- Android backup validation now preserves archive values and plans copies with fresh identities; installed-app export and restore integration remain under development.
+- Android now offers explicit review and recovery of pending viewing edits, preserving server revisions and clearing only confirmed obsolete outing links.
+- Android now retains synced physical collections, custom watch links and rich title metadata offline, including backfill for existing libraries.
+- Offline ratings after an outing completion can use its proven title revision while preserving newer edits and historical completion uncertainty.
+- Shared storage now supports private venue notes and theater-interest flags, including guarded note edits and cross-client sync.
+- Android title details now support editing tags, with durable status/rating changes and explicit comparison and recovery for saved edits.
+- The shared sync feed now includes saved watch links, physical collections, content ratings and critic/accolade metadata for Android clients that support those fields.
+- Android list membership changes now use the list-and-title identity, reconcile concurrent additions, and preserve later removals across retries.
+- Android outing changes now preserve the causal order of pending guarded ticket changes and retain uncertain ticket confirmations for retry.
+- Android list cards and details now display saved descriptions.
+- Android title details now show trailers and regional streaming, rental and purchase providers, with separate retry controls.
+- Undoing an outing now preserves newer title notes when the undo did not restore title status and an older title edit is still pending.
+- Web ticket changes retain the outing revision across offline reloads and retries, preserving newer plan edits and offering recovery when an older queued change has no revision proof.
+- Shared ticket commands can guard the outing revision, preventing a ticket upload from hiding a newer plan edit when later changes sync.
+- Android title details now show stored tags, language, release date, studios, franchise, date added and IMDb score while offline.
+- Shared completion receipts preserve the original outing revision, preventing older pending plan changes from overwriting newer edits on another device.
+- Web JSON imports regenerate episode and history identities while retaining their contents, and reject duplicate identities before saving.
+- Android credit refresh now fills empty seasons and missing Specials using confirmed episode identities, preserving existing progress and watch history.
+- Shared episode catalog fill reuses existing season and episode identities without overwriting watch progress, metadata or history from another device.
+- Shared completion receipts retain the original viewing revision so another device's pending edits cannot overwrite newer history; new completion notifications identify their exact outing.
+- Web: "Didn't make it" now queues a guarded reversal, preserving rated history, newer device edits and deliberate title-status changes across retries.
+- Android outing edits and viewing-unlink changes now use durable, version-checked commands; uncertain responses retain the original operation for confirmation instead of overwriting newer plans.
+- Shared outing reversal can follow queued plan and viewing edits using their exact receipts, while preserving later edits and rated history.
+- Shared credit refresh now updates provider metadata without replacing existing cast or crew identities, with owner-safe insertion and replay receipts.
+- Shared outing completion now preserves one canonical viewing identity across retries and provides guarded reversal that protects newer edits, ratings and title-status changes; native reconciliation is being integrated separately.
+- Android now retains season cast, episode crew and the full cast of newly added titles, preserving credited person identities through local upgrades and sync.
+- Shared library sync now includes season cast, episode crew and their deletion records, allowing native person filters to backfill existing credits safely.
+- Android: outing edits now send only changed fields, preserve uncertain legacy changes for review, and use consistent screening formats in plans and Ledger totals.
+- Android retains tags, studios, franchise metadata and explicit metadata clears, with a lossless local database upgrade and backend-aware sync backfill.
+- Web outing sharing waits for pending plan edits, isolates account changes, and shows each recipient the confirmed delivered snapshot.
+- Outing plan sharing now supports safe retries after an interrupted response and returns the actual delivered plan snapshot.
+
+- Web: title deep links now survive asynchronous local-library startup and reload while keeping account-specific detail drawers isolated.
+
+- Web: viewing and episode calendar dates no longer shift to the previous day in western time zones; timestamps still use local time.
+
+- Android: tags, studios, and franchise metadata now remain available locally after adding or syncing titles; upgrades preserve watch history and pending offline changes.
+- Android library sync now includes existing title tags, studios, and franchise metadata for native filtering and grouping.
+
+- Social comments and reactions now require an authenticated owner or a friend allowed by the title sharing scope; fixed a failing comments query and anonymous reaction exposure.
+
+- Web: sign-in now accurately offers email links; removed incomplete passkey controls that could report authentication or registration without completing either flow.
+
+- Shared library links now fetch their authorized title graph and Ledger layout in each request, avoiding session-token failures with pooled database connections.
+- Android: local libraries, pending changes, sync jobs, and outing notifications now stay with their signed-in account; legacy device data can be recovered explicitly with crash-safe receipts.
+- Android: Discover now searches the remote catalog beyond trending titles. Both clients now distinguish movie and TV ownership when TMDB IDs overlap, preserving the correct add actions and recommendations.
+- Android: Up Next ordering, mixed season progress, episode average ratings, and Ledger history/date-range calculations now match the web app.
+- Web: retrying an episode log preserves the original watch, rating, and review IDs and timestamps, avoiding duplicates after a lost response; clearing a title's rating or notes now clears the synced value too.
+- Web: GitHub Pages deep links now recover when session storage is unavailable, and stale external redirect values no longer interrupt startup.
+- Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
+
+### Added
+- Android: refresh catalog metadata and episodes for a single title or the whole library from Profile, preserving watch history, pending edits and synced credits.
+- Android: pin titles to the Library, synced with web, and choose Spider-Noir B&W or Color viewing modes with a live visual preview on title details.
+- Web: capture and view private ticket photos, verified barcodes and seat details, with offline access, durable replacement/removal and recovery from storage failures.
+- Android: refresh full cast and crew for existing titles and tracked seasons or episodes, preserving history and safely reconciling interrupted sync.
+- Android: Library can filter by a credited person across titles, seasons and episodes; credit links preserve existing filters and distinguish people with the same name.
+- Android: Profile now offers explicit review, selected-field reapplication, discard and preserved-original export for saved outing changes, with restart-safe retry and isolated recovery for unreadable records.
+- Shared backend: saved outing changes can be reapplied through an owner-scoped, version-checked review API with durable retry receipts; native review controls follow separately.
+- Shared backend: private ticket attachment storage with owner-only access, conflict-safe replacement, interrupted-request receipts, and retained deletion recovery; client capture integration follows separately.
+- Android: Library now supports metadata filters, half-star rating thresholds, matching search fields, six sort orders in both directions, and franchise grouping.
+- Android can share upcoming outing plans with friends or the system share/calendar sheet, and recommend a title directly after a viewing.
+
+- Web: eight Ledger charts now offer complete data tables with keyboard access, including compact layouts, zero-count dates, rating comparisons, and screening streaks.
+
+- Android: title details now support friend comments, reactions, and searchable recommendations with per-recipient retry and account-isolated loading.
+
+- Android: Up Next now offers exact-event Undo after logging an episode and an explicit series-completion action after a finale, preserving failed undo attempts for retry.
+
+- Web: library edits, episode logs, viewings, outings, lists, imports, and Ledger changes now save durably on the device before confirming success, with account-isolated retries, conflict recovery, and multi-tab synchronization.
+
+- Library imports can sync larger TV histories atomically and retain provider identities without partially creating a title.
+
+- Android: shared links now open scoped, read-only libraries and Ledger statistics without signing in; owners can create, restrict, and revoke links from Profile.
+
+- Android: episode detail now logs dated or pre-platform rewatches with watch notes and independent half-star ratings and reviews, shows their histories, and deletes individual watches without removing ratings or reviews.
+- Android: movie viewing history now supports creating, editing, and deleting individual viewings, including dates or pre-platform watches, half-star ratings, notes, venues, and companion names; offline retries preserve edit/delete order.
+- Android: profile identity editing, invite redemption and management, notification inbox, and Friends screens for relationships, recommendations, activity, and read-only libraries.
+- Web: Appearance now offers Android's four text sizes and bundled Lexend font, with a live preview, apply/cancel/reset controls, and device-local preferences that work offline.
+- Web: Up Next now shows private On This Day cinema memories with the original venue, companions, rating, and notes, matching Android.
+- Web: the moviegoing Ledger panel now includes venue and format spending, best-value theaters, and milestone badges in a complete keyboard-accessible detail view, matching Android.
+- Android: the Add-title form now has a date-watched picker (and a "watched before joining" undated option) for titles logged as Watched, matching the web app.
+- Web and Android: Settings → Data & Portability (web) and Settings → Import & sync
+  (Android) can now import watched titles and ratings from
+  Simkl, Plex and Emby, and re-importing a Letterboxd CSV now merges into films already in
+  the library (import-only; existing ratings and viewings are never
+  overwritten). TV is imported at title level; episode history is not yet synced.
+
 ## [1.33.1] - 2026-10-06
 
 ### Fixed

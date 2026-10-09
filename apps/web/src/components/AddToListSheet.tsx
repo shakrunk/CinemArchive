@@ -1,3 +1,5 @@
+import { saveSucceeded } from 'src/lib/localSave'
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -16,8 +18,7 @@ interface AddToListSheetProps {
 }
 
 // Templated on ShareScopeEditor's Chip-toggle multi-select. Each toggle writes
-// immediately (addTitleToList/removeTitleFromList are already fire-and-forget
-// optimistic store actions), so this needs no local "pending changes" state or
+// immediately after durable storage commits, so this needs no batched
 // batched Save button — unlike ShareScopeEditor, which only writes on Save.
 export function AddToListSheet({ titleId, titleName, onClose }: AddToListSheetProps) {
   const closeButtonRef = useModalFocusAndEscape<HTMLButtonElement>(onClose)
@@ -28,18 +29,21 @@ export function AddToListSheet({ titleId, titleName, onClose }: AddToListSheetPr
   const createList = useAppStore((s) => s.createList)
 
   const [newListName, setNewListName] = useState('')
+  const [saving, setSaving] = useState(false)
 
   function toggle(listId: string) {
     if (listMemberships[listId]?.has(titleId)) removeTitleFromList(listId, titleId)
     else addTitleToList(listId, titleId)
   }
 
-  function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     const name = newListName.trim()
-    if (!name) return
-    const list = createList(name)
-    addTitleToList(list.id, titleId)
+    if (!name || saving) return
+    setSaving(true)
+    const saved = await saveSucceeded(createList(name, null, titleId))
+    setSaving(false)
+    if (!saved) return
     setNewListName('')
   }
 
@@ -60,7 +64,7 @@ export function AddToListSheet({ titleId, titleName, onClose }: AddToListSheetPr
         <div className="px-5 pt-5 pb-4 shrink-0">
           <div
             className="font-mono uppercase tracking-widest"
-            style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+            style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
           >
             Add to list
           </div>

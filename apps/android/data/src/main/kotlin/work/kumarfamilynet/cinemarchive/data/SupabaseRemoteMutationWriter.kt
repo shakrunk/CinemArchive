@@ -26,30 +26,65 @@ class SupabaseRemoteMutationWriter(
         val payload = JSONObject(entry.payloadJson)
         return try {
             when (entry.entityType) {
+                "outing_completion" -> if (entry.operation == OUTING_COMPLETION) OutingCompletionTransport(client, sessionProvider).push(entry)
+                    else PushResult.Retry("Open Profile > Saved outing completions to review this preserved action.")
+                "outing_reversal" -> if (entry.operation == OUTING_REVERSAL) OutingReversalTransport(client, sessionProvider).push(entry)
+                    else PushResult.Retry("Open Profile > Saved outing completions to review this preserved action.")
+                "title_credits" -> pushCreditRefresh(entry, payload)
+                "title_catalog" -> EpisodeCatalogFillTransport(client, sessionProvider).push(entry)
                 "title" -> when (entry.operation) {
+                    TITLE_METADATA_COMMAND, "review" -> TitleMetadataTransport(client, SessionSource(sessionProvider)).push(entry)
                     "insert" -> insertTitle(payload)
                     "delete" -> deleteTitle(payload)
                     else -> pushTitleUpdate(payload)
                 }
-                "episode_watch_event" -> upsertWatchEvent(payload)
+                EPISODE_BULK -> EpisodeBulkTransport(client, SessionSource(sessionProvider)).push(entry)
+                "episode_watch_event" -> if (entry.operation == "delete") deleteWatchEvent(payload) else upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)
                 "episode_metadata" -> patchEpisodeMetadata(payload)
-                "viewing" -> if (entry.operation == "update") patchViewing(payload) else upsertViewing(payload)
-                "cinema_outing" -> upsertOuting(payload)
+                "viewing" -> when (entry.operation) {
+                    VIEWING_COMMAND -> ViewingCommandTransport(client, sessionProvider).push(entry)
+                    "review" -> PushResult.Retry("Open Profile > Saved viewing changes to review this preserved change.")
+                    AWAITING_COMPLETION -> PushResult.Retry("Confirm the pending outing completion before syncing this saved viewing change.")
+                    "update" -> patchViewing(payload)
+                    "delete" -> deleteViewing(payload)
+                    else -> upsertViewing(payload)
+                }
+                "cinema_outing" -> when (entry.operation) {
+                    OUTING_COMMAND -> OutingCommandTransport(client, sessionProvider).push(entry)
+                    "insert" -> insertOuting(payload)
+                    "update" -> PushResult.Review("Saved outing edits have no verified server baseline. Open Profile > Saved outing changes to review them.")
+                    "upsert" -> verifyLegacyOuting(payload)
+                    "review" -> PushResult.Retry("Open Profile > Saved outing changes to review this preserved change.")
+                    else -> PushResult.Retry("Unknown outing operation ${entry.operation}")
+                }
                 "list" -> when (entry.operation) {
                     "delete" -> deleteList(payload)
                     else -> upsertList(payload)
                 }
                 "list_item" -> when (entry.operation) {
-                    "delete" -> deleteListItem(payload)
-                    else -> upsertListItem(payload)
+                    MEMBERSHIP_COMMAND -> ListMembershipTransport(client, sessionProvider).push(entry)
+                    else -> PushResult.Retry("Open Profile > Saved list changes to review this older membership change.")
                 }
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             PushResult.Retry(e.message ?: e.javaClass.simpleName)
         }
+    }
+
+    private fun pushCreditRefresh(entry: OutboxEntity, payload: JSONObject): PushResult {
+        require(entry.operation == "refresh") { "Unknown credit refresh operation" }
+        val session = sessionProvider()
+        require(payload.getString("ownerId") == session.userId && payload.getString("titleId") == entry.entityId) { "Credit refresh account or title changed" }
+        val operations = payload.getJSONArray("operations")
+        val receipt = JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
+            .put("p_operations", operations).toString(), session.accessToken))
+        require(sessionProvider().userId == session.userId) { "This sign-in has ended" }
+        checkedLibraryCommandReceipt(entry.id, operations, receipt, session.userId)
+        return PushResult.Applied(receipt)
     }
 
     /**
@@ -93,6 +128,10 @@ class SupabaseRemoteMutationWriter(
             .putNullable("imdb_rating", payload, "imdbRating")
             .putNullable("rt_score", payload, "rtScore")
             .putNullable("metacritic_score", payload, "metacriticScore")
+            .putCatalogField("rt_url", payload, "rtUrl")
+            .putCatalogField("awards_count", payload, "awardsCount")
+            .putCatalogField("bechdel_outcome", payload, "bechdelOutcome")
+            .putCatalogField("bechdel_score", payload, "bechdelScore")
             .put("studios", payload.getJSONArray("studios"))
             .putNullable("collection_id", payload, "collectionId")
             .putNullable("collection_name", payload, "collectionName")
@@ -134,6 +173,8 @@ class SupabaseRemoteMutationWriter(
                 .put("name", member.getString("name"))
                 .putNullable("character_name", member, "characterName")
                 .put("cast_order", member.getInt("castOrder"))
+                .putCatalogField("profile_url", member, "profileUrl")
+                .putCatalogField("episode_count", member, "episodeCount")
         }?.let { client.upsert("title_cast", session.accessToken, it.toString()) }
 
         payload.rows("crew") { member ->
@@ -145,7 +186,23 @@ class SupabaseRemoteMutationWriter(
                 .put("name", member.getString("name"))
                 .put("job", member.getString("job"))
                 .putNullable("department", member, "department")
+                .putCatalogField("profile_url", member, "profileUrl")
         }?.let { client.upsert("title_crew", session.accessToken, it.toString()) }
+
+        // Optional arrays preserve compatibility with title inserts queued by older clients.
+        payload.rows("seasonCast") { member ->
+            JSONObject().put("id", member.getString("id")).put("title_id", titleId).put("user_id", userId)
+                .put("season_id", member.getString("seasonId")).put("tmdb_person_id", member.getInt("tmdbPersonId"))
+                .put("name", member.getString("name")).putNullable("character_name", member, "characterName")
+                .put("cast_order", member.getInt("castOrder"))
+                .putCatalogField("profile_url", member, "profileUrl")
+                .putCatalogField("episode_count", member, "episodeCount")
+        }?.let { client.upsert("season_cast", session.accessToken, it.toString()) }
+        payload.rows("episodeCrew") { member ->
+            JSONObject().put("id", member.getString("id")).put("title_id", titleId).put("user_id", userId)
+                .put("episode_id", member.getString("episodeId")).put("tmdb_person_id", member.getInt("tmdbPersonId"))
+                .put("name", member.getString("name")).put("job", member.getString("job"))
+        }?.let { client.upsert("episode_crew", session.accessToken, it.toString()) }
 
         payload.optJSONObject("viewing")?.let { viewing ->
             val body = JSONObject()
@@ -180,13 +237,14 @@ class SupabaseRemoteMutationWriter(
         val updated = JSONArray(client.patchWithFilter("titles", filter, session.accessToken, body.toString()))
         if (updated.length() > 0) return PushResult.Success
 
-        val current = JSONArray(client.get("titles", "id=eq.$id&select=status,updated_at", session.accessToken))
+        val current = JSONArray(client.get("titles", "id=eq.$id&select=status,rating,updated_at", session.accessToken))
         if (current.length() == 0) return PushResult.Retry("Title $id not found or not owned by this session")
         val currentRow = current.getJSONObject(0)
         return PushResult.Conflict(
             JSONObject()
                 .put("id", id)
                 .put("status", currentRow.getString("status"))
+                .put("rating", if (currentRow.isNull("rating")) JSONObject.NULL else currentRow.getDouble("rating"))
                 .put("updatedAt", currentRow.getString("updated_at")),
         )
     }
@@ -209,8 +267,16 @@ class SupabaseRemoteMutationWriter(
             .put("id", payload.getString("id"))
             .put("episode_id", payload.getString("episodeId"))
             .put("user_id", session.userId)
-            .put("watched_at", payload.opt("watchedAt").takeUnless { it == JSONObject.NULL })
+            .putNullable("watched_at", payload, "watchedAt")
+        if (payload.has("notes")) body.putNullable("notes", payload, "notes")
+        if (payload.has("colorMode")) body.putNullable("color_mode", payload, "colorMode")
         client.upsert("episode_watch_events", session.accessToken, body.toString())
+        return PushResult.Success
+    }
+
+    private fun deleteWatchEvent(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        client.delete("episode_watch_events", "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken)
         return PushResult.Success
     }
 
@@ -234,6 +300,7 @@ class SupabaseRemoteMutationWriter(
             .put("user_id", session.userId)
             .put("review_text", payload.getString("reviewText"))
             .put("reviewed_at", payload.getString("reviewedAt"))
+        if (payload.has("colorMode")) body.putNullable("color_mode", payload, "colorMode")
         client.upsert("episode_reviews", session.accessToken, body.toString())
         return PushResult.Success
     }
@@ -244,9 +311,8 @@ class SupabaseRemoteMutationWriter(
      * [upsertViewing] path can't serve them: it requires a full row, so these payloads threw
      * on the missing key and requeued forever instead of ever reaching the server.
      *
-     * Unconditional, unlike [pushTitleUpdate]: a viewing has no client-side `updatedAt` to
-     * arbitrate on (the column exists server-side but is trigger-maintained), and the web app
-     * has no competing writer for these two fields.
+     * Also accepts the history editor's date, venue and companion changes. A viewing has no
+     * client-side `updatedAt`; updates use the same unconditional PATCH semantics as web.
      */
     private fun patchViewing(payload: JSONObject): PushResult {
         val session = sessionProvider()
@@ -254,9 +320,44 @@ class SupabaseRemoteMutationWriter(
         val body = JSONObject()
         if (payload.has("rating")) body.putNullable("rating", payload, "rating")
         if (payload.has("notes")) body.putNullable("notes", payload, "notes")
+        if (payload.has("date")) body.putNullable("viewed_at", payload, "date")
+        if (payload.has("venue")) body.putNullable("venue", payload, "venue")
+        if (payload.has("companions")) body.put("companions", payload.getJSONArray("companions").viewingCompanions())
         if (body.length() == 0) return PushResult.Success
-        client.patchWithFilter("viewings", "id=eq.$id", session.accessToken, body.toString())
+        client.patchWithFilter("viewings", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken, body.toString())
         return PushResult.Success
+    }
+
+    private fun deleteViewing(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        client.delete("viewings", "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}", session.accessToken)
+        return PushResult.Success
+    }
+
+    /** Plain INSERT distinguishes a new plan from editing a cached one; retries never merge over another client. */
+    private fun insertOuting(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        val body = outingWireBody(payload, session.userId, insert = true)
+        try {
+            client.insert("cinema_outings", session.accessToken, body.toString())
+            return PushResult.Success
+        } catch (error: SupabaseHttpException) {
+            if (error.postgresCode != "23505") throw error
+        }
+        return verifyExistingOuting(payload, session, body)
+    }
+
+    /** Old full snapshots contain no changed-field mask or trustworthy create marker. Read only. */
+    private fun verifyLegacyOuting(payload: JSONObject): PushResult {
+        val session = sessionProvider()
+        return verifyExistingOuting(payload, session, outingWireBody(payload, session.userId, insert = true))
+    }
+
+    private fun verifyExistingOuting(payload: JSONObject, session: SupabaseSession, expected: JSONObject): PushResult {
+        val rows = JSONArray(client.get("cinema_outings",
+            "id=eq.${payload.getString("id")}&user_id=eq.${session.userId}&select=*", session.accessToken))
+        if (rows.length() == 1 && outingMatchesRemote(expected, rows.getJSONObject(0))) return PushResult.Success
+        return PushResult.Retry("Saved outing changes require review against the current plan. They have been preserved without overwriting or recreating it.")
     }
 
     /**
@@ -282,50 +383,17 @@ class SupabaseRemoteMutationWriter(
             .put("id", payload.getString("id"))
             .put("title_id", payload.getString("titleId"))
             .put("user_id", session.userId)
-            .put("viewed_at", payload.opt("date").takeUnless { it == JSONObject.NULL })
+            .putNullable("viewed_at", payload, "date")
+        for (key in listOf("rating", "notes", "venue")) {
+            if (payload.has(key)) body.putNullable(key, payload, key)
+        }
+        if (payload.has("companions")) body.put("companions", payload.getJSONArray("companions").viewingCompanions())
+        if (payload.has("outingId")) body.putNullable("outing_id", payload, "outingId")
         client.upsert("viewings", session.accessToken, body.toString())
         return PushResult.Success
     }
 
-    /** `cinema_outings` is always a full-row upsert, not the conditional last-write-wins
-     *  update [pushTitleUpdate] does: Android is the only writer of its own outings today
-     *  (no cross-device concurrency to arbitrate), so there's no conflict case to detect yet
-     *  — see docs/superpowers/plans/2026-07-21-android-cinema-outings.md §3. */
-    private fun upsertOuting(payload: JSONObject): PushResult {
-        val session = sessionProvider()
-        val body = JSONObject()
-            .put("id", payload.getString("id"))
-            .put("title_id", payload.getString("titleId"))
-            .put("user_id", session.userId)
-            .put("showtime", payload.getString("showtime"))
-            .put("previews_minutes", payload.getInt("previewsMinutes"))
-            .put("runtime_minutes", payload.getInt("runtimeMinutes"))
-            .put("ends_at", payload.getString("endsAt"))
-            .put("venue", payload.opt("venue").takeUnless { it == JSONObject.NULL })
-            .put("companions", payload.getJSONArray("companions"))
-            .put("format", payload.opt("format").takeUnless { it == JSONObject.NULL })
-            .put("ticket_price", payload.opt("ticketPrice").takeUnless { it == JSONObject.NULL })
-            .put("seat", payload.opt("seat").takeUnless { it == JSONObject.NULL })
-            .put("auditorium", payload.opt("auditorium").takeUnless { it == JSONObject.NULL })
-            .put("seat_row", payload.opt("seatRow").takeUnless { it == JSONObject.NULL })
-            .put("seats", payload.getJSONArray("seats"))
-            .put("booking_ref", payload.opt("bookingRef").takeUnless { it == JSONObject.NULL })
-            .put("ticket_image_path", payload.opt("ticketImagePath").takeUnless { it == JSONObject.NULL })
-            .put("ticket_barcode_payload", payload.opt("ticketBarcodePayload").takeUnless { it == JSONObject.NULL })
-            .put("ticket_barcode_format", payload.opt("ticketBarcodeFormat").takeUnless { it == JSONObject.NULL })
-            .put("notes", payload.opt("notes").takeUnless { it == JSONObject.NULL })
-            .put("status", payload.getString("status").lowercase())
-            .put("previous_status", payload.opt("previousStatus").takeUnless { it == JSONObject.NULL })
-            .put("completed_viewing_id", payload.opt("completedViewingId").takeUnless { it == JSONObject.NULL })
-            .put("follow_up_dismissed_at", payload.opt("followUpDismissedAt").takeUnless { it == JSONObject.NULL })
-            .put("created_at", payload.getString("createdAt"))
-            .put("updated_at", payload.getString("updatedAt"))
-        client.upsert("cinema_outings", session.accessToken, body.toString())
-        return PushResult.Success
-    }
-
-    /** `lists`/`list_items` are always a full-row upsert, like [upsertOuting] — private-only
-     *  (no sharing yet), so no cross-writer conflict case exists here either. */
+    /** Writes the list row carried by the queued command. */
     private fun upsertList(payload: JSONObject): PushResult {
         val session = sessionProvider()
         val body = JSONObject()
@@ -345,26 +413,7 @@ class SupabaseRemoteMutationWriter(
         return PushResult.Success
     }
 
-    private fun upsertListItem(payload: JSONObject): PushResult {
-        val session = sessionProvider()
-        val body = JSONObject()
-            .put("id", payload.getString("id"))
-            .put("list_id", payload.getString("listId"))
-            .put("title_id", payload.getString("titleId"))
-            .put("user_id", session.userId)
-            .putNullable("position", payload, "position")
-            .put("added_at", payload.getString("addedAt"))
-            .put("updated_at", payload.getString("updatedAt"))
-        client.upsert("list_items", session.accessToken, body.toString())
-        return PushResult.Success
-    }
 
-    private fun deleteListItem(payload: JSONObject): PushResult {
-        val session = sessionProvider()
-        val id = payload.getString("id")
-        client.delete("list_items", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken)
-        return PushResult.Success
-    }
 }
 
 /** Copies [key] from [source] under a (usually snake_case) [column], preserving an explicit
@@ -372,6 +421,18 @@ class SupabaseRemoteMutationWriter(
  *  as "leave this column alone" rather than "set it to null". */
 private fun JSONObject.putNullable(column: String, source: JSONObject, key: String): JSONObject =
     put(column, source.opt(key).takeUnless { it == null || it == JSONObject.NULL } ?: JSONObject.NULL)
+
+/** Old queued title graphs never fetched these fields; leave remote enrichment alone. */
+private fun JSONObject.putCatalogField(column: String, source: JSONObject, key: String): JSONObject =
+    if (source.has(key)) putNullable(column, source, key) else this
+
+/** Older queued outing completions store names; web and Postgres use companion objects. */
+private fun JSONArray.viewingCompanions(): JSONArray = JSONArray().also { result ->
+    for (index in 0 until length()) {
+        val value = get(index)
+        result.put(if (value is String) JSONObject().put("name", value) else value)
+    }
+}
 
 /** Maps a payload's nested array into a PostgREST bulk-insert body, or null when there's
  *  nothing to send — an empty array would be a pointless round trip. */

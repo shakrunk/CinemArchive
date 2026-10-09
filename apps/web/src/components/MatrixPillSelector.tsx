@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 interface MatrixPillSelectorProps {
   onRedPill: () => void
 }
@@ -32,7 +33,7 @@ export function MatrixPillSelector({ onRedPill }: MatrixPillSelectorProps) {
           gap: '6px',
           borderRadius: '9999px',
           padding: '4px 10px',
-          fontSize: '11px',
+          fontSize: scaledTextSize('11px'),
           fontFamily: 'var(--mono)',
           letterSpacing: '0.04em',
           background: 'rgba(74, 158, 255, 0.08)',
@@ -66,7 +67,7 @@ export function MatrixPillSelector({ onRedPill }: MatrixPillSelectorProps) {
           gap: '6px',
           borderRadius: '9999px',
           padding: '4px 10px',
-          fontSize: '11px',
+          fontSize: scaledTextSize('11px'),
           fontFamily: 'var(--mono)',
           letterSpacing: '0.04em',
           background: 'rgba(220, 50, 50, 0.08)',

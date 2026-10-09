@@ -1,3 +1,4 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { useState } from 'react'
 import { Send } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
@@ -26,8 +27,7 @@ function PostShowBody({
   viewing: Viewing | undefined
   onClose: () => void
 }) {
-  const updateTitle = useAppStore((s) => s.updateTitle)
-  const dismissOutingFollowUp = useAppStore((s) => s.dismissOutingFollowUp)
+  const editViewing = useAppStore((s) => s.editViewing)
   const revertOutingCompletion = useAppStore((s) => s.revertOutingCompletion)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
 
@@ -38,35 +38,28 @@ function PostShowBody({
   // Writes straight onto the auto-logged viewing — same control and semantics
   // as logViewing (TitleDetailDrawer): rating updates both the viewing and
   // title.rating, notes land on the viewing alone.
-  function commitViewing(patch: Partial<Pick<Viewing, 'rating' | 'notes'>>) {
-    const viewings = title.viewings.map((v) => (v.id === viewing?.id ? { ...v, ...patch } : v))
-    updateTitle(title.id, {
-      viewings,
-      ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
-    })
+  async function commitViewing(patch: Partial<Pick<Viewing, 'rating' | 'notes'>>) {
+    if (!viewing) return false
+    return saveSucceeded(editViewing(title.id, viewing.id, patch,
+      patch.rating !== undefined ? { rating: patch.rating } : {},
+      patch.rating !== undefined ? { id: outing.id, patch: { followUpDismissedAt: new Date().toISOString() } } : undefined))
   }
 
-  function handleRate(value: number) {
-    setRating(value)
-    if (!viewing) return
-    commitViewing({ rating: value })
-    // A rating asserts you saw it — the follow-up card/notification have done
-    // their job (rule §5.6; dismissOutingFollowUp is called both here and by
-    // the ✕, per its own doc comment).
-    dismissOutingFollowUp(outing.id)
+  async function handleRate(value: number) {
+    if (await commitViewing({ rating: value })) setRating(value)
   }
 
-  function handleNoteBlur() {
-    if (viewing && note !== (viewing.notes ?? '')) commitViewing({ notes: note || undefined })
+  async function handleNoteBlur() {
+    if (viewing && note !== (viewing.notes ?? '')) return commitViewing({ notes: note || undefined })
+    return true
   }
 
-  function handleRecommend() {
-    handleNoteBlur()
-    setShowRecommend(true)
+  async function handleRecommend() {
+    if (await handleNoteBlur()) setShowRecommend(true)
   }
 
-  function handleDidntMakeIt() {
-    revertOutingCompletion(outing.id)
+  async function handleDidntMakeIt() {
+    if (!await saveSucceeded(revertOutingCompletion(outing.id))) return
     onClose()
     openOutingSchedule(title.id, outing.id)
   }

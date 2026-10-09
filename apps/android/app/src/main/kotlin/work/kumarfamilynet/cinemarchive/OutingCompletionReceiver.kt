@@ -30,18 +30,29 @@ import work.kumarfamilynet.cinemarchive.core.model.OutingTransition
 class OutingCompletionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val app = context.applicationContext as CinemArchiveApplication
+        // An alarm armed before owner-scoping existed (no extra) or for a different account than
+        // the one signed in now does nothing — it must never run against, or notify, another user.
+        val ownerId = intent.getStringExtra(EXTRA_OWNER_ID) ?: return
         val pendingResult = goAsync()
+        // This detached scope only keeps goAsync() alive. ALL real work (DB, poster fetch, posting)
+        // runs inside the account runtime's own scope, so closing the runtime on sign-out / switch
+        // cancels it, and the final post is re-checked against the exact sign-in.
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val transitions = app.outingsRepository.completeDueOutings()
-                transitions.forEach { postCompletionNotification(context, it) }
+                val runtime = app.awaitRuntime(ownerId) ?: return@launch
+                runtime.runOwned {
+                    runtime.completeDueOutings().forEach { postCompletionNotification(context, runtime, it) }
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // Runtime closed mid-flight: nothing may be posted for that account.
             } finally {
                 pendingResult.finish()
             }
         }
     }
 
-    private suspend fun postCompletionNotification(context: Context, transition: OutingTransition) {
+    private suspend fun postCompletionNotification(context: Context, runtime: AppAccountRuntime, transition: OutingTransition) {
+        val ownerId = runtime.ownerId
         ensureChannel(context)
         if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
 
@@ -49,6 +60,7 @@ class OutingCompletionReceiver : BroadcastReceiver() {
             .setPackage(context.packageName)
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             .putExtra(MainActivity.EXTRA_OPEN_TITLE_ID, transition.titleId)
+            .putExtra(EXTRA_OWNER_ID, ownerId)
         val pendingIntent = PendingIntent.getActivity(
             context,
             transition.outingId.hashCode(),
@@ -70,7 +82,12 @@ class OutingCompletionReceiver : BroadcastReceiver() {
             builder.setLargeIcon(posterBitmap)
             builder.setStyle(NotificationCompat.BigPictureStyle().bigPicture(posterBitmap))
         }
-        NotificationManagerCompat.from(context).notify(transition.outingId.hashCode(), builder.build())
+        // The poster fetch above can take seconds — re-check the exact sign-in at the last moment,
+        // atomically with respect to the runtime's teardown (which cancels this account's posts).
+        runtime.postIfCurrent {
+            NotificationManagerCompat.from(context)
+                .notify(AppAccountRuntime.notificationTag(ownerId), transition.outingId.hashCode(), builder.build())
+        }
     }
 
     /** Best-effort poster fetch for the notification — a network hiccup or missing poster
@@ -102,7 +119,10 @@ class OutingCompletionReceiver : BroadcastReceiver() {
         )
     }
 
-    private companion object {
-        const val CHANNEL_ID = "cinema_outings"
+    companion object {
+        /** The account an alarm/notification was created for; consumers ignore a mismatch. */
+        const val EXTRA_OWNER_ID = "owner_user_id"
+
+        private const val CHANNEL_ID = "cinema_outings"
     }
 }

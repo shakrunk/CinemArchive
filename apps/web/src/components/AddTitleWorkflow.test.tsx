@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import 'fake-indexeddb/auto'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { AddTitleWorkflow } from './AddTitleWorkflow'
 import { useAppStore } from 'src/store/useAppStore'
@@ -12,11 +13,14 @@ vi.mock('src/lib/media', async (importOriginal) => ({
 
 const movie: SearchResult = { tmdbId: 42, type: 'movie', title: 'A new discovery', year: 2026, genres: ['Drama'] }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks()
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} })
-  useAppStore.setState({ user: null, titles: [], isAddTitleOpen: true, preselectedResult: null })
+  useAppStore.getState().setUser(null)
+  await vi.waitFor(() => expect(useAppStore.getState().offlineStatus.hydrated).toBe(true))
+  await useAppStore.getState().setTitles([])
+  useAppStore.setState({ isAddTitleOpen: true, preselectedResult: null })
   vi.mocked(searchMedia).mockResolvedValue([movie])
   vi.mocked(fetchMediaDetails).mockResolvedValue({ result: movie, tmdbSeasons: [] })
 })
@@ -28,7 +32,8 @@ it('starts with an empty search after saving a title and opening again', async (
   fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'discovery' } })
   fireEvent.click(await screen.findByRole('button', { name: /A new discovery/ }))
   fireEvent.click(await screen.findByRole('button', { name: 'Add to Library' }))
-  expect(useAppStore.getState().titles).toHaveLength(1)
+  await waitFor(() => expect(useAppStore.getState().titles).toHaveLength(1))
+  await waitFor(() => expect(useAppStore.getState().isAddTitleOpen).toBe(false))
   act(() => useAppStore.getState().openAddTitle())
   expect(screen.getByRole('textbox', { name: 'Search' })).toHaveValue('')
   expect(screen.queryByText(movie.title)).not.toBeInTheDocument()

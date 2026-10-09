@@ -1,0 +1,96 @@
+{
+  "description": "BackupRestoreMapper.mapTitle golden: a planCopy title row (fresh ids already admitted) with the frozen admission instant, and the exact Room draft, canonical titles insert operation and issues it must produce.",
+  "admittedAt": "2026-10-09T00:30:00Z",
+  "input": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "tmdbId": 603,
+    "type": "movie",
+    "title": "The Matrix",
+    "year": 0,
+    "director": null,
+    "genres": ["Action", "Sci-Fi"],
+    "synopsis": "",
+    "runtime": 136,
+    "status": "watched",
+    "rating": 4.5,
+    "notes": "",
+    "tags": [],
+    "addedAt": "2024-03-01T10:00:00+05:30",
+    "releaseDate": "1999-03-31",
+    "imdbRating": 8.7,
+    "rtScore": 0,
+    "awardsCount": 0,
+    "bechdelOutcome": "pass",
+    "inHomeCollection": false,
+    "physicalMedia": [
+      { "id": "22222222-2222-4222-8222-222222222222", "format": "4K", "notes": "steelbook", "futureField": { "a": 1 } }
+    ],
+    "seasons": [],
+    "viewings": [
+      { "id": "33333333-3333-4333-8333-333333333333", "titleId": "11111111-1111-4111-8111-111111111111", "date": "2024-03-02" }
+    ],
+    "cast": [{ "name": "Keanu Reeves" }],
+    "ext": { "futureFlag": true },
+    "mood": "tense"
+  },
+  "expectedOperation": {
+    "table": "titles",
+    "action": "insert",
+    "key": { "id": "11111111-1111-4111-8111-111111111111" },
+    "values": {
+      "tmdb_id": 603,
+      "type": "movie",
+      "title": "The Matrix",
+      "year": 0,
+      "status": "watched",
+      "genres": ["Action", "Sci-Fi"],
+      "synopsis": "",
+      "runtime": 136,
+      "rating": 4.5,
+      "notes": "",
+      "tags": [],
+      "imdb_rating": 8.7,
+      "rt_score": 0,
+      "release_date": "1999-03-31",
+      "awards_count": 0,
+      "bechdel_outcome": "pass",
+      "in_home_collection": false,
+      "physical_media": [
+        { "id": "22222222-2222-4222-8222-222222222222", "format": "4K", "notes": "steelbook", "futureField": { "a": 1 } }
+      ],
+      "added_at": "2024-03-01T10:00:00+05:30"
+    }
+  },
+  "expectedEntity": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "tmdbId": 603,
+    "type": "MOVIE",
+    "title": "The Matrix",
+    "year": 0,
+    "director": null,
+    "genres": ["Action", "Sci-Fi"],
+    "synopsis": "",
+    "runtime": 136,
+    "status": "WATCHED",
+    "rating": 4.5,
+    "notes": "",
+    "addedAt": "2024-03-01T10:00:00+05:30",
+    "updatedAt": "2026-10-09T00:30:00Z",
+    "imdbRating": 8.7,
+    "releaseDate": "1999-03-31",
+    "tags": [],
+    "rtScore": 0,
+    "awardsCount": 0,
+    "bechdelOutcome": "pass",
+    "inHomeCollection": false,
+    "physicalMedia": [
+      { "id": "22222222-2222-4222-8222-222222222222", "format": "4K", "notes": "steelbook", "futureField": { "a": 1 } }
+    ]
+  },
+  "expectedIssues": [
+    { "path": "titles[0].cast", "kind": "DEFERRED" },
+    { "path": "titles[0].ext", "kind": "UNMAPPED" },
+    { "path": "titles[0].mood", "kind": "UNMAPPED" },
+    { "path": "titles[0].viewings", "kind": "DEFERRED" }
+  ]
+}

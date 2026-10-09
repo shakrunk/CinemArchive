@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "f1", "tmdbId": 1.5, "type": "movie", "title": "Fraction", "status": "watched" },
+    { "id": "f2", "tmdbId": 603.0, "type": "movie", "title": "Written with fraction", "status": "watched" },
+    { "id": "f3", "tmdbId": 1e3, "type": "movie", "title": "Exponent", "status": "watched" },
+    { "id": "f4", "tmdbId": "603", "type": "movie", "title": "String id", "status": "watched" },
+    { "id": "f5", "tmdbId": 7, "type": "movie", "title": "Integer", "status": "watched" }
+  ]
+}

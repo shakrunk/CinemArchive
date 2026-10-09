@@ -1,6 +1,6 @@
+import { isCatalogTitleOwned, libraryCatalogKeys } from 'src/lib/catalogIdentity'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Search, Compass, X, Film, Tv, Check, Plus, Info, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, Play, Pause, type LucideIcon } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from 'src/store/useAppStore'
 import {
   searchMedia, fetchTrending, fetchDiscover,
@@ -215,7 +215,7 @@ const SPROCKET_PITCH_PX = 38.4
 
 interface DiscoverCarouselProps {
   results: SearchResult[]
-  libraryTmdbIds: Set<number>
+  ownedCatalogKeys: ReadonlySet<string>
   isSharedView: boolean
   onAdd: (result: SearchResult) => void
   onSelect: (result: SearchResult) => void
@@ -225,7 +225,7 @@ interface DiscoverCarouselProps {
   paused: boolean
 }
 
-function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSelect, delays, paused }: DiscoverCarouselProps) {
+function DiscoverCarousel({ results, ownedCatalogKeys, isSharedView, onAdd, onSelect, delays, paused }: DiscoverCarouselProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const markerRef = useRef<HTMLDivElement>(null)
@@ -466,7 +466,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
               <DiscoverCard
                 key={`${result.type}-${result.tmdbId}-a-${i}`}
                 result={result}
-                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isOwned={isCatalogTitleOwned(ownedCatalogKeys, result)}
                 isSharedView={isSharedView}
                 onAdd={onAdd}
                 onSelect={handleSelect}
@@ -479,7 +479,7 @@ function DiscoverCarousel({ results, libraryTmdbIds, isSharedView, onAdd, onSele
               <DiscoverCard
                 key={`${result.type}-${result.tmdbId}-b-${i}`}
                 result={result}
-                isOwned={result.tmdbId != null && libraryTmdbIds.has(result.tmdbId)}
+                isOwned={isCatalogTitleOwned(ownedCatalogKeys, result)}
                 isSharedView={isSharedView}
                 onAdd={onAdd}
                 onSelect={handleSelect}
@@ -792,14 +792,21 @@ function CompanyPicker({ companies, onSelect }: CompanyPickerProps) {
 
 // ─── Discover view ────────────────────────────────────────────────────────────
 
+function appendCatalogResults(previous: SearchResult[], incoming: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>()
+  return [...previous, ...incoming].filter((result) => {
+    const key = `${result.type}:${result.tmdbId}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export function Discover() {
-  const { titles, isSharedView, openAddTitlePreselected } = useAppStore(
-    useShallow((s) => ({
-      titles: s.titles,
-      isSharedView: s.isSharedView,
-      openAddTitlePreselected: s.openAddTitlePreselected,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const titles = useAppStore((s) => s.titles)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const openAddTitlePreselected = useAppStore((s) => s.openAddTitlePreselected)
 
   // ── Core ──
   const [query, setQuery] = useState('')
@@ -830,7 +837,20 @@ export function Discover() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
+  const moreRequestRef = useRef<symbol | null>(null)
+  const cancelLoadMore = useCallback(() => {
+    moreRequestRef.current = null
+    setLoadingMore(false)
+  }, [])
+  useEffect(() => () => { moreRequestRef.current = null }, [])
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchRequestRef = useRef<symbol | null>(null)
+  const cancelSearch = useCallback(() => {
+    searchRequestRef.current = null
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = null
+  }, [])
+  useEffect(() => () => cancelSearch(), [cancelSearch])
   const inputRef = useRef<HTMLInputElement>(null)
   const [genresExpanded, setGenresExpanded] = useState(true)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -842,9 +862,9 @@ export function Discover() {
   const [becauseWatchedPaused, setBecauseWatchedPaused] = useState(false)
   const [moreStarringPaused, setMoreStarringPaused] = useState(false)
 
-  // Fast owned-title lookup by tmdbId
-  const libraryTmdbIds = useMemo(
-    () => new Set(titles.map((t) => t.tmdbId).filter((id): id is number => id != null)),
+  // Movie and television IDs are separate TMDB namespaces.
+  const ownedCatalogKeys = useMemo(
+    () => libraryCatalogKeys(titles),
     [titles]
   )
 
@@ -894,7 +914,7 @@ export function Discover() {
     fetchPersonCredits(moreStarringPersonId)
       .then((credits) => {
         if (cancelled) return
-        setMoreStarringResults(credits.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+        setMoreStarringResults(credits.filter((r) => !isCatalogTitleOwned(ownedCatalogKeys, r)))
         setLoadedMoreStarringPersonId(moreStarringPersonId)
       })
       .catch((err) => {
@@ -904,7 +924,7 @@ export function Discover() {
         setLoadedMoreStarringPersonId(moreStarringPersonId)
       })
     return () => { cancelled = true }
-  }, [moreStarringPersonId, libraryTmdbIds])
+  }, [moreStarringPersonId, ownedCatalogKeys])
 
   const genres = filterType === 'tv' ? TV_GENRES : MOVIE_GENRES
 
@@ -922,7 +942,7 @@ export function Discover() {
     let cancelled = false
     const type: MediaType | 'all' = filterType
     fetchTrending(type)
-      .then((data) => { if (!cancelled) { setTrending(data); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
+      .then((data) => { if (!cancelled) { setTrending(appendCatalogResults([], data)); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
       .catch((err) => { console.error('fetchTrending error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [filterType, query, selectedGenreId, searchMode])
@@ -932,7 +952,7 @@ export function Discover() {
     if (searchMode !== 'titles' || selectedGenreId === null || query.trim()) return
     let cancelled = false
     fetchDiscover(filterType, selectedGenreId)
-      .then((data) => { if (!cancelled) { setDiscoverResults(data); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
+      .then((data) => { if (!cancelled) { setDiscoverResults(appendCatalogResults([], data)); setPage(1); setHasMore(data.length > 0); setLoading(false) } })
       .catch((err) => { console.error('fetchDiscover error:', err); if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [filterType, selectedGenreId, query, searchMode])
@@ -951,43 +971,53 @@ export function Discover() {
   // ── Handlers ──
 
   const handleSearch = useCallback((value: string) => {
+    cancelLoadMore()
+    cancelSearch()
     setQuery(value)
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     // Typing resets any active person/company selection back to picker mode
     setSelectedPerson(null)
     setAllPersonCredits([])
     setSelectedCompany(null)
     setCompanyTitles([])
     if (!value.trim()) {
+      if (searchMode === 'titles') setLoading(true)
       setSearchResults([])
       setPersonResults([])
       setCompanyResults([])
       return
     }
     setLoading(true)
+    const request = Symbol('search')
+    searchRequestRef.current = request
     searchTimerRef.current = setTimeout(async () => {
+      if (searchRequestRef.current !== request) return
+      searchTimerRef.current = null
       try {
         if (searchMode === 'titles') {
           const all = await searchMedia(value)
+          if (searchRequestRef.current !== request) return
           const filtered = filterType === 'all' ? all : all.filter((r) => r.type === filterType)
           setSearchResults(filtered)
         } else if (searchMode === 'people') {
           const results = await searchPersons(value)
+          if (searchRequestRef.current !== request) return
           setPersonResults(results)
         } else {
           const results = await searchCompanies(value)
+          if (searchRequestRef.current !== request) return
           setCompanyResults(results)
         }
       } catch (err) {
+        if (searchRequestRef.current !== request) return
         console.error('search error:', err)
         setSearchResults([])
         setPersonResults([])
         setCompanyResults([])
       } finally {
-        setLoading(false)
+        if (searchRequestRef.current === request) setLoading(false)
       }
     }, 400)
-  }, [filterType, searchMode])
+  }, [filterType, searchMode, cancelLoadMore, cancelSearch])
 
   async function handlePersonSelect(person: PersonResult) {
     setPersonResults([])
@@ -1023,6 +1053,8 @@ export function Discover() {
   }
 
   function handleSearchModeChange(mode: SearchMode) {
+    cancelLoadMore()
+    cancelSearch()
     setSearchMode(mode)
     setQuery('')
     setSearchResults([])
@@ -1038,6 +1070,9 @@ export function Discover() {
   }
 
   function clearSearch() {
+    cancelLoadMore()
+    cancelSearch()
+    if (searchMode === 'titles') setLoading(true)
     setQuery('')
     setSearchResults([])
     setPersonResults([])
@@ -1050,7 +1085,10 @@ export function Discover() {
   }
 
   function handleGenreSelect(id: number | null) {
-    if (id !== null) setLoading(true)
+    if (id === selectedGenreId && !query.trim()) return
+    cancelLoadMore()
+    cancelSearch()
+    setLoading(true)
     setSelectedGenreId(id)
     setSearchResults([])
     setQuery('')
@@ -1059,6 +1097,9 @@ export function Discover() {
   }
 
   function handleTypeChange(type: FilterType) {
+    if (type === filterType && (searchMode !== 'titles' || !query.trim())) return
+    cancelLoadMore()
+    cancelSearch()
     setFilterType(type)
     setSelectedGenreId(null)
     setPage(1)
@@ -1074,24 +1115,31 @@ export function Discover() {
   }
 
   async function handleLoadMore() {
+    if (moreRequestRef.current || loading || !hasMore || searchMode !== 'titles' || query.trim()) return
+    const request = Symbol('browse-page')
+    moreRequestRef.current = request
     setLoadingMore(true)
     const nextPage = page + 1
     try {
       let newResults: SearchResult[] = []
       if (selectedGenreId !== null) {
-        const mediaType: MediaType = filterType === 'all' ? 'movie' : filterType
-        newResults = await fetchDiscover(mediaType, selectedGenreId, nextPage)
-        setDiscoverResults((prev) => [...prev, ...newResults])
+        newResults = await fetchDiscover(filterType, selectedGenreId, nextPage)
+        if (moreRequestRef.current !== request) return
+        setDiscoverResults((prev) => appendCatalogResults(prev, newResults))
       } else {
         newResults = await fetchTrending(filterType, nextPage)
-        setTrending((prev) => [...prev, ...newResults])
+        if (moreRequestRef.current !== request) return
+        setTrending((prev) => appendCatalogResults(prev, newResults))
       }
       setPage(nextPage)
       setHasMore(newResults.length > 0)
     } catch (err) {
       console.error('load more error:', err)
     } finally {
-      setLoadingMore(false)
+      if (moreRequestRef.current === request) {
+        moreRequestRef.current = null
+        setLoadingMore(false)
+      }
     }
   }
 
@@ -1151,7 +1199,7 @@ export function Discover() {
     fetchRecommendations(tmdbId, type)
       .then((recs) => {
         if (cancelled) return
-        setBecauseWatchedResults(recs.filter((r) => r.tmdbId == null || !libraryTmdbIds.has(r.tmdbId)))
+        setBecauseWatchedResults(recs.filter((r) => !isCatalogTitleOwned(ownedCatalogKeys, r)))
         setLoadedBecauseWatchedId(id)
       })
       .catch((err) => {
@@ -1161,7 +1209,7 @@ export function Discover() {
         setLoadedBecauseWatchedId(id)
       })
     return () => { cancelled = true }
-  }, [becauseWatchedTitle, libraryTmdbIds])
+  }, [becauseWatchedTitle, ownedCatalogKeys])
 
   // Hide stale results whenever the current basis isn't the loaded one (or can't
   // be seeded at all) — mirrors visibleMoreStarringResults below. Filtered by
@@ -1184,7 +1232,7 @@ export function Discover() {
 
   const moreStarringDelays = useMemo(() => staggerDelays(visibleMoreStarringResults.length), [visibleMoreStarringResults.length])
 
-  const selectedIsOwned = selectedResult?.tmdbId != null && libraryTmdbIds.has(selectedResult.tmdbId)
+  const selectedIsOwned = isCatalogTitleOwned(ownedCatalogKeys, selectedResult)
   const showBack = (searchMode === 'people' && !!selectedPerson) || (searchMode === 'studios' && !!selectedCompany)
 
   return (
@@ -1433,7 +1481,7 @@ export function Discover() {
           ) : (
             <DiscoverCarousel
               results={displayResults}
-              libraryTmdbIds={libraryTmdbIds}
+              ownedCatalogKeys={ownedCatalogKeys}
               isSharedView={isSharedView}
               onAdd={openAddTitlePreselected}
               onSelect={setSelectedResult}
@@ -1469,7 +1517,7 @@ export function Discover() {
             ) : visibleBecauseWatchedResults.length > 0 ? (
               <DiscoverCarousel
                 results={visibleBecauseWatchedResults}
-                libraryTmdbIds={libraryTmdbIds}
+                ownedCatalogKeys={ownedCatalogKeys}
                 isSharedView={isSharedView}
                 onAdd={openAddTitlePreselected}
                 onSelect={setSelectedResult}
@@ -1510,7 +1558,7 @@ export function Discover() {
             ) : visibleMoreStarringResults.length > 0 ? (
               <DiscoverCarousel
                 results={visibleMoreStarringResults}
-                libraryTmdbIds={libraryTmdbIds}
+                ownedCatalogKeys={ownedCatalogKeys}
                 isSharedView={isSharedView}
                 onAdd={openAddTitlePreselected}
                 onSelect={setSelectedResult}

@@ -1,6 +1,8 @@
 package work.kumarfamilynet.cinemarchive
 
+
 import android.Manifest
+import android.content.Intent
 import android.animation.ObjectAnimator
 import android.os.Build
 import android.os.Bundle
@@ -21,8 +23,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +50,7 @@ import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -54,11 +59,15 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -73,16 +82,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
+import work.kumarfamilynet.cinemarchive.core.designsystem.noirVisualEffect
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePillFab
 import work.kumarfamilynet.cinemarchive.core.designsystem.MediumWindowBreakpoint
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingBottomNav
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingNavigationRail
 import work.kumarfamilynet.cinemarchive.core.designsystem.NavDestination
-import work.kumarfamilynet.cinemarchive.core.designsystem.TicketScreen
 import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
@@ -101,32 +111,67 @@ import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
+import work.kumarfamilynet.cinemarchive.data.NotificationRules
+import work.kumarfamilynet.cinemarchive.data.visibleRuntime
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
+import work.kumarfamilynet.cinemarchive.data.SyncServices
 import work.kumarfamilynet.cinemarchive.feature.auth.LoginRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.AddTitleOverlayRoute
+import work.kumarfamilynet.cinemarchive.feature.friends.FriendsRoute
 import work.kumarfamilynet.cinemarchive.feature.discover.DiscoverRoute
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerRoute
 import work.kumarfamilynet.cinemarchive.feature.library.LibraryRoute
+import work.kumarfamilynet.cinemarchive.feature.library.rememberAccountLibraryFilters
 import work.kumarfamilynet.cinemarchive.feature.library.TitleDetailRoute
 import work.kumarfamilynet.cinemarchive.feature.lists.ListsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AboutRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.AppearanceRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.DeveloperSettingsRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.ImportSyncRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.PermissionsRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.ProfileRoute
 import work.kumarfamilynet.cinemarchive.feature.settings.SettingsCategory
+import work.kumarfamilynet.cinemarchive.feature.settings.SharingRoute
+import work.kumarfamilynet.cinemarchive.data.SharingRules
 import work.kumarfamilynet.cinemarchive.feature.settings.profileInitial
+import work.kumarfamilynet.cinemarchive.feature.settings.IdentityRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.InvitesRoute
+import work.kumarfamilynet.cinemarchive.feature.settings.NotificationsRoute
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalUnreadNotificationCount
 import work.kumarfamilynet.cinemarchive.feature.upnext.UpNextRoute
 
 private val VoidColor = Color(0xFF0B0907)
 private val AmberColor = Color(0xFFE9B266)
 
 class MainActivity : ComponentActivity() {
+    private var sharedToken by mutableStateOf<String?>(null)
+    private var sharedLaunch by androidx.compose.runtime.mutableLongStateOf(0L)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingLink(intent)
+    }
+
+    private fun handleIncomingLink(incoming: Intent) {
+        val uri = incoming.data ?: return
+        val app = application as CinemArchiveApplication
+        val token = SharingRules.tokenFromLink(uri.toString())
+        if (token != null) {
+            sharedToken = token
+            sharedLaunch++
+        }
+        else if (app.authRepository.isAuthCallback(uri)) {
+            lifecycleScope.launch {
+                withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
+            }
+        }
+    }
     companion object {
         /** Read by [OutingCompletionReceiver]'s notification tap — opens straight to the
-         *  title whose outing just completed (standard launchMode recreates this Activity on
-         *  tap via FLAG_ACTIVITY_CLEAR_TASK, so onCreate always sees a fresh intent). */
+         *  title whose outing just completed (FLAG_ACTIVITY_CLEAR_TASK recreates this
+         *  Activity, so onCreate always sees a fresh intent). */
         const val EXTRA_OPEN_TITLE_ID = "open_title_id"
     }
 
@@ -143,27 +188,17 @@ class MainActivity : ComponentActivity() {
                 start()
             }
         }
-        val repository = (application as CinemArchiveApplication).libraryRepository
-        val discoverRepository = (application as CinemArchiveApplication).discoverRepository
-        val ledgerRepository = (application as CinemArchiveApplication).ledgerRepository
-        val ledgerLayoutRepository = (application as CinemArchiveApplication).ledgerLayoutRepository
-        val preferencesRepository = (application as CinemArchiveApplication).preferencesRepository
-        val outingsRepository = (application as CinemArchiveApplication).outingsRepository
-        val listsRepository = (application as CinemArchiveApplication).listsRepository
-        val authRepository = (application as CinemArchiveApplication).authRepository
-        val librarySyncRepository = (application as CinemArchiveApplication).librarySyncRepository
-        val appUpdateRepository = (application as CinemArchiveApplication).appUpdateRepository
-        val apkInstaller = (application as CinemArchiveApplication).apkInstaller
+        val app = application as CinemArchiveApplication
+        val discoverRepository = app.discoverRepository
+        val preferencesRepository = app.preferencesRepository
+        val authRepository = app.authRepository
+        val appUpdateRepository = app.appUpdateRepository
+        val apkInstaller = app.apkInstaller
         val initialTitleId = intent.getStringExtra(EXTRA_OPEN_TITLE_ID)
+        val initialTitleOwnerId = intent.getStringExtra(OutingCompletionReceiver.EXTRA_OWNER_ID)
 
-        // Magic-link tap: standard launchMode means this is a fresh onCreate (same pattern
-        // OutingCompletionReceiver's notification tap relies on), so intent.data is always
-        // this launch's own — never a stale one from a prior instance.
-        intent.data?.let { uri ->
-            if (authRepository.isAuthCallback(uri)) {
-                lifecycleScope.launch { withContext(Dispatchers.IO) { authRepository.completeMagicLinkCallback(uri) } }
-            }
-        }
+        // Both cold and singleTop warm launches use the same share/auth dispatcher.
+        handleIncomingLink(intent)
 
         setContent {
             val themeMode by preferencesRepository.observeThemeMode()
@@ -175,6 +210,10 @@ class MainActivity : ComponentActivity() {
             val fontScale by preferencesRepository.observeFontScale()
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
             val session by authRepository.observeSession().collectAsStateWithLifecycle()
+            val identity by authRepository.observeIdentity().collectAsStateWithLifecycle()
+            val publishedRuntime by app.accountRuntimeManager.runtime.collectAsStateWithLifecycle()
+            // Never render a runtime that is not exactly the current sign-in (see visibleRuntime).
+            val runtime = visibleRuntime(identity, publishedRuntime)
             val isDebugBuild = BuildConfig.DEBUG
             // Read at this top level (rather than inside CinemArchiveApp) so the banner covers
             // LoginRoute too, not just the signed-in app shell. remember(isDebugBuild) keeps the
@@ -187,25 +226,52 @@ class MainActivity : ComponentActivity() {
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
                 Surface {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (session == null) {
-                            LoginRoute(authRepository)
+                        val openedToken = sharedToken
+                        if (openedToken != null) {
+                            androidx.compose.runtime.key(openedToken, sharedLaunch) {
+                                SharedLibraryRoute(openedToken, app.sharedLibraryRepository, onClose = {
+                                    sharedToken = null
+                                    intent.data = null
+                                })
+                            }
+                        } else if (identity == null) {
+                            androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+                                LoginRoute(authRepository, modifier = Modifier.weight(1f))
+                                SharedLinkPromptButton(onOpen = { sharedToken = it })
+                            }
                         } else {
-                            CinemArchiveApp(
-                                repository,
-                                discoverRepository,
-                                ledgerRepository,
-                                ledgerLayoutRepository,
-                                preferencesRepository,
-                                outingsRepository,
-                                listsRepository,
-                                authRepository,
-                                librarySyncRepository,
-                                appUpdateRepository,
-                                apkInstaller,
-                                initialTitleId = initialTitleId,
-                                appVersionName = BuildConfig.VERSION_NAME,
-                                isDebugBuild = isDebugBuild,
-                            )
+                            val rt = runtime
+                            if (rt == null) {
+                                // Signed in, but the account runtime is still being assembled (local-only,
+                                // no network wait) — or is being swapped for another account.
+                                Box(modifier = Modifier.fillMaxSize())
+                            } else {
+                                // key(rt): a new sign-in is a fresh composition, so no remembered UI state
+                                // survives across accounts; the runtime is also the ViewModel store.
+                                androidx.compose.runtime.key(rt) {
+                                    androidx.compose.runtime.DisposableEffect(rt) {
+                                        rt.onUiAttached()
+                                        onDispose { rt.onUiDetached() }
+                                    }
+                                    androidx.compose.runtime.CompositionLocalProvider(
+                                        androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner provides rt,
+                                        LocalUnreadNotificationCount provides rt.notificationsRepository.inbox.collectAsStateWithLifecycle().value.unreadCount,
+                                    ) {
+                                        CinemArchiveApp(
+                                            rt,
+                                            discoverRepository,
+                                            preferencesRepository,
+                                            authRepository,
+                                            appUpdateRepository,
+                                            apkInstaller,
+                                            initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
+                                            appVersionName = BuildConfig.VERSION_NAME,
+                                            isDebugBuild = isDebugBuild,
+                                             onOpenSharedLink = { sharedToken = it },
+                                        )
+                                    }
+                                }
+                            }
                         }
                         // Sibling of both LoginRoute and CinemArchiveApp (rather than nested
                         // inside the latter) so it covers sign-in too — added after the app
@@ -301,10 +367,10 @@ private fun DebugBuildBanner(isDebugBuild: Boolean) {
     }
 }
 
-private enum class Tab { DISCOVER, LIBRARY, UP_NEXT, LEDGER, LISTS }
+private typealias Tab = work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 
 private sealed interface Overlay {
-    data class Detail(val titleId: String) : Overlay
+    data class Detail(val titleId: String, val initialSchedule: Boolean = false) : Overlay
 
     /** [preselected] is set when the add was started from a specific Discover result rather
      *  than the FAB, so the overlay opens on its log step instead of an empty search box.
@@ -315,7 +381,15 @@ private sealed interface Overlay {
         val openKey: String = java.util.UUID.randomUUID().toString(),
     ) : Overlay
     data object Profile : Overlay
+    data object Identity : Overlay
+    data object Invites : Overlay
+    data object Notifications : Overlay
+    data object Sharing : Overlay
+    data object Friends : Overlay
+    data class FriendLibrary(val friendUserId: String, val label: String) : Overlay
     data object Appearance : Overlay
+    data object Navigation : Overlay
+    data object ImportSync : Overlay
     data object About : Overlay
     data object Permissions : Overlay
     data object DeveloperSettings : Overlay
@@ -323,7 +397,7 @@ private sealed interface Overlay {
     /** The "at the theater" screen (seat + ticket QR code) — carries the outing and title name
      *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
      *  that opens this already has both in memory. */
-    data class Ticket(val outing: CinemaOuting, val titleName: String) : Overlay
+    data class Ticket(val outingId: String, val titleName: String) : Overlay
 }
 
 /**
@@ -335,23 +409,53 @@ private sealed interface Overlay {
  */
 @Composable
 private fun CinemArchiveApp(
-    repository: LibraryRepository,
+    runtime: AppAccountRuntime,
     discoverRepository: DiscoverRepository,
-    ledgerRepository: LedgerRepository,
-    ledgerLayoutRepository: LedgerLayoutRepository,
     preferencesRepository: PreferencesRepository,
-    outingsRepository: OutingsRepository,
-    listsRepository: ListsRepository,
     authRepository: AuthRepository,
-    librarySyncRepository: LibrarySyncRepository,
     appUpdateRepository: AppUpdateRepository,
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     appVersionName: String,
     isDebugBuild: Boolean,
+    onOpenSharedLink: (String) -> Unit,
 ) {
+    val repository = runtime.libraryRepository
+    val ledgerRepository = runtime.ledgerRepository
+    val ledgerLayoutRepository = runtime.ledgerLayoutRepository
+    val outingsRepository = runtime.outingsRepository
+    val listsRepository = runtime.listsRepository
+    val librarySyncRepository = runtime.librarySyncRepository
+    val syncServices = runtime.syncServices
+    // Both owner and sign-in generation fence saved person labels and every Library filter.
+    val libraryFiltersState = rememberAccountLibraryFilters("${runtime.ownerId}:${runtime.identity.generation}")
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    var noirPreview by remember(runtime) { mutableStateOf<work.kumarfamilynet.cinemarchive.core.model.NoirPreview?>(null) }
+    val noirPins by runtime.titlePins.state.collectAsStateWithLifecycle(initialValue = work.kumarfamilynet.cinemarchive.data.TitlePinsState())
+    val noirDetailId = (overlay as? Overlay.Detail)?.titleId
+    LaunchedEffect(noirDetailId) {
+        if (noirDetailId != null && noirPreview?.titleId != noirDetailId)
+            noirPreview = work.kumarfamilynet.cinemarchive.core.model.NoirPreview(noirDetailId, null, eligible = false)
+    }
+    val noirMode = work.kumarfamilynet.cinemarchive.core.model.effectiveNoirMode(noirDetailId, noirPreview, noirPins.pins)
+    var recommendTitleId by remember { mutableStateOf<String?>(null) }
+    var shareOutingId by remember { mutableStateOf<String?>(null) }
+    var globalSearch by remember(runtime) { mutableStateOf(false) }
+    val commandTitlesFlow = remember(repository) { repository.observeLibrary() }
+    val commandTitles by commandTitlesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val commandFocus = remember(runtime) { FocusRequester() }
+    val titleSocialSource = remember(runtime) {
+        work.kumarfamilynet.cinemarchive.feature.friends.RepositoryTitleSocialSource(runtime.friendsRepository) {
+            authRepository.observeIdentity().value == runtime.identity
+        }
+    }
+    recommendTitleId?.let { id ->
+        TitleRecommendationDialog(repository, titleSocialSource, runtime.ownerId, id, onDismiss = { recommendTitleId = null })
+    }
+    shareOutingId?.let { id ->
+        work.kumarfamilynet.cinemarchive.feature.friends.OutingPlansDialog(runtime.outingPlansRepository, id, onDismiss = { shareOutingId = null })
+    }
     // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
     // stays on screen permanently, so which detail sits opposite it needs its own state
     // instead of being encoded in `overlay` the way the phone-width push navigation is.
@@ -364,6 +468,9 @@ private fun CinemArchiveApp(
     // flash once, on cold start.
     val libraryViewMode by preferencesRepository.observeLibraryViewMode()
         .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
+    val navigationFlow = remember(preferencesRepository) { preferencesRepository.observeNavigation() }
+    val navigationPreferences by navigationFlow.collectAsStateWithLifecycle(
+        initialValue = work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences())
 
     // Hoisted for the same reason, and shared by both poster grids: pinching the density on
     // Discover and finding Library unchanged would be the surprising behaviour.
@@ -383,7 +490,41 @@ private fun CinemArchiveApp(
     val closeOverlay = { overlay = null }
 
     val session by authRepository.observeSession().collectAsStateWithLifecycle()
-    val profileInitial = remember(session?.email) { profileInitial(session?.email) }
+    val accountRepository = runtime.accountRepository
+    val notificationsRepository = runtime.notificationsRepository
+    val accountProfile by accountRepository.profile.collectAsStateWithLifecycle()
+    val conflictContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(runtime) {
+        runtime.conflicts.collect {
+            android.widget.Toast.makeText(
+                conflictContext,
+                "A newer change from another device replaced one of your edits; your library now matches it.",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+    // Account isolation: drop the previous user's cached identity/inbox the moment the signed-in
+    // user changes (or signs out), then poll the unread badge while this shell is on screen —
+    // web polls every 45s because the inbox has no realtime subscription.
+    val pollOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(session?.userId) {
+        accountRepository.onSessionChanged(session?.userId)
+        notificationsRepository.onSessionChanged(session?.userId)
+        if (session != null) {
+            // STARTED-gated: refreshes once on every resume, never polls while backgrounded.
+            pollOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                while (true) {
+                    notificationsRepository.refreshUnreadCount()
+                    delay(NotificationRules.POLL_INTERVAL_MS)
+                }
+            }
+        }
+    }
+    val profileInitial = remember(session?.email, accountProfile) {
+        (accountProfile?.displayName?.takeIf { it.isNotBlank() } ?: accountProfile?.username?.takeIf { it.isNotBlank() })
+            ?.firstOrNull()?.uppercaseChar()?.toString()
+            ?: profileInitial(session?.email)
+    }
 
     // Requested contextually — the moment the user opens the schedule sheet, not at app
     // launch (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6) — the OS prompt
@@ -406,6 +547,34 @@ private fun CinemArchiveApp(
     // lifecycle, not the ViewModel layer, since it's app-shell-wide rather than one screen's.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    if (globalSearch && runtime.isCurrent()) OwnerGlobalSearch(
+        "${runtime.ownerId}:${runtime.identity.generation}", commandTitles,
+        onDismiss = { globalSearch = false },
+        onTitle = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id) } },
+        onSchedule = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id, initialSchedule = true) } },
+        onCommand = { id -> if (runtime.isCurrent()) {
+            globalSearch = false
+            when (id) {
+                "add" -> overlay = Overlay.Add()
+                "profile" -> overlay = Overlay.Profile
+                "friends" -> overlay = Overlay.Friends
+                else -> {
+                    overlay = null
+                    tab = when (id) {
+                        "upnext", "marquee" -> Tab.UP_NEXT
+                        "ledger" -> Tab.LEDGER
+                        "discover" -> Tab.DISCOVER
+                        "lists" -> Tab.LISTS
+                        else -> Tab.LIBRARY
+                    }
+                    if (id == "grid" || id == "list") coroutineScope.launch {
+                        if (runtime.isCurrent()) preferencesRepository.setLibraryViewMode(
+                            if (id == "grid") LibraryViewMode.GRID else LibraryViewMode.LIST)
+                    }
+                }
+            }
+        } },
+    )
     val onToggleLibraryViewMode: () -> Unit = {
         val next = if (libraryViewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
         coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
@@ -459,7 +628,9 @@ private fun CinemArchiveApp(
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
             overlay = when (overlay) {
-                Overlay.Appearance, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
+                Overlay.Identity, Overlay.Invites, Overlay.Notifications, Overlay.Friends,
+                Overlay.Appearance, Overlay.ImportSync, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
+                is Overlay.FriendLibrary -> Overlay.Friends
                 else -> null
             }
             backProgress.snapTo(0f)
@@ -475,13 +646,16 @@ private fun CinemArchiveApp(
     // contentWindowInsets is zeroed (MorphingBottomNav/MorphingNavigationRail inset their own
     // edges instead), so the status bar inset is applied once here, above both the Scaffold
     // and the overlay.
-    Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+    Box(modifier = Modifier.fillMaxSize().noirVisualEffect(noirMode).statusBarsPadding().onPreviewKeyEvent {
+        if (it.opensGlobalSearch() && runtime.isCurrent()) { globalSearch = true; true } else false
+    }.focusRequester(commandFocus).focusable()) {
+        LaunchedEffect(runtime) { commandFocus.requestFocus() }
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             // Below Medium, nav stays a bottom bar as before. At/above it — an unfolded
             // foldable, a tablet — a bottom bar stretched across the full width reads as a
             // phone control blown up rather than adapted, so nav moves to a leading-edge rail.
             val useNavigationRail = maxWidth >= MediumWindowBreakpoint
-            val navDestinations = listOf(
+            val allNavDestinations = listOf(
                 NavDestination(Tab.DISCOVER, "Discover", Icons.Outlined.Explore, Icons.Filled.Explore),
                 NavDestination(
                     Tab.LIBRARY,
@@ -495,6 +669,10 @@ private fun CinemArchiveApp(
                 // the two tabs sitting side by side with the same icon would be confusing.
                 NavDestination(Tab.LISTS, "Lists", Icons.Outlined.Bookmarks, Icons.Filled.Bookmarks),
             )
+            val navDestinations: List<NavDestination<Tab?>> = navigationPreferences.visible.map { destination ->
+                val item = allNavDestinations.first { it.value == destination }
+                NavDestination<Tab?>(item.value, item.label, item.icon, item.selectedIcon)
+            } + NavDestination<Tab?>(null, "Search", Icons.Outlined.Search)
 
             @Composable
             fun TabScaffoldContent(innerPadding: PaddingValues) {
@@ -515,6 +693,7 @@ private fun CinemArchiveApp(
                             Tab.LIBRARY -> LibraryRoute(
                                 repository,
                                 librarySyncRepository,
+                                filtersState = libraryFiltersState,
                                 viewMode = libraryViewMode,
                                 onToggleViewMode = onToggleLibraryViewMode,
                                 gridColumns = posterGridColumns,
@@ -528,10 +707,11 @@ private fun CinemArchiveApp(
                                 repository,
                                 outingsRepository,
                                 librarySyncRepository,
+                                onRecommendTitle = { recommendTitleId = it },
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 onTitleClick = { overlay = Overlay.Detail(it) },
-                                onViewTicket = { overlay = Overlay.Ticket(it.outing, it.titleName) },
+                                onViewTicket = { overlay = Overlay.Ticket(it.outing.id, it.titleName) },
                                 onFabExpandedChange = { fabExpanded = it },
                             )
                             Tab.LEDGER -> LedgerRoute(
@@ -581,7 +761,8 @@ private fun CinemArchiveApp(
                     MorphingNavigationRail(
                         destinations = navDestinations,
                         selected = tab,
-                        onSelect = { tab = it },
+                        onSelect = { if (it == null) globalSearch = true else tab = it },
+                        compact = navigationPreferences.compact,
                     )
                     Scaffold(
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -595,7 +776,8 @@ private fun CinemArchiveApp(
                         MorphingBottomNav(
                             destinations = navDestinations,
                             selected = tab,
-                            onSelect = { tab = it },
+                            onSelect = { if (it == null) globalSearch = true else tab = it },
+                            compact = navigationPreferences.compact,
                         )
                     },
                 ) { innerPadding -> TabScaffoldContent(innerPadding) }
@@ -619,7 +801,13 @@ private fun CinemArchiveApp(
             // device was unfolded mid-visit to one of them), otherwise it's whatever was last
             // picked from the list, defaulting to Appearance.
             val settingsCategoryFromOverlay = when (overlay) {
+                Overlay.Identity -> SettingsCategory.IDENTITY
+                Overlay.Invites -> SettingsCategory.INVITES
+                Overlay.Notifications -> SettingsCategory.NOTIFICATIONS
+                Overlay.Sharing -> SettingsCategory.SHARING
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
+                Overlay.Navigation -> SettingsCategory.NAVIGATION
+                Overlay.ImportSync -> SettingsCategory.IMPORT_SYNC
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
                 Overlay.About -> SettingsCategory.ABOUT
                 Overlay.DeveloperSettings -> SettingsCategory.DEVELOPER
@@ -652,13 +840,40 @@ private fun CinemArchiveApp(
                             repository,
                             preferencesRepository,
                             authRepository,
+                            accountRepository,
+                            notificationsRepository,
                             appVersionName,
                             onClose = closeOverlay,
+                            onOpenIdentity = { selectedSettingsCategory = SettingsCategory.IDENTITY },
+                            onOpenInvites = { selectedSettingsCategory = SettingsCategory.INVITES },
+                            onOpenNotifications = { selectedSettingsCategory = SettingsCategory.NOTIFICATIONS },
+                            onOpenFriends = { overlay = Overlay.Friends },
+                            onOpenSharing = { selectedSettingsCategory = SettingsCategory.SHARING },
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
+                            onOpenNavigation = { selectedSettingsCategory = SettingsCategory.NAVIGATION },
+                            onOpenImportSync = { selectedSettingsCategory = SettingsCategory.IMPORT_SYNC },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
                             onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
                             devSettingsUnlocked = devSettingsUnlocked,
                             onOpenDeveloperSettings = { selectedSettingsCategory = SettingsCategory.DEVELOPER },
+                            legacyLoadStatus = runtime::legacyStatus,
+                            legacyRestore = runtime::restoreLegacy,
+                            outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+                            lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
+                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
+                            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
+                            listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
+                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
+                            titleChangesContent = {
+                        work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
+                        work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
+                    },
+                            ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
+                            moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
+                                work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
+                            } },
+                            viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
+                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                             selectedCategory = activeCategory,
                         )
                     }
@@ -667,7 +882,24 @@ private fun CinemArchiveApp(
                         // showBack = false: this pane has no "back" of its own to unwind — the
                         // list pane opposite it is the only way out, via its own close button.
                         when (activeCategory) {
+                            SettingsCategory.IDENTITY -> IdentityRoute(accountRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.INVITES -> InvitesRoute(accountRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.SHARING -> SharingSettings(runtime, onBack = closeOverlay, onOpenSharedLink = onOpenSharedLink, showBack = false)
+                            SettingsCategory.NOTIFICATIONS -> NotificationsRoute(
+                                notificationsRepository,
+                                onBack = closeOverlay,
+                                onOpenTitle = { overlay = Overlay.Detail(it) },
+                                onOpenProfile = { selectedSettingsCategory = SettingsCategory.IDENTITY },
+                                onOpenFriends = { overlay = Overlay.Friends },
+                                showBack = false,
+                            )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.NAVIGATION -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
+                                backupContent = { Column {
+                                    work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
+                                    work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
+                                } })
                             SettingsCategory.ABOUT -> AboutRoute(
                                 appVersionName,
                                 appUpdateRepository,
@@ -702,7 +934,29 @@ private fun CinemArchiveApp(
                     listsRepository,
                     current.titleId,
                     onBack = closeOverlay,
+                    initialSchedule = current.initialSchedule,
+                    onInitialScheduleConsumed = { if (overlay == current) overlay = current.copy(initialSchedule = false) },
+                    onScheduled = runtime::syncTickets,
                     onRequestNotificationPermission = requestNotificationPermission,
+                    onRecommendTitle = { recommendTitleId = it },
+                    onShareOutingPlans = { shareOutingId = it },
+                    onViewTicket = { outing, title -> overlay = Overlay.Ticket(outing.id, title) },
+                    onBrowsePerson = { person ->
+                        libraryFiltersState.value = libraryFiltersState.value.copy(person = person)
+                        overlay = null
+                        tab = Tab.LIBRARY
+                    },
+                    onRefreshCredits = { runtime.creditRefreshRepository.refreshMetadata(current.titleId) },
+                    noirPins = runtime.titlePins,
+                    onNoirMode = { mode ->
+                        if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)
+                            noirPreview = work.kumarfamilynet.cinemarchive.core.model.NoirPreview(current.titleId, mode)
+                    },
+                    catalogExtrasSource = runtime.catalogExtrasRepository,
+                    titleMetadataRecovery = runtime.titleMetadataRepository,
+                    socialContent = { detail ->
+                        work.kumarfamilynet.cinemarchive.feature.friends.OwnerTitleSocial(titleSocialSource, runtime.ownerId, detail)
+                    },
                 )
                 is Overlay.Add -> AddTitleOverlayRoute(
                     discoverRepository,
@@ -720,15 +974,71 @@ private fun CinemArchiveApp(
                     repository,
                     preferencesRepository,
                     authRepository,
+                    accountRepository,
+                    notificationsRepository,
                     appVersionName,
                     onClose = closeOverlay,
+                    onOpenIdentity = { overlay = Overlay.Identity },
+                    onOpenInvites = { overlay = Overlay.Invites },
+                    onOpenNotifications = { overlay = Overlay.Notifications },
+                    onOpenFriends = { overlay = Overlay.Friends },
+                    onOpenSharing = { overlay = Overlay.Sharing },
                     onOpenAppearance = { overlay = Overlay.Appearance },
+                    onOpenNavigation = { overlay = Overlay.Navigation },
+                    onOpenImportSync = { overlay = Overlay.ImportSync },
                     onOpenAbout = { overlay = Overlay.About },
                     onOpenPermissions = { overlay = Overlay.Permissions },
                     devSettingsUnlocked = devSettingsUnlocked,
                     onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
+                    legacyLoadStatus = runtime::legacyStatus,
+                    legacyRestore = runtime::restoreLegacy,
+                    outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+                    lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
+                        subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
+                            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
+                            listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
+                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
+                    titleChangesContent = {
+                        work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
+                        work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
+                    },
+                    ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
+                    moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
+                        work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
+                    } },
+                    viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
+                        subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
+                )
+                Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
+                Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)
+                Overlay.Sharing -> SharingSettings(runtime, onBack = openProfile, onOpenSharedLink = onOpenSharedLink)
+                Overlay.Notifications -> NotificationsRoute(
+                    notificationsRepository,
+                    onBack = openProfile,
+                    onOpenTitle = { overlay = Overlay.Detail(it) },
+                    onOpenProfile = openProfile,
+                    onOpenFriends = { overlay = Overlay.Friends },
+                )
+                Overlay.Friends -> FriendsWithAccessEditor(
+                    runtime, titleSocialSource,
+                    onBack = openProfile,
+                    onOpenFriendLibrary = { id, label -> overlay = Overlay.FriendLibrary(id, label) },
+                )
+                is Overlay.FriendLibrary -> FriendLibraryRoute(
+                    runtime.friendsRepository,
+                    viewerUserId = runtime.ownerId,
+                    friendUserId = current.friendUserId,
+                    label = current.label,
+                    socialSource = titleSocialSource,
+                    onBack = { overlay = Overlay.Friends },
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
+                Overlay.Navigation -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = openProfile)
+                Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
+                    backupContent = { Column {
+                        work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
+                        work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
+                    } })
                 Overlay.About -> AboutRoute(
                     appVersionName,
                     appUpdateRepository,
@@ -744,7 +1054,9 @@ private fun CinemArchiveApp(
                     onBack = openProfile,
                     onLock = lockDeveloperSettings,
                 )
-                is Overlay.Ticket -> TicketScreen(current.titleName, current.outing, onBack = closeOverlay)
+                is Overlay.Ticket -> work.kumarfamilynet.cinemarchive.feature.library.PortableTicketRoute(
+                    runtime.tickets, current.outingId, current.titleName, onBack = closeOverlay, onSaved = runtime::syncTickets,
+                )
             }
             }
             }
@@ -762,3 +1074,34 @@ private const val BACK_SLIDE_FRACTION = 0.10f
  *  with the window but a list pane that also grew would leave the category rows looking
  *  stretched well past what their short titles need. */
 private val SettingsListPaneWidth = 320.dp
+
+@Composable
+private fun FriendsWithAccessEditor(
+    runtime: AppAccountRuntime,
+    socialSource: work.kumarfamilynet.cinemarchive.feature.friends.TitleSocialSource,
+    onBack: () -> Unit,
+    onOpenFriendLibrary: (String, String) -> Unit,
+) {
+    key(runtime) {
+        val titles by runtime.libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
+        val source = remember(runtime, socialSource) {
+            work.kumarfamilynet.cinemarchive.feature.settings.RepositoryShareScopeSource(
+                runtime.sharingRepository, socialSource::isActive)
+        }
+        var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
+        FriendsRoute(runtime.friendsRepository, runtime.ownerId, onBack, onOpenFriendLibrary,
+            onEditFriendAccess = { id, label -> editing = id to label })
+        editing?.let { (id, label) ->
+            work.kumarfamilynet.cinemarchive.feature.settings.ShareScopeEditorDialog(
+                source, work.kumarfamilynet.cinemarchive.data.ShareScopeTarget.Friend(id), label,
+                titles.flatMap { it.genres }.distinct().sorted(), onClose = { editing = null })
+        }
+    }
+}
+
+@Composable
+private fun SharingSettings(runtime: AppAccountRuntime, onBack: () -> Unit, onOpenSharedLink: (String) -> Unit, showBack: Boolean = true) {
+    val titles by runtime.libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
+    SharingRoute(runtime.sharingRepository, availableGenres = titles.flatMap { it.genres }.distinct().sorted(),
+        onBack = onBack, showBack = showBack, onOpenSharedLink = onOpenSharedLink)
+}

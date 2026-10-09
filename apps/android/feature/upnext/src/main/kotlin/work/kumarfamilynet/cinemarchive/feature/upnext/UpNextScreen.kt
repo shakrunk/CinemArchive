@@ -69,6 +69,14 @@ import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
+import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
+import work.kumarfamilynet.cinemarchive.core.model.PostShowOpening
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.isActive
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
@@ -112,31 +120,33 @@ class UpNextViewModel(
         }
     }
 
-    fun onMarkEpisodeWatched(titleId: String) {
-        viewModelScope.launch {
-            repository.advanceNextEpisode(titleId, LocalDate.now().toString())
-        }
-    }
+    private val episodeActions = UpNextEpisodeActions(
+        scope = viewModelScope,
+        advance = { title -> repository.advanceNextEpisode(title.id, LocalDate.now().toString(), title.nextEpisodeId) },
+        deleteWatch = { receipt -> repository.deleteEpisodeWatchEvent(receipt.episodeId, receipt.watchEventId) },
+        markSeriesWatched = repository::markSeriesWatched,
+    )
+    val episodeActionState = episodeActions.state
+
+    fun onMarkEpisodeWatched(title: UpNextWatching) = episodeActions.mark(title)
+    fun onUndoEpisode(titleId: String) = episodeActions.undo(titleId)
+    fun onMarkSeriesWatched(titleId: String) = episodeActions.finishSeries(titleId)
 
     fun onCancelOuting(outingId: String) {
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
     }
 
-    fun onRatePostShow(viewingId: String, titleId: String, rating: Double) {
-        viewModelScope.launch { repository.rateViewing(viewingId, titleId, rating) }
-    }
+    suspend fun preparePostShow(titleId: String, viewingId: String): PostShowOpening = repository.preparePostShow(titleId, viewingId)
 
-    fun onSaveFollowUpNotes(viewingId: String, notes: String) {
-        viewModelScope.launch { repository.updateViewingNotes(viewingId, notes) }
-    }
+    suspend fun savePostShow(opening: PostShowOpening, rating: Double?, notes: String) = repository.savePostShow(opening, rating, notes)
+
+    suspend fun revertPostShow(opening: PostShowOpening) = outingsRepository.revertPostShow(opening)
 
     fun onDismissFollowUp(outingId: String) {
         viewModelScope.launch { outingsRepository.dismissFollowUp(outingId) }
     }
 
-    fun onDidntMakeIt(outingId: String) {
-        viewModelScope.launch { outingsRepository.revertCompletion(outingId) }
-    }
+
 }
 
 private class UpNextViewModelFactory(
@@ -159,47 +169,59 @@ fun UpNextRoute(
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
+    onRecommendTitle: ((String) -> Unit)? = null,
 ) {
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
     )
     val board by viewModel.board.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val episodeActions by viewModel.episodeActionState.collectAsStateWithLifecycle()
     UpNextScreen(
         board,
         onTitleClick,
         onViewTicket = onViewTicket,
         onMarkWatched = viewModel::onMarkEpisodeWatched,
         onCancelOuting = viewModel::onCancelOuting,
-        onRatePostShow = viewModel::onRatePostShow,
-        onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
+        onPreparePostShow = viewModel::preparePostShow,
+        onSavePostShow = viewModel::savePostShow,
+        onRevertPostShow = viewModel::revertPostShow,
+        postShowOwnerId = repository.viewingOwnerId,
         onDismissFollowUp = viewModel::onDismissFollowUp,
-        onDidntMakeIt = viewModel::onDidntMakeIt,
+        episodeActions = episodeActions,
+        onUndoEpisode = viewModel::onUndoEpisode,
+        onMarkSeriesWatched = viewModel::onMarkSeriesWatched,
         onOpenProfile = onOpenProfile,
         profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refresh,
+        onRecommendTitle = onRecommendTitle,
     )
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun UpNextScreen(
+fun UpNextScreen(
     board: UpNextBoard,
     onTitleClick: (String) -> Unit,
     onViewTicket: (UpNextOuting) -> Unit,
-    onMarkWatched: (String) -> Unit,
+    onMarkWatched: (UpNextWatching) -> Unit,
     onCancelOuting: (String) -> Unit,
-    onRatePostShow: (String, String, Double) -> Unit,
-    onSaveFollowUpNotes: (String, String) -> Unit,
     onDismissFollowUp: (String) -> Unit,
-    onDidntMakeIt: (String) -> Unit,
+    onPreparePostShow: (suspend (String, String) -> PostShowOpening)? = null,
+    onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
+    onRevertPostShow: suspend (PostShowOpening) -> Unit = { error("Post-show reversal unavailable") },
+    postShowOwnerId: String? = null,
+    episodeActions: Map<String, EpisodeActionState> = emptyMap(),
+    onUndoEpisode: (String) -> Unit = {},
+    onMarkSeriesWatched: (String) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    onRecommendTitle: ((String) -> Unit)? = null,
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -211,7 +233,31 @@ private fun UpNextScreen(
             now = Instant.now()
         }
     }
-    var postShowEntry by remember { mutableStateOf<UpNextOuting?>(null) }
+    var postShowState by rememberSaveable(postShowOwnerId) { mutableStateOf<String?>(null) }
+    val postShow = restorePostShow(postShowState, postShowOwnerId)
+    var preparingPostShow by remember { mutableStateOf(false) }
+    var postShowError by remember { mutableStateOf<String?>(null) }
+    val currentOwner by rememberUpdatedState(postShowOwnerId)
+    val postShowScope = rememberCoroutineScope()
+    fun openPostShow(entry: UpNextOuting) {
+        val viewingId = entry.outing.completedViewingId ?: return
+        if (preparingPostShow) return
+        val owner = postShowOwnerId
+        preparingPostShow = true
+        postShowError = null
+        postShowScope.launch {
+            try {
+                val opening = checkNotNull(onPreparePostShow) { "Post-show editing is unavailable." }(entry.outing.titleId, viewingId)
+                if (!isActive) return@launch
+                if (currentOwner == owner) postShowState = savePostShow(owner, entry.outing.titleId, entry.titleName, opening, entry.outing.id)
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (_: Exception) { if (currentOwner == owner) postShowError = "Couldn't open this viewing. Try again."
+            } finally { preparingPostShow = false }
+        }
+    }
+    val finales = episodeActions.values.filter { it.receipt?.caughtUp == true }
+    val finaleIds = finales.map { it.snapshot.id }.toSet()
+    val watching = board.watching.filterNot { it.id in finaleIds }
 
     val listState = rememberLazyListState()
     val collapsed = rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
@@ -251,7 +297,7 @@ private fun UpNextScreen(
                     FreshFromTheLobbyCard(
                         entry,
                         shape = groupShape(index, board.freshFromTheLobby.size),
-                        onOpen = { postShowEntry = entry },
+                        onOpen = { openPostShow(entry) },
                     )
                 }
             }
@@ -291,7 +337,7 @@ private fun UpNextScreen(
                 }
             }
 
-            if (board.watching.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
+            if (board.watching.isEmpty() && finales.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
                 item {
                     ReadingWidthColumn {
                         Text(
@@ -303,7 +349,7 @@ private fun UpNextScreen(
                 }
             }
 
-            if (board.watching.isNotEmpty()) {
+            if (watching.isNotEmpty() || finales.isNotEmpty()) {
                 item {
                     ReadingWidthColumn {
                         Text(
@@ -315,13 +361,26 @@ private fun UpNextScreen(
                     }
                 }
             }
-            itemsIndexed(board.watching, key = { _, it -> it.id }) { index, title ->
+            itemsIndexed(finales, key = { _, it -> "finale-${it.snapshot.id}" }) { index, action ->
+                ReadingWidthColumn {
+                    CaughtUpCard(
+                        action = action,
+                        shape = groupShape(index, finales.size),
+                        onOpen = { onTitleClick(action.snapshot.id) },
+                        onUndo = { onUndoEpisode(action.snapshot.id) },
+                        onFinish = { onMarkSeriesWatched(action.snapshot.id) },
+                    )
+                }
+            }
+            itemsIndexed(watching, key = { _, it -> it.id }) { index, title ->
                 ReadingWidthColumn {
                     ContinueWatchingCard(
                         title,
-                        shape = groupShape(index, board.watching.size),
+                        shape = groupShape(index, watching.size),
                         onOpen = { onTitleClick(title.id) },
-                        onMarkWatched = { onMarkWatched(title.id) },
+                        onMarkWatched = { onMarkWatched(title) },
+                        action = episodeActions[title.id],
+                        onUndo = { onUndoEpisode(title.id) },
                     )
                 }
             }
@@ -346,28 +405,29 @@ private fun UpNextScreen(
         }
     }
 
-    postShowEntry?.let { entry ->
-        val viewingId = entry.outing.completedViewingId
-        if (viewingId != null) {
+    postShow?.let { captured ->
+        androidx.compose.runtime.key(postShowOwnerId, captured.titleId, captured.opening.viewing.id) {
             PostShowSheet(
-                titleName = entry.titleName,
-                venue = entry.outing.venue,
-                companions = entry.outing.companions,
-                initialRating = 0.0,
-                initialNotes = "",
-                onRate = { onRatePostShow(viewingId, entry.outing.titleId, it) },
-                onSaveNotes = { onSaveFollowUpNotes(viewingId, it) },
-                onDidntMakeIt = {
-                    onDidntMakeIt(entry.outing.id)
-                    postShowEntry = null
-                },
+                titleName = captured.titleName,
+                opening = captured.opening,
+                onSave = onSavePostShow,
+                onRevert = onRevertPostShow,
+                onRecommend = onRecommendTitle?.let { recommend -> { recommend(captured.titleId) } },
                 onDismiss = {
-                    onDismissFollowUp(entry.outing.id)
-                    postShowEntry = null
+                    captured.followUpOutingId?.let(onDismissFollowUp)
+                    postShowState = null
                 },
+                onReverted = { postShowState = null },
             )
         }
     }
+    if (preparingPostShow) androidx.compose.material3.AlertDialog(onDismissRequest = {}, title = { Text("Opening viewing…") },
+        text = { androidx.compose.material3.CircularProgressIndicator() }, confirmButton = {})
+    postShowError?.let { message -> androidx.compose.material3.AlertDialog(onDismissRequest = { postShowError = null },
+        title = { Text("Viewing unavailable") }, text = { Text(message) }, confirmButton = {
+            TextButton(onClick = { postShowError = null }) { Text("Close") }
+        }) }
+
 }
 
 private val GroupOuterCorner = 24.dp
@@ -546,7 +606,14 @@ private fun addOutingToCalendar(context: android.content.Context, entry: UpNextO
 }
 
 @Composable
-private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: () -> Unit, onMarkWatched: () -> Unit) {
+private fun ContinueWatchingCard(
+    title: UpNextWatching,
+    shape: Shape,
+    onOpen: () -> Unit,
+    onMarkWatched: () -> Unit,
+    action: EpisodeActionState?,
+    onUndo: () -> Unit,
+) {
     val pct = if (title.episodesTotal > 0) (title.episodesWatched.toFloat() / title.episodesTotal) else 0f
     val hasNotAired = title.nextEpisodeAirDate?.let { iso ->
         runCatching { LocalDate.parse(iso).isAfter(LocalDate.now()) }.getOrDefault(false)
@@ -617,8 +684,16 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
                         .background(MaterialTheme.colorScheme.primary),
                 ) {}
             }
+            action?.receipt?.let {
+                Text("Watched S${it.seasonNumber} E${it.episodeNumber}", style = MaterialTheme.typography.labelSmall)
+            }
+            action?.error?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
         }
-        if (hasNotAired) {
+        if (action?.receipt != null) {
+            TextButton(onClick = onUndo, enabled = !action.busy) { Text(if (action.busy) "Saving…" else "Undo") }
+        } else if (hasNotAired) {
             Text(
                 "Airs\n${formatShortDate(title.nextEpisodeAirDate!!)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -641,6 +716,7 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
             )
             Surface(
                 onClick = onMarkWatched,
+                enabled = action?.busy != true,
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -652,6 +728,21 @@ private fun ContinueWatchingCard(title: UpNextWatching, shape: Shape, onOpen: ()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CaughtUpCard(action: EpisodeActionState, shape: Shape, onOpen: () -> Unit, onUndo: () -> Unit, onFinish: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surfaceContainer).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(action.snapshot.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.clickable(onClick = onOpen))
+        Text("All caught up", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        action.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        // These are explicit choices: logging the finale never changes the series status.
+        TextButton(onClick = onFinish, enabled = !action.busy) { Text("Mark series watched") }
+        TextButton(onClick = onUndo, enabled = !action.busy) { Text(if (action.busy) "Saving…" else "Undo") }
     }
 }
 

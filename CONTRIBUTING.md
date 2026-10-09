@@ -3,7 +3,7 @@
 Thanks for looking. CinemArchive is a personal project, but the conventions here are strict — both
 humans and AI agents work in this repo, and undocumented drift is expensive.
 
-**[CLAUDE.md](CLAUDE.md) is authoritative for every convention below.** This file is the short
+**[AGENTS.md](AGENTS.md) is authoritative for every convention below.** This file is the short
 version; the wiki's [Contributing](https://github.com/shakrunk/CinemArchive/wiki/Contributing) page is
 the walkthrough with reasoning and a pre-PR checklist.
 
@@ -19,18 +19,33 @@ Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
   [`docs/known-problems.md`](docs/known-problems.md) (`KP-###` rows) and
   [`docs/android-parity-matrix.md`](docs/android-parity-matrix.md) (Android↔web gaps — many apparent
   bugs are documented gaps).
+- **Tooling:** [Developer tooling](docs/developer-tooling.md) explains the CLI graph entrypoint,
+  stale-index recovery, RTK usage, and the single application version source.
 
 ## Verification gates
 
-**Typecheck, lint and build must all pass before a change is complete.** There is no CI job running
-these for the web app on a pull request, so this is on you.
+**Typecheck, lint and build must all pass before a change is complete.** The Web workflow runs
+these gates, unit tests, and a production dependency audit on every PR into `dev` or `main`.
+It has no path filter, so a required check can report on documentation-only PRs too.
 
 ```bash
 # web — from apps/web/
-npm run lint && npm run build && npm run test
+npm ci
+npm run typecheck
+npm run lint:ci
+npm run test
+npm audit --omit=dev --audit-level=moderate
+npm run build
+npx --no-install playwright install chromium firefox webkit
+npm run test:e2e
 ```
 
-`npm run build` runs `tsc -b` first, so it covers the typecheck gate.
+`npm run build` also runs `tsc -b`. `lint:ci` caps existing warnings; ordinary `lint` still
+prints all findings. Lower the cap as debt is removed; do not raise it to admit new warnings.
+See [release readiness](docs/release-readiness.md) for current coverage and remaining gates.
+Browser tests build their own credential-free production bundle in `dist-e2e/`; they do not
+prove live authentication, backend authorization, or physical-device compatibility. CI keeps
+their reports and failure traces for 14 days.
 
 ```bash
 # android — from apps/android/
@@ -38,6 +53,10 @@ npm run lint && npm run build && npm run test
 ```
 
 That Gradle line is exactly what `.github/workflows/android.yml` runs.
+The main deployment repeats it and verifies the signed release APK before production
+migration. Changes to release-version handling must also pass
+`node --test scripts/release-version.test.mjs` from the repo root (included in the web CI
+gate). See [release operations](docs/release-operations.md) for artifact checks and recovery.
 
 ## Branching
 
@@ -53,7 +72,7 @@ Topic branch → `dev` → (release PR) → `main`. **Version-bump and release P
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/) — the commit type determines the release
-version bump (see [CLAUDE.md § Versioning](CLAUDE.md#versioning)).
+version bump (see [AGENTS.md § Versioning](AGENTS.md#versioning)).
 
 ```
 feat(ledger): add Revival House widget

@@ -18,9 +18,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DeveloperMode
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,23 +43,33 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
+import work.kumarfamilynet.cinemarchive.data.AccountRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
+import work.kumarfamilynet.cinemarchive.data.NotificationsRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { APPEARANCE, PERMISSIONS, ABOUT, DEVELOPER }
+enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, SHARING, APPEARANCE, NAVIGATION, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
     libraryRepository: LibraryRepository,
     preferencesRepository: PreferencesRepository,
     authRepository: AuthRepository,
+    accountRepository: AccountRepository,
+    notificationsRepository: NotificationsRepository,
     appVersionName: String,
     onClose: () -> Unit,
+    onOpenIdentity: () -> Unit,
+    onOpenInvites: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenFriends: () -> Unit,
+    onOpenSharing: () -> Unit,
     onOpenAppearance: () -> Unit,
+    onOpenImportSync: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     // Governs the Developer Settings row's visibility — see
@@ -63,18 +78,40 @@ fun ProfileRoute(
     // overrides it.
     devSettingsUnlocked: Boolean,
     onOpenDeveloperSettings: () -> Unit,
+    legacyLoadStatus: suspend () -> work.kumarfamilynet.cinemarchive.data.LegacyArchiveStatus,
+    legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     // Non-null only in the wide/split layout, where this list sits permanently alongside its
     // detail pane rather than being replaced by it — highlights which category is showing
     // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
     // the only feedback needed before the screen it names takes over.
     selectedCategory: SettingsCategory? = null,
+    outingRecovery: (@Composable () -> Unit)? = null,
+    titleChangesContent: (@Composable () -> Unit)? = null,
+    viewingChangesContent: (@Composable () -> Unit)? = null,
+    ticketChangesContent: (@Composable () -> Unit)? = null,
+    moviegoingContent: (@Composable () -> Unit)? = null,
+    lifecycleChangesContent: (@Composable () -> Unit)? = null,
+    listChangesContent: (@Composable () -> Unit)? = null,
+    catalogRefreshContent: (@Composable () -> Unit)? = null,
+    onOpenNavigation: (() -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
     val palette by preferencesRepository.observePalette().collectAsStateWithLifecycle(initialValue = ArchivePalette.BRAND)
     val session by authRepository.observeSession().collectAsStateWithLifecycle()
 
+    val account by accountRepository.profile.collectAsStateWithLifecycle()
+    val inbox by notificationsRepository.inbox.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(session?.userId) { runCatching { accountRepository.refreshProfile() } }
+
     ProfileScreen(
+        heading = account?.displayName?.takeIf { it.isNotBlank() } ?: account?.username?.takeIf { it.isNotBlank() },
+        unreadNotifications = inbox.unreadCount,
+        onOpenIdentity = onOpenIdentity,
+        onOpenInvites = onOpenInvites,
+        onOpenNotifications = onOpenNotifications,
+        onOpenFriends = onOpenFriends,
+        onOpenSharing = onOpenSharing,
         ownedCount = titles.size,
         watchedCount = titles.count { it.status == LibraryStatus.WATCHED },
         appearanceSummary = "${themeMode.label()} · ${palette.label()}",
@@ -82,12 +119,24 @@ fun ProfileRoute(
         appVersionName = appVersionName,
         onClose = onClose,
         onOpenAppearance = onOpenAppearance,
+        onOpenImportSync = onOpenImportSync,
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
         devSettingsUnlocked = devSettingsUnlocked,
         onOpenDeveloperSettings = onOpenDeveloperSettings,
+        legacyLoadStatus = legacyLoadStatus,
+        legacyRestore = legacyRestore,
         onSignOut = authRepository::signOut,
         selectedCategory = selectedCategory,
+        outingRecovery = outingRecovery,
+        titleChangesContent = titleChangesContent,
+        viewingChangesContent = viewingChangesContent,
+        ticketChangesContent = ticketChangesContent,
+        moviegoingContent = moviegoingContent,
+        lifecycleChangesContent = lifecycleChangesContent,
+        listChangesContent = listChangesContent,
+        catalogRefreshContent = catalogRefreshContent,
+        onOpenNavigation = onOpenNavigation,
     )
 }
 
@@ -127,6 +176,13 @@ internal fun ArchivePalette.label(): String = when (this) {
 
 @Composable
 private fun ProfileScreen(
+    heading: String?,
+    unreadNotifications: Int,
+    onOpenIdentity: () -> Unit,
+    onOpenInvites: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenFriends: () -> Unit,
+    onOpenSharing: () -> Unit,
     ownedCount: Int,
     watchedCount: Int,
     appearanceSummary: String,
@@ -134,14 +190,26 @@ private fun ProfileScreen(
     appVersionName: String,
     onClose: () -> Unit,
     onOpenAppearance: () -> Unit,
+    onOpenImportSync: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     devSettingsUnlocked: Boolean,
     onOpenDeveloperSettings: () -> Unit,
+    legacyLoadStatus: suspend () -> work.kumarfamilynet.cinemarchive.data.LegacyArchiveStatus,
+    legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     onSignOut: () -> Unit,
     selectedCategory: SettingsCategory? = null,
+    outingRecovery: (@Composable () -> Unit)? = null,
+    titleChangesContent: (@Composable () -> Unit)? = null,
+    viewingChangesContent: (@Composable () -> Unit)? = null,
+    ticketChangesContent: (@Composable () -> Unit)? = null,
+    moviegoingContent: (@Composable () -> Unit)? = null,
+    lifecycleChangesContent: (@Composable () -> Unit)? = null,
+    listChangesContent: (@Composable () -> Unit)? = null,
+    catalogRefreshContent: (@Composable () -> Unit)? = null,
+    onOpenNavigation: (() -> Unit)? = null,
 ) {
-    val displayName = profileDisplayName(signedInEmail)
+    val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onClose) {
@@ -187,6 +255,61 @@ private fun ProfileScreen(
                 }
             }
 
+            if (signedInEmail != null) {
+                item {
+                    ReadingWidthColumn {
+                        ProfileRow(
+                            icon = Icons.Filled.Person,
+                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            title = "Identity",
+                            subtitle = "Display name & username",
+                            onClick = onOpenIdentity,
+                            selected = selectedCategory == SettingsCategory.IDENTITY,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.Notifications,
+                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            title = "Notifications",
+                            subtitle = if (unreadNotifications > 0) "$unreadNotifications unread" else "You're all caught up",
+                            onClick = onOpenNotifications,
+                            selected = selectedCategory == SettingsCategory.NOTIFICATIONS,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.People,
+                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            title = "Friends",
+                            subtitle = "Requests, inbox & activity",
+                            onClick = onOpenFriends,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.People,
+                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            title = "Share links",
+                            subtitle = "Read-only access & visibility",
+                            onClick = onOpenSharing,
+                            selected = selectedCategory == SettingsCategory.SHARING,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        ProfileRow(
+                            icon = Icons.Filled.ConfirmationNumber,
+                            iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+                            iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            title = "Invites",
+                            subtitle = "Invite people to the archive",
+                            onClick = onOpenInvites,
+                            selected = selectedCategory == SettingsCategory.INVITES,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                    }
+                }
+            }
             item {
                 ReadingWidthColumn {
                     ProfileRow(
@@ -197,6 +320,34 @@ private fun ProfileScreen(
                         subtitle = appearanceSummary,
                         onClick = onOpenAppearance,
                         selected = selectedCategory == SettingsCategory.APPEARANCE,
+                    )
+                }
+            }
+            if (onOpenNavigation != null) item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Palette,
+                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        title = "Navigation",
+                        subtitle = "Tab order, visibility & compact labels",
+                        onClick = onOpenNavigation,
+                        selected = selectedCategory == SettingsCategory.NAVIGATION,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    ProfileRow(
+                        icon = Icons.Filled.Sync,
+                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        title = "Import & sync",
+                        subtitle = "Letterboxd, Simkl, Plex & Emby",
+                        onClick = onOpenImportSync,
+                        selected = selectedCategory == SettingsCategory.IMPORT_SYNC,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
             }
@@ -256,6 +407,15 @@ private fun ProfileScreen(
 
             item {
                 ReadingWidthColumn {
+                    if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
+                    if (signedInEmail != null) outingRecovery?.invoke()
+                    if (signedInEmail != null) lifecycleChangesContent?.invoke()
+                    if (signedInEmail != null) listChangesContent?.invoke()
+                    if (signedInEmail != null) titleChangesContent?.invoke()
+                    if (signedInEmail != null) viewingChangesContent?.invoke()
+                    if (signedInEmail != null) ticketChangesContent?.invoke()
+                    if (signedInEmail != null) moviegoingContent?.invoke()
+                    if (signedInEmail != null) catalogRefreshContent?.invoke()
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

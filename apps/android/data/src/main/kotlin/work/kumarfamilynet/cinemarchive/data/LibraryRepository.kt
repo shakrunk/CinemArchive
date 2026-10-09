@@ -7,15 +7,20 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
+import org.json.JSONArray
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.PersonCreditsDao
+import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
+import work.kumarfamilynet.cinemarchive.core.model.PersonCredit
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewEntity
-import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchCount
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
@@ -28,13 +33,17 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleCrewDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleDao
 import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
-import work.kumarfamilynet.cinemarchive.core.database.TitleListRow
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.AddTitleRequest
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatch
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatchReceipt
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeRating
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeReview
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
@@ -46,17 +55,25 @@ import work.kumarfamilynet.cinemarchive.core.model.UpNextOnThisDay
 import work.kumarfamilynet.cinemarchive.core.model.UpNextOuting
 import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
+import work.kumarfamilynet.cinemarchive.core.model.ViewingDraft
+import work.kumarfamilynet.cinemarchive.core.database.ViewingCompletionAliasDao
 import work.kumarfamilynet.cinemarchive.core.model.isSpecialsSeason
+
+private data class TitleCreditAggregate(
+    val cast: List<TitleCastEntity>, val crew: List<TitleCrewEntity>,
+    val seasonCast: List<SeasonCastEntity>, val episodeCrew: List<EpisodeCrewEntity>,
+)
 
 private data class EpisodeAggregate(
     val seasons: List<SeasonEntity>,
     val episodes: List<EpisodeEntity>,
-    val watchCounts: List<EpisodeWatchCount>,
+    val watchEvents: List<EpisodeWatchEventEntity>,
     val ratings: List<EpisodeRatingEntity>,
+    val reviews: List<EpisodeReviewEntity>,
 )
 
 private data class UpNextCoreSources(
-    val titles: List<TitleListRow>,
+    val titles: List<TitleEntity>,
     val seasons: List<SeasonEntity>,
     val outingRows: List<CinemaOutingEntity>,
     val viewingRows: List<ViewingEntity>,
@@ -86,7 +103,15 @@ class LibraryRepository(
     private val theaterInterestDao: TheaterInterestDao,
     private val outbox: MutationOutbox,
     private val episodeMetadataFetcher: EpisodeMetadataFetcher,
+    private val personCreditsDao: PersonCreditsDao,
+    private val mutationOwnerId: String? = null,
+    private val viewingAliases: ViewingCompletionAliasDao? = null,
+    private val isCurrentOwner: () -> Boolean = { mutationOwnerId != null },
+    private val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
+    val episodeBulkRepository: EpisodeBulkRepository? = null,
+    private val manualTitleAdmission: AddTitleAdmission? = null,
 ) {
+    val viewingOwnerId: String? get() = mutationOwnerId
     /**
      * Adds a catalog result to the library: an optimistic Room write of everything the title
      * brings with it (the title row, its seasons and episodes, top-billed cast and key crew,
@@ -106,6 +131,9 @@ class LibraryRepository(
      * surfacing later as a push that can never succeed.
      */
     suspend fun addTitle(request: AddTitleRequest): String {
+        // Account runtimes use one atomic server graph command, including receipt handling
+        // and recovery. The legacy adapter below remains for older isolated callers.
+        manualTitleAdmission?.let { return it.add(request) }
         val details = request.details
         titleDao.findIdByTmdbKey(details.tmdbId, details.type.name)?.let { return it }
 
@@ -136,7 +164,7 @@ class LibraryRepository(
                 )
             }
         }
-        val cast = details.cast.take(MAX_CAST_ROWS).map { credit ->
+        val cast = details.cast.distinctBy { it.tmdbPersonId }.map { credit ->
             TitleCastEntity(
                 id = UUID.randomUUID().toString(),
                 titleId = titleId,
@@ -144,6 +172,8 @@ class LibraryRepository(
                 name = credit.name,
                 characterName = credit.characterName,
                 castOrder = credit.order,
+                profileUrl = credit.profileUrl,
+                episodeCount = credit.episodeCount,
             )
         }
         val crew = details.crew.map { credit ->
@@ -154,7 +184,25 @@ class LibraryRepository(
                 name = credit.name,
                 job = credit.job,
                 department = credit.department,
+                profileUrl = credit.profileUrl,
             )
+        }
+        val seasonIds = seasons.associate { it.first.seasonNumber to it.first.id }
+        val episodeIds = episodes.associate { (it.seasonId to it.episodeNumber) to it.id }
+        val seasonCast = details.seasons.flatMap { season ->
+            val seasonId = seasonIds.getValue(season.seasonNumber)
+            season.cast.distinctBy { it.tmdbPersonId }.map { credit ->
+                SeasonCastEntity(UUID.randomUUID().toString(), titleId, seasonId, credit.tmdbPersonId,
+                    credit.name, credit.characterName, credit.order, credit.profileUrl, credit.episodeCount)
+            }
+        }
+        val episodeCrew = details.seasons.flatMap { season ->
+            season.episodes.flatMap { episode ->
+                val episodeId = episodeIds.getValue(seasonIds.getValue(season.seasonNumber) to episode.episodeNumber)
+                episode.crew.distinctBy { it.tmdbPersonId to it.job }.map { credit ->
+                    EpisodeCrewEntity(UUID.randomUUID().toString(), titleId, episodeId, credit.tmdbPersonId, credit.name, credit.job)
+                }
+            }
         }
         // A title logged as already watched gets its first viewing here, so it lands on the
         // Ledger's date-bucketed widgets immediately instead of only counting once the user
@@ -193,21 +241,36 @@ class LibraryRepository(
             imdbRating = details.imdbRating,
             originalLanguage = details.originalLanguage,
             releaseDate = details.releaseDate,
+            studios = details.studios,
+            collectionId = details.collectionId,
+            collectionName = details.collectionName,
+            contentRating = details.contentRating,
+            imdbId = details.imdbId,
+            rtScore = details.rtScore,
+            metacriticScore = details.metacriticScore,
+            rtUrl = details.rtUrl,
+            awardsCount = details.awardsCount,
+            bechdelOutcome = details.bechdelOutcome,
+            bechdelScore = details.bechdelScore,
         )
 
-        titleDao.upsertAll(listOf(title))
-        seasonDao.upsertAll(seasons.map { it.first })
-        episodeDao.upsertAll(episodes)
-        if (cast.isNotEmpty()) titleCastDao.upsertAll(cast)
-        if (crew.isNotEmpty()) titleCrewDao.upsertAll(crew)
-        viewing?.let { viewingDao.upsertAll(listOf(it)) }
+        outbox.atomically {
+            titleDao.upsertAll(listOf(title))
+            seasonDao.upsertAll(seasons.map { it.first })
+            episodeDao.upsertAll(episodes)
+            if (cast.isNotEmpty()) titleCastDao.upsertAll(cast)
+            if (crew.isNotEmpty()) titleCrewDao.upsertAll(crew)
+            personCreditsDao.upsertSeasonCast(seasonCast)
+            personCreditsDao.upsertEpisodeCrew(episodeCrew)
+            viewing?.let { viewingDao.upsertAll(listOf(it)) }
 
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "insert",
-            payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing),
-        )
+            outbox.enqueue(
+                entityType = "title",
+                entityId = titleId,
+                operation = "insert",
+                payload = buildAddTitlePayload(title, details, seasons.map { it.first }, episodes, cast, crew, viewing, seasonCast, episodeCrew),
+            )
+        }
         return titleId
     }
 
@@ -221,12 +284,25 @@ class LibraryRepository(
      * a plain hard delete with no undo.
      */
     suspend fun removeTitle(titleId: String) {
-        titleDao.deleteById(titleId)
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "delete",
-            payload = JSONObject().put("id", titleId),
+        outbox.atomically {
+            titleDao.deleteById(titleId)
+            outbox.enqueue(
+                entityType = "title",
+                entityId = titleId,
+                operation = "delete",
+                payload = JSONObject().put("id", titleId),
+            )
+        }
+    }
+
+    /** What sync's merge planner needs to know about an existing title — see [planMerge]. */
+    suspend fun syncSnapshot(titleId: String): TitleSyncSnapshot? {
+        val title = titleDao.getById(titleId) ?: return null
+        val dates = viewingDao.observeViewings(titleId).first().mapNotNull { it.date }.toSet()
+        return TitleSyncSnapshot(
+            status = runCatching { LibraryStatus.valueOf(title.status) }.getOrDefault(LibraryStatus.WATCHLIST),
+            rating = title.rating,
+            viewingDates = dates,
         )
     }
 
@@ -240,10 +316,13 @@ class LibraryRepository(
         cinemaOutingDao.observeAllOutings(),
         titleDao.observeLastInteractions(),
         theaterInterestDao.observeAll(),
-    ) { rows, outings, interactions, theaterInterest ->
+        combine(titleCastDao.observeAllCast(), personCreditsDao.observeLibraryPeople()) { cast, people -> cast to people },
+    ) { rows, outings, interactions, theaterInterest, credits ->
         val scheduledTitleIds = CinemaOutingRules.titleIdsWithScheduledOuting(outings.map { it.toDomain() })
         val lastInteractionByTitle = interactions.associate { it.titleId to it.lastInteractionAt }
         val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
+        val castByTitle = credits.first.groupBy { it.titleId }
+        val peopleByTitle = credits.second.groupBy { it.titleId }
         rows.map { row ->
             LibraryTitle(
                 id = row.id,
@@ -260,6 +339,14 @@ class LibraryRepository(
                 genres = row.genres,
                 lastInteractionAt = lastInteractionByTitle[row.id],
                 interestedInTheaters = row.id in interestedTitleIds,
+                addedAt = row.addedAt,
+                originalLanguage = row.originalLanguage,
+                tags = row.tags,
+                studios = row.studios,
+                collectionId = row.collectionId,
+                collectionName = row.collectionName,
+                castNames = castByTitle[row.id].orEmpty().map { it.name },
+                people = peopleByTitle[row.id].orEmpty().distinctBy { it.tmdbPersonId }.map { LibraryPerson(it.tmdbPersonId, it.name) },
             )
         }
     }
@@ -276,6 +363,11 @@ class LibraryRepository(
             rows.associate { (it.tmdbId to MediaType.valueOf(it.type)) to it.id }
         }
 
+    /** Account-local title identities and title cast only; crew/episode credits are not actors here. */
+    fun observeDiscoverLibrary(): Flow<DiscoverLibrary> = combine(
+        titleDao.observeAllTitles(), titleCastDao.observeAllCast(), ::discoverLibrary,
+    )
+
     /** Continue-watching + watchlist + marquee board for the Up Next screen. Episode totals
      *  come from [SeasonDao.observeAllSeasons]'s already-aggregated per-season counts (same
      *  rollup the Ledger board uses) rather than a new query — a WATCHING title with zero
@@ -286,13 +378,13 @@ class LibraryRepository(
      *  first synced down (schema.sql's default/bulk-add value) and nothing server-side updates
      *  it when an episode gets watched afterward (episode_watch_events is the only write the
      *  web app makes) — so it goes stale at 0 (or whatever it started at) for any title tracked
-     *  episode-by-episode. Falls back to the season column only for a title with no locally
-     *  synced episode rows at all. Watchlist titles with a scheduled outing move to the
+     *  episode-by-episode. Falls back independently for each season without locally synced
+     *  episode rows. Watchlist titles with a scheduled outing move to the
      *  marquee instead of the plain watchlist list
      *  (docs/superpowers/plans/2026-07-21-android-cinema-outings.md §7). */
     fun observeUpNext(): Flow<UpNextBoard> = combine(
         combine(
-            titleDao.observeLibrary(),
+            titleDao.observeAllTitles(),
             seasonDao.observeAllSeasons(),
             cinemaOutingDao.observeAllOutings(),
             viewingDao.observeAllViewings(),
@@ -305,6 +397,7 @@ class LibraryRepository(
         val (episodes, watchEvents) = episodeSources
         val interestedTitleIds = theaterInterest.map { it.titleId }.toSet()
         val now = Instant.now()
+        val today = now.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
         val outings = outingRows.map { it.toDomain() }
         val titlesById = titles.associateBy { it.id }
         val viewingsById = viewingRows.associate { it.id to Viewing(it.id, it.date, it.rating, it.notes, it.venue, it.companions, it.outingId) }
@@ -316,37 +409,46 @@ class LibraryRepository(
         val seasonById = mainSeasons.associateBy { it.id }
         val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
         val episodesByTitle = episodes.filter { it.seasonId in seasonById }.groupBy { it.titleId }
-        val totalsByTitle = mainSeasons.groupBy { it.titleId }.mapValues { (_, rows) ->
-            rows.sumOf { it.episodeCount } to rows.sumOf { it.episodesWatched }
-        }
+        val seasonsByTitle = mainSeasons.groupBy { it.titleId }
+        val titleIdByEpisode = episodes.associate { it.id to it.titleId }
+        val lastWatchedByTitle = watchEvents.filter { it.watchedAt != null }
+            .groupBy { titleIdByEpisode[it.episodeId] }
+            .mapValues { (_, events) -> events.maxOf { it.watchedAt!! } }
         val watching = titles
-            .filter { LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHING }
+            .filter { it.type == MediaType.TV.name && LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHING }
+            .sortedByDescending { lastWatchedByTitle[it.id] ?: it.addedAt }
             .mapNotNull { row ->
-                val (total, watchedFallback) = totalsByTitle[row.id] ?: return@mapNotNull null
-                if (total <= 0) return@mapNotNull null
+                val titleSeasons = seasonsByTitle[row.id].orEmpty()
+                val total = titleSeasons.sumOf { it.episodeCount }
                 val titleEpisodes = episodesByTitle[row.id].orEmpty()
-                val watched = if (titleEpisodes.isNotEmpty()) {
-                    titleEpisodes.count { it.id in watchedEpisodeIds }
-                } else {
-                    watchedFallback
-                }
+                val watched = watchedEpisodeCount(titleSeasons, titleEpisodes, watchedEpisodeIds)
                 val next = titleEpisodes
                     .sortedWith(compareBy({ seasonById[it.seasonId]?.seasonNumber ?: 0 }, { it.episodeNumber }))
-                    .firstOrNull { it.id !in watchedEpisodeIds }
+                    .firstOrNull { it.id !in watchedEpisodeIds } ?: return@mapNotNull null
                 UpNextWatching(
                     id = row.id,
                     name = row.title,
                     posterUrl = row.posterUrl,
                     episodesWatched = watched,
                     episodesTotal = total,
-                    nextSeasonNumber = next?.let { seasonById[it.seasonId]?.seasonNumber },
-                    nextEpisodeNumber = next?.episodeNumber,
-                    nextEpisodeName = next?.episodeName,
-                    nextEpisodeAirDate = next?.airDate,
+                    nextSeasonNumber = seasonById[next.seasonId]?.seasonNumber,
+                    nextEpisodeNumber = next.episodeNumber,
+                    nextEpisodeName = next.episodeName,
+                    nextEpisodeAirDate = next.airDate,
+                    nextEpisodeId = next.id,
                 )
             }
         val watchlist = titles
             .filter { LibraryStatus.valueOf(it.status) == LibraryStatus.WATCHLIST && it.id !in scheduledTitleIds }
+            .sortedWith(compareBy<TitleEntity> { it.releaseDate?.let { date -> date > today } == true }
+                .thenComparator { a, b ->
+                    val releaseDate = a.releaseDate
+                    if (releaseDate != null && releaseDate > today) {
+                        releaseDate.compareTo(b.releaseDate ?: "")
+                    } else {
+                        b.addedAt.compareTo(a.addedAt)
+                    }
+                })
             .map { row ->
                 LibraryTitle(
                     id = row.id,
@@ -394,7 +496,14 @@ class LibraryRepository(
      *  choice via the status chips), and the locally cached episode rows aren't guaranteed to
      *  match the season's full episodeCount, so "no more unwatched rows" isn't a safe proxy
      *  for "season complete". */
-    suspend fun advanceNextEpisode(titleId: String, watchedAt: String?) {
+    suspend fun advanceNextEpisode(
+        titleId: String,
+        watchedAt: String?,
+        expectedEpisodeId: String? = null,
+        today: String = java.time.LocalDate.now().toString(),
+    ): EpisodeWatchReceipt? = outbox.atomically {
+        val title = titleDao.getById(titleId) ?: return@atomically null
+        if (title.type != MediaType.TV.name || title.status != LibraryStatus.WATCHING.name) return@atomically null
         val seasonNumberById = seasonDao.observeSeasons(titleId).first()
             .filterNot { isSpecialsSeason(it.seasonNumber) }
             .associate { it.id to it.seasonNumber }
@@ -403,41 +512,60 @@ class LibraryRepository(
             .filter { it.seasonId in seasonNumberById }
             .sortedWith(compareBy({ seasonNumberById.getValue(it.seasonId) }, { it.episodeNumber }))
         val watchCounts = watchEventDao.observeWatchCounts(titleId).first().associate { it.episodeId to it.watchCount }
-        val next = episodes.firstOrNull { (watchCounts[it.id] ?: 0) <= 0 } ?: return
-        logEpisodeWatched(next.id, watchedAt)
+        val unwatched = episodes.filter { (watchCounts[it.id] ?: 0) <= 0 }
+        val next = unwatched.firstOrNull() ?: return@atomically null
+        if (expectedEpisodeId != null && next.id != expectedEpisodeId) return@atomically null
+        if (next.airDate?.let { it > today } == true) return@atomically null
+        val eventId = logEpisodeWatched(next.id, watchedAt)
+        EpisodeWatchReceipt(titleId, next.id, eventId, seasonNumberById.getValue(next.seasonId), next.episodeNumber, unwatched.size == 1)
+    }
+
+    /** Explicit caught-up-card action. Logging a finale alone never changes series status. */
+    suspend fun markSeriesWatched(titleId: String) = outbox.atomically {
+        val title = checkNotNull(titleDao.getById(titleId)) { "This title is no longer in your library" }
+        require(title.type == MediaType.TV.name) { "This title is not a series" }
+        if (title.status != LibraryStatus.WATCHED.name) updateTitleStatus(titleId, LibraryStatus.WATCHED, Instant.now().toString())
     }
 
     fun observeTitleDetail(titleId: String): Flow<TitleDetail?> {
         val episodeAggregate = combine(
             seasonDao.observeSeasons(titleId),
             episodeDao.observeEpisodes(titleId),
-            watchEventDao.observeWatchCounts(titleId),
+            watchEventDao.observeAllWatchEvents(),
             ratingDao.observeRatings(titleId),
-        ) { seasons, episodes, watchCounts, ratings ->
-            EpisodeAggregate(seasons, episodes, watchCounts, ratings)
+            reviewDao.observeReviews(titleId),
+        ) { seasons, episodes, watches, ratings, reviews ->
+            EpisodeAggregate(seasons, episodes, watches, ratings, reviews)
         }
 
+        val creditAggregate = combine(titleCastDao.observeAllCast(), titleCrewDao.observeAllCrew(),
+            personCreditsDao.observeSeasonCast(), personCreditsDao.observeEpisodeCrew()) { cast, crew, seasonCast, episodeCrew ->
+            TitleCreditAggregate(cast.filter { it.titleId == titleId }, crew.filter { it.titleId == titleId },
+                seasonCast.filter { it.titleId == titleId }, episodeCrew.filter { it.titleId == titleId })
+        }
         return combine(
             titleDao.observeTitle(titleId),
-            episodeAggregate,
+            combine(episodeAggregate, creditAggregate) { episodes, credits -> episodes to credits },
             viewingDao.observeViewings(titleId),
             cinemaOutingDao.observeOutingsForTitle(titleId),
             theaterInterestDao.observeIsInterested(titleId),
-        ) { title, aggregate, viewings, outingRows, isInterested ->
+        ) { title, detailSources, viewings, outingRows, isInterested ->
+            val (aggregate, credits) = detailSources
             if (title == null) return@combine null
 
-            val watchCountByEpisode = aggregate.watchCounts.associate { it.episodeId to it.watchCount }
-            // aggregate.ratings is newest-first (see EpisodeRatingDao), so the first match per
-            // episode is the latest rating.
-            val latestRatingByEpisode = mutableMapOf<String, Double>()
-            for (rating in aggregate.ratings) {
-                latestRatingByEpisode.getOrPut(rating.episodeId) { rating.rating }
-            }
+            val watchesByEpisode = aggregate.watchEvents.groupBy { it.episodeId }
+            val watchCountByEpisode = watchesByEpisode.mapValues { it.value.size }
+            val reviewsByEpisode = aggregate.reviews.groupBy { it.episodeId }
+            // Episode cards summarize every rating, matching web avgEpisodeRating.
+            val ratingsByEpisode = aggregate.ratings.groupBy { it.episodeId }
+            val averageRatingByEpisode = ratingsByEpisode
+                .mapValues { (_, ratings) -> ratings.map { it.rating }.average() }
 
             val episodesBySeason = aggregate.episodes.groupBy { it.seasonId }
 
             TitleDetail(
                 id = title.id,
+                tmdbId = title.tmdbId,
                 type = MediaType.valueOf(title.type),
                 title = title.title,
                 year = title.year,
@@ -451,6 +579,26 @@ class LibraryRepository(
                 rating = title.rating,
                 notes = title.notes,
                 genres = title.genres,
+                tags = title.tags,
+                originalLanguage = title.originalLanguage,
+                releaseDate = title.releaseDate,
+                studios = title.studios,
+                collectionName = title.collectionName,
+                addedAt = title.addedAt,
+                imdbRating = title.imdbRating,
+                contentRating = title.contentRating,
+                imdbId = title.imdbId,
+                rtUrl = title.rtUrl,
+                rtScore = title.rtScore,
+                metacriticScore = title.metacriticScore,
+                customWatchUrl = title.customWatchUrl,
+                inHomeCollection = title.inHomeCollection,
+                physicalMedia = physicalMediaItems(title.physicalMediaJson),
+                awardsCount = title.awardsCount,
+                bechdelOutcome = title.bechdelOutcome,
+                bechdelScore = title.bechdelScore,
+                cast = credits.cast.sortedBy { it.castOrder }.map { PersonCredit(it.tmdbPersonId, it.name, it.characterName) },
+                crew = credits.crew.map { PersonCredit(it.tmdbPersonId, it.name, it.job) },
                 seasons = aggregate.seasons.map { season ->
                     val seasonEpisodes = episodesBySeason[season.id].orEmpty()
                     // season.episodesWatched (the synced column) is never updated after a
@@ -467,6 +615,8 @@ class LibraryRepository(
                         episodeCount = season.episodeCount,
                         episodesWatched = episodesWatched,
                         airYear = season.airYear,
+                        cast = credits.seasonCast.filter { it.seasonId == season.id }.sortedBy { it.castOrder }
+                            .map { PersonCredit(it.tmdbPersonId, it.name, it.characterName) },
                         episodes = seasonEpisodes.map { episode ->
                             EpisodeDetail(
                                 id = episode.id,
@@ -475,9 +625,17 @@ class LibraryRepository(
                                 airDate = episode.airDate,
                                 runtime = episode.runtime,
                                 watchCount = watchCountByEpisode[episode.id] ?: 0,
-                                latestRating = latestRatingByEpisode[episode.id],
+                                latestRating = ratingsByEpisode[episode.id]?.firstOrNull()?.rating,
+                                averageRating = averageRatingByEpisode[episode.id],
+                                crew = credits.episodeCrew.filter { it.episodeId == episode.id }
+                                    .map { PersonCredit(it.tmdbPersonId, it.name, it.job) },
                                 synopsis = episode.synopsis,
                                 stillUrl = episode.stillUrl,
+                                watchEvents = watchesByEpisode[episode.id].orEmpty()
+                                    .sortedWith(compareByDescending<EpisodeWatchEventEntity> { it.watchedAt }.thenBy { it.id })
+                                    .map { EpisodeWatch(it.id, it.watchedAt, it.notes, it.colorMode) },
+                                ratings = ratingsByEpisode[episode.id].orEmpty().map { EpisodeRating(it.id, it.rating, it.ratedAt) },
+                                reviews = reviewsByEpisode[episode.id].orEmpty().map { EpisodeReview(it.id, it.reviewText, it.reviewedAt, it.colorMode) },
                             )
                         },
                     )
@@ -489,7 +647,7 @@ class LibraryRepository(
                         rating = viewing.rating,
                         notes = viewing.notes,
                         venue = viewing.venue,
-                        companions = viewing.companions,
+                        companions = savedCompanionNames(viewing.companionsJson, viewing.companions),
                         outingId = viewing.outingId,
                     )
                 },
@@ -503,11 +661,7 @@ class LibraryRepository(
 
     /** Toggles "I want to see this in theaters" (issue #205) for [titleId]. */
     suspend fun setTheaterInterest(titleId: String, interested: Boolean) {
-        if (interested) {
-            theaterInterestDao.upsert(TheaterInterestEntity(titleId, Instant.now().toString()))
-        } else {
-            theaterInterestDao.deleteByTitleId(titleId)
-        }
+        checkNotNull(moviegoingPreferences) { "Shared preferences are unavailable for this session." }.setInterest(titleId, interested)
     }
 
     /**
@@ -551,18 +705,21 @@ class LibraryRepository(
         }
         if (updated.isEmpty()) return
 
-        episodeDao.upsertAll(updated)
-        for (episode in updated) {
-            outbox.enqueue(
-                entityType = "episode_metadata",
-                entityId = episode.id,
-                operation = "update",
-                payload = JSONObject().apply {
-                    put("id", episode.id)
-                    put("synopsis", episode.synopsis ?: JSONObject.NULL)
-                    put("stillUrl", episode.stillUrl ?: JSONObject.NULL)
-                },
-            )
+        // The TMDB fetches above stay outside the transaction; only the DB writes + enqueues are atomic.
+        outbox.atomically {
+            episodeDao.upsertAll(updated)
+            for (episode in updated) {
+                outbox.enqueue(
+                    entityType = "episode_metadata",
+                    entityId = episode.id,
+                    operation = "update",
+                    payload = JSONObject().apply {
+                        put("id", episode.id)
+                        put("synopsis", episode.synopsis ?: JSONObject.NULL)
+                        put("stillUrl", episode.stillUrl ?: JSONObject.NULL)
+                    },
+                )
+            }
         }
     }
 
@@ -574,138 +731,294 @@ class LibraryRepository(
         return episodeMetadataFetcher.fetchEpisodeCast(title.tmdbId, seasonNumber, episodeNumber)
     }
 
-    /** Rates the outing's auto-logged viewing (the post-show sheet's ★ control) and, matching
-     *  [updateTitleRating]'s semantics, bumps the title's own rating too — the web plan's §4.4
-     *  "writes viewing.rating and updates title.rating (same semantics as logViewing)". Notes
-     *  are a separate action ([updateViewingNotes]): the sheet's "Done" button always fires
-     *  regardless of whether the user actually touched the star control, and coupling it to
-     *  rating would silently stamp a fake 0★ rating on a still-unrated viewing. */
-    suspend fun rateViewing(viewingId: String, titleId: String, rating: Double) {
-        val existing = viewingDao.getById(viewingId) ?: return
-        val updated = existing.copy(rating = rating)
-        viewingDao.upsert(updated)
-        outbox.enqueue(
-            entityType = "viewing",
-            entityId = viewingId,
-            operation = "update",
-            payload = JSONObject().apply { put("id", viewingId); put("rating", rating) },
-        )
-        updateTitleRating(titleId, rating, Instant.now().toString())
+    /** Non-UI convenience callers still enter the same atomic guarded viewing/title command. */
+    suspend fun rateViewing(viewingId: String, titleId: String, rating: Double) = outbox.atomically {
+        val opening = preparePostShow(titleId, viewingId)
+        savePostShow(opening, rating, opening.viewing.notes.orEmpty())
     }
 
-    suspend fun updateViewingNotes(viewingId: String, notes: String) {
-        val existing = viewingDao.getById(viewingId) ?: return
-        viewingDao.upsert(existing.copy(notes = notes))
-        outbox.enqueue(
-            entityType = "viewing",
-            entityId = viewingId,
-            operation = "update",
-            payload = JSONObject().apply { put("id", viewingId); put("notes", notes) },
-        )
+    suspend fun updateViewingNotes(viewingId: String, notes: String) = outbox.atomically {
+        val viewing = checkNotNull(viewingDao.getById(viewingId)) { "This viewing was removed." }
+        val opening = preparePostShow(viewing.titleId, viewingId)
+        savePostShow(opening, opening.viewing.rating, notes)
+    }
+
+    /** One form submission may create independent watch, rating and review rows. */
+    suspend fun saveEpisodeLog(episodeId: String, draft: EpisodeLogDraft) {
+        outbox.atomically {
+            requireNotNull(episodeDao.getById(episodeId)) { "Episode is no longer in your library" }
+            if (draft.includeWatch) {
+                val existing = watchEventDao.observeAllWatchEvents().first().find { it.id == draft.watchEventId }
+                require(existing == null || existing.episodeId == episodeId) { "Watch belongs to another episode" }
+                watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(draft.watchEventId, episodeId, draft.watchedAt, draft.watchNotes, draft.colorMode)))
+                outbox.enqueue("episode_watch_event", draft.watchEventId, "upsert", JSONObject().apply {
+                    put("id", draft.watchEventId); put("episodeId", episodeId)
+                    put("watchedAt", draft.watchedAt ?: JSONObject.NULL)
+                    put("notes", draft.watchNotes ?: JSONObject.NULL)
+                    put("colorMode", draft.colorMode ?: JSONObject.NULL)
+                })
+            }
+            draft.rating?.let { rating ->
+                ratingDao.upsertAll(listOf(EpisodeRatingEntity(draft.ratingId, episodeId, rating, draft.recordedAt)))
+                outbox.enqueue("episode_rating", draft.ratingId, "upsert", JSONObject().apply {
+                    put("id", draft.ratingId); put("episodeId", episodeId)
+                    put("rating", rating); put("ratedAt", draft.recordedAt)
+                })
+            }
+            draft.reviewText?.takeIf { it.isNotBlank() }?.let { review ->
+                reviewDao.upsertAll(listOf(EpisodeReviewEntity(draft.reviewId, episodeId, review, draft.recordedAt, draft.colorMode)))
+                outbox.enqueue("episode_review", draft.reviewId, "upsert", JSONObject().apply {
+                    put("id", draft.reviewId); put("episodeId", episodeId)
+                    put("reviewText", review); put("reviewedAt", draft.recordedAt)
+                    put("colorMode", draft.colorMode ?: JSONObject.NULL)
+                })
+            }
+        }
+    }
+
+    suspend fun deleteEpisodeWatchEvent(episodeId: String, eventId: String) {
+        outbox.atomically {
+            val event = watchEventDao.observeAllWatchEvents().first().find { it.id == eventId } ?: return@atomically
+            require(event.episodeId == episodeId) { "Watch belongs to another episode" }
+            watchEventDao.deleteById(eventId)
+            outbox.enqueue("episode_watch_event", eventId, "delete", JSONObject().put("id", eventId))
+        }
     }
 
     /** Logs a watch for [episodeId] — optimistic local write + a queued remote push, per
      *  the idempotency contract in docs/android-sync-contract.md §4.2: the id is generated
      *  here (not left to the server) so a retried push upserts instead of duplicating. */
-    suspend fun logEpisodeWatched(episodeId: String, watchedAt: String?) {
+    suspend fun logEpisodeWatched(episodeId: String, watchedAt: String?): String {
         val id = UUID.randomUUID().toString()
-        watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(id = id, episodeId = episodeId, watchedAt = watchedAt)))
-        outbox.enqueue(
-            entityType = "episode_watch_event",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("episodeId", episodeId)
-                put("watchedAt", watchedAt ?: JSONObject.NULL)
-            },
-        )
+        outbox.atomically {
+            watchEventDao.upsertAll(listOf(EpisodeWatchEventEntity(id = id, episodeId = episodeId, watchedAt = watchedAt)))
+            outbox.enqueue(
+                entityType = "episode_watch_event",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("episodeId", episodeId)
+                    put("watchedAt", watchedAt ?: JSONObject.NULL)
+                },
+            )
+        }
+        return id
     }
 
     /** Records a rating for [episodeId] — same client-generated-id contract as
      *  [logEpisodeWatched]; ratings are an independent log, not tied to a watch event. */
     suspend fun logEpisodeRating(episodeId: String, rating: Double, ratedAt: String) {
         val id = UUID.randomUUID().toString()
-        ratingDao.upsertAll(listOf(EpisodeRatingEntity(id = id, episodeId = episodeId, rating = rating, ratedAt = ratedAt)))
-        outbox.enqueue(
-            entityType = "episode_rating",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("episodeId", episodeId)
-                put("rating", rating)
-                put("ratedAt", ratedAt)
-            },
-        )
+        outbox.atomically {
+            ratingDao.upsertAll(listOf(EpisodeRatingEntity(id = id, episodeId = episodeId, rating = rating, ratedAt = ratedAt)))
+            outbox.enqueue(
+                entityType = "episode_rating",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("episodeId", episodeId)
+                    put("rating", rating)
+                    put("ratedAt", ratedAt)
+                },
+            )
+        }
     }
 
     /** Records a review for [episodeId] — same client-generated-id contract as
      *  [logEpisodeWatched]; reviews are an independent log, not tied to a watch event or rating. */
     suspend fun logEpisodeReview(episodeId: String, reviewText: String, reviewedAt: String) {
         val id = UUID.randomUUID().toString()
-        reviewDao.upsertAll(listOf(EpisodeReviewEntity(id = id, episodeId = episodeId, reviewText = reviewText, reviewedAt = reviewedAt)))
-        outbox.enqueue(
-            entityType = "episode_review",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("episodeId", episodeId)
-                put("reviewText", reviewText)
-                put("reviewedAt", reviewedAt)
-            },
-        )
+        outbox.atomically {
+            reviewDao.upsertAll(listOf(EpisodeReviewEntity(id = id, episodeId = episodeId, reviewText = reviewText, reviewedAt = reviewedAt)))
+            outbox.enqueue(
+                entityType = "episode_review",
+                entityId = id,
+                operation = "upsert",
+                payload = JSONObject().apply {
+                    put("id", id)
+                    put("episodeId", episodeId)
+                    put("reviewText", reviewText)
+                    put("reviewedAt", reviewedAt)
+                },
+            )
+        }
     }
 
-    /** Logs a re-watch timeline entry for [titleId] — same client-generated-id contract as
-     *  [logEpisodeWatched]. */
+    /** Import convenience: each admitted event is transactional and has one durable command ID. */
     suspend fun logViewing(titleId: String, date: String?) {
-        val id = UUID.randomUUID().toString()
-        viewingDao.upsertAll(listOf(ViewingEntity(id = id, titleId = titleId, date = date, rating = null, notes = null, venue = null)))
-        outbox.enqueue(
-            entityType = "viewing",
-            entityId = id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", id)
-                put("titleId", titleId)
-                put("date", date ?: JSONObject.NULL)
-            },
-        )
+        outbox.atomically {
+            val draft = prepareViewingEdit(titleId, null).copy(date = date)
+            saveCapturedViewing(titleId, draft, isNew = true, updateTitle = false)
+        }
     }
 
-    /** Changes [titleId]'s status — an in-place update, not an append-only log, so the
-     *  outbox operation is "update" rather than "upsert". [updatedAt] feeds the
-     *  last-write-wins conflict resolution designed in docs/android-sync-contract.md §4.2,
-     *  so it must reflect when this change was made, not be left stale. */
-    suspend fun updateTitleStatus(titleId: String, status: LibraryStatus, updatedAt: String) {
-        titleDao.updateStatus(titleId, status.name, updatedAt)
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "update",
-            payload = JSONObject().apply {
-                put("id", titleId)
-                put("status", status.name)
-                put("updatedAt", updatedAt)
-            },
-        )
+    /** The opening snapshot, including its causal guards, is retained by the saved editor. */
+    suspend fun prepareViewingEdit(titleId: String, requestedId: String?): ViewingDraft = outbox.atomically {
+        val owner = activeViewingOwner()
+        val title = checkNotNull(titleDao.getById(titleId)) { "Title is no longer in your library." }
+        val alias = requestedId?.let { checkNotNull(viewingAliases) { "Viewing identity lookup is unavailable." }.byProvisionalId(it) }
+        require(alias == null || alias.titleId == titleId) { "Viewing belongs to another title." }
+        val existing = requestedId?.let { viewingDao.getById(alias?.canonicalViewingId ?: it) }
+        check(requestedId == null || existing != null) { "Viewing was removed. Reopen the history to continue." }
+        require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title." }
+        val draft = existing?.let { ViewingDraft(it.id, it.date?.take(10), it.rating, it.notes, it.venue, savedCompanionNames(it.companionsJson, it.companions)) }
+            ?: ViewingDraft(UUID.randomUUID().toString(), java.time.LocalDate.now().toString(), null, null, null)
+        val pending = outbox.pendingEntries()
+        val pendingCompletion = pending.firstOrNull { entry -> entry.entityType == "outing_completion" &&
+            entry.operation == OUTING_COMPLETION && runCatching { completionCommand(entry).provisionalViewingId == draft.id }.getOrDefault(false) }
+        val linked = cinemaOutingDao.observeOutingsForTitle(titleId).first().filter { it.completedViewingId == draft.id }.map { it.id }
+        val context = viewingOpening(owner, titleId, requestedId, draft,
+            existing?.let { captureViewingGuard(it, alias, pending, owner) } ?: ViewingGuard(),
+            captureViewingTitleGuard(title, pending, owner), linked, existing?.companionsJson, pendingCompletion)
+        activeViewingOwner()
+        draft.copy(openingContext = context)
     }
+
+    /** Every field diff is against the opening snapshot, never rebased from a refreshed Room row. */
+    suspend fun saveViewing(titleId: String, draft: ViewingDraft, isNew: Boolean) =
+        saveCapturedViewing(titleId, draft, isNew, updateTitle = true)
+
+    suspend fun preparePostShow(titleId: String, viewingId: String): work.kumarfamilynet.cinemarchive.core.model.PostShowOpening = outbox.atomically {
+        val draft = prepareViewingEdit(titleId, viewingId)
+        val viewing = checkNotNull(viewingDao.getById(draft.id)) { "This viewing was removed." }
+        val outing = viewing.outingId?.let { cinemaOutingDao.getById(it) }
+        val reversal = outing?.let { captureReversalContext(it, viewing, outbox.pendingEntries(), checkNotNull(outbox.outingOwnerScope)) }
+        activeViewingOwner()
+        work.kumarfamilynet.cinemarchive.core.model.PostShowOpening(draft, reversal)
+    }
+
+    suspend fun savePostShow(opening: work.kumarfamilynet.cinemarchive.core.model.PostShowOpening, rating: Double?, notes: String) {
+        val context = JSONObject(checkNotNull(opening.viewing.openingContext))
+        val titleId = context.getString("titleId")
+        saveViewing(titleId, opening.viewing.copy(rating = rating, notes = notes), isNew = false)
+    }
+
+    private suspend fun saveCapturedViewing(titleId: String, draft: ViewingDraft, isNew: Boolean, updateTitle: Boolean) {
+        val owner = activeViewingOwner()
+        val captured = checkedViewingOpening(draft, owner, titleId)
+        require(captured.isNew == isNew)
+        val fields = captured.fields(draft)
+        if (fields.length() == 0) return
+        val titlePatch = JSONObject().apply {
+            if (updateTitle && isNew) put("status", "watched")
+            if (updateTitle && fields.has("rating") && draft.rating != null) put("rating", draft.rating)
+        }.takeIf { it.length() > 0 }
+        val (operation, payload) = captured.payload(if (isNew) "insert" else "update", fields, titlePatch)
+        val operationId = capturedViewingOperationId(owner, captured.token, "viewing", payload)
+        outbox.atomically {
+            activeViewingOwner()
+            val title = checkNotNull(titleDao.getById(titleId)) { "Title is no longer in your library." }
+            if (outbox.pendingEntries().any { it.id == operationId }) {
+                outbox.enqueueCaptured(operationId, "viewing", draft.id, operation, payload)
+                return@atomically
+            }
+            val admittedEntry = resolveCapturedCompletionEntry(operationId, draft.id, operation, payload, owner)
+            val existing = viewingDao.getById(admittedEntry.entityId)
+            require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title." }
+            check(isNew || existing != null) { "Viewing was removed. Reopen the history to continue." }
+            val admitted = outbox.enqueueCaptured(operationId, "viewing", admittedEntry.entityId, admittedEntry.operation, admittedEntry.payloadJson)
+            if (admitted && !(isNew && existing != null)) {
+                val base = existing ?: ViewingEntity(draft.id, titleId, null, null, null, null)
+                viewingDao.upsert(base.copy(
+                    date = if (fields.has("date")) draft.date else base.date,
+                    rating = if (fields.has("rating")) draft.rating else base.rating,
+                    notes = if (fields.has("notes")) draft.notes else base.notes,
+                    venue = if (fields.has("venue")) draft.venue else base.venue,
+                    companions = if (fields.has("companions")) draft.companions else base.companions,
+                    companionsJson = if (fields.has("companions")) fields.getJSONArray("companions").toString() else base.companionsJson,
+                ))
+            }
+            if (admitted && titlePatch != null) titleDao.upsertAll(listOf(title.withTitleMetadata(titlePatch)))
+            activeViewingOwner()
+        }
+    }
+
+    /** Server FK removal and the exact viewing delete share one guarded transaction. */
+    suspend fun deleteViewing(titleId: String, draft: ViewingDraft) {
+        val owner = activeViewingOwner()
+        val captured = checkedViewingOpening(draft, owner, titleId)
+        require(!captured.isNew)
+        val (operation, payload) = captured.payload("delete", JSONObject())
+        val id = capturedViewingOperationId(owner, captured.token, "delete", payload)
+        outbox.atomically {
+            activeViewingOwner()
+            if (outbox.pendingEntries().any { it.id == id }) {
+                outbox.enqueueCaptured(id, "viewing", draft.id, operation, payload)
+                return@atomically
+            }
+            val admittedEntry = resolveCapturedCompletionEntry(id, draft.id, operation, payload, owner)
+            val existing = viewingDao.getById(admittedEntry.entityId)
+            require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title." }
+            if (outbox.enqueueCaptured(id, "viewing", admittedEntry.entityId, admittedEntry.operation, admittedEntry.payloadJson)) {
+                viewingDao.deleteById(admittedEntry.entityId)
+                cinemaOutingDao.observeOutingsForTitle(titleId).first().filter { it.completedViewingId == admittedEntry.entityId && it.id in captured.linkedOutings }.forEach {
+                    cinemaOutingDao.upsert(it.copy(completedViewingId = null))
+                }
+            }
+            activeViewingOwner()
+        }
+    }
+
+    private suspend fun resolveCapturedCompletionEntry(id: String, viewingId: String, operation: String, payload: String, owner: String): work.kumarfamilynet.cinemarchive.core.database.OutboxEntity {
+        val original = work.kumarfamilynet.cinemarchive.core.database.OutboxEntity(id, "viewing", viewingId, operation, payload, 0)
+        if (operation != AWAITING_COMPLETION) return original
+        val alias = checkNotNull(viewingAliases).byProvisionalId(viewingId) ?: return original
+        return runCatching { convertCapturedCompletionViewing(original, alias, owner) }.getOrElse {
+            original.copy(operation = "review")
+        }
+    }
+
+    private fun activeViewingOwner(): String {
+        check(isCurrentOwner()) { "This sign-in has ended. Reopen the history in your current account." }
+        return checkNotNull(mutationOwnerId) { "Viewing edits require an account runtime." }
+    }
+
+    /** Future title edits use exact server revisions/receipt predecessors; legacy timestamps are not CAS inputs. */
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun updateTitleStatus(titleId: String, status: LibraryStatus, updatedAt: String) =
+        updateTitleMetadata(titleId, JSONObject().put("status", status.name.lowercase()))
 
     /** Sets [titleId]'s own rating (distinct from per-episode ratings) — same in-place
      *  update contract as [updateTitleStatus]. */
-    suspend fun updateTitleRating(titleId: String, rating: Double, updatedAt: String) {
-        titleDao.updateRating(titleId, rating, updatedAt)
-        outbox.enqueue(
-            entityType = "title",
-            entityId = titleId,
-            operation = "update",
-            payload = JSONObject().apply {
-                put("id", titleId)
-                put("rating", rating)
-                put("updatedAt", updatedAt)
-            },
-        )
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun updateTitleRating(titleId: String, rating: Double, updatedAt: String) =
+        updateTitleMetadata(titleId, JSONObject().put("rating", rating))
+
+    suspend fun prepareTitleSources(titleId: String): String = titleSourcesEditor().capture(titleId)
+
+    suspend fun saveTitleSources(titleId: String, opening: String, desired: TitleSourcesValues) =
+        titleSourcesEditor().save(titleId, opening, desired)
+
+    private fun titleSourcesEditor() = TitleSourcesEditing(titleDao, outbox,
+        checkNotNull(mutationOwnerId) { "Title edits require an account runtime." }, isCurrentOwner)
+
+    suspend fun updateTitleTags(titleId: String, tags: List<String>) =
+        updateTitleMetadata(titleId, JSONObject().put("tags", org.json.JSONArray(tags)))
+
+    private suspend fun updateTitleMetadata(titleId: String, patch: JSONObject) {
+        val ownerId = checkNotNull(mutationOwnerId) { "Title edits require an account runtime." }
+        outbox.atomically {
+            val previous = checkNotNull(titleDao.getById(titleId)) { "This title was removed." }
+            val next = previous.withTitleMetadata(patch)
+            if (next == previous) return@atomically
+            titleDao.upsertAll(listOf(next))
+            outbox.enqueueTitleMetadata(previous, patch, ownerId)
+        }
+    }
+}
+
+/** Match web episodesWatchedInSeason: coarse progress applies independently to each
+ * season without episode rows; repeats count once and Specials never enter series totals. */
+internal fun watchedEpisodeCount(
+    seasons: List<SeasonEntity>,
+    episodes: List<EpisodeEntity>,
+    watchedEpisodeIds: Set<String>,
+): Int {
+    val bySeason = episodes.groupBy { it.seasonId }
+    return seasons.filterNot { isSpecialsSeason(it.seasonNumber) }.sumOf { season ->
+        val rows = bySeason[season.id].orEmpty()
+        if (rows.isEmpty()) season.episodesWatched else rows.count { it.id in watchedEpisodeIds }
     }
 }

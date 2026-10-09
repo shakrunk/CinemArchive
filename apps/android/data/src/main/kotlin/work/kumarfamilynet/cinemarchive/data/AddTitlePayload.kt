@@ -3,6 +3,8 @@ package work.kumarfamilynet.cinemarchive.data
 import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity
 import work.kumarfamilynet.cinemarchive.core.database.TitleCrewEntity
@@ -11,25 +13,13 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
 
 /**
- * How many cast rows a newly added title carries. TMDB bills whole ensembles — a big
- * production can list 150 people — and the only thing reading `title_cast` locally is the
- * Ledger Ensemble widget's leading-cast tally (`castOrder < 5`, docs/android-contracts/ledger.md
- * §2). Twenty leaves generous headroom for that while keeping the outbox payload, which is one
- * JSON blob in a Room row, from ballooning by an order of magnitude per add.
- */
-internal const val MAX_CAST_ROWS = 20
-
-/**
  * The single outbox payload for an added title — the whole object graph
  * (`LibraryRepository.addTitle` writes it as one entry; see that method's kdoc for why it
  * isn't split per table). Keys are camelCase like every other outbox payload in this module;
  * `SupabaseRemoteMutationWriter.insertTitle` maps them to their snake_case columns.
  *
- * Carries a handful of fields the local Room mirror has no column for — `contentRating`,
- * `imdbId`, `studios`, `collectionId`/`collectionName`, `rtScore`, `metacriticScore` — read
- * straight off [MediaDetails] rather than off [title]. The server has columns for all of them
- * and the web app renders them, so dropping them here would make a title added on a phone look
- * permanently poorer on the web than the same title added there (see [MediaDetails]' kdoc).
+ * Catalog details accompany the local title projection so both clients receive the same
+ * certification, external IDs, studios, collection and critic scores when a title is added.
  */
 internal fun buildAddTitlePayload(
     title: TitleEntity,
@@ -39,6 +29,8 @@ internal fun buildAddTitlePayload(
     cast: List<TitleCastEntity>,
     crew: List<TitleCrewEntity>,
     viewing: ViewingEntity?,
+    seasonCast: List<SeasonCastEntity> = emptyList(),
+    episodeCrew: List<EpisodeCrewEntity> = emptyList(),
 ): JSONObject {
     val seasonNumberById = seasons.associate { it.id to it.seasonNumber }
     return JSONObject().apply {
@@ -69,9 +61,26 @@ internal fun buildAddTitlePayload(
         putOrNull("imdbId", details.imdbId)
         putOrNull("rtScore", details.rtScore)
         putOrNull("metacriticScore", details.metacriticScore)
+        putOrNull("rtUrl", details.rtUrl)
+        putOrNull("awardsCount", details.awardsCount)
+        putOrNull("bechdelOutcome", details.bechdelOutcome)
+        putOrNull("bechdelScore", details.bechdelScore)
         put("studios", JSONArray(details.studios))
         putOrNull("collectionId", details.collectionId)
         putOrNull("collectionName", details.collectionName)
+        put("seasonCast", JSONArray().apply {
+            seasonCast.forEach { credit -> put(JSONObject().apply {
+                put("id", credit.id); put("seasonId", credit.seasonId); put("tmdbPersonId", credit.tmdbPersonId)
+                put("name", credit.name); putOrNull("characterName", credit.characterName); put("castOrder", credit.castOrder)
+                putOrNull("profileUrl", credit.profileUrl); putOrNull("episodeCount", credit.episodeCount)
+            }) }
+        })
+        put("episodeCrew", JSONArray().apply {
+            episodeCrew.forEach { credit -> put(JSONObject().apply {
+                put("id", credit.id); put("episodeId", credit.episodeId); put("tmdbPersonId", credit.tmdbPersonId)
+                put("name", credit.name); put("job", credit.job)
+            }) }
+        })
 
         put(
             "seasons",
@@ -122,6 +131,8 @@ internal fun buildAddTitlePayload(
                             put("name", member.name)
                             putOrNull("characterName", member.characterName)
                             put("castOrder", member.castOrder)
+                            putOrNull("profileUrl", member.profileUrl)
+                            putOrNull("episodeCount", member.episodeCount)
                         },
                     )
                 }
@@ -138,6 +149,7 @@ internal fun buildAddTitlePayload(
                             put("name", member.name)
                             put("job", member.job)
                             putOrNull("department", member.department)
+                            putOrNull("profileUrl", member.profileUrl)
                         },
                     )
                 }

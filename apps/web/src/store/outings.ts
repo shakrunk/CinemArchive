@@ -329,6 +329,19 @@ export interface FormatCount {
   count: number
 }
 
+export interface OutingSpendBreakdown {
+  label: string
+  totalSpent: number
+  pricedTripCount: number
+  perTrip: number
+}
+
+export interface OutingMilestone {
+  kind: 'venue' | 'format'
+  title: string
+  detail: string
+}
+
 export interface AtTheMoviesStats {
   tripsTotal: number
   tripsThisYear: number
@@ -338,11 +351,33 @@ export interface AtTheMoviesStats {
   venues: VenueCount[]
   favoriteVenue: string | null
   topCompanion: { name: string; count: number } | null
+  companions: { name: string; count: number }[]
   /** Formats, most-common first — joined off each trip's outing. */
   formats: FormatCount[]
   /** Sum of `ticketPrice` across trips whose outing logged one. */
   totalSpent: number
   pricedTripCount: number
+  venueSpend: OutingSpendBreakdown[]
+  formatSpend: OutingSpendBreakdown[]
+  bestValueVenue: OutingSpendBreakdown | null
+  milestoneBadges: OutingMilestone[]
+}
+
+const VENUE_VISIT_MILESTONES = [5, 10, 25, 50, 100]
+
+function addSpend(groups: Map<string, { totalSpent: number; pricedTripCount: number }>, label: string | undefined, price: number) {
+  if (label == null) return
+  const previous = groups.get(label)
+  groups.set(label, {
+    totalSpent: (previous?.totalSpent ?? 0) + price,
+    pricedTripCount: (previous?.pricedTripCount ?? 0) + 1,
+  })
+}
+
+function spendBreakdown(groups: Map<string, { totalSpent: number; pricedTripCount: number }>): OutingSpendBreakdown[] {
+  return [...groups].map(([label, totals]) => ({
+    label, ...totals, perTrip: totals.totalSpent / totals.pricedTripCount,
+  })).sort((a, b) => b.totalSpent - a.totalSpent)
 }
 
 /** "At the Movies" Ledger panel data (plan §4.8). Source of truth is
@@ -363,6 +398,8 @@ export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now 
   const formatCounts = new Map<CinemaFormat, number>()
   let totalSpent = 0
   let pricedTripCount = 0
+  const venueSpendGroups = new Map<string, { totalSpent: number; pricedTripCount: number }>()
+  const formatSpendGroups = new Map<string, { totalSpent: number; pricedTripCount: number }>()
 
   for (const t of titles) {
     for (const v of t.viewings) {
@@ -388,6 +425,10 @@ export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now 
       if (outing?.ticketPrice != null) {
         totalSpent += outing.ticketPrice
         pricedTripCount += 1
+        // Like Android, spend follows the outing's venue, while visit counts
+        // follow the viewing. A manual viewing need not have an outing at all.
+        addSpend(venueSpendGroups, outing.venue, outing.ticketPrice)
+        addSpend(formatSpendGroups, outing.format, outing.ticketPrice)
       }
     }
   }
@@ -395,13 +436,26 @@ export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now 
   const venues = [...venueCounts.entries()]
     .map(([venue, count]) => ({ venue, count }))
     .sort((a, b) => b.count - a.count)
-  const topCompanionEntry = [...companionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+  const companions = [...companionCounts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
   const formats = [...formatCounts.entries()]
     .map(([format, count]) => ({ format, count }))
     .sort((a, b) => b.count - a.count)
   const sortedYearCounts = [...yearCounts.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([year, count]) => ({ year, count }))
+  const venueSpend = spendBreakdown(venueSpendGroups)
+  const formatSpend = spendBreakdown(formatSpendGroups)
+  const bestValueVenue = venueSpend.filter((venue) => venue.pricedTripCount >= 2)
+    .sort((a, b) => a.perTrip - b.perTrip)[0] ?? null
+  const milestoneBadges: OutingMilestone[] = [...venueCounts].flatMap(([venue, count]) => {
+    const threshold = VENUE_VISIT_MILESTONES.filter((value) => value <= count).at(-1)
+    return threshold == null ? [] : [{ kind: 'venue', title: venue, detail: `${threshold} visits` }]
+  })
+  for (const format of formatCounts.keys()) {
+    milestoneBadges.push({ kind: 'format', title: format, detail: 'First outing' })
+  }
 
   return {
     tripsTotal,
@@ -409,9 +463,14 @@ export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now 
     yearCounts: sortedYearCounts,
     venues,
     favoriteVenue: venues[0]?.venue ?? null,
-    topCompanion: topCompanionEntry ? { name: topCompanionEntry[0], count: topCompanionEntry[1] } : null,
+    topCompanion: companions[0] ?? null,
+    companions,
     formats,
     totalSpent,
     pricedTripCount,
+    venueSpend,
+    formatSpend,
+    bestValueVenue,
+    milestoneBadges,
   }
 }

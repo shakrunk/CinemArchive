@@ -28,7 +28,18 @@ data class LibraryTitle(
      *  independent of [status]/[hasScheduledOuting]. Drives the Up Next watchlist card's
      *  prompt to schedule an outing once [releaseDate] has passed with no outing booked yet. */
     val interestedInTheaters: Boolean = false,
+    val addedAt: String? = null,
+    val originalLanguage: String? = null,
+    val tags: List<String> = emptyList(),
+    val studios: List<String> = emptyList(),
+    val collectionId: Int? = null,
+    val collectionName: String? = null,
+    val castNames: List<String> = emptyList(),
+    val people: List<LibraryPerson> = emptyList(),
 )
+
+/** Provider identity is authoritative: two credited people may have the same name. */
+data class LibraryPerson(val tmdbPersonId: Int, val name: String)
 
 enum class LibraryStatus {
     WATCHLIST,

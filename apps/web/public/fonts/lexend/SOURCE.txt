@@ -1,0 +1,11 @@
+Lexend variable font, normal style, weights 100-900.
+Unmodified WOFF2 subsets retrieved 2026-10-08 from Google Fonts:
+https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap
+
+lexend-latin.woff2: https://fonts.gstatic.com/s/lexend/v26/wlpwgwvFAVdoq2_v-6QU.woff2
+lexend-latin-ext.woff2: https://fonts.gstatic.com/s/lexend/v26/wlpwgwvFAVdoq2_v9aQU4Wc.woff2
+lexend-vietnamese.woff2: https://fonts.gstatic.com/s/lexend/v26/wlpwgwvFAVdoq2_v9KQU4Wc.woff2
+
+License (included as OFL.txt):
+https://raw.githubusercontent.com/google/fonts/main/ofl/lexend/OFL.txt
+Upstream project: https://github.com/googlefonts/lexend

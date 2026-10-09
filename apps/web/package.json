@@ -1,14 +1,18 @@
 {
   "name": "cinemarchive",
   "private": true,
-  "version": "1.12.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
+    "lint:ci": "eslint . --max-warnings 48",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:db": "node --test scripts/library-command.test.mjs scripts/shared-library-rpc.test.mjs scripts/episode-watch-notes-sync.test.mjs scripts/title-social-reads.test.mjs && node scripts/outing-share-receipts.test.mjs && node scripts/ticket-attachments.test.mjs && node scripts/person-credits-sync.test.mjs && node scripts/outing-review-resolution.test.mjs && node scripts/outing-completion.test.mjs && node scripts/ticket-causal-guards.test.mjs && node scripts/rich-title-metadata-sync.test.mjs && node scripts/moviegoing-preferences.test.mjs && node scripts/backup-graph-sync.test.mjs",
+    "test:e2e:offline": "playwright test --config offline.playwright.config.ts",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
     "test:ui": "vitest --ui"
   },
@@ -28,10 +32,13 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwind-merge": "^3.6.0",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "zxing-wasm": "3.1.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/node": "^4.3.3",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -44,6 +51,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "fake-indexeddb": "6.2.5",
     "globals": "^17.9.0",
     "jsdom": "^29.1.1",
     "playwright": "^1.62.1",

@@ -17,6 +17,17 @@ data class UpNextWatching(
     val nextEpisodeNumber: Int? = null,
     val nextEpisodeName: String? = null,
     val nextEpisodeAirDate: String? = null,
+    val nextEpisodeId: String? = null,
+)
+
+/** Identifies exactly the event just logged, even after its card leaves Up Next. */
+data class EpisodeWatchReceipt(
+    val titleId: String,
+    val episodeId: String,
+    val watchEventId: String,
+    val seasonNumber: Int,
+    val episodeNumber: Int,
+    val caughtUp: Boolean,
 )
 
 /** One "On the Marquee" card's presentation-ready shape (see [CinemaOutingRules]). */

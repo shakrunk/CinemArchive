@@ -19,6 +19,8 @@ export function useNavigationSync({
   const isAddTitleOpen = useAppStore((s) => s.isAddTitleOpen)
   const selectedListId = useAppStore((s) => s.selectedListId)
   const friendId = useAppStore((s) => (s.viewerContext.kind === 'friend' ? s.viewerContext.userId : null))
+  const libraryReady = useAppStore((s) => s.offlineStatus.hydrated ||
+    (s.isSharedView && !s.loadingUser) || s.libraryLoadError !== null || s.offlineStorageError !== null)
 
   const drawerTitle = isDetailDrawerOpen ? selectedTitleId : null
   const desired: NavState = { view: currentView, title: drawerTitle, list: selectedListId, add: isAddTitleOpen }
@@ -35,7 +37,10 @@ export function useNavigationSync({
   // ── Initial mount: open whatever modal the URL names (deep link / refresh). ──
   // Does NOT write history; the state->URL effect's first pass leaves the URL as-is.
   useEffect(() => {
-    if (didInit.current) return
+    // Authentication/cache startup clears the previous owner's modal state.
+    // Restore a fresh page's URL only after that reset, and preserve the URL
+    // while waiting so a reload cannot silently discard its title/list target.
+    if (didInit.current || !libraryReady) return
     didInit.current = true
     const s = useAppStore.getState()
     const fromUrl = parseNav(window.location.search, viewRef.current)
@@ -47,7 +52,7 @@ export function useNavigationSync({
     } else if (fromUrl.add) {
       if (!s.isAddTitleOpen) s.openAddTitle()
     }
-  }, [setCurrentView])
+  }, [setCurrentView, libraryReady])
 
   // ── popstate: URL drives state (this is what makes Back close the drawer) ──
   useEffect(() => {
@@ -80,6 +85,7 @@ export function useNavigationSync({
 
   // ── state -> URL ──
   useEffect(() => {
+    if (!didInit.current) return
     // First pass after mount: seed prevRef from the URL (the source of truth) and
     // write nothing, so a deep-linked ?title=/?add= survives until the init effect
     // opens it and state catches up.
@@ -139,5 +145,5 @@ export function useNavigationSync({
     }
     prevRef.current = desired
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [desired.view, desired.title, desired.list, desired.add, friendId])
+  }, [desired.view, desired.title, desired.list, desired.add, friendId, libraryReady])
 }

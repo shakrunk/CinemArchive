@@ -1,5 +1,6 @@
 // ─── The marathon (screening streaks) ─────────────────────────────────────────
 
+import { localDateStr } from "../labels"
 import { useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
@@ -30,7 +31,7 @@ export function TheMarathon({ className, settings, width = 'sm' }: { className?:
   }
 
   return (
-    <Panel title={panelTitle} hint={hint} className={className}>
+    <Panel title={panelTitle} hint={hint} className={className} data={{ columns: ["Date", "Screening night"], rows: streaks.last30.map((active, index) => { const day = new Date(); day.setDate(day.getDate() - (streaks.last30.length - 1 - index)); return [localDateStr(day), active ? "Yes" : "No"] }) }}>
       <div className={cn('flex items-start py-1', width === 'sm' ? 'justify-between gap-4' : 'justify-center gap-16')}>
         <div className="flex flex-col">
           <span className="stat-num text-[clamp(34px,4vw,52px)]">

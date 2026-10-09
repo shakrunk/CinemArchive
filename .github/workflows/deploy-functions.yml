@@ -31,3 +31,6 @@ jobs:
 
       - name: Deploy redeem-invite Edge Function
         run: supabase functions deploy redeem-invite --project-ref ${{ vars.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy simkl-sync Edge Function
+        run: supabase functions deploy simkl-sync --project-ref ${{ vars.SUPABASE_PROJECT_REF }}

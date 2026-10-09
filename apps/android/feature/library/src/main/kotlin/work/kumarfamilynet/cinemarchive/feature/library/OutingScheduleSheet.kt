@@ -1,8 +1,5 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
-import android.graphics.BitmapFactory
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,29 +32,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
-import work.kumarfamilynet.cinemarchive.core.designsystem.decodeTicketBarcode
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
-import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 
 /** Display label for [CinemaFormat] — the fixed UI list from the web plan §4.1, kept as a UI
  *  concern here rather than on the enum itself (the enum stays a plain data value). */
@@ -78,7 +71,7 @@ fun CinemaFormat.displayLabel(): String = when (this) {
  * non-null means editing an existing outing (pre-fills every field); null means a fresh "I've
  * got tickets" schedule. [venueNotes] backs the per-venue parking/transit notes pre-fill
  * (issue #214): picking a venue from the autocomplete list loads that venue's saved notes;
- * [onSaveVenueNotes] is fired on Save so edits to those notes are remembered for next time.
+ * Venue notes use a separate captured editor; saving tickets cannot silently replace them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +79,7 @@ fun OutingScheduleSheet(
     defaultRuntimeMinutes: Int?,
     initial: CinemaOuting?,
     onDismiss: () -> Unit,
-    onSave: (
+    onSave: suspend (
         showtime: Instant,
         previewsMinutes: Int,
         runtimeMinutes: Int,
@@ -101,20 +94,24 @@ fun OutingScheduleSheet(
     venueSuggestions: List<String> = emptyList(),
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
-    onSaveVenueNotes: (venue: String, notes: String) -> Unit = { _, _ -> },
-    /** Picks, decodes (GitHub #219 — see [decodeTicketBarcode]), and persists a ticket photo
-     *  for [initial]'s outing. Only offered once an outing already exists ([initial] != null),
-     *  since a capture needs a real outing id to attach itself to. */
-    onCaptureTicket: (outingId: String, imagePath: String, barcodePayload: String?, barcodeFormat: TicketBarcodeFormat?) -> Unit = { _, _, _, _ -> },
-    onClearTicketCapture: (outingId: String) -> Unit = {},
+    onEditVenueNote: ((String) -> Unit)? = null,
+    /** Portable ticket capture lives in the account-scoped viewer after the outing is saved. */
+    onManageTicket: ((CinemaOuting) -> Unit)? = null,
 ) {
-    val zone = remember { ZoneId.systemDefault() }
+    val zoneId = rememberSaveable { ZoneId.systemDefault().id }
+    val zone = remember(zoneId) { ZoneId.of(zoneId) }
+    val scope = rememberCoroutineScope()
+    var attempted by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    BackHandler(enabled = saving) {}
     val initialInstant = initial?.showtime?.let { Instant.parse(it) } ?: Instant.now().plusSeconds(3600)
     var date by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalDate().toString()) }
     var time by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalTime().withSecond(0).withNano(0).toString()) }
     var venue by rememberSaveable { mutableStateOf(initial?.venue ?: "") }
     var companionsText by rememberSaveable { mutableStateOf(initial?.companions?.joinToString(", ") ?: "") }
     var format by rememberSaveable { mutableStateOf(initial?.format ?: CinemaFormat.STANDARD) }
+    var formatChanged by rememberSaveable { mutableStateOf(false) }
     var previews by rememberSaveable { mutableStateOf((initial?.previewsMinutes ?: 20).toString()) }
     var runtime by rememberSaveable { mutableStateOf((initial?.runtimeMinutes ?: defaultRuntimeMinutes ?: 120).toString()) }
     var ticketPrice by rememberSaveable { mutableStateOf(initial?.ticketPrice?.toString() ?: "") }
@@ -123,35 +120,6 @@ fun OutingScheduleSheet(
     var seats by rememberSaveable { mutableStateOf(initial?.seats?.joinToString(", ") ?: "") }
     var bookingRef by rememberSaveable { mutableStateOf(initial?.bookingRef ?: "") }
     var notes by rememberSaveable { mutableStateOf(initial?.notes ?: "") }
-    var parkingNotes by rememberSaveable { mutableStateOf(initial?.venue?.let { venueNotes[it] } ?: "") }
-
-    var ticketImagePath by rememberSaveable { mutableStateOf(initial?.ticketImagePath) }
-    var ticketBarcodeFormat by rememberSaveable { mutableStateOf(initial?.ticketBarcodeFormat?.name) }
-    var isCapturingTicket by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val ticketPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        val outingId = initial?.id
-        if (uri == null || outingId == null) return@rememberLauncherForActivityResult
-        isCapturingTicket = true
-        coroutineScope.launch(Dispatchers.IO) {
-            val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
-            if (bytes != null) {
-                val bitmap = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
-                val decoded = bitmap?.let(::decodeTicketBarcode)
-                val extension = context.contentResolver.getType(uri)
-                    ?.let(android.webkit.MimeTypeMap.getSingleton()::getExtensionFromMimeType)
-                    ?: "jpg"
-                val ticketsDir = File(context.filesDir, "tickets").apply { mkdirs() }
-                val file = File(ticketsDir, "$outingId.$extension")
-                file.writeBytes(bytes)
-                ticketImagePath = file.absolutePath
-                ticketBarcodeFormat = decoded?.second?.name
-                onCaptureTicket(outingId, file.absolutePath, decoded?.first, decoded?.second)
-            }
-            isCapturingTicket = false
-        }
-    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -174,13 +142,22 @@ fun OutingScheduleSheet(
 
     val parsedDate = runCatching { LocalDate.parse(date) }.getOrDefault(LocalDate.now())
     val parsedTime = runCatching { LocalTime.parse(time) }.getOrDefault(LocalTime.of(19, 0))
-    val showtimeInstant = parsedDate.atTime(parsedTime).atZone(zone).toInstant()
+    val showtimeInstant = if (initial != null &&
+        date == initialInstant.atZone(zone).toLocalDate().toString() &&
+        time == initialInstant.atZone(zone).toLocalTime().withSecond(0).withNano(0).toString()) initialInstant
+        else parsedDate.atTime(parsedTime).atZone(zone).toInstant()
     val previewsMinutes = previews.toIntOrNull() ?: 20
     val runtimeMinutes = runtime.toIntOrNull()?.coerceAtLeast(1) ?: 120
-    val endsAt = showtimeInstant.plusSeconds((previewsMinutes + runtimeMinutes) * 60L)
+    val endsAt = showtimeInstant.plusSeconds((previewsMinutes.toLong() + runtimeMinutes) * 60L)
     val endsAtLabel = endsAt.atZone(zone).toLocalTime()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    val valid = previews.toIntOrNull()?.let { it in 0..120 } == true && runtime.toIntOrNull()?.let { it > 0 } == true &&
+        (ticketPrice.isBlank() || ticketPrice.toBigDecimalOrNull()?.let {
+            it >= java.math.BigDecimal.ZERO && it <= java.math.BigDecimal("9999.99") && it.stripTrailingZeros().scale() <= 2
+        } == true)
+    ModalBottomSheet(onDismissRequest = { if (!saving) onDismiss() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
+            confirmValueChange = { !saving || it != androidx.compose.material3.SheetValue.Hidden })) {
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp, 0.dp, 20.dp, 28.dp)) {
             Text(
                 if (initial == null) "I've got tickets" else "Edit tickets",
@@ -188,6 +165,7 @@ fun OutingScheduleSheet(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
+            if (!attempted) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
                 PickerField(label = "Date", value = parsedDate.toString(), onClick = { showDatePicker = true }, modifier = Modifier.weight(1f))
                 PickerField(label = "Showtime", value = parsedTime.toString().take(5), onClick = { showTimePicker = true }, modifier = Modifier.weight(1f))
@@ -210,7 +188,6 @@ fun OutingScheduleSheet(
                             text = { Text(suggestion) },
                             onClick = {
                                 venue = suggestion
-                                parkingNotes = venueNotes[suggestion] ?: parkingNotes
                                 venueMenuExpanded = false
                             },
                         )
@@ -243,20 +220,17 @@ fun OutingScheduleSheet(
                 }
             }
 
-            OutlinedTextField(
-                value = parkingNotes,
-                onValueChange = { parkingNotes = it },
-                label = { Text("Parking / transit notes") },
-                supportingText = { Text("Remembered for this venue") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-            )
+            if (venue.isNotBlank()) {
+                venueNotes[venue.trim(' ')]?.let { Text(it, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) }
+                onEditVenueNote?.let { edit -> TextButton(onClick = { edit(venue.trim(' ')) }) { Text("Edit parking / transit note") } }
+            }
 
             Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
             SegmentedGroup(
                 options = listOf(CinemaFormat.STANDARD, CinemaFormat.IMAX, CinemaFormat.THREE_D, CinemaFormat.DOLBY)
                     .map { ChoiceOption(it, it.displayLabel()) },
                 selected = format,
-                onSelect = { format = it },
+                onSelect = { format = it; formatChanged = true },
                 modifier = Modifier.padding(bottom = 14.dp),
             )
 
@@ -341,47 +315,8 @@ fun OutingScheduleSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-                ) {
-                    ticketImagePath?.let { path ->
-                        AsyncImage(
-                            model = File(path),
-                            contentDescription = "Captured ticket photo",
-                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        TextButton(onClick = { ticketPickerLauncher.launch("image/*") }, enabled = !isCapturingTicket) {
-                            Icon(Icons.Filled.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text(
-                                if (ticketImagePath != null) "Replace ticket photo" else "Add ticket photo",
-                                modifier = Modifier.padding(start = 6.dp),
-                            )
-                        }
-                        when {
-                            isCapturingTicket -> CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                            ticketBarcodeFormat != null -> Text(
-                                "Scanned as $ticketBarcodeFormat",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            ticketImagePath != null -> Text(
-                                "No scannable code found — photo saved anyway",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    if (ticketImagePath != null) {
-                        TextButton(onClick = {
-                            ticketImagePath = null
-                            ticketBarcodeFormat = null
-                            onClearTicketCapture(initial.id)
-                        }) { Text("Remove") }
-                    }
+                if (onManageTicket != null) TextButton(onClick = { onManageTicket(initial) }) {
+                    Text("Open ticket photo and code")
                 }
             }
 
@@ -399,17 +334,30 @@ fun OutingScheduleSheet(
                 modifier = Modifier.padding(bottom = 20.dp),
             )
 
+            } else {
+                Text("$date · $time · ${venue.ifBlank { "Cinema" }}", modifier = Modifier.padding(vertical = 12.dp))
+                Text("Retry preserves these ticket details and the original saved operation.")
+            }
+            if (!valid && !attempted) Text("Use 0–120 preview minutes, a positive runtime, and a price from 0 to 9999.99 with at most two decimals.",
+                color = MaterialTheme.colorScheme.error)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 12.dp)) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = {
+                TextButton(enabled = !saving && valid, onClick = {
+                    attempted = true
+                    saving = true
+                    error = null
+                    scope.launch {
+                    try {
                     onSave(
                         showtimeInstant,
                         previewsMinutes,
                         runtimeMinutes,
                         venue.ifBlank { null },
-                        companionsText.split(",").map(String::trim).filter(String::isNotBlank),
-                        format,
+                        if (initial != null && companionsText == initial.companions.joinToString(", ")) initial.companions
+                        else companionsText.split(",").map(String::trim).filter(String::isNotBlank),
+                        if (initial != null && !formatChanged) initial.format else format,
                         ticketPrice.toDoubleOrNull(),
                         SeatAssignment(
                             auditorium = auditorium.ifBlank { null },
@@ -419,9 +367,14 @@ fun OutingScheduleSheet(
                         bookingRef.ifBlank { null },
                         notes.ifBlank { null },
                     )
-                    if (venue.isNotBlank()) onSaveVenueNotes(venue, parkingNotes)
                     onDismiss()
-                }) { Text(if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
+                    } catch (cancelled: CancellationException) { throw cancelled
+                    } catch (failure: Exception) {
+                        error = failure.message ?: "Tickets could not be saved. Retry the same details."
+                    } finally { saving = false }
+                    }
+                }) { Text(if (saving) "Saving tickets…" else if (attempted) "Retry tickets"
+                    else if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
             }
         }
     }

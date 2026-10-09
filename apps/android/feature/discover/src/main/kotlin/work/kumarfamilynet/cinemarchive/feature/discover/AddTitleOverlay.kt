@@ -22,20 +22,37 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -125,6 +142,11 @@ fun AddTitleOverlayRoute(
                 onStatusChange = viewModel::onStatusChange,
                 onRatingChange = viewModel::onRatingChange,
                 onNotesChange = viewModel::onNotesChange,
+                onTagsChange = viewModel::onTagsChange,
+                onSeasonProgressChange = viewModel::onSeasonProgressChange,
+                onMarkAll = viewModel::markMainSeasonsWatched,
+                onWatchedOnChange = viewModel::onWatchedOnChange,
+                onPrePlatformChange = viewModel::onPrePlatformChange,
                 onRetry = viewModel::retryDetails,
                 onSave = { viewModel.save(onAdded) },
                 onOpenExisting = onOpenTitle,
@@ -250,6 +272,11 @@ private fun LogStep(
     onStatusChange: (LibraryStatus) -> Unit,
     onRatingChange: (Double) -> Unit,
     onNotesChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onSeasonProgressChange: (Int, Int) -> Unit,
+    onMarkAll: () -> Unit,
+    onWatchedOnChange: (LocalDate) -> Unit,
+    onPrePlatformChange: (Boolean) -> Unit,
     onRetry: () -> Unit,
     onSave: () -> Unit,
     onOpenExisting: (String) -> Unit,
@@ -282,6 +309,11 @@ private fun LogStep(
             onStatusChange = onStatusChange,
             onRatingChange = onRatingChange,
             onNotesChange = onNotesChange,
+            onTagsChange = onTagsChange,
+            onSeasonProgressChange = onSeasonProgressChange,
+            onMarkAll = onMarkAll,
+            onWatchedOnChange = onWatchedOnChange,
+            onPrePlatformChange = onPrePlatformChange,
             onSave = onSave,
             onOpenExisting = onOpenExisting,
         )
@@ -295,6 +327,11 @@ private fun LogForm(
     onStatusChange: (LibraryStatus) -> Unit,
     onRatingChange: (Double) -> Unit,
     onNotesChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onSeasonProgressChange: (Int, Int) -> Unit,
+    onMarkAll: () -> Unit,
+    onWatchedOnChange: (LocalDate) -> Unit,
+    onPrePlatformChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     onOpenExisting: (String) -> Unit,
 ) {
@@ -321,9 +358,14 @@ private fun LogForm(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
+                (details.director?.takeIf { it.isNotBlank() } ?: details.network?.takeIf { it.isNotBlank() })?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp))
+                }
                 if (details.genres.isNotEmpty()) {
                     Text(
-                        details.genres.take(3).joinToString(" · "),
+                        details.genres.joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp),
@@ -384,6 +426,43 @@ private fun LogForm(
             modifier = Modifier.padding(bottom = 20.dp),
         )
 
+        if (state.form.status == LibraryStatus.WATCHED) {
+            SectionLabel("Date watched")
+            WatchedDateField(
+                date = state.form.watchedOn,
+                prePlatform = state.form.prePlatform,
+                onDateChange = onWatchedOnChange,
+                onPrePlatformChange = onPrePlatformChange,
+                modifier = Modifier.padding(bottom = 20.dp),
+            )
+        }
+
+        SectionLabel("Tags")
+        androidx.compose.material3.OutlinedTextField(
+            value = state.form.tags, onValueChange = onTagsChange,
+            label = { Text("Tags, separated by commas") },
+            enabled = !state.isSaving, modifier = Modifier.fillMaxWidth(),
+        )
+        if (details.seasons.isNotEmpty()) {
+            SectionLabel("Season progress")
+            Text("Previously watched episodes are saved without a date.")
+            androidx.compose.material3.TextButton(onClick = onMarkAll, enabled = !state.isSaving) {
+                Text("Mark all main seasons watched")
+            }
+            details.seasons.sortedBy { it.seasonNumber }.forEach { season ->
+                val count = state.form.seasonProgress[season.seasonNumber] ?: 0
+                androidx.compose.material3.OutlinedTextField(
+                    value = count.toString(),
+                    onValueChange = { value ->
+                        value.toIntOrNull()?.takeIf { it in 0..season.episodeCount }
+                            ?.let { onSeasonProgressChange(season.seasonNumber, it) }
+                    },
+                    label = { Text((if (season.isSpecials) "Specials" else "Season " + season.seasonNumber) + ": watched / " + season.episodeCount) },
+                    enabled = !state.isSaving, modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
         SectionLabel("Notes")
         Box(
             modifier = Modifier
@@ -427,6 +506,68 @@ private fun LogForm(
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 32.dp),
         ) {
             Text(if (state.isSaving) "Adding…" else "Add to Library")
+        }
+    }
+}
+
+/** Mirrors the web Add workflow's "Date Watched" input plus its "no date" escape hatch for
+ *  titles seen before the user joined. Future dates aren't selectable. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WatchedDateField(
+    date: LocalDate,
+    prePlatform: Boolean,
+    onDateChange: (LocalDate) -> Unit,
+    onPrePlatformChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showPicker by rememberSaveable { mutableStateOf(false) }
+    Column(modifier = modifier) {
+        if (!prePlatform) {
+            OutlinedButton(onClick = { showPicker = true }) {
+                Text(date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)))
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.toggleable(
+                value = prePlatform,
+                role = Role.Checkbox,
+                onValueChange = onPrePlatformChange,
+            ),
+        ) {
+            Checkbox(checked = prePlatform, onCheckedChange = null)
+            Text(
+                "Watched before joining CinemArchive (no date)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+            )
+        }
+    }
+    if (showPicker) {
+        val todayMillis = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickerState.selectedDateMillis?.let {
+                            onDateChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate())
+                        }
+                        showPicker = false
+                    },
+                ) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } },
+        ) {
+            DatePicker(state = pickerState)
         }
     }
 }

@@ -64,7 +64,8 @@ internal fun ViewingEditorSheet(
                         try {
                             onSave(initial.copy(date = if (prePlatform) null else date, rating = rating.takeIf { it > 0 },
                                 notes = notes.takeIf { it.isNotBlank() }, venue = venue.trim().takeIf { it.isNotEmpty() },
-                                companions = companions.lines().map { it.trim() }.filter { it.isNotEmpty() }.distinct()), isNew)
+                                companions = if (companions == initial.companions.joinToString("\n")) initial.companions
+                                else companions.lines().map { it.trim() }.filter { it.isNotEmpty() }), isNew)
                             onDismiss()
                         } catch (e: CancellationException) {
                             throw e

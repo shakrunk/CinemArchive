@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android venue notes and theater interest now sync through durable account-scoped commands with explicit conflict recovery; viewing and outing edits preserve companion friend identities.
 - Android friend and shared archives now support full library filters, six sorts, person and studio facets, and franchise grouping without expanding shared access.
 - Android now edits friend access by genre and watch status; friend and link access editors retain failed drafts and treat empty selections as unrestricted.
 - Android Discover now searches people and studios, opens their movie/TV catalogs, and preserves media identity, filters and retry behavior across selections.

@@ -36,6 +36,7 @@ class OutingsRepository(
     private val outbox: MutationOutbox,
     private val venueNoteDao: VenueNoteDao,
     private val alarmScheduler: OutingAlarmScheduler = NoOpOutingAlarmScheduler,
+    val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
 ) {
     fun observeOutingsForTitle(titleId: String): Flow<List<CinemaOuting>> =
         cinemaOutingDao.observeOutingsForTitle(titleId).map { rows -> rows.map { it.toDomain() } }
@@ -68,9 +69,8 @@ class OutingsRepository(
         venueNoteDao.observeAll().map { rows -> rows.associate { it.venue to it.notes } }
 
     suspend fun saveVenueNotes(venue: String, notes: String) {
-        val trimmedVenue = venue.trim()
-        if (trimmedVenue.isEmpty()) return
-        venueNoteDao.upsert(VenueNoteEntity(venue = trimmedVenue, notes = notes, updatedAt = Instant.now().toString()))
+        val repository = checkNotNull(moviegoingPreferences) { "Shared venue notes are unavailable for this session." }
+        repository.saveVenue(repository.captureVenue(venue), notes)
     }
 
     /** "I've got tickets" — creates a new scheduled outing. [endsAt] is computed here
@@ -101,6 +101,7 @@ class OutingsRepository(
             endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
             venue = venue,
             companions = companions,
+            companionsJson = companionObjects(null, companions).toString(),
             format = format?.wireValue,
             ticketPrice = ticketPrice,
             // A new outing never gets a legacy free-text `seat` — that column only ever
@@ -147,6 +148,7 @@ class OutingsRepository(
                 endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
                 venue = venue,
                 companions = companions,
+                companionsJson = retainCompanionsJson(existing.companionsJson, existing.companions, companions),
                 format = if (CinemaFormat.fromWire(existing.format) == format) existing.format else format?.wireValue,
                 ticketPrice = ticketPrice,
                 // `seat` is deliberately carried forward untouched: the edit form has no input
@@ -320,6 +322,7 @@ class OutingsRepository(
                             notes = null,
                             venue = entity.venue,
                             companions = entity.companions,
+                            companionsJson = entity.companionsJson,
                             outingId = entity.id,
                         ),
                     )
@@ -332,7 +335,7 @@ class OutingsRepository(
                             put("titleId", entity.titleId)
                             put("date", viewedDate)
                             put("venue", entity.venue ?: JSONObject.NULL)
-                            put("companions", JSONArray(entity.companions))
+                            put("companions", companionObjects(entity.companionsJson, entity.companions))
                             put("outingId", entity.id)
                         },
                     )
@@ -395,7 +398,7 @@ internal fun CinemaOutingEntity.toDomain(): CinemaOuting = CinemaOuting(
     runtimeMinutes = runtimeMinutes,
     endsAt = endsAt,
     venue = venue,
-    companions = companions,
+    companions = savedCompanionNames(companionsJson, companions),
     format = CinemaFormat.fromWire(format),
     ticketPrice = ticketPrice,
     seat = seat,

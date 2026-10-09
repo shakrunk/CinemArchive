@@ -27,6 +27,7 @@ internal fun JSONObject.toRecoveryOuting(): CinemaOutingEntity {
         showtime = instant("showtime"), previewsMinutes = getInt("previews_minutes"),
         runtimeMinutes = getInt("runtime_minutes"), endsAt = instant("ends_at"),
         venue = text("venue"), companions = names(getJSONArray("companions")), format = text("format"),
+        companionsJson = getJSONArray("companions").toString(),
         ticketPrice = if (isNull("ticket_price")) null else getDouble("ticket_price"),
         seat = text("seat"), auditorium = text("auditorium"), seatRow = text("seat_row"),
         seats = getJSONArray("seats").let { values -> (0 until values.length()).map(values::getString) },

@@ -89,6 +89,7 @@ fun ProfileRoute(
     titleChangesContent: (@Composable () -> Unit)? = null,
     viewingChangesContent: (@Composable () -> Unit)? = null,
     ticketChangesContent: (@Composable () -> Unit)? = null,
+    moviegoingContent: (@Composable () -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -127,6 +128,7 @@ fun ProfileRoute(
         titleChangesContent = titleChangesContent,
         viewingChangesContent = viewingChangesContent,
         ticketChangesContent = ticketChangesContent,
+        moviegoingContent = moviegoingContent,
     )
 }
 
@@ -193,6 +195,7 @@ private fun ProfileScreen(
     titleChangesContent: (@Composable () -> Unit)? = null,
     viewingChangesContent: (@Composable () -> Unit)? = null,
     ticketChangesContent: (@Composable () -> Unit)? = null,
+    moviegoingContent: (@Composable () -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -383,6 +386,7 @@ private fun ProfileScreen(
                     if (signedInEmail != null) titleChangesContent?.invoke()
                     if (signedInEmail != null) viewingChangesContent?.invoke()
                     if (signedInEmail != null) ticketChangesContent?.invoke()
+                    if (signedInEmail != null) moviegoingContent?.invoke()
                     OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                         Text("Sign out")
                     }

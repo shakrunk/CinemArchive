@@ -58,7 +58,8 @@ class ViewingHistoryTest {
         db.viewingDao().upsertAll(listOf(ViewingProducerFixture.event(), ViewingProducerFixture.event(other)))
         val draft = repo.prepareViewingEdit(title, watch).copy(date = "2025-12-24", rating = 4.5, notes = "New notes", venue = "New venue", companions = listOf("Sam"))
         repo.saveViewing(title, draft, false)
-        assertEquals(ViewingProducerFixture.event().copy(date = draft.date, rating = draft.rating, notes = draft.notes, venue = draft.venue, companions = draft.companions), db.viewingDao().getById(watch))
+        assertEquals(ViewingProducerFixture.event().copy(date = draft.date, rating = draft.rating, notes = draft.notes, venue = draft.venue,
+            companions = draft.companions, companionsJson = "[{\"name\":\"Sam\"}]"), db.viewingDao().getById(watch))
         assertEquals(ViewingProducerFixture.event(other), db.viewingDao().getById(other))
         assertEquals(4.5, db.titleDao().getById(title)!!.rating!!, 0.0)
         assertEquals("WATCHLIST", db.titleDao().getById(title)!!.status)

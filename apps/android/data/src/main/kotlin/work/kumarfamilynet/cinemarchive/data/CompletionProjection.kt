@@ -33,5 +33,5 @@ internal fun JSONObject.toCompletionViewing(): ViewingEntity {
         }
     } }
     return ViewingEntity(getString("id"), getString("title_id"), date, rating, text("notes"), text("venue"),
-        companions, text("outing_id"), getString("updated_at").also(Instant::parse))
+        companions, text("outing_id"), getString("updated_at").also(Instant::parse), getJSONArray("companions").toString())
 }

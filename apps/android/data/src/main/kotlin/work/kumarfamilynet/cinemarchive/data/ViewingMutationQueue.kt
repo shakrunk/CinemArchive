@@ -46,25 +46,28 @@ internal fun captureViewingTitleGuard(title: TitleEntity, pending: List<OutboxEn
     return related.lastOrNull()?.let { ViewingGuard(operationId = it.id) } ?: ViewingGuard(revision = title.updatedAt)
 }
 
-internal fun ViewingDraft.viewingFields() = JSONObject().put("date", date ?: JSONObject.NULL)
+internal fun ViewingDraft.viewingFields(companionsJson: String? = null) = JSONObject().put("date", date ?: JSONObject.NULL)
     .put("rating", rating ?: JSONObject.NULL).put("notes", notes ?: JSONObject.NULL).put("venue", venue ?: JSONObject.NULL)
-    .put("companions", JSONArray().apply { companions.forEach { put(JSONObject().put("name", it)) } })
+    .put("companions", companionObjects(companionsJson, companions))
 
 internal fun viewingOpening(ownerId: String, titleId: String, requestedId: String?, original: ViewingDraft,
-    guard: ViewingGuard, titleGuard: ViewingGuard, linkedOutings: List<String>): String = canonicalViewingJson(JSONObject()
+    guard: ViewingGuard, titleGuard: ViewingGuard, linkedOutings: List<String>, companionsJson: String? = null): String = canonicalViewingJson(JSONObject()
     .put("version", 1).put("ownerId", ownerId).put("titleId", titleId).put("id", original.id)
     .put("requestedId", requestedId ?: JSONObject.NULL).put("isNew", requestedId == null)
-    .put("token", UUID.randomUUID().toString()).put("original", original.viewingFields())
+    .put("token", UUID.randomUUID().toString()).put("original", original.viewingFields(companionsJson))
+    .put("companionsKnown", companionsJson != null || original.companions.isEmpty() || requestedId == null)
     .put("guard", guard.json()).put("titleGuard", titleGuard.json()).put("linkedOutings", JSONArray(linkedOutings.sorted())))
 
 internal data class CapturedViewing(val ownerId: String, val titleId: String, val id: String, val isNew: Boolean,
     val token: String, val original: JSONObject, val guard: ViewingGuard, val titleGuard: ViewingGuard,
-    val linkedOutings: List<String>, val raw: String)
+    val linkedOutings: List<String>, val raw: String, val companionsKnown: Boolean)
 
 internal fun checkedViewingOpening(draft: ViewingDraft, ownerId: String, titleId: String): CapturedViewing {
     val raw = checkNotNull(draft.openingContext) { "Reopen the viewing editor to capture its original version." }
     val json = JSONObject(raw)
-    require(json.keys().asSequence().toSet() == setOf("version", "ownerId", "titleId", "id", "requestedId", "isNew", "token", "original", "guard", "titleGuard", "linkedOutings"))
+    val required = setOf("version", "ownerId", "titleId", "id", "requestedId", "isNew", "token", "original", "guard", "titleGuard", "linkedOutings")
+    require(json.keys().asSequence().toSet().let { it == required || it == required + "companionsKnown" })
+    if (json.has("companionsKnown")) require(json.get("companionsKnown") is Boolean)
     require(json.getInt("version") == 1 && json.getString("ownerId") == ownerId && json.getString("titleId") == titleId &&
         json.getString("id") == draft.id) { "This viewing editor belongs to another account or title." }
     listOf(ownerId, titleId, draft.id, json.getString("token")).forEach(UUID::fromString)
@@ -79,11 +82,13 @@ internal fun checkedViewingOpening(draft: ViewingDraft, ownerId: String, titleId
     val linked = json.getJSONArray("linkedOutings").let { values -> (0 until values.length()).map { values.getString(it).also(UUID::fromString) } }
     require(linked.size == linked.distinct().size)
     return CapturedViewing(ownerId, titleId, draft.id, json.getBoolean("isNew"), json.getString("token"), original,
-        guard("guard"), guard("titleGuard"), linked, raw)
+        guard("guard"), guard("titleGuard"), linked, raw,
+        json.optBoolean("companionsKnown", json.getBoolean("isNew") || original.getJSONArray("companions").length() == 0))
 }
 
 internal fun CapturedViewing.fields(draft: ViewingDraft): JSONObject {
-    val proposed = draft.viewingFields()
+    val before = original.getJSONArray("companions")
+    val proposed = draft.viewingFields(retainCompanionsJson(if (companionsKnown) before.toString() else null, companionNames(before), draft.companions))
     return if (isNew) proposed else JSONObject().apply { proposed.keys().forEach { key ->
         if (!sameCommandJson(original.get(key), proposed.get(key))) put(key, proposed.get(key))
     } }

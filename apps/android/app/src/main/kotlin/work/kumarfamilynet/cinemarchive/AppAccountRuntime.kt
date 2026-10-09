@@ -102,11 +102,24 @@ class AppAccountRuntime(
 
     private val ordinaryWriter = SupabaseRemoteMutationWriter(client) { session.currentSession() ?: error("Not signed in") }
 
+    val moviegoingPreferences: work.kumarfamilynet.cinemarchive.data.MoviegoingPreferencesRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.MoviegoingPreferencesRepository(database, outbox, ownerId, ::isCurrent,
+            client, session::currentSession,
+            work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_moviegoing_recovery")),
+            synchronize = { librarySyncRepository.syncNow() },
+            replayBoundary = { action -> librarySyncRepository.withDurableReplay(action) },
+            onQueued = { if (isCurrent()) scope.launch { librarySyncRepository.syncNow() } })
+    }
+
     private val outbox: MutationOutbox = MutationOutbox(
         database.outboxDao(),
         object : work.kumarfamilynet.cinemarchive.data.RemoteMutationWriter {
             override suspend fun push(entry: work.kumarfamilynet.cinemarchive.core.database.OutboxEntity) =
-                if (entry.entityType == "ticket_attachment") tickets.push(entry) else ordinaryWriter.push(entry)
+                when (entry.entityType) {
+                    "ticket_attachment" -> tickets.push(entry)
+                    "venue_note", "theater_interest" -> moviegoingPreferences.push(entry)
+                    else -> ordinaryWriter.push(entry)
+                }
         },
         TitleConflictHandler(database.titleDao(), database.titleReconcileDao()),
         transactor,
@@ -114,6 +127,7 @@ class AppAccountRuntime(
         appliedHandler = work.kumarfamilynet.cinemarchive.data.AppliedMutationHandler { entry, receipt ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             when (entry.entityType) {
+                "venue_note", "theater_interest" -> moviegoingPreferences.apply(entry, receipt)
                 "ticket_attachment" -> tickets.apply(entry, receipt)
                 "title" -> work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
                 "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
@@ -129,7 +143,7 @@ class AppAccountRuntime(
         pendingProjectionKeys = { entries ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
             work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries) + tickets.protectionKeys(entries) +
-                work.kumarfamilynet.cinemarchive.data.viewingHistoryProtectionKeys(entries, ownerId)
+                work.kumarfamilynet.cinemarchive.data.viewingHistoryProtectionKeys(entries, ownerId) + moviegoingPreferences.protectionKeys(entries)
         },
     )
 
@@ -174,6 +188,8 @@ class AppAccountRuntime(
         pendingKeys = outbox::pendingEntityKeys,
         transactor = transactor,
         afterPull = { tickets.refresh() },
+        venueNoteDao = database.venueNoteDao(),
+        theaterInterestDao = database.theaterInterestDao(),
     )
 
     val listsRepository = ListsRepository(
@@ -200,6 +216,7 @@ class AppAccountRuntime(
         mutationOwnerId = ownerId,
         viewingAliases = database.viewingCompletionAliasDao(),
         isCurrentOwner = { auth.observeIdentity().value == identity },
+        moviegoingPreferences = moviegoingPreferences,
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId)
@@ -220,6 +237,7 @@ class AppAccountRuntime(
         outbox = outbox,
         venueNoteDao = database.venueNoteDao(),
         alarmScheduler = alarmScheduler,
+        moviegoingPreferences = moviegoingPreferences,
     )
 
     val outingPlansRepository = work.kumarfamilynet.cinemarchive.data.OutingPlansRepository.create(

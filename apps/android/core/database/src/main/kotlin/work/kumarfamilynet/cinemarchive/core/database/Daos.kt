@@ -333,6 +333,14 @@ interface CinemaOutingDao {
 
 @Dao
 interface VenueNoteDao {
+    @Query("SELECT * FROM venue_notes WHERE venue = :venue")
+    suspend fun get(venue: String): VenueNoteEntity?
+
+    @Query("DELETE FROM venue_notes WHERE venue = :venue")
+    suspend fun delete(venue: String)
+
+    @Query("DELETE FROM venue_notes WHERE serverId = :id")
+    suspend fun deleteServerId(id: String)
     @Query("SELECT * FROM venue_notes")
     fun observeAll(): Flow<List<VenueNoteEntity>>
 

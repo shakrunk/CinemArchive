@@ -186,7 +186,7 @@ class TitleDetailViewModel(
 
     /** "I want to see this in theaters" (GitHub #205). */
     fun onToggleTheaterInterest(interested: Boolean) {
-        viewModelScope.launch { repository.setTheaterInterest(titleId, interested) }
+        editTitle { repository.setTheaterInterest(titleId, interested) }
     }
 
     fun onRateTitle(rating: Double) {
@@ -243,10 +243,6 @@ class TitleDetailViewModel(
 
     fun onDidntMakeIt(outingId: String) {
         viewModelScope.launch { outingsRepository.revertCompletion(outingId) }
-    }
-
-    fun onSaveVenueNotes(venue: String, notes: String) {
-        viewModelScope.launch { outingsRepository.saveVenueNotes(venue, notes) }
     }
 
     /** Toggles this title's membership in one list — mirrors [AddToListSheet]'s checkbox rows
@@ -315,6 +311,10 @@ fun TitleDetailRoute(
     val listOptions by viewModel.listOptions.collectAsStateWithLifecycle()
     val episodeCast by viewModel.episodeCast.collectAsStateWithLifecycle()
     var showAddToListSheet by rememberSaveable { mutableStateOf(false) }
+    var editVenue by rememberSaveable { mutableStateOf<String?>(null) }
+    editVenue?.let { venue -> outingsRepository.moviegoingPreferences?.let { preferences ->
+        VenueNoteEditor(preferences, venue) { editVenue = null }
+    } }
     if (showAddToListSheet && detail != null) {
         AddToListSheet(
             titleName = detail!!.title,
@@ -349,7 +349,7 @@ fun TitleDetailRoute(
         venueSuggestions = venueSuggestions,
         companionSuggestions = companionSuggestions,
         venueNotes = venueNotes,
-        onSaveVenueNotes = viewModel::onSaveVenueNotes,
+        onEditVenueNote = { editVenue = it },
         onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
         listOptions = listOptions,
         onOpenAddToList = { showAddToListSheet = true },
@@ -393,7 +393,7 @@ fun TitleDetailScreen(
     venueSuggestions: List<String> = emptyList(),
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
-    onSaveVenueNotes: (String, String) -> Unit = { _, _ -> },
+    onEditVenueNote: ((String) -> Unit)? = null,
     onRemoveTitle: () -> Unit = {},
     listOptions: List<ListMembershipOption> = emptyList(),
     onOpenAddToList: () -> Unit = {},
@@ -789,7 +789,7 @@ fun TitleDetailScreen(
             venueSuggestions = venueSuggestions,
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
-            onSaveVenueNotes = onSaveVenueNotes,
+            onEditVenueNote = onEditVenueNote,
             onManageTicket = onViewTicket?.let { open -> { outing ->
                 showScheduleSheet = false; editingOuting = null
                 open(outing, detail?.title ?: "Cinema outing")

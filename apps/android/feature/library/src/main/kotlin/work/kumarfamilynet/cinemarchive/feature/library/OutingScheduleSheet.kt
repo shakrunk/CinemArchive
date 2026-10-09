@@ -67,7 +67,7 @@ fun CinemaFormat.displayLabel(): String = when (this) {
  * non-null means editing an existing outing (pre-fills every field); null means a fresh "I've
  * got tickets" schedule. [venueNotes] backs the per-venue parking/transit notes pre-fill
  * (issue #214): picking a venue from the autocomplete list loads that venue's saved notes;
- * [onSaveVenueNotes] is fired on Save so edits to those notes are remembered for next time.
+ * Venue notes use a separate captured editor; saving tickets cannot silently replace them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +90,7 @@ fun OutingScheduleSheet(
     venueSuggestions: List<String> = emptyList(),
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
-    onSaveVenueNotes: (venue: String, notes: String) -> Unit = { _, _ -> },
+    onEditVenueNote: ((String) -> Unit)? = null,
     /** Portable ticket capture lives in the account-scoped viewer after the outing is saved. */
     onManageTicket: ((CinemaOuting) -> Unit)? = null,
 ) {
@@ -110,7 +110,6 @@ fun OutingScheduleSheet(
     var seats by rememberSaveable { mutableStateOf(initial?.seats?.joinToString(", ") ?: "") }
     var bookingRef by rememberSaveable { mutableStateOf(initial?.bookingRef ?: "") }
     var notes by rememberSaveable { mutableStateOf(initial?.notes ?: "") }
-    var parkingNotes by rememberSaveable { mutableStateOf(initial?.venue?.let { venueNotes[it] } ?: "") }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -169,7 +168,6 @@ fun OutingScheduleSheet(
                             text = { Text(suggestion) },
                             onClick = {
                                 venue = suggestion
-                                parkingNotes = venueNotes[suggestion] ?: parkingNotes
                                 venueMenuExpanded = false
                             },
                         )
@@ -202,13 +200,10 @@ fun OutingScheduleSheet(
                 }
             }
 
-            OutlinedTextField(
-                value = parkingNotes,
-                onValueChange = { parkingNotes = it },
-                label = { Text("Parking / transit notes") },
-                supportingText = { Text("Remembered for this venue") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-            )
+            if (venue.isNotBlank()) {
+                venueNotes[venue.trim(' ')]?.let { Text(it, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) }
+                onEditVenueNote?.let { edit -> TextButton(onClick = { edit(venue.trim(' ')) }) { Text("Edit parking / transit note") } }
+            }
 
             Text("FORMAT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
             SegmentedGroup(
@@ -340,7 +335,6 @@ fun OutingScheduleSheet(
                         bookingRef.ifBlank { null },
                         notes.ifBlank { null },
                     )
-                    if (venue.isNotBlank()) onSaveVenueNotes(venue, parkingNotes)
                     onDismiss()
                 }) { Text(if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
             }

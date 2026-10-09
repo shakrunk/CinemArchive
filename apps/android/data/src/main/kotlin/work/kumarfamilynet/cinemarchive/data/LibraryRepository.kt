@@ -107,6 +107,7 @@ class LibraryRepository(
     private val mutationOwnerId: String? = null,
     private val viewingAliases: ViewingCompletionAliasDao? = null,
     private val isCurrentOwner: () -> Boolean = { mutationOwnerId != null },
+    private val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
 ) {
     val viewingOwnerId: String? get() = mutationOwnerId
     /**
@@ -629,7 +630,7 @@ class LibraryRepository(
                         rating = viewing.rating,
                         notes = viewing.notes,
                         venue = viewing.venue,
-                        companions = viewing.companions,
+                        companions = savedCompanionNames(viewing.companionsJson, viewing.companions),
                         outingId = viewing.outingId,
                     )
                 },
@@ -643,11 +644,7 @@ class LibraryRepository(
 
     /** Toggles "I want to see this in theaters" (issue #205) for [titleId]. */
     suspend fun setTheaterInterest(titleId: String, interested: Boolean) {
-        if (interested) {
-            theaterInterestDao.upsert(TheaterInterestEntity(titleId, Instant.now().toString()))
-        } else {
-            theaterInterestDao.deleteByTitleId(titleId)
-        }
+        checkNotNull(moviegoingPreferences) { "Shared preferences are unavailable for this session." }.setInterest(titleId, interested)
     }
 
     /**
@@ -869,13 +866,13 @@ class LibraryRepository(
         val existing = requestedId?.let { viewingDao.getById(alias?.canonicalViewingId ?: it) }
         check(requestedId == null || existing != null) { "Viewing was removed. Reopen the history to continue." }
         require(existing == null || existing.titleId == titleId) { "Viewing belongs to another title." }
-        val draft = existing?.let { ViewingDraft(it.id, it.date?.take(10), it.rating, it.notes, it.venue, it.companions) }
+        val draft = existing?.let { ViewingDraft(it.id, it.date?.take(10), it.rating, it.notes, it.venue, savedCompanionNames(it.companionsJson, it.companions)) }
             ?: ViewingDraft(UUID.randomUUID().toString(), java.time.LocalDate.now().toString(), null, null, null)
         val pending = outbox.pendingEntries()
         val linked = cinemaOutingDao.observeOutingsForTitle(titleId).first().filter { it.completedViewingId == draft.id }.map { it.id }
         val context = viewingOpening(owner, titleId, requestedId, draft,
             existing?.let { captureViewingGuard(it, alias, pending) } ?: ViewingGuard(),
-            captureViewingTitleGuard(title, pending, owner), linked)
+            captureViewingTitleGuard(title, pending, owner), linked, existing?.companionsJson)
         activeViewingOwner()
         draft.copy(openingContext = context)
     }
@@ -911,6 +908,7 @@ class LibraryRepository(
                     notes = if (fields.has("notes")) draft.notes else base.notes,
                     venue = if (fields.has("venue")) draft.venue else base.venue,
                     companions = if (fields.has("companions")) draft.companions else base.companions,
+                    companionsJson = if (fields.has("companions")) fields.getJSONArray("companions").toString() else base.companionsJson,
                 ))
             }
             if (admitted && titlePatch != null) titleDao.upsertAll(listOf(title.withTitleMetadata(titlePatch)))

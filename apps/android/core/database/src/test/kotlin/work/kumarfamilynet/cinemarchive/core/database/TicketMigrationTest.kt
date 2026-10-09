@@ -32,7 +32,7 @@ class TicketMigrationTest {
             old.execSQL("INSERT INTO legacy_restore_receipt (`key`,archiveId,kind,restoredAt) VALUES ('entry:old','archive','entry','2026-01-01')")
             old.version = 16
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_16_17, LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19, LibraryDatabase.MIGRATION_19_20).build()
         try {
             assertEquals("/legacy/tickets/original.png", upgraded.cinemaOutingDao().getById("outing")!!.ticketImagePath)
             assertEquals("Real payload", upgraded.cinemaOutingDao().getById("outing")!!.ticketBarcodePayload)

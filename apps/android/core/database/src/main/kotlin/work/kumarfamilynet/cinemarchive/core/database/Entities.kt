@@ -205,6 +205,7 @@ data class ViewingEntity(
     val outingId: String? = null,
     // Null means no server revision is known; local timestamps must never become CAS baselines.
     val updatedAt: String? = null,
+    val companionsJson: String? = null,
 )
 
 /**
@@ -352,6 +353,7 @@ data class CinemaOutingEntity(
     val followUpDismissedAt: String? = null,
     val createdAt: String,
     val updatedAt: String,
+    val companionsJson: String? = null,
 )
 
 /**
@@ -367,6 +369,9 @@ data class VenueNoteEntity(
     @PrimaryKey val venue: String,
     val notes: String,
     val updatedAt: String,
+    val serverId: String? = null,
+    val serverUpdatedAt: String? = null,
+    val serverCreatedAt: String? = null,
 )
 
 /**
@@ -382,6 +387,7 @@ data class VenueNoteEntity(
 data class TheaterInterestEntity(
     @PrimaryKey val titleId: String,
     val createdAt: String,
+    val serverUpdatedAt: String? = null,
 )
 
 /**

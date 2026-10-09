@@ -8,19 +8,20 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 
 - Astra oversees integration and Git commits. Full parity is incomplete; see full-parity-execution.md. Keep batches small and stop for a verified commit before the next slice.
 - Sonnet is DISMISSED following its unverified title-mapper handoff. No further work is assigned; the Codex coordination watcher is disabled. Codex owns corrections, verification and integration.
-- The mapper correction is committed as 92199b6; completion title-revision parsing is committed as d91b2c4. Compiler, assembly and lint passed, with mapper19/parser23 unit cases and6 actual Android backup cases passing. Installed-app restore remains incomplete.
-- Library history editor admission and compound recovery are committed as f5672ec. Automatic completion, post-show and reversal lifecycle activation remain unfinished.
+- The mapper correction is committed as 92199b6; completion title-revision parsing is committed as d91b2c4. Compiler, assembly and lint passed, with mapper19/parser23 unit cases and6 actual Android backup cases passing. Installed-app restore is now committed in f628d9c.
+- Library history editor admission and compound recovery are committed as f5672ec. Automatic completion, captured post-show edits and guarded reversal are now committed in f628d9c.
 - Discover genre/type/pagination is committed as b630970 on Android and a2b498e on web. Shared viewing insert identity checks are committed as b438918.
 - Android Room 19 and protected metadata backfill are committed as 0ceb38b; credit refresh/rekey retention is e2013b8. Authenticated friend archives and Ledger are ba2dac0. Backup text mapping correction is 91abec8.
 - Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. Full parity remains incomplete; the execution inventory records the remaining work.
 
-## Active continuation claims
+## Final checkpoint / no active claims
 
-- Astra: integration, review and atomic commits. Collection controls ce84546 and viewing-review guard 7a78ccc are committed, alongside People/Studios b6c577f, access scopes 35d64d2 and archive filters d0bc1c8.
-- Reverse worker: outing completion/post-show/reversal activation and recovery (#322), and the sole native runner. Shared moviegoing preferences, Room 20 and companion preservation are committed as 88a7b0d.
-- Backup worker: installed JSON restore using complete local graphs and atomic commands. Export is committed as b9a5a3b. Coordinates exact runtime, sync and predecessor-proof seams with the reverse worker.
-- UI worker: captured asynchronous post-show/reversal controls in PostShowSheet, TitleDetail and UpNext, coordinated with the reverse worker. Discover recommendation and More starring shelves are committed as 9d1d080.
-- Git writes remain with Astra. No native runner starts before all source owners confirm a compiling frozen state. Each verified user-facing slice stops for an atomic commit.
+- All Codex worker assignments are finished; no active file claims or build/test runners remain.
+- Installed restore and outing lifecycle/recovery integration is committed as f628d9c; independent backup codec correction is fe1b9af.
+- Final verification: compiler, APK/test APK assembly and lint pass; 974 JVM cases across 123 suites, zero failures/errors, three existing live-service skips; 22 device cases pass. Lint retains 66 baseline warnings. Parity trailers pass all 133 commits through f628d9c.
+- Collection controls ce84546, Discover shelves 9d1d080, viewing-review guard 7a78ccc, installed export b9a5a3b and moviegoing preferences/companion preservation 88a7b0d are committed.
+- Full parity is still incomplete. The [execution inventory](full-parity-execution.md) records the remaining provider-import, detail/add/navigation, legacy recovery and live acceptance gaps.
+- Sonnet remains dismissed; do not restart its watcher or assign further work. Git integration remains with Astra. No push, release, deployment or production write occurred.
 
 ## New messages
 

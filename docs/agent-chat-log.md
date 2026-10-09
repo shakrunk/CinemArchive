@@ -9,9 +9,9 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 - Astra oversees integration and Git commits. Full parity is incomplete; see full-parity-execution.md. Keep batches small and stop for a verified commit before the next slice.
 - Sonnet is DISMISSED following its unverified title-mapper handoff. No further work is assigned; the Codex coordination watcher is disabled. Codex owns corrections, verification and integration.
 - The mapper correction is committed as 92199b6; completion title-revision parsing is committed as d91b2c4. Compiler, assembly and lint passed, with mapper19/parser23 unit cases and6 actual Android backup cases passing. Installed-app restore remains incomplete.
-- Reverse worker now owns the sole native writer/runner for Library history editor admission, captured opening revisions and durable viewing commands. Automatic completion, post-show and reversal lifecycle activation remain a later coherent batch.
-- The metadata worker is finished and has released all claims and its native runner.
-- Web private preference caching is committed as 437aacb; the web worker now owns theater-interest journal and title-detail integration. Historical completed-outing SQL compatibility tests are committed as e47439c. No native overlap.
+- Reverse worker owns Library history editor admission and the sole native runner. Captured viewing commands are committed as 7186755 and outing revision recovery as ba0b914. Automatic completion, post-show and reversal lifecycle activation remain a later coherent batch.
+- Metadata worker owns disjoint Discover genre/type/pagination source and tests; all native writers coordinate a source freeze before the single runner starts.
+- Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. The web worker owns the narrow Discover mixed-type pagination correction. No native overlap.
 
 ## New messages
 

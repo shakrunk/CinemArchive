@@ -57,6 +57,7 @@ internal data class CompletionAcknowledgment(
     val viewing: JSONObject?,
     val title: JSONObject?,
     val completionOutingVersion: String? = null,
+    val completionTitleVersion: String? = null,
 )
 
 /** Validate identity and immutable proof separately from the current (possibly deleted) graph. */
@@ -94,7 +95,7 @@ internal fun checkedCompletionResponse(entry: OutboxEntity, response: JSONObject
     if (status !in setOf("applied", "already_completed")) return CompletionAcknowledgment(status, null, outing, viewing, title)
 
     val effects = response.getJSONArray("rows")
-    require(effects.length() in 1..2)
+    require(effects.length() in 1..3)
     val outingEffect = effects.getJSONObject(0)
     require(outingEffect.getString("table") == "cinema_outings" && !outingEffect.optBoolean("deleted"))
     require(sameCommandJson(outingEffect.getJSONObject("key"), JSONObject().put("id", command.outingId)))
@@ -110,10 +111,11 @@ internal fun checkedCompletionResponse(entry: OutboxEntity, response: JSONObject
             else require(effectVersion != null && Instant.parse(version) == Instant.parse(effectVersion))
         }
     } else null
-    val version = if (effects.length() == 2) {
+    var nextEffect = 1
+    val version = if (nextEffect < effects.length() && effects.getJSONObject(nextEffect).getString("table") == "viewings") {
         require(canonicalId != null)
-        val effect = effects.getJSONObject(1)
-        require(effect.getString("table") == "viewings" && !effect.optBoolean("deleted"))
+        val effect = effects.getJSONObject(nextEffect++)
+        require(!effect.optBoolean("deleted"))
         require(sameCommandJson(effect.getJSONObject("key"), JSONObject().put("id", canonicalId)))
         val row = effect.getJSONObject("row")
         require(row.keys().asSequence().toSet() == setOf("id", "user_id", "title_id", "outing_id", "updated_at"))
@@ -121,9 +123,28 @@ internal fun checkedCompletionResponse(entry: OutboxEntity, response: JSONObject
         require(row.getString("outing_id") == command.outingId)
         row.getString("updated_at").also(Instant::parse)
     } else null // Older receipts prove identity only; never infer a baseline from current viewing.
+    // Only the explicit marker and its matching minimal effect prove an actual status
+    // change. A current title revision (or old reversal bookkeeping) is not that evidence.
+    val titleVersion = if (response.has("completionTitleVersion")) {
+        val value = response.get("completionTitleVersion")
+        require(value == JSONObject.NULL || value is String)
+        (value as? String)?.also(Instant::parse)
+    } else null
+    if (titleVersion != null) {
+        require(nextEffect < effects.length()) { "Completion title effect is missing." }
+        val effect = effects.getJSONObject(nextEffect++)
+        require(effect.keys().asSequence().toSet() == setOf("table", "key", "row"))
+        require(effect.getString("table") == "titles")
+        require(sameCommandJson(effect.getJSONObject("key"), JSONObject().put("id", command.titleId)))
+        val row = effect.getJSONObject("row")
+        require(row.keys().asSequence().toSet() == setOf("id", "user_id", "updated_at"))
+        require(row.getString("id") == command.titleId && row.getString("user_id") == ownerId)
+        require(Instant.parse(row.getString("updated_at")) == Instant.parse(titleVersion))
+    }
+    require(nextEffect == effects.length()) { "Completion contains an unproven or unexpected effect." }
     val alias = canonicalId?.let { ViewingCompletionAliasEntity(command.provisionalViewingId, it, command.titleId,
         command.outingId, entry.id, version) }
-    return CompletionAcknowledgment(status, alias, outing, viewing, title, outingVersion)
+    return CompletionAcknowledgment(status, alias, outing, viewing, title, outingVersion, titleVersion)
 }
 
 private fun ownedCompletionRow(row: JSONObject, id: String, titleId: String, ownerId: String) {

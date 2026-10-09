@@ -58,6 +58,89 @@ class OutingCompletionTransportTest {
         getJSONArray("rows").getJSONObject(0).put("row", JSONObject().put("id", command.outingId)
             .put("user_id", owner).put("title_id", command.titleId).put("updated_at", version ?: JSONObject.NULL))
     }
+    private fun responseWithTitleProof(version: String? = originalVersion): JSONObject = responseWithOutingProof(originalVersion).apply {
+        put("completionTitleVersion", version ?: JSONObject.NULL)
+        if (version != null) getJSONArray("rows").put(JSONObject().put("table", "titles")
+            .put("key", JSONObject().put("id", command.titleId)).put("row", JSONObject()
+                .put("id", command.titleId).put("user_id", owner).put("updated_at", version)))
+    }
+
+    @Test fun actualTitleEffectRetainsOriginalRevisionSeparatelyFromLaterTitleState() {
+        val reply = responseWithTitleProof()
+        reply.getJSONObject("title").put("status", "dropped").put("updated_at", "2026-10-09T12:00:00Z")
+        reply.getJSONArray("rows").getJSONObject(2).getJSONObject("row")
+            .put("updated_at", "2026-10-08T12:01:00.123456Z")
+        val checked = checkedCompletionResponse(entry, reply, owner)
+        assertEquals(originalVersion, checked.completionTitleVersion)
+        assertEquals(originalVersion, checked.completionOutingVersion)
+        assertEquals(originalVersion, checked.alias!!.canonicalViewingVersion)
+        assertEquals("dropped", checked.title!!.getString("status"))
+        assertEquals("2026-10-09T12:00:00Z", checked.title.getString("updated_at"))
+    }
+
+    @Test fun preservedAndHistoricalTitlesNeverGainEffectFromCurrentSnapshot() {
+        val variants = listOf(response(), responseWithOutingProof(originalVersion), responseWithTitleProof(null),
+            responseWithTitleProof(null).apply { getJSONArray("rows").remove(1) })
+        variants.forEach { reply ->
+            assertNull(checkedCompletionResponse(entry, reply, owner).completionTitleVersion)
+            assertNotNull(reply.getJSONObject("title").getString("updated_at"))
+        }
+    }
+
+    @Test fun newTitleEffectSurvivesTransportRefreshWithoutRestoringDeletedCurrentRows() = runTest {
+        val reply = responseWithTitleProof().put("outing", JSONObject.NULL)
+            .put("viewing", JSONObject.NULL).put("title", JSONObject.NULL)
+        replies += 200 to reply.toString()
+        replies += 200 to "[]"
+        val result = transport().push(entry) as PushResult.Applied
+        val checked = checkedCompletionEnvelope(entry, result.receipt, owner)
+        assertEquals(originalVersion, checked.completionTitleVersion)
+        assertNull(checked.outing); assertNull(checked.viewing); assertNull(checked.title)
+        assertEquals(canonical, checked.alias!!.canonicalViewingId)
+        assertEquals(2, requests.size)
+    }
+
+    @Test fun malformedTitleOwnerIdentityAndKeyNeverAcknowledge() {
+        val invalid = listOf(
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).getJSONObject("row").put("user_id", canonical) },
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).getJSONObject("row").put("id", canonical) },
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).getJSONObject("key").put("id", canonical) },
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).getJSONObject("key").put("user_id", owner) },
+        )
+        invalid.forEach { reply -> assertThrows(IllegalArgumentException::class.java) { checkedCompletionResponse(entry, reply, owner) } }
+    }
+
+    @Test fun missingNullOrContradictoryTitleProvenanceNeverAcknowledge() = runTest {
+        val invalid = listOf(
+            responseWithTitleProof().apply { getJSONArray("rows").remove(2) },
+            responseWithTitleProof().put("completionTitleVersion", JSONObject.NULL),
+            responseWithTitleProof().apply { remove("completionTitleVersion") },
+            responseWithTitleProof().put("completionTitleVersion", 42),
+            responseWithTitleProof().put("completionTitleVersion", "not-a-revision"),
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).getJSONObject("row").put("updated_at", "2026-10-09T12:00:00Z") },
+        )
+        invalid.forEach { reply ->
+            replies += 200 to reply.toString()
+            assertTrue(transport().push(entry) is PushResult.Retry)
+        }
+        assertEquals(invalid.size, requests.size) // No malformed receipt authorizes the follow-up lookup.
+        assertEquals(1, requests.indices.map(::body).distinct().size)
+    }
+
+    @Test fun extraReorderedDuplicateOrDeletedTitleEffectsAreRejected() {
+        val invalid = listOf(
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).getJSONObject("row").put("status", "watched") },
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).put("deleted", true) },
+            responseWithTitleProof().apply { getJSONArray("rows").getJSONObject(2).put("table", "title_credits") },
+            responseWithTitleProof().apply { getJSONArray("rows").put(getJSONArray("rows").getJSONObject(2)) },
+            responseWithTitleProof().apply {
+                val rows = getJSONArray("rows")
+                val viewingEffect = rows.getJSONObject(1)
+                rows.put(1, rows.getJSONObject(2)); rows.put(2, viewingEffect)
+            },
+        )
+        invalid.forEach { reply -> assertThrows(IllegalArgumentException::class.java) { checkedCompletionResponse(entry, reply, owner) } }
+    }
 
     @Test fun laterVenueCannotBecomeOriginalOutingBaseline() {
         val reply = responseWithOutingProof(originalVersion)

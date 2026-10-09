@@ -358,9 +358,14 @@ private fun LogForm(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
+                (details.director?.takeIf { it.isNotBlank() } ?: details.network?.takeIf { it.isNotBlank() })?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp))
+                }
                 if (details.genres.isNotEmpty()) {
                     Text(
-                        details.genres.take(3).joinToString(" · "),
+                        details.genres.joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp),

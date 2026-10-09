@@ -23,6 +23,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -63,6 +65,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -364,7 +369,7 @@ private fun DebugBuildBanner(isDebugBuild: Boolean) {
 private typealias Tab = work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 
 private sealed interface Overlay {
-    data class Detail(val titleId: String) : Overlay
+    data class Detail(val titleId: String, val initialSchedule: Boolean = false) : Overlay
 
     /** [preselected] is set when the add was started from a specific Discover result rather
      *  than the FAB, so the overlay opens on its log step instead of an empty search box.
@@ -427,6 +432,10 @@ private fun CinemArchiveApp(
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
     var shareOutingId by remember { mutableStateOf<String?>(null) }
+    var globalSearch by remember(runtime) { mutableStateOf(false) }
+    val commandTitlesFlow = remember(repository) { repository.observeLibrary() }
+    val commandTitles by commandTitlesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val commandFocus = remember(runtime) { FocusRequester() }
     val titleSocialSource = remember(runtime) {
         work.kumarfamilynet.cinemarchive.feature.friends.RepositoryTitleSocialSource(runtime.friendsRepository) {
             authRepository.observeIdentity().value == runtime.identity
@@ -529,6 +538,34 @@ private fun CinemArchiveApp(
     // lifecycle, not the ViewModel layer, since it's app-shell-wide rather than one screen's.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    if (globalSearch && runtime.isCurrent()) OwnerGlobalSearch(
+        "${runtime.ownerId}:${runtime.identity.generation}", commandTitles,
+        onDismiss = { globalSearch = false },
+        onTitle = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id) } },
+        onSchedule = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id, initialSchedule = true) } },
+        onCommand = { id -> if (runtime.isCurrent()) {
+            globalSearch = false
+            when (id) {
+                "add" -> overlay = Overlay.Add()
+                "profile" -> overlay = Overlay.Profile
+                "friends" -> overlay = Overlay.Friends
+                else -> {
+                    overlay = null
+                    tab = when (id) {
+                        "upnext", "marquee" -> Tab.UP_NEXT
+                        "ledger" -> Tab.LEDGER
+                        "discover" -> Tab.DISCOVER
+                        "lists" -> Tab.LISTS
+                        else -> Tab.LIBRARY
+                    }
+                    if (id == "grid" || id == "list") coroutineScope.launch {
+                        if (runtime.isCurrent()) preferencesRepository.setLibraryViewMode(
+                            if (id == "grid") LibraryViewMode.GRID else LibraryViewMode.LIST)
+                    }
+                }
+            }
+        } },
+    )
     val onToggleLibraryViewMode: () -> Unit = {
         val next = if (libraryViewMode == LibraryViewMode.GRID) LibraryViewMode.LIST else LibraryViewMode.GRID
         coroutineScope.launch { preferencesRepository.setLibraryViewMode(next) }
@@ -600,7 +637,10 @@ private fun CinemArchiveApp(
     // contentWindowInsets is zeroed (MorphingBottomNav/MorphingNavigationRail inset their own
     // edges instead), so the status bar inset is applied once here, above both the Scaffold
     // and the overlay.
-    Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+    Box(modifier = Modifier.fillMaxSize().statusBarsPadding().onPreviewKeyEvent {
+        if (it.opensGlobalSearch() && runtime.isCurrent()) { globalSearch = true; true } else false
+    }.focusRequester(commandFocus).focusable()) {
+        LaunchedEffect(runtime) { commandFocus.requestFocus() }
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             // Below Medium, nav stays a bottom bar as before. At/above it — an unfolded
             // foldable, a tablet — a bottom bar stretched across the full width reads as a
@@ -620,7 +660,10 @@ private fun CinemArchiveApp(
                 // the two tabs sitting side by side with the same icon would be confusing.
                 NavDestination(Tab.LISTS, "Lists", Icons.Outlined.Bookmarks, Icons.Filled.Bookmarks),
             )
-            val navDestinations = navigationPreferences.visible.map { destination -> allNavDestinations.first { it.value == destination } }
+            val navDestinations: List<NavDestination<Tab?>> = navigationPreferences.visible.map { destination ->
+                val item = allNavDestinations.first { it.value == destination }
+                NavDestination<Tab?>(item.value, item.label, item.icon, item.selectedIcon)
+            } + NavDestination<Tab?>(null, "Search", Icons.Outlined.Search)
 
             @Composable
             fun TabScaffoldContent(innerPadding: PaddingValues) {
@@ -709,7 +752,7 @@ private fun CinemArchiveApp(
                     MorphingNavigationRail(
                         destinations = navDestinations,
                         selected = tab,
-                        onSelect = { tab = it },
+                        onSelect = { if (it == null) globalSearch = true else tab = it },
                         compact = navigationPreferences.compact,
                     )
                     Scaffold(
@@ -724,7 +767,7 @@ private fun CinemArchiveApp(
                         MorphingBottomNav(
                             destinations = navDestinations,
                             selected = tab,
-                            onSelect = { tab = it },
+                            onSelect = { if (it == null) globalSearch = true else tab = it },
                             compact = navigationPreferences.compact,
                         )
                     },
@@ -881,6 +924,9 @@ private fun CinemArchiveApp(
                     listsRepository,
                     current.titleId,
                     onBack = closeOverlay,
+                    initialSchedule = current.initialSchedule,
+                    onInitialScheduleConsumed = { if (overlay == current) overlay = current.copy(initialSchedule = false) },
+                    onScheduled = runtime::syncTickets,
                     onRequestNotificationPermission = requestNotificationPermission,
                     onRecommendTitle = { recommendTitleId = it },
                     onShareOutingPlans = { shareOutingId = it },

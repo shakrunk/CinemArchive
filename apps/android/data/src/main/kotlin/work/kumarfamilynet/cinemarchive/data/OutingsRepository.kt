@@ -38,7 +38,22 @@ class OutingsRepository(
     private val alarmScheduler: OutingAlarmScheduler = NoOpOutingAlarmScheduler,
     val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
     private val lifecycle: OutingLifecycleRepository? = null,
+    private val scheduleCommands: OutingScheduleCommands? = null,
 ) {
+    suspend fun prepareOutingSchedule(titleId: String, outingId: String?): String =
+        checkNotNull(scheduleCommands) { "Ticket scheduling requires the current account runtime." }.prepare(titleId, outingId)
+
+    suspend fun saveOutingSchedule(
+        opening: String, showtime: Instant, previewsMinutes: Int, runtimeMinutes: Int,
+        venue: String?, companions: List<String>, format: CinemaFormat?, ticketPrice: Double?,
+        seating: SeatAssignment, bookingRef: String?, notes: String?,
+    ): String {
+        val id = checkNotNull(scheduleCommands) { "Ticket scheduling requires the current account runtime." }
+            .save(opening, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
+        refreshAlarm()
+        return id
+    }
+
     fun observeOutingsForTitle(titleId: String): Flow<List<CinemaOuting>> =
         cinemaOutingDao.observeOutingsForTitle(titleId).map { rows -> rows.map { it.toDomain() } }
 

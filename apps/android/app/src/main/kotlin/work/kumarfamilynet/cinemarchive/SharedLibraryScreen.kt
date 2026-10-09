@@ -1,12 +1,18 @@
 package work.kumarfamilynet.cinemarchive
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -80,12 +86,35 @@ internal fun ArchiveViewer(
     var ledger by remember(scopeKey) { mutableStateOf(false) }
     var expanded by remember(scopeKey) { mutableStateOf(emptySet<String>()) }
     var filters by remember(scopeKey) { mutableStateOf(LibraryFilters()) }
+    var search by remember(scopeKey) { mutableStateOf(false) }
+    val searchFocus = remember(scopeKey) { FocusRequester() }
+    if (search) {
+        val commands = listOf(
+            work.kumarfamilynet.cinemarchive.core.model.AppCommand("library", "Go to the Library", keywords = "collection posters"),
+            work.kumarfamilynet.cinemarchive.core.model.AppCommand("ledger", "Go to the Ledger", keywords = "stats dashboard"),
+        ) + snapshot?.library?.titles.orEmpty().map { title ->
+            work.kumarfamilynet.cinemarchive.core.model.titleCommand(title.id, title.title, title.year,
+                title.graph().optString("director").takeIf { it.isNotBlank() && it != "null" }, title.mediaType == "tv", title.genres)
+        }
+        GlobalSearchDialog(scopeKey, commands, onDismiss = { search = false }, onSelect = { command ->
+            search = false
+            when (command.id) {
+                "library" -> { selectedId = null; ledger = false }
+                "ledger" -> { selectedId = null; ledger = true }
+                else -> snapshot?.library?.titles?.firstOrNull { "title:${it.id}" == command.id }?.let { selectedId = it.id }
+            }
+        })
+    }
     val back = { if (selectedId != null) selectedId = null else onClose() }
     BackHandler(onBack = back)
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().onPreviewKeyEvent {
+        if (it.opensGlobalSearch()) { search = true; true } else false
+    }.focusRequester(searchFocus).focusable()) {
+        LaunchedEffect(scopeKey) { searchFocus.requestFocus() }
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = back) { Text(if (selectedId == null) "Close" else "Back") }
             Text(heading, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            IconButton(onClick = { search = true }, enabled = snapshot != null) { Icon(Icons.Outlined.Search, "Search archive") }
             Text("Read only", style = MaterialTheme.typography.labelMedium)
         }
         val current = snapshot

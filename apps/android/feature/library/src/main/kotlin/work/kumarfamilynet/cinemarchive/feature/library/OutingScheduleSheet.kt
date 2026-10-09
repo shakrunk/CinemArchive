@@ -34,6 +34,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,7 +79,7 @@ fun OutingScheduleSheet(
     defaultRuntimeMinutes: Int?,
     initial: CinemaOuting?,
     onDismiss: () -> Unit,
-    onSave: (
+    onSave: suspend (
         showtime: Instant,
         previewsMinutes: Int,
         runtimeMinutes: Int,
@@ -94,7 +98,13 @@ fun OutingScheduleSheet(
     /** Portable ticket capture lives in the account-scoped viewer after the outing is saved. */
     onManageTicket: ((CinemaOuting) -> Unit)? = null,
 ) {
-    val zone = remember { ZoneId.systemDefault() }
+    val zoneId = rememberSaveable { ZoneId.systemDefault().id }
+    val zone = remember(zoneId) { ZoneId.of(zoneId) }
+    val scope = rememberCoroutineScope()
+    var attempted by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    BackHandler(enabled = saving) {}
     val initialInstant = initial?.showtime?.let { Instant.parse(it) } ?: Instant.now().plusSeconds(3600)
     var date by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalDate().toString()) }
     var time by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalTime().withSecond(0).withNano(0).toString()) }
@@ -132,13 +142,22 @@ fun OutingScheduleSheet(
 
     val parsedDate = runCatching { LocalDate.parse(date) }.getOrDefault(LocalDate.now())
     val parsedTime = runCatching { LocalTime.parse(time) }.getOrDefault(LocalTime.of(19, 0))
-    val showtimeInstant = parsedDate.atTime(parsedTime).atZone(zone).toInstant()
+    val showtimeInstant = if (initial != null &&
+        date == initialInstant.atZone(zone).toLocalDate().toString() &&
+        time == initialInstant.atZone(zone).toLocalTime().withSecond(0).withNano(0).toString()) initialInstant
+        else parsedDate.atTime(parsedTime).atZone(zone).toInstant()
     val previewsMinutes = previews.toIntOrNull() ?: 20
     val runtimeMinutes = runtime.toIntOrNull()?.coerceAtLeast(1) ?: 120
-    val endsAt = showtimeInstant.plusSeconds((previewsMinutes + runtimeMinutes) * 60L)
+    val endsAt = showtimeInstant.plusSeconds((previewsMinutes.toLong() + runtimeMinutes) * 60L)
     val endsAtLabel = endsAt.atZone(zone).toLocalTime()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    val valid = previews.toIntOrNull()?.let { it in 0..120 } == true && runtime.toIntOrNull()?.let { it > 0 } == true &&
+        (ticketPrice.isBlank() || ticketPrice.toBigDecimalOrNull()?.let {
+            it >= java.math.BigDecimal.ZERO && it <= java.math.BigDecimal("9999.99") && it.stripTrailingZeros().scale() <= 2
+        } == true)
+    ModalBottomSheet(onDismissRequest = { if (!saving) onDismiss() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true,
+            confirmValueChange = { !saving || it != androidx.compose.material3.SheetValue.Hidden })) {
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp, 0.dp, 20.dp, 28.dp)) {
             Text(
                 if (initial == null) "I've got tickets" else "Edit tickets",
@@ -146,6 +165,7 @@ fun OutingScheduleSheet(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
+            if (!attempted) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
                 PickerField(label = "Date", value = parsedDate.toString(), onClick = { showDatePicker = true }, modifier = Modifier.weight(1f))
                 PickerField(label = "Showtime", value = parsedTime.toString().take(5), onClick = { showTimePicker = true }, modifier = Modifier.weight(1f))
@@ -314,10 +334,22 @@ fun OutingScheduleSheet(
                 modifier = Modifier.padding(bottom = 20.dp),
             )
 
+            } else {
+                Text("$date · $time · ${venue.ifBlank { "Cinema" }}", modifier = Modifier.padding(vertical = 12.dp))
+                Text("Retry preserves these ticket details and the original saved operation.")
+            }
+            if (!valid && !attempted) Text("Use 0–120 preview minutes, a positive runtime, and a price from 0 to 9999.99 with at most two decimals.",
+                color = MaterialTheme.colorScheme.error)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 12.dp)) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = {
+                TextButton(enabled = !saving && valid, onClick = {
+                    attempted = true
+                    saving = true
+                    error = null
+                    scope.launch {
+                    try {
                     onSave(
                         showtimeInstant,
                         previewsMinutes,
@@ -336,7 +368,13 @@ fun OutingScheduleSheet(
                         notes.ifBlank { null },
                     )
                     onDismiss()
-                }) { Text(if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
+                    } catch (cancelled: CancellationException) { throw cancelled
+                    } catch (failure: Exception) {
+                        error = failure.message ?: "Tickets could not be saved. Retry the same details."
+                    } finally { saving = false }
+                    }
+                }) { Text(if (saving) "Saving tickets…" else if (attempted) "Retry tickets"
+                    else if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
             }
         }
     }

@@ -6,7 +6,7 @@ import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 
 /** Recovery consumes the complete owner-only table row, rather than the public sharing payload. */
-internal fun JSONObject.toRecoveryOuting(): CinemaOutingEntity {
+internal fun JSONObject.toRecoveryOuting(localUpdatedAt: String? = null): CinemaOutingEntity {
     require(setOf("id", "user_id", "title_id", "showtime", "previews_minutes", "runtime_minutes", "ends_at",
         "venue", "companions", "format", "ticket_price", "seat", "auditorium", "seat_row", "seats", "booking_ref",
         "ticket_image_path", "ticket_barcode_payload", "ticket_barcode_format", "notes", "status",
@@ -35,6 +35,8 @@ internal fun JSONObject.toRecoveryOuting(): CinemaOutingEntity {
         ticketBarcodePayload = text("ticket_barcode_payload"), ticketBarcodeFormat = text("ticket_barcode_format"),
         notes = text("notes"), status = getString("status").uppercase(),
         previousStatus = text("previous_status")?.uppercase(), completedViewingId = text("completed_viewing_id"),
-        followUpDismissedAt = text("follow_up_dismissed_at"), createdAt = instant("created_at"), updatedAt = instant("updated_at"),
+        // Only a captured/local projection may supply an unproven revision; remote reads stay strict.
+        followUpDismissedAt = text("follow_up_dismissed_at"), createdAt = instant("created_at"),
+        updatedAt = localUpdatedAt ?: instant("updated_at"),
     )
 }

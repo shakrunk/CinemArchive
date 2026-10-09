@@ -32,7 +32,7 @@ class SeasonRevisionMigrationTest {
             sql.execSQL("INSERT INTO legacy_restore_receipt VALUES ('receipt','archive','episode_watch_event','2026-01-01')")
             sql.version = 20
         } finally { seed.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_20_21).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_20_21, LibraryDatabase.MIGRATION_21_22).build()
         try {
             val season = upgraded.seasonDao().observeSeasons("title").first().single()
             assertNull(season.updatedAt); assertEquals(4, season.episodesWatched)

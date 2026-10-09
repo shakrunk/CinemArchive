@@ -200,40 +200,14 @@ class TitleDetailViewModel(
         editTitle { repository.updateTitleRating(titleId, rating, Instant.now().toString()) }
     }
 
-    fun onScheduleOuting(
-        showtime: Instant,
-        previewsMinutes: Int,
-        runtimeMinutes: Int,
-        venue: String?,
-        companions: List<String>,
-        format: CinemaFormat?,
-        ticketPrice: Double?,
-        seating: SeatAssignment,
-        bookingRef: String?,
-        notes: String?,
-    ) {
-        viewModelScope.launch {
-            outingsRepository.scheduleOuting(titleId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
-        }
-    }
+    suspend fun prepareSchedule(outingId: String?): String = outingsRepository.prepareOutingSchedule(titleId, outingId)
 
-    fun onEditOuting(
-        outingId: String,
-        showtime: Instant,
-        previewsMinutes: Int,
-        runtimeMinutes: Int,
-        venue: String?,
-        companions: List<String>,
-        format: CinemaFormat?,
-        ticketPrice: Double?,
-        seating: SeatAssignment,
-        bookingRef: String?,
-        notes: String?,
-    ) {
-        viewModelScope.launch {
-            outingsRepository.updateOuting(outingId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
-        }
-    }
+    suspend fun saveSchedule(
+        opening: String, showtime: Instant, previewsMinutes: Int, runtimeMinutes: Int,
+        venue: String?, companions: List<String>, format: CinemaFormat?, ticketPrice: Double?,
+        seating: SeatAssignment, bookingRef: String?, notes: String?,
+    ) { outingsRepository.saveOutingSchedule(opening, showtime, previewsMinutes, runtimeMinutes,
+        venue, companions, format, ticketPrice, seating, bookingRef, notes) }
 
     fun onCancelOuting(outingId: String) {
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
@@ -290,6 +264,9 @@ fun TitleDetailRoute(
     onRefreshCredits: (suspend () -> Boolean)? = null,
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
+    initialSchedule: Boolean = false,
+    onInitialScheduleConsumed: () -> Unit = {},
+    onScheduled: () -> Unit = {},
 ) {
     val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: TitleDetailViewModel =
@@ -338,8 +315,13 @@ fun TitleDetailRoute(
         onChangeStatus = viewModel::onChangeStatus,
         onToggleTheaterInterest = viewModel::onToggleTheaterInterest,
         onRateTitle = viewModel::onRateTitle,
-        onScheduleOuting = viewModel::onScheduleOuting,
-        onEditOuting = viewModel::onEditOuting,
+        onPrepareSchedule = viewModel::prepareSchedule,
+        onSaveSchedule = { opening, time, previews, runtime, venue, companions, format, price, seating, booking, notes ->
+            viewModel.saveSchedule(opening, time, previews, runtime, venue, companions, format, price, seating, booking, notes)
+            onScheduled()
+        },
+        initialSchedule = initialSchedule,
+        onInitialScheduleConsumed = onInitialScheduleConsumed,
         onCancelOuting = viewModel::onCancelOuting,
         onViewTicket = onViewTicket,
         ticketOutings = ticketOutings,
@@ -391,8 +373,8 @@ fun TitleDetailScreen(
     onChangeStatus: (LibraryStatus) -> Unit = {},
     onToggleTheaterInterest: (Boolean) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
-    onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
+    onPrepareSchedule: (suspend (String?) -> String)? = null,
+    onSaveSchedule: suspend (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> error("Ticket scheduling unavailable") },
     onCancelOuting: (String) -> Unit = {},
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
     ticketOutings: List<CinemaOuting> = emptyList(),
@@ -425,9 +407,16 @@ fun TitleDetailScreen(
     viewingOwnerId: String? = null,
     viewingTitleId: String? = detail?.id,
     episodeBulkContent: (@Composable (TitleDetail, Int) -> Unit)? = null,
+    initialSchedule: Boolean = false,
+    onInitialScheduleConsumed: () -> Unit = {},
 ) {
-    var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
-    var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
+    var scheduleOpening by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
+    var preparingSchedule by remember { mutableStateOf(false) }
+    var scheduleError by remember { mutableStateOf<String?>(null) }
+    var scheduleTarget by remember { mutableStateOf<String?>(null) }
+    val scheduleOriginal = scheduleOpening?.let { runCatching {
+        work.kumarfamilynet.cinemarchive.data.capturedScheduleInitial(it, viewingOwnerId, viewingTitleId)
+    } }
     var postShowState by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
     val postShow = restorePostShow(postShowState, viewingOwnerId, viewingTitleId)
     var preparingPostShow by remember { mutableStateOf(false) }
@@ -442,6 +431,30 @@ fun TitleDetailScreen(
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
     val historyScope = rememberCoroutineScope()
+    fun openSchedule(outingId: String?) {
+        if (preparingSchedule) return
+        val openingOwner = viewingOwnerId
+        val openingTitle = viewingTitleId
+        scheduleTarget = outingId
+        preparingSchedule = true
+        scheduleError = null
+        historyScope.launch {
+            try {
+                val opening = checkNotNull(onPrepareSchedule) { "Ticket scheduling is unavailable." }(outingId)
+                if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = opening
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (failure: Exception) {
+                if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle)
+                    scheduleError = failure.message ?: "Please try again."
+            } finally { preparingSchedule = false }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(initialSchedule, detail?.id, viewingOwnerId) {
+        if (initialSchedule && detail?.type == MediaType.MOVIE) {
+            onInitialScheduleConsumed()
+            if (scheduleOpening == null) openSchedule(null)
+        }
+    }
     fun openViewing(viewing: Viewing?, deleting: Boolean = false) {
         val openingTitle = detail?.id ?: return
         val openingOwner = viewingOwnerId
@@ -486,7 +499,7 @@ fun TitleDetailScreen(
         mutableStateOf(detail?.seasons?.orderedForDisplay()?.firstOrNull()?.seasonNumber ?: 1)
     }
 
-    if (showScheduleSheet || editingOuting != null) {
+    if (scheduleOpening != null) {
         androidx.compose.runtime.LaunchedEffect(Unit) { onRequestNotificationPermission() }
     }
 
@@ -520,14 +533,14 @@ fun TitleDetailScreen(
                         ScheduledOutingBanner(
                             outing = outing,
                             onShare = onShareOutingPlans?.let { share -> { share(outing.id) } },
-                            onEdit = { editingOuting = outing },
+                            onEdit = { openSchedule(outing.id) },
                             onCancel = { onCancelOuting(outing.id) },
                             modifier = Modifier.padding(bottom = 16.dp),
                         )
                     }
 
                     if (detail.type == MediaType.MOVIE && detail.scheduledOuting == null) {
-                        TextButton(onClick = { editingOuting = null; showScheduleSheet = true }, modifier = Modifier.padding(bottom = 4.dp)) {
+                        TextButton(onClick = { openSchedule(null) }, enabled = !preparingSchedule, modifier = Modifier.padding(bottom = 4.dp)) {
                             Icon(Icons.Filled.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text(
                                 if (detail.status == LibraryStatus.WATCHED) "Plan a cinema trip" else "I've got tickets",
@@ -810,25 +823,32 @@ fun TitleDetailScreen(
         }
     }
 
-    if (showScheduleSheet || editingOuting != null) {
+    if (preparingSchedule) AlertDialog(onDismissRequest = {}, title = { Text("Opening tickets…") },
+        text = { CircularProgressIndicator() }, confirmButton = {})
+    if (scheduleError != null || scheduleOriginal?.isFailure == true) AlertDialog(
+        onDismissRequest = { scheduleError = null; if (scheduleOriginal?.isFailure == true) scheduleOpening = null },
+        title = { Text("Couldn't open tickets") },
+        text = { Text(scheduleError ?: "This saved form belongs to another session. Close it and reopen the outing.") },
+        confirmButton = { if (scheduleError != null) TextButton(onClick = { openSchedule(scheduleTarget) }) { Text("Retry") } },
+        dismissButton = { TextButton(onClick = { scheduleError = null; if (scheduleOriginal?.isFailure == true) scheduleOpening = null }) { Text("Close") } },
+    )
+    if (scheduleOpening != null && scheduleOriginal?.isSuccess == true) {
+        val opening = checkNotNull(scheduleOpening)
+        val openingOwner = viewingOwnerId
+        val openingTitle = viewingTitleId
         OutingScheduleSheet(
             defaultRuntimeMinutes = detail?.runtime,
-            initial = editingOuting,
-            onDismiss = { showScheduleSheet = false; editingOuting = null },
+            initial = scheduleOriginal.getOrNull(),
+            onDismiss = { if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = null },
             onSave = { showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes ->
-                val outing = editingOuting
-                if (outing != null) {
-                    onEditOuting(outing.id, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
-                } else {
-                    onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
-                }
+                onSaveSchedule(opening, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
             },
             venueSuggestions = venueSuggestions,
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
             onEditVenueNote = onEditVenueNote,
             onManageTicket = onViewTicket?.let { open -> { outing ->
-                showScheduleSheet = false; editingOuting = null
+                scheduleOpening = null
                 open(outing, detail?.title ?: "Cinema outing")
             } },
         )

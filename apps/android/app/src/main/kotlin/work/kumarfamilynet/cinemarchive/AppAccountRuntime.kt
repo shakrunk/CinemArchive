@@ -277,6 +277,7 @@ class AppAccountRuntime(
         alarmScheduler = alarmScheduler,
         moviegoingPreferences = moviegoingPreferences,
         lifecycle = outingLifecycle,
+        scheduleCommands = work.kumarfamilynet.cinemarchive.data.OutingScheduleCommands(database, outbox, importOwner, ::isCurrent),
     )
 
     val outingPlansRepository = work.kumarfamilynet.cinemarchive.data.OutingPlansRepository.create(

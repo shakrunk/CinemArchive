@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android now offers global keyboard search and owner actions, including ticket scheduling with preserved drafts, visible retries and durable duplicate prevention.
 - Android title additions now save tags and previously watched season progress through one durable atomic graph command, preserving undated history and catalog metadata.
 - Android now logs pre-platform watches for a series or season, preserving existing history and offering durable retry, conflict review, discard and original-request export from Profile.
 - Android provider imports now save new titles, supplied viewing dates and provider identity as one durable operation, with honest partial-failure reporting and account-safe document picking.

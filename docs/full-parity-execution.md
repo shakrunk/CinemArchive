@@ -166,6 +166,12 @@ Material You colors, APK updating, OS permission UI, predictive back, exact alar
 - Full native gate passed 989 JVM cases across 126 suites, zero failures/errors and three existing live-service skips, plus all four navigation/list device cases. Eight migration fixtures initially omitted registration of the pending Room 21 migration; adding the missing registration resolved them. The final list label/sync refinements passed the 25 focused cases and compiler, APK/test APK assembly and lint. These checks do not establish live multi-device acceptance.
 - Provider-import durability, bulk pre-platform/Noir controls and global command search continue in separate batches. Catalog-source audit also confirms missing RT links/accolades and fetched credit profile/count fields, despite existing storage/display support. No push, deployment or production writes occurred.
 
+## Catalog, provider admission and bulk watching checkpoint
+
+- Catalog enrichment ea01266 preserves RT links, accolades, Bechdel values and fetched credit profiles/counts during title additions; older queued graphs do not clear enrichment. Provider admission 06eb77a durably queues complete new-title graphs and provenance with exact retries. Bulk watching d0dd552 implements series/season pre-platform history, captured progress guards and global recovery/export through Room 21.
+- Compiler, debug APK/test APK assembly and lint pass. The final JVM gate passes 1,028 cases across 132 suites with zero failures/errors and three existing live-service skips. Device acceptance passes all 11 relevant cases across the two runs: bulk watching four, provider import three and command search four. Search test fixture corrections passed in the final run.
+- Parity trailers pass all 140 commits through d0dd552. Remaining active batches are Noir episode logging, command search/scheduling and existing-title provider merging. Sonnet remains dismissed; its watcher is disabled. No push, release, deployment or production write occurred.
+
 ## Remaining work
 
 Full parity remains incomplete. The acceptance inventory above stays authoritative; the following are the largest unfinished implementation groups, not a replacement or reduction of the goal:

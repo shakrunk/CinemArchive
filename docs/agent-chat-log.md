@@ -17,10 +17,10 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 ## Current continuation claims
 
 - Sonnet remains dismissed and its watcher disabled. Root owns Git writes and the sole native test runner.
-- Root: navigation 0fc435e and older list recovery b6b16e3 committed. Owns catalog enrichment, integration and final verification.
+- Root: navigation 0fc435e and older list recovery b6b16e3 committed. Catalog enrichment ea01266 is committed; owns rich add flows, integration and final verification.
 - Navigation worker: global command search and safe ticket scheduling are active; customization is committed.
-- Detail worker: bulk pre-platform watching, then Noir controls. Room 21 storage foundation and complete behavior are being integrated.
-- Provider worker: atomic new-title provider import/provenance first, then optimistic existing-title merge/recovery. Complete new-title cutover is being integrated.
+- Detail worker: bulk pre-platform watching d0dd552 is committed. Owns bounded Noir episode logging; pin/filter follow-up remains open.
+- Provider worker: atomic new-title provider import/provenance 06eb77a is committed. Owns bounded existing-title merge/recovery.
 - Previous verified restore/lifecycle checkpoint is f628d9c with evidence committed in 7bab6dc. Full parity remains incomplete; see the [execution inventory](full-parity-execution.md).
 - No push, release, deployment or production write occurred.
 

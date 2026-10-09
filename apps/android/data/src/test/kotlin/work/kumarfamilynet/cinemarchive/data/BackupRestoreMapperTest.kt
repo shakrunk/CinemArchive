@@ -129,6 +129,32 @@ class BackupRestoreMapperTest {
         assertEquals(listOf("titles[0].physicalMedia[1]", "titles[0].physicalMedia[2]"), paths(m, Kind.UNMAPPED))
     }
 
+    @Test fun unrepresentableNestedCollectionTextIsReportedWithoutChangingArchive() {
+        for (invalid in listOf("a\u0000b", "\uD800", "\uDC00", "\uD800x")) {
+            val nested = JSONObject().put("future", JSONArray().put(JSONObject().put("label", invalid)))
+            val media = JSONArray().put(nested)
+            val mapped = map(base().put("physicalMedia", media).put("addedAt", at))
+            assertFalse(values(mapped).has("physical_media"))
+            assertNull(mapped.entity!!.physicalMediaJson)
+            assertEquals(listOf("titles[0].physicalMedia[0].future[0].label"), paths(mapped, Kind.LOSSY))
+            assertEquals(invalid, nested.getJSONArray("future").getJSONObject(0).getString("label"))
+        }
+        val badKey = JSONObject().put("bad\u0000key", 1)
+        val mapped = map(base().put("physicalMedia", JSONArray().put(badKey)).put("addedAt", at))
+        assertEquals(listOf("titles[0].physicalMedia[0][object key]"), paths(mapped, Kind.LOSSY))
+        assertFalse(values(mapped).has("physical_media"))
+        assertTrue(badKey.has("bad\u0000key"))
+    }
+
+    @Test fun validUnicodeCollectionKeysAndValuesRemainExact() {
+        val text = "Archive \uD83C\uDFAC"
+        val media = JSONArray().put(JSONObject().put(text, text))
+        val mapped = map(base().put("physicalMedia", media).put("addedAt", at))
+        assertTrue(mapped.issues.isEmpty())
+        assertEquals(text, values(mapped).getJSONArray("physical_media").getJSONObject(0).getString(text))
+        assertEquals(text, JSONArray(mapped.entity!!.physicalMediaJson).getJSONObject(0).getString(text))
+    }
+
     @Test fun operationShapeAndAuthorityExclusion() {
         val row = base().put("user_id", "x").put("userId", "x").put("ticketAttachment", JSONObject()).put("operationId", "op")
             .put("shareToken", "t").put("updated_at", "2000-01-01T00:00:00Z")

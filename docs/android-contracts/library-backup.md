@@ -114,7 +114,7 @@ the input. No parser/serializer is duplicated in the mapper.
   both outputs and reported `LOSSY` with its path. `releaseDate` must be `YYYY-MM-DD`; datetimes are not truncated.
 * `addedAt` must be an ISO-8601 instant with offset and is kept verbatim. Missing or date-only values are not
   reinterpreted in any timezone: the frozen admission time is used and reported `LOSSY`.
-* `physicalMedia` is the complete array verbatim (all raw element fields, regenerated element ids from the plan).
+* `physicalMedia` retains the complete array (all raw element fields, regenerated element ids from the plan) when its text is representable by PostgreSQL JSONB. A NUL or unpaired surrogate in a nested value or key produces a path-specific LOSSY report and omits the whole field from both the operation and Room draft; the source archive remains unchanged.
   Absent `inHomeCollection` is `false` (server NOT NULL default).
 * Reported by path, never written: `DEFERRED` seasons, viewings, cast, crew (non-empty), plan outings
   (completed outings need a reviewed restore contract and are never downgraded) and lists; `UNMAPPED` `ext` and

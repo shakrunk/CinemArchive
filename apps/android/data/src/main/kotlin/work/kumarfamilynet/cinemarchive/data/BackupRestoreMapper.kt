@@ -186,12 +186,17 @@ object BackupRestoreMapper {
         val media = row.opt("physicalMedia")
         if (!isNull(media)) {
             if (media is JSONArray) {
-                val copy = detached(media) as JSONArray
-                for (i in 0 until copy.length()) {
-                    if (copy.opt(i) !is JSONObject) issues.add(Issue("$base.physicalMedia[$i]", Kind.UNMAPPED, "Not an object; kept verbatim, not interpreted."))
+                val invalidText = invalidJsonText(media, "$base.physicalMedia")
+                if (invalidText != null) {
+                    lossy(issues, invalidText, "NUL or an unpaired Unicode surrogate cannot be stored in server JSON; physicalMedia left unmapped and retained in the archive.")
+                } else {
+                    val copy = detached(media) as JSONArray
+                    for (i in 0 until copy.length()) {
+                        if (copy.opt(i) !is JSONObject) issues.add(Issue("$base.physicalMedia[$i]", Kind.UNMAPPED, "Not an object; kept verbatim, not interpreted."))
+                    }
+                    values.put("physical_media", copy)
+                    physicalMediaJson = LibraryBackupCodec.encodeJsonValue(copy)
                 }
-                values.put("physical_media", copy)
-                physicalMediaJson = LibraryBackupCodec.encodeJsonValue(copy)
             } else lossy(issues, "$base.physicalMedia", "Expected an array; left unmapped.")
         }
 
@@ -235,6 +240,26 @@ object BackupRestoreMapper {
     }
 
     private val STATUSES = setOf("watched", "watchlist", "watching", "dropped")
+
+    /** PostgreSQL jsonb validates text in both keys and values, including opaque nested data. */
+    private fun invalidJsonText(value: Any?, path: String): String? = when (value) {
+        is String -> path.takeIf { !validJsonText(value) }
+        is JSONObject -> keysOf(value).firstNotNullOfOrNull { key ->
+            if (!validJsonText(key)) "$path[object key]" else invalidJsonText(value.get(key), "$path.$key")
+        }
+        is JSONArray -> (0 until value.length()).firstNotNullOfOrNull { invalidJsonText(value.get(it), "$path[$it]") }
+        else -> null
+    }
+
+    private fun validJsonText(value: String): Boolean {
+        var index = 0
+        while (index < value.length) {
+            val char = value[index++]
+            if (char == '\u0000' || char.isLowSurrogate()) return false
+            if (char.isHighSurrogate() && (index == value.length || !value[index++].isLowSurrogate())) return false
+        }
+        return true
+    }
 
     /** Clone containers, retaining immutable scalar objects (including exact BigInteger/BigDecimal). */
     private fun detached(value: Any?): Any? = when (value) {

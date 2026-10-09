@@ -37,7 +37,11 @@ class CreditRefreshRepository(
             val queuedParents = enqueueMissingEpisodeCatalog(database, outbox, titleId, ownerId, fresh)
             val oldByIdentity = old.associateBy { it.identity }
             val next = mutableListOf<CreditRow>()
-            fun add(row: CreditRow) { next += row.copy(id = oldByIdentity[row.identity]?.id ?: UUID.randomUUID().toString()) }
+            fun add(row: CreditRow) {
+                val previous = oldByIdentity[row.identity]
+                next += row.copy(id = previous?.id ?: UUID.randomUUID().toString(),
+                    profileUrl = previous?.profileUrl, episodeCount = previous?.episodeCount)
+            }
             fresh.cast.distinctBy { it.tmdbPersonId }.forEach {
                 add(CreditRow("title_cast", "", titleId, titleId, it.tmdbPersonId, it.name, it.characterName, it.order))
             }

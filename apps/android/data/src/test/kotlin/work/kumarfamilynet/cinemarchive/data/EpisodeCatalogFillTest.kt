@@ -215,4 +215,38 @@ class EpisodeCatalogFillTest {
             assertEquals("Latest writer",db.personCreditsDao().observeEpisodeCrew().first().single { it.episodeId==episodeId }.name)
         } finally { db.close() }
     }
+
+    @Test fun parentFillRetainsExistingSeasonProfilesForUnchangedAndUpdatedCredits() = runBlocking {
+        for (changedName in listOf(false, true)) {
+            val db = database()
+            try {
+                seed(db)
+                val server = Server(); server.seedCoarse()
+                val outbox = box(db, server.writer())
+                val original = SeasonCastEntity(UUID.randomUUID().toString(), titleId, coarseId, 84,
+                    "Stored guest", null, 0, "https://image/retained", 0)
+                db.personCreditsDao().upsertSeasonCast(listOf(original))
+                val name = if (changedName) "Updated guest" else original.name
+                val source = fresh(listOf(MediaSeason(1, 3, 2020, listOf(MediaEpisode(1, "Episode", null, 30)),
+                    cast = listOf(MediaCredit(84, name, null, 0)))))
+                // Exercise the production parent-fill path independently of the ordinary refresh.
+                outbox.atomically { assertTrue(enqueueMissingEpisodeCatalog(db, outbox, titleId, owner, source)) }
+                outbox.flush()
+                assertTrue(db.outboxDao().getPending().isEmpty())
+                val saved = db.personCreditsDao().observeSeasonCast().first().single()
+                assertEquals(name, saved.name); assertEquals("https://image/retained", saved.profileUrl); assertEquals(0, saved.episodeCount)
+                if (changedName) assertNotEquals(original.id, saved.id) else assertEquals(original.id, saved.id)
+                assertEquals(if (changedName) 2 else 1, server.requests.size)
+                server.requests.map { JSONObject(it).getJSONArray("p_operations") }.forEach { operations ->
+                    for (index in 0 until operations.length()) {
+                        val operation = operations.getJSONObject(index)
+                        if (operation.getString("table") == "season_cast") {
+                            assertFalse(operation.getJSONObject("values").has("profile_url"))
+                            assertFalse(operation.getJSONObject("values").has("episode_count"))
+                        }
+                    }
+                }
+            } finally { db.close() }
+        }
+    }
 }

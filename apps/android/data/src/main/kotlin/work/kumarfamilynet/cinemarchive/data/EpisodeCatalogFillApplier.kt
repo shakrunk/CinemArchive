@@ -25,7 +25,8 @@ class EpisodeCatalogFillApplier(private val database: LibraryDatabase, private v
             // A newer local refresh/removal retains priority over this fetched snapshot.
             if (pendingCreditOps.any { it.getString("table") == row.table && sameCommandJson(it.getJSONObject("key"), row.key()) }) return
             val previous = old.firstOrNull { it.identity == row.identity }
-            val next = row.copy(id = previous?.id ?: UUID.randomUUID().toString())
+            val next = row.copy(id = previous?.id ?: UUID.randomUUID().toString(),
+                profileUrl = previous?.profileUrl, episodeCount = previous?.episodeCount)
             if (next != previous) changed += next
         }
         for (index in 0 until catalog.length()) {

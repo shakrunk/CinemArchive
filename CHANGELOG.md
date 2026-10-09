@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android credit refresh now preserves synced profile images and episode counts when updating names, filling missing seasons or reconciling server identities.
 - Android backup mapping now reports nested collection text that server storage cannot represent while preserving the original archive; installed-app restore remains in progress.
 - Android now retains synced credit profiles, episode counts and episode watch/review color modes offline, including safe backfill that preserves pending edits.
 - Android Discover now browses movie and TV feeds by genre and loads additional pages, retaining results on retry and ignoring outdated requests.

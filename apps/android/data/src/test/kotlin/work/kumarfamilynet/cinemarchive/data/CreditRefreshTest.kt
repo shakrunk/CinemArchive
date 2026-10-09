@@ -119,6 +119,55 @@ class CreditRefreshTest {
         } finally { db.close() }
     }
 
+    @Test fun retainedProfilesAndCountsSurviveNoOpChangedRefreshAndCanonicalRekeyWithoutBeingSent() = runBlocking {
+        val db = database()
+        try {
+            seed(db)
+            val cast = db.titleCastDao().observeAllCast().first().single { it.tmdbPersonId == 1 }
+                .copy(profileUrl = "https://image/cast", episodeCount = 0)
+            val crew = TitleCrewEntity(UUID.randomUUID().toString(), titleId, 7, "Director", "Director", "Directing", "https://image/crew")
+            val guest = db.personCreditsDao().observeSeasonCast().first().single()
+                .copy(profileUrl = "https://image/guest", episodeCount = 8)
+            db.titleCastDao().upsertAll(listOf(cast)); db.titleCrewDao().upsertAll(listOf(crew))
+            db.personCreditsDao().upsertSeasonCast(listOf(guest))
+            val source = fresh(cast = (1..20).map { MediaCredit(it, "Person $it", null, it) }, seasons = listOf(
+                MediaSeason(0, 1, 2020, listOf(MediaEpisode(3, "Special", null, 30,
+                    crew = listOf(MediaCrewCredit(91, "Episode person", "Writer", null)))),
+                    cast = listOf(MediaCredit(90, "Season person", null, 0))),
+            )).copy(crew = listOf(MediaCrewCredit(7, "Director", "Director", "Directing")))
+            val box = outbox(db, object : RemoteMutationWriter {
+                override suspend fun push(entry: OutboxEntity) = PushResult.Applied(receipt(entry))
+            })
+            assertFalse(repo(db, box, source).refresh(titleId))
+            assertTrue(db.outboxDao().getPending().isEmpty())
+            val changed = source.copy(
+                cast = source.cast.map { if (it.tmdbPersonId == 1) it.copy(name = "Updated actor") else it },
+                crew = source.crew.map { it.copy(name = "Updated director") },
+                seasons = source.seasons.map { it.copy(cast = it.cast.map { person -> person.copy(name = "Updated guest") }) },
+            )
+            assertTrue(repo(db, box, changed).refresh(titleId))
+            val pending = db.outboxDao().getPending().single()
+            val operations = JSONObject(pending.payloadJson).getJSONArray("operations")
+            assertEquals(4, operations.length()) // Title barrier plus only the three changed people.
+            for (index in 1 until operations.length()) {
+                val values = operations.getJSONObject(index).getJSONObject("values")
+                assertFalse(values.has("profile_url")); assertFalse(values.has("episode_count"))
+            }
+            assertEquals(cast.profileUrl, db.titleCastDao().observeAllCast().first().single { it.tmdbPersonId == 1 }.profileUrl)
+            assertEquals(0, db.titleCastDao().observeAllCast().first().single { it.tmdbPersonId == 1 }.episodeCount)
+            box.flush()
+            assertTrue(db.outboxDao().getPending().isEmpty())
+            val savedCast = db.titleCastDao().observeAllCast().first().single { it.tmdbPersonId == 1 }
+            val savedCrew = db.titleCrewDao().observeAllCrew().first().single()
+            val savedGuest = db.personCreditsDao().observeSeasonCast().first().single()
+            assertNotEquals(cast.id, savedCast.id); assertNotEquals(crew.id, savedCrew.id); assertNotEquals(guest.id, savedGuest.id)
+            assertEquals("Updated actor", savedCast.name); assertEquals("https://image/cast", savedCast.profileUrl); assertEquals(0, savedCast.episodeCount)
+            assertEquals("Updated director", savedCrew.name); assertEquals("https://image/crew", savedCrew.profileUrl)
+            assertEquals("Updated guest", savedGuest.name); assertEquals("https://image/guest", savedGuest.profileUrl); assertEquals(8, savedGuest.episodeCount)
+            assertFalse(repo(db, box, changed).refresh(titleId))
+        } finally { db.close() }
+    }
+
     @Test fun staleOwnerOrDeletedTitleDuringFetchCannotSaveOrResurrectCredits() = runBlocking {
         val db=database()
         try {
@@ -155,6 +204,8 @@ class CreditRefreshTest {
             repo(db,box,fresh()).refresh(titleId)
             val first=db.outboxDao().getPending().single()
             repo(db,box,fresh(cast=(1..59).map { MediaCredit(it,"Latest $it",null,it) })).refresh(titleId)
+            val newer = db.titleCastDao().observeAllCast().first().single { it.tmdbPersonId == 21 }
+            db.titleCastDao().upsertAll(listOf(newer.copy(profileUrl = "https://image/newer", episodeCount = 0)))
             val applier=CreditReceiptApplier(db,ownerId)
             val immutableCommands=db.outboxDao().getPending().associate { it.id to it.payloadJson }
             db.withCreditTransaction { applier.apply(first,receipt(first)) }
@@ -165,6 +216,8 @@ class CreditRefreshTest {
             val later=db.outboxDao().getPending().single()
             assertEquals(immutableCommands.getValue(later.id),later.payloadJson)
             val canonicalId=rows.single { it.tmdbPersonId==21 }.id
+            assertEquals("https://image/newer", rows.single { it.tmdbPersonId == 21 }.profileUrl)
+            assertEquals(0, rows.single { it.tmdbPersonId == 21 }.episodeCount)
             assertFalse(JSONObject(later.payloadJson).getJSONArray("protectedKeys").toString().contains(canonicalId))
             val tombstone=JSONObject().put("entity_type","tombstone").put("entity_id",canonicalId).put("parent_id",JSONObject.NULL).put("payload",JSONObject().put("entityType","title_cast"))
             assertTrue(db.withCreditTransaction { isProtectedFromPull(tombstone,box.pendingEntityKeys()) })

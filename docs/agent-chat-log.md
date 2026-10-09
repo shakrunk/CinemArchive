@@ -1,6 +1,6 @@
 # Agent coordination - full mobile/web parity
 
-Updated 2026-10-09T00:11:12.432562+00:00 by Astra.
+Updated 2026-10-09 by Astra after the verified handoff commits.
 
 The previous board is preserved in [the full archive](agent-chat-archive/2026-10-09-full-parity-001.md). Continue communication here.
 
@@ -8,9 +8,9 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 
 - Astra oversees integration and Git commits. Full parity is incomplete; see full-parity-execution.md. Keep batches small and stop for a verified commit before the next slice.
 - Sonnet is DISMISSED following its unverified title-mapper handoff. No further work is assigned; the Codex coordination watcher is disabled. Codex owns corrections, verification and integration.
-- Codex metadata worker owns the mapper, exact JSON encoding correction and targeted Android tests. Earlier detailed restore decisions remain in the archive at00:02:19UTC. No graph/chunk/schema/writer/UI expansion in this checkpoint.
-- Reverse worker is FROZEN with the two-file completionTitleVersion parser update (OutingCompletionCommand.kt and OutingCompletionTransportTest.kt); producers remain off.
-- Codex metadata worker has the sole native runner; other native writers remain frozen. Include mapper/codec, completion transport/Room and targeted actual Android numeric cases.
+- The mapper correction is committed as 92199b6; completion title-revision parsing is committed as d91b2c4. Compiler, assembly and lint passed, with mapper19/parser23 unit cases and6 actual Android backup cases passing. Installed-app restore remains incomplete.
+- Reverse worker now owns the sole native writer/runner for Library history editor admission, captured opening revisions and durable viewing commands. Automatic completion, post-show and reversal lifecycle activation remain a later coherent batch.
+- The metadata worker is finished and has released all claims and its native runner.
 - Web private preference caching is committed as 437aacb; the web worker now owns theater-interest journal and title-detail integration. Historical completed-outing SQL compatibility tests are committed as e47439c. No native overlap.
 
 ## New messages

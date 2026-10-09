@@ -88,7 +88,7 @@ private const val PAGE_SIZE = 500
 // 8: title tags, studios, and franchise metadata used by Library filters and grouping.
 // 9: season cast and episode crew, gated by the RPC's explicit personCreditsVersion marker.
 // 10: rich title fields. 11: credit profiles/counts and watch/review color modes.
-private const val SYNC_SCHEMA_VERSION = 12
+private const val SYNC_SCHEMA_VERSION = 13
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -166,7 +166,7 @@ class LibrarySyncRepository(
         val session = authRepository.currentSession() ?: return
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
         // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
-        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "outing_lifecycle:").any(key::startsWith) }) {
+        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
             dataStore.edit { it[cursorKey] = EPOCH }
         }
         // Push first (best effort — offline just leaves entries queued and protected below).
@@ -419,7 +419,7 @@ class LibrarySyncRepository(
             // Carry forward whatever the RPC doesn't send — see toTitleEntity's kdoc.
             titleDao.upsertAll(listOf(payload.toTitleEntity(titleDao.getById(payload.getString("id")))))
         }
-        byType["season"]?.forEach { deferred.addSeason(it.payload().toSeasonEntity()) }
+        byType["season"]?.forEach { deferred.addSeason(it.payload().toSeasonEntity(it.getString("updated_at"))) }
         byType["episode"]?.forEach { deferred.addEpisode(it.payload()) }
         // Older servers omit these keys; preserve retained values until an explicit clear.
         // Read each old-server collection at most once per page, not once per credit.
@@ -605,13 +605,14 @@ class LibrarySyncRepository(
         tmdbPersonId = getInt("tmdbPersonId"), name = getString("name"), job = getString("job"),
     )
 
-    private fun JSONObject.toSeasonEntity() = SeasonEntity(
+    private fun JSONObject.toSeasonEntity(revision: String) = SeasonEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         seasonNumber = getInt("seasonNumber"),
         episodeCount = getInt("episodeCount"),
         episodesWatched = getInt("episodesWatched"),
         airYear = optIntOrNull("airYear"),
+        updatedAt = revision.also { java.time.Instant.parse(it) },
     )
 
     private fun JSONObject.toEpisodeEntity(seasonId: String) = EpisodeEntity(

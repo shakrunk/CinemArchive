@@ -38,6 +38,7 @@ class SupabaseRemoteMutationWriter(
                     "delete" -> deleteTitle(payload)
                     else -> pushTitleUpdate(payload)
                 }
+                EPISODE_BULK -> EpisodeBulkTransport(client, SessionSource(sessionProvider)).push(entry)
                 "episode_watch_event" -> if (entry.operation == "delete") deleteWatchEvent(payload) else upsertWatchEvent(payload)
                 "episode_rating" -> upsertRating(payload)
                 "episode_review" -> upsertReview(payload)

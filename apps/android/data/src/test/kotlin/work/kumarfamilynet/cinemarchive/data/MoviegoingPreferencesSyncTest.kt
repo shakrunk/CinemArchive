@@ -65,7 +65,7 @@ class MoviegoingPreferencesSyncTest {
         page = JSONArray().put(title(false)); sync().syncNow(); assertEquals(11, prefs.data.first()[version])
         page = JSONArray().put(title()).put(note()).put(interest()); sync().syncNow()
         assertEquals(listOf("1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z"), since)
-        assertEquals(12, prefs.data.first()[version]); assertEquals("note", db.venueNoteDao().get("Cinema")!!.serverId)
+        assertEquals(13, prefs.data.first()[version]); assertEquals("note", db.venueNoteDao().get("Cinema")!!.serverId)
         assertEquals(stamp, db.theaterInterestDao().observeAll().first().single().serverUpdatedAt)
         assertEquals("WATCHLIST", db.titleDao().getById("title")!!.status)
         assertTrue(db.cinemaOutingDao().observeAllOutings().first().isEmpty())
@@ -103,7 +103,7 @@ class MoviegoingPreferencesSyncTest {
         failAfter = 2
         assertTrue(runCatching { sync().syncNow() }.isFailure); assertEquals(11, prefs.data.first()[version])
         failAfter = null; page = JSONArray().put(title()).put(interest()); sync().syncNow()
-        assertEquals("1970-01-01T00:00:00Z", since.last()); assertEquals(12, prefs.data.first()[version])
+        assertEquals("1970-01-01T00:00:00Z", since.last()); assertEquals(13, prefs.data.first()[version])
         page = JSONArray().put(deleted("title", "title")); sync().syncNow()
         assertTrue(db.theaterInterestDao().observeAll().first().isEmpty())
     }

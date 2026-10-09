@@ -24,7 +24,8 @@ class TitleMetadataApplier(private val database: LibraryDatabase, private val ow
 internal fun overlayTitleIntents(base: TitleEntity, pending: List<OutboxEntity>, ownerId: String): TitleEntity =
     pending.fold(base) { row, entry ->
         val payload = JSONObject(entry.payloadJson)
-        if (entry.entityType == "viewing") row.withTitleMetadata(titleMetadataPatch(checkNotNull(viewingTitleEntry(entry, ownerId)), ownerId))
+        if (entry.entityType == EPISODE_BULK) row.withTitleMetadata(titleMetadataPatch(checkNotNull(bulkTitleEntry(entry)), ownerId))
+        else if (entry.entityType == "viewing") row.withTitleMetadata(titleMetadataPatch(checkNotNull(viewingTitleEntry(entry, ownerId)), ownerId))
         else if (payload.has(TITLE_METADATA_DATA)) row.withTitleMetadata(titleMetadataPatch(entry, ownerId))
         else if (entry.operation == "update") {
             val patch = JSONObject()
@@ -37,6 +38,7 @@ internal fun overlayTitleIntents(base: TitleEntity, pending: List<OutboxEntity>,
 
 internal fun pendingTitleIntents(queue: List<OutboxEntity>, titleId: String): List<OutboxEntity> =
     queue.filter { (it.entityType == "title" && it.entityId == titleId) || hasViewingTitleEffect(it, titleId) ||
+        (it.entityType == EPISODE_BULK && it.entityId == titleId && bulkTitleEntry(it) != null) ||
         (it.entityType in setOf("outing_completion", "outing_reversal") && JSONObject(it.payloadJson).optString("titleId") == titleId) }
 
 internal suspend fun applyCurrentViewingTitle(database: LibraryDatabase, titleId: String, current: JSONObject?,

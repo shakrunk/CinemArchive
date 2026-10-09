@@ -80,6 +80,8 @@ data class SeasonEntity(
     val episodeCount: Int,
     val episodesWatched: Int,
     val airYear: Int?,
+    /** Observed server revision only; null on older/local-only seasons. */
+    val updatedAt: String? = null,
 )
 
 @Entity(

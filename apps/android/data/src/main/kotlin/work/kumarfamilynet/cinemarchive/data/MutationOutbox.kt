@@ -137,6 +137,7 @@ class MutationOutbox(
     suspend fun pendingEntityKeys(): Set<String> = buildSet {
         val entries = outboxDao.getPending()
         addAll(membershipProtectionKeys(entries))
+        addAll(bulkProtectionKeys(entries))
         entries.forEach { entry ->
             add(pendingKey(entry.entityType, entry.entityId))
             if (entry.entityType == "title" && runCatching { JSONObject(entry.payloadJson).has(TITLE_METADATA_DATA) }.getOrDefault(false)) {

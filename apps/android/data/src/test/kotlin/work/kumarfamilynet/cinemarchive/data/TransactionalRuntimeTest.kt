@@ -624,6 +624,51 @@ class TransactionalRuntimeTest {
         assertNull(cleared.originalLanguage); assertNull(cleared.releaseDate); assertNull(cleared.imdbRating)
     }
 
+    @Test fun coarseSeasonRevisionBackfillsFromEnvelopeAndPendingBulkSurvivesInterruptedAck() = runBlocking {
+        val db = memoryDb()
+        val id = "10000000-0000-4000-8000-000000000010"
+        val titleId = "10000000-0000-4000-8000-000000000002"
+        val owner = "10000000-0000-4000-8000-000000000001"
+        db.titleDao().upsertAll(listOf(title(titleId).copy(type = "TV")))
+        db.seasonDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.SeasonEntity(id, titleId, 1, 10, 3, 2020)))
+        val file = tmpFile("season-revision")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val schema = intPreferencesKey("sync_schema_version")
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[schema] = 12; it[cursor] = "2026-10-08T00:00:00Z" }
+        val revision = "2026-01-02T03:04:05.123456Z"
+        fun page() = JSONArray().put(JSONObject().put("entity_type", "season").put("entity_id", id).put("updated_at", revision)
+            .put("payload", JSONObject().put("id", id).put("titleId", titleId).put("seasonNumber", 1).put("episodeCount", 10)
+                .put("episodesWatched", 2).put("updatedAt", "2099-01-01T00:00:00Z")))
+        val writer = ScriptedWriter { PushResult.Retry("offline") }
+        val queue = outbox(db, writer)
+        val http = SyncHttp(ArrayDeque(listOf(page(), page(), page())))
+        val sync = syncRepository(db, queue, http, file, prefs)
+        sync.syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+        val observed = db.seasonDao().observeSeasons(titleId).first().single()
+        assertEquals(revision, observed.updatedAt)
+        db.seasonDao().upsertAll(listOf(observed.copy(episodesWatched = 10)))
+        queue.enqueue("episode_bulk", titleId, EPISODE_BULK_COMMAND, JSONObject().put("version", 1).put("ownerId", owner).put("titleId", titleId)
+            .put("seasonNumber", 1).put("watches", JSONArray()).put("seasons", JSONArray().put(JSONObject().put("id", id).put("count", 10).put("before", 2).put("baseline", revision))))
+        // Mark the current schema to prove the rewind is due to this command, not the upgrade.
+        prefs.edit { it[schema] = 13; it[cursor] = "2026-10-08T00:00:00Z" }
+        sync.syncNow()
+        assertEquals(10, db.seasonDao().observeSeasons(titleId).first().single().episodesWatched)
+        writer.next = {
+            assertEquals("1970-01-01T00:00:00Z", runBlocking { prefs.data.first()[cursor] })
+            PushResult.Success
+        }
+        val interrupted = syncRepository(db, queue, http, file, prefs, pushPending = {
+            queue.flush(); throw kotlinx.coroutines.CancellationException("Process ended after ACK")
+        })
+        try { interrupted.syncNow(); fail("Expected interruption") } catch (_: kotlinx.coroutines.CancellationException) { }
+        assertTrue(db.outboxDao().getPending().isEmpty())
+        assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+        sync.syncNow()
+        assertEquals(2, db.seasonDao().observeSeasons(titleId).first().single().episodesWatched)
+    }
+
     @Test fun viewingBackfillUsesEnvelopeRevisionWithoutOverwritingPendingHistory() = runBlocking {
         val db = memoryDb()
         db.titleDao().upsertAll(listOf(title("movie")))
@@ -677,7 +722,7 @@ class TransactionalRuntimeTest {
         sync.syncNow()
         assertEquals(List(3) { "1970-01-01T00:00:00Z" }, http.requests.map { it.getString("p_since") })
         assertEquals(listOf("Backfilled"), db.titleDao().getById("t1")!!.tags)
-        assertEquals(12, prefs.data.first()[intPreferencesKey("sync_schema_version")])
+        assertEquals(13, prefs.data.first()[intPreferencesKey("sync_schema_version")])
         sync.syncNow()
         assertEquals("2026-01-01T00:00:00Z", http.requests.last().getString("p_since"))
     }

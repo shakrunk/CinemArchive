@@ -12,6 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         TitleEntity::class,
         SeasonEntity::class,
+        EpisodeBulkAdmissionEntity::class,
         EpisodeEntity::class,
         EpisodeWatchEventEntity::class,
         EpisodeRatingEntity::class,
@@ -33,7 +34,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TicketAssociationEntity::class,
         TicketIntentEntity::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -41,6 +42,7 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun titleDao(): TitleDao
     abstract fun titleReconcileDao(): TitleReconcileDao
     abstract fun seasonDao(): SeasonDao
+    abstract fun episodeBulkAdmissionDao(): EpisodeBulkAdmissionDao
     abstract fun episodeDao(): EpisodeDao
     abstract fun episodeWatchEventDao(): EpisodeWatchEventDao
     abstract fun episodeRatingDao(): EpisodeRatingDao
@@ -61,6 +63,13 @@ abstract class LibraryDatabase : RoomDatabase() {
     abstract fun ticketAttachmentDao(): TicketAttachmentDao
 
     companion object {
+        internal val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE seasons ADD COLUMN updatedAt TEXT")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `episode_bulk_admissions` (`operationId` TEXT NOT NULL, `payloadJson` TEXT NOT NULL, PRIMARY KEY(`operationId`))")
+            }
+        }
+
         const val LEGACY_DATABASE_NAME = "cinemarchive.db"
 
         /** Adds titles.releaseDate (see Entities.kt's TitleEntity kdoc). A real ALTER TABLE,
@@ -246,7 +255,7 @@ abstract class LibraryDatabase : RoomDatabase() {
             LibraryDatabase::class.java,
             name,
         )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
             // Safety net for any future version bump that ships without its own explicit
             // Migration — see MIGRATION_4_5's kdoc for why bumps should add one instead of
             // relying on this now that real user data lives locally.
@@ -267,7 +276,7 @@ abstract class LibraryDatabase : RoomDatabase() {
          */
         fun createForRecovery(context: Context, name: String): LibraryDatabase =
             Room.databaseBuilder(context, LibraryDatabase::class.java, name)
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
                 .build()
     }
 }

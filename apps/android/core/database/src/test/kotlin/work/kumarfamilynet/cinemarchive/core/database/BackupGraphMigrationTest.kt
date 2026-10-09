@@ -35,7 +35,7 @@ class BackupGraphMigrationTest {
             old.execSQL("INSERT INTO mutation_outbox (id,entityType,entityId,operation,payloadJson,createdAt,attemptCount) VALUES ('pending','episode_review','review','review','{\"immutable\":true}',1,4)")
             old.version = 18
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_18_19, LibraryDatabase.MIGRATION_19_20).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_18_19, LibraryDatabase.MIGRATION_19_20, LibraryDatabase.MIGRATION_20_21).build()
         try {
             val cast = upgraded.titleCastDao().observeAllCast().first().single()
             val crew = upgraded.titleCrewDao().observeAllCrew().first().single()

@@ -83,7 +83,7 @@ class BackupGraphSyncTest {
     @Test fun fullGraphBackfillsUnchangedRowsAndAcknowledgesCapability() = runBlocking {
         oldCursor(); page = graph(); repository().syncNow()
         assertEquals("1970-01-01T00:00:00Z", requests.single().getString("p_since"))
-        assertEquals(12, prefs.data.first()[version])
+        assertEquals(13, prefs.data.first()[version])
         assertEquals("https://image/person", db.titleCastDao().observeAllCast().first().single().profileUrl)
         assertEquals(0, db.titleCastDao().observeAllCast().first().single().episodeCount)
         assertEquals("https://image/person", db.titleCrewDao().observeAllCrew().first().single().profileUrl)
@@ -97,7 +97,7 @@ class BackupGraphSyncTest {
     @Test fun emptyAndOlderServerCannotAcknowledgeBackfill() = runBlocking {
         oldCursor(); repository().syncNow(); assertEquals(10, prefs.data.first()[version])
         page = graph(capable = false, fields = false); repository().syncNow(); assertEquals(10, prefs.data.first()[version])
-        page = graph(); repository().syncNow(); assertEquals(12, prefs.data.first()[version])
+        page = graph(); repository().syncNow(); assertEquals(13, prefs.data.first()[version])
         assertEquals(List(3) { "1970-01-01T00:00:00Z" }, requests.map { it.getString("p_since") })
     }
     @Test fun absentFieldsRetainValuesAndExplicitNullClearsThem() = runBlocking {
@@ -127,7 +127,7 @@ class BackupGraphSyncTest {
         assertNull(db.episodeWatchEventDao().observeAllWatchEvents().first().single().colorMode)
         assertNull(db.episodeReviewDao().observeReviews("title").first().single().colorMode)
         pending = { emptySet() }; repository().syncNow()
-        assertEquals(12, prefs.data.first()[version])
+        assertEquals(13, prefs.data.first()[version])
         assertEquals("https://image/person", db.titleCastDao().observeAllCast().first().single().profileUrl)
         assertEquals("bw", db.episodeReviewDao().observeReviews("title").first().single().colorMode)
         assertEquals("1970-01-01T00:00:00Z", requests.last().getString("p_since"))
@@ -136,7 +136,7 @@ class BackupGraphSyncTest {
         oldCursor(); page = graph(); networkFails = true
         try { repository().syncNow(); fail("Expected offline failure") } catch (_: java.io.IOException) { }
         assertEquals(10, prefs.data.first()[version]); networkFails = false
-        repository().syncNow(); assertEquals(12, prefs.data.first()[version])
+        repository().syncNow(); assertEquals(13, prefs.data.first()[version])
         assertEquals(List(2) { "1970-01-01T00:00:00Z" }, requests.map { it.getString("p_since") })
     }
 
@@ -175,7 +175,7 @@ class BackupGraphSyncTest {
         assertEquals("bw", db.episodeWatchEventDao().observeAllWatchEvents().first().single().colorMode)
         networkFails = false; beforeResponse = {}; page = graph()
         repository().syncNow()
-        assertEquals(12, prefs.data.first()[version])
+        assertEquals(13, prefs.data.first()[version])
         assertEquals(listOf("1970-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "1970-01-01T00:00:00Z"), requests.map { it.getString("p_since") })
     }
 
@@ -218,7 +218,7 @@ class BackupGraphSyncTest {
         beforeResponse = {}; scriptedPages = null; page = graph()
         repository().syncNow()
         assertEquals("1970-01-01T00:00:00Z", requests.last().getString("p_since"))
-        assertEquals(12, prefs.data.first()[version])
+        assertEquals(13, prefs.data.first()[version])
         assertEquals("https://image/person", db.titleCastDao().observeAllCast().first().single { it.id == "cast" }.profileUrl)
     }
 }

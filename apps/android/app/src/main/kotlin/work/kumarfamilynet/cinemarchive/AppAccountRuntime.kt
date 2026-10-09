@@ -145,6 +145,7 @@ class AppAccountRuntime(
                 "title" -> if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry))
                     work.kumarfamilynet.cinemarchive.data.BackupImportApplier(database, importOwner).apply(entry, receipt)
                 else work.kumarfamilynet.cinemarchive.data.TitleMetadataApplier(database, ownerId).apply(entry, receipt)
+                "episode_bulk" -> work.kumarfamilynet.cinemarchive.data.EpisodeBulkApplier(database, ownerId).apply(entry, receipt)
                 "title_credits" -> work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).apply(entry, receipt)
                 "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
                 "list_item" -> work.kumarfamilynet.cinemarchive.data.ListMembershipApplier(database, ownerId).apply(entry, receipt)
@@ -171,6 +172,12 @@ class AppAccountRuntime(
     private val alarmScheduler = AndroidOutingAlarmScheduler(context, identity.userId)
 
     val accountRepository = AccountRepository(client, session::currentSession)
+    val episodeBulkRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.EpisodeBulkRepository(database, outbox, ownerId, ::isCurrent,
+            work.kumarfamilynet.cinemarchive.data.EpisodeBulkTransport(client, session),
+            synchronize = { librarySyncRepository.syncNow() }, replay = { action -> librarySyncRepository.withDurableReplay(action) },
+            requestSync = { if (isCurrent()) scope.launch { librarySyncRepository.syncNow() }; Unit })
+    }
     val catalogExtrasRepository = work.kumarfamilynet.cinemarchive.data.CatalogExtrasRepository(client, session)
     val titleMetadataRepository = work.kumarfamilynet.cinemarchive.data.TitleMetadataRepository(
         database, outbox, ownerId, session, work.kumarfamilynet.cinemarchive.data.TitleMetadataTransport(client, session),
@@ -235,6 +242,7 @@ class AppAccountRuntime(
         viewingAliases = database.viewingCompletionAliasDao(),
         isCurrentOwner = { auth.observeIdentity().value == identity },
         moviegoingPreferences = moviegoingPreferences,
+        episodeBulkRepository = episodeBulkRepository,
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId,

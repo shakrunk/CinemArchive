@@ -108,6 +108,7 @@ class LibraryRepository(
     private val viewingAliases: ViewingCompletionAliasDao? = null,
     private val isCurrentOwner: () -> Boolean = { mutationOwnerId != null },
     private val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
+    val episodeBulkRepository: EpisodeBulkRepository? = null,
 ) {
     val viewingOwnerId: String? get() = mutationOwnerId
     /**

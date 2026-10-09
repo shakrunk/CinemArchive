@@ -31,7 +31,7 @@ class MoviegoingPreferencesMigrationTest {
             sql.execSQL("INSERT INTO mutation_outbox (id,entityType,entityId,operation,payloadJson,createdAt,attemptCount) VALUES ('pending','viewing','viewing','review','{\"companions\":[\"Alex\"]}',1,3)")
             sql.version = 19
         } finally { seed.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_19_20).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_19_20, LibraryDatabase.MIGRATION_20_21).build()
         try {
             val note = upgraded.venueNoteDao().observeAll().first().single()
             assertEquals("Park here", note.notes); assertEquals("2099-01-01", note.updatedAt)

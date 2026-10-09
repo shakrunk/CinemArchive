@@ -368,6 +368,14 @@ fun TitleDetailRoute(
         titleSourcesContent = { TitleSourcesEditor(titleId, viewModel::prepareSources, viewModel::saveSources) },
         titleEditError = titleEditError,
         titleMetadataRecovery = titleMetadataRecovery,
+        episodeBulkContent = repository.episodeBulkRepository?.let { source -> { current, season ->
+            androidx.compose.runtime.key(repository.viewingOwnerId, current.id) {
+                val pending by remember(source, current.id) { source.pending(current.id) }.collectAsStateWithLifecycle(initialValue = emptyList())
+                PrePlatformWatchControl(current, season, checkNotNull(repository.viewingOwnerId), pending,
+                    prepare = { source.prepare(current.id, it) }, save = source::save, retry = source::retry,
+                    compare = source::compare, applyReviewed = source::applyReviewed, discard = source::discard)
+            }
+        } },
     )
 }
 
@@ -416,6 +424,7 @@ fun TitleDetailScreen(
     onPrepareViewing: (suspend (String?) -> ViewingDraft)? = null,
     viewingOwnerId: String? = null,
     viewingTitleId: String? = detail?.id,
+    episodeBulkContent: (@Composable (TitleDetail, Int) -> Unit)? = null,
 ) {
     var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
     var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
@@ -728,6 +737,9 @@ fun TitleDetailScreen(
 
                 val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
                     ?: detail.seasons.orderedForDisplay().first()
+                episodeBulkContent?.let { content -> item(key = "pre-platform-watches") {
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) { content(detail, selectedSeason.seasonNumber) }
+                } }
                 if (selectedSeason.cast.isNotEmpty()) item(key = "season-credits") {
                     ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
                         PersonCreditsSection("Season cast", selectedSeason.cast, onBrowsePerson)

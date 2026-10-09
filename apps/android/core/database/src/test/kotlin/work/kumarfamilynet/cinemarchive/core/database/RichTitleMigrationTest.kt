@@ -33,7 +33,7 @@ class RichTitleMigrationTest {
             old.execSQL("INSERT INTO ticket_intents VALUES ('ticket-op','project','owner','outing','{\"unchanged\":true}',1,NULL)")
             old.version = 17
         } finally { fixture.close() }
-        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19, LibraryDatabase.MIGRATION_19_20).build()
+        val upgraded = builder().addMigrations(LibraryDatabase.MIGRATION_17_18, LibraryDatabase.MIGRATION_18_19, LibraryDatabase.MIGRATION_19_20, LibraryDatabase.MIGRATION_20_21).build()
         try {
             val row = upgraded.titleDao().getById("title")!!
             assertEquals(listOf("Keep tag"), row.tags)

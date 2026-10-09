@@ -811,7 +811,10 @@ private fun CinemArchiveApp(
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
                             listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
-                            titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
+                            titleChangesContent = {
+                        work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
+                        work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
+                    },
                             ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
                             moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
                                 work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
@@ -933,7 +936,10 @@ private fun CinemArchiveApp(
                         subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
                             listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
                                 subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
-                    titleChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository) },
+                    titleChangesContent = {
+                        work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
+                        work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
+                    },
                     ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
                     moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
                         work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)

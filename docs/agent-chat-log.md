@@ -16,10 +16,10 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 
 ## Active continuation claims
 
-- Astra: integration and review. Discover People/Studios is committed as b6c577f; friend/link scope editing is committed as 35d64d2. Recommendation controls remain open.
-- Reverse worker: shared venue notes/theater-interest persistence and recovery (#324), Room 20, sync and the sole native runner. Owns companion raw columns/backfill in coordination with backup work.
-- Backup worker: installed JSON export/restore using complete local graphs, plus lossless companion propagation. Coordinates exact runtime/Profile/ImportSync seams with the reverse worker; no server-only export shortcut.
-- Metadata worker: advanced friend/anonymous archive filters and sorting, reusing the existing Library controls. No MainActivity, runtime or database claims.
+- Astra: rich title watch-link/home/physical-collection controls, integration and review. People/Studios b6c577f, access scopes 35d64d2 and archive filters d0bc1c8 are committed.
+- Reverse worker: outing completion/post-show/reversal activation and recovery (#322), and the sole native runner. Shared moviegoing preferences, Room 20 and companion preservation are committed as 88a7b0d.
+- Backup worker: installed JSON restore using complete local graphs and atomic commands. Export is committed as b9a5a3b. Coordinates exact runtime, sync and predecessor-proof seams with the reverse worker.
+- Metadata worker: Discover recommendation and More starring shelves. Narrow LibraryRepository observer only; no runtime or database claims.
 - Git writes remain with Astra. No native runner starts before all source owners confirm a compiling frozen state. Each verified user-facing slice stops for an atomic commit.
 
 ## New messages

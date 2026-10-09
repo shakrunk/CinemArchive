@@ -24,7 +24,11 @@ class OutingCommandApplier(private val database: LibraryDatabase, private val ow
         val projection = runCatching {
             val row = JSONObject(current.toString())
             later.forEach { pending ->
-                val patch = outingWireBody(JSONObject(pending.payloadJson), ownerId, false)
+                val operation = outingCommandOperations(pending).getJSONObject(0)
+                require(operation.getString("action") == "update")
+                // Only actual mutation fields overlay the current row. The retained intent's
+                // local updatedAt is not a server revision and cannot become a future CAS guard.
+                val patch = operation.getJSONObject("values")
                 patch.keys().forEach { key -> row.put(key, patch.get(key)) }
             }
             row.toRecoveryOuting()

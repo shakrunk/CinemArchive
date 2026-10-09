@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android outing recovery now preserves the server revision while displaying pending edits, keeping unsupported saved intents available for review.
 - Android viewing-command recovery now retains original edit identities and refreshes exact linked outings after deletion; history-editor activation is being integrated separately.
 - Web outing planning now supports private venue notes with durable offline saves, explicit removal and comparison when another device changes a note.
 - Shared library sync now retains credit profiles and episode counts plus watch/review color modes for native backup parity; Android storage and export integration are still in progress.

@@ -56,6 +56,8 @@ class OutingCommandRoomTest {
         val row = db.cinemaOutingDao().getById(OutingCommandFixture.outing)!!
         assertEquals("Current remote cinema", row.venue)
         assertEquals("Later local note", row.notes)
+        assertEquals("2026-10-08T14:00:00Z", row.updatedAt)
+        assertNotEquals(JSONObject(later.payloadJson).getString("updatedAt"), row.updatedAt)
         assertEquals(later.payloadJson, db.outboxDao().getPending().single().payloadJson)
         assertEquals(first.id, outingCommandOperations(db.outboxDao().getPending().single()).getJSONObject(0).getString("expectedOperationId"))
         assertEquals("Keep", db.viewingDao().getById("history")!!.notes)
@@ -69,6 +71,30 @@ class OutingCommandRoomTest {
         assertNull(db.cinemaOutingDao().getById(OutingCommandFixture.outing))
         assertNotNull(db.viewingDao().getById("history"))
         assertTrue(db.outboxDao().getPending().isEmpty())
+    }
+
+    @Test fun unsupportedLaterIntentKeepsItsOriginalProjectionQueueAndPullProtection() = runBlocking {
+        val first = OutingCommandFixture.patch()
+        val later = OutingCommandFixture.patch("40000000-0000-4000-8000-000000000002", first.id, "Retained note")
+        val tampered = JSONObject(later.payloadJson).apply {
+            getJSONObject(OUTING_COMMAND_DATA).getJSONArray("operations").getJSONObject(0).getJSONObject("values").put("notes", "Different intent")
+        }
+        val unsupported = listOf(later.copy(operation = "update"), later.copy(operation = "review"),
+            later.copy(payloadJson = tampered.toString()), OutingCommandFixture.create().copy(id = later.id))
+        for (saved in unsupported) {
+            db.outboxDao().getPending().forEach { db.outboxDao().remove(it.id) }
+            val local = OutingCommandFixture.entity().copy(venue = "Local draft venue", notes = "Retained note")
+            db.cinemaOutingDao().upsert(local)
+            db.outboxDao().enqueue(first); db.outboxDao().enqueue(saved)
+            deliver = { if (it.id == first.id) PushResult.Applied(OutingCommandFixture.envelope(first,
+                OutingCommandFixture.applied(first).put("venue", "New remote venue"))) else PushResult.Review("Compare preserved intent") }
+            outbox.flush()
+            assertEquals(local, db.cinemaOutingDao().getById(OutingCommandFixture.outing))
+            val pending = db.outboxDao().getPending().single()
+            assertEquals(saved.id, pending.id); assertEquals(saved.payloadJson, pending.payloadJson)
+            assertEquals("review", pending.operation)
+            assertTrue("cinema_outing:${OutingCommandFixture.outing}" in outbox.pendingEntityKeys())
+        }
     }
 
     @Test fun laterLocalDeletionCannotBeResurrectedByAnOldReceiptOrCurrentRemoteRow() = runBlocking {

@@ -87,6 +87,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
+import work.kumarfamilynet.cinemarchive.core.designsystem.noirVisualEffect
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePillFab
 import work.kumarfamilynet.cinemarchive.core.designsystem.MediumWindowBreakpoint
 import work.kumarfamilynet.cinemarchive.core.designsystem.MorphingBottomNav
@@ -430,6 +431,14 @@ private fun CinemArchiveApp(
     val libraryFiltersState = rememberAccountLibraryFilters("${runtime.ownerId}:${runtime.identity.generation}")
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
+    var noirPreview by remember(runtime) { mutableStateOf<work.kumarfamilynet.cinemarchive.core.model.NoirPreview?>(null) }
+    val noirPins by runtime.titlePins.state.collectAsStateWithLifecycle(initialValue = work.kumarfamilynet.cinemarchive.data.TitlePinsState())
+    val noirDetailId = (overlay as? Overlay.Detail)?.titleId
+    LaunchedEffect(noirDetailId) {
+        if (noirDetailId != null && noirPreview?.titleId != noirDetailId)
+            noirPreview = work.kumarfamilynet.cinemarchive.core.model.NoirPreview(noirDetailId, null, eligible = false)
+    }
+    val noirMode = work.kumarfamilynet.cinemarchive.core.model.effectiveNoirMode(noirDetailId, noirPreview, noirPins.pins)
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
     var shareOutingId by remember { mutableStateOf<String?>(null) }
     var globalSearch by remember(runtime) { mutableStateOf(false) }
@@ -637,7 +646,7 @@ private fun CinemArchiveApp(
     // contentWindowInsets is zeroed (MorphingBottomNav/MorphingNavigationRail inset their own
     // edges instead), so the status bar inset is applied once here, above both the Scaffold
     // and the overlay.
-    Box(modifier = Modifier.fillMaxSize().statusBarsPadding().onPreviewKeyEvent {
+    Box(modifier = Modifier.fillMaxSize().noirVisualEffect(noirMode).statusBarsPadding().onPreviewKeyEvent {
         if (it.opensGlobalSearch() && runtime.isCurrent()) { globalSearch = true; true } else false
     }.focusRequester(commandFocus).focusable()) {
         LaunchedEffect(runtime) { commandFocus.requestFocus() }
@@ -937,6 +946,11 @@ private fun CinemArchiveApp(
                         tab = Tab.LIBRARY
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refresh(current.titleId) },
+                    noirPins = runtime.titlePins,
+                    onNoirMode = { mode ->
+                        if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)
+                            noirPreview = work.kumarfamilynet.cinemarchive.core.model.NoirPreview(current.titleId, mode)
+                    },
                     catalogExtrasSource = runtime.catalogExtrasRepository,
                     titleMetadataRecovery = runtime.titleMetadataRepository,
                     socialContent = { detail ->

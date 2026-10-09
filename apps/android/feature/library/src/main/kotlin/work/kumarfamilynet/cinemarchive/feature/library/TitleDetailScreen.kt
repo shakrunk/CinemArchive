@@ -267,11 +267,14 @@ fun TitleDetailRoute(
     initialSchedule: Boolean = false,
     onInitialScheduleConsumed: () -> Unit = {},
     onScheduled: () -> Unit = {},
+    noirPins: work.kumarfamilynet.cinemarchive.data.TitlePinsRepository? = null,
+    onNoirMode: (String?) -> Unit = {},
 ) {
     val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
+    var noirLoggedMode by rememberSaveable(titleId) { mutableStateOf<String?>(null) }
     val titleEditError by viewModel.titleEditError.collectAsStateWithLifecycle()
     val languageTag = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].toLanguageTag()
     val catalogKey = detail?.let { current -> current.tmdbId?.takeIf { it > 0 }?.let {
@@ -305,7 +308,15 @@ fun TitleDetailRoute(
     TitleDetailScreen(
         detail,
         onBack,
-        onSaveEpisodeLog = viewModel::saveEpisodeLog,
+        onSaveEpisodeLog = { episodeId, draft ->
+            viewModel.saveEpisodeLog(episodeId, draft)
+            if (detail?.tmdbId == work.kumarfamilynet.cinemarchive.core.model.SPIDER_NOIR_TMDB_ID && draft.colorMode != null) {
+                noirLoggedMode = "${draft.watchEventId}|${draft.colorMode}"
+                // The lazy header may be offscreen; the owner/title-fenced root callback updates immediately.
+                onNoirMode(draft.colorMode)
+            }
+        },
+        noirContent = noirPins?.let { source -> { current -> NoirDetailControls(current, source, noirLoggedMode, onNoirMode) } },
         onDeleteEpisodeWatch = viewModel::deleteEpisodeWatch,
         onSaveViewing = viewModel::saveViewing,
         onDeleteViewing = viewModel::deleteViewing,
@@ -407,6 +418,7 @@ fun TitleDetailScreen(
     viewingOwnerId: String? = null,
     viewingTitleId: String? = detail?.id,
     episodeBulkContent: (@Composable (TitleDetail, Int) -> Unit)? = null,
+    noirContent: (@Composable (TitleDetail) -> Unit)? = null,
     initialSchedule: Boolean = false,
     onInitialScheduleConsumed: () -> Unit = {},
 ) {
@@ -522,6 +534,8 @@ fun TitleDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                     )
+
+                    noirContent?.invoke(detail)
 
                     if (onViewTicket != null) ticketOutings.forEach { outing ->
                         TextButton(onClick = { onViewTicket(outing, detail.title) }) {

@@ -99,6 +99,7 @@ number is chosen.
 - Web: dismissing the command palette restores keyboard focus to its opener without taking focus away from a newly opened dialog.
 
 ### Added
+- Android: pin titles to the Library, synced with web, and choose Spider-Noir B&W or Color viewing modes with a live visual preview on title details.
 - Web: capture and view private ticket photos, verified barcodes and seat details, with offline access, durable replacement/removal and recovery from storage failures.
 - Android: refresh full cast and crew for existing titles and tracked seasons or episodes, preserving history and safely reconciling interrupted sync.
 - Android: Library can filter by a credited person across titles, seasons and episodes; credit links preserve existing filters and distinguish people with the same name.

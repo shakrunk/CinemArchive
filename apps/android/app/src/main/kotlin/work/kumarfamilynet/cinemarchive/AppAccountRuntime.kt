@@ -132,6 +132,7 @@ class AppAccountRuntime(
         object : work.kumarfamilynet.cinemarchive.data.RemoteMutationWriter {
             override suspend fun push(entry: work.kumarfamilynet.cinemarchive.core.database.OutboxEntity) =
                 if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry)) importWriter.push(entry) else when (entry.entityType) {
+                    "title_pin" -> titlePins.push(entry)
                     "ticket_attachment" -> tickets.push(entry)
                     "provider_merge" -> providerMergeWriter.push(entry)
                     "venue_note", "theater_interest" -> moviegoingPreferences.push(entry)
@@ -147,6 +148,7 @@ class AppAccountRuntime(
                 "outing_completion" -> work.kumarfamilynet.cinemarchive.data.OutingCompletionApplier(database, ownerId).apply(entry, receipt)
                 "outing_reversal" -> work.kumarfamilynet.cinemarchive.data.OutingReversalApplier(database, ownerId).apply(entry, receipt)
                 "venue_note", "theater_interest" -> moviegoingPreferences.apply(entry, receipt)
+                "title_pin" -> titlePins.apply(entry, receipt)
                 "ticket_attachment" -> tickets.apply(entry, receipt)
                 "provider_merge" -> work.kumarfamilynet.cinemarchive.data.ProviderMergeApplier(database, importOwner).apply(entry, receipt)
                 "title" -> if (work.kumarfamilynet.cinemarchive.data.isBackupImport(entry))
@@ -198,6 +200,12 @@ class AppAccountRuntime(
         client, session::currentSession,
     )
 
+    val titlePins: work.kumarfamilynet.cinemarchive.data.TitlePinsRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.TitlePinsRepository(database, dataStore("cinemarchive_title_pins"), outbox,
+            ownerId, ::isCurrent, work.kumarfamilynet.cinemarchive.data.TitlePinTransport(client, session),
+            requestSync = { if (isCurrent()) scope.launch { librarySyncRepository.syncNow() }; Unit })
+    }
+
     val ledgerLayoutRepository = LedgerLayoutRepository(dataStore("cinemarchive_ledger_layout"), session, SupabaseLedgerLayoutWriter(client))
 
     val librarySyncRepository = LibrarySyncRepository(
@@ -220,7 +228,7 @@ class AppAccountRuntime(
         pushPending = outbox::flush,
         pendingKeys = outbox::pendingEntityKeys,
         transactor = transactor,
-        afterPull = { tickets.refresh() },
+        afterPull = { tickets.refresh(); titlePins.refresh() },
         venueNoteDao = database.venueNoteDao(),
         theaterInterestDao = database.theaterInterestDao(),
     )

@@ -6,6 +6,7 @@ import type { OfflineSnapshot } from './snapshot'
 export function mutationEntities(mutation: Mutation, base: OfflineSnapshot): Set<string> {
   const entities = new Set<string>()
   for (const leaf of mutation.kind === 'batch' ? mutation.mutations : [mutation]) {
+    if (leaf.kind === 'venueNote.change') entities.add(`venue:${leaf.venue}`)
     if ('titleId' in leaf) entities.add(`title:${leaf.titleId}`)
     if (leaf.kind === 'title.create') entities.add(`title:${leaf.title.id}`)
     if ('listId' in leaf) entities.add(`list:${leaf.listId}`)

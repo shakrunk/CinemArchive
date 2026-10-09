@@ -1,4 +1,6 @@
 import { saveSucceeded } from 'src/lib/localSave'
+import { VenueNoteEditor } from './VenueNoteEditor'
+import { normalizeVenue } from '../lib/venueNotes'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Ticket, Search, Calendar, Clock, MapPin, Users, Film, X, Share2, Download, RefreshCw } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
@@ -347,7 +349,7 @@ function OutingForm({
       previewsMinutes: form.previewsMinutes,
       runtimeMinutes: form.runtimeMinutes,
       endsAt: endsAtIso,
-      venue: form.venue.trim() || undefined,
+      venue: normalizeVenue(form.venue) || undefined,
       companions: form.companions,
       format: form.format || undefined,
       ticketPrice: form.ticketPrice.trim() ? Number(form.ticketPrice) : undefined,
@@ -457,6 +459,7 @@ function OutingForm({
         <datalist id="outing-venue-suggestions">
           {venues.map((v) => <option key={v} value={v} />)}
         </datalist>
+        <VenueNoteEditor venue={form.venue} />
       </div>
 
       <div>

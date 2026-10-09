@@ -4,12 +4,14 @@ import { mutationEntities } from './entities'
 import type { TicketCapture } from '../tickets/types'
 import type { OfflineSnapshot } from './snapshot'
 import { IndexedDbOfflineStore, type OfflineRead } from './storage'
+import { checkedVenueChain, sameVenueNote, venueChange, type VenueNoteReview } from '../venueNotes'
+import { assertSnapshot } from './validation'
 
 export type DeliveryResult =
   | { kind: 'success'; canonicalEffect?: Mutation; canonicalBase?: OfflineSnapshot }
   | { kind: 'retry'; message: string; retryAfterMs?: number }
   | { kind: 'auth'; message: string }
-  | { kind: 'failed' | 'conflict'; message: string }
+  | { kind: 'failed' | 'conflict'; message: string; venueRejection?: true }
 
 export interface DeliveryContext {
   scope: OfflineScope
@@ -212,6 +214,37 @@ export class OfflineCoordinator {
     this.publish(session, await this.options.store.discard(session.scope, commandId))
   }
 
+  private async venueComparison(session: Session, commandId: string, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>) {
+    if (!this.current(session) || !await this.options.isAuthenticated(session.scope) || !this.current(session)) throw new Error('Library account changed')
+    const read = await this.options.store.read(session.scope)
+    const commands = checkedVenueChain(read.document.commands, commandId)
+    const mutation = commands[commands.length - 1].mutation
+    if (mutation.kind !== 'venueNote.change') throw new Error('Invalid venue change')
+    const base = await fetchBase(this.context(session))
+    if (!this.current(session)) throw new Error('Library account changed')
+    assertSnapshot(base, session.scope.userId)
+    if (base.moviegoingPreferencesSupport !== 'authoritative') throw new Error('Venue review requires the updated server')
+    return { base, review: { commands, current: base.venueNotes?.find((note) => note.venue === mutation.venue) ?? null, notes: mutation.notes } satisfies VenueNoteReview }
+  }
+
+  async reviewVenue(commandId: string, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>): Promise<VenueNoteReview> {
+    const session = this.capture()
+    return this.lock(`cinemarchive-offline:${scopeKey(session.scope)}`, async () => (await this.venueComparison(session, commandId, fetchBase)).review)
+  }
+
+  async resolveVenue(review: VenueNoteReview, keepLocal: boolean, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>): Promise<void> {
+    const session = this.capture()
+    await this.lock(`cinemarchive-offline:${scopeKey(session.scope)}`, async () => {
+      const fresh = await this.venueComparison(session, review.commands[0].id, fetchBase)
+      if (!sameVenueNote(fresh.review.current, review.current) || JSON.stringify(fresh.review.commands) !== JSON.stringify(review.commands)) throw new Error('The venue note changed again. Compare it before resolving.')
+      const old = review.commands[review.commands.length - 1].mutation
+      if (old.kind !== 'venueNote.change') throw new Error('Invalid venue change')
+      const replacement = keepLocal && !(review.notes === null && !review.current) ? createCommand(session.scope,
+        venueChange({ venue: old.venue, userId: session.scope.userId, baseline: review.current }, review.notes)) : undefined
+      this.publish(session, await this.options.store.resolveVenue(session.scope, review, fresh.base, replacement))
+    })
+  }
+
   private schedule(session: Session, delay: number): void {
     clearTimeout(this.retryTimer)
     this.retryTimer = setTimeout(() => {
@@ -261,6 +294,7 @@ export class OfflineCoordinator {
         }
         this.publish(session, await this.options.store.recordFailure(session.scope, command.id, {
           state: result.kind === 'auth' ? 'pending' : result.kind, message: result.message,
+          ...('venueRejection' in result && result.venueRejection ? { venueRejection: true as const } : {}),
         }))
         if (result.kind === 'auth') return // Resume on auth/reconnect, never a tight timer loop.
       }

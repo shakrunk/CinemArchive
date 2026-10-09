@@ -7,7 +7,8 @@ import { computeLedgerStats } from './ledgerStats'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
 import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
-import type { TheaterInterest } from '../lib/moviegoingPreferences'
+import type { TheaterInterest, VenueNote } from '../lib/moviegoingPreferences'
+import { captureVenueDraft, venueChange, type VenueNoteDraft, type VenueNoteReview } from '../lib/venueNotes'
 import { assertDeliverableCommand, createLibraryCommandDelivery } from '../lib/offlineRpc'
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
 import { createTicketCommandDelivery } from '../lib/tickets/delivery'
@@ -254,6 +255,11 @@ export type ViewerContext =
   | { kind: 'friend'; userId: string; displayName: string }
 
 interface AuthSlice {
+  venueNotes: VenueNote[]
+  openVenueNote: (venue: string) => VenueNoteDraft & { session: number }
+  saveVenueNote: (draft: VenueNoteDraft & { session: number }, notes: string | null) => Promise<void>
+  reviewVenueNote: (commandId: string) => Promise<VenueNoteReview>
+  resolveVenueNote: (review: VenueNoteReview, keepLocal: boolean) => Promise<void>
   theaterInterest: TheaterInterest[]
   moviegoingPreferencesSupport: OfflineSnapshot['moviegoingPreferencesSupport']
   setTheaterInterest: (titleId: string, present: boolean) => Promise<void>
@@ -669,6 +675,7 @@ function afterOutingRevert(outingId: string, confirmed = false): void {
 function snapshotState(snapshot: OfflineSnapshot, s: AppStore): Partial<AppStore> {
   return { ...withDerivedTitles(snapshot.titles, s.filters), outings: snapshot.outings,
     theaterInterest: snapshot.theaterInterest ?? [], moviegoingPreferencesSupport: snapshot.moviegoingPreferencesSupport,
+    venueNotes: snapshot.venueNotes ?? [],
     lists: snapshot.lists,
     listMemberships: Object.fromEntries(Object.entries(snapshot.listMemberships).map(([id, members]) => [id, new Set(members)])),
     pinnedModes: snapshot.pinnedModes,
@@ -987,6 +994,19 @@ export const useAppStore = create<AppStore>()(
   },
 
   // ── Auth ───────────────────────────────────────────────────
+  venueNotes: [],
+  openVenueNote: (venue) => {
+    const state = get()
+    if (!state.user || isDevMockUser(state.user) || state.isSharedView || state.viewerContext.kind !== 'owner') throw new Error('Sign in to edit private venue notes')
+    return { ...captureVenueDraft(state, state.offlineStatus.commands, state.user.id, venue), session: libraryGeneration }
+  },
+  saveVenueNote: (draft, notes) => writeLocalLibrary(async (state) => {
+    if (!state.user || isDevMockUser(state.user) || state.user.id !== draft.userId || libraryGeneration !== draft.session) throw new Error('The venue editor belongs to an earlier sign-in')
+    const opening: VenueNoteDraft = { venue: draft.venue, userId: draft.userId, baseline: draft.baseline, previousCommandId: draft.previousCommandId }
+    await libraryRuntime.submit(venueChange(opening, notes))
+  }),
+  reviewVenueNote: (id) => libraryRuntime.reviewVenue(id),
+  resolveVenueNote: (review, keepLocal) => writeLocalLibrary(async () => { await libraryRuntime.resolveVenue(review, keepLocal) }),
   theaterInterest: [],
   moviegoingPreferencesSupport: undefined,
   setTheaterInterest: (titleId, present) => writeLocalLibrary(async (state) => {

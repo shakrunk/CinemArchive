@@ -4,6 +4,7 @@ import { replayPending } from './replay'
 import { mutationEntities } from './entities'
 import { capturePreconditions, captureRowPrecondition, OfflineRevisionError } from './preconditions'
 import { emptySnapshot, mergeRefreshedSnapshot, type OfflineSnapshot } from './snapshot'
+import { assertVenueAdmission, checkedVenueChain, VenueNoteError, type VenueNoteReview } from '../venueNotes'
 import { assertCommand, assertMutation, assertSnapshot } from './validation'
 import { isTicketMutation, type TicketAttachment, type TicketBlobRecord, type TicketCapture, type TicketOutingGuard } from '../tickets/types'
 import { assertTicketBytes, isTicketAttachment, sameTicketAttachment, ticketObjectKey } from '../tickets/validation'
@@ -73,6 +74,7 @@ function appendToDocument(d: OwnerDocument, command: PendingCommand): void {
   }
   if (command.dependsOn.some((id) => !d.commands.some((c) => c.id === id))) throw new Error('Unknown command dependency')
   const projection = replayPending(d.base, d.commands)
+  if (command.mutation.kind === 'venueNote.change') assertVenueAdmission(command.mutation, projection, d.commands)
   for (const leaf of command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]) {
     if (leaf.kind !== 'theaterInterest.set') continue
     if (d.base.moviegoingPreferencesSupport !== 'authoritative') throw new Error('Sync moviegoing preferences with the updated server before editing theater interest')
@@ -178,7 +180,7 @@ export class IndexedDbOfflineStore {
         if (result) resolve(result)
         else reject(new OfflineStorageError('Offline transaction completed without a result'))
       }
-      tx.onabort = () => reject(new OfflineStorageError(error instanceof OfflineRevisionError
+      tx.onabort = () => reject(new OfflineStorageError(error instanceof OfflineRevisionError || error instanceof VenueNoteError
         ? `${error.message} These changes are not saved on this device.`
         : 'Could not persist offline changes; they are not saved on this device', error ?? tx.error))
       tx.onerror = (event) => {
@@ -349,30 +351,59 @@ export class IndexedDbOfflineStore {
     return this.transact(scope, (d) => {
       const command = d.commands.find((c) => c.id === commandId)
       if (!command) return
+      if (command.mutation.kind === 'venueNote.change' && (!base || base.moviegoingPreferencesSupport !== 'authoritative')) throw new Error('Venue notes require an authoritative current snapshot before confirmation')
       d.base = base ? mergeRefreshedSnapshot(d.base, base) : applyMutation(d.base, captured ?? command.mutation)
       d.commands = d.commands.filter((c) => c.id !== commandId).map((c) => ({ ...c, dependsOn: c.dependsOn.filter((id) => id !== commandId) }))
     })
   }
 
-  recordFailure(scope: OfflineScope, commandId: string, failure: { state: PendingCommand['state']; message: string; nextAttemptAt?: number }): Promise<OfflineRead> {
+  recordFailure(scope: OfflineScope, commandId: string, failure: { state: PendingCommand['state']; message: string; nextAttemptAt?: number; venueRejection?: true }): Promise<OfflineRead> {
     return this.transact(scope, (d) => {
-      d.commands = d.commands.map((c) => c.id === commandId ? { ...c,
-        state: failure.state, attempts: c.attempts + 1, lastError: failure.message, nextAttemptAt: failure.nextAttemptAt ?? 0,
-      } : c)
+      d.commands = d.commands.map((c) => {
+        if (c.id !== commandId) return c
+        const next = { ...c, state: failure.state, attempts: c.attempts + 1, lastError: failure.message, nextAttemptAt: failure.nextAttemptAt ?? 0 }
+        delete next.venueRejection
+        if (failure.venueRejection && c.mutation.kind === 'venueNote.change' && failure.state === 'conflict') next.venueRejection = true
+        return next
+      })
     })
   }
 
   retry(scope: OfflineScope, commandId: string): Promise<OfflineRead> {
     return this.transact(scope, (d) => {
-      d.commands = d.commands.map((c) => c.id === commandId ? { ...c, state: 'pending', nextAttemptAt: 0 } : c)
+      d.commands = d.commands.map((c) => {
+        if (c.id !== commandId) return c
+        const next = { ...c, state: 'pending' as const, nextAttemptAt: 0 }
+        delete next.venueRejection
+        return next
+      })
     })
   }
 
   /** Discard requires an explicit UI action; dependencies cannot silently vanish. */
   discard(scope: OfflineScope, commandId: string): Promise<OfflineRead> {
     return this.transact(scope, (d) => {
+      if (d.commands.some((c) => c.id === commandId && c.mutation.kind === 'venueNote.change')) throw new VenueNoteError('Open this venue note to compare and resolve its saved changes')
       if (d.commands.some((c) => c.dependsOn.includes(commandId))) throw new Error('Resolve dependent commands before discarding their prerequisite')
       d.commands = d.commands.filter((c) => c.id !== commandId)
+    })
+  }
+
+  /** Caller holds the delivery lock and has re-read the comparison. */
+  resolveVenue(scope: OfflineScope, review: VenueNoteReview, base: OfflineSnapshot, replacement?: PendingCommand): Promise<OfflineRead> {
+    assertSnapshot(base, scope.userId)
+    if (base.moviegoingPreferencesSupport !== 'authoritative') throw new Error('Venue review requires the updated server')
+    if (replacement) assertCommand(replacement)
+    return this.transact(scope, (d) => {
+      const chain = checkedVenueChain(d.commands, review.commands[0].id)
+      if (JSON.stringify(chain) !== JSON.stringify(review.commands)) throw new VenueNoteError('Saved venue changes changed during review; compare them again')
+      d.base = mergeRefreshedSnapshot(d.base, base)
+      const ids = new Set(chain.map((command) => command.id))
+      d.commands = d.commands.filter((command) => !ids.has(command.id))
+      if (replacement) {
+        if (!sameScope(replacement.scope, scope) || replacement.mutation.kind !== 'venueNote.change') throw new Error('Invalid venue replacement owner')
+        appendToDocument(d, replacement)
+      }
     })
   }
 }

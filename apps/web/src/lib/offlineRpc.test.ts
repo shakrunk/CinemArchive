@@ -4,6 +4,7 @@ import { assertDeliverableCommand, classifyLibraryError, createLibraryCommandDel
 import { title } from './offline/fixtures.test-support'
 import type { DeliveryContext } from './offline/coordinator'
 import type { OfflineSnapshot } from './offline/snapshot'
+import { venueChange } from './venueNotes'
 
 const { getSession }=vi.hoisted(()=>({getSession:vi.fn()}))
 vi.mock('./auth',()=>({supabase:{auth:{getSession}}}))
@@ -102,6 +103,35 @@ describe('atomic command payloads',()=>{
 })
 
 describe('account-fenced delivery',()=>{
+  it.each(['40001', '23505'])('records venue rejection only from the write transaction (%s)', async (code) => {
+    const ownerScope = { ...scope, userId: '10000000-0000-4000-8000-000000000001' }
+    getSession.mockResolvedValue({ data: { session: { user: { id: ownerScope.userId }, access_token: 'captured' } }, error: null })
+    const pending = createCommand(ownerScope, venueChange({ venue: '__proto__', userId: ownerScope.userId, baseline: null }, ''))
+    const deliveryContext = { ...context(), scope: ownerScope }
+    const request = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ code, message: 'Changed' }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ operationId: pending.id })))
+    vi.stubGlobal('fetch', request)
+    const refresh = vi.fn().mockRejectedValue(Object.assign(new Error('Refresh failed after acceptance'), { code }))
+    const deliver = createLibraryCommandDelivery(refresh)
+    expect(await deliver(pending, deliveryContext)).toMatchObject({ kind: 'conflict', venueRejection: true })
+    expect(refresh).not.toHaveBeenCalled()
+    await expect(deliver(pending, deliveryContext)).rejects.toThrow('after acceptance')
+    expect(request.mock.calls[0][1].body).toBe(request.mock.calls[1][1].body)
+  })
+  it('keeps a venue receipt queued until authoritative refresh without replaying historical receipt text', async () => {
+    const ownerScope = { ...scope, userId: '10000000-0000-4000-8000-000000000001' }
+    getSession.mockResolvedValue({ data: { session: { user: { id: ownerScope.userId }, access_token: 'captured' } }, error: null })
+    const pending = createCommand(ownerScope, venueChange({ venue: "O'Brien", userId: ownerScope.userId, baseline: null }, 'Original'))
+    const request = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ operationId: pending.id, rows: [{ table: 'venue_notes', row: { notes: 'Original' } }] })))
+    vi.stubGlobal('fetch', request)
+    const canonical = { ...snapshot, moviegoingPreferencesSupport: 'authoritative', venueNotes: [], theaterInterest: [] }
+    const deliver = createLibraryCommandDelivery(vi.fn().mockResolvedValueOnce({ ...snapshot, moviegoingPreferencesSupport: 'unsupported' }).mockResolvedValueOnce(canonical))
+    const deliveryContext = { ...context(), scope: ownerScope }
+    expect((await deliver(pending, deliveryContext)).kind).toBe('retry')
+    expect(await deliver(pending, deliveryContext)).toEqual({ kind: 'success', canonicalBase: canonical })
+    expect(request.mock.calls[0][1].body).toBe(request.mock.calls[1][1].body)
+    expect(JSON.parse(request.mock.calls[0][1].body).p_operations[0].key).toEqual({ venue: "O'Brien" })
+  })
   it('retains accepted interest until an authoritative read and retries the exact original operation', async () => {
     const interestScope = { ...scope, userId: '10000000-0000-4000-8000-000000000001' }
     getSession.mockResolvedValue({ data: { session: { user: { id: interestScope.userId }, access_token: 'captured' } }, error: null })

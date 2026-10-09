@@ -88,6 +88,13 @@ function seasonOperations(titleId: string, season: Season, recordedAt: string, r
 
 /** Pure mapping: retry uses exactly the same IDs, payload and recorded timestamps. */
 export function libraryOperations(command: PendingCommand): LibraryOperation[] {
+  if (command.mutation.kind === 'venueNote.change') {
+    const mutation = command.mutation
+    return [{ table: 'venue_notes', action: mutation.notes === null ? 'delete' : mutation.baseline ? 'update' : 'insert', key: { venue: mutation.venue },
+      ...(mutation.notes === null ? {} : { values: { notes: mutation.notes } }),
+      ...(mutation.baseline ? mutation.previousCommandId ? { expectedOperationId: mutation.previousCommandId } : { expectedUpdatedAt: mutation.baseline.updatedAt } : {}),
+    }]
+  }
   if (isTicketMutation(command.mutation)) throw new Error('Ticket commands require their dedicated delivery adapter')
   if (command.mutation.kind === 'outing.revert') throw new Error('Outing reversal requires its guarded delivery adapter')
   const leaf = (mutation: TrackingMutation): LibraryOperation[] => {
@@ -156,6 +163,7 @@ export function libraryOperations(command: PendingCommand): LibraryOperation[] {
 /** Run before durable admission as well as delivery. Reserve room for the
  * per-row revision guards that IndexedDB captures during its transaction. */
 export function assertDeliverableCommand(command: PendingCommand): void {
+  if (command.mutation.kind === 'venueNote.change') assertCommand(command)
   if (isTicketMutation(command.mutation) || command.mutation.kind === 'outing.revert') { assertCommand(command); return }
   const operations = libraryOperations(command)
   // Pretty JSON conservatively covers PostgreSQL jsonb's spaces, including
@@ -200,7 +208,9 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
     const result: unknown=await response.json()
     if (!response.ok) {
       const failure=result as {code?:string;message?:string}
-      return classifyLibraryError(response.status,failure?.code,failure?.message ?? 'Library sync failed.')
+      const classified = classifyLibraryError(response.status,failure?.code,failure?.message ?? 'Library sync failed.')
+      return command.mutation.kind === 'venueNote.change' && classified.kind === 'conflict'
+        ? { ...classified, venueRejection: true } : classified
     }
     if (!result || typeof result!=='object' || !('operationId' in result) || result.operationId!==command.id) return {kind:'retry',message:'Sync returned an unrecognized receipt.'}
     if (reverting) {
@@ -213,8 +223,8 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
     // preserves edits made on another device after that command was committed.
     const canonicalBase=await fetchBase(context)
     const interests = command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]
-    if (interests.some((mutation) => mutation.kind === 'theaterInterest.set') && canonicalBase.moviegoingPreferencesSupport !== 'authoritative') {
-      return { kind: 'retry', message: 'The saved theater preference needs an authoritative server read before confirmation. Retry when moviegoing preference sync is available.' }
+    if (interests.some((mutation) => mutation.kind === 'theaterInterest.set' || mutation.kind === 'venueNote.change') && canonicalBase.moviegoingPreferencesSupport !== 'authoritative') {
+      return { kind: 'retry', message: 'The saved moviegoing preference needs an authoritative server read before confirmation. Retry when moviegoing preference sync is available.' }
     }
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed during refresh.'}
     if (command.mutation.kind === 'outing.revert') onOutingReverted?.(command.mutation.outingId)

@@ -19,7 +19,7 @@ export type LibraryWrite = <T>(prepare: (state: LibraryActionState) => { mutatio
 type EpisodeLog = { watchedAt?: string; prePlatform?: boolean; watchNotes?: string; rating?: number; reviewText?: string; colorMode?: 'bw' | 'color' }
 const leaves = (mutation: Mutation | null): TrackingMutation[] => {
   if (!mutation) return []
-  if (isTicketMutation(mutation) || mutation.kind === 'outing.revert') throw new Error('This change cannot be combined with library commands')
+  if (isTicketMutation(mutation) || mutation.kind === 'outing.revert' || mutation.kind === 'venueNote.change') throw new Error('This change cannot be combined with library commands')
   return mutation.kind === 'batch' ? mutation.mutations : [mutation]
 }
 

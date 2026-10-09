@@ -4,6 +4,7 @@ import { mutationRows } from './preconditions'
 import { isTicketAttachment, isTicketId, isValidTicketMutation, ticketObjectKey } from '../tickets/validation'
 import { isTicketMutation } from '../tickets/types'
 import { assertMoviegoingSnapshot, isTheaterInterest, isVenueNote } from '../moviegoingPreferences'
+import { isVenueNoteMutation } from '../venueNotes'
 
 type Check = (value: unknown) => boolean
 type Fields = Record<string, Check>
@@ -115,7 +116,7 @@ function isLeaf(value: unknown): boolean {
 export function assertMutation(value: unknown): asserts value is Mutation {
   const revert = shape({ kind: oneOf('outing.revert'), outingId: id, titleId: id, viewingId: nullable(id), viewingPresent: boolean })(value) &&
     record(value) && (!value.viewingPresent || value.viewingId !== null)
-  const valid = isLeaf(value) || revert || isValidTicketMutation(value) || (record(value) && value.kind === 'batch' &&
+  const valid = isLeaf(value) || revert || isVenueNoteMutation(value) || isValidTicketMutation(value) || (record(value) && value.kind === 'batch' &&
     shape({ kind: text, mutations: (v) => Array.isArray(v) && v.length > 0 && v.length <= 10_000 && v.every(isLeaf) })(value))
   if (!valid) throw new Error('Invalid or unsupported offline mutation')
 }
@@ -128,9 +129,12 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     sequence: integer, mutation: (v) => { try { assertMutation(v); return true } catch { return false } },
     dependsOn: array(id), state: oneOf('pending', 'failed', 'conflict'), attempts: integer, nextAttemptAt: integer,
   }, { baseRevision: text, lastError: text,
+    venueRejection: oneOf(true),
     preconditions: array(precondition),
   })(value)) throw new Error('Invalid or unsupported offline command')
   const command = value as PendingCommand
+  if (command.venueRejection && (command.mutation.kind !== 'venueNote.change' || command.state !== 'conflict')) throw new Error('Invalid venue rejection evidence')
+  if (command.mutation.kind === 'venueNote.change' && (command.mutation.userId !== command.scope.userId || command.baseRevision || command.preconditions?.length || command.mutation.previousCommandId === command.id)) throw new Error('Invalid venue note owner or guard')
   for (const leaf of command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]) {
     if (leaf.kind === 'theaterInterest.set' && (leaf.userId !== command.scope.userId || command.baseRevision)) throw new Error('Theater interest requires its authenticated owner and desired-presence intent')
   }

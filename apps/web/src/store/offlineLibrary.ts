@@ -11,6 +11,7 @@ import { ticketRemote, mergeOwnedTickets } from '../lib/tickets/remote'
 import { replayPending } from '../lib/offline/replay'
 import { assertTicketBytes, sameTicketAttachment } from '../lib/tickets/validation'
 import { fetchOwnedMoviegoingPreferences, mergeOwnedMoviegoingPreferences } from '../lib/moviegoingPreferences'
+import type { VenueNoteReview } from '../lib/venueNotes'
 
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
 export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
@@ -287,6 +288,12 @@ export class OfflineLibraryRuntime {
     this.syncing = sync
   }
   retry(commandId: string): Promise<void> { return this.coordinator.retry(commandId) }
+  reviewVenue(commandId: string): Promise<VenueNoteReview> { return this.coordinator.reviewVenue(commandId, this.options.fetchBase ?? fetchOwnerSnapshot) }
+  async resolveVenue(review: VenueNoteReview, keepLocal: boolean): Promise<void> {
+    await this.coordinator.resolveVenue(review, keepLocal, this.options.fetchBase ?? fetchOwnerSnapshot)
+    this.channel?.postMessage({ kind: 'changed' })
+    this.wake()
+  }
   discard(commandId: string): Promise<void> { return this.coordinator.discard(commandId) }
   async discardDamagedCache(): Promise<void> {
     const ownerId = this.ownerId

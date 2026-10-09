@@ -2,6 +2,7 @@ import type { Episode, Season, Title } from '../../store/mockData'
 import type { Mutation, PendingCommand, TrackingMutation, OutingRevertMutation } from './commands'
 import type { OfflineSnapshot } from './snapshot'
 import type { TicketMutation } from '../tickets/types'
+import type { VenueNoteMutation } from '../venueNotes'
 
 function put<T extends { id: string }>(rows: T[], row: T): T[] {
   return rows.some((r) => r.id === row.id) ? rows.map((r) => r.id === row.id ? row : r) : [...rows, row]
@@ -81,8 +82,16 @@ function episode(state: OfflineSnapshot, titleId: string, episodeId: string, cha
   }) }))
 }
 
-function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMutation | OutingRevertMutation): OfflineSnapshot {
+function applyLeaf(state: OfflineSnapshot, mutation: TrackingMutation | TicketMutation | VenueNoteMutation | OutingRevertMutation): OfflineSnapshot {
   switch (mutation.kind) {
+    case 'venueNote.change': {
+      const current = state.venueNotes?.find((row) => row.venue === mutation.venue)
+      const remaining = (state.venueNotes ?? []).filter((row) => row.venue !== mutation.venue)
+      return { ...state, venueNotes: mutation.notes === null ? remaining : [...remaining, {
+        id: current?.id ?? mutation.baseline?.id ?? mutation.localId, userId: mutation.userId, venue: mutation.venue,
+        notes: mutation.notes, createdAt: current?.createdAt ?? mutation.baseline?.createdAt ?? mutation.recordedAt, updatedAt: mutation.recordedAt,
+      }] }
+    }
     case 'title.create':
       return state.titles.some((t) => t.id === mutation.title.id)
         ? titles(state, mutation.title.id, (existing) => mergeCreatedTitle(existing, mutation.title))

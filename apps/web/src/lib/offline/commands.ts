@@ -2,6 +2,7 @@ import type { CinemaOuting, Episode, EpisodeRating, EpisodeReview, EpisodeWatchE
 import type { LedgerWidget } from '../ledgerPanels'
 import { assertCommand, assertMutation, assertScope } from './validation'
 import type { TicketMutation, TicketOutingField } from '../tickets/types'
+import type { VenueNoteMutation } from '../venueNotes'
 
 /** Project identity must be the configured Supabase project/URL, never an access token. */
 export interface OfflineScope { projectId: string; userId: string }
@@ -43,7 +44,7 @@ export interface OutingRevertMutation {
   kind: 'outing.revert'; outingId: string; titleId: string
   viewingId: string | null; viewingPresent: boolean
 }
-export type Mutation = TrackingMutation | TicketMutation | OutingRevertMutation | { kind: 'batch'; mutations: TrackingMutation[] }
+export type Mutation = TrackingMutation | TicketMutation | VenueNoteMutation | OutingRevertMutation | { kind: 'batch'; mutations: TrackingMutation[] }
 
 export type RevisionTable = 'titles' | 'lists' | 'cinema_outings' | 'seasons' | 'episodes' | 'viewings' | 'episode_watch_events' | 'episode_ratings' | 'episode_reviews'
 export type RowPrecondition = { table: RevisionTable; id: string } & ({ updatedAt: string; afterCommandId?: never } | { afterCommandId: string; updatedAt?: never })
@@ -63,6 +64,8 @@ export interface PendingCommand {
   attempts: number
   nextAttemptAt: number
   lastError?: string
+  /** Definitive rejection of this immutable venue RPC, cleared before retry. */
+  venueRejection?: true
 }
 
 export function scopeKey(scope: OfflineScope): string {

@@ -99,6 +99,44 @@ test('switching accounts hides private work synchronously and retains it for its
   expect(await page.evaluate(() => window.offlineHarness.status?.commands.length)).toBe(1)
 })
 
+test('private theater intents retain their order and identities across browser restart and account switch', async ({ page }) => {
+  const owner = '10000000-0000-4000-8000-000000000001'
+  const movie = { ...title, id: '20000000-0000-4000-8000-000000000001' }
+  await boot(page, owner)
+  await page.evaluate(async ({ owner, movie }) => {
+    const base = { titles: [movie], outings: [], lists: [], listMemberships: {}, pinnedModes: {}, ledgerWidgets: [],
+      moviegoingPreferencesSupport: 'authoritative', venueNotes: [], theaterInterest: [] }
+    localStorage.setItem(`test-server:${owner}`, JSON.stringify(base))
+    await window.offlineHarness.runtime.refresh()
+  }, { owner, movie })
+  const saved = await page.evaluate(async ({ owner, titleId }) => {
+    const commands = []
+    for (const present of [true, false]) commands.push(await window.offlineHarness.runtime.submit({
+      kind: 'theaterInterest.set', userId: owner, titleId, present, createdAt: '2026-10-08T12:00:00.000Z',
+    }))
+    return commands.map(({ id, mutation }) => ({ id, mutation }))
+  }, { owner, titleId: movie.id })
+  expect(await page.evaluate(() => window.offlineHarness.snapshot?.theaterInterest)).toEqual([])
+  await boot(page, owner)
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands.map(({ id, mutation }) => ({ id, mutation })))).toEqual(saved)
+  const isolated = await page.evaluate(async () => {
+    const switching = window.offlineHarness.runtime.activate('10000000-0000-4000-8000-000000000002')
+    const hiddenImmediately = window.offlineHarness.snapshot === null
+    await switching
+    return { hiddenImmediately, titles: window.offlineHarness.snapshot?.titles, commands: window.offlineHarness.status?.commands }
+  })
+  expect(isolated).toEqual({ hiddenImmediately: true, titles: [], commands: [] })
+  await page.evaluate((owner) => window.offlineHarness.runtime.activate(owner), owner)
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands.map(({ id, mutation }) => ({ id, mutation })))).toEqual(saved)
+  await page.evaluate(() => { localStorage.setItem('test-server-online', 'yes'); window.dispatchEvent(new Event('online')) })
+  await expect.poll(() => page.evaluate(() => window.offlineHarness.status?.commands.length)).toBe(0)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('test-receipts') ?? '[]'))).toEqual(saved.map(({ id }) => id))
+  expect(await page.evaluate((owner) => JSON.parse(localStorage.getItem(`test-server:${owner}`)!).theaterInterest, owner)).toEqual([])
+  await boot(page, owner)
+  expect(await page.evaluate(() => window.offlineHarness.snapshot?.theaterInterest)).toEqual([])
+  expect(await page.evaluate(() => window.offlineHarness.errors)).toEqual([])
+})
+
 test('ticket revision intent survives real IndexedDB restart and receipt-only recovery without adopting a newer revision', async ({ page }) => {
   await page.goto('/e2e/offline-harness.html')
   const saved = await page.evaluate(async () => {

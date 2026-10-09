@@ -243,6 +243,7 @@ class AppAccountRuntime(
         isCurrentOwner = { auth.observeIdentity().value == identity },
         moviegoingPreferences = moviegoingPreferences,
         episodeBulkRepository = episodeBulkRepository,
+        manualTitleAdmission = work.kumarfamilynet.cinemarchive.data.AddTitleAdmission(database, outbox, importOwner, ::isCurrent),
     )
 
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId,

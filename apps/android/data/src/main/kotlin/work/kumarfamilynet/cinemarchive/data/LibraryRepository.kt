@@ -109,6 +109,7 @@ class LibraryRepository(
     private val isCurrentOwner: () -> Boolean = { mutationOwnerId != null },
     private val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
     val episodeBulkRepository: EpisodeBulkRepository? = null,
+    private val manualTitleAdmission: AddTitleAdmission? = null,
 ) {
     val viewingOwnerId: String? get() = mutationOwnerId
     /**
@@ -130,6 +131,9 @@ class LibraryRepository(
      * surfacing later as a push that can never succeed.
      */
     suspend fun addTitle(request: AddTitleRequest): String {
+        // Account runtimes use one atomic server graph command, including receipt handling
+        // and recovery. The legacy adapter below remains for older isolated callers.
+        manualTitleAdmission?.let { return it.add(request) }
         val details = request.details
         titleDao.findIdByTmdbKey(details.tmdbId, details.type.name)?.let { return it }
 

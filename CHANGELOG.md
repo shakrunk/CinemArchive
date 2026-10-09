@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android title additions now save tags and previously watched season progress through one durable atomic graph command, preserving undated history and catalog metadata.
 - Android now logs pre-platform watches for a series or season, preserving existing history and offering durable retry, conflict review, discard and original-request export from Profile.
 - Android provider imports now save new titles, supplied viewing dates and provider identity as one durable operation, with honest partial-failure reporting and account-safe document picking.
 - Android catalog additions now preserve Rotten Tomatoes links, awards, Bechdel results, credit portraits and episode counts through local storage and synchronization.

@@ -142,6 +142,9 @@ fun AddTitleOverlayRoute(
                 onStatusChange = viewModel::onStatusChange,
                 onRatingChange = viewModel::onRatingChange,
                 onNotesChange = viewModel::onNotesChange,
+                onTagsChange = viewModel::onTagsChange,
+                onSeasonProgressChange = viewModel::onSeasonProgressChange,
+                onMarkAll = viewModel::markMainSeasonsWatched,
                 onWatchedOnChange = viewModel::onWatchedOnChange,
                 onPrePlatformChange = viewModel::onPrePlatformChange,
                 onRetry = viewModel::retryDetails,
@@ -269,6 +272,9 @@ private fun LogStep(
     onStatusChange: (LibraryStatus) -> Unit,
     onRatingChange: (Double) -> Unit,
     onNotesChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onSeasonProgressChange: (Int, Int) -> Unit,
+    onMarkAll: () -> Unit,
     onWatchedOnChange: (LocalDate) -> Unit,
     onPrePlatformChange: (Boolean) -> Unit,
     onRetry: () -> Unit,
@@ -303,6 +309,9 @@ private fun LogStep(
             onStatusChange = onStatusChange,
             onRatingChange = onRatingChange,
             onNotesChange = onNotesChange,
+            onTagsChange = onTagsChange,
+            onSeasonProgressChange = onSeasonProgressChange,
+            onMarkAll = onMarkAll,
             onWatchedOnChange = onWatchedOnChange,
             onPrePlatformChange = onPrePlatformChange,
             onSave = onSave,
@@ -318,6 +327,9 @@ private fun LogForm(
     onStatusChange: (LibraryStatus) -> Unit,
     onRatingChange: (Double) -> Unit,
     onNotesChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onSeasonProgressChange: (Int, Int) -> Unit,
+    onMarkAll: () -> Unit,
     onWatchedOnChange: (LocalDate) -> Unit,
     onPrePlatformChange: (Boolean) -> Unit,
     onSave: () -> Unit,
@@ -418,6 +430,32 @@ private fun LogForm(
                 onPrePlatformChange = onPrePlatformChange,
                 modifier = Modifier.padding(bottom = 20.dp),
             )
+        }
+
+        SectionLabel("Tags")
+        androidx.compose.material3.OutlinedTextField(
+            value = state.form.tags, onValueChange = onTagsChange,
+            label = { Text("Tags, separated by commas") },
+            enabled = !state.isSaving, modifier = Modifier.fillMaxWidth(),
+        )
+        if (details.seasons.isNotEmpty()) {
+            SectionLabel("Season progress")
+            Text("Previously watched episodes are saved without a date.")
+            androidx.compose.material3.TextButton(onClick = onMarkAll, enabled = !state.isSaving) {
+                Text("Mark all main seasons watched")
+            }
+            details.seasons.sortedBy { it.seasonNumber }.forEach { season ->
+                val count = state.form.seasonProgress[season.seasonNumber] ?: 0
+                androidx.compose.material3.OutlinedTextField(
+                    value = count.toString(),
+                    onValueChange = { value ->
+                        value.toIntOrNull()?.takeIf { it in 0..season.episodeCount }
+                            ?.let { onSeasonProgressChange(season.seasonNumber, it) }
+                    },
+                    label = { Text((if (season.isSpecials) "Specials" else "Season " + season.seasonNumber) + ": watched / " + season.episodeCount) },
+                    enabled = !state.isSaving, modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         SectionLabel("Notes")

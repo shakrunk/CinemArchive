@@ -151,4 +151,6 @@ data class AddTitleRequest(
     /** `YYYY-MM-DD`. Only honored for [LibraryStatus.WATCHED], where it seeds the title's
      *  first viewing so the Ledger's date-bucketed widgets have something to fold in. */
     val watchedOn: String? = null,
+    val tags: List<String> = emptyList(),
+    val seasonProgress: Map<Int, Int> = emptyMap(),
 )

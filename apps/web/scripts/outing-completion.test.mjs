@@ -166,6 +166,56 @@ test('restored completion undo preserves rated history and later edits without p
   assert.equal((await db.query('select status from titles where id=$1', [edited.titleId])).rows[0].status, 'watched')
 })
 
+test('guarded viewing deletion atomically clears only its exact outing link and preserves newer history', async () => {
+  const restored = await restoreHistoricalTrip()
+  const secondViewing = randomUUID(), secondOuting = randomUUID()
+  await db.query('select apply_library_command($1,$2::jsonb)', [randomUUID(), JSON.stringify([
+    { table: 'viewings', action: 'insert', key: { id: secondViewing }, values: {
+      title_id: restored.titleId, viewed_at: '2021-01-01', notes: 'Keep this rewatch', rating: 4,
+    } },
+    { table: 'cinema_outings', action: 'insert', key: { id: secondOuting }, values: {
+      title_id: restored.titleId, showtime: '2021-01-01T20:00:00Z', ends_at: '2021-01-01T22:00:00Z',
+      previews_minutes: 20, runtime_minutes: 100, status: 'completed', completed_viewing_id: secondViewing,
+    } },
+    { table: 'viewings', action: 'update', key: { id: secondViewing }, values: { outing_id: secondOuting } },
+  ])])
+  const readOuting = async (id) => (await db.query('select to_jsonb(o) as row from cinema_outings o where id=$1', [id])).rows[0].row
+  const readViewing = async (id) => (await db.query('select to_jsonb(v) as row from viewings v where id=$1', [id])).rows[0]?.row
+  const otherOuting = await readOuting(secondOuting), otherViewing = await readViewing(secondViewing)
+  const operation = randomUUID()
+  const deleteRequest = [{ table: 'viewings', action: 'delete', key: { id: restored.canonicalViewingId }, expectedUpdatedAt: restored.viewing.updated_at }]
+  await patchReceipt('viewings', restored.canonicalViewingId, { notes: 'Newer note must survive' })
+  const newer = await readViewing(restored.canonicalViewingId)
+  assert.notEqual(newer.updated_at, restored.viewing.updated_at)
+  await assert.rejects(db.query('select apply_library_command($1,$2::jsonb)', [operation, JSON.stringify(deleteRequest)]), { code: '40001' })
+  assert.deepEqual(await readViewing(restored.canonicalViewingId), newer)
+  assert.deepEqual(await readOuting(restored.outing.id), restored.outing)
+  assert.deepEqual(await readOuting(secondOuting), otherOuting)
+  assert.deepEqual(await readViewing(secondViewing), otherViewing)
+
+  // A newly confirmed deletion uses the freshly observed viewing revision, with no
+  // preliminary outing mutation and no title-status restoration.
+  const confirmedOperation = randomUUID()
+  const confirmedRequest = [{ ...deleteRequest[0], expectedUpdatedAt: newer.updated_at }]
+  const receipt = (await db.query('select apply_library_command($1,$2::jsonb) as result', [confirmedOperation, JSON.stringify(confirmedRequest)])).rows[0].result
+  assert.equal(await readViewing(restored.canonicalViewingId), undefined)
+  const detached = await readOuting(restored.outing.id)
+  assert.equal(detached.completed_viewing_id, null)
+  assert.equal(detached.status, 'completed')
+  assert.equal(detached.venue, restored.outing.venue)
+  assert.notEqual(detached.updated_at, restored.outing.updated_at)
+  assert.deepEqual(await readOuting(secondOuting), otherOuting)
+  assert.deepEqual(await readViewing(secondViewing), otherViewing)
+  assert.equal((await db.query('select status,notes from titles where id=$1', [restored.titleId])).rows[0].status, 'watched')
+
+  // A lost-response retry does not clear a link deliberately changed afterwards.
+  await patchReceipt('cinema_outings', restored.outing.id, { completed_viewing_id: secondViewing })
+  const relinked = await readOuting(restored.outing.id)
+  assert.deepEqual((await db.query('select apply_library_command($1,$2::jsonb) as result', [confirmedOperation, JSON.stringify(confirmedRequest)])).rows[0].result, receipt)
+  assert.deepEqual(await readOuting(restored.outing.id), relinked)
+  assert.deepEqual(await readViewing(secondViewing), otherViewing)
+})
+
 async function dependentTitle(snapshot, values = { rating: 4.5 }, id = randomUUID(), titleId = snapshot.title?.id ?? titleEffect(snapshot)?.key.id) {
   return (await db.query('select apply_library_command($1,$2) as result', [id, [{
     table: 'titles', action: 'update', key: { id: titleId }, values, expectedOperationId: snapshot.operationId,

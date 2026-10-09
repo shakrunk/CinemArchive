@@ -251,6 +251,34 @@ Every Android write RPC/insert must satisfy:
 
 ## 5. Fixtures and RLS matrices
 
+### Backup graph fields (2026-10-09)
+
+`20261009004431_backup_graph_sync.sql` extends the existing owner-only incremental feed:
+
+| Entity | Additional payload keys |
+| --- | --- |
+| `title` | `backupGraphVersion: 1` |
+| `title_cast`, `season_cast` | `profileUrl`, `episodeCount` |
+| `title_crew` | `profileUrl` |
+| `episode_watch_event`, `episode_review` | `colorMode` |
+
+Nullable values are emitted as explicit JSON nulls; zero episode counts remain zero. Existing
+`companions` payloads on viewings and outings already preserve `friendUserId` and remain unchanged.
+The prior `personCreditsVersion`, `titleMetadataVersion`, and `moviegoingPreferencesVersion` markers,
+all entity arms, parent identities, tombstones, and timestamp-group pagination remain intact.
+
+The migration updates only the RPC definition and grants. It does not rewrite rows or timestamps.
+A newly capable native mirror must replay from epoch, retain pending local intent during that replay,
+and acknowledge its new local schema capability only after observing `backupGraphVersion >= 1` on
+an actual title. An empty feed or an older backend does not prove support: absent keys preserve local
+values; present null keys clear them. Protected pending writes require a durable replay after their
+protection ends so unchanged metadata and earlier tombstones are not permanently skipped.
+
+`apps/web/scripts/backup-graph-sync.test.mjs` exercises the real PostgreSQL migration locally before
+and after existing graph insertion, explicit clears, raw companions, all current entity arms,
+owner/anonymous boundaries, direct/cascade tombstones, and both page caps and tied timestamps.
+This backend contract alone does not add native storage or installed-app backup UI.
+
 See `docs/android-contracts/` for the JSON fixtures and RLS authorization matrices for the
 three domains closest to ready (Library, Title detail, Episode tracking). Domains still at
 "Discovery" (Discover/add, Up Next, Ledger, Sharing, Friends, Notifications) are out of

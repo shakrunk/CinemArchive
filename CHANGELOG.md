@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web Discover now keeps movies and TV shows in mixed genre pagination and prevents outdated searches or page responses from replacing a newer selection.
 - Android outing recovery now preserves the server revision while displaying pending edits, keeping unsupported saved intents available for review.
 - Android viewing-command recovery now retains original edit identities and refreshes exact linked outings after deletion; history-editor activation is being integrated separately.
 - Web outing planning now supports private venue notes with durable offline saves, explicit removal and comparison when another device changes a note.

@@ -3,6 +3,7 @@ import { expect, test, type Page } from 'playwright/test'
 import type { OfflineLibraryRuntime, OfflineLibraryStatus } from '../src/store/offlineLibrary'
 import type { OfflineSnapshot } from '../src/lib/offline/snapshot'
 import type { Title } from '../src/store/mockData'
+import type { PendingCommand } from '../src/lib/offline/commands'
 
 declare global {
   interface Window {
@@ -19,10 +20,12 @@ async function boot(page: Page, owner = 'owner-a') {
     const storagePath = '/src/lib/offline/storage.ts'
     const replayPath = '/src/lib/offline/replay.ts'
     const snapshotPath = '/src/lib/offline/snapshot.ts'
+    const rpcPath = '/src/lib/offlineRpc.ts'
     const { OfflineLibraryRuntime } = await import(runtimePath)
     const { IndexedDbOfflineStore } = await import(storagePath)
     const { applyMutation } = await import(replayPath)
     const { emptySnapshot } = await import(snapshotPath)
+    const { libraryOperations } = await import(rpcPath)
     const base = (userId: string) => JSON.parse(localStorage.getItem(`test-server:${userId}`) ?? JSON.stringify(emptySnapshot()))
     const runtime = new OfflineLibraryRuntime({
       projectId: 'browser-test', ownerStorage: new IndexedDbOfflineStore({ databaseName: 'browser-owner' }),
@@ -32,18 +35,32 @@ async function boot(page: Page, owner = 'owner-a') {
       onSnapshot: (snapshot: OfflineSnapshot | null) => { window.offlineHarness.snapshot = snapshot },
       onStatus: (status: OfflineLibraryStatus) => { window.offlineHarness.status = status },
       onError: (error: unknown) => { window.offlineHarness.errors.push(String(error)) },
-      deliver: async (command: { id: string; mutation: Parameters<typeof applyMutation>[1] }, context: { scope: { userId: string } }) => {
+      deliver: async (command: PendingCommand, context: { scope: { userId: string } }) => {
         if (localStorage.getItem('test-server-online') !== 'yes') return { kind: 'retry', message: 'Network unavailable', retryAfterMs: 100 }
         const active = Number(localStorage.getItem('test-active-deliveries') ?? '0') + 1
         localStorage.setItem('test-active-deliveries', String(active))
         localStorage.setItem('test-max-deliveries', String(Math.max(active, Number(localStorage.getItem('test-max-deliveries') ?? '0'))))
         await new Promise((resolve) => setTimeout(resolve, 20))
         const receipts: string[] = JSON.parse(localStorage.getItem('test-receipts') ?? '[]')
+        // Synthetic transport outcomes around real runtime/IDB/Web Locks. This
+        // proves client recovery and immutable requests, not PostgreSQL CAS.
+        if (command.mutation.kind === 'venueNote.change') {
+          const attempts = JSON.parse(localStorage.getItem('test-venue-attempts') ?? '[]')
+          localStorage.setItem('test-venue-attempts', JSON.stringify([...attempts, { id: command.id, mutation: command.mutation, operations: libraryOperations(command) }]))
+          if (!receipts.includes(command.id) && localStorage.getItem(`test-reject:${command.id}`) === 'yes') {
+            localStorage.setItem('test-active-deliveries', String(active - 1))
+            return { kind: 'conflict', venueRejection: true, message: 'Server venue note changed' }
+          }
+        }
         if (!receipts.includes(command.id)) {
           localStorage.setItem(`test-server:${context.scope.userId}`, JSON.stringify(applyMutation(base(context.scope.userId), command.mutation)))
           localStorage.setItem('test-receipts', JSON.stringify([...receipts, command.id]))
         }
         localStorage.setItem('test-active-deliveries', String(active - 1))
+        if (localStorage.getItem(`test-lose-ack:${command.id}`) === 'yes') {
+          localStorage.removeItem(`test-lose-ack:${command.id}`)
+          return { kind: 'retry', message: 'Response lost after acceptance', retryAfterMs: 60_000 }
+        }
         return { kind: 'success', canonicalBase: base(context.scope.userId) }
       },
     })
@@ -134,6 +151,101 @@ test('private theater intents retain their order and identities across browser r
   expect(await page.evaluate((owner) => JSON.parse(localStorage.getItem(`test-server:${owner}`)!).theaterInterest, owner)).toEqual([])
   await boot(page, owner)
   expect(await page.evaluate(() => window.offlineHarness.snapshot?.theaterInterest)).toEqual([])
+  expect(await page.evaluate(() => window.offlineHarness.errors)).toEqual([])
+})
+
+test('venue notes preserve opening proof, resolve rejected chains and confirm unknown outcomes across reload and owner switch', async ({ page }) => {
+  const owner = '10000000-0000-4000-8000-000000000001'
+  const original = { id: '20000000-0000-4000-8000-000000000001', userId: owner, venue: "O'Brien Cinema", notes: 'Original parking',
+    createdAt: '2026-10-08T12:00:00.123456Z', updatedAt: '2026-10-08T12:00:00.123456Z' }
+  await boot(page, owner)
+  await page.evaluate(async ({ owner, original }) => {
+    const base = { titles: [], outings: [], lists: [], listMemberships: {}, pinnedModes: {}, ledgerWidgets: [],
+      moviegoingPreferencesSupport: 'authoritative', venueNotes: [original], theaterInterest: [] }
+    localStorage.setItem(`test-server:${owner}`, JSON.stringify(base))
+    await window.offlineHarness.runtime.refresh()
+  }, { owner, original })
+  const saved = await page.evaluate(async ({ owner, venue }) => {
+    const path = '/src/lib/venueNotes.ts'
+    const { captureVenueDraft, venueChange } = await import(path)
+    const commands = []
+    for (const text of ['First local draft', 'Latest local draft']) {
+      const harness = window.offlineHarness
+      const opening = captureVenueDraft(harness.snapshot, harness.status!.commands, owner, venue)
+      const command = await harness.runtime.submit(venueChange(opening, text))
+      commands.push({ id: command.id, mutation: command.mutation })
+    }
+    return commands
+  }, { owner, venue: original.venue })
+  expect(saved[0].mutation).toMatchObject({ baseline: original })
+  expect(saved[1].mutation).toMatchObject({ previousCommandId: saved[0].id })
+  await boot(page, owner)
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands.map(({ id, mutation }) => ({ id, mutation })))).toEqual(saved)
+  const isolated = await page.evaluate(async () => {
+    const switching = window.offlineHarness.runtime.activate('10000000-0000-4000-8000-000000000002')
+    const hiddenImmediately = window.offlineHarness.snapshot === null
+    await switching
+    return { hiddenImmediately, notes: window.offlineHarness.snapshot?.venueNotes ?? [], commands: window.offlineHarness.status?.commands }
+  })
+  expect(isolated).toEqual({ hiddenImmediately: true, notes: [], commands: [] })
+  await page.evaluate((owner) => window.offlineHarness.runtime.activate(owner), owner)
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands.map(({ id, mutation }) => ({ id, mutation })))).toEqual(saved)
+  const remote = { ...original, notes: 'Remote parking change', updatedAt: '2026-10-09T12:00:00.654321Z' }
+  await page.evaluate(async ({ owner, remote, rejectedId }) => {
+    const base = JSON.parse(localStorage.getItem(`test-server:${owner}`)!)
+    localStorage.setItem(`test-server:${owner}`, JSON.stringify({ ...base, venueNotes: [remote] }))
+    localStorage.setItem(`test-reject:${rejectedId}`, 'yes')
+    localStorage.setItem('test-server-online', 'yes')
+    await window.offlineHarness.runtime.flush()
+  }, { owner, remote, rejectedId: saved[0].id })
+  await expect.poll(() => page.evaluate(() => window.offlineHarness.status?.commands[0].venueRejection)).toBe(true)
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands[1].attempts)).toBe(0)
+  const replacement = await page.evaluate(async (rejectedId) => {
+    const harness = window.offlineHarness
+    const review = await harness.runtime.reviewVenue(rejectedId)
+    // Only mutation transport is paused; fetchBase intentionally reads the
+    // fixture. Resolution still uses the real delivery lock and IDB transaction.
+    localStorage.setItem('test-server-online', 'no')
+    await harness.runtime.resolveVenue(review, true)
+    return { review, command: harness.status!.commands[0], count: harness.status!.commands.length }
+  }, saved[0].id)
+  expect(replacement.review.current).toEqual(remote)
+  expect(replacement.review.notes).toBe('Latest local draft')
+  expect(replacement.review.commands.map(({ id }) => id)).toEqual(saved.map(({ id }) => id))
+  expect(replacement.count).toBe(1)
+  expect(saved.map(({ id }) => id)).not.toContain(replacement.command.id)
+  expect(replacement.command.mutation).toMatchObject({ baseline: remote, notes: 'Latest local draft' })
+  expect(replacement.command.mutation).not.toHaveProperty('previousCommandId')
+  await boot(page, owner)
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands[0].mutation)).toEqual(replacement.command.mutation)
+  await page.evaluate(async (id) => {
+    localStorage.setItem(`test-lose-ack:${id}`, 'yes')
+    localStorage.setItem('test-server-online', 'yes')
+    await window.offlineHarness.runtime.retry(id)
+  }, replacement.command.id)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('test-receipts') ?? '[]'))).toEqual([replacement.command.id])
+  expect(await page.evaluate(() => window.offlineHarness.status?.commands[0])).toMatchObject({ id: replacement.command.id, state: 'pending', lastError: 'Response lost after acceptance' })
+  const uncertain = await page.evaluate(async (id) => {
+    try { await window.offlineHarness.runtime.reviewVenue(id); return 'incorrectly allowed' }
+    catch (error) { return String(error) }
+  }, replacement.command.id)
+  expect(uncertain).toContain('not known to be rejected')
+  // A later server edit must survive replay of the old accepted receipt.
+  const newer = { ...remote, notes: 'Later remote note', updatedAt: '2026-10-10T12:00:00.654321Z' }
+  await page.evaluate(async ({ owner, newer, id }) => {
+    const base = JSON.parse(localStorage.getItem(`test-server:${owner}`)!)
+    localStorage.setItem(`test-server:${owner}`, JSON.stringify({ ...base, venueNotes: [newer] }))
+    await window.offlineHarness.runtime.retry(id)
+  }, { owner, newer, id: replacement.command.id })
+  await expect.poll(() => page.evaluate(() => window.offlineHarness.status?.commands.length)).toBe(0)
+  const attempts = await page.evaluate(() => JSON.parse(localStorage.getItem('test-venue-attempts') ?? '[]'))
+  expect(attempts.map((attempt: { id: string }) => attempt.id)).toEqual([saved[0].id, replacement.command.id, replacement.command.id])
+  expect(attempts[0].operations[0]).toMatchObject({ key: { venue: original.venue }, expectedUpdatedAt: original.updatedAt })
+  expect(attempts[1]).toEqual(attempts[2])
+  expect(attempts[1].operations[0].expectedUpdatedAt).toBe(remote.updatedAt)
+  await boot(page, owner)
+  expect(await page.evaluate(() => window.offlineHarness.snapshot?.venueNotes)).toEqual([newer])
+  expect(await page.evaluate(() => localStorage.getItem('test-max-deliveries'))).toBe('1')
   expect(await page.evaluate(() => window.offlineHarness.errors)).toEqual([])
 })
 

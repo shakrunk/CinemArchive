@@ -42,10 +42,20 @@ internal fun membershipProjectionKey(listId: String, titleId: String) = "list_me
 
 /** Preserve the natural key even when the server row has a different UUID. */
 internal fun membershipProtectionKeys(entries: List<OutboxEntity>): Set<String> = entries
-    .filter { it.entityType == "list_item" && it.operation == MEMBERSHIP_COMMAND }
+    .filter { it.entityType == "list_item" }
     .map { entry ->
-        val key = membershipOperations(entry).getJSONObject(0).getJSONObject("key")
-        membershipProjectionKey(key.getString("list_id"), key.getString("title_id"))
+        if (entry.operation == MEMBERSHIP_COMMAND) {
+            val key = membershipOperations(entry).getJSONObject(0).getJSONObject("key")
+            membershipProjectionKey(key.getString("list_id"), key.getString("title_id"))
+        } else {
+            // Older deletes carried only a surrogate ID; do not infer a different title.
+            // Replaying from the epoch after recovery releases any deferred canonical rows.
+            val payload = runCatching { JSONObject(entry.payloadJson) }.getOrNull()
+            val list = payload?.optString("listId").orEmpty()
+            val title = payload?.optString("titleId").orEmpty()
+            if (list.isNotBlank() && title.isNotBlank()) membershipProjectionKey(list, title)
+            else "list_membership:legacy"
+        }
     }.toSet()
 
 internal class ListMembershipTransport(

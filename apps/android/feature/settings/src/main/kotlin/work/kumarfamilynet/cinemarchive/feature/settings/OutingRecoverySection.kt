@@ -130,7 +130,7 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
                 if (review != null && !review.resolved) TextButton(
                     onClick = { if (review.pendingAttempt) controller.apply() else confirmation = "apply" },
                     enabled = !state.busy && (review.pendingAttempt || (review.remoteExists && state.selected.isNotEmpty())),
-                ) { Text(if (review.pendingAttempt) "Confirm previous attempt" else if (lifecycle) lifecycleAction else if (deleting) "Delete this viewing" else "Apply selected fields") }
+                ) { Text(if (review.pendingAttempt) "Confirm previous attempt" else if (lifecycle) lifecycleAction else if (deleting) "Delete this viewing" else if (subject == RecoverySubject.LIST) "Queue saved membership" else "Apply selected fields") }
             },
             dismissButton = { TextButton(onClick = controller::dismiss) { Text("Close") } },
         )
@@ -138,19 +138,21 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
     confirmation?.let { action ->
         AlertDialog(
             onDismissRequest = { confirmation = null },
-            title = { Text(if (action == "apply") { if (lifecycle) "$lifecycleAction?" else if (deleting) "Delete this exact viewing?" else "Apply only selected fields?" } else "Discard this saved change?") },
+            title = { Text(if (action == "apply") { if (subject == RecoverySubject.LIST) "Queue this saved membership?" else if (lifecycle) "$lifecycleAction?" else if (deleting) "Delete this exact viewing?" else "Apply only selected fields?" } else "Discard this saved change?") },
             text = { Text(when {
+                action == "apply" && subject == RecoverySubject.LIST -> "Queue the saved add or remove action for this list and title. It will sync in its original order; the original remains available to export."
                 action == "apply" && lifecycle -> "Apply this whole action only against the current outing shown here. If the outing or its linked history changed, review the new state before trying again. The original saved action remains available to export."
                 action == "apply" && deleting -> "Delete only this viewing if it has not changed. Other viewing history and the title's status and rating are preserved. The original saved change remains available to export."
                 action == "apply" -> "Selected saved values will replace the current values only if the " + subject.item + " has not changed. The other saved values will be discarded. The original remains available to export."
                 lifecycle -> "Discard this saved outing action? Its original remains available to export. Dependent saved edits are preserved for separate review; discarding does not authorize them to overwrite current history."
+                subject == RecoverySubject.LIST -> "Remove only this queued membership change. Changes already delivered are not undone, and other pending changes are preserved. The original remains available to export."
                 subject == RecoverySubject.OUTING -> "This removes only this saved change from the queue and keeps the current plan. Viewing history and other pending changes are preserved. The original remains available to export."
                 else -> "This removes only this saved change from the queue and keeps the current viewing. Other viewing history and pending changes are preserved. The original remains available to export."
             }) },
             confirmButton = { TextButton(onClick = {
                 confirmation = null
                 if (action == "apply") controller.apply() else controller.discard()
-            }) { Text(if (action == "apply") { if (lifecycle) "Confirm outing action" else if (deleting) "Delete only this viewing" else "Apply selected and keep other current values" } else "Discard this change") } },
+            }) { Text(if (action == "apply") { if (subject == RecoverySubject.LIST) "Queue membership change" else if (lifecycle) "Confirm outing action" else if (deleting) "Delete only this viewing" else "Apply selected and keep other current values" } else "Discard this change") } },
             dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
         )
     }

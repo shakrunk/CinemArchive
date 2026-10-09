@@ -276,6 +276,14 @@ class AppAccountRuntime(
         friendsRepository = friendsRepository,
     )
 
+    val listMembershipRecovery = work.kumarfamilynet.cinemarchive.data.ListMembershipRecoveryRepository(
+        database, ownerId, session::currentSession, outbox,
+        work.kumarfamilynet.cinemarchive.data.DataStoreOutingRecoveryArchive(dataStore("cinemarchive_list_recovery")),
+        work.kumarfamilynet.cinemarchive.data.ListMembershipRecoveryRepository.remote(client, ownerId, session::currentSession),
+        replayBoundary = { action -> librarySyncRepository.withDurableReplay(action) },
+        synchronize = { librarySyncRepository.syncNow() },
+    )
+
     val outingRecoveryRepository = work.kumarfamilynet.cinemarchive.data.OutingRecoveryRepository(
         ownerId, session::currentSession, database.outboxDao(), database.cinemaOutingDao(),
         database.titleDao(), outbox,

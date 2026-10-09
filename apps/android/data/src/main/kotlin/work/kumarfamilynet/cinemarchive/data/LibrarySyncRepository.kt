@@ -719,6 +719,8 @@ internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean
     val entityType = row.getString("entity_type")
     if (entityType == "viewing" && "outing_lifecycle_title:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
     if (entityType == "venue_note" && "venue_note_name:${row.getJSONObject("payload").getString("venue")}" in pending) return true
+    if ("list_membership:legacy" in pending && (entityType == "list_item" ||
+        entityType == "tombstone" && row.getJSONObject("payload").optString("entityType") == "list_item")) return true
     if (entityType == "list_item") {
         val payload = row.optJSONObject("payload")
         if (payload != null && membershipProjectionKey(payload.optString("listId"), payload.optString("titleId")) in pending) return true

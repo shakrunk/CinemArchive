@@ -64,8 +64,7 @@ class SupabaseRemoteMutationWriter(
                 }
                 "list_item" -> when (entry.operation) {
                     MEMBERSHIP_COMMAND -> ListMembershipTransport(client, sessionProvider).push(entry)
-                    "delete" -> deleteListItem(payload)
-                    else -> upsertListItem(payload)
+                    else -> PushResult.Retry("Open Profile > Saved list changes to review this older membership change.")
                 }
                 else -> PushResult.Retry("Unknown entity type ${entry.entityType}")
             }
@@ -402,26 +401,7 @@ class SupabaseRemoteMutationWriter(
         return PushResult.Success
     }
 
-    private fun upsertListItem(payload: JSONObject): PushResult {
-        val session = sessionProvider()
-        val body = JSONObject()
-            .put("id", payload.getString("id"))
-            .put("list_id", payload.getString("listId"))
-            .put("title_id", payload.getString("titleId"))
-            .put("user_id", session.userId)
-            .putNullable("position", payload, "position")
-            .put("added_at", payload.getString("addedAt"))
-            .put("updated_at", payload.getString("updatedAt"))
-        client.upsert("list_items", session.accessToken, body.toString())
-        return PushResult.Success
-    }
 
-    private fun deleteListItem(payload: JSONObject): PushResult {
-        val session = sessionProvider()
-        val id = payload.getString("id")
-        client.delete("list_items", "id=eq.$id&user_id=eq.${session.userId}", session.accessToken)
-        return PushResult.Success
-    }
 }
 
 /** Copies [key] from [source] under a (usually snake_case) [column], preserving an explicit

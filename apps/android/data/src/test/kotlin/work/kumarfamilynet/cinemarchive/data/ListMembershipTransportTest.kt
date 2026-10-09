@@ -29,6 +29,17 @@ class ListMembershipTransportTest {
     private fun transport() = ListMembershipTransport(client) { session }
     private fun body(index: Int) = Buffer().also { requests[index].body!!.writeTo(it) }.readUtf8()
 
+    @Test fun olderMembershipsNeverDispatchSurrogateWritesBeforeExplicitReview() = runTest {
+        val writer = SupabaseRemoteMutationWriter(client) { requireNotNull(session) }
+        for (operation in listOf("upsert", "delete", "review")) {
+            val entry = MembershipFixture.command().copy(operation = operation)
+            val result = writer.push(entry)
+            assertTrue(result is PushResult.Retry)
+            assertTrue((result as PushResult.Retry).reason.contains("Saved list changes"))
+        }
+        assertTrue(requests.isEmpty())
+    }
+
     @Test fun uncertainAddRetriesExactCommandThenReadsCanonicalNaturalIdentity() = runTest {
         val entry = MembershipFixture.command()
         replies += 503 to "{\"message\":\"Unknown delivery\"}"

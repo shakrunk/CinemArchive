@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android now reviews older queued list changes, preserves originals, and recovers membership by list/title identity without losing later edits.
 - Android navigation now supports device-local tab ordering, visibility, compact icons and reset, including phone and wide layouts.
 - Android can restore JSON backups through the system picker, with previews, duplicate skips, recoverable failures and preserved title, episode and outing history.
 - Android outing completion, post-show ratings and notes, and undo now use durable actions with explicit conflict recovery and protection against duplicate viewing history.

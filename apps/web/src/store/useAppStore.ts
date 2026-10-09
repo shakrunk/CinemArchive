@@ -411,11 +411,7 @@ function timeOf(dateStr: string | undefined): number {
 }
 
 interface TitleSearchIndex {
-  title: string
-  director: string | undefined
-  genres: string[]
-  tags: string[]
-  cast: string[]
+  searchText: string
 }
 
 const titleSearchCache = new WeakMap<Title, TitleSearchIndex>()
@@ -423,13 +419,15 @@ const titleSearchCache = new WeakMap<Title, TitleSearchIndex>()
 function getTitleSearch(t: Title): TitleSearchIndex {
   let index = titleSearchCache.get(t)
   if (!index) {
-    index = {
-      title: t.title.toLowerCase(),
-      director: t.director?.toLowerCase(),
-      genres: t.genres.map((g) => g.toLowerCase()),
-      tags: t.tags.map((tag) => tag.toLowerCase()),
-      cast: t.cast?.map((c) => c.name.toLowerCase()) || [],
-    }
+    const parts = [
+      t.title.toLowerCase(),
+      t.director?.toLowerCase(),
+      ...t.genres.map((g) => g.toLowerCase()),
+      ...t.tags.map((tag) => tag.toLowerCase()),
+      ...(t.cast?.map((c) => c.name.toLowerCase()) || []),
+    ]
+    // ⚡ Bolt: Join with a null byte to prevent cross-field false positive matches during search
+    index = { searchText: parts.filter(Boolean).join('\0') }
     titleSearchCache.set(t, index)
   }
   return index
@@ -471,13 +469,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
     const q = filters.search.toLowerCase()
     result = result.filter((t) => {
       const idx = getTitleSearch(t)
-      return (
-        idx.title.includes(q) ||
-        idx.director?.includes(q) ||
-        idx.genres.some((g) => g.includes(q)) ||
-        idx.tags.some((tag) => tag.includes(q)) ||
-        idx.cast.some((c) => c.includes(q))
-      )
+      return idx.searchText.includes(q)
     })
   }
 

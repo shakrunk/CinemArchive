@@ -99,10 +99,17 @@ class LedgerRepository(
     fun observeLedgerStats(): Flow<LedgerStats> = combine(
         titleDao.observeAllTitles(),
         viewingDao.observeTotalViewingCount(),
-    ) { titles, viewingCount ->
+        episodeDao.observeAllEpisodes(),
+        watchEventDao.observeAllWatchEvents(),
+    ) { titles, viewingCount, episodes, watchEvents ->
         val ratings = titles.mapNotNull { it.rating }
         val watchedMovieMinutes = titles
             .filter { it.type == MediaType.MOVIE.name && it.status == LibraryStatus.WATCHED.name }
+            .sumOf { it.runtime ?: 0 }
+        val seriesIds = titles.filter { it.type == MediaType.TV.name }.map { it.id }.toSet()
+        val watchedEpisodeIds = watchEvents.map { it.episodeId }.toSet()
+        val watchedEpisodeMinutes = episodes
+            .filter { it.titleId in seriesIds && it.id in watchedEpisodeIds }
             .sumOf { it.runtime ?: 0 }
 
         LedgerStats(
@@ -111,6 +118,7 @@ class LedgerRepository(
             totalViewings = viewingCount,
             averageRating = ratings.takeIf { it.isNotEmpty() }?.average(),
             totalWatchedMovieMinutes = watchedMovieMinutes,
+            totalWatchedEpisodeMinutes = watchedEpisodeMinutes,
         )
     }
 

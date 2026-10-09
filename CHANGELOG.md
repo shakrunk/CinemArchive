@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android Ledger hero totals now include watched episode and Special minutes and round hours like the web app, verified against shared calculation fixtures.
 - Android Spider-Noir episode watches and reviews now capture B&W or Color choices, preserve them across retries and synchronization, and show the chosen mode in history.
 - Android provider imports now merge existing titles and viewing dates atomically, preserve provider identity across pending imports, and expose exact retry, conflict review and request export.
 - Android now offers global keyboard search and owner actions, including ticket scheduling with preserved drafts, visible retries and durable duplicate prevention.

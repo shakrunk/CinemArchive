@@ -361,12 +361,12 @@ private fun LedgerBoardContent(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 HeroCopy(stats, viewedDisplayName)
-                val totalScreeningDays = stats.totalWatchedMovieMinutes / 60.0 / 24.0
+                val totalScreeningDays = stats.totalWatchedMinutes / 60.0 / 24.0
                 val tiles = listOf(
                     StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
                     StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
                     StatTileData("Screenings", stats.totalViewings.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
-                    StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                    StatTileData("Hours logged", stats.roundedHours.toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
                     StatTileData("Days in the dark", "%.1fd".format(totalScreeningDays), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
                     StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
                 )
@@ -1134,7 +1134,7 @@ private fun HeroCopy(stats: LedgerStats, viewedDisplayName: String?) {
         LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
     }
     val totalTitles = stats.totalMovies + stats.totalSeries
-    val hours = stats.totalWatchedMovieMinutes / 60
+    val hours = stats.roundedHours
     Column {
         Text(
             "now showing · $today",

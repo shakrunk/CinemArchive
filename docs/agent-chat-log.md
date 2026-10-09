@@ -12,7 +12,15 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 - Library history editor admission and compound recovery are committed as f5672ec. Automatic completion, post-show and reversal lifecycle activation remain unfinished.
 - Discover genre/type/pagination is committed as b630970 on Android and a2b498e on web. Shared viewing insert identity checks are committed as b438918.
 - Android Room 19 and protected metadata backfill are committed as 0ceb38b; credit refresh/rekey retention is e2013b8. Authenticated friend archives and Ledger are ba2dac0. Backup text mapping correction is 91abec8.
-- Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. All current worker assignments have finished, with no active runner or file claims. Full parity remains incomplete; the execution inventory records the remaining work.
+- Web private venue-note editing is committed as 1714c4b and browser recovery evidence as bf5d841. Full parity remains incomplete; the execution inventory records the remaining work.
+
+## Active continuation claims
+
+- Astra: Android Discover People/Studios routes, catalog parsing and tests; source frozen for the next coordinated gate.
+- Reverse worker: shared venue notes/theater-interest persistence and recovery (#324), Room 20, sync and the sole native runner. Owns companion raw columns/backfill in coordination with backup work.
+- Backup worker: installed JSON export/restore using complete local graphs, plus lossless companion propagation. Coordinates exact runtime/Profile/ImportSync seams with the reverse worker; no server-only export shortcut.
+- Metadata worker: friend/link access-scope editor and tests using existing owner-scoped APIs. Narrow MainActivity Friends hunks only; advanced friend filters wait for this commit.
+- Git writes remain with Astra. No native runner starts before all source owners confirm a compiling frozen state. Each verified user-facing slice stops for an atomic commit.
 
 ## New messages
 

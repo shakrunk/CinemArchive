@@ -41,6 +41,15 @@ internal object ViewingCommandFixture {
     }
     fun envelope(entry: OutboxEntity, current: JSONObject? = applied(entry)) = JSONObject()
         .put("receipt", receipt(entry)).put("current", current ?: JSONObject.NULL)
+    fun linkedDelete(): OutboxEntity {
+        val draft = work.kumarfamilynet.cinemarchive.core.model.ViewingDraft(viewing, "2026-10-01", null, null, null)
+        val captured = draft.copy(openingContext = viewingOpening(owner, title, viewing, draft,
+            ViewingGuard(revision = baseline), ViewingGuard(revision = baseline), listOf(OutingCommandFixture.outing)))
+        val (operationName, payload) = checkedViewingOpening(captured, owner, title).payload("delete", JSONObject())
+        return OutboxEntity(operation, "viewing", viewing, operationName, payload, 1)
+    }
+    fun linkedOuting() = OutingCommandFixture.row().put("user_id", owner).put("title_id", title)
+        .put("completed_viewing_id", JSONObject.NULL).put("status", "completed").put("updated_at", "2026-10-08T15:00:00Z")
 }
 
 class ViewingCommandTransportTest {
@@ -177,5 +186,45 @@ class ViewingCommandTransportTest {
         payload.getJSONObject(VIEWING_COMMAND_DATA).getJSONArray("operations").getJSONObject(0).getJSONObject("values").put("notes", "Different")
         assertTrue(transport().push(original.copy(payloadJson = payload.toString())) is PushResult.Retry)
         assertTrue(requests.isEmpty())
+    }
+
+    @Test fun acceptedDeleteReadsExactOwnedOutingAndRetainsOriginalCommandWhenReadFails() = runTest {
+        val entry = ViewingCommandFixture.linkedDelete()
+        for (code in listOf("40001", "23505")) {
+            accepted(entry, null)
+            replies += 409 to JSONObject().put("code", code).put("message", "Outing read failed").toString()
+            assertTrue(transport().push(entry) is PushResult.Retry)
+        }
+        accepted(entry, null)
+        replies += 200 to JSONArray().put(ViewingCommandFixture.linkedOuting()).toString()
+        val response = (transport().push(entry) as PushResult.Applied).receipt
+        assertEquals(body(0), body(3)); assertEquals(body(0), body(6))
+        assertEquals("/rest/v1/cinema_outings", requests.last().url.encodedPath)
+        assertEquals("eq.${OutingCommandFixture.outing}", requests.last().url.queryParameter("id"))
+        assertEquals("eq.${ViewingCommandFixture.owner}", requests.last().url.queryParameter("user_id"))
+        assertEquals("2026-10-08T15:00:00Z", response.getJSONObject("currentOutings").getJSONObject(OutingCommandFixture.outing).getString("updated_at"))
+    }
+
+    @Test fun deletedOutingRemainsExplicitlyAbsentAndAccountChangeCannotAcknowledge() = runTest {
+        val entry = ViewingCommandFixture.linkedDelete()
+        accepted(entry, null); replies += 200 to "[]"
+        val response = (transport().push(entry) as PushResult.Applied).receipt
+        assertTrue(response.getJSONObject("currentOutings").isNull(OutingCommandFixture.outing))
+        accepted(entry, null); replies += 200 to JSONArray().put(ViewingCommandFixture.linkedOuting()).toString()
+        afterResponse = { if (requests.last().url.encodedPath.endsWith("cinema_outings")) session = null }
+        assertTrue(transport().push(entry) is PushResult.Retry)
+    }
+
+    @Test fun malformedOrWrongOwnerOutingReadRetainsDeleteForRetry() = runTest {
+        val entry = ViewingCommandFixture.linkedDelete()
+        for (key in listOf("user_id", "title_id", "id")) {
+            accepted(entry, null)
+            replies += 200 to JSONArray().put(ViewingCommandFixture.linkedOuting().put(key, ViewingCommandFixture.nextOperation)).toString()
+            assertTrue(transport().push(entry) is PushResult.Retry)
+        }
+        val wrongOwner = JSONObject(entry.payloadJson).apply { getJSONObject(VIEWING_OPENING).put("ownerId", ViewingCommandFixture.nextOperation) }
+        val count = requests.size
+        assertTrue(transport().push(entry.copy(payloadJson = wrongOwner.toString())) is PushResult.Retry)
+        assertEquals(count, requests.size)
     }
 }

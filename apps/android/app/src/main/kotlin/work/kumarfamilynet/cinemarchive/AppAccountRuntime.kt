@@ -120,13 +120,16 @@ class AppAccountRuntime(
                 "title_catalog" -> work.kumarfamilynet.cinemarchive.data.EpisodeCatalogFillApplier(database, ownerId).apply(entry, receipt)
                 "list_item" -> work.kumarfamilynet.cinemarchive.data.ListMembershipApplier(database, ownerId).apply(entry, receipt)
                 "cinema_outing" -> work.kumarfamilynet.cinemarchive.data.OutingCommandApplier(database, ownerId).apply(entry, receipt)
-                "viewing" -> work.kumarfamilynet.cinemarchive.data.ViewingCommandApplier(database, ownerId).apply(entry, receipt)
+                "viewing" -> work.kumarfamilynet.cinemarchive.data.ViewingCommandApplier(database, ownerId) {
+                    auth.observeIdentity().value == identity
+                }.apply(entry, receipt)
                 else -> error("No canonical receipt handler for ${entry.entityType}")
             }
         },
         pendingProjectionKeys = { entries ->
             check(auth.observeIdentity().value == identity) { "This sign-in has ended" }
-            work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries) + tickets.protectionKeys(entries)
+            work.kumarfamilynet.cinemarchive.data.CreditReceiptApplier(database, ownerId).protectionKeys(entries) + tickets.protectionKeys(entries) +
+                work.kumarfamilynet.cinemarchive.data.viewingHistoryProtectionKeys(entries, ownerId)
         },
     )
 

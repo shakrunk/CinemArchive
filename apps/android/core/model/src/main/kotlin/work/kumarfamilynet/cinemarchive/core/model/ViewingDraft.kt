@@ -10,6 +10,8 @@ data class ViewingDraft(
     val notes: String?,
     val venue: String?,
     val companions: List<String> = emptyList(),
+    /** Owner-scoped opening snapshot and causal preconditions; opaque to the form. */
+    val openingContext: String? = null,
 ) {
     init {
         require(id.isNotBlank())

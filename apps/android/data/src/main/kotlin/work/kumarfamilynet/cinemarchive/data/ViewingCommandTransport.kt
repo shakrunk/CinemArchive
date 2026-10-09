@@ -20,6 +20,7 @@ internal class ViewingCommandTransport(
             val session = sessionProvider() ?: error("Account changed before viewing sync.")
             fun checkOwner() { check(sessionProvider()?.userId == session.userId) { "Account changed during viewing sync." } }
             val operations = viewingCommandOperations(entry)
+            val linkedOutings = viewingLinkedOutingIds(entry, session.userId)
             checkOwner()
             val receipt = JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
                 .put("p_operations", operations).toString(), session.accessToken))
@@ -35,6 +36,18 @@ internal class ViewingCommandTransport(
             currentCoroutineContext().ensureActive(); checkOwner()
             val envelope = JSONObject().put("receipt", receipt).put("current", if (rows.length() == 0) JSONObject.NULL else rows.getJSONObject(0))
             currentViewingCommandRow(entry, envelope, session.userId)
+            if (linkedOutings.isNotEmpty()) {
+                val currentOutings = JSONObject()
+                for (id in linkedOutings) {
+                    currentCoroutineContext().ensureActive(); checkOwner()
+                    val outings = JSONArray(client.get("cinema_outings", "id=eq.$id&user_id=eq.${session.userId}&select=*", session.accessToken))
+                    require(outings.length() <= 1)
+                    currentCoroutineContext().ensureActive(); checkOwner()
+                    currentOutings.put(id, if (outings.length() == 0) JSONObject.NULL else outings.getJSONObject(0))
+                }
+                envelope.put("currentOutings", currentOutings)
+                currentViewingLinkedOutings(entry, envelope, session.userId)
+            }
             PushResult.Applied(envelope)
         } catch (error: CancellationException) { throw error }
         catch (error: SupabaseHttpException) {
@@ -43,6 +56,39 @@ internal class ViewingCommandTransport(
             else PushResult.Retry(error.message ?: "Could not confirm viewing sync. Retry the same saved command.")
         } catch (error: Exception) {
             PushResult.Retry(error.message ?: "Could not confirm viewing sync. Retry the same saved command.")
+        }
+    }
+}
+
+/** Only exact IDs captured with the original delete may be read or projected by its ACK. */
+internal fun viewingLinkedOutingIds(entry: OutboxEntity, ownerId: String): List<String> {
+    val payload = JSONObject(entry.payloadJson)
+    val opening = payload.optJSONObject(VIEWING_OPENING)
+    if (opening != null) {
+        require(opening.getString("ownerId") == ownerId && opening.getString("id") == entry.entityId &&
+            opening.getString("titleId") == payload.getString("titleId")) { "Saved viewing belongs to another account or title." }
+    }
+    if (!payload.has("linkedOutings")) return emptyList()
+    require(viewingCommandOperations(entry).getJSONObject(0).getString("action") == "delete")
+    require(opening != null && sameCommandJson(opening.getJSONArray("linkedOutings"), payload.getJSONArray("linkedOutings")))
+    val ids = payload.getJSONArray("linkedOutings").let { values -> (0 until values.length()).map { values.getString(it).also(java.util.UUID::fromString) } }
+    require(ids.size == ids.distinct().size)
+    return ids
+}
+
+internal fun currentViewingLinkedOutings(entry: OutboxEntity, envelope: JSONObject, ownerId: String): Map<String, JSONObject?> {
+    val ids = viewingLinkedOutingIds(entry, ownerId)
+    if (ids.isEmpty()) {
+        require(!envelope.has("currentOutings") || envelope.getJSONObject("currentOutings").length() == 0)
+        return emptyMap()
+    }
+    val rows = envelope.getJSONObject("currentOutings")
+    require(rows.keys().asSequence().toSet() == ids.toSet()) { "Current linked outing state is incomplete." }
+    val titleId = JSONObject(entry.payloadJson).getString("titleId")
+    return ids.associateWith { id ->
+        if (rows.isNull(id)) null else rows.getJSONObject(id).also {
+            require(it.getString("id") == id && it.getString("user_id") == ownerId && it.getString("title_id") == titleId)
+            it.toRecoveryOuting()
         }
     }
 }

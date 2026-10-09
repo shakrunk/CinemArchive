@@ -144,6 +144,68 @@ class ViewingCommandRoomTest {
         assertEquals("Current server note", db.viewingDao().getById(entry.entityId)!!.notes)
         assertTrue(db.outboxDao().getPending().isEmpty())
     }
+
+    private suspend fun seedLinkedDelete(): OutboxEntity {
+        val deletion = ViewingCommandFixture.linkedDelete()
+        db.outboxDao().remove(entry.id); db.outboxDao().enqueue(deletion)
+        db.cinemaOutingDao().upsert(ViewingCommandFixture.linkedOuting().put("completed_viewing_id", deletion.entityId).toRecoveryOuting())
+        return deletion
+    }
+    private fun deletionEnvelope(deletion: OutboxEntity, outing: JSONObject?) = ViewingCommandFixture.envelope(deletion, null)
+        .put("currentOutings", JSONObject().put(OutingCommandFixture.outing, outing ?: JSONObject.NULL))
+
+    @Test fun deleteAckUsesCurrentLinkAndRevisionWithoutTouchingUnrelatedRewatchOrOuting() = runBlocking {
+        val deletion = seedLinkedDelete()
+        val other = viewingLinkedOuting("unrelated", ViewingCommandFixture.nextOperation)
+        db.cinemaOutingDao().upsert(other)
+        val rewatch = db.viewingDao().getById(entry.entityId)!!.copy(id = ViewingCommandFixture.nextOperation)
+        db.viewingDao().upsert(rewatch)
+        val current = ViewingCommandFixture.linkedOuting().put("completed_viewing_id", rewatch.id)
+        tx.run { applier.apply(deletion, deletionEnvelope(deletion, current)); db.outboxDao().remove(deletion.id) }
+        assertEquals(current.toRecoveryOuting(), db.cinemaOutingDao().getById(OutingCommandFixture.outing))
+        assertEquals(other, db.cinemaOutingDao().getById(other.id))
+        assertEquals(rewatch, db.viewingDao().getById(rewatch.id))
+        assertNull(db.viewingDao().getById(deletion.entityId))
+    }
+
+    @Test fun deleteAckKeepsLaterNarrowOutingAndTicketIntentWhileTakingServerRevision() = runBlocking {
+        val deletion = seedLinkedDelete()
+        val later = OutingCommandFixture.patch(notes = "Later private note")
+        db.outboxDao().enqueue(later)
+        val ticket = OutboxEntity(ViewingCommandFixture.nextOperation, TICKET_COMMAND_ENTITY, OutingCommandFixture.outing, "ticket_v1", "{}", 2)
+        db.outboxDao().enqueue(ticket)
+        db.cinemaOutingDao().upsert(db.cinemaOutingDao().getById(OutingCommandFixture.outing)!!.copy(ticketImagePath = "new-local-ticket"))
+        val current = ViewingCommandFixture.linkedOuting().put("venue", "New server venue")
+        tx.run { applier.apply(deletion, deletionEnvelope(deletion, current)); db.outboxDao().remove(deletion.id) }
+        val result = db.cinemaOutingDao().getById(OutingCommandFixture.outing)!!
+        assertEquals("Later private note", result.notes); assertEquals("New server venue", result.venue)
+        assertEquals("new-local-ticket", result.ticketImagePath); assertEquals("2026-10-08T15:00:00Z", result.updatedAt)
+        assertNull(result.completedViewingId)
+        assertEquals(listOf(later, ticket), db.outboxDao().getPending())
+    }
+
+    @Test fun missingCurrentOutingStaysAbsentButLaterIntentSurvives() = runBlocking {
+        val deletion = seedLinkedDelete()
+        val later = OutingCommandFixture.patch(notes = "Review after remote removal")
+        db.outboxDao().enqueue(later)
+        tx.run { applier.apply(deletion, deletionEnvelope(deletion, null)); db.outboxDao().remove(deletion.id) }
+        assertNull(db.cinemaOutingDao().getById(OutingCommandFixture.outing))
+        assertEquals(later, db.outboxDao().getPending().single())
+    }
+
+    @Test fun accountChangeDuringAckRollsBackViewingAndLinkedOutingTogether() = runBlocking {
+        val deletion = seedLinkedDelete()
+        val original = db.cinemaOutingDao().getById(OutingCommandFixture.outing)
+        var checks = 0
+        val fenced = ViewingCommandApplier(db, ViewingCommandFixture.owner) { ++checks == 1 }
+        assertTrue(runCatching { tx.run {
+            fenced.apply(deletion, deletionEnvelope(deletion, ViewingCommandFixture.linkedOuting()))
+            db.outboxDao().remove(deletion.id)
+        } }.isFailure)
+        assertEquals(original, db.cinemaOutingDao().getById(OutingCommandFixture.outing))
+        assertNotNull(db.viewingDao().getById(deletion.entityId))
+        assertEquals(deletion, db.outboxDao().getPending().single())
+    }
 }
 
 internal fun viewingLinkedOuting(id: String, viewingId: String) = CinemaOutingEntity(id, ViewingCommandFixture.title,

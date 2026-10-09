@@ -5,10 +5,18 @@ import work.kumarfamilynet.cinemarchive.core.database.LibraryDatabase
 import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 
 /** Network-free ACK, invoked in the same transaction that removes the original queue entry. */
-class ViewingCommandApplier(private val database: LibraryDatabase, private val ownerId: String) {
+class ViewingCommandApplier(private val database: LibraryDatabase, private val ownerId: String,
+    private val isCurrentOwner: () -> Boolean = { true }) {
     suspend fun apply(entry: OutboxEntity, envelope: JSONObject) {
+        check(isCurrentOwner()) { "Viewing account changed." }
+        applyOwned(entry, envelope)
+        check(isCurrentOwner()) { "Viewing account changed." }
+    }
+
+    private suspend fun applyOwned(entry: OutboxEntity, envelope: JSONObject) {
         check(database.inTransaction()) { "Viewing acknowledgment requires one Room transaction." }
         val current = currentViewingCommandRow(entry, envelope, ownerId)
+        val currentOutings = currentViewingLinkedOutings(entry, envelope, ownerId)
         val titleId = JSONObject(entry.payloadJson).getString("titleId")
         val queue = database.outboxDao().getPending()
         require(queue.firstOrNull()?.let { it.id == entry.id && it.operation == entry.operation && it.payloadJson == entry.payloadJson } == true)
@@ -16,11 +24,34 @@ class ViewingCommandApplier(private val database: LibraryDatabase, private val o
         val local = database.viewingDao().getById(entry.entityId)
         require(local == null || local.titleId == titleId)
         if (database.titleDao().getById(titleId) == null) return
+        if (current == null) database.completionQueueDao().clearViewingLink(entry.entityId)
+        for ((id, row) in currentOutings) {
+            val outing = database.cinemaOutingDao().getById(id) ?: continue
+            require(outing.titleId == titleId)
+            if (row == null) {
+                database.cinemaOutingDao().deleteById(id)
+                continue // later queued intent remains reviewable, never a remote resurrection
+            }
+            val pending = queue.drop(1).filter { it.entityId == id && it.entityType in setOf("cinema_outing", "outing_completion", TICKET_COMMAND_ENTITY) }
+            val projected = runCatching {
+                val result = JSONObject(row.toString())
+                pending.filter { it.entityType != TICKET_COMMAND_ENTITY }.forEach {
+                    require(it.entityType == "cinema_outing" && it.operation == OUTING_COMMAND)
+                    val operation = outingCommandOperations(it).getJSONObject(0)
+                    require(operation.getString("action") == "update")
+                    val fields = operation.getJSONObject("values")
+                    fields.keys().forEach { key -> result.put(key, fields.get(key)) }
+                }
+                result.toRecoveryOuting().let {
+                    if (pending.any { saved -> saved.entityType == TICKET_COMMAND_ENTITY }) it.copy(ticketImagePath = outing.ticketImagePath) else it
+                }
+            }
+            projected.getOrNull()?.let { database.cinemaOutingDao().upsert(it) }
+        }
         if (current == null) {
             // A removed remote event cannot be recreated by an old receipt. Keep any unsent
             // draft in its original queue payload for explicit recovery, not as live history.
             database.viewingDao().deleteById(entry.entityId)
-            database.completionQueueDao().clearViewingLink(entry.entityId)
             return
         }
         if (local == null) return // a later local delete remains deleted

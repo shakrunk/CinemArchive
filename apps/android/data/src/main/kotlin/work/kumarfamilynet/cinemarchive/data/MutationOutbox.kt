@@ -61,6 +61,19 @@ class MutationOutbox(
         )
     }
 
+    /** A restored editor reuses its admitted operation identity and exact request bytes. */
+    internal suspend fun enqueueCaptured(id: String, entityType: String, entityId: String, operation: String, payload: String): Boolean {
+        UUID.fromString(id)
+        val existing = outboxDao.getPending().firstOrNull { it.id == id }
+        if (existing != null) {
+            require(existing.entityType == entityType && existing.entityId == entityId && existing.payloadJson == payload &&
+                (existing.operation == operation || existing.operation == "review")) { "A saved operation ID was reused with different intent." }
+            return false // Keep its FIFO position, attempts and known rejection/review state.
+        }
+        outboxDao.enqueue(OutboxEntity(id, entityType, entityId, operation, payload, System.currentTimeMillis()))
+        return true
+    }
+
     /** Pushes pending mutations in enqueue order, stopping at the first retry. Safe to call
      *  repeatedly (on launch, on reconnect, on a timer) — failed entries stay queued. A
      *  [PushResult.Conflict] resolves immediately (the server payload wins by construction,

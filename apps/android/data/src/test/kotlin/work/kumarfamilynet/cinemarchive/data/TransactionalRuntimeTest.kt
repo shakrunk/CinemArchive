@@ -272,6 +272,33 @@ class TransactionalRuntimeTest {
         assertEquals("Unchanged old credit", db.titleCastDao().observeAllCast().first().single().name)
     }
 
+    @Test fun capturedViewingAckPersistsReplayBeforeProtectionDisappearsAcrossRestart() = runBlocking {
+        val db = memoryDb()
+        val file = tmpFile("viewing-replay")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 10; it[cursor] = "2026-10-08T00:00:00Z" }
+        val queue = MutationOutbox(db.outboxDao(), object : RemoteMutationWriter {
+            override suspend fun push(entry: OutboxEntity): PushResult {
+                assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+                return PushResult.Success
+            }
+        }, TitleConflictHandler(db.titleDao(), db.titleReconcileDao()), RoomTransactor(db),
+            pendingProjectionKeys = { viewingHistoryProtectionKeys(it, ViewingCommandFixture.owner) })
+        db.outboxDao().enqueue(ViewingCommandFixture.linkedDelete())
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray())))
+        val interrupted = syncRepository(db, queue, http, file, prefs, pushPending = {
+            queue.flush()
+            throw kotlinx.coroutines.CancellationException("process ended after ACK")
+        })
+        assertTrue(runCatching { interrupted.syncNow() }.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertTrue(http.requests.isEmpty())
+        assertEquals("1970-01-01T00:00:00Z", prefs.data.first()[cursor])
+        syncRepository(db, queue, http, file, prefs).syncNow()
+        assertEquals("1970-01-01T00:00:00Z", http.requests.single().getString("p_since"))
+    }
+
     @Test fun personCreditsResolveParentsAcrossPagesAndTombstonesDoNotResurrectDeferredRows() = runBlocking {
         val db = memoryDb()
         val seasonCredit = JSONObject().put("titleId", "show").put("seasonId", "season").put("tmdbPersonId", 42).put("name", "Same name").put("castOrder", 0)

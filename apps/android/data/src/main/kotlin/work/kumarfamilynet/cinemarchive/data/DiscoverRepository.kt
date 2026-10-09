@@ -26,6 +26,24 @@ class DiscoverRepository(
     private val client: SupabaseRestClient,
     private val authRepository: AuthRepository,
 ) : EpisodeMetadataFetcher {
+    suspend fun searchPeople(query: String): List<CatalogLookup> = searchLookups(query, people = true)
+    suspend fun searchStudios(query: String): List<CatalogLookup> = searchLookups(query, people = false)
+
+    private suspend fun searchLookups(query: String, people: Boolean): List<CatalogLookup> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) emptyList() else parseCatalogLookups(
+            client.invokeFunction("media-proxy", catalogLookupQuery(query, people), accessToken()), people)
+    }
+
+    suspend fun fetchPersonTitles(id: Int): List<TrendingTitle> = withContext(Dispatchers.IO) {
+        require(id > 0)
+        parseCatalogPersonTitles(client.invokeFunction("media-proxy", "action=person_credits&id=$id", accessToken()))
+    }
+
+    suspend fun fetchStudioTitles(id: Int, type: MediaType?): List<TrendingTitle> = withContext(Dispatchers.IO) {
+        val token = accessToken()
+        fetchCatalogStudioTitles(id, type) { client.invokeFunction("media-proxy", it, token) }
+    }
+
     /** A complete catalog page for the selected type and optional genre. Search/add APIs stay separate. */
     suspend fun fetchBrowse(type: MediaType?, genreId: Int?, page: Int): List<TrendingTitle> = withContext(Dispatchers.IO) {
         val token = accessToken()

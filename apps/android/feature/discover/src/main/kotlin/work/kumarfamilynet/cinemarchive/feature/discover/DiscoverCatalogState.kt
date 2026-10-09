@@ -2,6 +2,9 @@ package work.kumarfamilynet.cinemarchive.feature.discover
 
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
+import work.kumarfamilynet.cinemarchive.data.CatalogLookup
+
+enum class DiscoverMode(val label: String) { TITLES("Titles"), PEOPLE("People"), STUDIOS("Studios") }
 
 enum class TypeFilter(val label: String) {
     ALL("All"), MOVIE("Movies"), TV("TV");
@@ -30,6 +33,10 @@ internal fun filterDiscoverTitles(titles: List<TrendingTitle>, filter: TypeFilte
     titles.filter { filter == TypeFilter.ALL || (filter == TypeFilter.MOVIE) == (it.type == MediaType.MOVIE) }
 
 data class DiscoverUiState(
+    val mode: DiscoverMode = DiscoverMode.TITLES,
+    val lookups: List<CatalogLookup> = emptyList(),
+    val selectedLookup: CatalogLookup? = null,
+    val personTitles: List<TrendingTitle> = emptyList(),
     val query: String = "",
     val typeFilter: TypeFilter = TypeFilter.ALL,
     val genreId: Int? = null,

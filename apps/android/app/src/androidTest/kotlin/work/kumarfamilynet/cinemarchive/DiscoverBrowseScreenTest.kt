@@ -33,7 +33,7 @@ class DiscoverBrowseScreenTest {
     ) {
         compose.setContent { CinemArchiveTheme {
             val store = remember { ViewModelStore() }
-            val model = remember { DiscoverViewModel(browse) { listOf(MediaSearchResult(84, "Search hit", 2024, MediaType.TV, null, null)) }.also { store.put("discover", it) } }
+            val model = remember { DiscoverViewModel(browse, { listOf(MediaSearchResult(84, "Search hit", 2024, MediaType.TV, null, null)) }).also { store.put("discover", it) } }
             DisposableEffect(store) { onDispose { store.clear() } }
             val state by model.uiState.collectAsState()
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {

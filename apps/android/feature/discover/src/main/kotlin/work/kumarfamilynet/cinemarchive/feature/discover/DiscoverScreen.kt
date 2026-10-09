@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -70,6 +72,7 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.data.CatalogLookup
 
 private class DiscoverViewModelFactory(
     private val repository: DiscoverRepository,
@@ -126,6 +129,12 @@ fun DiscoverRoute(
         isLoadingMore = uiState.isLoadingMore,
         moreError = uiState.moreError,
         onLoadMore = viewModel::loadMore,
+        mode = uiState.mode,
+        onModeChange = viewModel::onModeChange,
+        lookups = uiState.lookups,
+        selectedLookup = uiState.selectedLookup,
+        onLookupSelect = viewModel::onLookupSelect,
+        onLookupBack = viewModel::clearLookup,
     )
 
     preview?.let { title ->
@@ -165,6 +174,12 @@ fun DiscoverScreen(
     isLoadingMore: Boolean = false,
     moreError: String? = null,
     onLoadMore: () -> Unit = {},
+    mode: DiscoverMode = DiscoverMode.TITLES,
+    onModeChange: (DiscoverMode) -> Unit = {},
+    lookups: List<CatalogLookup> = emptyList(),
+    selectedLookup: CatalogLookup? = null,
+    onLookupSelect: (CatalogLookup) -> Unit = {},
+    onLookupBack: () -> Unit = {},
 ) {
     val gridState = rememberLazyGridState()
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
@@ -193,6 +208,11 @@ fun DiscoverScreen(
             exit = fadeOut() + shrinkVertically(),
         ) {
             Column {
+                SegmentedGroup(
+                    options = DiscoverMode.entries.map { ChoiceOption(it, it.label) },
+                    selected = mode, onSelect = onModeChange,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -212,7 +232,11 @@ fun DiscoverScreen(
                         decorationBox = { inner ->
                             if (search.isEmpty()) {
                                 Text(
-                                    "Search movies & TV…",
+                                    when (mode) {
+                                        DiscoverMode.TITLES -> "Search movies & TV…"
+                                        DiscoverMode.PEOPLE -> "Search actors, directors & crew…"
+                                        DiscoverMode.STUDIOS -> "Search studios & companies…"
+                                    },
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -232,7 +256,7 @@ fun DiscoverScreen(
                     onSelect = onTypeFilterChange,
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
-                Box(Modifier.padding(horizontal = 20.dp)) {
+                if (mode == DiscoverMode.TITLES) Box(Modifier.padding(horizontal = 20.dp)) {
                     var genresExpanded by remember { mutableStateOf(false) }
                     val genres = discoverGenres(typeFilter)
                     TextButton(onClick = { genresExpanded = true }) {
@@ -244,6 +268,9 @@ fun DiscoverScreen(
                             DropdownMenuItem(text = { Text(genre.name) }, onClick = { genresExpanded = false; onGenreChange(genre.id) })
                         }
                     }
+                }
+                if (selectedLookup != null) TextButton(onClick = onLookupBack, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Back to ${mode.label.lowercase()}")
                 }
             }
         }
@@ -257,7 +284,7 @@ fun DiscoverScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    if (search.isNotBlank()) "Couldn't search titles" else if (genreId != null) "Couldn't load this genre" else "Couldn't load trending titles",
+                    if (mode != DiscoverMode.TITLES) "Couldn't load ${mode.label.lowercase()}" else if (search.isNotBlank()) "Couldn't search titles" else if (genreId != null) "Couldn't load this genre" else "Couldn't load trending titles",
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -269,6 +296,29 @@ fun DiscoverScreen(
                     modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
                 )
                 Button(onClick = onRetry) { Text("Retry") }
+            }
+            mode != DiscoverMode.TITLES && selectedLookup == null -> LazyColumn(
+                modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (lookups.isEmpty()) item {
+                    Text(if (search.isBlank()) "Search for ${if (mode == DiscoverMode.PEOPLE) "a person" else "a studio"}"
+                        else "No ${mode.label.lowercase()} found for “${search.trim()}”")
+                }
+                items(lookups, key = { it.id }) { lookup ->
+                    Surface(onClick = { onLookupSelect(lookup) }, shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            PosterSurface(tint = tintForKey(lookup.id.toString()), imageUrl = lookup.imageUrl,
+                                modifier = Modifier.size(48.dp, 64.dp), aspectRatio = 0.75f, cornerRadius = 8.dp)
+                            Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                                Text(lookup.name, style = MaterialTheme.typography.titleMedium)
+                                if (lookup.description.isNotBlank()) Text(lookup.description, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
             }
             else -> ExpressivePullToRefresh(
                 isRefreshing = isRefreshing,

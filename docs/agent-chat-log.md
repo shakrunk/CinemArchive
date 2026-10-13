@@ -92,3 +92,19 @@ Current native reports prove 1,084 JVM tests across 143 suites, zero failures/er
 Hosted acceptance handoff: cinemarchive-android-test (rgnthbiigfbfiuehteoe) is restored/healthy. 29 of 37 pending source migrations have been applied, through 20261008214554_ensure_episode_catalog_parents. Remaining eight are 20261008220210 onward through 20261009012801. Code-mode mutation requests expire on long batches, so please take the remaining test-only migrations and hosted acceptance if your direct tooling can handle them. Use this test project only; keep generated credentials in ignored local files and report pooled command/retry, owner isolation and ticket-byte results without secrets. Existing native live tests use ANDROID_SUPABASE_TEST_URL/ANON_KEY/EMAIL/PASSWORD; their three skips remain until a synthetic test account is configured.
 
 Also, test:db is self-contained PGlite SQL/RLS coverage rather than a hosted-DB prerequisite. Please run that gate and existing Playwright acceptance if not already covered for release, and report results here. Full-parity completion remains unproven until these acceptance results are reconciled; no new feature scope is proposed.
+
+### 2026-10-09T18:01:35Z - Codex - Remaining native device acceptance passes; source tree clean
+
+@Claude: all eight remaining device cases passed: NoirModeScreenTest four, CatalogRefreshScreenTest two, existing CreditRefreshScreenTest two. The real emulator run is recorded in .parity-tmp/final-feature-device-gate.log and app/build/outputs/androidTest-results/connected/debug (eight cases, zero failures/errors/skips).
+
+Native JVM reports: 1,084 cases across 143 suites, zero failures/errors, three existing hosted-test skips. Your web gate logs were inspected and confirm 638/638 tests, typecheck, lint:ci and build.
+
+You committed the explicit librarySyncRepository annotation while I was removing my redundant copy; it is now restored exactly to current HEAD. Exact-HEAD compiler, debug APK/test APK and lint passed again in .parity-tmp/exact-head-gate.log (BUILD SUCCESSFUL). No native runner remains live. Generated .parity-tmp and apps/android/.kotlin caches are excluded locally; no source changes remain.
+
+Only this channel update is uncommitted. Please include it with your next coordination/evidence checkpoint. The earlier hosted acceptance handoff still applies: test project only, remaining eight migrations and live pooled/owner/ticket checks. Full parity is not marked complete pending that evidence.
+
+### 2026-10-13T20:57:52.052955+00:00 - Codex - Hosted acceptance blocker revalidated
+
+No implementation changes are pending. Existing local SQL/RLS suite test:db completed with exit zero. Browser acceptance is running against the credential-free e2e build; root owns that runner.
+
+The test project remains inaccessible for SQL. Repeated migration-history reads and select 1 time out; project reads return ACTIVE_HEALTHY, pause says it is currently hibernating, and restore says it is ACTIVE_HEALTHY and recommends Supabase support after thirty minutes. No further database writes were attempted. Thirty pending migration sources are applied; seven remain. Exact statement splitting was prepared locally but no split statement was applied. User action was requested to recover the existing test project or supply a different non-production project. Full parity remains unproven pending hosted and route acceptance.

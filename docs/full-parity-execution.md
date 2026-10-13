@@ -183,11 +183,17 @@ Material You colors, APK updating, OS permission UI, predictive back, exact alar
 - Corrections include shared database scheduling bounds, explicit local unproven-revision handling that cannot become CAS authority, a real queued-import predecessor after ACK, and provider identity collision rejection in both import directions. Parity trailers pass all 153 commits through 988fccb, including externally integrated web commits.
 - Remaining implementation claims are Noir visual selection/synced pins and full single/bulk catalog refresh. Root is closing the small add-preview display gap against the actual web preview. Live signed-in cross-client acceptance still lacks configured non-production test credentials. Sonnet remains dismissed and its watcher disabled. This task has not pushed, released, deployed or written production data.
 
+## Final implementation and local acceptance checkpoint
+
+- Noir visual modes/pins c017708d, full catalog refresh 1ef29a3b, shared Ledger calculation parity de0bf114 and add-preview display 21d81a6f are committed. The shared calculation fixture verifies both clients against identical bytes and fixes native viewing totals to include distinct watched episodes and Specials.
+- Native evidence: 1,084 JVM cases across 143 suites, zero failures/errors and three hosted-service skips; compiler, debug APK/test APK assembly and lint pass. All eight final Noir/catalog device cases pass. Exact committed-source build/lint passed again after coordination cleanup. Web evidence: inspected logs show typecheck, lint (48 baseline warnings), production build and 638 tests across 74 files passing. The existing self-contained SQL/RLS suite also completed with exit zero.
+- Browser acceptance is being completed separately. Hosted pooled HTTP, account/session and ticket-byte acceptance remain unproven. The existing non-production test project was restored; thirty pending source migrations are applied. Seven remaining migration sources have been prepared as exact ordered statements, but no partial-statement migration has been applied. On 2026-10-13, migration-history reads and a simple connectivity query repeatedly time out despite project health reporting ACTIVE_HEALTHY. Pause is rejected because the project is currently hibernating; restore is rejected because it is ACTIVE_HEALTHY, with a support recommendation after thirty minutes. Database writes remain held until history can be revalidated; recovery or a different non-production project is required. Production was not modified by this task.
+
 ## Remaining work
 
-Full parity remains incomplete. The complete acceptance inventory above remains authoritative.
+Full parity remains incomplete. The complete acceptance inventory above remains authoritative. The identified implementation groups are committed; remaining work is acceptance evidence, not additional feature scope:
 
-- Noir visual selection and synced pins, full title/episode catalog refresh, and add-preview display parity.
-- Complete account/auth/invite/notification/deep-link acceptance, shared Library/Ledger fixture comparison, pooled backend concurrency and live signed-in cross-client/device journeys.
+- Complete account/auth/invite/notification/deep-link acceptance and live signed-in cross-client/device journeys.
+- Finish credential-free browser acceptance and hosted pooled command/concurrency, owner isolation and ticket-byte verification.
 
 The backup contract distinguishes current web parity from enhancements absent on both clients, including merged duplicate histories and embedded photo bytes. Current local checks do not prove the remaining requirements.

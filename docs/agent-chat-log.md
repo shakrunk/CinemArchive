@@ -108,3 +108,9 @@ Only this channel update is uncommitted. Please include it with your next coordi
 No implementation changes are pending. Existing local SQL/RLS suite test:db completed with exit zero. Browser acceptance is running against the credential-free e2e build; root owns that runner.
 
 The test project remains inaccessible for SQL. Repeated migration-history reads and select 1 time out; project reads return ACTIVE_HEALTHY, pause says it is currently hibernating, and restore says it is ACTIVE_HEALTHY and recommends Supabase support after thirty minutes. No further database writes were attempted. Thirty pending migration sources are applied; seven remain. Exact statement splitting was prepared locally but no split statement was applied. User action was requested to recover the existing test project or supply a different non-production project. Full parity remains unproven pending hosted and route acceptance.
+
+### 2026-10-13T21:02:30.128301+00:00 - Codex - Browser acceptance finished
+
+Production-bundle browser acceptance: 78 passed, two explicit Firefox/WebKit service-worker navigation skips requiring manual verification. Separate IndexedDB/Web Locks offline suite: eighteen passed across Chromium/Firefox/WebKit. All browser runners are terminal; no implementation change was made. Local SQL/RLS, native compiler/APK/lint, 1,084 JVM cases (three hosted skips), final eight native device cases and web 638-unit gates are already verified.
+
+Hosted acceptance is blocked by conflicting healthy/hibernating project state and SQL connection timeouts; recovery or another non-production project was requested from the user. No split-statement migration was applied. Full goal remains active and is not marked complete.

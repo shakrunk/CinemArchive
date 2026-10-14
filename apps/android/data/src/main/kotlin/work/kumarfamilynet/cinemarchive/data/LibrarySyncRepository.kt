@@ -5,6 +5,9 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -149,7 +152,33 @@ class LibrarySyncRepository(
      *  does blocking OkHttp network calls, and a caller invoking it from a Compose
      *  `LaunchedEffect`/`viewModelScope` (Main by default) would otherwise hit a
      *  `NetworkOnMainThreadException`. */
-    suspend fun syncNow() = withContext(Dispatchers.IO) { syncMutex.withLock { syncLocked(); afterPull() } }
+    suspend fun syncNow() = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            val session = authRepository.currentSession() ?: return@withLock
+            try {
+                syncLocked(session)
+                ensureSessionActive(session)
+                afterPull()
+                ensureSessionActive(session)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A generation can end inside an owner-fenced dependency (including
+                // afterPull). End the launched refresh normally instead of crashing Main.
+                if (authRepository.currentSession()?.userId != session.userId) {
+                    throw CancellationException("This sign-in has ended").also { it.initCause(e) }
+                }
+                throw e
+            }
+        }
+    }
+
+    private suspend fun ensureSessionActive(session: SupabaseSession) {
+        currentCoroutineContext().ensureActive()
+        if (authRepository.currentSession()?.userId != session.userId) {
+            throw CancellationException("This sign-in has ended")
+        }
+    }
 
     /** Recovery can remove protection without a push. Commit replay before that removal,
      * serialized with pulls so a concurrent page cannot advance past the retained epoch. */
@@ -162,8 +191,8 @@ class LibrarySyncRepository(
         }
     }
 
-    private suspend fun syncLocked() {
-        val session = authRepository.currentSession() ?: return
+    private suspend fun syncLocked(session: SupabaseSession) {
+        ensureSessionActive(session)
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
         // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
         if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
@@ -177,6 +206,7 @@ class LibrarySyncRepository(
         } catch (_: Exception) {
             // Offline or a failing entry: it stays queued, and is protected from the pull below.
         }
+        ensureSessionActive(session)
         val prefs = dataStore.data.first()
         // An install that predates SYNC_SCHEMA_VERSION has no stored version at all — treat
         // that as version 1, so every pre-existing install also gets the one-time reset.
@@ -193,7 +223,7 @@ class LibrarySyncRepository(
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
             val rows = exactMetadataArray(client.rpc("sync_library_changes", params, session.accessToken))
-            check(authRepository.currentSession()?.userId == session.userId) { "This sign-in has ended" }
+            ensureSessionActive(session)
             if (rows.length() == 0) break
             if (storedSchemaVersion < SYNC_SCHEMA_VERSION) {
                 for (index in 0 until rows.length()) {
@@ -211,19 +241,29 @@ class LibrarySyncRepository(
                     }
                 }
             }
-            transactor.run { if (applyPage(rows, deferred)) skippedBackfillRows = true }
+            transactor.run {
+                ensureSessionActive(session)
+                if (applyPage(rows, deferred)) skippedBackfillRows = true
+                ensureSessionActive(session)
+            }
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
-            dataStore.edit { it[cursorKey] = cursor }
+            dataStore.edit { ensureSessionActive(session); it[cursorKey] = cursor }
             // A page may overshoot PAGE_SIZE — the RPC widens it to avoid splitting a group of
             // rows sharing one `updated_at` — but it can only ever *under*shoot when there was
             // nothing left to send, so a short page is still a reliable "that was the last one".
             if (rows.length() < PAGE_SIZE) break
         }
-        transactor.run { if (deferred.flush()) skippedBackfillRows = true }
         transactor.run {
+            ensureSessionActive(session)
+            if (deferred.flush()) skippedBackfillRows = true
+            ensureSessionActive(session)
+        }
+        transactor.run {
+            ensureSessionActive(session)
             val protected = pendingKeys()
             theaterInterestDao?.observeAll()?.first()?.filter { titleDao.getById(it.titleId) == null && "theater_interest:${it.titleId}" !in protected }
                 ?.forEach { theaterInterestDao.deleteByTitleId(it.titleId) }
+            ensureSessionActive(session)
         }
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
@@ -239,7 +279,7 @@ class LibrarySyncRepository(
                 !moviegoingSchemaAvailable -> maxOf(storedSchemaVersion, 11)
                 else -> SYNC_SCHEMA_VERSION
             }
-            if (acknowledged > storedSchemaVersion) dataStore.edit { it[schemaVersionKey] = acknowledged }
+            if (acknowledged > storedSchemaVersion) dataStore.edit { ensureSessionActive(session); it[schemaVersionKey] = acknowledged }
         }
     }
 

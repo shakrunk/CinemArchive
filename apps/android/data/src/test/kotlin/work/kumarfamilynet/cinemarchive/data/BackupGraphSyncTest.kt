@@ -9,6 +9,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -46,6 +47,8 @@ class BackupGraphSyncTest {
     private var networkFails = false
     private var scriptedPages: ArrayDeque<JSONArray>? = null
     private var beforeResponse: (Int) -> Unit = {}
+    @Volatile private var session: SupabaseSession? = SupabaseSession("token", "owner")
+    private var afterPull: suspend () -> Unit = {}
     private val http = OkHttpClient.Builder().addInterceptor { chain ->
         requests += JSONObject(Buffer().also { chain.request().body!!.writeTo(it) }.readUtf8())
         beforeResponse(requests.size)
@@ -54,9 +57,10 @@ class BackupGraphSyncTest {
             .body((scriptedPages?.removeFirstOrNull() ?: page).toString().toResponseBody("application/json".toMediaType())).build()
     }.build()
     private fun repository() = LibrarySyncRepository(prefs, SupabaseRestClient("https://x.supabase.co", "anon", http),
-        SessionSource { SupabaseSession("token", "owner") }, db.titleDao(), db.seasonDao(), db.episodeDao(), db.episodeWatchEventDao(),
+        SessionSource { session }, db.titleDao(), db.seasonDao(), db.episodeDao(), db.episodeWatchEventDao(),
         db.episodeRatingDao(), db.episodeReviewDao(), db.viewingDao(), db.cinemaOutingDao(), db.titleCastDao(), db.titleCrewDao(),
-        db.listDao(), db.listItemDao(), db.personCreditsDao(), pendingKeys = { pending() }, transactor = RoomTransactor(db))
+        db.listDao(), db.listItemDao(), db.personCreditsDao(), pendingKeys = { pending() }, transactor = RoomTransactor(db),
+        afterPull = { afterPull() })
     @After fun close() { db.close(); scope.cancel() }
     private suspend fun oldCursor() { prefs.edit { it[version] = 10; it[cursor] = "2026-10-08T00:00:00Z" } }
     private fun row(type: String, id: String, payload: JSONObject) = JSONObject().put("entity_type", type).put("entity_id", id)
@@ -138,6 +142,85 @@ class BackupGraphSyncTest {
         assertEquals(10, prefs.data.first()[version]); networkFails = false
         repository().syncNow(); assertEquals(13, prefs.data.first()[version])
         assertEquals(List(2) { "1970-01-01T00:00:00Z" }, requests.map { it.getString("p_since") })
+    }
+
+    @Test fun endedSessionDuringInflightPullCancelsWithoutPublishingRowsCursorOrFollowUp() = runBlocking {
+        oldCursor(); page = graph()
+        var followUps = 0
+        afterPull = { followUps++ }
+        val waiting = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        beforeResponse = {
+            waiting.countDown()
+            check(release.await(20, java.util.concurrent.TimeUnit.SECONDS))
+        }
+        val running = async(Dispatchers.IO) { repository().syncNow() }
+        try {
+            withContext(Dispatchers.IO) {
+                check(waiting.await(15, java.util.concurrent.TimeUnit.SECONDS))
+            }
+            // FencedSessionSource returns null when its exact sign-in generation ends,
+            // even when a callback signs the same user in again.
+            session = null
+        } finally { release.countDown() }
+        assertTrue(runCatching { running.await() }.exceptionOrNull() is CancellationException)
+        assertNull(db.titleDao().getById("title"))
+        assertEquals("2026-10-08T00:00:00Z", prefs.data.first()[cursor])
+        assertEquals(10, prefs.data.first()[version])
+        assertEquals(0, followUps)
+        // A fresh runtime/session can retry the same pull normally.
+        session = SupabaseSession("fresh-token", "owner")
+        beforeResponse = {}
+        repository().syncNow()
+        assertNotNull(db.titleDao().getById("title"))
+        assertEquals(1, followUps)
+    }
+
+    @Test fun endedSessionInsideAfterPullCancelsInsteadOfCrashingCaller() = runBlocking {
+        val ended = IllegalStateException("This sign-in has ended")
+        afterPull = { session = null; throw ended }
+        val failure = runCatching { repository().syncNow() }.exceptionOrNull()
+        assertTrue(failure is CancellationException)
+        // Coroutine stack-trace recovery may copy the exception and wrap its original.
+        assertTrue(generateSequence(failure) { it.cause }.any { it === ended })
+    }
+
+    @Test fun sessionEndingDuringPageApplicationRollsBackThePage() = runBlocking {
+        oldCursor(); page = graph()
+        var reads = 0
+        pending = {
+            reads++
+            if (reads == 2) session = null // Inside applyPage's Room transaction.
+            emptySet()
+        }
+        assertTrue(runCatching { repository().syncNow() }.exceptionOrNull() is CancellationException)
+        assertNull(db.titleDao().getById("title"))
+        assertEquals("2026-10-08T00:00:00Z", prefs.data.first()[cursor])
+        assertEquals(10, prefs.data.first()[version])
+    }
+
+    @Test fun activeSessionAfterPullFailureRemainsVisible() = runBlocking {
+        val network = java.io.IOException("Offline")
+        afterPull = { throw network }
+        val networkFailure = runCatching { repository().syncNow() }.exceptionOrNull()
+        assertTrue(networkFailure is java.io.IOException)
+        assertEquals(network.message, networkFailure?.message)
+        assertTrue(generateSequence(networkFailure) { it.cause }.any { it === network })
+        val invalid = IllegalStateException("Unexpected active-session failure")
+        afterPull = { throw invalid }
+        val invalidFailure = runCatching { repository().syncNow() }.exceptionOrNull()
+        assertTrue(invalidFailure is IllegalStateException)
+        assertEquals(invalid.message, invalidFailure?.message)
+        assertTrue(generateSequence(invalidFailure) { it.cause }.any { it === invalid })
+    }
+
+    @Test fun signedOutSyncDoesNotRunAccountFollowUp() = runBlocking {
+        session = null
+        var followUps = 0
+        afterPull = { followUps++ }
+        repository().syncNow()
+        assertTrue(requests.isEmpty())
+        assertEquals(0, followUps)
     }
 
     @Test fun epochPullRetainsExactOpaquePhysicalCopyNumbers() = runBlocking {

@@ -145,6 +145,7 @@ private val VoidColor = Color(0xFF0B0907)
 private val AmberColor = Color(0xFFE9B266)
 
 class MainActivity : ComponentActivity() {
+    private var callbackFailed by mutableStateOf(false)
     private var sharedToken by mutableStateOf<String?>(null)
     private var sharedLaunch by androidx.compose.runtime.mutableLongStateOf(0L)
 
@@ -164,7 +165,14 @@ class MainActivity : ComponentActivity() {
         }
         else if (app.authRepository.isAuthCallback(uri)) {
             lifecycleScope.launch {
-                withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
+                callbackFailed = false
+                try {
+                    withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    callbackFailed = true
+                }
             }
         }
     }
@@ -279,6 +287,16 @@ class MainActivity : ComponentActivity() {
                         // that's still up and over everything once it fades out.
                         if (showBuildBanner) {
                             DebugBuildBanner(isDebugBuild)
+                        }
+                        if (callbackFailed) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { callbackFailed = false },
+                                title = { Text("Couldn't finish sign-in") },
+                                text = { Text("Check your connection and open the sign-in link again. If it has expired, request a new link.") },
+                                confirmButton = {
+                                    androidx.compose.material3.TextButton(onClick = { callbackFailed = false }) { Text("OK") }
+                                },
+                            )
                         }
                         var showBrandedSplash by remember { mutableStateOf(true) }
                         AnimatedVisibility(
@@ -605,8 +623,17 @@ private fun CinemArchiveApp(
                 // Pull remote changes (e.g. made on the web app while backgrounded) before
                 // deciding which outings are due, same ordering rationale as the launch path.
                 coroutineScope.launch {
-                    librarySyncRepository.syncNow()
-                    outingsRepository.completeDueOutings()
+                    try {
+                        librarySyncRepository.syncNow()
+                        if (authRepository.observeIdentity().value != runtime.identity) return@launch
+                        outingsRepository.completeDueOutings()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        if (authRepository.observeIdentity().value == runtime.identity) throw e
+                        // A callback can replace this runtime between sync and due-outing work.
+                        throw CancellationException("This sign-in has ended").also { it.initCause(e) }
+                    }
                 }
             }
         }

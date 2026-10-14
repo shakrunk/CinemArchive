@@ -10,6 +10,8 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android account changes now cancel obsolete background synchronization instead of crashing while retaining account isolation.
+- Android sign-in callback failures now show a recoverable error instead of closing the app.
 - Revision conflicts now return promptly over Supabase HTTP instead of entering server retries; web and Android retain pending edits for conflict review.
 
 ## [1.34.0] - 2026-10-09

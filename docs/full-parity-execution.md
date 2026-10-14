@@ -6,6 +6,8 @@ The goal is the union of shipped user capabilities on Android and web, with the 
 
 ## Acceptance inventory
 
+The capability requirements in this original inventory remain in scope. Its implementation-status phrases are historical; use the dated evidence below and the closing acceptance checklist for current progress. In particular, bulk/Noir controls, rich preview, catalog refresh, provider merging and global search have since been implemented and verified.
+
 | Area | Remaining work established by source audit | Acceptance evidence | Status / owner |
 | --- | --- | --- | --- |
 | Account isolation | Per-owner Android runtime, generation fences and refresh CAS implemented; legacy recovery, transactional local write/enqueue and runtime race proof remain. | A offline write → sign-out → B cannot see/replay A → A can recover queue; blocked pull/push/refresh switch races; signed-out restart and stale alarms/routes. Preserve unknown-owner legacy data without replay or loss. | Runtime committed; signed-in device transition proof remains |
@@ -257,3 +259,14 @@ On the real API-36 emulator, both Wi-Fi and mobile data were disabled before cre
 Rendered API-36 journeys followed real hosted inbox entries: invite redemption opened Profile and changed the unread indicator to caught-up; friend acceptance opened Friends with the redeemed user's invite suggestion; outing completion opened the corresponding title with both scheduled and completed ticket entries. These prove the three exercised destination classes, not every event's separate action control.
 
 A disposable watchlist-scoped share key opened through `cinemarchive://share` into a read-only native archive with eight watchlist titles, excluding the owner's watched title. Its Ledger showed eight movies and zero screenings. Revoking the key through the owner API and reopening the same warm intent replaced the archive with the invalid/expired/revoked message and Retry control. The test key remains revoked; its token is only in ignored scratch. No production data or shipped code changed. Safari device availability has been requested from the user for the outstanding manual offline-navigation check; no browser check is waived by these results.
+
+### Closing acceptance checklist (reconciled 2026-10-13)
+
+Do not reopen locally verified implementation groups merely because an early table cell says open. Bulk/Noir, catalog refresh, rich preview, command search/navigation, provider admission/merge, installed backup/restore and shared Ledger calculations have later executable evidence. Hosted concurrency, receipts, ownership, ticket bytes and outing completion also pass. Both clients now have live callback/account-switch and queued-list owner-recovery evidence. Remaining integration evidence is bounded as follows:
+
+- Firefox and Safari: installed service worker controls the production bundle; disconnect, reload Library, then open the previously unopened lazy Lists view. The explicit automated skips remain unproven.
+- One paired-client private mutation journey: venue-note save/read/edit/delete and theater-interest convergence; list membership add/remove; ticket upload and other-client viewing, downloaded offline use, replacement/removal convergence and original export. List creation and direct Storage checks alone do not prove these paths.
+- Live social client integration: scoped friend archive/detail/Ledger, comment/reaction/recommendation and outing-sharing recipient actions, plus denied/revoked refresh. Backend lifecycle and synthetic component tests already pass.
+- Native rendered identity/invite controls: profile edit, invite creation/deletion/capacity/redeemed display. Map expiry/cancellation to existing evidence or exercise the missing behavior; do not add unimplemented QR/WebAuthn scope.
+- Distinct notification and deep-link branches: reuse the proven Profile/Friends/Title route classes; cover remaining recommendation/outing-share action controls, ordinary title/list/add navigation, and corresponding live web routes. Shared-link refusal is being checked on web after native passed.
+- Final requirement-by-requirement audit against the inventory and these results. Preserve documented exclusions for backup list/photo bundles, duplicate-history merging and verified Android HTTPS association; do not waive an existing capability.

@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android can log a selected title from its known catalog snapshot when metadata lookup is unavailable, matching web behavior.
 - Android recommendation inbox entries now open owned titles or the preselected add flow and expose valid watch links.
 - Android shared-outing notifications now open calendar and prefilled scheduling actions; completed-outing notifications open the pending post-show editor.
 - Android now requests a fresh sign-in when the server permanently rejects a session refresh, while retaining saved changes and tolerating temporary network failures.

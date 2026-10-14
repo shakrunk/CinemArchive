@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
@@ -74,10 +75,12 @@ private enum class LoginMethod { MAGIC_LINK, INVITE }
  */
 @Composable
 fun LoginRoute(authRepository: AuthRepository, modifier: Modifier = Modifier) {
+    val reauthenticationRequired by authRepository.observeReauthenticationRequired().collectAsStateWithLifecycle()
     LoginScreen(
         onSendMagicLink = { email -> withContext(Dispatchers.IO) { authRepository.sendMagicLink(email) } },
         onRedeemInvite = { email, code -> withContext(Dispatchers.IO) { authRepository.redeemInviteAndSendLink(email, code) } },
         modifier = modifier,
+        reauthenticationRequired = reauthenticationRequired,
     )
 }
 
@@ -86,6 +89,7 @@ private fun LoginScreen(
     onSendMagicLink: suspend (String) -> Unit,
     onRedeemInvite: suspend (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    reauthenticationRequired: Boolean = false,
 ) {
     var method by remember { mutableStateOf(LoginMethod.MAGIC_LINK) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -105,6 +109,15 @@ private fun LoginScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 28.dp),
             )
+
+            if (reauthenticationRequired) {
+                Text(
+                    "Session expired. Sign in again to resume syncing. Your saved changes remain on this device.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 20.dp),
+                )
+            }
 
             SegmentedGroup(
                 options = listOf(

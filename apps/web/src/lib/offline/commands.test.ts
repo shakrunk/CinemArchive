@@ -96,6 +96,16 @@ describe('durable tracking commands', () => {
     expect(base.titles[0].seasons[0].episodes).toHaveLength(1)
   })
 
+  it('names the rejected row and field without echoing its value', () => {
+    const rejected = { ...snapshot(), outings: [{ ...outing, format: 'PRIVATE-VALUE' }] }
+    expect(() => assertSnapshot(rejected)).toThrow(`offline snapshot at .outings[0 id=${outing.id}].format: unsupported string`)
+    expect(() => assertSnapshot(rejected)).not.toThrow('PRIVATE-VALUE')
+    expect(() => assertSnapshot({ ...snapshot(), titles: [{ ...title, extra: true }] })).toThrow(`.titles[0 id=${title.id}].extra: unexpected field`)
+    const missing: Record<string, unknown> = { ...title }
+    delete missing.status
+    expect(() => assertSnapshot({ ...snapshot(), titles: [missing] })).toThrow(`.titles[0 id=${title.id}].status: missing field`)
+  })
+
   it('replays dependent list, outing, pin, and layout mutations, then title cascade', () => {
     const change: Mutation = { kind: 'batch', mutations: [
       { kind: 'list.create', list: { id: 'list-a', name: 'Films', description: 'old', createdAt: stamp, updatedAt: stamp } },

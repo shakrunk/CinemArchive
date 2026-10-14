@@ -103,6 +103,12 @@ describe('mapDbOutingToLocal', () => {
     expect(outing.completedViewingId).toBe('v1')
   })
 
+  it('reads legacy Android format names as the shared spelling', () => {
+    const formats = ['STANDARD', 'THREE_D', 'SEVENTY_MM', 'DRIVE_IN', 'dolby', 'imax', '3D', 'Future format', '', null]
+    expect(formats.map((format) => mapDbOutingToLocal({ ...fullRow, format }).format))
+      .toEqual(['Standard', '3D', '70mm', 'Drive-in', 'Dolby', 'IMAX', '3D', 'Future format', undefined, undefined])
+  })
+
   it('defaults companions to an empty array when the column is missing', () => {
     const row = { ...fullRow, companions: undefined }
     expect(mapDbOutingToLocal(row).companions).toEqual([])

@@ -4,8 +4,10 @@ import { collectRowRevisions } from './offline/preconditions'
 import type { DeliveryContext } from './offline/coordinator'
 import type { FriendshipView } from './auth'
 import { assertSharedOutingSnapshot, type SharedOutingSnapshot } from './outingSharing'
+import { CINEMA_FORMATS } from '../store/mockData'
 import type {
   CastMember,
+  CinemaFormat,
   CinemaOuting,
   CrewMember,
   EpisodeCrew,
@@ -51,6 +53,18 @@ export function mapDbViewingToLocal(row: any): Viewing {
   }
 }
 
+// Older Android builds stored enum names ("STANDARD", "THREE_D", …) instead of
+// the shared spelling. Mirrors Android's CinemaFormat.fromWire: both spellings,
+// case-insensitive. Unknown values pass through unchanged rather than being guessed.
+const LEGACY_FORMAT_NAMES: Record<string, CinemaFormat> = {
+  STANDARD: 'Standard', IMAX: 'IMAX', THREE_D: '3D', DOLBY: 'Dolby', SEVENTY_MM: '70mm', DRIVE_IN: 'Drive-in', OTHER: 'Other',
+}
+function normalizeCinemaFormat(raw: unknown): CinemaFormat | undefined {
+  if (typeof raw !== 'string' || !raw) return undefined
+  return CINEMA_FORMATS.find((format) => format.toLowerCase() === raw.toLowerCase()) ??
+    LEGACY_FORMAT_NAMES[raw.toUpperCase()] ?? raw as CinemaFormat
+}
+
 export function mapDbOutingToLocal(row: any): CinemaOuting {
   return {
     id: row.id,
@@ -61,7 +75,7 @@ export function mapDbOutingToLocal(row: any): CinemaOuting {
     endsAt: row.ends_at,
     venue: row.venue || undefined,
     companions: normalizeCompanions(row.companions),
-    format: row.format || undefined,
+    format: normalizeCinemaFormat(row.format),
     ticketPrice: row.ticket_price != null ? parseFloat(row.ticket_price) : undefined,
     seat: row.seat || undefined,
     auditorium: row.auditorium || undefined,

@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web libraries containing outings saved with older Android format names (such as `STANDARD`) now load instead of failing with an invalid offline snapshot.
 - Web offline snapshot rejections now name the rejected row and field instead of reporting only an invalid snapshot.
 
 ## [1.34.1] - 2026-10-14

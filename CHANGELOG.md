@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web shared and friend libraries now show failed-load errors with a retry action instead of presenting an empty archive.
 - Android account changes now cancel obsolete background synchronization instead of crashing while retaining account isolation.
 - Android sign-in callback failures now show a recoverable error instead of closing the app.
 - Revision conflicts now return promptly over Supabase HTTP instead of entering server retries; web and Android retain pending edits for conflict review.

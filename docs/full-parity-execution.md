@@ -197,6 +197,14 @@ Material You colors, APK updating, OS permission UI, predictive back, exact alar
 
 ## Remaining work
 
+### Replacement hosted environment (2026-10-13)
+
+The user authorized deleting the inaccessible `cinemarchive-android-test` project (`rgnthbiigfbfiuehteoe`) and created its replacement, `cinemarchive-parity-test` (`riwudbiraiktjtzthpch`, Free plan, us-east-1). Deletion of the old project and connectivity to the replacement are verified. Production `taoyxhbacdvnhevqyrqm` was not modified.
+
+All 73 repository migration sources are applied and verified in the replacement's migration history. The connector applied the first 61; repeated connector request-state failures on the next migration were bypassed using the already-authenticated official CLI. An isolated ignored workspace fetched the applied history, staged the twelve remaining unchanged sources, passed a dry run, and completed `db push` with exit zero. Migration versions in this disposable test project reflect application time; names preserve original source identities. The CLI's optional Docker catalog cache warning did not prevent application. No partial-statement migrations were used.
+
+Two synthetic accounts were created and password sign-in verified for both; credentials and API keys remain in ignored local scratch. Live native checks and pooled HTTP acceptance are in progress. Eight simultaneous exact command retries returned identical receipts and changed-intent UUID reuse was rejected. A later competing-update request timed out; this is not a passing concurrency result, and its repeat remains under investigation. The former inaccessible-database blocker is resolved; signed-in route/device acceptance and the remaining manual browser checks are still unproven.
+
 Full parity remains incomplete. The complete acceptance inventory above remains authoritative. The identified implementation groups are committed; remaining work is acceptance evidence, not additional feature scope:
 
 - Complete account/auth/invite/notification/deep-link acceptance and live signed-in cross-client/device journeys.

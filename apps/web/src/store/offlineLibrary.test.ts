@@ -31,6 +31,68 @@ function setup(factory = new IDBFactory(), browserEvents = false) {
 afterEach(async () => { runtimes.splice(0).forEach((runtime) => runtime.deactivate()); vi.restoreAllMocks(); vi.unstubAllGlobals(); await Promise.all(stores.splice(0).map((store) => store.close())) })
 
 describe('owner library runtime', () => {
+  it('delivers an edit submitted during the initial refresh without another browser event', async () => {
+    const { runtime, ownerStorage, fetchBase, deliver } = setup(new IDBFactory(), true)
+    const scope = { projectId: 'project', userId: 'owner' }
+    await ownerStorage.replaceBase(scope, snapshot())
+    const delayed = deferred<OfflineSnapshot>()
+    fetchBase.mockReturnValueOnce(delayed.promise).mockResolvedValue(snapshot())
+    await runtime.activate(scope.userId)
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledOnce())
+    const command = await runtime.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'during refresh' } })
+    expect(deliver).not.toHaveBeenCalled()
+    delayed.resolve(snapshot())
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledOnce())
+    expect(deliver.mock.calls[0][0].id).toBe(command.id)
+    await vi.waitFor(async () => expect((await ownerStorage.read(scope)).document.commands).toEqual([]))
+  })
+
+  it('coalesces wake requests without spinning on a rejected command', async () => {
+    const { runtime, ownerStorage, fetchBase, deliver } = setup(new IDBFactory(), true)
+    const scope = { projectId: 'project', userId: 'owner' }
+    await ownerStorage.replaceBase(scope, snapshot())
+    const delayed = deferred<OfflineSnapshot>()
+    fetchBase.mockReturnValueOnce(delayed.promise).mockResolvedValue(snapshot())
+    deliver.mockResolvedValue({ kind: 'failed', message: 'Review this change' })
+    const flush = vi.spyOn(runtime, 'flush')
+    await runtime.activate(scope.userId)
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledOnce())
+    await runtime.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'during refresh' } })
+    window.dispatchEvent(new Event('online'))
+    window.dispatchEvent(new Event('focus'))
+    delayed.resolve(snapshot())
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledTimes(2))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(flush).toHaveBeenCalledTimes(2)
+    expect(deliver).toHaveBeenCalledOnce()
+    expect((await ownerStorage.read(scope)).document.commands).toMatchObject([{ state: 'failed' }])
+  })
+
+  it('does not carry an old owner wake request into a new owner session', async () => {
+    const { runtime, ownerStorage, fetchBase, deliver } = setup(new IDBFactory(), true)
+    const scope = { projectId: 'project', userId: 'owner-a' }
+    await ownerStorage.replaceBase(scope, snapshot())
+    const oldRefresh = deferred<OfflineSnapshot>()
+    const newRefresh = deferred<OfflineSnapshot>()
+    fetchBase.mockReturnValueOnce(oldRefresh.promise).mockReturnValueOnce(newRefresh.promise)
+    const refresh = vi.spyOn(runtime, 'refresh')
+    const flush = vi.spyOn(runtime, 'flush')
+    await runtime.activate(scope.userId)
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledOnce())
+    await runtime.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'owner-a only' } })
+    await runtime.activate('owner-b')
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledTimes(2))
+    oldRefresh.resolve(snapshot())
+    await refresh.mock.results[0].value
+    newRefresh.resolve(emptySnapshot())
+    await refresh.mock.results[1].value
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(flush).toHaveBeenCalledTimes(2)
+    expect(deliver).not.toHaveBeenCalled()
+    expect((await ownerStorage.read(scope)).document.commands).toHaveLength(1)
+    expect((await ownerStorage.read({ ...scope, userId: 'owner-b' })).document.commands).toEqual([])
+  })
+
   it('resumes on browser events, reloads broadcasts without a refresh loop, and detaches on logout', async () => {
     const channels: FakeChannel[] = []
     class FakeChannel {

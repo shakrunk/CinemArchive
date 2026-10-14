@@ -10,6 +10,7 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Web changes made while startup synchronization is finishing now trigger a follow-up sync instead of waiting for another browser event.
 - Web shared and friend libraries now show failed-load errors with a retry action instead of presenting an empty archive.
 - Android account changes now cancel obsolete background synchronization instead of crashing while retaining account isolation.
 - Android sign-in callback failures now show a recoverable error instead of closing the app.

@@ -74,6 +74,7 @@ export class OfflineLibraryRuntime {
   private removeListeners: (() => void) | undefined
   private channel: BroadcastChannel | undefined
   private syncing: Promise<void> | undefined
+  private wakeRequested = false
   private broadcastRevision = -1
   private ticketRequests = new AbortController()
 
@@ -244,6 +245,7 @@ export class OfflineLibraryRuntime {
     this.channel?.close()
     this.channel = undefined
     this.syncing = undefined
+    this.wakeRequested = false
     this.broadcastRevision = -1
   }
 
@@ -278,13 +280,23 @@ export class OfflineLibraryRuntime {
 
   /** Delivery precedes refresh so reconnect cannot overwrite queued optimism.
    * Coordinator locking excludes competing tabs, and repeated browser events
-   * share this session's in-flight wake. */
+   * coalesce into one follow-up wake. Edits appended during refresh must get
+   * another delivery pass after that refresh releases the coordinator lock. */
   private wake(): void {
-    if (!this.ownerId || this.syncing || (typeof navigator !== 'undefined' && navigator.onLine === false)) return
+    if (!this.ownerId || (typeof navigator !== 'undefined' && navigator.onLine === false)) return
+    if (this.syncing) {
+      this.wakeRequested = true
+      return
+    }
+    this.wakeRequested = false
     const generation = this.generation
     const sync = this.flush().then(async () => {
       if (generation === this.generation && this.ownerId) await this.refresh()
-    }).catch(this.options.onError).finally(() => { if (this.syncing === sync) this.syncing = undefined })
+    }).catch(this.options.onError).finally(() => {
+      if (this.syncing !== sync) return
+      this.syncing = undefined
+      if (generation === this.generation && this.wakeRequested) this.wake()
+    })
     this.syncing = sync
   }
   retry(commandId: string): Promise<void> { return this.coordinator.retry(commandId) }

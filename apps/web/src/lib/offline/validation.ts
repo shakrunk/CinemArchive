@@ -16,7 +16,25 @@ const boolean: Check = (v) => typeof v === 'boolean'
 const timestamp: Check = (v) => typeof v === 'string' && Number.isFinite(Date.parse(v))
 const oneOf = (...values: unknown[]): Check => (v) => values.includes(v)
 const nullable = (check: Check): Check => (v) => v === null || check(v)
-const array = (check: Check): Check => (v) => Array.isArray(v) && v.every(check)
+
+// The innermost rejected field, so a refused snapshot names the row and field
+// instead of failing opaquely. Only value types are reported, never contents.
+const trail: string[] = []
+let rejected: string | undefined
+function fail(segment: string, problem: string): false {
+  rejected ??= `${trail.join('')}${segment}: ${problem}`
+  return false
+}
+function at(segment: string, value: unknown, check: Check): boolean {
+  trail.push(segment)
+  try {
+    if (check(value)) return true
+  } finally { trail.pop() }
+  return fail(segment, `unsupported ${value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value}`)
+}
+
+const array = (check: Check): Check => (v) => Array.isArray(v) && v.every((item, index) =>
+  at(record(item) && typeof item.id === 'string' ? `[${index} id=${item.id}]` : `[${index}]`, item, check))
 const strings = array(text)
 
 function record(v: unknown): v is Record<string, unknown> {
@@ -24,14 +42,14 @@ function record(v: unknown): v is Record<string, unknown> {
     (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null)
 }
 const safeKey = (key: string) => !['__proto__', 'prototype', 'constructor'].includes(key)
-const dictionary = (check: Check): Check => (v) => record(v) && Object.entries(v).every(([key, value]) => safeKey(key) && check(value))
+const dictionary = (check: Check): Check => (v) => record(v) && Object.entries(v).every(([key, value]) =>
+  safeKey(key) ? at(`[${JSON.stringify(key)}]`, value, check) : fail(`[${JSON.stringify(key)}]`, 'unsafe key'))
 
 function shape(required: Fields, optional: Fields = {}): Check {
-  return (v) => record(v) && Object.entries(required).every(([key, check]) => Object.hasOwn(v, key) && check(v[key])) &&
+  return (v) => record(v) && Object.keys(required).every((key) => Object.hasOwn(v, key) || fail(`.${key}`, 'missing field')) &&
     Object.entries(v).every(([key, value]) => {
-      if (!safeKey(key)) return false
-      const check = Object.hasOwn(required, key) ? required[key] : Object.hasOwn(optional, key) ? optional[key] : undefined
-      return check !== undefined && check(value)
+      const check = !safeKey(key) ? undefined : Object.hasOwn(required, key) ? required[key] : Object.hasOwn(optional, key) ? optional[key] : undefined
+      return check === undefined ? fail(`.${key}`, 'unexpected field') : at(`.${key}`, value, check)
     })
 }
 function patch(required: Fields, optional: Fields = {}): Check {
@@ -154,11 +172,13 @@ export function assertCommand(value: unknown): asserts value is PendingCommand {
     guarded.add(key)
   }
 }
+const snapshot = shape({ titles: array(title), outings: array(outingSnapshot), lists: array(list),
+  listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
+}, { rowRevisions: dictionary(timestamp), ticketAttachmentSupport: (v) => v === 'authoritative' || v === 'unsupported',
+  venueNotes: array(isVenueNote), theaterInterest: array(isTheaterInterest), moviegoingPreferencesSupport: oneOf('authoritative', 'unsupported'),
+})
 export function assertSnapshot(value: unknown, ownerId?: string): asserts value is OfflineSnapshot {
-  if (!shape({ titles: array(title), outings: array(outingSnapshot), lists: array(list),
-    listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
-  }, { rowRevisions: dictionary(timestamp), ticketAttachmentSupport: (v) => v === 'authoritative' || v === 'unsupported',
-    venueNotes: array(isVenueNote), theaterInterest: array(isTheaterInterest), moviegoingPreferencesSupport: oneOf('authoritative', 'unsupported'),
-  })(value)) throw new Error('Invalid or unsupported offline snapshot')
+  rejected = undefined
+  if (!snapshot(value)) throw new Error(`Invalid or unsupported offline snapshot${rejected ? ` at ${rejected}` : ''}`)
   assertMoviegoingSnapshot(value as OfflineSnapshot, ownerId)
 }

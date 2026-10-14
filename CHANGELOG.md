@@ -9,6 +9,9 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+- Web offline snapshot rejections now name the rejected row and field instead of reporting only an invalid snapshot.
+
 ## [1.34.1] - 2026-10-14
 
 ### Fixed

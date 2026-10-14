@@ -24,17 +24,24 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.data.AppNotification
 import work.kumarfamilynet.cinemarchive.data.NotificationRoute
 import work.kumarfamilynet.cinemarchive.data.NotificationRules
 import work.kumarfamilynet.cinemarchive.data.NotificationsRepository
+import work.kumarfamilynet.cinemarchive.data.NotificationType
+import work.kumarfamilynet.cinemarchive.data.SharedOutingNotification
+import work.kumarfamilynet.cinemarchive.data.parseSharedOutingNotification
 
 /** The persistent inbox — web `NotificationCenter`: unread dots, mark one/all read, dismiss,
  *  load-more pagination, and tap routing (title detail / Profile). */
@@ -45,10 +52,15 @@ fun NotificationsRoute(
     onOpenTitle: (String) -> Unit,
     onOpenProfile: () -> Unit,
     onOpenFriends: () -> Unit,
+    onOpenPostShow: (String) -> Unit,
+    onGotTicketsToo: suspend (SharedOutingNotification) -> Unit,
+    onAddToCalendar: (SharedOutingNotification) -> Unit,
     showBack: Boolean = true,
 ) {
     val inbox by repository.inbox.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    var actionError by remember { mutableStateOf<String?>(null) }
+    var opening by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { repository.load() }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -64,6 +76,7 @@ fun NotificationsRoute(
         LazyColumn(modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp, 4.dp, 20.dp, 28.dp)) {
             item {
                 ReadingWidthColumn {
+                    actionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (inbox.error != null && inbox.items.isEmpty()) {
                         Text(inbox.error.orEmpty(), color = MaterialTheme.colorScheme.error)
                         OutlinedButton(onClick = { scope.launch { repository.load() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Retry") }
@@ -81,13 +94,34 @@ fun NotificationsRoute(
                         onClick = {
                             scope.launch { repository.markRead(n.id) }
                             when (val route = NotificationRules.route(n)) {
-                                is NotificationRoute.TitleDetail -> onOpenTitle(route.titleId)
+                                is NotificationRoute.TitleDetail -> if (n.type == NotificationType.OUTING_COMPLETED)
+                                    onOpenPostShow(route.titleId) else onOpenTitle(route.titleId)
                                 NotificationRoute.Profile -> onOpenProfile()
                                 NotificationRoute.Friends -> onOpenFriends()
                                 NotificationRoute.None -> Unit
                             }
                         },
                         onDismiss = { scope.launch { repository.delete(n.id) } },
+                        actionsEnabled = !opening,
+                        onGotTicketsToo = { shared ->
+                            if (!opening) {
+                                opening = true
+                                actionError = null
+                                scope.launch {
+                                    try {
+                                        repository.markRead(n.id)
+                                        onGotTicketsToo(shared)
+                                    } catch (cancelled: CancellationException) { throw cancelled
+                                    } catch (failure: Exception) { actionError = failure.message ?: "Couldn't open these plans. Try again."
+                                    } finally { opening = false }
+                                }
+                            }
+                        },
+                        onAddToCalendar = { shared ->
+                            scope.launch { repository.markRead(n.id) }
+                            try { onAddToCalendar(shared) }
+                            catch (_: Exception) { actionError = "No calendar app is available to open these plans." }
+                        },
                     )
                 }
             }
@@ -105,7 +139,13 @@ fun NotificationsRoute(
 }
 
 @Composable
-private fun NotificationRow(n: AppNotification, onClick: () -> Unit, onDismiss: () -> Unit) {
+private fun NotificationRow(
+    n: AppNotification, onClick: () -> Unit, onDismiss: () -> Unit,
+    actionsEnabled: Boolean,
+    onGotTicketsToo: (SharedOutingNotification) -> Unit,
+    onAddToCalendar: (SharedOutingNotification) -> Unit,
+) {
+    val shared = if (n.type == NotificationType.OUTING_PLANS_SHARED) parseSharedOutingNotification(n.payload) else null
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -125,6 +165,14 @@ private fun NotificationRow(n: AppNotification, onClick: () -> Unit, onDismiss: 
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                shared?.let { snapshot ->
+                    Text(listOfNotNull(snapshot.plan.showtime, snapshot.plan.venue, snapshot.plan.seat?.let { "Seat $it" }).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall)
+                    if (snapshot.type == work.kumarfamilynet.cinemarchive.core.model.MediaType.MOVIE) {
+                        TextButton(enabled = actionsEnabled, onClick = { onGotTicketsToo(snapshot) }) { Text("I've got tickets too") }
+                    }
+                    TextButton(onClick = { onAddToCalendar(snapshot) }) { Text("Add to calendar") }
+                }
             }
             IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Dismiss notification") }
         }

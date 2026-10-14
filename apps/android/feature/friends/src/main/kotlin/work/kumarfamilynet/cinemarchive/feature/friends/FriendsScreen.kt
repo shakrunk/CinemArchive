@@ -31,10 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
@@ -61,6 +63,7 @@ fun FriendsRoute(
     viewerUserId: String,
     onBack: () -> Unit,
     onOpenFriendLibrary: (friendUserId: String, label: String) -> Unit,
+    onOpenRecommendation: suspend (Recommendation) -> Unit,
     showBack: Boolean = true,
     onEditFriendAccess: ((friendUserId: String, label: String) -> Unit)? = null,
 ) {
@@ -83,7 +86,7 @@ fun FriendsRoute(
         }
         when (section) {
             FriendsSection.FRIENDS -> FriendsList(repository, viewerUserId, onOpenFriendLibrary, onEditFriendAccess)
-            FriendsSection.INBOX -> InboxList(repository)
+            FriendsSection.INBOX -> InboxList(repository, onOpenRecommendation)
             FriendsSection.ACTIVITY -> ActivityList(repository, onOpenFriendLibrary)
         }
     }
@@ -283,7 +286,9 @@ fun FriendRow(
 }
 
 @Composable
-private fun InboxList(repository: FriendsRepository) {
+private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspend (Recommendation) -> Unit) {
+    val uriHandler = LocalUriHandler.current
+    var opening by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<Recommendation>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var status by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
@@ -309,7 +314,27 @@ private fun InboxList(repository: FriendsRepository) {
                     Column(modifier = Modifier.padding(14.dp, 10.dp)) {
                         Text("${r.senderName} sent you \"${r.title}\"" + (r.year?.let { " ($it)" } ?: ""), style = MaterialTheme.typography.titleSmall)
                         r.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                            Button(enabled = opening == null && r.type != null, onClick = {
+                                opening = r.id
+                                scope.launch {
+                                    try {
+                                        onOpenRecommendation(r)
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (e: Exception) {
+                                        status = (e.message ?: "Couldn't open recommendation.") to true
+                                    } finally {
+                                        opening = null
+                                    }
+                                }
+                            }) { Text("Open") }
+                            recommendationWatchUrl(r.watchUrl)?.let { url ->
+                                TextButton(onClick = {
+                                    try { uriHandler.openUri(url) }
+                                    catch (_: Exception) { status = "Couldn't open watch link." to true }
+                                }) { Text("Watch") }
+                            }
                             if (r.isUnread) OutlinedButton(onClick = { scope.runAction(report, null, ::reload) { repository.markRecommendationRead(r.id) } }) { Text("Mark read") }
                             TextButton(onClick = { scope.runAction(report, null, ::reload) { repository.dismissRecommendation(r.id) } }) { Text("Dismiss") }
                         }

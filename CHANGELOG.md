@@ -10,6 +10,8 @@ number is chosen.
 ## [Unreleased]
 
 ### Fixed
+- Android recommendation inbox entries now open owned titles or the preselected add flow and expose valid watch links.
+- Android shared-outing notifications now open calendar and prefilled scheduling actions; completed-outing notifications open the pending post-show editor.
 - Android now requests a fresh sign-in when the server permanently rejects a session refresh, while retaining saved changes and tolerating temporary network failures.
 - Android now opens title, list, and add-title destinations from ordinary CinemArchive links.
 - Web changes made while startup synchronization is finishing now trigger a follow-up sync instead of waiting for another browser event.

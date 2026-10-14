@@ -405,7 +405,12 @@ private fun DebugBuildBanner(isDebugBuild: Boolean) {
 private typealias Tab = work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 
 private sealed interface Overlay {
-    data class Detail(val titleId: String, val initialSchedule: Boolean = false) : Overlay
+    data class Detail(
+        val titleId: String,
+        val initialSchedule: Boolean = false,
+        val schedulePrefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
+        val initialPostShow: Boolean = false,
+    ) : Overlay
 
     /** [preselected] is set when the add was started from a specific Discover result rather
      *  than the FAB, so the overlay opens on its log step instead of an empty search box.
@@ -606,6 +611,23 @@ private fun CinemArchiveApp(
     // lifecycle, not the ViewModel layer, since it's app-shell-wide rather than one screen's.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val openSharedOuting: suspend (work.kumarfamilynet.cinemarchive.data.SharedOutingNotification) -> Unit = { shared ->
+        work.kumarfamilynet.cinemarchive.data.resolveSharedOutingNotification(
+            shared, runtime::isCurrent, repository::findLibraryTitleId, repository::addTitle,
+        )?.let { id ->
+            if (runtime.isCurrent()) {
+                runtime.syncTickets()
+                overlay = Overlay.Detail(id, initialSchedule = true, schedulePrefill = shared.prefill)
+            }
+        }
+    }
+    val openNotificationPostShow: (String) -> Unit = { id ->
+        if (runtime.isCurrent()) overlay = Overlay.Detail(id, initialPostShow = true)
+    }
+    val addSharedToCalendar: (work.kumarfamilynet.cinemarchive.data.SharedOutingNotification) -> Unit = { shared ->
+        if (runtime.isCurrent()) conflictContext.startActivity(
+            work.kumarfamilynet.cinemarchive.feature.friends.outingCalendarIntent(shared.plan))
+    }
     if (globalSearch && runtime.isCurrent()) OwnerGlobalSearch(
         "${runtime.ownerId}:${runtime.identity.generation}", commandTitles,
         onDismiss = { globalSearch = false },
@@ -962,6 +984,9 @@ private fun CinemArchiveApp(
                                 onOpenTitle = { overlay = Overlay.Detail(it) },
                                 onOpenProfile = { selectedSettingsCategory = SettingsCategory.IDENTITY },
                                 onOpenFriends = { overlay = Overlay.Friends },
+                                onOpenPostShow = openNotificationPostShow,
+                                onGotTicketsToo = openSharedOuting,
+                                onAddToCalendar = addSharedToCalendar,
                                 showBack = false,
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
@@ -1007,6 +1032,9 @@ private fun CinemArchiveApp(
                     onBack = closeOverlay,
                     initialSchedule = current.initialSchedule,
                     onInitialScheduleConsumed = { if (overlay == current) overlay = current.copy(initialSchedule = false) },
+                    schedulePrefill = current.schedulePrefill,
+                    initialPostShow = current.initialPostShow,
+                    onInitialPostShowConsumed = { if (overlay == current) overlay = current.copy(initialPostShow = false) },
                     onScheduled = runtime::syncTickets,
                     onRequestNotificationPermission = requestNotificationPermission,
                     onRecommendTitle = { recommendTitleId = it },
@@ -1089,11 +1117,20 @@ private fun CinemArchiveApp(
                     onOpenTitle = { overlay = Overlay.Detail(it) },
                     onOpenProfile = openProfile,
                     onOpenFriends = { overlay = Overlay.Friends },
+                    onOpenPostShow = openNotificationPostShow,
+                    onGotTicketsToo = openSharedOuting,
+                    onAddToCalendar = addSharedToCalendar,
                 )
                 Overlay.Friends -> FriendsWithAccessEditor(
                     runtime, titleSocialSource,
                     onBack = openProfile,
                     onOpenFriendLibrary = { id, label -> overlay = Overlay.FriendLibrary(id, label) },
+                    onOpenRecommendation = { destination ->
+                        if (runtime.isCurrent()) overlay = when (destination) {
+                            is work.kumarfamilynet.cinemarchive.feature.friends.RecommendationNavigation.Owned -> Overlay.Detail(destination.titleId)
+                            is work.kumarfamilynet.cinemarchive.feature.friends.RecommendationNavigation.Add -> Overlay.Add(destination.title)
+                        }
+                    },
                 )
                 is Overlay.FriendLibrary -> FriendLibraryRoute(
                     runtime.friendsRepository,
@@ -1152,6 +1189,7 @@ private fun FriendsWithAccessEditor(
     socialSource: work.kumarfamilynet.cinemarchive.feature.friends.TitleSocialSource,
     onBack: () -> Unit,
     onOpenFriendLibrary: (String, String) -> Unit,
+    onOpenRecommendation: (work.kumarfamilynet.cinemarchive.feature.friends.RecommendationNavigation) -> Unit,
 ) {
     key(runtime) {
         val titles by runtime.libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -1161,6 +1199,13 @@ private fun FriendsWithAccessEditor(
         }
         var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
         FriendsRoute(runtime.friendsRepository, runtime.ownerId, onBack, onOpenFriendLibrary,
+            onOpenRecommendation = { recommendation ->
+                work.kumarfamilynet.cinemarchive.feature.friends.recommendationNavigation(
+                    recommendation, runtime::isCurrent,
+                    runtime.friendsRepository::markRecommendationRead,
+                    runtime.libraryRepository::findLibraryTitleId,
+                )?.let { if (runtime.isCurrent()) onOpenRecommendation(it) }
+            },
             onEditFriendAccess = { id, label -> editing = id to label })
         editing?.let { (id, label) ->
             work.kumarfamilynet.cinemarchive.feature.settings.ShareScopeEditorDialog(

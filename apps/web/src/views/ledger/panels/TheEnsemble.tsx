@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 // ─── The ensemble (leading cast) ──────────────────────────────────────────────
 
 import { useMemo } from 'react'
@@ -99,7 +100,7 @@ export function TheEnsemble({
                   style={{
                     width: size,
                     height: size,
-                    fontSize: size * 0.32,
+                    fontSize: scaledTextSize(size * 0.32),
                     background:
                       i === 0
                         ? 'linear-gradient(155deg, var(--amber-bright), var(--amber-deep))'

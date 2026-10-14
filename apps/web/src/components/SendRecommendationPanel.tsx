@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useState } from 'react'
 import { Send, Check, Loader2, Search, RefreshCw, Link2, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
@@ -134,7 +135,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
           <div className="flex-1 min-w-0 pt-1">
             <div
               className="font-mono uppercase tracking-widest"
-              style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+              style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
             >
               Send to a friend
             </div>
@@ -156,7 +157,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
             className="w-full rounded-md px-3 py-2 text-sm font-sans resize-none focus:outline-hidden"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           />
-          <div className="text-right font-mono mt-1" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+          <div className="text-right font-mono mt-1" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
             {note.length}/{NOTE_MAX_LEN}
           </div>
         </div>
@@ -164,7 +165,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
         {/* Optional where-to-watch link — pre-filled from the title's own
             custom link (if set) but editable per-send/per-recipient */}
         <div className="px-5 pb-3 shrink-0">
-          <label className="flex items-center gap-1.5 mb-1.5 font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+          <label className="flex items-center gap-1.5 mb-1.5 font-mono" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
             <Link2 className="w-3 h-3" />
             Where to watch (optional)
           </label>
@@ -269,7 +270,7 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
                     <span className="flex-1 min-w-0">
                       <span className="block truncate font-sans text-sm" style={{ color: 'var(--paper)' }}>{name}</span>
                       {wasThere && (
-                        <span className="block font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+                        <span className="block font-mono" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
                           was there with you
                         </span>
                       )}
@@ -278,13 +279,13 @@ export function SendRecommendationPanel({ title, onClose, companionFriendIds }: 
                       <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--paper-faint)' }} />
                     )}
                     {state === 'sent' && (
-                      <span className="flex items-center gap-1 font-mono shrink-0" style={{ fontSize: '10px', color: 'var(--amber)' }}>
+                      <span className="flex items-center gap-1 font-mono shrink-0" style={{ fontSize: scaledTextSize('10px'), color: 'var(--amber)' }}>
                         <Check className="w-3.5 h-3.5" />
                         Sent
                       </span>
                     )}
                     {state === 'error' && (
-                      <span className="font-mono shrink-0" style={{ fontSize: '10px', color: 'var(--ember)' }}>
+                      <span className="font-mono shrink-0" style={{ fontSize: scaledTextSize('10px'), color: 'var(--ember)' }}>
                         Failed — tap to retry
                       </span>
                     )}

@@ -94,7 +94,7 @@ renders — even though the initial view (`discover` by default, or `upnext`) sh
 it, and the poster wall only needs title/year/poster/rating/status. For a library with deep
 TV back-catalogs this is the largest network+parse cost in the app and it's paid unconditionally.
 
-This is a deliberate architectural tradeoff already recorded in `CLAUDE.md` ("all
+This is a deliberate architectural tradeoff already recorded in `AGENTS.md` ("all
 filtering/sorting is client-side… no DB queries for filter changes") — the fix below keeps
 that model, it just defers the expensive nested part.
 
@@ -218,7 +218,7 @@ preconnect would open a connection the actual image requests can't reuse, wastin
 
 ### 6. Poster wall has no virtualization (already flagged, worth prioritizing)
 
-`apps/web/CLAUDE.md` already notes: *"the poster wall renders the full filtered set (grid
+`apps/web/AGENTS.md` already notes: *"the poster wall renders the full filtered set (grid
 virtualization was planned but is not implemented)."* Confirmed in
 `apps/web/src/views/Library.tsx` — `PosterWall` maps over the entire `filteredTitles` array
 into live DOM nodes. Images are `loading="lazy"` (good — network is already deferred for

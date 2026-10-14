@@ -245,11 +245,9 @@ fun LedgerScreen(
     // fall just under the threshold on exactly the widths a rail appears at, in the same
     // breath as switching nav (see docs: responsive-foldable-layout plan).
     isWideLayout: Boolean = false,
-    // Android has no friend/shared viewer mode yet (see LedgerWidgets.kt's kdoc on the same
-    // gap), so this is always null today — threaded through now so the eventual Friends/
-    // Sharing work only needs to supply a real value, not rewire this call chain. See
-    // docs/superpowers/plans/2026-07-23-android-ledger-parity.md §8.
+    // Shared viewers identify the scoped archive and suppress all owner editing controls.
     viewedDisplayName: String? = null,
+    readOnly: Boolean = false,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -258,7 +256,7 @@ fun LedgerScreen(
             modifier = Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 0.dp),
         ) {
             Text("THE NUMBERS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
+            if (!readOnly) ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -266,7 +264,7 @@ fun LedgerScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         ) {
             Text("The Ledger", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(vertical = 2.dp))
-            TextButton(onClick = onToggleEditMode) {
+            if (!readOnly) TextButton(onClick = onToggleEditMode) {
                 Icon(
                     if (editMode) Icons.Filled.Check else Icons.Filled.Edit,
                     contentDescription = null,
@@ -287,7 +285,7 @@ fun LedgerScreen(
             return@Column
         }
 
-        if (editMode) {
+        if (editMode && !readOnly) {
             LedgerEditModeContent(
                 modifier = Modifier.fillMaxSize(),
                 layout = layout,
@@ -363,12 +361,12 @@ private fun LedgerBoardContent(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 HeroCopy(stats, viewedDisplayName)
-                val totalScreeningDays = stats.totalWatchedMovieMinutes / 60.0 / 24.0
+                val totalScreeningDays = stats.totalWatchedMinutes / 60.0 / 24.0
                 val tiles = listOf(
                     StatTileData("Movies", stats.totalMovies.toString(), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
                     StatTileData("Series", stats.totalSeries.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
                     StatTileData("Screenings", stats.totalViewings.toString(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
-                    StatTileData("Hours logged", (stats.totalWatchedMovieMinutes / 60).toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                    StatTileData("Hours logged", stats.roundedHours.toString() + "h", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
                     StatTileData("Days in the dark", "%.1fd".format(totalScreeningDays), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
                     StatTileData("Avg rating", stats.averageRating?.let { "%.1f".format(it) } ?: "—", MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primary),
                 )
@@ -1136,7 +1134,7 @@ private fun HeroCopy(stats: LedgerStats, viewedDisplayName: String?) {
         LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
     }
     val totalTitles = stats.totalMovies + stats.totalSeries
-    val hours = stats.totalWatchedMovieMinutes / 60
+    val hours = stats.roundedHours
     Column {
         Text(
             "now showing · $today",

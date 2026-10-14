@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "a", "tmdbId": 603, "type": "movie", "title": "Already Here", "status": "watched", "tags": [], "viewings": [ { "id": "va", "titleId": "a", "date": "2026-03-01", "outingId": "oa-comp" } ] },
+    { "id": "b", "tmdbId": 604, "type": "movie", "title": "New", "status": "watched", "tags": [], "viewings": [ { "id": "vb", "titleId": "b", "date": "2026-03-02", "outingId": "ob-comp" } ] },
+    { "id": "c", "tmdbId": 604, "type": "movie", "title": "New (second copy, distinct id)", "status": "watched", "tags": [], "viewings": [ { "id": "vc", "titleId": "c", "date": "2026-03-03", "outingId": "oc-comp" } ] }
+  ],
+  "outings": [
+    { "id": "oa-comp", "titleId": "a", "showtime": "2026-03-01T19:00:00Z", "endsAt": "2026-03-01T21:00:00Z", "status": "completed", "completedViewingId": "va" },
+    { "id": "oa-sched", "titleId": "a", "showtime": "2027-03-01T19:00:00Z", "endsAt": "2027-03-01T21:00:00Z", "status": "scheduled" },
+    { "id": "oa-missed", "titleId": "a", "showtime": "2026-03-05T19:00:00Z", "endsAt": "2026-03-05T21:00:00Z", "status": "missed", "completedViewingId": "va" },
+    { "id": "ob-comp", "titleId": "b", "showtime": "2026-03-02T19:00:00Z", "endsAt": "2026-03-02T21:00:00Z", "status": "completed", "completedViewingId": "vb" },
+    { "id": "oc-comp", "titleId": "c", "showtime": "2026-03-03T19:00:00Z", "endsAt": "2026-03-03T21:00:00Z", "status": "completed", "completedViewingId": "vc" },
+    { "id": "oc-sched", "titleId": "c", "showtime": "2027-03-03T19:00:00Z", "endsAt": "2027-03-03T21:00:00Z", "status": "scheduled" }
+  ],
+  "lists": [
+    { "id": "l", "name": "Mixed", "items": [ { "titleId": "a" }, { "titleId": "b" }, { "titleId": "c" } ] }
+  ]
+}

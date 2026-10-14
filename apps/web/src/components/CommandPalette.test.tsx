@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { CommandPalette } from './CommandPalette'
 import { AppCommandPalette } from './AppCommandPalette'
@@ -12,6 +12,25 @@ const commands: Command[] = [
 
 beforeEach(() => { Element.prototype.scrollIntoView = vi.fn() })
 afterEach(cleanup)
+
+it('restores focus to an external opener after dismissal', async () => {
+  const { rerender } = render(<>
+    <button>Open search</button>
+    <CommandPalette open={false} onClose={vi.fn()} commands={commands} onRun={vi.fn()} />
+  </>)
+  const opener = screen.getByRole('button', { name: 'Open search' })
+  opener.focus()
+  rerender(<>
+    <button>Open search</button>
+    <CommandPalette open onClose={vi.fn()} commands={commands} onRun={vi.fn()} />
+  </>)
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus())
+  rerender(<>
+    <button>Open search</button>
+    <CommandPalette open={false} onClose={vi.fn()} commands={commands} onRun={vi.fn()} />
+  </>)
+  await waitFor(() => expect(opener).toHaveFocus())
+})
 
 it('keeps Enter working when library updates remove the highlighted result', () => {
   const onRun = vi.fn()

@@ -2,6 +2,7 @@
 // settings (time range / scope / top N / custom title), duplicate, remove.
 
 import { X, Copy, ChevronUp, ChevronDown, Minus, Plus, PanelRightClose } from 'lucide-react'
+import { useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn } from 'src/lib/utils'
 import {
@@ -20,6 +21,7 @@ import {
 } from 'src/lib/ledgerPanels'
 import { editorBtnClass, floatingPanelStyle } from './chrome'
 import { Eyebrow } from 'src/components/ui/typography'
+import { useLedgerSave } from './useLedgerSave'
 
 const segmentBtnClass = (active: boolean) =>
   cn(
@@ -47,6 +49,7 @@ export function WidgetDetails({
   const moveLedgerWidget = useAppStore((s) => s.moveLedgerWidget)
   const setLedgerWidgetWidth = useAppStore((s) => s.setLedgerWidgetWidth)
   const setLedgerWidgetSettings = useAppStore((s) => s.setLedgerWidgetSettings)
+  const { save, pending, error } = useLedgerSave()
 
   const selected = widgets.find((w) => w.id === selectedId)
   const selectedIndex = selected ? widgets.findIndex((w) => w.id === selected.id) : -1
@@ -61,6 +64,8 @@ export function WidgetDetails({
       className={cn('rounded-xl border border-(--line) p-4 flex flex-col gap-3.5 overflow-y-auto min-h-0 scrollbar-thin', className)}
       style={floatingPanelStyle}
     >
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <fieldset disabled={pending} className="contents" aria-busy={pending}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-serif text-[15px] font-medium text-paper leading-tight">
@@ -97,7 +102,7 @@ export function WidgetDetails({
             <button
               key={w}
               type="button"
-              onClick={() => setLedgerWidgetWidth(selected.id, w)}
+              onClick={() => void save(() => setLedgerWidgetWidth(selected.id, w))}
               aria-pressed={selected.width === w}
               className={cn(
                 'rounded-md border py-1.5 font-mono text-[10px] transition-colors',
@@ -117,7 +122,7 @@ export function WidgetDetails({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => moveLedgerWidget(selected.id, 'up')}
+            onClick={() => void save(() => moveLedgerWidget(selected.id, 'up'))}
             disabled={selectedIndex <= 0}
             aria-label="Move widget earlier"
             className={editorBtnClass}
@@ -126,7 +131,7 @@ export function WidgetDetails({
           </button>
           <button
             type="button"
-            onClick={() => moveLedgerWidget(selected.id, 'down')}
+            onClick={() => void save(() => moveLedgerWidget(selected.id, 'down'))}
             disabled={selectedIndex === widgets.length - 1}
             aria-label="Move widget later"
             className={editorBtnClass}
@@ -136,7 +141,7 @@ export function WidgetDetails({
           <span className="flex-1" />
           <button
             type="button"
-            onClick={() => onSelect(duplicateLedgerWidget(selected.id))}
+            onClick={() => void save(async () => { onSelect(await duplicateLedgerWidget(selected.id)) })}
             className={editorBtnClass}
           >
             <Copy className="w-3 h-3" /> Duplicate
@@ -152,7 +157,7 @@ export function WidgetDetails({
               <button
                 key={r}
                 type="button"
-                onClick={() => setLedgerWidgetSettings(selected.id, { timeRange: r })}
+                onClick={() => void save(() => setLedgerWidgetSettings(selected.id, { timeRange: r }))}
                 aria-pressed={effective.timeRange === r}
                 className={segmentBtnClass(effective.timeRange === r)}
               >
@@ -171,7 +176,7 @@ export function WidgetDetails({
               <button
                 key={sc}
                 type="button"
-                onClick={() => setLedgerWidgetSettings(selected.id, { scope: sc })}
+                onClick={() => void save(() => setLedgerWidgetSettings(selected.id, { scope: sc }))}
                 aria-pressed={effective.scope === sc}
                 className={segmentBtnClass(effective.scope === sc)}
               >
@@ -188,7 +193,7 @@ export function WidgetDetails({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setLedgerWidgetSettings(selected.id, { topN: clampTopN(effective.topN - 1) })}
+              onClick={() => void save(() => setLedgerWidgetSettings(selected.id, { topN: clampTopN(effective.topN - 1) }))}
               disabled={effective.topN <= LEDGER_TOP_N_MIN}
               aria-label="Show fewer entries"
               className={editorBtnClass}
@@ -198,7 +203,7 @@ export function WidgetDetails({
             <span className="w-10 text-center font-mono text-[12px] text-paper">{effective.topN}</span>
             <button
               type="button"
-              onClick={() => setLedgerWidgetSettings(selected.id, { topN: clampTopN(effective.topN + 1) })}
+              onClick={() => void save(() => setLedgerWidgetSettings(selected.id, { topN: clampTopN(effective.topN + 1) }))}
               disabled={effective.topN >= LEDGER_TOP_N_MAX}
               aria-label="Show more entries"
               className={editorBtnClass}
@@ -213,32 +218,40 @@ export function WidgetDetails({
       {settingKeys.includes('title') && (
         <div>
           <Eyebrow as="p" className="mb-1.5">Custom title</Eyebrow>
-          <input
-            type="text"
-            value={selected.settings?.title ?? ''}
-            maxLength={40}
+          <TitleSetting key={selected.id} value={selected.settings?.title ?? ''}
             placeholder={LEDGER_PANEL_LABELS[selected.panel]}
-            onChange={(e) => {
-              const value = e.target.value
-              // An empty input restores the panel's default title.
-              setLedgerWidgetSettings(selected.id, { title: value.trim() ? value : undefined })
-            }}
-            className="w-full rounded-md border border-(--line) bg-transparent px-2.5 py-1.5 font-mono text-[12px] text-paper placeholder:text-paper-faint focus:border-amber/40 focus:outline-hidden transition-colors"
-          />
+            onSave={(value) => save(() => setLedgerWidgetSettings(selected.id, { title: value.trim() ? value : undefined }))} />
         </div>
       )}
 
       <button
         type="button"
-        onClick={() => {
-          removeLedgerWidget(selected.id)
+        onClick={() => void save(async () => {
+          await removeLedgerWidget(selected.id)
           onSelect(null)
-        }}
+        })}
         className="w-full shrink-0 rounded-md border py-1.5 text-xs font-sans transition-colors"
         style={{ color: 'var(--ember)', borderColor: 'rgba(200,90,60,0.35)' }}
       >
         Remove from board
       </button>
+      </fieldset>
     </aside>
   )
+}
+
+function TitleSetting({ value, placeholder, onSave }: {
+  value: string; placeholder: string; onSave: (value: string) => Promise<boolean>
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  async function commit() {
+    if (draft !== null && await onSave(draft)) setDraft(null)
+  }
+  return <div className="flex gap-2">
+    <input type="text" aria-label="Custom widget title" value={draft ?? value} maxLength={40}
+      placeholder={placeholder} onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void commit() } }}
+      className="min-w-0 flex-1 rounded-md border border-(--line) bg-transparent px-2.5 py-1.5 font-mono text-[12px] text-paper placeholder:text-paper-faint focus:border-amber/40 focus:outline-hidden transition-colors" />
+    <button type="button" disabled={draft === null} onClick={() => void commit()} className={editorBtnClass}>Save title</button>
+  </div>
 }

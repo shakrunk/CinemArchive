@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { Pin } from 'lucide-react'
 import { cn } from 'src/lib/utils'
 
@@ -55,7 +56,7 @@ export function SpiderNoirModeSelector({
                     : 'bg-transparent hover:text-paper'
                 )}
                 style={{
-                  fontSize: '11px',
+                  fontSize: scaledTextSize('11px'),
                   padding: '4px 10px',
                   border: `1px solid ${isActive ? 'rgba(233,178,102,0.50)' : 'var(--line)'}`,
                   color: isActive ? 'var(--amber)' : 'var(--paper-faint)',
@@ -110,7 +111,7 @@ export function SpiderNoirModeSelector({
         <div
           style={{
             fontFamily: 'var(--mono)',
-            fontSize: '10px',
+            fontSize: scaledTextSize('10px'),
             color: 'var(--paper-faint)',
             letterSpacing: '0.06em',
           }}

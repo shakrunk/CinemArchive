@@ -10,7 +10,12 @@ export default defineConfig([
   // tsconfig.json) used for parallel-branch work — linting the main tree
   // must never descend into them, or typescript-eslint's project service
   // sees two candidate tsconfigRootDirs and refuses to parse anything.
-  globalIgnores(['dist', '.worktrees']),
+  globalIgnores(['dist', 'dist-e2e', 'playwright-report', 'test-results', '.worktrees']),
+  {
+    files: ['public/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.browser },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

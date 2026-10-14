@@ -1,0 +1,515 @@
+{
+  "titles": [
+    {
+      "id": "a",
+      "title": "Alpha",
+      "type": "movie",
+      "year": 2001,
+      "director": "Zed",
+      "rating": 4.5,
+      "genres": [
+        "Drama"
+      ],
+      "tags": [
+        "comfort"
+      ],
+      "originalLanguage": "fr",
+      "studios": [
+        "Studio A"
+      ],
+      "collectionId": 7,
+      "collectionName": "Saga",
+      "releaseDate": "2001-03-01",
+      "addedAt": "2026-01-01T00:00:00Z",
+      "lastInteractionAt": "2026-06-01T00:00:00Z",
+      "status": "watched",
+      "castNames": [
+        "Jane Example"
+      ]
+    },
+    {
+      "id": "b",
+      "title": "Beta",
+      "type": "tv",
+      "year": 2012,
+      "director": "Amy",
+      "rating": 4,
+      "genres": [
+        "Comedy"
+      ],
+      "tags": [
+        "weekend"
+      ],
+      "originalLanguage": "ja",
+      "network": "Canal",
+      "studios": [
+        "Studio A"
+      ],
+      "collectionId": 8,
+      "collectionName": "Saga",
+      "releaseDate": "2012-01-01",
+      "addedAt": "2026-01-03T00:00:00Z",
+      "lastInteractionAt": "2026-06-01T00:00:00.100Z",
+      "status": "watching",
+      "castNames": [
+        "Bill Example"
+      ]
+    },
+    {
+      "id": "c",
+      "title": "Gamma",
+      "type": "movie",
+      "year": 1999,
+      "director": "Amy",
+      "rating": 4.5,
+      "genres": [
+        "Drama",
+        "Mystery"
+      ],
+      "tags": [
+        "comfort"
+      ],
+      "originalLanguage": "en",
+      "studios": [
+        "Studio B"
+      ],
+      "collectionId": 7,
+      "collectionName": "Saga",
+      "releaseDate": "1999-02-01",
+      "addedAt": "2026-01-02T00:00:00Z",
+      "lastInteractionAt": "2026-05-31T18:00:00-06:00",
+      "status": "watchlist",
+      "castNames": []
+    },
+    {
+      "id": "d",
+      "title": "Delta",
+      "type": "movie",
+      "year": 2020,
+      "genres": [
+        "Action"
+      ],
+      "tags": [],
+      "originalLanguage": "en",
+      "studios": [],
+      "addedAt": "2026-01-04T00:00:00Z",
+      "lastInteractionAt": "2026-07-01T00:00:00Z",
+      "status": "dropped",
+      "castNames": []
+    },
+    {
+      "id": "e",
+      "title": "Echo",
+      "type": "tv",
+      "year": 0,
+      "rating": 0,
+      "genres": [],
+      "tags": [],
+      "studios": [],
+      "addedAt": "2026-01-04T00:00:00Z",
+      "lastInteractionAt": "2026-01-04T00:00:00Z",
+      "status": "watchlist",
+      "castNames": []
+    }
+  ],
+  "cases": [
+    {
+      "name": "title asc",
+      "filters": {
+        "sortField": "title",
+        "sortDir": "asc"
+      },
+      "expected": [
+        "a",
+        "b",
+        "d",
+        "e",
+        "c"
+      ]
+    },
+    {
+      "name": "title desc",
+      "filters": {
+        "sortField": "title",
+        "sortDir": "desc"
+      },
+      "expected": [
+        "c",
+        "e",
+        "d",
+        "b",
+        "a"
+      ]
+    },
+    {
+      "name": "year asc",
+      "filters": {
+        "sortField": "year",
+        "sortDir": "asc"
+      },
+      "expected": [
+        "e",
+        "c",
+        "a",
+        "b",
+        "d"
+      ]
+    },
+    {
+      "name": "year desc",
+      "filters": {
+        "sortField": "year",
+        "sortDir": "desc"
+      },
+      "expected": [
+        "d",
+        "b",
+        "a",
+        "c",
+        "e"
+      ]
+    },
+    {
+      "name": "rating asc",
+      "filters": {
+        "sortField": "rating",
+        "sortDir": "asc"
+      },
+      "expected": [
+        "d",
+        "e",
+        "b",
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "rating desc",
+      "filters": {
+        "sortField": "rating",
+        "sortDir": "desc"
+      },
+      "expected": [
+        "a",
+        "c",
+        "b",
+        "d",
+        "e"
+      ]
+    },
+    {
+      "name": "addedAt asc",
+      "filters": {
+        "sortField": "addedAt",
+        "sortDir": "asc"
+      },
+      "expected": [
+        "a",
+        "c",
+        "b",
+        "d",
+        "e"
+      ]
+    },
+    {
+      "name": "addedAt desc",
+      "filters": {
+        "sortField": "addedAt",
+        "sortDir": "desc"
+      },
+      "expected": [
+        "d",
+        "e",
+        "b",
+        "c",
+        "a"
+      ]
+    },
+    {
+      "name": "director asc",
+      "filters": {
+        "sortField": "director",
+        "sortDir": "asc"
+      },
+      "expected": [
+        "d",
+        "e",
+        "b",
+        "c",
+        "a"
+      ]
+    },
+    {
+      "name": "director desc",
+      "filters": {
+        "sortField": "director",
+        "sortDir": "desc"
+      },
+      "expected": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ]
+    },
+    {
+      "name": "lastInteraction asc",
+      "filters": {
+        "sortField": "lastInteraction",
+        "sortDir": "asc"
+      },
+      "expected": [
+        "e",
+        "a",
+        "c",
+        "b",
+        "d"
+      ]
+    },
+    {
+      "name": "lastInteraction desc",
+      "filters": {
+        "sortField": "lastInteraction",
+        "sortDir": "desc"
+      },
+      "expected": [
+        "d",
+        "b",
+        "a",
+        "c",
+        "e"
+      ]
+    },
+    {
+      "name": "search 'ALPHA'",
+      "filters": {
+        "search": "ALPHA"
+      },
+      "expected": [
+        "a"
+      ]
+    },
+    {
+      "name": "search 'Amy'",
+      "filters": {
+        "search": "Amy"
+      },
+      "expected": [
+        "b",
+        "c"
+      ]
+    },
+    {
+      "name": "search 'mystery'",
+      "filters": {
+        "search": "mystery"
+      },
+      "expected": [
+        "c"
+      ]
+    },
+    {
+      "name": "search 'comfort'",
+      "filters": {
+        "search": "comfort"
+      },
+      "expected": [
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "search 'jAnE'",
+      "filters": {
+        "search": "jAnE"
+      },
+      "expected": [
+        "a"
+      ]
+    },
+    {
+      "name": "search 'Canal'",
+      "filters": {
+        "search": "Canal"
+      },
+      "expected": []
+    },
+    {
+      "name": "search 'ja'",
+      "filters": {
+        "search": "ja"
+      },
+      "expected": [
+        "a"
+      ]
+    },
+    {
+      "name": "search '   '",
+      "filters": {
+        "search": "   "
+      },
+      "expected": [
+        "d",
+        "b",
+        "a",
+        "c",
+        "e"
+      ]
+    },
+    {
+      "name": "search ' Alpha '",
+      "filters": {
+        "search": " Alpha "
+      },
+      "expected": []
+    },
+    {
+      "name": "type",
+      "filters": {
+        "type": "movie"
+      },
+      "expected": [
+        "d",
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "status",
+      "filters": {
+        "status": "watchlist"
+      },
+      "expected": [
+        "c",
+        "e"
+      ]
+    },
+    {
+      "name": "genre OR",
+      "filters": {
+        "genres": [
+          "Comedy",
+          "Drama"
+        ]
+      },
+      "expected": [
+        "b",
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "networks",
+      "filters": {
+        "networks": [
+          "Canal"
+        ]
+      },
+      "expected": [
+        "b"
+      ]
+    },
+    {
+      "name": "decades",
+      "filters": {
+        "decades": [
+          "1990s",
+          "2000s"
+        ]
+      },
+      "expected": [
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "unknown decade",
+      "filters": {
+        "decades": [
+          "0s"
+        ]
+      },
+      "expected": [
+        "e"
+      ]
+    },
+    {
+      "name": "languages",
+      "filters": {
+        "languages": [
+          "fr",
+          "ja"
+        ]
+      },
+      "expected": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "name": "studio",
+      "filters": {
+        "studio": "Studio B"
+      },
+      "expected": [
+        "c"
+      ]
+    },
+    {
+      "name": "half star",
+      "filters": {
+        "minRating": 4.5
+      },
+      "expected": [
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "combined facets",
+      "filters": {
+        "type": "movie",
+        "genres": [
+          "Drama"
+        ],
+        "tags": [
+          "comfort"
+        ],
+        "languages": [
+          "fr"
+        ],
+        "minRating": 4.5,
+        "studio": "Studio A"
+      },
+      "expected": [
+        "a"
+      ]
+    },
+    {
+      "name": "empty conjunction",
+      "filters": {
+        "networks": [
+          "Canal"
+        ],
+        "languages": [
+          "fr"
+        ]
+      },
+      "expected": []
+    }
+  ],
+  "franchiseGroups": [
+    [
+      "b"
+    ],
+    [
+      "c",
+      "a"
+    ],
+    [
+      "d",
+      "e"
+    ]
+  ]
+}

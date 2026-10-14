@@ -40,12 +40,8 @@ fun TrendingTitle.asSearchResult() = MediaSearchResult(
  * Everything `media-proxy?action=details` (plus the OMDb `ratings` action) can tell us about a
  * title, in the shape `LibraryRepository.addTitle` needs to write it.
  *
- * A few fields here have no column in the local Room mirror ([contentRating], [imdbId],
- * [studios], [collectionId]/[collectionName], [rtScore], [metacriticScore]) — they're carried
- * anyway because the *server* has columns for all of them (schema.sql's `titles`), and the web
- * app renders them. Dropping them on the Android add path would mean a title added on a phone
- * looks permanently poorer on the web than the same title added there. They ride in the outbox
- * payload only; see `SupabaseRemoteMutationWriter.insertTitle`.
+ * Catalog fields are mirrored in Room and included in the outbox graph so Android and web
+ * retain the same certification, external IDs and critic scores from this fetch.
  */
 data class MediaDetails(
     val tmdbId: Int,
@@ -79,6 +75,10 @@ data class MediaDetails(
     /** Empty for movies. Includes season 0 (TMDB "Specials") only when it has episodes,
      *  matching the web app — see Specials.kt. */
     val seasons: List<MediaSeason> = emptyList(),
+    val rtUrl: String? = null,
+    val awardsCount: Int? = null,
+    val bechdelOutcome: String? = null,
+    val bechdelScore: String? = null,
 )
 
 data class MediaSeason(
@@ -89,6 +89,7 @@ data class MediaSeason(
      *  season still counts toward progress via [episodeCount], it just can't be ticked off
      *  episode by episode until a later sync fills the rows in. */
     val episodes: List<MediaEpisode> = emptyList(),
+    val cast: List<MediaCredit> = emptyList(),
 )
 
 data class MediaEpisode(
@@ -98,6 +99,7 @@ data class MediaEpisode(
     val runtime: Int?,
     val synopsis: String? = null,
     val stillUrl: String? = null,
+    val crew: List<MediaCrewCredit> = emptyList(),
 )
 
 /** One person credited on a single episode — the `action=episode_credits` payload. Unlike
@@ -127,6 +129,8 @@ data class MediaCredit(
     val name: String,
     val characterName: String?,
     val order: Int,
+    val profileUrl: String? = null,
+    val episodeCount: Int? = null,
 )
 
 data class MediaCrewCredit(
@@ -134,6 +138,7 @@ data class MediaCrewCredit(
     val name: String,
     val job: String,
     val department: String?,
+    val profileUrl: String? = null,
 )
 
 /** What the Add overlay's second step collects, on top of the TMDB metadata itself. */
@@ -146,4 +151,6 @@ data class AddTitleRequest(
     /** `YYYY-MM-DD`. Only honored for [LibraryStatus.WATCHED], where it seeds the title's
      *  first viewing so the Ledger's date-bucketed widgets have something to fold in. */
     val watchedOn: String? = null,
+    val tags: List<String> = emptyList(),
+    val seasonProgress: Map<Int, Int> = emptyMap(),
 )

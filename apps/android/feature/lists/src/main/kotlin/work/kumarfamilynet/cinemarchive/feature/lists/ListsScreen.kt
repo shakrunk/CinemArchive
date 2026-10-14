@@ -249,6 +249,11 @@ private fun ListRow(list: TitleList, members: List<LibraryTitle>, onClick: () ->
             }
             Column(modifier = Modifier.weight(2f).padding(start = 12.dp)) {
                 Text(list.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                list.description?.takeIf { it.isNotEmpty() }?.let { description ->
+                    Text(description, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
                 Text(
                     "${members.size} ${if (members.size == 1) "title" else "titles"}",
                     style = MaterialTheme.typography.labelSmall,
@@ -294,6 +299,12 @@ private fun ListDetailScreen(
             IconButton(onClick = { confirmingDelete = true }) {
                 Icon(Icons.Filled.Delete, contentDescription = "Delete list", tint = MaterialTheme.colorScheme.error)
             }
+        }
+
+        list.description?.takeIf { it.isNotEmpty() }?.let { description ->
+            Text(description, style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         }
 
         if (members.isEmpty()) {

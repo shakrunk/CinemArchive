@@ -174,6 +174,79 @@ const MOCK_RESULTS: SearchResult[] = [
   },
 ]
 
+// ─── Raw TMDB / OMDb payload shapes ──────────────────────────────────────────
+// Only the fields this module reads, all optional: the media-proxy Edge Function
+// forwards TMDB/OMDb JSON verbatim, so nothing here is guaranteed present.
+
+/** A movie/TV entry from search, trending, discover, collection, recommendations or person credits. */
+interface TmdbItem {
+  id: number
+  title?: string
+  name?: string
+  release_date?: string
+  first_air_date?: string
+  poster_path?: string | null
+  backdrop_path?: string | null
+  overview?: string
+  media_type?: string
+  popularity?: number
+}
+
+interface TmdbCastEntry {
+  id: number
+  name: string
+  character?: string
+  order?: number
+  episode_count?: number
+  total_episode_count?: number
+  profile_path?: string | null
+  roles?: Array<{ character?: string }>
+}
+
+interface TmdbCertificationSource {
+  release_dates?: { results?: Array<{ iso_3166_1: string; release_dates?: Array<{ certification?: string }> }> }
+  content_ratings?: { results?: Array<{ iso_3166_1: string; rating?: string }> }
+}
+
+interface TmdbVideo {
+  key: string
+  name: string
+  type: string
+  site?: string
+  official?: boolean
+}
+
+interface TmdbProvider {
+  provider_id: number
+  provider_name: string
+  logo_path?: string | null
+}
+
+interface TmdbPerson {
+  id: number
+  name: string
+  known_for?: Array<{ title?: string; name?: string }>
+  profile_path?: string | null
+  known_for_department?: string
+}
+
+interface TmdbCompany {
+  id: number
+  name: string
+  logo_path?: string | null
+  origin_country?: string
+}
+
+interface TmdbImage {
+  file_path?: string
+  iso_639_1?: string | null
+}
+
+interface OmdbRating {
+  Source: string
+  Value: string
+}
+
 // ─── Mapping helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -183,15 +256,15 @@ const MOCK_RESULTS: SearchResult[] = [
  * value, so we scan for the first non-empty rather than taking [0].
  * TV exposes a single `content_ratings.results[].rating`.
  */
-function extractCertification(data: any, type: MediaType): string | undefined {
+function extractCertification(data: TmdbCertificationSource, type: MediaType): string | undefined {
   if (type === 'movie') {
-    const us = (data.release_dates?.results ?? []).find((r: any) => r.iso_3166_1 === 'US')
+    const us = (data.release_dates?.results ?? []).find((r) => r.iso_3166_1 === 'US')
     const cert = (us?.release_dates ?? [])
-      .map((rd: any) => rd.certification)
-      .find((c: string) => c && c.trim() !== '')
+      .map((rd) => rd.certification)
+      .find((c) => c && c.trim() !== '')
     return cert ? cert.trim() : undefined
   }
-  const us = (data.content_ratings?.results ?? []).find((r: any) => r.iso_3166_1 === 'US')
+  const us = (data.content_ratings?.results ?? []).find((r) => r.iso_3166_1 === 'US')
   const rating = us?.rating
   return rating && rating.trim() !== '' ? rating.trim() : undefined
 }
@@ -201,8 +274,8 @@ function extractCertification(data: any, type: MediaType): string | undefined {
  * TV aggregate_credits shape (`roles[0].character`, `total_episode_count`)
  * vs. the standard credits shape (`character`, `episode_count`).
  */
-function mapTmdbCast(list: any[], opts: { aggregate?: boolean } = {}): CastMember[] {
-  return list.map((c: any) => ({
+function mapTmdbCast(list: TmdbCastEntry[], opts: { aggregate?: boolean } = {}): CastMember[] {
+  return list.map((c) => ({
     tmdbPersonId: c.id,
     name: c.name,
     character: opts.aggregate ? (c.roles?.[0]?.character || undefined) : (c.character || undefined),
@@ -223,12 +296,13 @@ function interleave<T>(a: T[], b: T[], limit: number): T[] {
   return combined.slice(0, limit)
 }
 
-function mapSearchItem(item: any, type: MediaType): SearchResult {
+function mapSearchItem(item: TmdbItem, type: MediaType): SearchResult {
   const date = type === 'movie' ? item.release_date : item.first_air_date
   return {
     tmdbId: item.id,
     type,
-    title: type === 'movie' ? item.title : item.name,
+    // TMDB always supplies title (movies) / name (TV); the shape marks both optional.
+    title: (type === 'movie' ? item.title : item.name) as string,
     year: date ? new Date(date).getFullYear() : 0,
     posterUrl: item.poster_path ? `${TMDB_IMG}/w500${item.poster_path}` : undefined,
     backdropUrl: item.backdrop_path ? `${TMDB_IMG}/w1280${item.backdrop_path}` : undefined,
@@ -255,8 +329,8 @@ export async function searchMedia(query: string): Promise<SearchResult[]> {
     if (movieRes.error) throw movieRes.error
     if (tvRes.error) throw tvRes.error
 
-    const movies = (movieRes.data?.results || []).map((i: any) => mapSearchItem(i, 'movie'))
-    const tv = (tvRes.data?.results || []).map((i: any) => mapSearchItem(i, 'tv'))
+    const movies = (movieRes.data?.results || []).map((i: TmdbItem) => mapSearchItem(i, 'movie'))
+    const tv = (tvRes.data?.results || []).map((i: TmdbItem) => mapSearchItem(i, 'tv'))
 
     return interleave(movies, tv, 15)
   }
@@ -265,6 +339,27 @@ export async function searchMedia(query: string): Promise<SearchResult[]> {
   return MOCK_RESULTS.filter(
     (r) => r.title.toLowerCase().includes(q) || r.director?.toLowerCase().includes(q)
   )
+}
+
+/**
+ * Resolve an external id (IMDb "tt…" or TVDB) to a TMDB search result via the
+ * proxy's `find` action. Exact — no fuzzy matching. Returns undefined when TMDB
+ * has no match or when Supabase isn't configured.
+ */
+export async function findMediaByExternalId(
+  source: 'imdb_id' | 'tvdb_id',
+  externalId: string,
+  preferType?: MediaType
+): Promise<SearchResult | undefined> {
+  if (!(isSupabaseConfigured && supabase)) return undefined
+  const { data, error } = await supabase.functions.invoke(
+    `media-proxy?action=find&id=${encodeURIComponent(externalId)}&source=${source}`
+  )
+  if (error) throw error
+  const movies: SearchResult[] = (data?.movie_results ?? []).map((i: TmdbItem) => mapSearchItem(i, 'movie'))
+  const tv: SearchResult[] = (data?.tv_results ?? []).map((i: TmdbItem) => mapSearchItem(i, 'tv'))
+  const ordered = preferType === 'tv' ? [...tv, ...movies] : [...movies, ...tv]
+  return ordered[0]
 }
 
 /**
@@ -305,7 +400,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
           ratingsData.imdbRating && ratingsData.imdbRating !== 'N/A'
             ? parseFloat(ratingsData.imdbRating)
             : undefined
-        const rt = ratingsData.Ratings?.find((r: any) => r.Source === 'Rotten Tomatoes')?.Value
+        const rt = (ratingsData.Ratings as OmdbRating[] | undefined)?.find((r) => r.Source === 'Rotten Tomatoes')?.Value
         rtScore = rt ? parseInt(rt.replace('%', ''), 10) : undefined
         const meta = ratingsData.Metascore
         metacriticScore = meta && meta !== 'N/A' ? parseInt(meta, 10) : undefined
@@ -359,7 +454,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     }
   }
 
-  const studios: string[] = (data.production_companies ?? []).map((c: any) => c.name as string)
+  const studios: string[] = (data.production_companies ?? []).map((c: { name: string }) => c.name)
 
   // Movies only — TMDB has no collection concept for TV.
   const collection = data.belongs_to_collection ?? null
@@ -380,7 +475,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     posterUrl: data.poster_path ? `${TMDB_IMG}/w500${data.poster_path}` : base.posterUrl,
     backdropUrl: data.backdrop_path ? `${TMDB_IMG}/w1280${data.backdrop_path}` : base.backdropUrl,
     director,
-    genres: data.genres?.map((g: any) => g.name) ?? [],
+    genres: data.genres?.map((g: { name: string }) => g.name) ?? [],
     synopsis: data.overview,
     runtime: data.runtime,
     network: data.networks?.[0]?.name,
@@ -416,15 +511,7 @@ export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): 
 
     const episodes = (data?.episodes ?? []) as RawTmdbEpisode[]
 
-    const cast: CastMember[] = (data?.credits?.cast ?? [])
-      .map((c: any) => ({
-        tmdbPersonId: c.id,
-        name: c.name,
-        character: c.character || undefined,
-        episodeCount: c.episode_count ?? undefined,
-        profileUrl: c.profile_path ? `${TMDB_IMG_W185}${c.profile_path}` : undefined,
-        order: c.order ?? 0,
-      }))
+    const cast: CastMember[] = mapTmdbCast(data?.credits?.cast ?? [])
 
     return { episodes, cast }
   } catch (e) {
@@ -479,7 +566,7 @@ export async function fetchTitleVideos(tmdbId: number, type: MediaType): Promise
     )
     if (error) throw error
 
-    const results: TitleVideo[] = ((data?.results ?? []) as any[])
+    const results: TitleVideo[] = ((data?.results ?? []) as TmdbVideo[])
       .filter((v) => v.site === 'YouTube' && ['Trailer', 'Teaser'].includes(v.type))
       .map((v) => ({
         key: v.key as string,
@@ -525,7 +612,7 @@ function detectWatchRegion(): string {
   return parts.length > 1 ? parts[1].toUpperCase() : 'US'
 }
 
-function mapWatchProviderList(list: any[] | undefined): WatchProvider[] {
+function mapWatchProviderList(list: TmdbProvider[] | undefined): WatchProvider[] {
   return (list ?? []).map((p) => ({
     providerId: p.provider_id,
     name: p.provider_name,
@@ -645,7 +732,7 @@ export async function fetchTrending(type: MediaType | 'all', page = 1): Promise<
         `media-proxy?action=trending&type=${t}&page=${page}`
       )
       if (error) throw error
-      return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]
+      return (data?.results ?? []).map((i: TmdbItem) => mapSearchItem(i, t)) as SearchResult[]
     })
   )
 
@@ -679,7 +766,7 @@ export async function fetchDiscover(type: MediaType | 'all', genreId?: number, p
     if (genreId) params.set('genre', String(genreId))
     const { data, error } = await client.functions.invoke(`media-proxy?${params.toString()}`)
     if (error) throw error
-    return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]
+    return (data?.results ?? []).map((i: TmdbItem) => mapSearchItem(i, t)) as SearchResult[]
   }
 
   if (type === 'all') {
@@ -707,7 +794,7 @@ export async function fetchCollectionParts(collectionId: number): Promise<Search
     `media-proxy?action=collection&id=${collectionId}`
   )
   if (error) throw error
-  const parts = (data?.parts ?? []).map((i: any) => mapSearchItem(i, 'movie')) as SearchResult[]
+  const parts = (data?.parts ?? []).map((i: TmdbItem) => mapSearchItem(i, 'movie')) as SearchResult[]
   // TMDB doesn't guarantee part order; sort by release year, unreleased (year 0) last.
   return parts.sort((a, b) => (a.year || 9999) - (b.year || 9999))
 }
@@ -728,7 +815,7 @@ export async function fetchRecommendations(tmdbId: number, type: MediaType, page
   if (error) throw error
   // TMDB's recommendations payload carries a media_type per item; trust it over
   // the source title's type so a movie can still recommend a series spin-off.
-  return (data?.results ?? []).map((i: any) =>
+  return (data?.results ?? []).map((i: TmdbItem) =>
     mapSearchItem(i, i.media_type === 'tv' ? 'tv' : 'movie')
   ) as SearchResult[]
 }
@@ -774,12 +861,12 @@ export async function searchPersons(query: string): Promise<PersonResult[]> {
     )
     if (error) throw error
 
-    return (data?.results ?? []).slice(0, 8).map((p: any) => ({
+    return (data?.results ?? []).slice(0, 8).map((p: TmdbPerson): PersonResult => ({
       id: p.id,
       name: p.name,
       knownFor: (p.known_for ?? [])
         .slice(0, 3)
-        .map((k: any) => (k.title || k.name) as string)
+        .map((k) => (k.title || k.name) as string)
         .filter(Boolean)
         .join(', '),
       profileUrl: p.profile_path ? `${TMDB_IMG_W185}${p.profile_path}` : undefined,
@@ -803,8 +890,8 @@ export async function fetchPersonCredits(personId: number): Promise<SearchResult
   )
   if (error) throw error
 
-  const cast: any[] = data?.cast ?? []
-  const crew: any[] = data?.crew ?? []
+  const cast: TmdbItem[] = data?.cast ?? []
+  const crew: TmdbItem[] = data?.crew ?? []
 
   const seen = new Set<string>()
   const all = [...cast, ...crew].filter((item) => {
@@ -834,7 +921,7 @@ export async function searchCompanies(query: string): Promise<CompanyResult[]> {
     )
     if (error) throw error
 
-    return (data?.results ?? []).slice(0, 8).map((c: any) => ({
+    return (data?.results ?? []).slice(0, 8).map((c: TmdbCompany): CompanyResult => ({
       id: c.id,
       name: c.name,
       logoUrl: c.logo_path ? `${TMDB_IMG_LOGO}${c.logo_path}` : undefined,
@@ -859,7 +946,7 @@ export async function fetchCompanyTitles(companyId: number, type: MediaType | 'a
       `media-proxy?action=discover&type=${t}&company=${companyId}`
     )
     if (error) throw error
-    return (data?.results ?? []).map((i: any) => mapSearchItem(i, t)) as SearchResult[]
+    return (data?.results ?? []).map((i: TmdbItem) => mapSearchItem(i, t)) as SearchResult[]
   }
 
   if (type === 'all') {
@@ -896,7 +983,7 @@ export async function fetchTitleImages(tmdbId: number, type: MediaType): Promise
     if (error) throw error
 
     // Logo — take the first English logo; fall back to first textless (iso null) logo.
-    const allLogos = ((data?.logos ?? []) as any[]).filter((l) => l.file_path)
+    const allLogos = ((data?.logos ?? []) as TmdbImage[]).filter((l) => l.file_path)
     const englishLogos = allLogos.filter((l) => l.iso_639_1 === 'en')
     const logo = englishLogos[0] ?? allLogos.filter((l) => l.iso_639_1 === null)[0]
     const logoUrl = logo ? `${TMDB_IMG}/original${logo.file_path}` : null
@@ -906,7 +993,7 @@ export async function fetchTitleImages(tmdbId: number, type: MediaType): Promise
     // renders wider than ~1000px, and it's the same cap already used for
     // title.backdropUrl at write time — this stays consistent with that
     // stored fallback rather than silently outsizing it.
-    const backdrop = ((data?.backdrops ?? []) as any[]).find((b) => b.file_path)
+    const backdrop = ((data?.backdrops ?? []) as TmdbImage[]).find((b) => b.file_path)
     const backdropUrl = backdrop ? `${TMDB_IMG}/w1280${backdrop.file_path}` : null
 
     return { logoUrl, backdropUrl }

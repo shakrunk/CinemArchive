@@ -172,6 +172,8 @@ internal fun parseCast(data: JSONObject, type: MediaType): List<MediaCredit> {
                 entry.stringOrNull("character")
             },
             order = entry.optInt("order", Int.MAX_VALUE),
+            profileUrl = entry.stringOrNull("profile_path")?.let { "$TMDB_PROFILE_BASE$it" },
+            episodeCount = if (aggregate) entry.intOrNull("total_episode_count") else null,
         )
     }.sortedBy { it.order }.distinctBy { it.tmdbPersonId }
 }
@@ -187,14 +189,16 @@ internal fun parseCrew(data: JSONObject, type: MediaType): List<MediaCrewCredit>
         val name = entry.stringOrNull("name") ?: continue
         val id = entry.optInt("id")
         if (!seen.add("$id:$job")) continue
-        crew += MediaCrewCredit(id, name, job, entry.stringOrNull("department"))
+        crew += MediaCrewCredit(id, name, job, entry.stringOrNull("department"),
+            entry.stringOrNull("profile_path")?.let { "$TMDB_PROFILE_BASE$it" })
     }
     if (type == MediaType.TV) {
         for (creator in data.optJSONArray("created_by").objects()) {
             val name = creator.stringOrNull("name") ?: continue
             val id = creator.optInt("id")
             if (!seen.add("$id:Creator")) continue
-            crew += MediaCrewCredit(id, name, "Creator", "Writing")
+            crew += MediaCrewCredit(id, name, "Creator", "Writing",
+                creator.stringOrNull("profile_path")?.let { "$TMDB_PROFILE_BASE$it" })
         }
     }
     return crew
@@ -233,9 +237,17 @@ internal fun parseSeasonEpisodes(body: String): List<MediaEpisode> =
                 runtime = episode.intOrNull("runtime"),
                 synopsis = episode.stringOrNull("overview"),
                 stillUrl = episode.stringOrNull("still_path")?.let { "$TMDB_STILL_BASE$it" },
+                crew = episode.optJSONArray("crew").objects().mapNotNull { credit ->
+                    val job = credit.stringOrNull("job") ?: return@mapNotNull null
+                    if (job !in setOf("Director", "Writer", "Teleplay", "Story")) return@mapNotNull null
+                    val name = credit.stringOrNull("name") ?: return@mapNotNull null
+                    MediaCrewCredit(credit.getInt("id"), name, job, credit.stringOrNull("department"))
+                }.distinctBy { it.tmdbPersonId to it.job },
             )
         }
         .sortedBy { it.episodeNumber }
+
+internal fun parseSeasonCast(body: String): List<MediaCredit> = parseCast(JSONObject(body), MediaType.MOVIE)
 
 /** Maps one `action=episode_credits` payload: `cast` holds the series regulars who appear in
  *  the episode, `guest_stars` that episode's guests. Both are ordered by billing and

@@ -41,7 +41,7 @@ export function PremieresRevivals({ className, settings, width = 'md' }: { class
   }
 
   return (
-    <Panel title={panelTitle} hint={hint} className={className}>
+    <Panel title={panelTitle} hint={hint} className={className} data={{ columns: ["Month", "Premieres", "Revivals"], rows: months.map((month) => [month.month, month.premieres, month.revivals]) }}>
       <div className="min-w-0 overflow-hidden">
         <div className="flex min-w-0 items-stretch gap-[clamp(2px,0.6vw,8px)]">
           {months.map((m, i) => (

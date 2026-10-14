@@ -4,7 +4,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useShallow } from 'zustand/react/shallow'
 import { Pencil, Check, ChevronUp, PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, SECONDARY_AMBER_BUTTON } from 'src/lib/utils'
@@ -19,6 +18,7 @@ import { PANEL_REGISTRY, WIDTH_GRID_CLASSES } from './panelRegistry'
 import { WidgetPalette } from './editor/WidgetPalette'
 import { WidgetDetails } from './editor/WidgetDetails'
 import { useBoardDrag } from './editor/useBoardDrag'
+import { useLedgerSave } from './editor/useLedgerSave'
 import { floatingPanelStyle } from './editor/chrome'
 import { Eyebrow } from 'src/components/ui/typography'
 
@@ -33,32 +33,18 @@ export function Ledger() {
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [])
-  // ⚡ Bolt: Batch Zustand selectors to reduce store subscriptions
-  const {
-    ownWidgets,
-    viewedLedgerWidgets,
-    addLedgerWidget,
-    resetLedgerPrefs,
-    friendView,
-    isSharedView,
-    loadingUser,
-    libraryLoadError,
-    titlesEmpty,
-    loadUserLibrary,
-  } = useAppStore(
-    useShallow((s) => ({
-      ownWidgets: s.ledgerPrefs.widgets,
-      viewedLedgerWidgets: s.viewedLedgerWidgets,
-      addLedgerWidget: s.addLedgerWidget,
-      resetLedgerPrefs: s.resetLedgerPrefs,
-      friendView: s.viewerContext.kind === 'friend' ? s.viewerContext : null,
-      isSharedView: s.isSharedView,
-      loadingUser: s.loadingUser,
-      libraryLoadError: s.libraryLoadError,
-      titlesEmpty: s.titles.length === 0,
-      loadUserLibrary: s.loadUserLibrary,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const ownWidgets = useAppStore((s) => s.ledgerPrefs.widgets)
+  const viewedLedgerWidgets = useAppStore((s) => s.viewedLedgerWidgets)
+  const addLedgerWidget = useAppStore((s) => s.addLedgerWidget)
+  const resetLedgerPrefs = useAppStore((s) => s.resetLedgerPrefs)
+  const { save: saveBoard, error: boardSaveError } = useLedgerSave()
+  const friendView = useAppStore((s) => s.viewerContext.kind === 'friend' ? s.viewerContext : null)
+  const isSharedView = useAppStore((s) => s.isSharedView)
+  const loadingUser = useAppStore((s) => s.loadingUser)
+  const libraryLoadError = useAppStore((s) => s.libraryLoadError)
+  const titlesEmpty = useAppStore((s) => s.titles.length === 0)
+  const loadUserLibrary = useAppStore((s) => s.loadUserLibrary)
   const canEdit = !friendView && !isSharedView
   // Shared/friend views render the owner's synced board arrangement, falling
   // back to the default board when they never synced one. Editing is disabled
@@ -113,6 +99,7 @@ export function Ledger() {
   }, [editing])
 
   const {
+    saveError: pointerSaveError,
     itemRefs,
     gridRef,
     boardRef,
@@ -167,6 +154,7 @@ export function Ledger() {
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+      {(boardSaveError || pointerSaveError) && <p role="alert" className="mb-4 text-sm text-destructive">{boardSaveError || pointerSaveError}</p>}
       <div className="flex items-start justify-between gap-4">
         <DashHero />
         {canEdit && (
@@ -343,12 +331,12 @@ export function Ledger() {
                   onItemPointerDown={handlePaletteItemPointerDown}
                   onItemPointerMove={handlePaletteItemPointerMove}
                   onItemPointerEnd={handlePaletteItemPointerEnd}
-                  onItemActivate={(panel) => selectWidget(addLedgerWidget(panel))}
+                  onItemActivate={(panel) => void saveBoard(async () => { selectWidget(await addLedgerWidget(panel)) })}
                   onClose={stopEditing}
-                  onReset={() => {
-                    resetLedgerPrefs()
+                  onReset={() => void saveBoard(async () => {
+                    await resetLedgerPrefs()
                     setSelectedId(null)
-                  }}
+                  })}
                   onHide={() => setPaletteHidden(true)}
                 />
               </div>
@@ -411,12 +399,12 @@ export function Ledger() {
                     onItemPointerDown={handlePaletteItemPointerDown}
                     onItemPointerMove={handlePaletteItemPointerMove}
                     onItemPointerEnd={handlePaletteItemPointerEnd}
-                    onItemActivate={(panel) => selectWidget(addLedgerWidget(panel))}
+                    onItemActivate={(panel) => void saveBoard(async () => { selectWidget(await addLedgerWidget(panel)) })}
                     onClose={stopEditing}
-                    onReset={() => {
-                      resetLedgerPrefs()
+                    onReset={() => void saveBoard(async () => {
+                      await resetLedgerPrefs()
                       setSelectedId(null)
-                    }}
+                    })}
                     onHide={() => setPaletteHidden(true)}
                   />
                 )}

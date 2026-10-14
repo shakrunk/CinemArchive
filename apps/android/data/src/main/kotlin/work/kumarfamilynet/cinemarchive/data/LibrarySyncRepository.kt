@@ -1,12 +1,14 @@
 package work.kumarfamilynet.cinemarchive.data
 
-import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -14,6 +16,9 @@ import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingDao
 import work.kumarfamilynet.cinemarchive.core.database.CinemaOutingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeEntity
+import work.kumarfamilynet.cinemarchive.core.database.EpisodeCrewEntity
+import work.kumarfamilynet.cinemarchive.core.database.SeasonCastEntity
+import work.kumarfamilynet.cinemarchive.core.database.PersonCreditsDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingDao
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeRatingEntity
 import work.kumarfamilynet.cinemarchive.core.database.EpisodeReviewDao
@@ -23,6 +28,8 @@ import work.kumarfamilynet.cinemarchive.core.database.EpisodeWatchEventEntity
 import work.kumarfamilynet.cinemarchive.core.database.ListDao
 import work.kumarfamilynet.cinemarchive.core.database.ListEntity
 import work.kumarfamilynet.cinemarchive.core.database.ListItemDao
+import work.kumarfamilynet.cinemarchive.core.database.LocalTransactor
+import work.kumarfamilynet.cinemarchive.core.database.PassthroughTransactor
 import work.kumarfamilynet.cinemarchive.core.database.ListItemEntity
 import work.kumarfamilynet.cinemarchive.core.database.SeasonDao
 import work.kumarfamilynet.cinemarchive.core.database.SeasonEntity
@@ -35,7 +42,6 @@ import work.kumarfamilynet.cinemarchive.core.database.TitleEntity
 import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 
-private val Context.librarySyncDataStore by preferencesDataStore(name = "cinemarchive_sync")
 private const val EPOCH = "1970-01-01T00:00:00Z"
 private const val PAGE_SIZE = 500
 
@@ -78,7 +84,11 @@ private const val PAGE_SIZE = 500
  * "stuck behind an old watermark" backlog the way title_cast/title_crew had; bumped anyway to
  * keep this constant's history a complete audit trail per its own stated policy.
  */
-private const val SYNC_SCHEMA_VERSION = 6
+// 7: episode watch notes. Re-read existing events while preserving queued local edits/deletes.
+// 8: title tags, studios, and franchise metadata used by Library filters and grouping.
+// 9: season cast and episode crew, gated by the RPC's explicit personCreditsVersion marker.
+// 10: rich title fields. 11: credit profiles/counts and watch/review color modes.
+private const val SYNC_SCHEMA_VERSION = 13
 
 /**
  * Pulls the authenticated user's real library down via `sync_library_changes`
@@ -96,9 +106,9 @@ private const val SYNC_SCHEMA_VERSION = 6
  * had no credits at all and the Ledger's Ensemble widget could never populate (#177).
  */
 class LibrarySyncRepository(
-    context: Context,
+    private val dataStore: DataStore<Preferences>,
     private val client: SupabaseRestClient,
-    private val authRepository: AuthRepository,
+    private val authRepository: SessionSource,
     private val titleDao: TitleDao,
     private val seasonDao: SeasonDao,
     private val episodeDao: EpisodeDao,
@@ -111,8 +121,25 @@ class LibrarySyncRepository(
     private val titleCrewDao: TitleCrewDao,
     private val listDao: ListDao,
     private val listItemDao: ListItemDao,
+    private val personCreditsDao: PersonCreditsDao,
+    /** Pushes queued local edits. Run before every pull so the server (and so the pull) already
+     *  reflects what this device did while offline. */
+    private val pushPending: suspend () -> Unit = {},
+    /** [pendingKey]s of entities with a queued, unpushed mutation. The pull never overwrites,
+     *  deletes or resurrects these — the local copy is the user's newer intent. */
+    private val pendingKeys: suspend () -> Set<String> = { emptySet() },
+    /** Each pulled page (including reading [pendingKeys]) is applied as one transaction, so a user
+     *  edit + its queue entry lands entirely before the page (and is then protected) or entirely
+     *  after it (and wins) — never between the pending check and the write. */
+    private val transactor: LocalTransactor = PassthroughTransactor,
+    private val afterPull: suspend () -> Unit = {},
+    private val venueNoteDao: work.kumarfamilynet.cinemarchive.core.database.VenueNoteDao? = null,
+    private val theaterInterestDao: work.kumarfamilynet.cinemarchive.core.database.TheaterInterestDao? = null,
 ) {
-    private val dataStore = context.librarySyncDataStore
+    /** The ONE sync pipeline: startup, resume and pull-to-refresh all land here and run
+     *  strictly one at a time, so a push and a pull can never interleave. */
+    private val syncMutex = Mutex()
+
     private val cursorKey = stringPreferencesKey("last_synced_at")
     private val schemaVersionKey = intPreferencesKey("sync_schema_version")
 
@@ -122,19 +149,69 @@ class LibrarySyncRepository(
      *  does blocking OkHttp network calls, and a caller invoking it from a Compose
      *  `LaunchedEffect`/`viewModelScope` (Main by default) would otherwise hit a
      *  `NetworkOnMainThreadException`. */
-    suspend fun syncNow() = withContext(Dispatchers.IO) {
-        val session = authRepository.currentSession() ?: return@withContext
+    suspend fun syncNow() = withContext(Dispatchers.IO) { syncMutex.withLock { syncLocked(); afterPull() } }
+
+    /** Recovery can remove protection without a push. Commit replay before that removal,
+     * serialized with pulls so a concurrent page cannot advance past the retained epoch. */
+    suspend fun withDurableReplay(action: suspend () -> Unit) = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            val session = checkNotNull(authRepository.currentSession()) { "This sign-in has ended" }
+            dataStore.edit { it[cursorKey] = EPOCH }
+            check(authRepository.currentSession()?.userId == session.userId) { "This sign-in has ended" }
+            action()
+        }
+    }
+
+    private suspend fun syncLocked() {
+        val session = authRepository.currentSession() ?: return
+        // Persist before any ACK can drain the queue. A crash after ACK must still replay
+        // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
+        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
+            dataStore.edit { it[cursorKey] = EPOCH }
+        }
+        // Push first (best effort — offline just leaves entries queued and protected below).
+        try {
+            pushPending()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Offline or a failing entry: it stays queued, and is protected from the pull below.
+        }
         val prefs = dataStore.data.first()
         // An install that predates SYNC_SCHEMA_VERSION has no stored version at all — treat
         // that as version 1, so every pre-existing install also gets the one-time reset.
         val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
         var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
+        var metadataSchemaAvailable = true
+        var sawMetadataTitle = false
+        var personSchemaAvailable = true
+        var richTitleSchemaAvailable = true
+        var backupGraphSchemaAvailable = true
+        var moviegoingSchemaAvailable = true
+        var skippedBackfillRows = false
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
-            val rows = JSONArray(client.rpc("sync_library_changes", params, session.accessToken))
+            val rows = exactMetadataArray(client.rpc("sync_library_changes", params, session.accessToken))
+            check(authRepository.currentSession()?.userId == session.userId) { "This sign-in has ended" }
             if (rows.length() == 0) break
-            applyPage(rows, deferred)
+            if (storedSchemaVersion < SYNC_SCHEMA_VERSION) {
+                for (index in 0 until rows.length()) {
+                    val row = rows.getJSONObject(index)
+                    if (row.getString("entity_type") == "title") {
+                        sawMetadataTitle = true
+                        val payload = row.getJSONObject("payload")
+                        if (storedSchemaVersion < 8 && listOf("tags", "studios", "collectionId", "collectionName").any { !payload.has(it) }) {
+                            metadataSchemaAvailable = false
+                        }
+                        if (payload.optInt("personCreditsVersion", 0) < 1) personSchemaAvailable = false
+                        if (payload.optInt("titleMetadataVersion", 0) < 1) richTitleSchemaAvailable = false
+                        if (payload.optInt("backupGraphVersion", 0) < 1) backupGraphSchemaAvailable = false
+                        if (payload.optInt("moviegoingPreferencesVersion", 0) < 1) moviegoingSchemaAvailable = false
+                    }
+                }
+            }
+            transactor.run { if (applyPage(rows, deferred)) skippedBackfillRows = true }
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
             dataStore.edit { it[cursorKey] = cursor }
             // A page may overshoot PAGE_SIZE — the RPC widens it to avoid splitting a group of
@@ -142,11 +219,28 @@ class LibrarySyncRepository(
             // nothing left to send, so a short page is still a reliable "that was the last one".
             if (rows.length() < PAGE_SIZE) break
         }
-        deferred.flush()
+        transactor.run { if (deferred.flush()) skippedBackfillRows = true }
+        transactor.run {
+            val protected = pendingKeys()
+            theaterInterestDao?.observeAll()?.first()?.filter { titleDao.getById(it.titleId) == null && "theater_interest:${it.titleId}" !in protected }
+                ?.forEach { theaterInterestDao.deleteByTitleId(it.titleId) }
+        }
         // Only recorded once the resync above actually ran to completion — if the app is
         // killed mid-resync, the next syncNow() sees the still-stale stored version and (safely,
         // idempotently) does the full resync again rather than settling for a partial one.
-        if (storedSchemaVersion < SYNC_SCHEMA_VERSION) dataStore.edit { it[schemaVersionKey] = SYNC_SCHEMA_VERSION }
+        // An older RPC can still sync safely, but must not acknowledge the metadata backfill:
+        // its later migration does not bump existing title timestamps. An empty archive cannot
+        // prove capability either: keep retrying from epoch until a complete title is observed.
+        if (storedSchemaVersion < SYNC_SCHEMA_VERSION && sawMetadataTitle && metadataSchemaAvailable) {
+            val acknowledged = when {
+                !personSchemaAvailable -> maxOf(storedSchemaVersion, 8)
+                !richTitleSchemaAvailable || pendingKeys().any { it.startsWith("title:") } -> maxOf(storedSchemaVersion, 9)
+                !backupGraphSchemaAvailable || skippedBackfillRows -> maxOf(storedSchemaVersion, 10)
+                !moviegoingSchemaAvailable -> maxOf(storedSchemaVersion, 11)
+                else -> SYNC_SCHEMA_VERSION
+            }
+            if (acknowledged > storedSchemaVersion) dataStore.edit { it[schemaVersionKey] = acknowledged }
+        }
     }
 
     /**
@@ -179,6 +273,8 @@ class LibrarySyncRepository(
         private val cinemaOutings = mutableListOf<CinemaOutingEntity>()
         private val cast = mutableListOf<TitleCastEntity>()
         private val crew = mutableListOf<TitleCrewEntity>()
+        private val seasonCast = mutableListOf<SeasonCastEntity>()
+        private val episodeCrew = mutableListOf<EpisodeCrewEntity>()
         private val watchEvents = mutableListOf<EpisodeWatchEventEntity>()
         private val ratings = mutableListOf<EpisodeRatingEntity>()
         private val reviews = mutableListOf<EpisodeReviewEntity>()
@@ -207,6 +303,14 @@ class LibrarySyncRepository(
 
         suspend fun addCrew(row: TitleCrewEntity) {
             if (titleDao.getById(row.titleId) != null) titleCrewDao.upsertAll(listOf(row)) else crew += row
+        }
+
+        suspend fun addSeasonCast(row: SeasonCastEntity) {
+            if (personCreditsDao.hasSeason(row.titleId, row.seasonId)) personCreditsDao.upsertSeasonCast(listOf(row)) else seasonCast += row
+        }
+
+        suspend fun addEpisodeCrew(row: EpisodeCrewEntity) {
+            if (personCreditsDao.hasEpisode(row.titleId, row.episodeId)) personCreditsDao.upsertEpisodeCrew(listOf(row)) else episodeCrew += row
         }
 
         suspend fun addWatchEvent(row: EpisodeWatchEventEntity) {
@@ -239,6 +343,8 @@ class LibrarySyncRepository(
                 "cinema_outing" -> cinemaOutings.removeAll { it.id == entityId }
                 "title_cast" -> cast.removeAll { it.id == entityId }
                 "title_crew" -> crew.removeAll { it.id == entityId }
+                "season_cast" -> seasonCast.removeAll { it.id == entityId }
+                "episode_crew" -> episodeCrew.removeAll { it.id == entityId }
                 "episode_watch_event" -> watchEvents.removeAll { it.id == entityId }
                 "episode_rating" -> ratings.removeAll { it.id == entityId }
                 "episode_review" -> reviews.removeAll { it.id == entityId }
@@ -246,7 +352,29 @@ class LibrarySyncRepository(
             }
         }
 
-        suspend fun flush() {
+        suspend fun flush(): Boolean {
+            // A title can arrive pages after a child. While the next HTTP page is loading,
+            // the user may edit its now-visible graph; final deferred writes need the same
+            // transactional protection check as ordinary page writes.
+            val pending = pendingKeys()
+            var skipped = false
+            fun protected(type: String, id: String, titleId: String? = null, listId: String? = null): Boolean {
+                val row = JSONObject().put("entity_type", type).put("entity_id", id)
+                    .put("payload", JSONObject().put("titleId", titleId).put("listId", listId))
+                return isProtectedFromPull(row, pending).also { if (it) skipped = true }
+            }
+            seasons.removeAll { protected("season", it.id, it.titleId) }
+            episodes.removeAll { protected("episode", it.getString("id"), it.getString("titleId")) }
+            viewings.removeAll { protected("viewing", it.id, it.titleId) }
+            cinemaOutings.removeAll { protected("cinema_outing", it.id, it.titleId) }
+            cast.removeAll { protected("title_cast", it.id, it.titleId) }
+            crew.removeAll { protected("title_crew", it.id, it.titleId) }
+            seasonCast.removeAll { protected("season_cast", it.id, it.titleId) }
+            episodeCrew.removeAll { protected("episode_crew", it.id, it.titleId) }
+            watchEvents.removeAll { protected("episode_watch_event", it.id) }
+            ratings.removeAll { protected("episode_rating", it.id) }
+            reviews.removeAll { protected("episode_review", it.id) }
+            listItems.removeAll { protected("list_item", it.id, it.titleId, it.listId) }
             seasonDao.upsertAll(seasons.filter { titleDao.getById(it.titleId) != null })
             viewingDao.upsertAll(viewings.filter { titleDao.getById(it.titleId) != null })
             cinemaOutings.filter { titleDao.getById(it.titleId) != null }.forEach { cinemaOutingDao.upsert(it) }
@@ -258,12 +386,15 @@ class LibrarySyncRepository(
                     ?.let { payload.toEpisodeEntity(it) }
             }
             episodeDao.upsertAll(resolvedEpisodes)
+            personCreditsDao.upsertSeasonCast(seasonCast.filter { personCreditsDao.hasSeason(it.titleId, it.seasonId) })
+            personCreditsDao.upsertEpisodeCrew(episodeCrew.filter { personCreditsDao.hasEpisode(it.titleId, it.episodeId) })
 
             watchEventDao.upsertAll(watchEvents.filter { episodeDao.getById(it.episodeId) != null })
             ratingDao.upsertAll(ratings.filter { episodeDao.getById(it.episodeId) != null })
             reviewDao.upsertAll(reviews.filter { episodeDao.getById(it.episodeId) != null })
 
             listItemDao.upsertAll(listItems.filter { listDao.getById(it.listId) != null && titleDao.getById(it.titleId) != null })
+            return skipped
         }
     }
 
@@ -274,23 +405,62 @@ class LibrarySyncRepository(
      *  Anything whose parent isn't in the local DB yet goes through [deferred] instead of a
      *  direct DAO call — see [DeferredRows]'s kdoc for why that's necessary even though title
      *  is always applied first *within* a page. */
-    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows) {
-        val byType = (0 until rows.length()).map { rows.getJSONObject(it) }.groupBy { it.getString("entity_type") }
+    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows): Boolean {
+        // Re-read per page: edits enqueued while an earlier page was applying are protected too.
+        val pending = pendingKeys()
+        val allRows = (0 until rows.length()).map { rows.getJSONObject(it) }
+        val skipped = allRows.any { isProtectedFromPull(it, pending) }
+        val byType = allRows
+            .filterNot { isProtectedFromPull(it, pending) }
+            .groupBy { it.getString("entity_type") }
 
         byType["title"]?.forEach { row ->
             val payload = row.payload()
             // Carry forward whatever the RPC doesn't send — see toTitleEntity's kdoc.
             titleDao.upsertAll(listOf(payload.toTitleEntity(titleDao.getById(payload.getString("id")))))
         }
-        byType["season"]?.forEach { deferred.addSeason(it.payload().toSeasonEntity()) }
+        byType["season"]?.forEach { deferred.addSeason(it.payload().toSeasonEntity(it.getString("updated_at"))) }
         byType["episode"]?.forEach { deferred.addEpisode(it.payload()) }
-        byType["title_cast"]?.forEach { deferred.addCast(it.payload().toTitleCastEntity()) }
-        byType["title_crew"]?.forEach { deferred.addCrew(it.payload().toTitleCrewEntity()) }
-        byType["viewing"]?.forEach { deferred.addViewing(it.payload().toViewingEntity()) }
-        byType["episode_watch_event"]?.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity()) }
+        // Older servers omit these keys; preserve retained values until an explicit clear.
+        // Read each old-server collection at most once per page, not once per credit.
+        byType["title_cast"]?.let { credits ->
+            val previous = if (credits.any { !it.payload().has("profileUrl") || !it.payload().has("episodeCount") })
+                titleCastDao.observeAllCast().first().associateBy { it.id } else emptyMap()
+            credits.forEach { deferred.addCast(it.payload().toTitleCastEntity(previous[it.getString("entity_id")])) }
+        }
+        byType["title_crew"]?.let { credits ->
+            val previous = if (credits.any { !it.payload().has("profileUrl") })
+                titleCrewDao.observeAllCrew().first().associateBy { it.id } else emptyMap()
+            credits.forEach { deferred.addCrew(it.payload().toTitleCrewEntity(previous[it.getString("entity_id")])) }
+        }
+        byType["season_cast"]?.let { credits ->
+            val previous = if (credits.any { !it.payload().has("profileUrl") || !it.payload().has("episodeCount") })
+                personCreditsDao.observeSeasonCast().first().associateBy { it.id } else emptyMap()
+            credits.forEach { deferred.addSeasonCast(it.payload().toSeasonCastEntity(previous[it.getString("entity_id")])) }
+        }
+        byType["episode_crew"]?.forEach { deferred.addEpisodeCrew(it.payload().toEpisodeCrewEntity()) }
+        byType["viewing"]?.forEach { row ->
+            // The sync envelope has always carried the server revision, including on older
+            // payload versions. Never substitute a local timestamp or a payload hint for CAS.
+            val revision = row.getString("updated_at").also { java.time.Instant.parse(it) }
+            deferred.addViewing(row.payload().toViewingEntity(revision, viewingDao.getById(row.getString("entity_id"))))
+        }
+        byType["episode_watch_event"]?.let { events ->
+            val previous = if (events.any { !it.payload().has("colorMode") })
+                watchEventDao.observeAllWatchEvents().first().associateBy { it.id } else emptyMap()
+            events.forEach { deferred.addWatchEvent(it.payload().toWatchEventEntity(previous[it.getString("entity_id")])) }
+        }
         byType["episode_rating"]?.forEach { deferred.addRating(it.payload().toRatingEntity()) }
-        byType["episode_review"]?.forEach { deferred.addReview(it.payload().toReviewEntity()) }
-        byType["cinema_outing"]?.forEach { deferred.addCinemaOuting(it.payload().toCinemaOutingEntity()) }
+        byType["episode_review"]?.let { reviews ->
+            val previous = mutableMapOf<String, EpisodeReviewEntity>()
+            val readTitles = mutableSetOf<String>()
+            for (row in reviews.filter { !it.payload().has("colorMode") }) {
+                val titleId = episodeDao.getById(row.payload().getString("episodeId"))?.titleId ?: continue
+                if (readTitles.add(titleId)) reviewDao.observeReviews(titleId).first().forEach { previous[it.id] = it }
+            }
+            reviews.forEach { deferred.addReview(it.payload().toReviewEntity(previous[it.getString("entity_id")])) }
+        }
+        byType["cinema_outing"]?.forEach { deferred.addCinemaOuting(it.payload().toCinemaOutingEntity(cinemaOutingDao.getById(it.getString("entity_id")))) }
         byType["list"]?.forEach { listDao.upsertAll(listOf(it.payload().toListEntity())) }
         byType["list_item"]?.forEach { deferred.addListItem(it.payload().toListItemEntity()) }
 
@@ -298,7 +468,7 @@ class LibrarySyncRepository(
             val entityId = row.getString("entity_id")
             val entityType = row.getJSONObject("payload").getString("entityType")
             when (entityType) {
-                "title" -> titleDao.deleteById(entityId)
+                "title" -> { titleDao.deleteById(entityId); theaterInterestDao?.deleteByTitleId(entityId) }
                 "season" -> seasonDao.deleteById(entityId)
                 "episode" -> episodeDao.deleteById(entityId)
                 "viewing" -> viewingDao.deleteById(entityId)
@@ -308,11 +478,34 @@ class LibrarySyncRepository(
                 "cinema_outing" -> cinemaOutingDao.deleteById(entityId)
                 "title_cast" -> titleCastDao.deleteById(entityId)
                 "title_crew" -> titleCrewDao.deleteById(entityId)
+                "season_cast" -> personCreditsDao.deleteSeasonCast(entityId)
+                "episode_crew" -> personCreditsDao.deleteEpisodeCrew(entityId)
                 "list" -> listDao.deleteById(entityId)
                 "list_item" -> listItemDao.deleteById(entityId)
             }
             deferred.forget(entityType, entityId)
         }
+        // Preference membership can be removed and re-added with the same ID. Preserve the
+        // RPC's chronological order instead of letting every old tombstone win a full replay.
+        allRows.filterNot { isProtectedFromPull(it, pending) }.forEach { row ->
+            val type = row.getString("entity_type")
+            val p = row.payload()
+            when (type) {
+                "venue_note" -> venueNoteDao?.upsert(work.kumarfamilynet.cinemarchive.core.database.VenueNoteEntity(
+                    normalizedVenue(p.getString("venue")), checkedPreferenceText(p.getString("notes"), 20_000),
+                    p.getString("updatedAt"), p.getString("id"), p.getString("updatedAt"), p.getString("createdAt")))
+                "theater_interest" -> {
+                    require(p.getString("id") == p.getString("titleId"))
+                    theaterInterestDao?.upsert(work.kumarfamilynet.cinemarchive.core.database.TheaterInterestEntity(
+                        p.getString("titleId"), p.getString("createdAt"), p.getString("updatedAt")))
+                }
+                "tombstone" -> when (p.getString("entityType")) {
+                    "venue_note" -> venueNoteDao?.deleteServerId(row.getString("entity_id"))
+                    "theater_interest" -> theaterInterestDao?.deleteByTitleId(row.getString("entity_id"))
+                }
+            }
+        }
+        return skipped
     }
 
     private fun JSONObject.payload(): JSONObject = getJSONObject("payload")
@@ -369,40 +562,57 @@ class LibrarySyncRepository(
         notes = optStringOrNull("notes"),
         addedAt = getString("addedAt"),
         updatedAt = getString("updatedAt"),
-        releaseDate = optStringOrNull("releaseDate") ?: existing?.releaseDate,
-        imdbRating = optDoubleOrNull("imdbRating") ?: existing?.imdbRating,
-        originalLanguage = optStringOrNull("originalLanguage") ?: existing?.originalLanguage,
-    )
+        releaseDate = if (has("releaseDate")) optStringOrNull("releaseDate") else existing?.releaseDate,
+        imdbRating = if (has("imdbRating")) optDoubleOrNull("imdbRating") else existing?.imdbRating,
+        originalLanguage = if (has("originalLanguage")) optStringOrNull("originalLanguage") else existing?.originalLanguage,
+        tags = if (has("tags")) optJSONArray("tags").toStringList() else existing?.tags.orEmpty(),
+        studios = if (has("studios")) optJSONArray("studios").toStringList() else existing?.studios.orEmpty(),
+        collectionId = if (has("collectionId")) optIntOrNull("collectionId") else existing?.collectionId,
+        collectionName = if (has("collectionName")) optStringOrNull("collectionName") else existing?.collectionName,
+    ).withRichMetadata(this, previous = existing)
 
-    // `castOrder`/`department` are the only fields either Ledger credits widget reads
-    // (The Ensemble filters on castOrder < 5, The Auteurs no longer touches crew at all —
-    // see LedgerRepository.buildBoard). The RPC deliberately omits profile_url/episode_count,
-    // which this mirror has no column for.
-    private fun JSONObject.toTitleCastEntity() = TitleCastEntity(
+    private fun JSONObject.toTitleCastEntity(previous: TitleCastEntity? = null) = TitleCastEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         tmdbPersonId = getInt("tmdbPersonId"),
         name = getString("name"),
         characterName = optStringOrNull("characterName"),
         castOrder = optIntOrNull("castOrder") ?: 0,
+        profileUrl = if (has("profileUrl")) optStringOrNull("profileUrl") else previous?.profileUrl,
+        episodeCount = if (has("episodeCount")) optIntOrNull("episodeCount") else previous?.episodeCount,
     )
 
-    private fun JSONObject.toTitleCrewEntity() = TitleCrewEntity(
+    private fun JSONObject.toTitleCrewEntity(previous: TitleCrewEntity? = null) = TitleCrewEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         tmdbPersonId = getInt("tmdbPersonId"),
         name = getString("name"),
         job = getString("job"),
         department = optStringOrNull("department"),
+        profileUrl = if (has("profileUrl")) optStringOrNull("profileUrl") else previous?.profileUrl,
     )
 
-    private fun JSONObject.toSeasonEntity() = SeasonEntity(
+    private fun JSONObject.toSeasonCastEntity(previous: SeasonCastEntity? = null) = SeasonCastEntity(
+        id = getString("id"), titleId = getString("titleId"), seasonId = getString("seasonId"),
+        tmdbPersonId = getInt("tmdbPersonId"), name = getString("name"),
+        characterName = optStringOrNull("characterName"), castOrder = optInt("castOrder", 0),
+        profileUrl = if (has("profileUrl")) optStringOrNull("profileUrl") else previous?.profileUrl,
+        episodeCount = if (has("episodeCount")) optIntOrNull("episodeCount") else previous?.episodeCount,
+    )
+
+    private fun JSONObject.toEpisodeCrewEntity() = EpisodeCrewEntity(
+        id = getString("id"), titleId = getString("titleId"), episodeId = getString("episodeId"),
+        tmdbPersonId = getInt("tmdbPersonId"), name = getString("name"), job = getString("job"),
+    )
+
+    private fun JSONObject.toSeasonEntity(revision: String) = SeasonEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         seasonNumber = getInt("seasonNumber"),
         episodeCount = getInt("episodeCount"),
         episodesWatched = getInt("episodesWatched"),
         airYear = optIntOrNull("airYear"),
+        updatedAt = revision.also { java.time.Instant.parse(it) },
     )
 
     private fun JSONObject.toEpisodeEntity(seasonId: String) = EpisodeEntity(
@@ -417,22 +627,24 @@ class LibrarySyncRepository(
         stillUrl = optStringOrNull("stillUrl"),
     )
 
-    private fun JSONObject.toViewingEntity() = ViewingEntity(
+    private fun JSONObject.toViewingEntity(revision: String, previous: ViewingEntity? = null) = ViewingEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         date = optStringOrNull("date"),
         rating = optDoubleOrNull("rating"),
         notes = optStringOrNull("notes"),
         venue = optStringOrNull("venue"),
-        companions = optJSONArray("companions").toCompanionNames(),
+        companions = if (has("companions")) optJSONArray("companions").toCompanionNames() else previous?.companions.orEmpty(),
         outingId = optStringOrNull("outingId"),
+        updatedAt = revision,
+        companionsJson = if (has("companions")) optJSONArray("companions")?.toString() else previous?.companionsJson,
     )
 
     // Postgres's status/previous_status enums are lowercase ('scheduled', 'watched', ...);
     // Room stores OutingStatus.name/LibraryStatus.name (uppercase) — same conversion every
     // other title/cinema_outing boundary crossing already applies (see toTitleEntity's kdoc
     // and SupabaseRemoteMutationWriter's upsertOuting).
-    private fun JSONObject.toCinemaOutingEntity() = CinemaOutingEntity(
+    private fun JSONObject.toCinemaOutingEntity(previous: CinemaOutingEntity? = null) = CinemaOutingEntity(
         id = getString("id"),
         titleId = getString("titleId"),
         showtime = getString("showtime"),
@@ -440,7 +652,7 @@ class LibrarySyncRepository(
         runtimeMinutes = getInt("runtimeMinutes"),
         endsAt = getString("endsAt"),
         venue = optStringOrNull("venue"),
-        companions = optJSONArray("companions").toCompanionNames(),
+        companions = if (has("companions")) optJSONArray("companions").toCompanionNames() else previous?.companions.orEmpty(),
         format = optStringOrNull("format"),
         ticketPrice = optDoubleOrNull("ticketPrice"),
         seat = optStringOrNull("seat"),
@@ -458,12 +670,15 @@ class LibrarySyncRepository(
         followUpDismissedAt = optStringOrNull("followUpDismissedAt"),
         createdAt = getString("createdAt"),
         updatedAt = getString("updatedAt"),
+        companionsJson = if (has("companions")) optJSONArray("companions")?.toString() else previous?.companionsJson,
     )
 
-    private fun JSONObject.toWatchEventEntity() = EpisodeWatchEventEntity(
+    private fun JSONObject.toWatchEventEntity(previous: EpisodeWatchEventEntity? = null) = EpisodeWatchEventEntity(
         id = getString("id"),
         episodeId = getString("episodeId"),
         watchedAt = optStringOrNull("watchedAt"),
+        notes = optStringOrNull("notes"),
+        colorMode = if (has("colorMode")) optStringOrNull("colorMode") else previous?.colorMode,
     )
 
     private fun JSONObject.toRatingEntity() = EpisodeRatingEntity(
@@ -473,11 +688,12 @@ class LibrarySyncRepository(
         ratedAt = getString("ratedAt"),
     )
 
-    private fun JSONObject.toReviewEntity() = EpisodeReviewEntity(
+    private fun JSONObject.toReviewEntity(previous: EpisodeReviewEntity? = null) = EpisodeReviewEntity(
         id = getString("id"),
         episodeId = getString("episodeId"),
         reviewText = getString("reviewText"),
         reviewedAt = getString("reviewedAt"),
+        colorMode = if (has("colorMode")) optStringOrNull("colorMode") else previous?.colorMode,
     )
 
     private fun JSONObject.toListEntity() = ListEntity(
@@ -496,4 +712,27 @@ class LibrarySyncRepository(
         addedAt = getString("addedAt"),
         updatedAt = getString("updatedAt"),
     )
+}
+
+/** True for a pulled row (upsert or tombstone) whose entity has a queued local mutation. */
+internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean {
+    if (pending.isEmpty()) return false
+    val entityType = row.getString("entity_type")
+    if (entityType == "viewing" && "outing_lifecycle_title:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
+    if (entityType == "venue_note" && "venue_note_name:${row.getJSONObject("payload").getString("venue")}" in pending) return true
+    if ("list_membership:legacy" in pending && (entityType == "list_item" ||
+        entityType == "tombstone" && row.getJSONObject("payload").optString("entityType") == "list_item")) return true
+    if (entityType == "list_item") {
+        val payload = row.optJSONObject("payload")
+        if (payload != null && membershipProjectionKey(payload.optString("listId"), payload.optString("titleId")) in pending) return true
+    }
+    val creditTypes = setOf("title_cast", "title_crew", "season_cast", "episode_crew")
+    if (entityType in creditTypes && "title_credits:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
+    if (entityType in creditTypes && "title_catalog:${row.getJSONObject("payload").optString("titleId")}" in pending) return true
+    val key = if (entityType == "tombstone") {
+        pendingKey(row.getJSONObject("payload").getString("entityType"), row.getString("entity_id"))
+    } else {
+        pendingKey(entityType, row.getString("entity_id"))
+    }
+    return key in pending
 }

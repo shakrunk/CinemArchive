@@ -1,0 +1,286 @@
+{
+  "_comment": "Synthetic graph consumed byte-for-byte by web calculationParity.test.ts and Android SharedCalculationParityTest. Date tokens resolve against each runner's local current day: @today, @yearStart (inclusive YTD edge), @beforeYearStart. No production data.",
+  "titles": [
+    {
+      "id": "show",
+      "tmdbId": 10,
+      "type": "tv",
+      "title": "Mixed Show",
+      "year": 2020,
+      "status": "watching",
+      "rating": 4,
+      "genres": [
+        "Drama"
+      ],
+      "addedAt": "@yearStart",
+      "viewings": [],
+      "cast": [
+        {
+          "tmdbPersonId": 42,
+          "name": "Same Name",
+          "character": "Lead",
+          "order": 0
+        }
+      ],
+      "seasons": [
+        {
+          "id": "coarse",
+          "seasonNumber": 1,
+          "episodeCount": 3,
+          "episodesWatched": 2
+        },
+        {
+          "id": "detailed",
+          "seasonNumber": 2,
+          "episodeCount": 2,
+          "episodesWatched": 2,
+          "episodes": [
+            {
+              "id": "seen",
+              "episodeNumber": 1,
+              "runtime": 45,
+              "watchEvents": [
+                {
+                  "id": "watch-old",
+                  "watchedAt": "@beforeYearStart"
+                },
+                {
+                  "id": "watch-again",
+                  "watchedAt": "@today"
+                }
+              ],
+              "ratings": [
+                {
+                  "id": "rating-new",
+                  "rating": 5,
+                  "ratedAt": "@today"
+                },
+                {
+                  "id": "rating-old",
+                  "rating": 1,
+                  "ratedAt": "@beforeYearStart"
+                }
+              ],
+              "reviews": []
+            },
+            {
+              "id": "next",
+              "episodeNumber": 2,
+              "watchEvents": [],
+              "ratings": [],
+              "reviews": []
+            }
+          ]
+        },
+        {
+          "id": "specials",
+          "seasonNumber": 0,
+          "episodeCount": 7,
+          "episodesWatched": 7,
+          "episodes": [
+            {
+              "id": "special",
+              "episodeNumber": 1,
+              "runtime": 30,
+              "watchEvents": [
+                {
+                  "id": "special-watch",
+                  "watchedAt": "@today"
+                }
+              ],
+              "ratings": [
+                {
+                  "id": "special-rating",
+                  "rating": 1,
+                  "ratedAt": "@today"
+                }
+              ],
+              "reviews": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "short",
+      "tmdbId": 11,
+      "type": "movie",
+      "title": "Short Film",
+      "year": 2021,
+      "status": "watched",
+      "rating": 4.5,
+      "runtime": 89,
+      "genres": [
+        "Drama"
+      ],
+      "addedAt": "@beforeYearStart",
+      "cast": [
+        {
+          "tmdbPersonId": 42,
+          "name": "Same Name",
+          "character": "Lead",
+          "order": 0
+        }
+      ],
+      "viewings": [
+        {
+          "id": "short-before",
+          "titleId": "short",
+          "rating": 1
+        },
+        {
+          "id": "short-again",
+          "titleId": "short",
+          "date": "@today",
+          "rating": 5
+        }
+      ]
+    },
+    {
+      "id": "feature",
+      "tmdbId": 12,
+      "type": "movie",
+      "title": "Feature Film",
+      "year": 2022,
+      "status": "watched",
+      "rating": 2.5,
+      "runtime": 120,
+      "genres": [
+        "Comedy"
+      ],
+      "addedAt": "@yearStart",
+      "viewings": [
+        {
+          "id": "feature-first",
+          "titleId": "feature",
+          "date": "@yearStart",
+          "rating": 2
+        }
+      ]
+    },
+    {
+      "id": "unknown",
+      "tmdbId": 13,
+      "type": "movie",
+      "title": "Unknown Runtime",
+      "year": 2023,
+      "status": "watched",
+      "rating": 3,
+      "genres": [
+        "Drama"
+      ],
+      "addedAt": "@beforeYearStart",
+      "cast": [
+        {
+          "tmdbPersonId": 99,
+          "name": "Same Name",
+          "character": "Lead",
+          "order": 0
+        }
+      ],
+      "viewings": [
+        {
+          "id": "unknown-first",
+          "titleId": "unknown",
+          "date": "@beforeYearStart"
+        },
+        {
+          "id": "unknown-again",
+          "titleId": "unknown",
+          "date": "@today"
+        }
+      ]
+    },
+    {
+      "id": "zero",
+      "tmdbId": 14,
+      "type": "movie",
+      "title": "Zero Runtime",
+      "year": 2024,
+      "status": "watchlist",
+      "runtime": 0,
+      "genres": [
+        "Comedy"
+      ],
+      "addedAt": "@yearStart",
+      "viewings": []
+    }
+  ],
+  "expected": {
+    "stats": {
+      "movies": 4,
+      "series": 1,
+      "viewings": 5,
+      "averageRating": 3.5,
+      "movieMinutes": 209,
+      "episodeMinutes": 75,
+      "totalMinutes": 284,
+      "roundedHours": 5
+    },
+    "progress": {
+      "id": "show",
+      "watched": 3,
+      "total": 5,
+      "nextSeason": 2,
+      "nextEpisode": 2,
+      "seasonWatched": [
+        2,
+        1,
+        1
+      ],
+      "episodeAverage": 3,
+      "latestEpisodeRating": 5,
+      "episodeWatchCount": 2
+    },
+    "runtimeBuckets": [
+      1,
+      0,
+      1,
+      0
+    ],
+    "actorCounts": [
+      2,
+      1
+    ],
+    "ranges": {
+      "all": {
+        "viewings": 5,
+        "datedViewings": 4,
+        "premieres": 2,
+        "revivals": 2,
+        "trajectoryTitles": 4
+      },
+      "ytd": {
+        "viewings": 3,
+        "datedViewings": 3,
+        "premieres": 1,
+        "revivals": 2,
+        "trajectoryTitles": 3
+      }
+    },
+    "filterCases": [
+      {
+        "name": "exact namesake identity",
+        "personId": 42,
+        "expected": [
+          "show",
+          "short"
+        ]
+      },
+      {
+        "name": "other namesake identity",
+        "personId": 99,
+        "expected": [
+          "unknown"
+        ]
+      }
+    ],
+    "ratingDescending": [
+      "short",
+      "show",
+      "unknown",
+      "feature",
+      "zero"
+    ]
+  }
+}

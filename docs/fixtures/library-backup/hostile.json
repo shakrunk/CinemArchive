@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "dup", "tmdbId": 1, "type": "movie", "title": "A", "year": 2000, "genres": [], "status": "watched", "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+    { "id": "dup", "tmdbId": 2, "type": "movie", "title": "B (duplicate id)", "year": 2000, "genres": [], "status": "watched", "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+    { "id": 42, "tmdbId": 3, "type": "movie", "title": "C (non-string id)", "year": 2000, "genres": [], "status": "watched", "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+    { "id": "r9", "tmdbId": 4, "type": "movie", "title": "D (rating 9)", "year": 2000, "genres": [], "status": "watched", "rating": 9, "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+    { "id": "bs", "tmdbId": 5, "type": "movie", "title": "E (bad status)", "year": 2000, "genres": [], "status": "binged", "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+    { "id": "nt", "tmdbId": 0, "type": "movie", "title": "F (bad tmdb)", "year": 2000, "genres": [], "status": "watched", "tags": [], "addedAt": "2026-01-01", "viewings": [] },
+    { "id": "ok", "tmdbId": 6, "type": "movie", "title": "G (fine, but carries untrusted keys)", "year": 2000, "genres": [], "status": "watched", "tags": [], "addedAt": "2026-01-01",
+      "userId": "someone-else", "outbox": [{ "id": "o1" }], "receipts": [1], "aliases": {"a": "b"}, "shareToken": "tok",
+      "viewings": [ { "id": "ov", "titleId": "ok", "date": "2026-01-02", "operationId": "op", "outingId": "ghost-outing" } ] }
+  ],
+  "outings": [
+    { "id": "o-ok", "titleId": "ok", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "completed", "completedViewingId": "ghost-viewing", "companions": [], "seats": [], "createdAt": "2026-01-01T00:00:00Z" },
+    { "id": "o-missing-title", "titleId": "nope", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled", "companions": [], "seats": [], "createdAt": "2026-01-01T00:00:00Z" },
+    { "id": "o-bad-time", "titleId": "ok", "showtime": "tomorrow-ish", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled", "companions": [], "seats": [], "createdAt": "2026-01-01T00:00:00Z" }
+  ],
+  "lists": [
+    { "id": "hl", "name": "Hostile", "items": [ { "titleId": "ok" }, { "titleId": "dup-never-restored" } ] },
+    { "id": "hl2", "name": "   " }
+  ]
+}

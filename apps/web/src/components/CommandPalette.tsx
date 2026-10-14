@@ -12,11 +12,32 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ open, onClose, commands, onRun }: CommandPaletteProps) {
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="command-overlay" />
-        <DialogPrimitive.Content className="command-content" aria-label="Command palette">
+        <DialogPrimitive.Content
+          ref={contentRef}
+          className="command-content"
+          aria-label="Command palette"
+          onOpenAutoFocus={() => {
+            // Openers live outside this dialog (toolbar and global shortcuts),
+            // so Radix has no Dialog.Trigger to restore focus to on dismissal.
+            returnFocusRef.current = document.activeElement instanceof HTMLElement
+              ? document.activeElement : null
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            // A command may open another dialog. Keep its newly assigned focus.
+            const active = document.activeElement
+            if (!active || active === document.body || contentRef.current?.contains(active)) {
+              if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus()
+            }
+          }}
+        >
           <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
             Search titles or run an action. Use arrow keys and Enter.
@@ -77,7 +98,6 @@ function CommandPaletteBody({
         <Search className="w-[18px] h-[18px] text-paper-faint shrink-0" />
         <input
           ref={inputRef}
-          autoFocus
           aria-label="Search command palette"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setActiveId(null) }}

@@ -17,6 +17,21 @@ data class SupabaseSession(
 private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 /**
+ * A non-2xx response from Supabase. Extends [IllegalStateException] so every existing caller
+ * that catches the old `check(...)` failure keeps working; [postgresCode] (PostgREST's
+ * SQLSTATE, e.g. `23505` unique violation, `42501` RLS denial) lets account/social callers map
+ * the same codes `apps/web/src/lib/auth.ts` branches on into friendly messages.
+ */
+class SupabaseHttpException(
+    val status: Int,
+    val responseBody: String,
+    message: String,
+) : IllegalStateException(message) {
+    val postgresCode: String? =
+        runCatching { JSONObject(responseBody).optString("code").takeIf { it.isNotEmpty() } }.getOrNull()
+}
+
+/**
  * Minimal REST + Auth client for Supabase's PostgREST and GoTrue endpoints, built on OkHttp
  * — not the full Supabase Kotlin SDK — deliberately narrow (no realtime/storage/broader auth
  * surface) since the outbox's push semantics only need password sign-in, PATCH-with-filter
@@ -113,11 +128,11 @@ class SupabaseRestClient(
 
     /** Calls a PostgREST RPC (`POST /rest/v1/rpc/<name>`) — used for `sync_library_changes`.
      *  Returns the raw JSON array/object response body. */
-    fun rpc(name: String, paramsJson: String, accessToken: String): String {
+    fun rpc(name: String, paramsJson: String, accessToken: String?): String {
         val request = Request.Builder()
             .url("$baseUrl/rest/v1/rpc/$name")
             .header("apikey", anonKey)
-            .header("Authorization", "Bearer $accessToken")
+            .apply { accessToken?.let { header("Authorization", "Bearer $it") } }
             .post(paramsJson.toRequestBody(JSON_MEDIA_TYPE))
             .build()
         return execute(request)
@@ -150,6 +165,18 @@ class SupabaseRestClient(
             .header("apikey", anonKey)
             .header("Authorization", "Bearer ${accessToken ?: anonKey}")
             .get()
+            .build()
+        return execute(request)
+    }
+
+    /** POSTs a JSON body to a Supabase Edge Function — used by [SimklApi], whose function takes
+     *  `{ action, ... }` bodies rather than query strings. */
+    fun invokeFunctionPost(name: String, bodyJson: String, accessToken: String?): String {
+        val request = Request.Builder()
+            .url("$baseUrl/functions/v1/$name")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer ${accessToken ?: anonKey}")
+            .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
             .build()
         return execute(request)
     }
@@ -193,10 +220,29 @@ class SupabaseRestClient(
         return execute(request)
     }
 
+    /** Plain POST insert (`return=representation`) — unlike [upsert], a duplicate key is a
+     *  failure (`23505`), which the invite-code insert relies on to detect code collisions. */
+    fun insert(table: String, accessToken: String, bodyJson: String): String {
+        val request = Request.Builder()
+            .url("$baseUrl/rest/v1/$table")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .header("Prefer", "return=representation")
+            .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        return execute(request)
+    }
+
     private fun execute(request: Request): String {
         httpClient.newCall(request).execute().use { response ->
             val body = response.body?.string() ?: ""
-            check(response.isSuccessful) { "${request.method} ${request.url} failed: HTTP ${response.code} $body" }
+            if (!response.isSuccessful) {
+                throw SupabaseHttpException(
+                    response.code,
+                    body,
+                    "${request.method} ${request.url} failed: HTTP ${response.code} $body",
+                )
+            }
             return body
         }
     }

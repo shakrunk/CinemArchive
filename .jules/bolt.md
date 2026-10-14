@@ -96,3 +96,7 @@
 ## 2024-10-03 - O(N log N) Date Parsing in Array.prototype.sort
 **Learning:** Instantiating `new Date(dateString)` or running date parsing directly inside the `.sort()` comparator for arrays of objects containing date strings incurs a severe O(N log N) overhead, leading to poor sort performance on large arrays.
 **Action:** When sorting arrays by date properties, always precompute the numeric timestamps (e.g., using `new Date().getTime()`) into a `Map` before the sort loop to achieve O(N) extraction complexity, referencing the precomputed values inside the comparator.
+
+## 2024-03-24 - Node.js ES Modules Extension
+**Learning:** When creating ad-hoc Node.js scripts (such as patching scripts) inside a directory with `"type": "module"` defined in `package.json` (like `apps/web`), running a `.js` file with `require()` will throw a `ReferenceError: require is not defined in ES module scope`.
+**Action:** Always use the `.cjs` file extension when creating temporary Node.js scripts that use CommonJS `require()` syntax inside projects that enforce ES modules to prevent execution errors.

@@ -98,6 +98,7 @@ export function ActivityHeatmap({
       title={settings?.title || 'Time in the dark'}
       hint={`past ${weeksBack} weeks${describeLedgerSettings(settings)}`}
       className={className}
+      data={{ columns: ["Date", "Screenings"], rows: weeks.flat().map((day) => [day.date, day.count]) }}
     >
       <div
         className="min-w-0"

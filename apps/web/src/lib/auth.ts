@@ -19,37 +19,9 @@ function getClient(): SupabaseClient {
   return supabase
 }
 
-// ─── Passkey / WebAuthn helpers ─────────────────────────────────────────────
-
-/** Start passkey registration for the current authenticated user. */
-export async function registerPasskey() {
-  const { data, error } = await getClient().auth.mfa.enroll({ factorType: 'webauthn' })
-  if (error) throw error
-  return data
-}
-
-/** Authenticate using a passkey (WebAuthn assertion). */
-export async function signInWithPasskey(email: string) {
-  // Phase 1: initiate the challenge
-  // shouldCreateUser: false — this app is invite-only. Accounts are created
-  // exclusively by the redeem-invite Edge Function (see redeemInvite below);
-  // an unknown email must never silently become a new account here.
-  const { data: challengeData, error: challengeError } =
-    await getClient().auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: window.location.origin + import.meta.env.BASE_URL,
-      },
-    })
-  if (challengeError) throw challengeError
-
-  return challengeData
-}
-
-/** Sign in with email magic link (fallback when passkey unavailable). */
+/** Sign in with a passwordless email link. */
 export async function signInWithEmail(email: string) {
-  // shouldCreateUser: false — see signInWithPasskey above.
+  // Accounts are created by redeem-invite; requesting a link must not bypass it.
   const { data, error } = await getClient().auth.signInWithOtp({
     email,
     options: {
@@ -84,16 +56,13 @@ export function onAuthStateChange(callback: (user: User | null) => void) {
 
 // ─── Shared Access Key helpers ───────────────────────────────────────────────
 
-/** Set the shared token for the current Supabase session (enables read-only RLS). */
-export function setSharedToken(token: string) {
-  return getClient().rpc('set_shared_token', { token })
-}
-
 /** Create a new shared access key for the authenticated user. */
 export async function createSharedKey(label?: string, expiresAt?: Date) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not signed in.')
   const { data, error } = await getClient()
     .from('shared_access_keys')
-    .insert({ label, expires_at: expiresAt?.toISOString() })
+    .insert({ user_id: user.id, label, expires_at: expiresAt?.toISOString() })
     .select()
     .single()
   if (error) throw error
@@ -230,7 +199,7 @@ export async function deleteInviteCode(id: string): Promise<void> {
 }
 
 /** Redeem an invite code for a brand-new account. On success, the email is
- *  now a known user — follow up with signInWithEmail/signInWithPasskey to
+ *  now a known user — follow up with signInWithEmail to
  *  actually log in. */
 export async function redeemInvite(email: string, code: string): Promise<void> {
   const client = getClient()

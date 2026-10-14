@@ -1,10 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.model
 
 /**
- * Read-only detail view of a single title, mirroring the shape documented in
- * docs/android-contracts/title-detail.md (a subset of the full web contract — cast/crew
- * are deferred until the network sync layer lands, since they add real weight to every
- * Room read for a screen that doesn't need them to demonstrate the read-only spine).
+ * Read-only detail view of a title and its locally mirrored history and credits.
  */
 data class TitleDetail(
     val id: String,
@@ -28,6 +25,37 @@ data class TitleDetail(
     val scheduledOuting: CinemaOuting? = null,
     /** "I want to see this in theaters" (issue #205) — see [LibraryTitle.interestedInTheaters]. */
     val interestedInTheaters: Boolean = false,
+    /** Stable provider identity for recommendation snapshots; unavailable on legacy synthetic rows. */
+    val tmdbId: Int? = null,
+    val cast: List<PersonCredit> = emptyList(),
+    val crew: List<PersonCredit> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val originalLanguage: String? = null,
+    val releaseDate: String? = null,
+    val studios: List<String> = emptyList(),
+    val collectionName: String? = null,
+    val addedAt: String? = null,
+    val imdbRating: Double? = null,
+    val contentRating: String? = null,
+    val imdbId: String? = null,
+    val rtUrl: String? = null,
+    val rtScore: Int? = null,
+    val metacriticScore: Int? = null,
+    val customWatchUrl: String? = null,
+    val inHomeCollection: Boolean? = null,
+    val physicalMedia: List<PhysicalMediaItem> = emptyList(),
+    val awardsCount: Int? = null,
+    val bechdelOutcome: String? = null,
+    val bechdelScore: String? = null,
+)
+
+/** Display projection retains the complete copy object for later edits without losing notes/extensions. */
+data class PhysicalMediaItem(
+    val id: String,
+    val format: String,
+    val edition: String?,
+    val notes: String?,
+    val sourceJson: String,
 )
 
 data class SeasonDetail(
@@ -37,6 +65,7 @@ data class SeasonDetail(
     val episodesWatched: Int,
     val airYear: Int?,
     val episodes: List<EpisodeDetail>,
+    val cast: List<PersonCredit> = emptyList(),
 )
 
 data class EpisodeDetail(
@@ -49,7 +78,21 @@ data class EpisodeDetail(
     val latestRating: Double?,
     val synopsis: String? = null,
     val stillUrl: String? = null,
+    /** Mean of all logged ratings, matching the web episode card. */
+    val averageRating: Double? = latestRating,
+    val watchEvents: List<EpisodeWatch> = emptyList(),
+    val ratings: List<EpisodeRating> = emptyList(),
+    val reviews: List<EpisodeReview> = emptyList(),
+    val crew: List<PersonCredit> = emptyList(),
 )
+
+data class PersonCredit(val tmdbPersonId: Int, val name: String, val role: String?) {
+    val person: LibraryPerson get() = LibraryPerson(tmdbPersonId, name)
+}
+
+data class EpisodeWatch(val id: String, val watchedAt: String?, val notes: String? = null, val colorMode: String? = null)
+data class EpisodeRating(val id: String, val rating: Double, val ratedAt: String)
+data class EpisodeReview(val id: String, val reviewText: String, val reviewedAt: String, val colorMode: String? = null)
 
 data class Viewing(
     val id: String,

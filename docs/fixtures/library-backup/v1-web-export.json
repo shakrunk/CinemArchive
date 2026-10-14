@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "exportedAt": "2026-10-01",
+  "titles": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "tmdbId": 603,
+      "type": "movie",
+      "title": "The Matrix",
+      "year": 1999,
+      "genres": ["Action", "Science Fiction"],
+      "status": "watched",
+      "rating": 4.5,
+      "tags": ["rewatch", "cyberpunk"],
+      "addedAt": "2026-01-02",
+      "customWatchUrl": "https://example.com/watch/matrix",
+      "inHomeCollection": true,
+      "physicalMedia": [{ "id": "pm-1", "format": "4K UHD", "edition": "Steelbook" }],
+      "futureField": { "keep": "me", "n": 1 },
+      "viewings": [
+        {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "titleId": "11111111-1111-4111-8111-111111111111",
+          "date": "2026-02-14",
+          "rating": 5,
+          "venue": "Alamo Drafthouse",
+          "companions": [{ "name": "Sam", "friendUserId": "99999999-9999-4999-8999-999999999999" }, { "name": "Alex" }],
+          "outingId": "33333333-3333-4333-8333-333333333333"
+        }
+      ]
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "tmdbId": 1396,
+      "type": "tv",
+      "title": "Breaking Bad",
+      "year": 2008,
+      "genres": ["Drama"],
+      "status": "watching",
+      "tags": [],
+      "addedAt": "2026-03-01",
+      "seasons": [
+        {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "seasonNumber": 1,
+          "episodeCount": 2,
+          "episodesWatched": 1,
+          "episodes": [
+            {
+              "id": "66666666-6666-4666-8666-666666666666",
+              "episodeNumber": 1,
+              "episodeName": "Pilot",
+              "watchEvents": [{ "id": "77777777-7777-4777-8777-777777777777", "watchedAt": "2026-03-02" }],
+              "ratings": [{ "id": "88888888-8888-4888-8888-888888888888", "rating": 4, "ratedAt": "2026-03-02T21:00:00Z" }],
+              "reviews": [{ "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "reviewText": "Strong start.", "reviewedAt": "2026-03-02T21:05:00Z" }]
+            },
+            { "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "episodeNumber": 2, "watchEvents": [], "ratings": [], "reviews": [] }
+          ]
+        }
+      ],
+      "viewings": []
+    }
+  ],
+  "outings": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "titleId": "11111111-1111-4111-8111-111111111111",
+      "showtime": "2026-02-14T19:00:00Z",
+      "previewsMinutes": 20,
+      "runtimeMinutes": 136,
+      "endsAt": "2026-02-14T21:36:00Z",
+      "venue": "Alamo Drafthouse",
+      "companions": [{ "name": "Sam", "friendUserId": "99999999-9999-4999-8999-999999999999" }],
+      "format": "IMAX",
+      "ticketPrice": 18.5,
+      "auditorium": "7",
+      "seatRow": "F",
+      "seats": ["12", "13"],
+      "status": "completed",
+      "completedViewingId": "22222222-2222-4222-8222-222222222222",
+      "createdAt": "2026-02-01T10:00:00Z",
+      "ticketManaged": true,
+      "ticketAttachment": { "objectKey": "owner/abc/ticket.jpg", "sha256": "deadbeef", "operationId": "op-1" },
+      "ticketImagePath": "/data/user/0/app/files/tickets/legacy.jpg"
+    }
+  ]
+}

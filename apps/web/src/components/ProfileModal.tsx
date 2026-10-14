@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Mail, Fingerprint, Loader2 } from 'lucide-react'
+import { Mail, Loader2 } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { cn, getErrorMessage } from 'src/lib/utils'
-import { signInWithEmail, signInWithPasskey } from 'src/lib/auth'
+import { signInWithEmail } from 'src/lib/auth'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
 import { Eyebrow } from 'src/components/ui/typography'
@@ -44,32 +44,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
       setAuthMessage({
         type: 'error',
         text: getErrorMessage(err, 'Failed to send magic link.'),
-      })
-    } finally {
-      setLoadingAuth(false)
-    }
-  }
-
-  async function handlePasskeySignIn() {
-    if (!email.trim()) {
-      setAuthMessage({ type: 'error', text: 'Enter your email first to authenticate with a passkey.' })
-      return
-    }
-
-    setLoadingAuth(true)
-    setAuthMessage(null)
-    try {
-      await signInWithPasskey(email)
-      // Note: signInWithPasskey starts challenge. Supabase handles the MFA verification redirect.
-      setAuthMessage({
-        type: 'success',
-        text: 'Passkey verification initiated. Check your browser prompt.',
-      })
-    } catch (err) {
-      console.error(err)
-      setAuthMessage({
-        type: 'error',
-        text: getErrorMessage(err, 'Failed to sign in with passkey.'),
       })
     } finally {
       setLoadingAuth(false)
@@ -155,17 +129,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                       <Mail className="w-4 h-4 mr-2" />
                     )}
                     Send Magic Link
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handlePasskeySignIn}
-                    disabled={loadingAuth}
-                    variant="outline"
-                    className="border-border text-muted-foreground hover:text-foreground"
-                    title="Sign In with Passkey"
-                    aria-label="Sign In with Passkey"
-                  >
-                    <Fingerprint className="w-4 h-4" />
                   </Button>
                 </div>
               </form>

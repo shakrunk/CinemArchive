@@ -48,7 +48,7 @@ export function ShiftingStandards({ className, settings, width = 'md' }: { class
   const labelStep = Math.max(1, Math.ceil(quarters.length / labelBudget))
 
   return (
-    <Panel title={panelTitle} hint={hint} className={className}>
+    <Panel title={panelTitle} hint={hint} className={className} data={{ columns: ["Quarter", "Average rating (out of 5)", "Rated titles"], rows: quarters.map((quarter) => [quarter.quarter, quarter.avg.toFixed(1), quarter.count]) }}>
       <div className="min-w-0 overflow-hidden">
         <div className="min-w-0">
           <MiniLineChart

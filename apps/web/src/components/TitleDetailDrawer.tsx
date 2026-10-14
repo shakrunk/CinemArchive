@@ -1,3 +1,5 @@
+import { captureLibrarySession, saveSucceeded } from 'src/lib/localSave'
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState, useEffect, useRef, useMemo, useId } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
@@ -8,6 +10,7 @@ import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
+import { TicketButton } from './TicketViewer'
 import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
@@ -33,15 +36,15 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
 import { formatCompanions, findPendingFollowUpOuting, companionSuggestions, venueSuggestions } from 'src/store/outings'
-import { CINEMA_FORMATS, type Title, type Viewing, type WatchStatus, type Season, type Episode, type CastMember, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
+import { CINEMA_FORMATS, type Title, type Viewing, type WatchStatus, type Season, type Episode, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, fetchCollectionParts, TMDB_STILL_BASE, type TitleVideo, type WatchProviders, type SearchResult } from 'src/lib/media'
-import { upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
 import { Chip } from 'src/components/ui/chip'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CompanionInput } from 'src/components/OutingScheduleSheet'
+import { TheaterInterestControl } from './TheaterInterestControl'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
@@ -172,12 +175,13 @@ function TicketStubLine({ viewing, outing }: { viewing: Viewing; outing: CinemaO
     companionLabel && `with ${companionLabel}`,
     outing?.format,
   ].filter((s): s is string => Boolean(s))
-  if (segments.length === 0) return null
+  if (segments.length === 0 && !outing) return null
 
   return (
-    <div className="flex items-center gap-2 mt-1.5">
+    <div className="flex flex-wrap items-center gap-2 mt-1.5">
       <span className="ticket-perforation" aria-hidden="true" />
       <span className="font-mono text-xs text-amber/80">{segments.join(' · ')}</span>
+      {outing && <TicketButton outingId={outing.id} />}
     </div>
   )
 }
@@ -200,8 +204,7 @@ function ViewingEditForm({
   outing: CinemaOuting | undefined
   onClose: () => void
 }) {
-  const updateTitle = useAppStore((s) => s.updateTitle)
-  const updateOuting = useAppStore((s) => s.updateOuting)
+  const editViewing = useAppStore((s) => s.editViewing)
 
   const [prePlatform, setPrePlatform] = useState(!viewing.date)
   const [date, setDate] = useState(viewing.date ?? new Date().toISOString().slice(0, 10))
@@ -217,35 +220,18 @@ function ViewingEditForm({
   const [seats, setSeats] = useState((outing?.seats ?? []).join(', '))
   const [bookingRef, setBookingRef] = useState(outing?.bookingRef ?? '')
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    const nextViewings = title.viewings.map((v) =>
-      v.id === viewing.id
-        ? {
-            ...v,
-            date: prePlatform ? undefined : date,
-            rating: rating > 0 ? rating : undefined,
-            notes: notes.trim() || undefined,
-            venue: venue.trim() || undefined,
-            companions: companions.length > 0 ? companions : undefined,
-          }
-        : v
-    )
-    updateTitle(title.id, {
-      viewings: nextViewings,
-      ...(rating > 0 ? { rating } : {}),
-    })
-    if (outing) {
-      updateOuting(outing.id, {
-        format: format || undefined,
-        ticketPrice: ticketPrice.trim() ? Number(ticketPrice) : undefined,
-        auditorium: auditorium.trim() || undefined,
-        seatRow: seatRow.trim() || undefined,
-        seats: parseSeatsInput(seats),
-        bookingRef: bookingRef.trim() || undefined,
-      })
-    }
-    onClose()
+    const saved = await saveSucceeded(editViewing(title.id, viewing.id, {
+      date: prePlatform ? undefined : date, rating: rating > 0 ? rating : undefined,
+      notes: notes.trim() || undefined, venue: venue.trim() || undefined,
+      companions: companions.length > 0 ? companions : undefined,
+    }, rating > 0 ? { rating } : {}, outing ? { id: outing.id, patch: {
+      format: format || undefined, ticketPrice: ticketPrice.trim() ? Number(ticketPrice) : undefined,
+      auditorium: auditorium.trim() || undefined, seatRow: seatRow.trim() || undefined,
+      seats: parseSeatsInput(seats), bookingRef: bookingRef.trim() || undefined,
+    } } : undefined))
+    if (saved) onClose()
   }
 
   return (
@@ -305,6 +291,7 @@ function ViewingEditForm({
           <Eyebrow as="p" size="md">
             Ticket details
           </Eyebrow>
+          <TicketButton outingId={outing.id} />
           <div className="flex flex-wrap gap-2">
             {CINEMA_FORMATS.map((f) => (
               <button
@@ -412,7 +399,7 @@ function ViewingTimeline({
   isSharedView,
 }: {
   title: Title
-  onDeleteViewing?: (viewingId: string) => void
+  onDeleteViewing?: (viewingId: string) => Promise<void>
   onLogViewing?: () => void
   isSharedView?: boolean
 }) {
@@ -464,8 +451,8 @@ function ViewingTimeline({
                     </span>
                     <div className="flex items-center gap-3">
                       <button type="button"
-                        onClick={() => {
-                          onDeleteViewing?.(v.id)
+                        onClick={async () => {
+                          if (onDeleteViewing && !await saveSucceeded(onDeleteViewing(v.id))) return
                           setPendingDeleteId(null)
                         }}
                         className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
@@ -785,8 +772,8 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
         </span>
         <div className="flex items-center gap-3">
           <button type="button"
-            onClick={() => {
-              markPrePlatformWatched(titleId, scope === 'season' ? season?.seasonNumber : undefined)
+            onClick={async () => {
+              if (!await saveSucceeded(markPrePlatformWatched(titleId, scope === 'season' ? season?.seasonNumber : undefined))) return
               setConfirmPrePlatform(null)
             }}
             className="font-mono text-xs transition-colors text-amber hover:text-amber/80"
@@ -903,10 +890,10 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                     : 'border-transparent hover:border-(--line) hover:bg-(--wash)'
                 )}
               >
-                <div className="font-mono" style={{ fontSize: '13px', color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
+                <div className="font-mono" style={{ fontSize: scaledTextSize('13px'), color: selectedSeason === s.seasonNumber ? 'var(--amber)' : 'var(--paper-dim)' }}>
                   {seasonShortLabel(s.seasonNumber)}
                 </div>
-                <div className="font-mono" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>
+                <div className="font-mono" style={{ fontSize: scaledTextSize('11px'), color: 'var(--paper-faint)' }}>
                   {pct}%{seasonAvg !== null ? ` · ★${seasonAvg.toFixed(1)}` : ''}
                 </div>
               </button>
@@ -1032,10 +1019,10 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
                   )}
                 </div>
                 <div className="p-2">
-                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: '12px', color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
-                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
+                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
+                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
                   {member.episodeCount != null && (
-                    <div className="font-mono mt-0.5" style={{ fontSize: '10px', color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
+                    <div className="font-mono mt-0.5" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
                       {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
                     </div>
                   )}
@@ -1420,6 +1407,8 @@ export function TitleDetailDrawer() {
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const closeDetailDrawer = useAppStore((s) => s.closeDetailDrawer)
   const updateTitle = useAppStore((s) => s.updateTitle)
+  const addViewing = useAppStore((s) => s.addViewing)
+  const updateTitleMetadata = useAppStore((s) => s.updateTitleMetadata)
   const removeTitle = useAppStore((s) => s.removeTitle)
   const removeViewing = useAppStore((s) => s.removeViewing)
   const openRefreshMetadata = useAppStore((s) => s.openRefreshMetadata)
@@ -1648,7 +1637,7 @@ export function TitleDetailDrawer() {
     backfilledRef.current.add(cacheKey)
 
     const snapshotTitle = title
-    const snapshotUser = user
+    const checkSession = captureLibrarySession()
 
     const EP_CREW_JOBS_BF = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
 
@@ -1661,9 +1650,6 @@ export function TitleDetailDrawer() {
       )
 
       let updatedSeasons = [...snapshotTitle.seasons!]
-      const allUpdatedEpisodes: Parameters<typeof upsertEpisodeMetadataInDb>[2] = []
-      const allEpisodeCrew: Array<{ episodeId: string; crew: EpisodeCrew[] }> = []
-      const allSeasonCast: Array<{ seasonId: string; cast: CastMember[] }> = []
 
       for (const result of settled) {
         if (result.status !== 'fulfilled' || result.value.tmdbEps.length === 0) continue
@@ -1725,46 +1711,11 @@ export function TitleDetailDrawer() {
           )
         }
 
-        for (const ep of updatedEpisodes) {
-          allUpdatedEpisodes.push({
-            id: ep.id,
-            seasonNumber: season.seasonNumber,
-            episodeNumber: ep.episodeNumber,
-            episodeName: ep.episodeName,
-            airDate: ep.airDate,
-            runtime: ep.runtime,
-            synopsis: ep.synopsis,
-            stillUrl: ep.stillUrl,
-          })
-          if (ep.crew && ep.crew.length > 0) {
-            allEpisodeCrew.push({ episodeId: ep.id, crew: ep.crew })
-          }
-        }
-
-        if (seasonCast.length > 0) {
-          allSeasonCast.push({ seasonId: season.id, cast: seasonCast })
-        }
       }
 
-      if (allUpdatedEpisodes.length > 0 || allSeasonCast.length > 0) {
-        updateTitle(snapshotTitle.id, { seasons: updatedSeasons })
-        if (snapshotUser) {
-          if (allUpdatedEpisodes.length > 0) {
-            upsertEpisodeMetadataInDb(snapshotUser.id, snapshotTitle.id, allUpdatedEpisodes).catch((e) =>
-              console.error('Episode metadata backfill DB write failed:', e)
-            )
-          }
-          if (allSeasonCast.length > 0) {
-            bulkUpsertSeasonCastInDb(snapshotUser.id, snapshotTitle.id, allSeasonCast).catch((e) =>
-              console.error('Season cast backfill DB write failed:', e)
-            )
-          }
-          if (allEpisodeCrew.length > 0) {
-            bulkUpsertEpisodeCrewInDb(snapshotUser.id, snapshotTitle.id, allEpisodeCrew).catch((e) =>
-              console.error('Episode crew backfill DB write failed:', e)
-            )
-          }
-        }
+      checkSession()
+      if (JSON.stringify(snapshotTitle.seasons) !== JSON.stringify(updatedSeasons)) {
+        await updateTitleMetadata(snapshotTitle.id, { seasons: updatedSeasons })
       }
     }
 
@@ -1773,7 +1724,7 @@ export function TitleDetailDrawer() {
 
   if (!title) return null
 
-  function logViewing() {
+  async function logViewing() {
     if (!title || (!logPrePlatform && !logDate)) return
     const viewing: Viewing = {
       id: crypto.randomUUID(),
@@ -1784,11 +1735,10 @@ export function TitleDetailDrawer() {
       venue: logVenue.trim() || undefined,
       companions: logCompanions.length > 0 ? logCompanions : undefined,
     }
-    updateTitle(title.id, {
-      viewings: [...title.viewings, viewing],
+    if (!await saveSucceeded(addViewing(title.id, viewing, {
       status: 'watched',
-      rating: logRating > 0 ? logRating : title.rating,
-    })
+      ...(logRating > 0 ? { rating: logRating } : {}),
+    }))) return false
     setShowMovieSaved(true)
     setTimeout(() => {
       setShowMovieSaved(false)
@@ -1800,12 +1750,12 @@ export function TitleDetailDrawer() {
       setLogVenue('')
       setLogCompanions([])
     }, 1500)
+    return true
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!title) return
-    closeDetailDrawer()
-    removeTitle(title.id)
+    if (await saveSucceeded(removeTitle(title.id))) closeDetailDrawer()
   }
 
   function handleModeSelect(mode: SelectorMode) {
@@ -1831,10 +1781,9 @@ export function TitleDetailDrawer() {
     logViewing()
   }
 
-  function handleMatrixRed() {
+  async function handleMatrixRed() {
     setShowMatrixModal(false)
-    logViewing()
-    setShowMatrixRain(true)
+    if (await logViewing()) setShowMatrixRain(true)
   }
 
   return (
@@ -2124,6 +2073,7 @@ export function TitleDetailDrawer() {
           {/* ── Movie section (and TV without seasons) ─────────────── */}
           {title.type === 'movie' && (
             <>
+              <TheaterInterestControl titleId={title.id} />
               {/* Viewing History */}
               <SectionCard
                 title="Viewing History"

@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "m0", "tmdbId": 1, "type": "tv", "title": "seasons object", "seasons": { "a": 1 } },
+    { "id": "m1", "tmdbId": 2, "type": "movie", "title": "viewings string", "viewings": "none" },
+    { "id": "m2", "tmdbId": 3, "type": "movie", "title": "tags object", "tags": { "x": 1 } },
+    { "id": "m3", "tmdbId": 4, "type": "tv", "title": "episodes string", "seasons": [ { "id": "s", "seasonNumber": 1, "episodes": "all" } ] },
+    { "id": "m4", "tmdbId": 5, "type": "tv", "title": "watchEvents number", "seasons": [ { "id": "s2", "seasonNumber": 1, "episodes": [ { "id": "e", "episodeNumber": 1, "watchEvents": 3 } ] } ] },
+    { "id": "m5", "tmdbId": 6, "type": "movie", "title": "companions string", "viewings": [ { "id": "v", "companions": "Sam" } ] },
+    { "id": "m6", "tmdbId": 8, "type": "movie", "title": "genres string", "genres": "Drama" },
+    { "id": "m7", "tmdbId": 9, "type": "movie", "title": "tag not string", "tags": [ 1 ] },
+    { "id": "m8", "tmdbId": 10, "type": "movie", "title": "Clean", "status": "watched", "tags": [], "viewings": [] }
+  ],
+  "outings": [
+    { "id": "mo1", "titleId": "m8", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled", "seats": "A1" },
+    { "id": "mo2", "titleId": "m8", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled", "companions": "Sam" }
+  ],
+  "lists": [
+    { "id": "ml1", "name": "items object", "items": { "titleId": "m8" } }
+  ]
+}

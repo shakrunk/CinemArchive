@@ -1,15 +1,19 @@
 package work.kumarfamilynet.cinemarchive.core.database
 
+import androidx.room.Dao
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
+import androidx.room.Query
 import androidx.room.TypeConverter
 
 /**
  * Local mirror of the `titles` table (see schema.sql / docs/android-contracts/title-detail.md).
- * A read-only subset for now — cast/crew/physical-media/badge-score columns are deferred
- * until the network sync layer (docs/android-sync-contract.md) actually populates them.
+ * Owner fields and catalog metadata are preserved independently of whether a screen displays them.
  */
 @Entity(tableName = "titles")
 data class TitleEntity(
@@ -39,6 +43,22 @@ data class TitleEntity(
     // Mirrors schema.sql's titles.release_date — drives the Up Next watchlist card's
     // "releases <date>" label for a title that hasn't come out yet.
     val releaseDate: String? = null,
+    @ColumnInfo(defaultValue = "''") val tags: List<String> = emptyList(),
+    @ColumnInfo(defaultValue = "''") val studios: List<String> = emptyList(),
+    val collectionId: Int? = null,
+    val collectionName: String? = null,
+    val contentRating: String? = null,
+    val imdbId: String? = null,
+    val rtUrl: String? = null,
+    val rtScore: Int? = null,
+    val metacriticScore: Int? = null,
+    val customWatchUrl: String? = null,
+    val inHomeCollection: Boolean? = null,
+    /** Keep the complete JSON array, including unknown fields, until an explicit owner edit. */
+    val physicalMediaJson: String? = null,
+    val awardsCount: Int? = null,
+    val bechdelOutcome: String? = null,
+    val bechdelScore: String? = null,
 )
 
 @Entity(
@@ -60,6 +80,8 @@ data class SeasonEntity(
     val episodeCount: Int,
     val episodesWatched: Int,
     val airYear: Int?,
+    /** Observed server revision only; null on older/local-only seasons. */
+    val updatedAt: String? = null,
 )
 
 @Entity(
@@ -112,6 +134,8 @@ data class EpisodeWatchEventEntity(
     @PrimaryKey val id: String,
     val episodeId: String,
     val watchedAt: String?, // null = watched before joining the platform
+    val notes: String? = null,
+    val colorMode: String? = null,
 )
 
 /** Independent rating log — deliberately not 1:1 with watch events. */
@@ -152,6 +176,7 @@ data class EpisodeReviewEntity(
     val episodeId: String,
     val reviewText: String,
     val reviewedAt: String,
+    val colorMode: String? = null,
 )
 
 /** Re-watch timeline entry — see docs/android-contracts/title-detail.md §1 (Viewings). */
@@ -180,6 +205,9 @@ data class ViewingEntity(
     // Feeds the Ledger "At the Movies" widget (docs/android-contracts/ledger.md §2/§3).
     val companions: List<String> = emptyList(),
     val outingId: String? = null,
+    // Null means no server revision is known; local timestamps must never become CAS baselines.
+    val updatedAt: String? = null,
+    val companionsJson: String? = null,
 )
 
 /**
@@ -207,6 +235,8 @@ data class TitleCastEntity(
     val name: String,
     val characterName: String?,
     val castOrder: Int,
+    val profileUrl: String? = null,
+    val episodeCount: Int? = null,
 )
 
 /**
@@ -235,6 +265,46 @@ data class TitleCrewEntity(
     val name: String,
     val job: String,
     val department: String?,
+    val profileUrl: String? = null,
+)
+
+/** Season-billed people participate in person filtering even when absent from series cast. */
+@Entity(
+    tableName = "season_cast",
+    foreignKeys = [
+        ForeignKey(entity = TitleEntity::class, parentColumns = ["id"], childColumns = ["titleId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = SeasonEntity::class, parentColumns = ["id"], childColumns = ["seasonId"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [Index("titleId"), Index("seasonId")],
+)
+data class SeasonCastEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val seasonId: String,
+    val tmdbPersonId: Int,
+    val name: String,
+    val characterName: String?,
+    val castOrder: Int,
+    val profileUrl: String? = null,
+    val episodeCount: Int? = null,
+)
+
+/** Director and writing credits for an individual episode, keyed by stable provider identity. */
+@Entity(
+    tableName = "episode_crew",
+    foreignKeys = [
+        ForeignKey(entity = TitleEntity::class, parentColumns = ["id"], childColumns = ["titleId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = EpisodeEntity::class, parentColumns = ["id"], childColumns = ["episodeId"], onDelete = ForeignKey.CASCADE),
+    ],
+    indices = [Index("titleId"), Index("episodeId")],
+)
+data class EpisodeCrewEntity(
+    @PrimaryKey val id: String,
+    val titleId: String,
+    val episodeId: String,
+    val tmdbPersonId: Int,
+    val name: String,
+    val job: String,
 )
 
 /**
@@ -285,6 +355,7 @@ data class CinemaOutingEntity(
     val followUpDismissedAt: String? = null,
     val createdAt: String,
     val updatedAt: String,
+    val companionsJson: String? = null,
 )
 
 /**
@@ -300,6 +371,9 @@ data class VenueNoteEntity(
     @PrimaryKey val venue: String,
     val notes: String,
     val updatedAt: String,
+    val serverId: String? = null,
+    val serverUpdatedAt: String? = null,
+    val serverCreatedAt: String? = null,
 )
 
 /**
@@ -315,6 +389,7 @@ data class VenueNoteEntity(
 data class TheaterInterestEntity(
     @PrimaryKey val titleId: String,
     val createdAt: String,
+    val serverUpdatedAt: String? = null,
 )
 
 /**
@@ -364,6 +439,32 @@ data class ListItemEntity(
     val addedAt: String,
     val updatedAt: String,
 )
+
+/**
+ * Durable proof, committed in the SAME transaction as the recovered data, that a legacy-archive
+ * restore delivered something into THIS account's database (see the data module's
+ * `LegacyArchive`). `key` is `entry:<legacy outbox id>` (kind `entry`: that outbox entry was
+ * handed to this account, even if it has since been pushed and removed from `mutation_outbox`),
+ * `skip:<outbox id>` (kind `skipped`: handed over but its local row could not be restored yet) or
+ * `archive:<archiveId>` (kind `complete`: nothing skipped). `archiveId` is the SHA-256 of the
+ * legacy file. Local-only: not synced.
+ */
+@Entity(tableName = "legacy_restore_receipt")
+data class LegacyRestoreReceiptEntity(
+    @PrimaryKey val key: String,
+    val archiveId: String,
+    val kind: String,
+    val restoredAt: String,
+)
+
+@Dao
+interface LegacyRestoreReceiptDao {
+    @Query("SELECT `key` FROM legacy_restore_receipt WHERE archiveId = :archiveId")
+    suspend fun keysFor(archiveId: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(row: LegacyRestoreReceiptEntity)
+}
 
 class Converters {
     @TypeConverter

@@ -12,6 +12,7 @@ error states. Fixture JSON lives alongside each doc in `fixtures/`.
 | Title detail | [title-detail.md](./title-detail.md) | [fixtures/title-detail.json](./fixtures/title-detail.json) |
 | Episode tracking | [episode-tracking.md](./episode-tracking.md) | [fixtures/episode-tracking.json](./fixtures/episode-tracking.json) |
 | Ledger | [ledger.md](./ledger.md) | [fixtures/ledger.json](./fixtures/ledger.json) |
+| Lists | [lists.md](./lists.md) | — (no fixture yet) |
 
 These fixtures are hand-authored from the current `schema.sql` and `apps/web/src/lib/db.ts` shapes,
 not exported from a live database — they are for shape/contract testing, not production

@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,11 +72,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import work.kumarfamilynet.cinemarchive.core.designsystem.AddToListSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
 import work.kumarfamilynet.cinemarchive.core.designsystem.ListMembershipOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
+import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
+import work.kumarfamilynet.cinemarchive.core.model.PostShowOpening
+import kotlinx.coroutines.isActive
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
@@ -86,14 +92,16 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCastMember
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
+import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.ScheduledEpisode
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
-import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
+import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
+import work.kumarfamilynet.cinemarchive.core.model.ViewingDraft
 import work.kumarfamilynet.cinemarchive.core.model.isUnaired
 import work.kumarfamilynet.cinemarchive.core.model.mainSeasons
 import work.kumarfamilynet.cinemarchive.core.model.nextScheduledEpisode
@@ -109,7 +117,23 @@ class TitleDetailViewModel(
     private val outingsRepository: OutingsRepository,
     private val listsRepository: ListsRepository,
     private val titleId: String,
+    catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
 ) : ViewModel() {
+    val catalogExtras = catalogExtrasSource?.let { CatalogExtrasController(it, viewModelScope) }
+    private val _titleEditError = MutableStateFlow<String?>(null)
+    val titleEditError = _titleEditError.asStateFlow()
+    private fun editTitle(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            _titleEditError.value = null
+            try { block() }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { _titleEditError.value = "Couldn't save this title change. Try again." }
+        }
+    }
+    suspend fun saveTags(tags: List<String>) = repository.updateTitleTags(titleId, tags)
+    suspend fun prepareSources() = repository.prepareTitleSources(titleId)
+    suspend fun saveSources(opening: String, values: work.kumarfamilynet.cinemarchive.data.TitleSourcesValues) =
+        repository.saveTitleSources(titleId, opening, values)
     val uiState = repository.observeTitleDetail(titleId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -143,10 +167,9 @@ class TitleDetailViewModel(
         viewModelScope.launch { repository.backfillEpisodeMetadata(titleId) }
     }
 
-    /** Optimistic local write + queued remote push — see LibraryRepository.logEpisodeWatched. */
-    fun onMarkWatched(episodeId: String) {
-        viewModelScope.launch { repository.logEpisodeWatched(episodeId, LocalDate.now().toString()) }
-    }
+    suspend fun saveEpisodeLog(episodeId: String, draft: EpisodeLogDraft) = repository.saveEpisodeLog(episodeId, draft)
+
+    suspend fun deleteEpisodeWatch(episodeId: String, eventId: String) = repository.deleteEpisodeWatchEvent(episodeId, eventId)
 
     /** Loads an episode's cast the first time its cast section is opened — see
      *  LibraryRepository.fetchEpisodeCast. */
@@ -159,94 +182,43 @@ class TitleDetailViewModel(
         }
     }
 
-    fun onRateEpisode(episodeId: String, rating: Double) {
-        viewModelScope.launch { repository.logEpisodeRating(episodeId, rating, Instant.now().toString()) }
-    }
+    suspend fun saveViewing(draft: ViewingDraft, isNew: Boolean) = repository.saveViewing(titleId, draft, isNew)
 
-    fun onSubmitReview(episodeId: String, reviewText: String) {
-        viewModelScope.launch { repository.logEpisodeReview(episodeId, reviewText, Instant.now().toString()) }
-    }
-
-    fun onLogViewing() {
-        viewModelScope.launch { repository.logViewing(titleId, LocalDate.now().toString()) }
-    }
+    suspend fun prepareViewing(viewingId: String?) = repository.prepareViewingEdit(titleId, viewingId)
+    suspend fun deleteViewing(draft: ViewingDraft) = repository.deleteViewing(titleId, draft)
 
     fun onChangeStatus(status: LibraryStatus) {
-        viewModelScope.launch { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
+        editTitle { repository.updateTitleStatus(titleId, status, Instant.now().toString()) }
     }
 
     /** "I want to see this in theaters" (GitHub #205). */
     fun onToggleTheaterInterest(interested: Boolean) {
-        viewModelScope.launch { repository.setTheaterInterest(titleId, interested) }
+        editTitle { repository.setTheaterInterest(titleId, interested) }
     }
 
     fun onRateTitle(rating: Double) {
-        viewModelScope.launch { repository.updateTitleRating(titleId, rating, Instant.now().toString()) }
+        editTitle { repository.updateTitleRating(titleId, rating, Instant.now().toString()) }
     }
 
-    fun onScheduleOuting(
-        showtime: Instant,
-        previewsMinutes: Int,
-        runtimeMinutes: Int,
-        venue: String?,
-        companions: List<String>,
-        format: CinemaFormat?,
-        ticketPrice: Double?,
-        seating: SeatAssignment,
-        bookingRef: String?,
-        notes: String?,
-    ) {
-        viewModelScope.launch {
-            outingsRepository.scheduleOuting(titleId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
-        }
-    }
+    suspend fun prepareSchedule(outingId: String?): String = outingsRepository.prepareOutingSchedule(titleId, outingId)
 
-    fun onEditOuting(
-        outingId: String,
-        showtime: Instant,
-        previewsMinutes: Int,
-        runtimeMinutes: Int,
-        venue: String?,
-        companions: List<String>,
-        format: CinemaFormat?,
-        ticketPrice: Double?,
-        seating: SeatAssignment,
-        bookingRef: String?,
-        notes: String?,
-    ) {
-        viewModelScope.launch {
-            outingsRepository.updateOuting(outingId, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
-        }
-    }
+    suspend fun saveSchedule(
+        opening: String, showtime: Instant, previewsMinutes: Int, runtimeMinutes: Int,
+        venue: String?, companions: List<String>, format: CinemaFormat?, ticketPrice: Double?,
+        seating: SeatAssignment, bookingRef: String?, notes: String?,
+    ) { outingsRepository.saveOutingSchedule(opening, showtime, previewsMinutes, runtimeMinutes,
+        venue, companions, format, ticketPrice, seating, bookingRef, notes) }
 
     fun onCancelOuting(outingId: String) {
         viewModelScope.launch { outingsRepository.cancelOuting(outingId) }
     }
 
-    /** Persists a ticket photo picked+decoded by [OutingScheduleSheet] (GitHub #219). */
-    fun onCaptureTicket(outingId: String, imagePath: String, barcodePayload: String?, barcodeFormat: TicketBarcodeFormat?) {
-        viewModelScope.launch { outingsRepository.saveTicketCapture(outingId, imagePath, barcodePayload, barcodeFormat) }
-    }
 
-    fun onClearTicketCapture(outingId: String) {
-        viewModelScope.launch { outingsRepository.clearTicketCapture(outingId) }
-    }
+    suspend fun preparePostShow(viewingId: String): PostShowOpening = repository.preparePostShow(titleId, viewingId)
 
-    fun onRatePostShow(viewingId: String, rating: Double) {
-        viewModelScope.launch { repository.rateViewing(viewingId, titleId, rating) }
-    }
+    suspend fun savePostShow(opening: PostShowOpening, rating: Double?, notes: String) = repository.savePostShow(opening, rating, notes)
 
-    fun onSaveFollowUpNotes(viewingId: String, notes: String) {
-        viewModelScope.launch { repository.updateViewingNotes(viewingId, notes) }
-    }
-
-    fun onDidntMakeIt(outingId: String) {
-        viewModelScope.launch { outingsRepository.revertCompletion(outingId) }
-    }
-
-    fun onSaveVenueNotes(venue: String, notes: String) {
-        viewModelScope.launch { outingsRepository.saveVenueNotes(venue, notes) }
-    }
+    suspend fun revertPostShow(opening: PostShowOpening) = outingsRepository.revertPostShow(opening)
 
     /** Toggles this title's membership in one list — mirrors [AddToListSheet]'s checkbox rows
      *  1:1, so the caller doesn't need to know current membership state itself. */
@@ -283,17 +255,47 @@ fun TitleDetailRoute(
     listsRepository: ListsRepository,
     titleId: String,
     onBack: () -> Unit,
+    onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
     onRequestNotificationPermission: () -> Unit = {},
+    socialContent: (@Composable (TitleDetail) -> Unit)? = null,
+    onRecommendTitle: ((String) -> Unit)? = null,
+    onShareOutingPlans: ((String) -> Unit)? = null,
+    onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
+    onRefreshCredits: (suspend () -> Boolean)? = null,
+    catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
+    titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
+    initialSchedule: Boolean = false,
+    onInitialScheduleConsumed: () -> Unit = {},
+    onScheduled: () -> Unit = {},
+    noirPins: work.kumarfamilynet.cinemarchive.data.TitlePinsRepository? = null,
+    onNoirMode: (String?) -> Unit = {},
 ) {
+    val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: TitleDetailViewModel =
-        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId))
+        viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
+    var noirLoggedMode by rememberSaveable(titleId) { mutableStateOf<String?>(null) }
+    val titleEditError by viewModel.titleEditError.collectAsStateWithLifecycle()
+    val languageTag = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].toLanguageTag()
+    val catalogKey = detail?.let { current -> current.tmdbId?.takeIf { it > 0 }?.let {
+            work.kumarfamilynet.cinemarchive.core.model.CatalogExtrasKey(it, current.type,
+                work.kumarfamilynet.cinemarchive.core.model.catalogWatchRegion(languageTag))
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(catalogKey) {
+        viewModel.catalogExtras?.select(catalogKey)
+    }
+    val catalogExtrasState = viewModel.catalogExtras?.state?.collectAsStateWithLifecycle()?.value?.takeIf { it.key == catalogKey }
     val venueSuggestions by viewModel.venueSuggestions.collectAsStateWithLifecycle()
     val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
     val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
     val listOptions by viewModel.listOptions.collectAsStateWithLifecycle()
     val episodeCast by viewModel.episodeCast.collectAsStateWithLifecycle()
     var showAddToListSheet by rememberSaveable { mutableStateOf(false) }
+    var editVenue by rememberSaveable { mutableStateOf<String?>(null) }
+    editVenue?.let { venue -> outingsRepository.moviegoingPreferences?.let { preferences ->
+        VenueNoteEditor(preferences, venue) { editVenue = null }
+    } }
     if (showAddToListSheet && detail != null) {
         AddToListSheet(
             titleName = detail!!.title,
@@ -306,31 +308,67 @@ fun TitleDetailRoute(
     TitleDetailScreen(
         detail,
         onBack,
-        onMarkWatched = viewModel::onMarkWatched,
-        onRateEpisode = viewModel::onRateEpisode,
-        onSubmitReview = viewModel::onSubmitReview,
-        onLogViewing = viewModel::onLogViewing,
+        onSaveEpisodeLog = { episodeId, draft ->
+            viewModel.saveEpisodeLog(episodeId, draft)
+            if (detail?.tmdbId == work.kumarfamilynet.cinemarchive.core.model.SPIDER_NOIR_TMDB_ID && draft.colorMode != null) {
+                noirLoggedMode = "${draft.watchEventId}|${draft.colorMode}"
+                // The lazy header may be offscreen; the owner/title-fenced root callback updates immediately.
+                onNoirMode(draft.colorMode)
+            }
+        },
+        noirContent = noirPins?.let { source -> { current -> NoirDetailControls(current, source, noirLoggedMode, onNoirMode) } },
+        onDeleteEpisodeWatch = viewModel::deleteEpisodeWatch,
+        onSaveViewing = viewModel::saveViewing,
+        onDeleteViewing = viewModel::deleteViewing,
+        onPrepareViewing = viewModel::prepareViewing,
+        viewingOwnerId = repository.viewingOwnerId,
+        viewingTitleId = titleId,
         onChangeStatus = viewModel::onChangeStatus,
         onToggleTheaterInterest = viewModel::onToggleTheaterInterest,
         onRateTitle = viewModel::onRateTitle,
-        onScheduleOuting = viewModel::onScheduleOuting,
-        onEditOuting = viewModel::onEditOuting,
+        onPrepareSchedule = viewModel::prepareSchedule,
+        onSaveSchedule = { opening, time, previews, runtime, venue, companions, format, price, seating, booking, notes ->
+            viewModel.saveSchedule(opening, time, previews, runtime, venue, companions, format, price, seating, booking, notes)
+            onScheduled()
+        },
+        initialSchedule = initialSchedule,
+        onInitialScheduleConsumed = onInitialScheduleConsumed,
         onCancelOuting = viewModel::onCancelOuting,
-        onCaptureTicket = viewModel::onCaptureTicket,
-        onClearTicketCapture = viewModel::onClearTicketCapture,
-        onRatePostShow = viewModel::onRatePostShow,
-        onSaveFollowUpNotes = viewModel::onSaveFollowUpNotes,
-        onDidntMakeIt = viewModel::onDidntMakeIt,
+        onViewTicket = onViewTicket,
+        ticketOutings = ticketOutings,
+        onPreparePostShow = viewModel::preparePostShow,
+        onSavePostShow = viewModel::savePostShow,
+        onRevertPostShow = viewModel::revertPostShow,
         onRequestNotificationPermission = onRequestNotificationPermission,
         venueSuggestions = venueSuggestions,
         companionSuggestions = companionSuggestions,
         venueNotes = venueNotes,
-        onSaveVenueNotes = viewModel::onSaveVenueNotes,
+        onEditVenueNote = { editVenue = it },
         onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
         listOptions = listOptions,
         onOpenAddToList = { showAddToListSheet = true },
         episodeCast = episodeCast,
         onLoadEpisodeCast = viewModel::onLoadEpisodeCast,
+        socialContent = socialContent,
+        onRecommendTitle = onRecommendTitle,
+        onShareOutingPlans = onShareOutingPlans,
+        onBrowsePerson = onBrowsePerson,
+        onRefreshCredits = onRefreshCredits,
+        catalogExtrasState = catalogExtrasState,
+        onRetryVideos = { viewModel.catalogExtras?.retryVideos() },
+        onRetryProviders = { viewModel.catalogExtras?.retryProviders() },
+        onSaveTags = viewModel::saveTags,
+        titleSourcesContent = { TitleSourcesEditor(titleId, viewModel::prepareSources, viewModel::saveSources) },
+        titleEditError = titleEditError,
+        titleMetadataRecovery = titleMetadataRecovery,
+        episodeBulkContent = repository.episodeBulkRepository?.let { source -> { current, season ->
+            androidx.compose.runtime.key(repository.viewingOwnerId, current.id) {
+                val pending by remember(source, current.id) { source.pending(current.id) }.collectAsStateWithLifecycle(initialValue = emptyList())
+                PrePlatformWatchControl(current, season, checkNotNull(repository.viewingOwnerId), pending,
+                    prepare = { source.prepare(current.id, it) }, save = source::save, retry = source::retry,
+                    compare = source::compare, applyReviewed = source::applyReviewed, discard = source::discard)
+            }
+        } },
     )
 }
 
@@ -339,35 +377,133 @@ fun TitleDetailRoute(
 fun TitleDetailScreen(
     detail: TitleDetail?,
     onBack: () -> Unit,
-    onMarkWatched: (String) -> Unit = {},
-    onRateEpisode: (String, Double) -> Unit = { _, _ -> },
-    onSubmitReview: (String, String) -> Unit = { _, _ -> },
-    onLogViewing: () -> Unit = {},
+    onSaveEpisodeLog: suspend (String, EpisodeLogDraft) -> Unit = { _, _ -> },
+    onDeleteEpisodeWatch: suspend (String, String) -> Unit = { _, _ -> },
+    onSaveViewing: suspend (ViewingDraft, Boolean) -> Unit = { _, _ -> },
+    onDeleteViewing: suspend (ViewingDraft) -> Unit = {},
     onChangeStatus: (LibraryStatus) -> Unit = {},
     onToggleTheaterInterest: (Boolean) -> Unit = {},
     onRateTitle: (Double) -> Unit = {},
-    onScheduleOuting: (Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onEditOuting: (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
+    onPrepareSchedule: (suspend (String?) -> String)? = null,
+    onSaveSchedule: suspend (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> error("Ticket scheduling unavailable") },
     onCancelOuting: (String) -> Unit = {},
-    onCaptureTicket: (String, String, String?, TicketBarcodeFormat?) -> Unit = { _, _, _, _ -> },
-    onClearTicketCapture: (String) -> Unit = {},
-    onRatePostShow: (String, Double) -> Unit = { _, _ -> },
-    onSaveFollowUpNotes: (String, String) -> Unit = { _, _ -> },
-    onDidntMakeIt: (String) -> Unit = {},
+    onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
+    ticketOutings: List<CinemaOuting> = emptyList(),
+    onPreparePostShow: (suspend (String) -> PostShowOpening)? = null,
+    onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
+    onRevertPostShow: suspend (PostShowOpening) -> Unit = { error("Post-show reversal unavailable") },
     onRequestNotificationPermission: () -> Unit = {},
     venueSuggestions: List<String> = emptyList(),
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
-    onSaveVenueNotes: (String, String) -> Unit = { _, _ -> },
+    onEditVenueNote: ((String) -> Unit)? = null,
     onRemoveTitle: () -> Unit = {},
     listOptions: List<ListMembershipOption> = emptyList(),
     onOpenAddToList: () -> Unit = {},
     episodeCast: Map<String, EpisodeCast?> = emptyMap(),
     onLoadEpisodeCast: (String, Int, Int) -> Unit = { _, _, _ -> },
+    socialContent: (@Composable (TitleDetail) -> Unit)? = null,
+    onRecommendTitle: ((String) -> Unit)? = null,
+    onShareOutingPlans: ((String) -> Unit)? = null,
+    onBrowsePerson: ((LibraryPerson) -> Unit)? = null,
+    onRefreshCredits: (suspend () -> Boolean)? = null,
+    catalogExtrasState: CatalogExtrasState? = null,
+    onRetryVideos: () -> Unit = {},
+    onRetryProviders: () -> Unit = {},
+    onSaveTags: (suspend (List<String>) -> Unit)? = null,
+    titleSourcesContent: (@Composable () -> Unit)? = null,
+    titleEditError: String? = null,
+    titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
+    onPrepareViewing: (suspend (String?) -> ViewingDraft)? = null,
+    viewingOwnerId: String? = null,
+    viewingTitleId: String? = detail?.id,
+    episodeBulkContent: (@Composable (TitleDetail, Int) -> Unit)? = null,
+    noirContent: (@Composable (TitleDetail) -> Unit)? = null,
+    initialSchedule: Boolean = false,
+    onInitialScheduleConsumed: () -> Unit = {},
 ) {
-    var showScheduleSheet by rememberSaveable { mutableStateOf(false) }
-    var editingOuting by remember { mutableStateOf<CinemaOuting?>(null) }
-    var postShowViewing by remember { mutableStateOf<Viewing?>(null) }
+    var scheduleOpening by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
+    var preparingSchedule by remember { mutableStateOf(false) }
+    var scheduleError by remember { mutableStateOf<String?>(null) }
+    var scheduleTarget by remember { mutableStateOf<String?>(null) }
+    val scheduleOriginal = scheduleOpening?.let { runCatching {
+        work.kumarfamilynet.cinemarchive.data.capturedScheduleInitial(it, viewingOwnerId, viewingTitleId)
+    } }
+    var postShowState by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
+    val postShow = restorePostShow(postShowState, viewingOwnerId, viewingTitleId)
+    var preparingPostShow by remember { mutableStateOf(false) }
+    var editingViewingState by rememberSaveable(viewingTitleId, viewingOwnerId) { mutableStateOf<String?>(null) }
+    var deletingViewingState by rememberSaveable(viewingTitleId, viewingOwnerId) { mutableStateOf<String?>(null) }
+    val editingViewing = restoreViewingEditor(editingViewingState, viewingOwnerId, viewingTitleId)
+    val deletingViewing = restoreViewingEditor(deletingViewingState, viewingOwnerId, viewingTitleId)?.draft
+    var preparingViewing by remember { mutableStateOf(false) }
+    var viewingOpenError by remember { mutableStateOf<String?>(null) }
+    val currentHistoryOwner by androidx.compose.runtime.rememberUpdatedState(viewingOwnerId)
+    val currentHistoryTitle by androidx.compose.runtime.rememberUpdatedState(viewingTitleId)
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
+    val historyScope = rememberCoroutineScope()
+    fun openSchedule(outingId: String?) {
+        if (preparingSchedule) return
+        val openingOwner = viewingOwnerId
+        val openingTitle = viewingTitleId
+        scheduleTarget = outingId
+        preparingSchedule = true
+        scheduleError = null
+        historyScope.launch {
+            try {
+                val opening = checkNotNull(onPrepareSchedule) { "Ticket scheduling is unavailable." }(outingId)
+                if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = opening
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (failure: Exception) {
+                if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle)
+                    scheduleError = failure.message ?: "Please try again."
+            } finally { preparingSchedule = false }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(initialSchedule, detail?.id, viewingOwnerId) {
+        if (initialSchedule && detail?.type == MediaType.MOVIE) {
+            onInitialScheduleConsumed()
+            if (scheduleOpening == null) openSchedule(null)
+        }
+    }
+    fun openViewing(viewing: Viewing?, deleting: Boolean = false) {
+        val openingTitle = detail?.id ?: return
+        val openingOwner = viewingOwnerId
+        preparingViewing = true
+        viewingOpenError = null
+        historyScope.launch {
+            try {
+                val draft = onPrepareViewing?.invoke(viewing?.id) ?: viewing?.let {
+                    ViewingDraft(it.id, it.date?.take(10), it.rating, it.notes, it.venue, it.companions)
+                } ?: ViewingDraft(java.util.UUID.randomUUID().toString(), java.time.LocalDate.now().toString(), null, null, null)
+                if (currentHistoryOwner != openingOwner || currentHistoryTitle != openingTitle) return@launch
+                val saved = saveViewingEditor(openingOwner, openingTitle, draft, viewing == null)
+                if (deleting) { deletingViewingState = saved; deleteError = null } else editingViewingState = saved
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (currentHistoryOwner == openingOwner) viewingOpenError = e.message ?: "Couldn't open this viewing." }
+            finally { preparingViewing = false }
+        }
+    }
+    fun openPostShow(viewing: Viewing) {
+        val current = detail ?: return
+        if (preparingPostShow) return
+        val owner = viewingOwnerId
+        preparingPostShow = true
+        viewingOpenError = null
+        historyScope.launch {
+            try {
+                val opening = checkNotNull(onPreparePostShow) { "Post-show editing is unavailable." }(viewing.id)
+                if (!isActive) return@launch
+                if (currentHistoryOwner == owner && currentHistoryTitle == current.id) {
+                    postShowState = savePostShow(owner, current.id, current.title, opening)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (_: Exception) {
+                if (currentHistoryOwner == owner && currentHistoryTitle == current.id) viewingOpenError = "Couldn't open this viewing. Try again."
+            } finally { preparingPostShow = false }
+        }
+    }
     var showRemoveConfirm by rememberSaveable { mutableStateOf(false) }
     // Keyed on the title id (not just rememberSaveable) so navigating from one series' detail
     // screen straight to another's doesn't carry over a season number that may not exist there.
@@ -375,7 +511,7 @@ fun TitleDetailScreen(
         mutableStateOf(detail?.seasons?.orderedForDisplay()?.firstOrNull()?.seasonNumber ?: 1)
     }
 
-    if (showScheduleSheet || editingOuting != null) {
+    if (scheduleOpening != null) {
         androidx.compose.runtime.LaunchedEffect(Unit) { onRequestNotificationPermission() }
     }
 
@@ -399,17 +535,26 @@ fun TitleDetailScreen(
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                     )
 
+                    noirContent?.invoke(detail)
+
+                    if (onViewTicket != null) ticketOutings.forEach { outing ->
+                        TextButton(onClick = { onViewTicket(outing, detail.title) }) {
+                            Text("Ticket · ${outing.venue ?: "Cinema"} · ${outing.showtime.take(10)}")
+                        }
+                    }
+
                     detail.scheduledOuting?.let { outing ->
                         ScheduledOutingBanner(
                             outing = outing,
-                            onEdit = { editingOuting = outing },
+                            onShare = onShareOutingPlans?.let { share -> { share(outing.id) } },
+                            onEdit = { openSchedule(outing.id) },
                             onCancel = { onCancelOuting(outing.id) },
                             modifier = Modifier.padding(bottom = 16.dp),
                         )
                     }
 
                     if (detail.type == MediaType.MOVIE && detail.scheduledOuting == null) {
-                        TextButton(onClick = { editingOuting = null; showScheduleSheet = true }, modifier = Modifier.padding(bottom = 4.dp)) {
+                        TextButton(onClick = { openSchedule(null) }, enabled = !preparingSchedule, modifier = Modifier.padding(bottom = 4.dp)) {
                             Icon(Icons.Filled.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text(
                                 if (detail.status == LibraryStatus.WATCHED) "Plan a cinema trip" else "I've got tickets",
@@ -551,6 +696,40 @@ fun TitleDetailScreen(
                 }
             }
 
+            item(key = "catalog-details") {
+                ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                    CatalogDetailsSection(detail, showTags = onSaveTags == null)
+                    titleSourcesContent?.invoke()
+                }
+            }
+            if (onSaveTags != null || titleEditError != null || titleMetadataRecovery != null) {
+                item(key = "title-metadata-edits") {
+                    ReadingWidthColumn(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            onSaveTags?.let { TitleTagsEditor(detail.id, detail.tags, it) }
+                            titleEditError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            titleMetadataRecovery?.let { TitleMetadataRecoveryPanel(it, detail.id) }
+                        }
+                    }
+                }
+            }
+            if (catalogExtrasState?.key != null) {
+                item(key = "catalog-extras") {
+                    ReadingWidthColumn(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                        CatalogExtrasSection(catalogExtrasState, onRetryVideos, onRetryProviders)
+                    }
+                }
+            }
+
+            if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty() || onRefreshCredits != null) {
+                item(key = "title-credits") {
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
+                        PersonCreditsSection("Cast", detail.cast, onBrowsePerson)
+                        PersonCreditsSection("Crew", detail.crew, onBrowsePerson)
+                        onRefreshCredits?.let { CreditRefreshControl(detail.id, it) }
+                    }
+                }
+            }
             if (detail.seasons.isNotEmpty()) {
                 item {
                     ReadingWidthColumn {
@@ -585,15 +764,24 @@ fun TitleDetailScreen(
 
                 val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
                     ?: detail.seasons.orderedForDisplay().first()
+                episodeBulkContent?.let { content -> item(key = "pre-platform-watches") {
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) { content(detail, selectedSeason.seasonNumber) }
+                } }
+                if (selectedSeason.cast.isNotEmpty()) item(key = "season-credits") {
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
+                        PersonCreditsSection("Season cast", selectedSeason.cast, onBrowsePerson)
+                    }
+                }
                 items(selectedSeason.episodes, key = EpisodeDetail::id) { episode ->
                     ReadingWidthColumn {
                         EpisodeRow(
                             episode,
-                            onMarkWatched,
-                            onRateEpisode,
-                            onSubmitReview,
+                            onSaveEpisodeLog,
+                            onDeleteEpisodeWatch,
                             cast = episodeCast[episode.id],
+                            onBrowsePerson = onBrowsePerson,
                             onShowCast = { onLoadEpisodeCast(episode.id, selectedSeason.seasonNumber, episode.episodeNumber) },
+                            isSpiderNoir = detail.tmdbId == 220102,
                             modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
                         )
                     }
@@ -608,7 +796,7 @@ fun TitleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Viewing history", style = MaterialTheme.typography.titleMedium)
-                        TextButton(onClick = onLogViewing) { Text("Log a viewing") }
+                        TextButton(enabled = !preparingViewing, onClick = { openViewing(null) }) { Text("Log a viewing") }
                     }
                 }
             }
@@ -616,10 +804,15 @@ fun TitleDetailScreen(
                 ReadingWidthColumn {
                     ViewingRow(
                         viewing,
-                        onRateClick = { postShowViewing = viewing },
+                        onRateClick = { openPostShow(viewing) },
+                        onEditClick = { if (!preparingViewing) openViewing(viewing) },
+                        onDeleteClick = { if (!preparingViewing) openViewing(viewing, deleting = true) },
                         modifier = Modifier.padding(horizontal = 22.dp),
                     )
                 }
+            }
+            if (socialContent != null) {
+                item(key = "social") { ReadingWidthColumn { socialContent(detail) } }
             }
             item {
                 ReadingWidthColumn {
@@ -645,42 +838,83 @@ fun TitleDetailScreen(
         }
     }
 
-    if (showScheduleSheet || editingOuting != null) {
+    if (preparingSchedule) AlertDialog(onDismissRequest = {}, title = { Text("Opening tickets…") },
+        text = { CircularProgressIndicator() }, confirmButton = {})
+    if (scheduleError != null || scheduleOriginal?.isFailure == true) AlertDialog(
+        onDismissRequest = { scheduleError = null; if (scheduleOriginal?.isFailure == true) scheduleOpening = null },
+        title = { Text("Couldn't open tickets") },
+        text = { Text(scheduleError ?: "This saved form belongs to another session. Close it and reopen the outing.") },
+        confirmButton = { if (scheduleError != null) TextButton(onClick = { openSchedule(scheduleTarget) }) { Text("Retry") } },
+        dismissButton = { TextButton(onClick = { scheduleError = null; if (scheduleOriginal?.isFailure == true) scheduleOpening = null }) { Text("Close") } },
+    )
+    if (scheduleOpening != null && scheduleOriginal?.isSuccess == true) {
+        val opening = checkNotNull(scheduleOpening)
+        val openingOwner = viewingOwnerId
+        val openingTitle = viewingTitleId
         OutingScheduleSheet(
             defaultRuntimeMinutes = detail?.runtime,
-            initial = editingOuting,
-            onDismiss = { showScheduleSheet = false; editingOuting = null },
+            initial = scheduleOriginal.getOrNull(),
+            onDismiss = { if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = null },
             onSave = { showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes ->
-                val outing = editingOuting
-                if (outing != null) {
-                    onEditOuting(outing.id, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
-                } else {
-                    onScheduleOuting(showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
-                }
+                onSaveSchedule(opening, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)
             },
             venueSuggestions = venueSuggestions,
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
-            onSaveVenueNotes = onSaveVenueNotes,
-            onCaptureTicket = onCaptureTicket,
-            onClearTicketCapture = onClearTicketCapture,
+            onEditVenueNote = onEditVenueNote,
+            onManageTicket = onViewTicket?.let { open -> { outing ->
+                scheduleOpening = null
+                open(outing, detail?.title ?: "Cinema outing")
+            } },
         )
     }
 
-    postShowViewing?.let { viewing ->
-        PostShowSheet(
-            titleName = detail?.title ?: "",
-            venue = viewing.venue,
-            companions = viewing.companions,
-            initialRating = viewing.rating ?: 0.0,
-            initialNotes = viewing.notes ?: "",
-            onRate = { onRatePostShow(viewing.id, it) },
-            onSaveNotes = { onSaveFollowUpNotes(viewing.id, it) },
-            onDidntMakeIt = {
-                viewing.outingId?.let(onDidntMakeIt)
-                postShowViewing = null
+    postShow?.let { captured ->
+        androidx.compose.runtime.key(viewingOwnerId, captured.titleId, captured.opening.viewing.id) {
+            PostShowSheet(
+                titleName = captured.titleName,
+                opening = captured.opening,
+                onSave = onSavePostShow,
+                onRevert = onRevertPostShow,
+                onDismiss = { postShowState = null },
+                onRecommend = if (detail?.tmdbId != null && onRecommendTitle != null) ({ onRecommendTitle(captured.titleId) }) else null,
+            )
+        }
+    }
+    if (preparingPostShow) AlertDialog(onDismissRequest = {}, title = { Text("Opening viewing…") },
+        text = { CircularProgressIndicator() }, confirmButton = {})
+
+    viewingOpenError?.let { message ->
+        AlertDialog(onDismissRequest = { viewingOpenError = null }, title = { Text("Viewing unavailable") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = { viewingOpenError = null }) { Text("Close") } })
+    }
+    if (editingViewing != null) {
+        androidx.compose.runtime.key(editingViewingState) {
+            ViewingEditorSheet(editingViewing.draft, editingViewing.isNew, onSaveViewing, onDismiss = { editingViewingState = null })
+        }
+    }
+    deletingViewing?.let { viewing ->
+        AlertDialog(
+            onDismissRequest = { if (!deleting) deletingViewingState = null },
+            title = { Text("Delete this viewing?") },
+            text = { Text(deleteError ?: "Remove the viewing from ${viewing.date ?: "before joining"}? Other viewings stay in your history.") },
+            dismissButton = { TextButton(enabled = !deleting, onClick = { deletingViewingState = null }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(enabled = !deleting, onClick = {
+                    deleting = true
+                    deleteError = null
+                    historyScope.launch {
+                        try {
+                            onDeleteViewing(viewing)
+                            deletingViewingState = null
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            deleteError = e.message ?: "Couldn't delete viewing. Try again."
+                        } finally { deleting = false }
+                    }
+                }) { Text(if (deleting) "Deleting…" else "Delete viewing", color = MaterialTheme.colorScheme.error) }
             },
-            onDismiss = { postShowViewing = null },
         )
     }
 
@@ -714,7 +948,7 @@ private fun metaLine(detail: TitleDetail): String = listOfNotNull(
 ).joinToString(" · ")
 
 @Composable
-private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier, onShare: (() -> Unit)? = null) {
     val now = remember { Instant.now() }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -736,6 +970,7 @@ private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCa
                 TextButton(onClick = onEdit) { Text("Edit") }
                 TextButton(onClick = onCancel) { Text("Cancel outing") }
             }
+            onShare?.let { TextButton(onClick = it) { Text("Share plans") } }
         }
     }
 }
@@ -846,17 +1081,16 @@ private fun SeasonSelector(
 @Composable
 private fun EpisodeRow(
     episode: EpisodeDetail,
-    onMarkWatched: (String) -> Unit,
-    onRateEpisode: (String, Double) -> Unit,
-    onSubmitReview: (String, String) -> Unit,
+    onSaveEpisodeLog: suspend (String, EpisodeLogDraft) -> Unit,
+    onDeleteEpisodeWatch: suspend (String, String) -> Unit,
     cast: EpisodeCast?,
+    isSpiderNoir: Boolean,
     onShowCast: () -> Unit,
+    onBrowsePerson: ((LibraryPerson) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val watched = episode.watchCount > 0
     var castExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
-    var reviewExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
-    var reviewText by rememberSaveable(episode.id) { mutableStateOf("") }
     var synopsisExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
 
     Surface(
@@ -925,30 +1159,8 @@ private fun EpisodeRow(
                         .clickable { synopsisExpanded = !synopsisExpanded },
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp),
-            ) {
-                if (!watched) {
-                    TextButton(onClick = { onMarkWatched(episode.id) }) {
-                        Text("Mark watched")
-                    }
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                for (star in 1..5) {
-                    val filled = star <= (episode.latestRating ?: 0.0)
-                    Icon(
-                        if (filled) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        contentDescription = "Rate $star star${if (star == 1) "" else "s"}",
-                        tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clickable { onRateEpisode(episode.id, star.toDouble()) }
-                            .padding(2.dp)
-                            .size(18.dp),
-                    )
-                }
-                TextButton(onClick = { reviewExpanded = !reviewExpanded }) { Text("Review") }
-            }
+            PersonCreditsSection("Episode crew", episode.crew, onBrowsePerson)
+            EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch, isSpiderNoir)
             TextButton(
                 onClick = {
                     castExpanded = !castExpanded
@@ -964,25 +1176,7 @@ private fun EpisodeRow(
                 )
             }
             if (castExpanded) {
-                EpisodeCastSection(cast, modifier = Modifier.padding(top = 4.dp))
-            }
-            if (reviewExpanded) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = reviewText,
-                        onValueChange = { reviewText = it },
-                        modifier = Modifier.weight(1f),
-                        label = { Text("Your review") },
-                    )
-                    TextButton(
-                        onClick = {
-                            onSubmitReview(episode.id, reviewText)
-                            reviewText = ""
-                            reviewExpanded = false
-                        },
-                        enabled = reviewText.isNotBlank(),
-                    ) { Text("Submit") }
-                }
+                EpisodeCastSection(cast, onBrowsePerson, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -991,7 +1185,7 @@ private fun EpisodeRow(
 /** The expanded cast of one episode: series regulars, then guest stars, each a horizontal row
  *  of headshots — the web app's `EpisodeCastSection`. A null [cast] means it's still loading. */
 @Composable
-private fun EpisodeCastSection(cast: EpisodeCast?, modifier: Modifier = Modifier) {
+private fun EpisodeCastSection(cast: EpisodeCast?, onBrowsePerson: ((LibraryPerson) -> Unit)?, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         when {
             cast == null -> CircularProgressIndicator(
@@ -1005,15 +1199,15 @@ private fun EpisodeCastSection(cast: EpisodeCast?, modifier: Modifier = Modifier
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
             else -> {
-                if (cast.cast.isNotEmpty()) EpisodeCastRow("Episode cast", cast.cast)
-                if (cast.guestStars.isNotEmpty()) EpisodeCastRow("Guest stars", cast.guestStars)
+                if (cast.cast.isNotEmpty()) EpisodeCastRow("Episode cast", cast.cast, onBrowsePerson)
+                if (cast.guestStars.isNotEmpty()) EpisodeCastRow("Guest stars", cast.guestStars, onBrowsePerson)
             }
         }
     }
 }
 
 @Composable
-private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
+private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>, onBrowsePerson: ((LibraryPerson) -> Unit)?) {
     Column {
         Text(
             label,
@@ -1025,7 +1219,7 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
             items(members, key = EpisodeCastMember::tmdbPersonId) { member ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.width(72.dp),
+                    modifier = Modifier.width(72.dp).clickable(enabled = onBrowsePerson != null) { onBrowsePerson?.invoke(LibraryPerson(member.tmdbPersonId, member.name)) },
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -1073,7 +1267,7 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>) {
 }
 
 @Composable
-private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, onEditClick: () -> Unit, onDeleteClick: () -> Unit, modifier: Modifier = Modifier) {
     // Ticket stub — degrades gracefully when only one of venue/companions is present (web
     // plan §13's polish checklist), and only shows for outing-linked viewings.
     val stub = listOfNotNull(
@@ -1095,11 +1289,16 @@ private fun ViewingRow(viewing: Viewing, onRateClick: () -> Unit, modifier: Modi
             }
         }
         viewing.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (isTicketStub) {
+        viewing.rating?.let { Text("$it / 5", style = MaterialTheme.typography.bodyMedium) }
+        if (stub.isNotBlank()) {
             Text(stub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
         if (viewing.outingId != null && viewing.rating == null) {
             TextButton(onClick = onRateClick, modifier = Modifier.padding(top = 2.dp)) { Text("How was it?") }
+        }
+        Row {
+            TextButton(onClick = onEditClick) { Text("Edit viewing") }
+            TextButton(onClick = onDeleteClick) { Text("Delete viewing", color = MaterialTheme.colorScheme.error) }
         }
     }
 }
@@ -1109,8 +1308,9 @@ private class TitleDetailViewModelFactory(
     private val outingsRepository: OutingsRepository,
     private val listsRepository: ListsRepository,
     private val titleId: String,
+    private val catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource?,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        TitleDetailViewModel(repository, outingsRepository, listsRepository, titleId) as T
+        TitleDetailViewModel(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource) as T
 }

@@ -5,7 +5,11 @@ import work.kumarfamilynet.cinemarchive.core.database.OutboxEntity
 
 sealed interface PushResult {
     data object Success : PushResult
+    /** Verified remote receipt; local canonical identities must be committed before ACK. */
+    data class Applied(val receipt: JSONObject) : PushResult
     data class Retry(val reason: String) : PushResult
+    /** Definite pre-effect conflict; preserve the entry for an explicit review decision. */
+    data class Review(val reason: String) : PushResult
 
     /**
      * The server rejected this write because its current row is at least as new — see
@@ -24,10 +28,20 @@ interface RemoteMutationWriter {
     suspend fun push(entry: OutboxEntity): PushResult
 }
 
+fun interface AppliedMutationHandler {
+    /** Called inside the outbox's Room transaction. Must not perform network work. */
+    suspend fun apply(entry: OutboxEntity, receipt: JSONObject)
+}
+
 /** Applies a [PushResult.Conflict]'s server-authoritative payload back into the local
  *  read model, so a losing local write converges to what the server actually holds. */
 fun interface ConflictHandler {
     suspend fun applyRemote(entityType: String, entityId: String, serverPayload: JSONObject)
+
+    /** Re-applies [laterPending] — still-queued LATER edits to the same entity, oldest first —
+     *  on top of the just-reconciled server row, so a conflicted earlier edit can never roll a
+     *  newer offline edit back out of the local projection while that edit waits to retry. */
+    suspend fun rebasePending(entityType: String, entityId: String, laterPending: List<JSONObject>) = Unit
 }
 
 /**

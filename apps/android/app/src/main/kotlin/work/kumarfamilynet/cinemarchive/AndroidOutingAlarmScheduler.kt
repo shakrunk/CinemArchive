@@ -5,7 +5,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import java.time.Instant
+import androidx.core.net.toUri
 import work.kumarfamilynet.cinemarchive.data.OutingAlarmScheduler
+import work.kumarfamilynet.cinemarchive.data.OwnerNamespace
 
 /**
  * Real [OutingAlarmScheduler]: a single exact alarm (re-armed on every schedule/edit/cancel/
@@ -13,14 +15,19 @@ import work.kumarfamilynet.cinemarchive.data.OutingAlarmScheduler
  * if CinemArchive isn't in the foreground when the show lets out — see
  * docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6.
  */
-class AndroidOutingAlarmScheduler(private val context: Context) : OutingAlarmScheduler {
+class AndroidOutingAlarmScheduler(private val context: Context, private val ownerId: String) : OutingAlarmScheduler {
     private val alarmManager = context.getSystemService(AlarmManager::class.java)
 
     private val pendingIntent: PendingIntent
         get() = PendingIntent.getBroadcast(
             context,
             REQUEST_CODE,
-            Intent(context, OutingCompletionReceiver::class.java).setPackage(context.packageName),
+            Intent(context, OutingCompletionReceiver::class.java)
+                .setPackage(context.packageName)
+                .putExtra(OutingCompletionReceiver.EXTRA_OWNER_ID, ownerId)
+                // Intent identity ignores extras, so the owner goes in the data URI: A's re-arm can
+                // never overwrite B's alarm, and cancel() only ever hits this owner's.
+                .setData("cinemarchive://outing-alarm/${OwnerNamespace.key(ownerId)}".toUri()),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 

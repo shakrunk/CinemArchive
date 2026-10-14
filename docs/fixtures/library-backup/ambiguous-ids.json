@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "dupT", "tmdbId": 1, "type": "movie", "title": "A", "status": "watched" },
+    { "id": "dupT", "tmdbId": 2, "type": "movie", "title": "B", "status": "watched" },
+    { "id": "c", "tmdbId": 3, "type": "movie", "title": "C", "status": "watched", "viewings": [ { "id": "vdup", "titleId": "c" } ] },
+    { "id": "d", "tmdbId": 4, "type": "movie", "title": "D", "status": "watched", "viewings": [ { "id": "vdup", "titleId": "d" } ] },
+    { "id": "good", "tmdbId": 5, "type": "movie", "title": "Good", "status": "watched", "tags": [],
+      "viewings": [ { "id": "vgood", "titleId": "good", "date": "2026-01-02", "outingId": "odup" } ] }
+  ],
+  "outings": [
+    { "id": "oa", "titleId": "dupT", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled" },
+    { "id": "ob", "titleId": "good", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled" },
+    { "id": "oc", "titleId": "good", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "completed", "completedViewingId": "vdup" },
+    { "id": "odup", "titleId": "good", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled" },
+    { "id": "odup", "titleId": "good", "showtime": "2026-01-03T19:00:00Z", "endsAt": "2026-01-03T21:00:00Z", "status": "scheduled" },
+    { "id": "oe", "titleId": "c", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled" },
+    { "id": "ocomp", "titleId": "good", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "completed", "completedViewingId": "vgood" }
+  ],
+  "lists": [
+    { "id": "al", "name": "Mixed", "items": [ { "titleId": "dupT" }, { "titleId": "good" }, { "titleId": "c" } ] }
+  ]
+}

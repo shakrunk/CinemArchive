@@ -9,6 +9,8 @@ enum class LibrarySortOrder {
     TITLE,
     YEAR_NEWEST,
     RATING_HIGHEST,
+    ADDED_AT,
+    DIRECTOR,
 }
 
 /** Library screen grouping (#120/KP-050) — inserts section headers into the poster grid/list;
@@ -16,4 +18,7 @@ enum class LibrarySortOrder {
 enum class LibraryGrouping {
     NONE,
     STATUS,
+    FRANCHISE,
 }
+
+enum class LibrarySortDirection { ASCENDING, DESCENDING }

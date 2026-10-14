@@ -34,6 +34,12 @@ data class AddTitleLogForm(
     val status: LibraryStatus = LibraryStatus.WATCHLIST,
     val rating: Double = 0.0,
     val notes: String = "",
+    /** ISO date the title was watched; only used when [status] is WATCHED. */
+    val watchedOn: LocalDate = LocalDate.now(),
+    /** "Watched before joining CinemArchive": the seed viewing is saved undated. */
+    val prePlatform: Boolean = false,
+    val tags: String = "",
+    val seasonProgress: Map<Int, Int> = emptyMap(),
 )
 
 data class AddTitleUiState(
@@ -127,7 +133,9 @@ class AddTitleViewModel(
         }
     }
 
-    fun select(result: MediaSearchResult) {
+    fun select(result: MediaSearchResult) = loadDetails(result, preserveForm = false)
+
+    private fun loadDetails(result: MediaSearchResult, preserveForm: Boolean) {
         detailsJob?.cancel()
         _uiState.update {
             it.copy(
@@ -138,7 +146,7 @@ class AddTitleViewModel(
                 detailsError = null,
                 saveError = null,
                 alreadyOwnedTitleId = null,
-                form = AddTitleLogForm(),
+                form = if (preserveForm) it.form else AddTitleLogForm(),
             )
         }
         detailsJob = viewModelScope.launch {
@@ -160,7 +168,7 @@ class AddTitleViewModel(
     }
 
     fun retryDetails() {
-        _uiState.value.selected?.let(::select)
+        _uiState.value.selected?.let { loadDetails(it, preserveForm = true) }
     }
 
     fun backToSearch() {
@@ -173,6 +181,21 @@ class AddTitleViewModel(
     fun onRatingChange(rating: Double) = _uiState.update { it.copy(form = it.form.copy(rating = rating)) }
 
     fun onNotesChange(notes: String) = _uiState.update { it.copy(form = it.form.copy(notes = notes)) }
+
+    fun onTagsChange(tags: String) = _uiState.update { it.copy(form = it.form.copy(tags = tags)) }
+
+    fun onSeasonProgressChange(number: Int, count: Int) = _uiState.update {
+        it.copy(form = it.form.copy(seasonProgress = it.form.seasonProgress + (number to count)))
+    }
+
+    fun markMainSeasonsWatched() = _uiState.update { state ->
+        state.copy(form = state.form.copy(seasonProgress = state.form.seasonProgress +
+            state.details?.seasons.orEmpty().filter { it.seasonNumber > 0 }.associate { it.seasonNumber to it.episodeCount }))
+    }
+
+    fun onWatchedOnChange(date: LocalDate) = _uiState.update { it.copy(form = it.form.copy(watchedOn = date)) }
+
+    fun onPrePlatformChange(prePlatform: Boolean) = _uiState.update { it.copy(form = it.form.copy(prePlatform = prePlatform)) }
 
     /** Writes the title and reports its new local id to [onAdded]. The write itself is
      *  local-only and effectively instant — the Supabase push is the outbox's problem, and
@@ -188,7 +211,9 @@ class AddTitleViewModel(
                 status = state.form.status,
                 rating = state.form.rating.takeIf { it > 0.0 },
                 notes = state.form.notes.trim().takeIf { it.isNotEmpty() },
-                watchedOn = LocalDate.now().toString(),
+                watchedOn = if (state.form.prePlatform) null else state.form.watchedOn.toString(),
+                tags = state.form.tags.split(',').map(String::trim).filter(String::isNotEmpty).distinct(),
+                seasonProgress = state.form.seasonProgress,
             )
             runCatching { libraryRepository.addTitle(request) }
                 .onSuccess { id ->

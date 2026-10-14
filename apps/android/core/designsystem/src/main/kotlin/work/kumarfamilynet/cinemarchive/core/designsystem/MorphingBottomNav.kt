@@ -66,6 +66,7 @@ fun <T> MorphingBottomNav(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -76,7 +77,7 @@ fun <T> MorphingBottomNav(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .height(80.dp)
+                .height(if (compact) 56.dp else 80.dp)
                 .padding(horizontal = 8.dp),
         ) {
             val itemWidth = maxWidth / destinations.size
@@ -87,7 +88,7 @@ fun <T> MorphingBottomNav(
                 label = "navIndicatorOffset",
             )
 
-            Box(
+            if (destinations.any { it.value == selected }) Box(
                 modifier = Modifier
                     .padding(top = INDICATOR_TOP_INSET)
                     .offset(x = indicatorOffset + 6.dp)
@@ -141,7 +142,7 @@ fun <T> MorphingBottomNav(
                                     modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
                                 )
                             }
-                            Text(
+                            if (!compact) Text(
                                 destination.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = color,
@@ -173,6 +174,7 @@ fun <T> MorphingNavigationRail(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -187,16 +189,17 @@ fun <T> MorphingNavigationRail(
                 .padding(vertical = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val stackHeight = RAIL_ITEM_HEIGHT * destinations.size
+            val itemHeight = if (compact) 56.dp else RAIL_ITEM_HEIGHT
+            val stackHeight = itemHeight * destinations.size
             Box(modifier = Modifier.width(RAIL_WIDTH).height(stackHeight)) {
                 val selectedIndex = destinations.indexOfFirst { it.value == selected }.coerceAtLeast(0)
                 val indicatorOffset by animateDpAsState(
-                    targetValue = RAIL_ITEM_HEIGHT * selectedIndex,
+                    targetValue = itemHeight * selectedIndex,
                     animationSpec = expressiveSpring(),
                     label = "railIndicatorOffset",
                 )
 
-                Box(
+                if (destinations.any { it.value == selected }) Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .offset(y = indicatorOffset + INDICATOR_TOP_INSET)
@@ -223,7 +226,7 @@ fun <T> MorphingNavigationRail(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(RAIL_ITEM_HEIGHT)
+                                .height(itemHeight)
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = LocalIndication.current,
@@ -243,7 +246,7 @@ fun <T> MorphingNavigationRail(
                                     modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
                                 )
                             }
-                            Text(
+                            if (!compact) Text(
                                 destination.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = color,

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 import {
-  Mail, Key, Plus, Trash2, Copy, Check, LogOut, Fingerprint, Shield, Loader2,
+  Mail, Key, Plus, Trash2, Copy, Check, LogOut, Loader2, type LucideIcon,
   Download, Upload, Eye, EyeOff, Settings2,
   UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
   LayoutGrid, GripVertical, Ticket, RefreshCw, Info, ExternalLink,
@@ -15,9 +14,7 @@ import { useCopyFeedback } from 'src/lib/useCopyFeedback'
 import {
   isSupabaseConfigured,
   signInWithEmail,
-  signInWithPasskey,
   signOut,
-  registerPasskey,
   createSharedKey,
   revokeSharedKey,
   listSharedKeys,
@@ -30,9 +27,11 @@ import {
   type InviteCode,
 } from 'src/lib/auth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
-import { parseLetterboxdCsv, resolveLetterboxdRows } from 'src/lib/letterboxd-import'
-import { insertTitleToDb, insertOutingToDb } from 'src/lib/db'
+import { parseLetterboxdCsv, letterboxdToSyncItems } from 'src/lib/letterboxd-import'
+import { resolveSyncItems } from 'src/lib/sync/core'
+import { applySyncOutcome } from 'src/lib/sync/apply'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
+import { captureLibrarySession } from 'src/lib/localSave'
 import { applyTheme } from 'src/lib/theme'
 import type { Theme } from 'src/store/useAppStore'
 import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
@@ -40,14 +39,15 @@ import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
+import { SyncConnections } from 'src/components/SyncConnections'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { Eyebrow } from 'src/components/ui/typography'
+import { TextPreferences } from 'src/components/TextPreferences'
 
-const SECTION_NAV: { id: string; label: string; Icon: typeof Shield; authOnly: boolean }[] = [
+const SECTION_NAV: { id: string; label: string; Icon: LucideIcon; authOnly: boolean }[] = [
   { id: 'account', label: 'Account', Icon: UserCircle, authOnly: false },
   { id: 'identity', label: 'Identity', Icon: Pencil, authOnly: true },
-  { id: 'security', label: 'Security', Icon: Shield, authOnly: true },
   { id: 'appearance', label: 'Appearance', Icon: Sun, authOnly: false },
   { id: 'navigation', label: 'Navigation', Icon: LayoutGrid, authOnly: false },
   { id: 'sharing', label: 'Shared Links', Icon: Key, authOnly: true },
@@ -119,24 +119,6 @@ function SignInCard() {
     }
   }
 
-  async function handlePasskeySignIn() {
-    if (!email.trim()) {
-      setMessage({ type: 'error', text: 'Enter your email first to authenticate with a passkey.' })
-      return
-    }
-    setLoading(true)
-    setMessage(null)
-    try {
-      await signInWithPasskey(email)
-      setMessage({ type: 'success', text: 'Passkey verification initiated. Check your browser prompt.' })
-    } catch (err) {
-      console.error(err)
-      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to sign in with passkey.') })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="space-y-4">
       <AuthModeTabs mode={mode} onChange={switchMode} />
@@ -176,17 +158,6 @@ function SignInCard() {
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
               Send Magic Link
             </Button>
-            <Button
-              type="button"
-              onClick={handlePasskeySignIn}
-              disabled={loading}
-              variant="outline"
-              className="border-border text-muted-foreground hover:text-foreground"
-              title="Sign In with Passkey"
-              aria-label="Sign In with Passkey"
-            >
-              <Fingerprint className="w-4 h-4" />
-            </Button>
           </div>
         </form>
       ) : (
@@ -206,13 +177,10 @@ function SignInCard() {
 }
 
 function AccountSection({ profile }: { profile: MyProfile | null }) {
-  const { user, setUser, isSharedView } = useAppStore(
-    useShallow((s) => ({
-      user: s.user,
-      setUser: s.setUser,
-      isSharedView: s.isSharedView,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const user = useAppStore((s) => s.user)
+  const setUser = useAppStore((s) => s.setUser)
+  const isSharedView = useAppStore((s) => s.isSharedView)
 
   async function handleSignOut() {
     try {
@@ -395,62 +363,15 @@ function IdentitySection({
   )
 }
 
-// ─── Security ─────────────────────────────────────────────────────────────────
-
-function SecuritySection() {
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<Message | null>(null)
-
-  async function handleRegisterPasskey() {
-    setLoading(true)
-    setMessage(null)
-    try {
-      await registerPasskey()
-      setMessage({ type: 'success', text: 'Passkey registered successfully! You can now use it to sign in.' })
-    } catch (err) {
-      console.error(err)
-      setMessage({ type: 'error', text: getErrorMessage(err, 'Failed to register passkey.') })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Section
-      id="security"
-      title="Passkey Security"
-      Icon={Shield}
-      description="Add a biometric passkey (face lock, fingerprint, or PIN) to log in instantly on this device next time without waiting for email links."
-    >
-      <MessageBanner message={message} />
-      <Button
-        onClick={handleRegisterPasskey}
-        disabled={loading}
-        className="bg-secondary/60 hover:bg-amber/20 hover:text-amber text-paper font-sans text-xs border border-border transition-colors gap-2"
-      >
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Fingerprint className="w-3.5 h-3.5 text-amber" />
-        )}
-        Register new Passkey
-      </Button>
-    </Section>
-  )
-}
-
 // ─── Appearance ───────────────────────────────────────────────────────────────
 
 function AppearanceSection() {
-  const { theme, themeMode, setTheme, unlockedThemes, titles } = useAppStore(
-    useShallow((s) => ({
-      theme: s.theme,
-      themeMode: s.themeMode,
-      setTheme: s.setTheme,
-      unlockedThemes: s.unlockedThemes,
-      titles: s.titles,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const theme = useAppStore((s) => s.theme)
+  const themeMode = useAppStore((s) => s.themeMode)
+  const setTheme = useAppStore((s) => s.setTheme)
+  const unlockedThemes = useAppStore((s) => s.unlockedThemes)
+  const titles = useAppStore((s) => s.titles)
 
   function choose(next: Theme) {
     if (next === theme) return
@@ -536,6 +457,7 @@ function AppearanceSection() {
           )
         })}
       </div>
+      <TextPreferences />
     </Section>
   )
 }
@@ -552,15 +474,12 @@ interface NavDragMeta {
 }
 
 function NavigationSection() {
-  const { navPrefs, moveNavItem, reorderNav, toggleNavItemHidden, setNavCompact } = useAppStore(
-    useShallow((s) => ({
-      navPrefs: s.navPrefs,
-      moveNavItem: s.moveNavItem,
-      reorderNav: s.reorderNav,
-      toggleNavItemHidden: s.toggleNavItemHidden,
-      setNavCompact: s.setNavCompact,
-    }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const navPrefs = useAppStore((s) => s.navPrefs)
+  const moveNavItem = useAppStore((s) => s.moveNavItem)
+  const reorderNav = useAppStore((s) => s.reorderNav)
+  const toggleNavItemHidden = useAppStore((s) => s.toggleNavItemHidden)
+  const setNavCompact = useAppStore((s) => s.setNavCompact)
 
   const order = navPrefs.order
   const itemRefs = useRef(new Map<NavItemId, HTMLDivElement>())
@@ -1059,9 +978,13 @@ function InvitesSection({ profile }: { profile: MyProfile | null }) {
 // ─── Data & portability ───────────────────────────────────────────────────────
 
 function DataSection() {
-  const { user, titles, setTitles, outings, setOutings } = useAppStore(
-    useShallow((s) => ({ user: s.user, titles: s.titles, setTitles: s.setTitles, outings: s.outings, setOutings: s.setOutings }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const user = useAppStore((s) => s.user)
+  const titles = useAppStore((s) => s.titles)
+  const setTitles = useAppStore((s) => s.setTitles)
+  const updateTitle = useAppStore((s) => s.updateTitle)
+  const outings = useAppStore((s) => s.outings)
+  const importLibrary = useAppStore((s) => s.importLibrary)
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1075,6 +998,7 @@ function DataSection() {
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const checkSession = captureLibrarySession()
     const file = e.target.files?.[0]
     if (!file) return
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -1083,25 +1007,15 @@ function DataSection() {
     setMessage(null)
     try {
       const { titles: imported, outings: importedOutings } = await parseImportFile(file)
+      checkSession()
       const existingKeys = new Set(titles.map((t) => `${t.tmdbId}:${t.type}`))
       const newTitles = imported.filter((t) => !existingKeys.has(`${t.tmdbId}:${t.type}`))
       const skipped = imported.length - newTitles.length
 
       if (newTitles.length > 0) {
-        setTitles([...newTitles, ...titles])
-        // Only outings belonging to a title that actually got imported (not
-        // skipped as a duplicate) are kept — matches the newTitles filtering
-        // above and rule §5.13's outing⇄viewing link scope.
-        const newTitleIds = new Set(newTitles.map((t) => t.id))
-        const outingsToInsert = importedOutings.filter((o) => newTitleIds.has(o.titleId))
-        if (outingsToInsert.length > 0) setOutings([...outingsToInsert, ...outings])
-        if (user) {
-          // Outings first: a kept title's viewings may carry an outing_id
-          // back-reference, which needs its cinema_outings row to already
-          // exist before insertTitleToDb writes them (rule §5.13).
-          await Promise.all(outingsToInsert.map((o) => insertOutingToDb(user.id, o)))
-          await Promise.all(newTitles.map((t) => insertTitleToDb(user.id, t)))
-        }
+        const newTitleIds = new Set(newTitles.map((title) => title.id))
+        const outingsToInsert = importedOutings.filter((outing) => newTitleIds.has(outing.titleId))
+        await importLibrary(newTitles, outingsToInsert)
       }
 
       const added = newTitles.length
@@ -1121,6 +1035,7 @@ function DataSection() {
   // watchlist.csv). Each film resolves to TMDB by name+year, so large
   // histories take a while; progress + cancel keep it honest.
   async function handleLetterboxdFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const checkSession = captureLibrarySession()
     const file = e.target.files?.[0]
     if (!file) return
     if (lbFileInputRef.current) lbFileInputRef.current.value = ''
@@ -1135,26 +1050,23 @@ function DataSection() {
 
       // watchlist.csv rows land on the watchlist; everything else is history.
       const status = /watchlist/i.test(file.name) ? ('watchlist' as const) : ('watched' as const)
-      const existingMovieIds = new Set(
-        titles.filter((t) => t.type === 'movie' && t.tmdbId != null).map((t) => t.tmdbId)
-      )
-      const { imported, unmatched, duplicates } = await resolveLetterboxdRows(rows, {
-        status,
-        isDuplicate: (tmdbId) => existingMovieIds.has(tmdbId),
+      const outcome = await resolveSyncItems(letterboxdToSyncItems(rows, status), {
+        library: titles,
         onProgress: (done, total) => setLbProgress({ done, total }),
         isCancelled: () => lbCancelRef.current,
       })
+      let added = 0
+      let updated = 0
+      checkSession()
+      if (user) ({ added, updated } = await applySyncOutcome({ userId: user.id, outcome, titles, setTitles, updateTitle }))
+      else ({ added, updated } = await useAppStore.getState().applySyncOutcome(outcome))
 
-      if (imported.length > 0) {
-        setTitles([...imported, ...titles])
-        if (user) await Promise.all(imported.map((t) => insertTitleToDb(user.id, t)))
-      }
-
-      const parts = [`Imported ${imported.length} film${imported.length !== 1 ? 's' : ''}`]
-      if (duplicates > 0) parts.push(`skipped ${duplicates} already in your library`)
-      if (unmatched.length > 0) {
-        const shown = unmatched.slice(0, 5).join(', ')
-        parts.push(`couldn't match ${unmatched.length}: ${shown}${unmatched.length > 5 ? `, +${unmatched.length - 5} more` : ''}`)
+      const parts = [`Added ${added} film${added !== 1 ? 's' : ''}`]
+      if (updated > 0) parts.push(`updated ${updated}`)
+      if (outcome.unchanged > 0) parts.push(`${outcome.unchanged} already up to date`)
+      if (outcome.unmatched.length > 0) {
+        const shown = outcome.unmatched.slice(0, 5).join(', ')
+        parts.push(`couldn't match ${outcome.unmatched.length}: ${shown}${outcome.unmatched.length > 5 ? `, +${outcome.unmatched.length - 5} more` : ''}`)
       }
       if (lbCancelRef.current) parts.push('(cancelled early)')
       setMessage({ type: 'success', text: `${parts.join(' · ')}.` })
@@ -1171,7 +1083,7 @@ function DataSection() {
       id="data"
       title="Data & Portability"
       Icon={Download}
-      description="Export your entire library as a JSON file, import a previously exported archive, or bring your watch history and ratings over from a Letterboxd CSV export. Duplicates are skipped on import."
+      description="Export your entire library as a JSON file, import a previously exported archive, bring your watch history and ratings over from a Letterboxd CSV export, or import from Simkl, Plex and Emby. Duplicates are skipped on import."
     >
       <MessageBanner message={message} />
       <div className="flex gap-2 max-w-md">
@@ -1232,6 +1144,7 @@ function DataSection() {
         diary.csv, or watchlist.csv). Films are matched to TMDB by name and year;
         anything that can't be matched confidently is reported, not guessed.
       </p>
+      <SyncConnections />
     </Section>
   )
 }
@@ -1239,9 +1152,10 @@ function DataSection() {
 // ─── Maintenance ────────────────────────────────────────────────────────────
 
 function MaintenanceSection() {
-  const { user, titles, updateTitle } = useAppStore(
-    useShallow((s) => ({ user: s.user, titles: s.titles, updateTitle: s.updateTitle }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const user = useAppStore((s) => s.user)
+  const titles = useAppStore((s) => s.titles)
+  const updateTitle = useAppStore((s) => s.updateTitleMetadata)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [message, setMessage] = useState<Message | null>(null)
@@ -1250,6 +1164,7 @@ function MaintenanceSection() {
   const eligible = titles.filter((t) => t.tmdbId)
 
   async function handleRefreshAll() {
+    const checkSession = captureLibrarySession()
     if (
       !confirm(
         `Refresh metadata for ${eligible.length} title${eligible.length !== 1 ? 's' : ''} from TMDB/OMDb? This re-pulls posters, synopses, and ratings for your whole library and can take a few minutes.`
@@ -1270,7 +1185,8 @@ function MaintenanceSection() {
       if (cancelRef.current) break
       try {
         const patch = await fetchRefreshedTitlePatch(title, titleToSearchResult(title), user?.id)
-        updateTitle(title.id, patch)
+        checkSession()
+        await updateTitle(title.id, patch)
       } catch (err) {
         console.error(`Failed to refresh metadata for "${title.title}":`, err)
         failed.push(title.title)
@@ -1426,7 +1342,7 @@ export function Profile() {
   const authed = Boolean(user) && isSupabaseConfigured && !isSharedView
   // Mask rather than reset on sign-out: a fresh fetch overwrites it on the
   // next sign-in, and effects must not set state synchronously.
-  const effectiveProfile = authed ? profile : null
+  const effectiveProfile = authed && profile?.user_id === user?.id ? profile : null
 
   useEffect(() => {
     if (!authed) return
@@ -1439,7 +1355,7 @@ export function Profile() {
     return () => {
       cancelled = true
     }
-  }, [authed])
+  }, [authed, user?.id])
 
   const visibleNav = SECTION_NAV.filter((s) => authed || !s.authOnly)
 
@@ -1484,7 +1400,7 @@ export function Profile() {
         </nav>
 
         {/* Sections */}
-        <div className="col-span-12 lg:col-span-9 xl:col-span-7 space-y-10">
+        <div key={user?.id ?? 'anonymous'} className="col-span-12 lg:col-span-9 xl:col-span-7 space-y-10">
           <AccountSection profile={effectiveProfile} />
 
           {authed && (
@@ -1494,7 +1410,6 @@ export function Profile() {
               onProfileChange={setProfile}
             />
           )}
-          {authed && <SecuritySection />}
 
           <AppearanceSection />
 

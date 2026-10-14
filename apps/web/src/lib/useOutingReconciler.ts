@@ -11,12 +11,18 @@ import { nextTransitionAt } from 'src/store/outings'
 // exactly once per load regardless of whether this hook has mounted yet.)
 export function useOutingReconciler(): void {
   const user = useAppStore((s) => s.user)
+  const isSharedView = useAppStore((s) => s.isSharedView)
 
   useEffect(() => {
-    if (!user) return
+    if (!user || isSharedView) return
+    let reconciling = false
+    let disposed = false
 
-    function reconcile() {
-      void useAppStore.getState().reconcileOutings()
+    async function reconcile() {
+      const state = useAppStore.getState()
+      if (reconciling || state.isSharedView || !state.offlineStatus.hydrated || state.offlineStatus.commands.length > 0 || state.offlineStatus.quarantined.length > 0) return
+      reconciling = true
+      try { await state.reconcileOutings() } finally { reconciling = false }
     }
 
     // Covers the case where outings were already loaded before this hook
@@ -43,6 +49,7 @@ export function useOutingReconciler(): void {
     const MAX_TIMEOUT_DELAY = 2_147_483_647
 
     function armTimer() {
+      if (disposed) return
       window.clearTimeout(timer)
       const next = nextTransitionAt(useAppStore.getState().outings)
       if (!next) return
@@ -52,10 +59,10 @@ export function useOutingReconciler(): void {
         timer = window.setTimeout(armTimer, MAX_TIMEOUT_DELAY)
         return
       }
-      timer = window.setTimeout(() => {
-        reconcile()
+      timer = window.setTimeout(async () => {
+        await reconcile()
         armTimer()
-      }, delay)
+      }, Math.max(1000, delay))
     }
     armTimer()
 
@@ -66,11 +73,12 @@ export function useOutingReconciler(): void {
     })
 
     return () => {
+      disposed = true
       window.removeEventListener('focus', reconcile)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('online', reconcile)
       window.clearTimeout(timer)
       unsubscribe()
     }
-  }, [user])
+  }, [user, isSharedView])
 }

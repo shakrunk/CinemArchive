@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "a", "tmdbId": 1, "tmdbId": 2, "type": "movie", "title": "Dup key", "status": "watched" }
+  ]
+}

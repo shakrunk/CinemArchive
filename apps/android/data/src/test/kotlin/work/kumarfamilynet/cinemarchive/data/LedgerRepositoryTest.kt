@@ -412,10 +412,10 @@ class LedgerRepositoryTest {
     }
 
     @Test
-    fun `The Revival House buckets both viewings into 16 plus years`() = runTest {
+    fun `The Revival House buckets both viewings into modern titles`() = runTest {
         val board = LedgerFixture.repository().observeLedgerBoard().first()
-        assertEquals(2, board.timewarp.single { it.label == "16+ yrs" }.count)
-        assertEquals(0, board.timewarp.filter { it.label != "16+ yrs" }.sumOf { it.count })
+        assertEquals(2, board.timewarp.single { it.label == "Modern · 6–20 yr" }.count)
+        assertEquals(0, board.timewarp.filter { it.label != "Modern · 6–20 yr" }.sumOf { it.count })
     }
 
     @Test
@@ -524,8 +524,31 @@ class LedgerRepositoryTest {
         // 6 total visits to "Regular Spot" clears the 5-visit milestone but not 10.
         assertTrue(badges.contains(LedgerMilestoneBadge("Regular Spot", "5 visits")))
         assertTrue(badges.none { it.title == "Regular Spot" && it.detail == "10 visits" })
-        assertTrue(badges.contains(LedgerMilestoneBadge("STANDARD", "First outing")))
+        assertTrue(badges.contains(LedgerMilestoneBadge("Standard", "First outing")))
         assertTrue(badges.contains(LedgerMilestoneBadge("IMAX", "First outing")))
+    }
+
+    @Test
+    fun `At the Movies merges legacy and web format spellings without rewriting unknown formats`() = runTest {
+        val formats = listOf("THREE_D", "3D", "SEVENTY_MM", "70mm", "Future format")
+        val outings = formats.mapIndexed { index, format ->
+            CinemaOutingEntity(id = "format-$index", titleId = LedgerFixture.INCEPTION_ID,
+                showtime = "2026-06-01T19:00:00Z", runtimeMinutes = 100, endsAt = "2026-06-01T20:40:00Z",
+                venue = "Cinema", format = format, ticketPrice = 10.0, status = "COMPLETED",
+                createdAt = "2026-06-01T00:00:00Z", updatedAt = "2026-06-01T20:40:00Z")
+        }
+        val viewings = outings.map { ViewingEntity("v-${it.id}", it.titleId, "2026-06-01",
+            null, null, it.venue, outingId = it.id) }
+        val repository = LedgerRepository(
+            FakeTitleDao(LedgerFixture.titles), FakeViewingDao(viewings),
+            FakeTitleCastDao(emptyList()), FakeTitleCrewDao(emptyList()), FakeCinemaOutingDao(outings),
+            FakeEpisodeWatchEventDao(emptyList()), FakeSeasonDao(emptyList()), FakeEpisodeDao(emptyList()),
+        )
+        val stats = repository.observeLedgerBoard().first().moviegoing
+        assertEquals(mapOf("3D" to 2, "70mm" to 2, "Future format" to 1), stats.formats.associate { it.label to it.count })
+        assertEquals(mapOf("3D" to 20.0, "70mm" to 20.0, "Future format" to 10.0), stats.formatSpend.associate { it.label to it.totalSpend })
+        assertEquals(setOf("3D", "70mm", "Future format"),
+            stats.milestoneBadges.filter { it.detail == "First outing" }.map { it.title }.toSet())
     }
 
     // --- Time-relative widgets: pinned against synthetic dates computed from LocalDate.now()

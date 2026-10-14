@@ -15,7 +15,13 @@ export const SECONDARY_AMBER_BUTTON_LG =
 const SHORT_DATE_FORMAT: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
 
 export function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', SHORT_DATE_FORMAT)
+  // Watch dates are calendar days, whereas added_at is an instant. Parsing a
+  // date-only ISO string creates UTC midnight; format that calendar value in
+  // UTC so a western time zone cannot shift it to the previous day.
+  const options = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? { ...SHORT_DATE_FORMAT, timeZone: 'UTC' }
+    : SHORT_DATE_FORMAT
+  return new Date(iso).toLocaleDateString('en-US', options)
 }
 
 /** Format a YYYY-MM-DD date as e.g. "Jul 16, 2010", parsing as local-naive to avoid TZ drift. */

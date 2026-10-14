@@ -1,0 +1,43 @@
+{
+  "format": "cinemarchive-library",
+  "version": 2,
+  "exportedAt": "2026-10-08T12:30:00Z",
+  "client": { "platform": "android", "version": "1.2.3", "build": 42 },
+  "titles": [
+    {
+      "id": "av-t1",
+      "tmdbId": 27205,
+      "type": "movie",
+      "title": "Inception",
+      "year": 2010,
+      "genres": ["Action", "Science Fiction"],
+      "status": "watched",
+      "rating": 4.5,
+      "tags": ["mind-bending", "rewatch"],
+      "addedAt": "2026-10-01",
+      "viewings": [
+        { "id": "av-v1", "titleId": "av-t1", "date": "2026-10-05", "rating": 4.5, "venue": "Home", "companions": [{ "name": "Robin" }] }
+      ]
+    }
+  ],
+  "outings": [
+    {
+      "id": "av-o1",
+      "titleId": "av-t1",
+      "showtime": "2026-10-20T18:00:00Z",
+      "endsAt": "2026-10-20T20:30:00Z",
+      "venue": "Vue",
+      "format": "IMAX",
+      "status": "scheduled",
+      "companions": [],
+      "seats": ["A1"],
+      "createdAt": "2026-10-08T12:00:00Z"
+    }
+  ],
+  "lists": [
+    { "id": "av-l1", "name": "Favourites", "description": "Best of", "createdAt": "2026-10-01T00:00:00Z", "updatedAt": "2026-10-01T00:00:00Z",
+      "items": [ { "titleId": "av-t1", "position": 0, "addedAt": "2026-10-01T00:00:00Z" } ] }
+  ],
+  "localOnly": { "venueNotes": [{ "venue": "Vue", "notes": "Row F" }], "theaterInterest": ["av-t1"] },
+  "futureTopLevel": { "kept": true }
+}

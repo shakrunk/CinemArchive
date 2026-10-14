@@ -1,3 +1,4 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Search, Star, Calendar, FileText, ChevronRight, Check, Tag, X } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
@@ -431,8 +432,9 @@ function AddTitleForm() {
     selectResult(preselectedResult)
   }, [isAddTitleOpen, preselectedResult, selectResult])
 
-  function handleSave() {
-    if (!selected) return
+  const [saving, setSaving] = useState(false)
+  async function handleSave() {
+    if (!selected || saving) return
 
     const id = crypto.randomUUID()
 
@@ -476,7 +478,10 @@ function AddTitleForm() {
       collectionName: selected.collectionName,
     }
 
-    addTitle(newTitle)
+    setSaving(true)
+    const saved = await saveSucceeded(addTitle(newTitle))
+    setSaving(false)
+    if (!saved) return
 
     // Polish (plan §4.1): a movie freshly added to the watchlist is exactly
     // the "a friend invited me to a movie I hadn't tracked yet" moment — offer
@@ -749,6 +754,7 @@ function AddTitleForm() {
           <Button
             className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
             onClick={handleSave}
+            disabled={saving}
           >
             <Star className="w-4 h-4 mr-2" />
             Add to Library

@@ -1,4 +1,4 @@
-import type { CinemaOuting, Title } from '../store/mockData'
+import type { CinemaOuting, Episode, Title } from '../store/mockData'
 import { normalizeCompanions } from '../store/companions'
 
 interface ExportEnvelope {
@@ -52,19 +52,40 @@ export async function parseImportFile(file: File): Promise<ImportResult> {
   // regeneration alongside the title-ID remap below.
   const titleIdMap = new Map<string, string>()
   const viewingIdMap = new Map<string, string>()
+  const importedIds = new Map<string, Set<string>>()
+  const regenerateId = (table: string, previous: unknown): string => {
+    if (previous !== undefined && previous !== null) {
+      if (typeof previous !== 'string' || !previous) throw new Error(`Invalid ${table} identity in export file.`)
+      const seen = importedIds.get(table) ?? new Set<string>()
+      if (seen.has(previous)) throw new Error(`Duplicate ${table} identity in export file.`)
+      seen.add(previous)
+      importedIds.set(table, seen)
+    }
+    return crypto.randomUUID()
+  }
 
   const titles: Title[] = raw.map((t: any, i: number) => {
     if (!t.tmdbId || !t.type || !t.title) {
       throw new Error(`Entry ${i + 1} is missing required fields (tmdbId, type, title).`)
     }
-    const newTitleId = crypto.randomUUID()
+    const newTitleId = regenerateId('title', t.id)
     if (t.id) titleIdMap.set(t.id, newTitleId)
     return {
       ...t,
       id: newTitleId,
-      seasons: (t.seasons ?? []).map((s: any) => ({ ...s, id: crypto.randomUUID() })),
+      seasons: (t.seasons ?? []).map((s: any) => ({
+        ...s,
+        id: regenerateId('season', s.id),
+        ...(s.episodes == null ? {} : { episodes: s.episodes.map((episode: Episode) => ({
+          ...episode,
+          id: regenerateId('episode', episode.id),
+          watchEvents: (episode.watchEvents ?? []).map((event) => ({ ...event, id: regenerateId('episode watch', event.id) })),
+          ratings: (episode.ratings ?? []).map((rating) => ({ ...rating, id: regenerateId('episode rating', rating.id) })),
+          reviews: (episode.reviews ?? []).map((review) => ({ ...review, id: regenerateId('episode review', review.id) })),
+        })) }),
+      })),
       viewings: (t.viewings ?? []).map((v: any) => {
-        const newViewingId = crypto.randomUUID()
+        const newViewingId = regenerateId('viewing', v.id)
         if (v.id) viewingIdMap.set(v.id, newViewingId)
         // outingId is remapped in a second pass below, once regenerated
         // outing IDs exist.
@@ -78,7 +99,7 @@ export async function parseImportFile(file: File): Promise<ImportResult> {
 
   const outingIdMap = new Map<string, string>()
   const outings: CinemaOuting[] = rawOutings.map((o: any) => {
-    const newOutingId = crypto.randomUUID()
+    const newOutingId = regenerateId('outing', o.id)
     if (o.id) outingIdMap.set(o.id, newOutingId)
     return {
       ...o,

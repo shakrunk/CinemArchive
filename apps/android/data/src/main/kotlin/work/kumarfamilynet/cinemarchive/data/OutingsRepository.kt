@@ -25,13 +25,9 @@ import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.TicketBarcodeFormat
 
 /**
- * Owns [CinemaOuting] CRUD and the local completion engine — the Android analogue of the web
- * app's `complete_due_outings()` Postgres RPC (docs/superpowers/plans/2026-07-11-cinema-outings.md
- * §6.4), except it runs as a plain Kotlin function over Room rather than a server call: there
- * is no live Supabase session to call an RPC through yet (see
- * docs/superpowers/plans/2026-07-21-android-cinema-outings.md §2). Writes land in Room
- * immediately and are queued in [outbox] for a remote push once network sync is wired up,
- * same pattern as [LibraryRepository].
+ * Owns [CinemaOuting] CRUD and the offline completion projection. Writes land in Room and
+ * [outbox] atomically. New plans carry explicit insert intent; edits carry only changed
+ * fields, so a stale local snapshot cannot replay unrelated remote fields.
  */
 class OutingsRepository(
     private val cinemaOutingDao: CinemaOutingDao,
@@ -40,7 +36,24 @@ class OutingsRepository(
     private val outbox: MutationOutbox,
     private val venueNoteDao: VenueNoteDao,
     private val alarmScheduler: OutingAlarmScheduler = NoOpOutingAlarmScheduler,
+    val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
+    private val lifecycle: OutingLifecycleRepository? = null,
+    private val scheduleCommands: OutingScheduleCommands? = null,
 ) {
+    suspend fun prepareOutingSchedule(titleId: String, outingId: String?): String =
+        checkNotNull(scheduleCommands) { "Ticket scheduling requires the current account runtime." }.prepare(titleId, outingId)
+
+    suspend fun saveOutingSchedule(
+        opening: String, showtime: Instant, previewsMinutes: Int, runtimeMinutes: Int,
+        venue: String?, companions: List<String>, format: CinemaFormat?, ticketPrice: Double?,
+        seating: SeatAssignment, bookingRef: String?, notes: String?,
+    ): String {
+        val id = checkNotNull(scheduleCommands) { "Ticket scheduling requires the current account runtime." }
+            .save(opening, showtime, previewsMinutes, runtimeMinutes, venue, companions, format, ticketPrice, seating, bookingRef, notes)
+        refreshAlarm()
+        return id
+    }
+
     fun observeOutingsForTitle(titleId: String): Flow<List<CinemaOuting>> =
         cinemaOutingDao.observeOutingsForTitle(titleId).map { rows -> rows.map { it.toDomain() } }
 
@@ -72,9 +85,8 @@ class OutingsRepository(
         venueNoteDao.observeAll().map { rows -> rows.associate { it.venue to it.notes } }
 
     suspend fun saveVenueNotes(venue: String, notes: String) {
-        val trimmedVenue = venue.trim()
-        if (trimmedVenue.isEmpty()) return
-        venueNoteDao.upsert(VenueNoteEntity(venue = trimmedVenue, notes = notes, updatedAt = Instant.now().toString()))
+        val repository = checkNotNull(moviegoingPreferences) { "Shared venue notes are unavailable for this session." }
+        repository.saveVenue(repository.captureVenue(venue), notes)
     }
 
     /** "I've got tickets" — creates a new scheduled outing. [endsAt] is computed here
@@ -105,7 +117,8 @@ class OutingsRepository(
             endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
             venue = venue,
             companions = companions,
-            format = format?.name,
+            companionsJson = companionObjects(null, companions).toString(),
+            format = format?.wireValue,
             ticketPrice = ticketPrice,
             // A new outing never gets a legacy free-text `seat` — that column only ever
             // holds what pre-#221 rows already had (see SeatAssignment's kdoc).
@@ -119,8 +132,10 @@ class OutingsRepository(
             createdAt = nowIso,
             updatedAt = nowIso,
         )
-        cinemaOutingDao.upsert(entity)
-        enqueueOutingMutation(entity)
+        outbox.atomically {
+            cinemaOutingDao.upsert(entity)
+            enqueueOutingMutation(entity)
+        }
         rearmAlarm()
         return id
     }
@@ -140,29 +155,33 @@ class OutingsRepository(
         bookingRef: String?,
         notes: String?,
     ) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(
-            showtime = showtime.toString(),
-            previewsMinutes = previewsMinutes,
-            runtimeMinutes = runtimeMinutes,
-            endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
-            venue = venue,
-            companions = companions,
-            format = format?.name,
-            ticketPrice = ticketPrice,
-            // `seat` is deliberately carried forward untouched: the edit form has no input
-            // for it, so taking it from `seating` would erase a pre-#221 row's only seat
-            // record the first time it's edited for any other reason.
-            auditorium = seating.auditorium,
-            seatRow = seating.seatRow,
-            seats = seating.seats,
-            bookingRef = bookingRef,
-            notes = notes,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
-        rearmAlarm()
+        val applied = outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically false
+            val updated = existing.copy(
+                showtime = showtime.toString(),
+                previewsMinutes = previewsMinutes,
+                runtimeMinutes = runtimeMinutes,
+                endsAt = endsAt(showtime, previewsMinutes, runtimeMinutes).toString(),
+                venue = venue,
+                companions = companions,
+                companionsJson = retainCompanionsJson(existing.companionsJson, existing.companions, companions),
+                format = if (CinemaFormat.fromWire(existing.format) == format) existing.format else format?.wireValue,
+                ticketPrice = ticketPrice,
+                // `seat` is deliberately carried forward untouched: the edit form has no input
+                // for it, so taking it from `seating` would erase a pre-#221 row's only seat
+                // record the first time it's edited for any other reason.
+                auditorium = seating.auditorium,
+                seatRow = seating.seatRow,
+                seats = seating.seats,
+                bookingRef = bookingRef,
+                notes = notes,
+                updatedAt = Instant.now().toString(),
+            )
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated, existing)
+            true
+        }
+        if (applied) rearmAlarm()
     }
 
     /** Attaches a captured ticket photo (GitHub #219) to an outing, plus whatever barcode
@@ -176,187 +195,78 @@ class OutingsRepository(
         barcodePayload: String?,
         barcodeFormat: TicketBarcodeFormat?,
     ) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(
-            ticketImagePath = imagePath,
-            ticketBarcodePayload = barcodePayload,
-            ticketBarcodeFormat = barcodeFormat?.name,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            val updated = existing.copy(
+                ticketImagePath = imagePath,
+                ticketBarcodePayload = barcodePayload,
+                ticketBarcodeFormat = barcodeFormat?.name,
+                updatedAt = Instant.now().toString(),
+            )
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated, existing)
+        }
     }
 
     /** Removes a captured ticket photo/barcode, e.g. before re-capturing or if it was added by
      *  mistake. Does not touch [CinemaOutingEntity.bookingRef] — that's a separately-entered
      *  field, not part of the capture. */
     suspend fun clearTicketCapture(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(
-            ticketImagePath = null,
-            ticketBarcodePayload = null,
-            ticketBarcodeFormat = null,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            val updated = existing.copy(
+                ticketImagePath = null,
+                ticketBarcodePayload = null,
+                ticketBarcodeFormat = null,
+                updatedAt = Instant.now().toString(),
+            )
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated, existing)
+        }
     }
 
     /** Cancels a still-scheduled outing (before the show ends) — kept as a row for history,
      *  never transitions to completed. No-op for an outing that's already completed/missed/
      *  cancelled. */
     suspend fun cancelOuting(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        if (existing.status != OutingStatus.SCHEDULED.name) return
-        val updated = existing.copy(status = OutingStatus.CANCELLED.name, updatedAt = Instant.now().toString())
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
-        rearmAlarm()
+        val applied = outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically false
+            if (existing.status != OutingStatus.SCHEDULED.name) return@atomically false
+            val updated = existing.copy(status = OutingStatus.CANCELLED.name, updatedAt = Instant.now().toString())
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated, existing)
+            true
+        }
+        if (applied) rearmAlarm()
     }
 
     /** Stamps the 14-day follow-up window closed without rating — the post-show card/inbox
      *  item's ✕ dismissal (web plan §4.4). */
     suspend fun dismissFollowUp(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        val updated = existing.copy(followUpDismissedAt = Instant.now().toString(), updatedAt = Instant.now().toString())
-        cinemaOutingDao.upsert(updated)
-        enqueueOutingMutation(updated)
+        outbox.atomically {
+            val existing = cinemaOutingDao.getById(outingId) ?: return@atomically
+            val updated = existing.copy(followUpDismissedAt = Instant.now().toString(), updatedAt = Instant.now().toString())
+            cinemaOutingDao.upsert(updated)
+            enqueueOutingMutation(updated, existing)
+        }
     }
 
-    /** "Didn't make it" — reverts a completion: deletes the auto-logged viewing, restores the
-     *  title's [CinemaOutingEntity.previousStatus] iff it's still `WATCHED` (a manual status
-     *  change in between is left alone, per the web plan's rule 6), and moves the outing to
-     *  `MISSED`. Hidden by the UI once the viewing has a rating — enforced by the caller, not
-     *  here, so this stays a pure revert regardless of who calls it. */
-    suspend fun revertCompletion(outingId: String) {
-        val existing = cinemaOutingDao.getById(outingId) ?: return
-        if (existing.status != OutingStatus.COMPLETED.name) return
-
-        existing.completedViewingId?.let { viewingId ->
-            viewingDao.deleteById(viewingId)
-            // Not yet meaningfully flushable: SupabaseRemoteMutationWriter's "viewing" case
-            // always upserts regardless of `operation` (docs/android-sync-contract.md's delete
-            // contract isn't implemented for viewings yet). Harmless today since the writer
-            // is Unconfigured; worth fixing before this write path goes live.
-            outbox.enqueue(
-                entityType = "viewing",
-                entityId = viewingId,
-                operation = "delete",
-                payload = JSONObject().put("id", viewingId),
-            )
-        }
-
-        val title = titleDao.observeTitle(existing.titleId).first()
-        val previousStatus = existing.previousStatus
-        if (title != null && previousStatus != null && title.status == LibraryStatus.WATCHED.name) {
-            val nowIso = Instant.now().toString()
-            titleDao.updateStatus(existing.titleId, previousStatus, nowIso)
-            outbox.enqueue(
-                entityType = "title",
-                entityId = existing.titleId,
-                operation = "update",
-                payload = JSONObject().put("id", existing.titleId).put("status", previousStatus).put("updatedAt", nowIso),
-            )
-        }
-
-        val reverted = existing.copy(
-            status = OutingStatus.MISSED.name,
-            completedViewingId = null,
-            updatedAt = Instant.now().toString(),
-        )
-        cinemaOutingDao.upsert(reverted)
-        enqueueOutingMutation(reverted)
-    }
-
-    /**
-     * The local completion choke point (see this class's kdoc). Safe to call redundantly —
-     * from app launch, resume, and the exact-alarm receiver alike — because:
-     * 1. it only ever reads outings still `SCHEDULED` (a completed one drops out immediately);
-     * 2. the viewing insert is deduped by [ViewingDao.getByOutingId], so a re-run after a
-     *    process death between the viewing insert and the outing's status flip can't double-log.
-     *
-     * For each due outing: inserts a `viewings` row (date = the showtime's calendar date in
-     * the device's own zone — Android has no per-outing IANA zone to pass through, unlike the
-     * web RPC's `p_tz` argument, since this never crosses devices in v1), flips the title to
-     * `WATCHED` iff it isn't already, marks the outing `COMPLETED`, and returns a transition
-     * per outing so the UI can show a toast / "Fresh from the lobby" card without a re-query.
-     */
+    /** All new lifecycle writes use the same canonical, receipt-backed command on both clients. */
     suspend fun completeDueOutings(now: Instant = Instant.now()): List<OutingTransition> {
-        val due = cinemaOutingDao.getScheduledOutings().filter { Instant.parse(it.endsAt) <= now }
-        if (due.isEmpty()) {
-            rearmAlarm()
-            return emptyList()
-        }
-
-        val transitions = mutableListOf<OutingTransition>()
-        for (entity in due) {
-            val title = titleDao.observeTitle(entity.titleId).first() ?: continue
-            val nowIso = now.toString()
-
-            val viewingId = viewingDao.getByOutingId(entity.id)?.id ?: run {
-                val id = UUID.randomUUID().toString()
-                val viewedDate = Instant.parse(entity.showtime).atZone(ZoneId.systemDefault()).toLocalDate().toString()
-                viewingDao.upsert(
-                    ViewingEntity(
-                        id = id,
-                        titleId = entity.titleId,
-                        date = viewedDate,
-                        rating = null,
-                        notes = null,
-                        venue = entity.venue,
-                        companions = entity.companions,
-                        outingId = entity.id,
-                    ),
-                )
-                outbox.enqueue(
-                    entityType = "viewing",
-                    entityId = id,
-                    operation = "upsert",
-                    payload = JSONObject().apply {
-                        put("id", id)
-                        put("titleId", entity.titleId)
-                        put("date", viewedDate)
-                        put("venue", entity.venue ?: JSONObject.NULL)
-                        put("companions", JSONArray(entity.companions))
-                        put("outingId", entity.id)
-                    },
-                )
-                id
-            }
-
-            val previousStatus = title.status
-            val newStatus = if (previousStatus == LibraryStatus.WATCHED.name) previousStatus else LibraryStatus.WATCHED.name
-            if (previousStatus != newStatus) {
-                titleDao.updateStatus(entity.titleId, newStatus, nowIso)
-                outbox.enqueue(
-                    entityType = "title",
-                    entityId = entity.titleId,
-                    operation = "update",
-                    payload = JSONObject().put("id", entity.titleId).put("status", newStatus).put("updatedAt", nowIso),
-                )
-            }
-
-            val completed = entity.copy(
-                status = OutingStatus.COMPLETED.name,
-                previousStatus = previousStatus,
-                completedViewingId = viewingId,
-                updatedAt = nowIso,
-            )
-            cinemaOutingDao.upsert(completed)
-            enqueueOutingMutation(completed)
-
-            transitions += OutingTransition(
-                outingId = entity.id,
-                titleId = entity.titleId,
-                titleName = title.title,
-                posterUrl = title.posterUrl,
-                viewingId = viewingId,
-                newTitleStatus = LibraryStatus.valueOf(newStatus),
-                previousStatus = LibraryStatus.valueOf(previousStatus),
-            )
-        }
-        rearmAlarm()
+        val transitions = checkNotNull(lifecycle) { "Outing completion requires the current account runtime." }.completeDue(now)
+        refreshAlarm()
         return transitions
+    }
+
+    suspend fun revertPostShow(opening: work.kumarfamilynet.cinemarchive.core.model.PostShowOpening) {
+        checkNotNull(lifecycle) { "Outing reversal requires the current account runtime." }.revert(opening)
+        refreshAlarm()
+    }
+
+    /** Restore may re-arm notifications without performing any completion side effects. */
+    suspend fun refreshAlarm() {
+        lifecycle?.active()
+        rearmAlarm()
     }
 
     private suspend fun rearmAlarm() {
@@ -367,39 +277,8 @@ class OutingsRepository(
     private fun endsAt(showtime: Instant, previewsMinutes: Int, runtimeMinutes: Int): Instant =
         showtime.plusSeconds((previewsMinutes + runtimeMinutes) * 60L)
 
-    private suspend fun enqueueOutingMutation(entity: CinemaOutingEntity) {
-        outbox.enqueue(
-            entityType = "cinema_outing",
-            entityId = entity.id,
-            operation = "upsert",
-            payload = JSONObject().apply {
-                put("id", entity.id)
-                put("titleId", entity.titleId)
-                put("showtime", entity.showtime)
-                put("previewsMinutes", entity.previewsMinutes)
-                put("runtimeMinutes", entity.runtimeMinutes)
-                put("endsAt", entity.endsAt)
-                put("venue", entity.venue ?: JSONObject.NULL)
-                put("companions", JSONArray(entity.companions))
-                put("format", entity.format ?: JSONObject.NULL)
-                put("ticketPrice", entity.ticketPrice ?: JSONObject.NULL)
-                put("seat", entity.seat ?: JSONObject.NULL)
-                put("auditorium", entity.auditorium ?: JSONObject.NULL)
-                put("seatRow", entity.seatRow ?: JSONObject.NULL)
-                put("seats", JSONArray(entity.seats))
-                put("bookingRef", entity.bookingRef ?: JSONObject.NULL)
-                put("ticketImagePath", entity.ticketImagePath ?: JSONObject.NULL)
-                put("ticketBarcodePayload", entity.ticketBarcodePayload ?: JSONObject.NULL)
-                put("ticketBarcodeFormat", entity.ticketBarcodeFormat ?: JSONObject.NULL)
-                put("notes", entity.notes ?: JSONObject.NULL)
-                put("status", entity.status)
-                put("previousStatus", entity.previousStatus ?: JSONObject.NULL)
-                put("completedViewingId", entity.completedViewingId ?: JSONObject.NULL)
-                put("followUpDismissedAt", entity.followUpDismissedAt ?: JSONObject.NULL)
-                put("createdAt", entity.createdAt)
-                put("updatedAt", entity.updatedAt)
-            },
-        )
+    private suspend fun enqueueOutingMutation(entity: CinemaOutingEntity, previous: CinemaOutingEntity? = null) {
+        outbox.enqueueOutingCommand(entity, previous)
     }
 }
 
@@ -411,8 +290,8 @@ internal fun CinemaOutingEntity.toDomain(): CinemaOuting = CinemaOuting(
     runtimeMinutes = runtimeMinutes,
     endsAt = endsAt,
     venue = venue,
-    companions = companions,
-    format = format?.let { runCatching { CinemaFormat.valueOf(it) }.getOrNull() },
+    companions = savedCompanionNames(companionsJson, companions),
+    format = CinemaFormat.fromWire(format),
     ticketPrice = ticketPrice,
     seat = seat,
     auditorium = auditorium,

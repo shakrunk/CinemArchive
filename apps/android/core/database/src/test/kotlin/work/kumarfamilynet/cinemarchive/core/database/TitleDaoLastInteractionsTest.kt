@@ -54,7 +54,7 @@ class TitleDaoLastInteractionsTest {
 
         val result = titleDao.observeLastInteractions().first()
 
-        assertEquals(listOf(TitleLastInteraction("t1", "2026-01-01T00:00:00Z")), result)
+        assertEquals(listOf(TitleLastInteraction("t1", "2026-01-01T00:00:00.000Z")), result)
     }
 
     @Test
@@ -64,7 +64,7 @@ class TitleDaoLastInteractionsTest {
 
         val result = titleDao.observeLastInteractions().first()
 
-        assertEquals("2026-03-01", result.single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-03-01T00:00:00.000Z", result.single { it.titleId == "t1" }.lastInteractionAt)
     }
 
     @Test
@@ -74,7 +74,7 @@ class TitleDaoLastInteractionsTest {
 
         val result = titleDao.observeLastInteractions().first()
 
-        assertEquals("2026-06-01T00:00:00Z", result.single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-06-01T00:00:00.000Z", result.single { it.titleId == "t1" }.lastInteractionAt)
     }
 
     @Test
@@ -87,7 +87,7 @@ class TitleDaoLastInteractionsTest {
 
         val result = titleDao.observeLastInteractions().first()
 
-        assertEquals("2026-01-01T00:00:00Z", result.single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-01-01T00:00:00.000Z", result.single { it.titleId == "t1" }.lastInteractionAt)
     }
 
     @Test
@@ -97,11 +97,11 @@ class TitleDaoLastInteractionsTest {
         episodeDao.upsertAll(listOf(episode("e1", titleId = "t1", seasonId = "s1")))
         ratingDao.upsertAll(listOf(EpisodeRatingEntity(id = "r1", episodeId = "e1", rating = 4.0, ratedAt = "2026-02-01T00:00:00Z")))
 
-        assertEquals("2026-02-01T00:00:00Z", titleDao.observeLastInteractions().first().single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-02-01T00:00:00.000Z", titleDao.observeLastInteractions().first().single { it.titleId == "t1" }.lastInteractionAt)
 
         reviewDao.upsertAll(listOf(EpisodeReviewEntity(id = "rv1", episodeId = "e1", reviewText = "Great", reviewedAt = "2026-03-01T00:00:00Z")))
 
-        assertEquals("2026-03-01T00:00:00Z", titleDao.observeLastInteractions().first().single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-03-01T00:00:00.000Z", titleDao.observeLastInteractions().first().single { it.titleId == "t1" }.lastInteractionAt)
     }
 
     @Test
@@ -109,12 +109,27 @@ class TitleDaoLastInteractionsTest {
         titleDao.upsertAll(listOf(title("t1", addedAt = "2026-01-01T00:00:00Z")))
 
         val before = titleDao.observeLastInteractions().first()
-        assertEquals("2026-01-01T00:00:00Z", before.single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-01-01T00:00:00.000Z", before.single { it.titleId == "t1" }.lastInteractionAt)
 
         viewingDao.upsert(viewing("v1", titleId = "t1", date = "2026-05-01"))
 
         val after = titleDao.observeLastInteractions().first()
-        assertEquals("2026-05-01", after.single { it.titleId == "t1" }.lastInteractionAt)
+        assertEquals("2026-05-01T00:00:00.000Z", after.single { it.titleId == "t1" }.lastInteractionAt)
+    }
+
+    @Test
+    fun `mixed offsets and fractional precision compare chronologically within each source`() = runTest {
+        titleDao.upsertAll(listOf(title("t1", addedAt = "2026-01-01T00:00:00Z")))
+        seasonDao.upsertAll(listOf(season("s1", titleId = "t1")))
+        episodeDao.upsertAll(listOf(episode("e1", titleId = "t1", seasonId = "s1")))
+        watchEventDao.upsertAll(listOf(
+            EpisodeWatchEventEntity("whole", "e1", "2026-01-01T00:00:00Z"),
+            EpisodeWatchEventEntity("fraction", "e1", "2026-01-01T00:00:00.100Z"),
+            EpisodeWatchEventEntity("offset", "e1", "2026-01-01T01:00:00.050+01:00"),
+        ))
+        assertEquals("2026-01-01T00:00:00.100Z", titleDao.observeLastInteractions().first().single().lastInteractionAt)
+        viewingDao.upsert(viewing("v1", "t1", "2025-12-31T23:30:00-01:00"))
+        assertEquals("2026-01-01T00:30:00.000Z", titleDao.observeLastInteractions().first().single().lastInteractionAt)
     }
 
     private fun title(id: String, addedAt: String) = TitleEntity(

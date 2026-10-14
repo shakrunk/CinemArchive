@@ -90,6 +90,7 @@ export function TheRun({
       title={settings?.title || 'The run'}
       hint={`monthly screenings · last ${recent.length} mo${describeLedgerSettings(settings)}`}
       className={className}
+      data={{ columns: ["Month", "Screenings"], rows: recent.map((month) => [month.month, month.count]) }}
     >
       {total === 0 ? (
         <PanelEmpty message="No screenings in the past year" />

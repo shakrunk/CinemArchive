@@ -1,3 +1,4 @@
+import { saveSucceeded } from 'src/lib/localSave'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   PlayCircle,
@@ -12,13 +13,14 @@ import {
   Star,
   X,
 } from 'lucide-react'
-import { useShallow } from 'zustand/react/shallow'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
+import { TicketButton } from '../components/TicketViewer'
 import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
 import { computeMarqueeEntries, formatCompanions, type MarqueeEntry } from 'src/store/outings'
+import { computeOutingMemories, type OutingMemory } from 'src/store/outingMemories'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile } from 'src/lib/ics'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import type { Title } from 'src/store/mockData'
@@ -144,9 +146,9 @@ function LiveCard({
 
   const isSpiderNoir = title.tmdbId === SPIDER_NOIR_TMDB_ID
 
-  function doMarkWatched(colorMode?: 'bw' | 'color') {
+  async function doMarkWatched(colorMode?: 'bw' | 'color') {
     const label = `S${season.seasonNumber} E${episode.episodeNumber}`
-    const result = logNextEpisodeWatch(title.id, colorMode)
+    const result = await logNextEpisodeWatch(title.id, colorMode).catch(() => null)
     if (!result) return
     const undo: PendingUndo = { ...result, label }
     const updated = useAppStore.getState().titles.find((t) => t.id === title.id)
@@ -180,14 +182,14 @@ function LiveCard({
     doMarkWatched()
   }
 
-  function handleUndo() {
+  async function handleUndo() {
     if (!pendingUndo) return
-    deleteEpisodeWatchEvent(
+    if (!await saveSucceeded(deleteEpisodeWatchEvent(
       title.id,
       pendingUndo.seasonNumber,
       pendingUndo.episodeNumber,
       pendingUndo.watchEventId
-    )
+    ))) return
     if (timerRef.current) clearTimeout(timerRef.current)
     setPendingUndo(null)
   }
@@ -272,14 +274,14 @@ function CaughtUpCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on title?.id only, see comment above
   }, [title?.id])
 
-  function handleUndo() {
+  async function handleUndo() {
     if (!title) return
-    deleteEpisodeWatchEvent(title.id, undo.seasonNumber, undo.episodeNumber, undo.watchEventId)
+    if (!await saveSucceeded(deleteEpisodeWatchEvent(title.id, undo.seasonNumber, undo.episodeNumber, undo.watchEventId))) return
     onDismiss(title.id)
   }
-  function handleMarkSeriesWatched() {
+  async function handleMarkSeriesWatched() {
     if (!title) return
-    updateTitle(title.id, { status: 'watched' })
+    if (!await saveSucceeded(updateTitle(title.id, { status: 'watched' }))) return
     onDismiss(title.id)
   }
 
@@ -328,10 +330,12 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
   const isSharedView = useAppStore((s) => s.isSharedView)
+  const interested = useAppStore((s) => !!s.user && s.viewerContext.kind === 'owner' && s.theaterInterest.some((row) => row.titleId === entry.title.id))
   const { title, releaseDate } = entry
+  const readyToSchedule = !isSharedView && interested && title.type === 'movie' && !releaseDate
   return (
     <div className="relative">
-      <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+      <CardFrame title={title} onOpen={() => readyToSchedule ? openOutingSchedule(title.id) : openDetailDrawer(title.id)} delayMs={delayMs}>
         {releaseDate ? (
           <>
             <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
@@ -343,7 +347,7 @@ function UpcomingCard({ entry, delayMs }: { entry: UpcomingEntry; delayMs?: numb
           </>
         ) : (
           <p className="font-mono text-xs text-amber mt-0.5 inline-flex items-center gap-1.5">
-            <Bookmark className="w-3.5 h-3.5" /> On your watchlist
+            <Bookmark className="w-3.5 h-3.5" /> {readyToSchedule ? 'Now playing — tap to schedule an outing' : 'On your watchlist'}
           </p>
         )}
       </CardFrame>
@@ -400,6 +404,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
           <span aria-label={presentation.ariaLabel}>{presentation.label}</span>
         </p>
         {detailLine && <p className="font-sans text-sm text-paper-dim truncate">{detailLine}</p>}
+        {!isSharedView && <div className="pt-2"><TicketButton outingId={outing.id} /></div>}
         {!isSharedView && (
           <div className="mt-auto pt-3 flex items-center justify-between gap-2">
             {confirmingCancel ? (
@@ -540,6 +545,28 @@ function FreshFromLobbyCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?:
 
 // ─── Up Next view ────────────────────────────────────────────────────────────
 
+function OutingMemoryCard({ entry, delayMs }: { entry: OutingMemory; delayMs?: number }) {
+  const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const { outing, title, yearsAgo, viewing } = entry
+  const companions = formatCompanions(outing.companions)
+  return (
+    <CardFrame title={title} onOpen={() => openDetailDrawer(title.id)} delayMs={delayMs}>
+      <p className="font-mono text-xs text-amber mt-0.5">
+        {yearsAgo} {yearsAgo === 1 ? 'year' : 'years'} ago today
+      </p>
+      {outing.venue && <p className="font-sans text-sm text-paper-dim">{outing.venue}</p>}
+      {companions && <p className="font-sans text-sm text-paper-dim">With {companions}</p>}
+      {viewing?.rating != null && (
+        <p className="font-mono text-xs text-amber" aria-label={`Rated ${viewing.rating} out of 5 stars`}>
+          <span aria-hidden="true">★ {viewing.rating.toFixed(1)}</span>
+        </p>
+      )}
+      {viewing?.notes && <p className="font-sans text-sm text-paper-dim wrap-break-word mt-1">“{viewing.notes}”</p>}
+      <TicketButton outingId={outing.id} />
+    </CardFrame>
+  )
+}
+
 export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   const shows = useUpNextShows()
   const upcoming = useUpcomingTitles()
@@ -548,9 +575,10 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   // Owner-only data (plan §4.5: "not rendered in shared/friend views") — the
   // marquee is skipped entirely in a shared/friend session rather than
   // trusting `outings` to already be empty there.
-  const { outings, titles, isSharedView } = useAppStore(
-    useShallow((s) => ({ outings: s.outings, titles: s.titles, isSharedView: s.isSharedView }))
-  )
+  // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
+  const outings = useAppStore((s) => s.outings)
+  const titles = useAppStore((s) => s.titles)
+  const isSharedView = useAppStore((s) => s.isSharedView || s.viewerContext.kind !== 'owner')
 
   // A single shared "now" tick for the whole section (not per-card timers) —
   // countdown labels re-derive once a minute; completion itself is driven by
@@ -563,6 +591,11 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
 
   const marqueeEntries = useMemo(
     () => (isSharedView ? [] : computeMarqueeEntries(outings, titles, now)),
+    [isSharedView, outings, titles, now]
+  )
+
+  const memories = useMemo(
+    () => (isSharedView ? [] : computeOutingMemories(outings, titles, now)),
     [isSharedView, outings, titles, now]
   )
 
@@ -591,14 +624,15 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
   // app's smart-landing check") — Up Next isn't "empty" just because nothing's
   // mid-episode or on the watchlist yet.
   const isEmpty =
-    shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee
+    shows.length === 0 && finishedToShow.length === 0 && upcoming.length === 0 && !hasMarquee && memories.length === 0
 
   const totalCards =
     shows.length +
     finishedToShow.length +
     marqueeEntries.length +
     availableWatchlist.length +
-    comingSoon.length
+    comingSoon.length +
+    memories.length
   const delays = useMemo(() => staggerDelays(totalCards), [totalCards])
   let cardIndex = 0
 
@@ -651,9 +685,17 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
               )}
             </>
           )}
+          {memories.length > 0 && (
+            <>
+              <Eyebrow as="h2" size="lg" className="col-span-full pt-2 pb-1">On this day</Eyebrow>
+              {memories.map((entry) => (
+                <OutingMemoryCard key={entry.outing.id} entry={entry} delayMs={delays[cardIndex++]} />
+              ))}
+            </>
+          )}
           {availableWatchlist.length > 0 && (
             <>
-              {(hasLiveSection || hasMarquee) && (
+              {(hasLiveSection || hasMarquee || memories.length > 0) && (
                 <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
                   On your watchlist
                 </Eyebrow>
@@ -665,7 +707,7 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
           )}
           {comingSoon.length > 0 && (
             <>
-              {(hasLiveSection || hasMarquee || availableWatchlist.length > 0) && (
+              {(hasLiveSection || hasMarquee || memories.length > 0 || availableWatchlist.length > 0) && (
                 <Eyebrow as="p" size="lg" className="col-span-full pt-2 pb-1">
                   Coming soon
                 </Eyebrow>

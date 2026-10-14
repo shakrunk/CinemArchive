@@ -48,9 +48,11 @@ describe('cross-platform companions', () => {
     }
   })
 
-  it('normalizes the existing browser cache before title and outing editors read it', async () => {
+  it('preserves an unknown-owner browser cache without adopting its library', async () => {
     const initial = useAppStore.getState()
     const stored = localStorage.getItem('cinemarchive-library')
+    const deviceKey = 'cinemarchive-device-preferences-v1'
+    const deviceStored = localStorage.getItem(deviceKey)
     try {
       localStorage.setItem('cinemarchive-library', JSON.stringify({
         version: useAppStore.persist.getOptions().version,
@@ -59,11 +61,17 @@ describe('cross-platform companions', () => {
           outings: [{ id: 'o1', companions: mixedCompanions }],
         },
       }))
+      const legacy = localStorage.getItem('cinemarchive-library')
+      useAppStore.setState({ titles: [], outings: [] })
+      localStorage.removeItem(deviceKey)
       await useAppStore.persist.rehydrate()
-      expect(useAppStore.getState().titles[0].viewings[0].companions).toEqual(expected)
-      expect(useAppStore.getState().outings[0].companions).toEqual(expected)
+      expect(useAppStore.getState().titles).toEqual([])
+      expect(useAppStore.getState().outings).toEqual([])
+      expect(localStorage.getItem('cinemarchive-library')).toBe(legacy)
     } finally {
       useAppStore.setState(initial, true)
+      if (deviceStored === null) localStorage.removeItem(deviceKey)
+      else localStorage.setItem(deviceKey, deviceStored)
       if (stored === null) localStorage.removeItem('cinemarchive-library')
       else localStorage.setItem('cinemarchive-library', stored)
     }

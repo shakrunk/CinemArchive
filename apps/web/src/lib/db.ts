@@ -1,5 +1,9 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from './auth'
+import { collectRowRevisions } from './offline/preconditions'
+import type { DeliveryContext } from './offline/coordinator'
+import type { FriendshipView } from './auth'
+import { assertSharedOutingSnapshot, type SharedOutingSnapshot } from './outingSharing'
 import type {
   CastMember,
   CinemaOuting,
@@ -64,6 +68,10 @@ export function mapDbOutingToLocal(row: any): CinemaOuting {
     seatRow: row.seat_row || undefined,
     seats: Array.isArray(row.seats) ? row.seats : [],
     bookingRef: row.booking_ref || undefined,
+    ticketManaged: row.ticket_attachment_managed === true || undefined,
+    ticketImagePath: typeof row.ticket_image_path === 'string' ? row.ticket_image_path : undefined,
+    ticketBarcodePayload: typeof row.ticket_barcode_payload === 'string' ? row.ticket_barcode_payload : undefined,
+    ticketBarcodeFormat: typeof row.ticket_barcode_format === 'string' ? row.ticket_barcode_format : undefined,
     notes: row.notes || undefined,
     status: row.status as OutingStatus,
     previousStatus: row.previous_status || undefined,
@@ -240,7 +248,7 @@ const TITLE_SELECT = `
 
 // Cinema outings are owner-private (rule §9) — folded into the owner's own
 // library fetch only, never into fetchSharedLibrary/fetchFriendLibrary below.
-export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[] }> {
+export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[]; rowRevisions?: Record<string, string> }> {
   if (!supabase) return { titles: [], outings: [] }
 
   const [{ data, error }, { data: outingRows, error: outingsError }] = await Promise.all([
@@ -254,33 +262,37 @@ export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[
   return {
     titles: (data || []).map(mapDbTitleToLocal),
     outings: (outingRows || []).map(mapDbOutingToLocal),
+    rowRevisions: collectRowRevisions(data || [], outingRows || []),
   }
 }
 
-/** Shared-token view returns the titles plus the owner's user id (looked up
- *  directly from the key, independent of whether the owner has any titles)
- *  so the owner's synced prefs can be read too. */
+/** Each request validates its own token and returns scoped data and the board.
+ * No connection-local token or follow-up private preferences read is needed. */
 export async function fetchSharedLibrary(
   token: string
-): Promise<{ titles: Title[]; ownerUserId: string | null }> {
-  if (!supabase) return { titles: [], ownerUserId: null }
-
-  const { error: rpcError } = await supabase.rpc('set_shared_token', { token })
-  unwrap(rpcError, 'Error setting shared token RPC:')
-
-  const [{ data, error }, { data: ownerUserId, error: ownerError }] = await Promise.all([
-    supabase
-      .from('titles')
-      .select(TITLE_SELECT),
-    supabase.rpc('shared_key_owner', { token_val: token }),
-  ])
-
-  unwrap(error, 'Error fetching shared library:')
-  if (ownerError) console.error('Error resolving shared link owner:', ownerError)
-
-  return {
-    titles: (data || []).map(mapDbTitleToLocal),
-    ownerUserId: (ownerUserId as string | null) ?? null,
+): Promise<{ titles: Title[]; ownerUserId: string; ledgerWidgets: LedgerWidget[] | null }> {
+  if (!supabase) throw new Error('Shared libraries are not configured.')
+  const titles = new Map<string, Title>()
+  let ownerUserId: string | undefined
+  let offset = 0
+  for (;;) {
+    const { data, error } = await supabase.rpc('get_shared_library', { p_token: token, p_offset: offset, p_limit: 100 })
+    unwrap(error, 'Error fetching shared library:')
+    if (!data || typeof data.ownerUserId !== 'string' || !Array.isArray(data.titles) ||
+      typeof data.hasMore !== 'boolean' || !('ledgerLayout' in data) || data.titles.length > 100) {
+      throw new Error('Invalid shared library response.')
+    }
+    if (ownerUserId !== undefined && ownerUserId !== data.ownerUserId) throw new Error('Shared library owner changed during loading.')
+    ownerUserId = data.ownerUserId
+    const ledgerWidgets = data.ledgerLayout === null ? null : normalizeLedgerWidgets(data.ledgerLayout)
+    const previousSize = titles.size
+    for (const row of data.titles) {
+      if (!row || typeof row.id !== 'string' || row.user_id !== ownerUserId) throw new Error('Invalid shared library title owner.')
+      titles.set(row.id, mapDbTitleToLocal(row))
+    }
+    if (!data.hasMore) return { titles: [...titles.values()], ownerUserId: ownerUserId!, ledgerWidgets }
+    if (data.titles.length === 0 || titles.size === previousSize) throw new Error('Shared library pagination did not advance.')
+    offset += data.titles.length
   }
 }
 
@@ -834,8 +846,8 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
 
   const mappedPatch: any = {}
   if (patch.status !== undefined) mappedPatch.status = patch.status
-  if (patch.rating !== undefined) mappedPatch.rating = patch.rating
-  if (patch.notes !== undefined) mappedPatch.notes = patch.notes
+  if ('rating' in patch) mappedPatch.rating = patch.rating ?? null
+  if ('notes' in patch) mappedPatch.notes = patch.notes ?? null
   if (patch.tags !== undefined) mappedPatch.tags = patch.tags
   if (patch.inHomeCollection !== undefined) mappedPatch.in_home_collection = patch.inHomeCollection
   // Clearing the shelf passes physicalMedia: undefined — presence of the key
@@ -933,49 +945,70 @@ export async function updateTitleInDb(userId: string, titleId: string, patch: Pa
   }
 }
 
+export interface EpisodeLogWrite {
+  watchedAt?: string
+  prePlatform?: boolean // watched before joining — creates a watch event with a null (indeterminate) date
+  watchNotes?: string
+  rating?: number
+  reviewText?: string
+  colorMode?: 'bw' | 'color'
+  watchEventId?: string
+  ratingId?: string
+  reviewId?: string
+  recordedAt: string
+}
+
+/** IDs and timestamp are assigned by the caller once, before optimism or delivery.
+ * Retrying a partly delivered log inserts only missing records and never overwrites
+ * a historical record that another device may have subsequently edited. */
 export async function logEpisodeToDb(
   userId: string,
   episodeId: string,
-  opts: {
-    watchedAt?: string
-    prePlatform?: boolean // watched before joining — creates a watch event with a null (indeterminate) date
-    watchNotes?: string
-    rating?: number
-    reviewText?: string
-    colorMode?: 'bw' | 'color'
-    watchEventId?: string // client-supplied uuid so the optimistic store id matches the DB row (enables reliable delete/undo)
-  }
+  opts: EpisodeLogWrite
 ): Promise<void> {
   if (!supabase) return
 
+  if ((opts.watchedAt || opts.prePlatform) && !opts.watchEventId ||
+      opts.rating && opts.rating > 0 && !opts.ratingId ||
+      opts.reviewText?.trim() && !opts.reviewId ||
+      !opts.recordedAt || !Number.isFinite(Date.parse(opts.recordedAt))) {
+    throw new Error('Episode logs require stable record IDs and a timestamp before delivery.')
+  }
+  const insertOnce = { onConflict: 'id', ignoreDuplicates: true }
+
   if (opts.watchedAt || opts.prePlatform) {
-    const { error } = await supabase.from('episode_watch_events').insert({
-      ...(opts.watchEventId ? { id: opts.watchEventId } : {}),
+    const { error } = await supabase.from('episode_watch_events').upsert({
+      id: opts.watchEventId,
       episode_id: episodeId,
       user_id: userId,
-      watched_at: opts.watchedAt ?? null,
+      watched_at: opts.prePlatform ? null : opts.watchedAt ?? null,
       notes: opts.watchNotes || undefined,
       color_mode: opts.colorMode ?? null,
-    })
+      created_at: opts.recordedAt,
+    }, insertOnce)
     unwrap(error, 'Error inserting episode watch event:')
   }
 
   if (opts.rating && opts.rating > 0) {
-    const { error } = await supabase.from('episode_ratings').insert({
+    const { error } = await supabase.from('episode_ratings').upsert({
+      id: opts.ratingId,
       episode_id: episodeId,
       user_id: userId,
       rating: opts.rating,
-    })
+      rated_at: opts.recordedAt,
+    }, insertOnce)
     unwrap(error, 'Error inserting episode rating:')
   }
 
   if (opts.reviewText?.trim()) {
-    const { error } = await supabase.from('episode_reviews').insert({
+    const { error } = await supabase.from('episode_reviews').upsert({
+      id: opts.reviewId,
       episode_id: episodeId,
       user_id: userId,
       review_text: opts.reviewText.trim(),
       color_mode: opts.colorMode ?? null,
-    })
+      reviewed_at: opts.recordedAt,
+    }, insertOnce)
     unwrap(error, 'Error inserting episode review:')
   }
 }
@@ -989,13 +1022,14 @@ export async function insertPrePlatformWatchEventsToDb(
 ): Promise<void> {
   if (!supabase || events.length === 0) return
 
-  const { error } = await supabase.from('episode_watch_events').insert(
+  const { error } = await supabase.from('episode_watch_events').upsert(
     events.map((e) => ({
       id: e.id,
       episode_id: e.episodeId,
       user_id: userId,
       watched_at: null,
-    }))
+    })),
+    { onConflict: 'id', ignoreDuplicates: true }
   )
   unwrap(error, 'Error inserting pre-platform watch events:')
 }
@@ -1330,9 +1364,15 @@ function mapDbOutingCompletionToLocal(row: any): OutingCompletionResult {
 // (validated server-side against pg_timezone_names, falling back to UTC);
 // only the viewing's calendar date needs it, since showtime/endsAt are
 // already absolute instants.
-export async function completeDueOutings(tz: string): Promise<OutingCompletionResult[]> {
+export async function completeDueOutings(tz: string, context?: DeliveryContext): Promise<OutingCompletionResult[]> {
   if (!supabase) return []
-  const { data, error } = await supabase.rpc('complete_due_outings', { p_tz: tz })
+  let request = supabase.rpc('complete_due_outings', { p_tz: tz })
+  if (context) {
+    const { data, error } = await supabase.auth.getSession()
+    if (error || !data.session || data.session.user.id !== context.scope.userId || !context.isCurrent()) throw new Error('Library owner changed before outing reconciliation')
+    request = request.setHeader('Authorization', `Bearer ${data.session.access_token}`).abortSignal(context.signal)
+  }
+  const { data, error } = await request
   unwrap(error, 'Error completing due outings:')
   return (data || []).map(mapDbOutingCompletionToLocal)
 }
@@ -1340,13 +1380,35 @@ export async function completeDueOutings(tz: string): Promise<OutingCompletionRe
 // One-way plan-sharing snapshot (plan §4.10) — pushes a copy of the outing's
 // details into each recipient's inbox; never a read grant on the outing
 // itself. Requires accepted friendship, enforced by the RPC, not the client.
-export async function shareOutingPlans(outingId: string, recipientIds: string[]): Promise<void> {
-  if (!supabase) return
-  const { error } = await supabase.rpc('share_outing_plans', {
+async function outingShareToken(context: DeliveryContext): Promise<string> {
+  if (!supabase) throw new Error('Sign in to share your plans')
+  const { data, error } = await supabase.auth.getSession()
+  if (error || !data.session || data.session.user.id !== context.scope.userId || !context.isCurrent()) throw new Error('Library account changed')
+  return data.session.access_token
+}
+
+export async function listOutingShareFriends(context: DeliveryContext): Promise<FriendshipView[]> {
+  const token = await outingShareToken(context)
+  const { data, error } = await supabase!.rpc('list_friendships')
+    .setHeader('Authorization', `Bearer ${token}`).abortSignal(context.signal)
+  if (!context.isCurrent()) throw new Error('Library account changed')
+  unwrap(error, 'Error loading outing share friends:')
+  return (data ?? []).filter((friend: FriendshipView) => friend.status === 'accepted')
+}
+
+export async function shareOutingPlans(outingId: string, recipientIds: string[], operationId: string, context: DeliveryContext, assertReady: () => Promise<void>): Promise<SharedOutingSnapshot> {
+  const token = await outingShareToken(context)
+  await assertReady()
+  if (!context.isCurrent()) throw new Error('Library account changed')
+  const { data, error } = await supabase!.rpc('share_outing_plans', {
     p_outing_id: outingId,
     p_recipient_ids: recipientIds,
-  })
+    p_operation_id: operationId,
+  }).setHeader('Authorization', `Bearer ${token}`).abortSignal(context.signal)
+  if (!context.isCurrent()) throw new Error('Library account changed')
   unwrap(error, 'Error sharing outing plans:')
+  assertSharedOutingSnapshot(data)
+  return data
 }
 
 // ─── User Title Pins ──────────────────────────────────────────────────────────
@@ -1361,7 +1423,7 @@ export async function fetchAllTitlePins(
     .eq('user_id', userId)
   if (error) {
     console.error('fetchAllTitlePins:', error)
-    return []
+    throw error
   }
   return (data ?? []).map((row) => ({
     titleId: row.title_id as string,

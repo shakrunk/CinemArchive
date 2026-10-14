@@ -38,6 +38,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -53,11 +54,31 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="cinemarchive" android:host="auth-callback" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cinemarchive" android:host="share" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="cinemarchive.kumarfamilynet.work" />
+            </intent-filter>
         </activity>
 
         <receiver
             android:name=".OutingCompletionReceiver"
             android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.tickets"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/ticket_camera_paths" />
+        </provider>
 
         <!-- PackageInstaller's reply to a committed update session. Not optional: the system
              delivers its install-confirmation Intent here and installs nothing until the app

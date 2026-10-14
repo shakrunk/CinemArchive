@@ -35,6 +35,7 @@ export function SecondOpinions({ className, settings, width = 'lg' }: { classNam
       title={settings?.title || 'Second opinions'}
       hint={`your call vs the critics${describeLedgerSettings(settings)}`}
       className={className}
+      data={{ columns: ["Title", "Your rating (out of 10)", "IMDb (out of 10)", "Difference"], rows: rows.map((row) => [row.title.title, row.mine.toFixed(1), row.critics.toFixed(1), row.delta.toFixed(1)]) }}
     >
       {rows.length === 0 ? (
         <PanelEmpty message="Rate a few titles to compare against IMDb" />

@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "titles": [
+    { "id": "t1", "tmdbId": 10, "type": "movie", "title": "One", "status": "watched", "tags": [], "viewings": [ { "id": "v1", "titleId": "t1", "date": "2026-02-01", "outingId": "o4" } ] },
+    { "id": "t2", "tmdbId": 11, "type": "movie", "title": "Two", "status": "watched", "tags": [], "viewings": [ { "id": "v2", "titleId": "t2", "date": "2026-02-02", "outingId": "o4" } ] }
+  ],
+  "outings": [
+    { "id": "o0", "titleId": "t1", "showtime": "2026-02-01T19:00:00Z", "endsAt": "2026-02-01T21:00:00Z", "status": "completed" },
+    { "id": "o1", "titleId": "t1", "showtime": "2026-02-01T19:00:00Z", "endsAt": "2026-02-01T21:00:00Z", "status": "completed", "completedViewingId": "ghost" },
+    { "id": "o2", "titleId": "t1", "showtime": "2026-02-01T19:00:00Z", "endsAt": "2026-02-01T21:00:00Z", "status": "completed", "completedViewingId": "v2" },
+    { "id": "o3", "titleId": "t1", "showtime": "2026-02-01T19:00:00Z", "endsAt": "2026-02-01T21:00:00Z", "status": "scheduled", "completedViewingId": "ghost" },
+    { "id": "o4", "titleId": "t1", "showtime": "2026-02-01T19:00:00Z", "endsAt": "2026-02-01T21:00:00Z", "status": "completed", "completedViewingId": "v1" }
+  ]
+}

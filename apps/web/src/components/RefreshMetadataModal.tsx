@@ -8,12 +8,13 @@ import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { searchMedia, type SearchResult } from 'src/lib/media'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import type { Title } from 'src/store/mockData'
+import { captureLibrarySession } from 'src/lib/localSave'
 
 // Inner body is conditionally mounted only while the modal is open (see the
 // wrapper below), so it unmounts on close and its local state resets cleanly
 // on the next open — no reset effect needed.
 function RefreshContent({ title, onClose }: { title: Title; onClose: () => void }) {
-  const updateTitle = useAppStore((s) => s.updateTitle)
+  const updateTitle = useAppStore((s) => s.updateTitleMetadata)
   const titles = useAppStore((s) => s.titles)
   const user = useAppStore((s) => s.user)
 
@@ -50,6 +51,7 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
   const typedResults = results.filter((r) => r.type === title.type)
 
   async function applyFrom(base: SearchResult) {
+    const checkSession = captureLibrarySession()
     // The DB enforces a unique (user, tmdb_id, type) link; block re-pointing this
     // title at an entry another title already owns so local state can't drift
     // from a silently-rejected write.
@@ -67,11 +69,12 @@ function RefreshContent({ title, onClose }: { title: Title; onClose: () => void 
     setError(null)
     try {
       const patch = await fetchRefreshedTitlePatch(title, base, user?.id)
-      updateTitle(title.id, patch)
+      checkSession()
+      await updateTitle(title.id, patch)
       onClose()
     } catch (err) {
       console.error('Error refreshing metadata:', err)
-      setError('Could not fetch fresh metadata. Please try again.')
+      setError(err instanceof Error ? err.message : 'Could not save fresh metadata. Please try again.')
       setApplying(false)
     }
   }

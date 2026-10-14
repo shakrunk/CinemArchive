@@ -119,7 +119,7 @@ describe('formatOutingShareSnippet', () => {
 })
 
 describe('shareOutingSnippet', () => {
-  const originalShare = (navigator as any).share
+  const originalShare = navigator.share as Navigator['share'] | undefined
   const originalClipboard = navigator.clipboard
 
   afterEach(() => {

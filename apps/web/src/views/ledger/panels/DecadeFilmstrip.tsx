@@ -50,6 +50,7 @@ export function DecadeFilmstrip({ className, settings, width = 'full' }: { class
       title={settings?.title || 'By the era'}
       hint={`decade breakdown${describeLedgerSettings(settings)}`}
       className={className}
+      data={{ columns: ["Decade", "Titles"], rows: decades.map((decade) => [decade.label, decade.count]) }}
     >
       {decades.length === 0 ? (
         <PanelEmpty message="No titles yet" />
@@ -84,6 +85,7 @@ export function DecadeFilmstrip({ className, settings, width = 'full' }: { class
               {decades.map((d, i) => (
                 <button
                   key={d.label}
+                  aria-label={`${d.label}: ${d.count} titles`}
                   onClick={() => {
                     setFilter('decades', [d.label])
                     requestView('library')

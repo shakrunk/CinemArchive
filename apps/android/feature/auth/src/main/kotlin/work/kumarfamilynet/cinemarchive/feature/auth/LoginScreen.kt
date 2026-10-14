@@ -59,24 +59,34 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 
-private enum class LoginMethod { MAGIC_LINK, PASSKEY, QR }
+private enum class LoginMethod { MAGIC_LINK, INVITE }
 
 /**
- * Shown whenever [AuthRepository.observeSession] is null — see MainActivity's app-shell
- * gate. Only the magic-link pane has a real backend behind it (see plan doc / this
- * package's kdoc-equivalent context in CinemArchiveApplication); passkey and QR are real,
- * interactive UI wired to a "not built yet" message rather than a mockup.
+ * Shown whenever [AuthRepository.observeSession] is null — see MainActivity's app-shell gate.
+ * Two real flows, both backed by the same backend as the web app: Email (magic link, the exact
+ * `signInWithOtp(shouldCreateUser = false)` call web uses for both its "magic link" and its
+ * "passkey" buttons) and Invite (`redeem-invite` Edge Function, then the magic link).
+ *
+ * Deliberately absent: a Passkey tab and a Scan-QR tab. Web's "Sign in with passkey" is the same
+ * OTP email (no WebAuthn assertion is ever performed — see apps/web/src/lib/auth.ts
+ * `signInWithPasskey`), and no QR pairing producer exists on any client, so both were
+ * non-functional placeholders. See docs/android-parity-matrix.md / the channel for the audit.
  */
 @Composable
 fun LoginRoute(authRepository: AuthRepository, modifier: Modifier = Modifier) {
     LoginScreen(
         onSendMagicLink = { email -> withContext(Dispatchers.IO) { authRepository.sendMagicLink(email) } },
+        onRedeemInvite = { email, code -> withContext(Dispatchers.IO) { authRepository.redeemInviteAndSendLink(email, code) } },
         modifier = modifier,
     )
 }
 
 @Composable
-private fun LoginScreen(onSendMagicLink: suspend (String) -> Unit, modifier: Modifier = Modifier) {
+private fun LoginScreen(
+    onSendMagicLink: suspend (String) -> Unit,
+    onRedeemInvite: suspend (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var method by remember { mutableStateOf(LoginMethod.MAGIC_LINK) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -99,8 +109,7 @@ private fun LoginScreen(onSendMagicLink: suspend (String) -> Unit, modifier: Mod
             SegmentedGroup(
                 options = listOf(
                     ChoiceOption(LoginMethod.MAGIC_LINK, "Email"),
-                    ChoiceOption(LoginMethod.PASSKEY, "Passkey"),
-                    ChoiceOption(LoginMethod.QR, "Scan QR"),
+                    ChoiceOption(LoginMethod.INVITE, "Invite"),
                 ),
                 selected = method,
                 onSelect = { method = it },
@@ -110,8 +119,7 @@ private fun LoginScreen(onSendMagicLink: suspend (String) -> Unit, modifier: Mod
 
             when (method) {
                 LoginMethod.MAGIC_LINK -> MagicLinkPane(onSend = onSendMagicLink)
-                LoginMethod.PASSKEY -> PasskeyPane(snackbarHostState = snackbarHostState)
-                LoginMethod.QR -> QrScanPane(snackbarHostState = snackbarHostState)
+                LoginMethod.INVITE -> InvitePane(onRedeem = onRedeemInvite)
             }
         }
     }
@@ -187,135 +195,79 @@ private fun MagicLinkPane(onSend: suspend (String) -> Unit, modifier: Modifier =
     }
 }
 
+/** Invite-only sign-up (web `InviteRedeemForm`): email + invite code, then the same magic link. */
 @Composable
-private fun PasskeyPane(snackbarHostState: SnackbarHostState, modifier: Modifier = Modifier) {
+private fun InvitePane(onRedeem: suspend (String, String) -> Unit, modifier: Modifier = Modifier) {
+    var email by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf<MagicLinkStatus>(MagicLinkStatus.Idle) }
     val scope = rememberCoroutineScope()
-    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            Icons.Filled.Key,
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary,
+    val isBusy = status is MagicLinkStatus.Sending
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = email,
+            onValueChange = {
+                email = it
+                if (status !is MagicLinkStatus.Idle) status = MagicLinkStatus.Idle
+            },
+            label = { Text("Email") },
+            singleLine = true,
+            enabled = !isBusy,
+            leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            "Sign in without a password, using a passkey stored on this device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+        OutlinedTextField(
+            value = code,
+            onValueChange = {
+                code = it.uppercase()
+                if (status !is MagicLinkStatus.Idle) status = MagicLinkStatus.Idle
+            },
+            label = { Text("Invite code") },
+            singleLine = true,
+            enabled = !isBusy,
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Button(
             onClick = {
+                status = MagicLinkStatus.Sending
                 scope.launch {
-                    snackbarHostState.showSnackbar("Passkey sign-in isn't wired up yet — use email link for now.")
+                    status = runCatching { onRedeem(email.trim(), code.trim()) }.fold(
+                        onSuccess = { MagicLinkStatus.Sent },
+                        onFailure = { MagicLinkStatus.Error(it.message ?: "Failed to redeem invite code.") },
+                    )
                 }
             },
+            enabled = email.isNotBlank() && code.isNotBlank() && !isBusy,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Continue with Passkey")
-        }
-    }
-}
-
-@Composable
-private fun QrScanPane(snackbarHostState: SnackbarHostState, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
-    var hasCameraPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        hasCameraPermission = granted
-    }
-
-    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (!hasCameraPermission) {
-            Icon(
-                Icons.Filled.QrCodeScanner,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Point your camera at the QR code shown in CinemArchive on your desktop.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Enable camera")
-            }
-        } else {
-            var lastHandledValue by remember { mutableStateOf<String?>(null) }
-            var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-            val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
-            val scanner = remember { BarcodeScanning.getClient() }
-
-            Surface(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth().height(320.dp)) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        val previewView = PreviewView(ctx)
-                        val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                        cameraProviderFuture.addListener(
-                            {
-                                val provider = cameraProviderFuture.get()
-                                cameraProvider = provider
-                                val preview = Preview.Builder().build()
-                                    .also { it.setSurfaceProvider(previewView.surfaceProvider) }
-                                val analysis = ImageAnalysis.Builder()
-                                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                    .build()
-                                analysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                                    val mediaImage = imageProxy.image
-                                    if (mediaImage == null) {
-                                        imageProxy.close()
-                                    } else {
-                                        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                                        scanner.process(image)
-                                            .addOnSuccessListener { barcodes ->
-                                                val value = barcodes.firstNotNullOfOrNull { it.rawValue }
-                                                if (value != null) {
-                                                    scope.launch {
-                                                        if (value != lastHandledValue) {
-                                                            lastHandledValue = value
-                                                            snackbarHostState.showSnackbar("Desktop pairing isn't wired up yet.")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            .addOnCompleteListener { imageProxy.close() }
-                                    }
-                                }
-                                provider.unbindAll()
-                                provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-                            },
-                            ContextCompat.getMainExecutor(ctx),
-                        )
-                        previewView
-                    },
-                    onRelease = { cameraProvider?.unbindAll() },
+            if (isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
                 )
+            } else {
+                Text("Create account")
             }
-
-            DisposableEffect(Unit) {
-                onDispose {
-                    scanner.close()
-                    analysisExecutor.shutdown()
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Point your camera at the QR code shown in CinemArchive on your desktop.",
+        }
+        when (val current = status) {
+            is MagicLinkStatus.Sent -> Text(
+                "Account created — check your inbox and tap the magic link on this phone to finish signing in.",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp),
             )
+            is MagicLinkStatus.Error -> Text(
+                current.message,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            else -> Unit
         }
     }
 }

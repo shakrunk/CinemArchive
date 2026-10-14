@@ -7,7 +7,17 @@ package work.kumarfamilynet.cinemarchive.core.model
  *  before the show ends. */
 enum class OutingStatus { SCHEDULED, COMPLETED, MISSED, CANCELLED }
 
-enum class CinemaFormat { STANDARD, IMAX, THREE_D, DOLBY, SEVENTY_MM, DRIVE_IN, OTHER }
+enum class CinemaFormat(val wireValue: String) {
+    STANDARD("Standard"), IMAX("IMAX"), THREE_D("3D"), DOLBY("Dolby"),
+    SEVENTY_MM("70mm"), DRIVE_IN("Drive-in"), OTHER("Other");
+
+    companion object {
+        /** Accept the shared web values and older Android enum names at every read boundary. */
+        fun fromWire(value: String?): CinemaFormat? = value?.let { raw ->
+            entries.firstOrNull { it.wireValue.equals(raw, ignoreCase = true) || it.name.equals(raw, ignoreCase = true) }
+        }
+    }
+}
 
 /** Symbology of a captured ticket barcode (issue #219) — stored alongside the decoded payload
  *  rather than inferred later, because re-encoding a 1D payload (e.g. [CODE_128]) as a QR code

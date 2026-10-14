@@ -32,10 +32,11 @@ interface OutboxDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun enqueue(entry: OutboxEntity)
 
-    @Query("SELECT * FROM mutation_outbox ORDER BY createdAt")
+    // SQLite insertion order survives equal timestamps and a device clock moving backwards.
+    @Query("SELECT * FROM mutation_outbox ORDER BY rowid")
     fun observePending(): Flow<List<OutboxEntity>>
 
-    @Query("SELECT * FROM mutation_outbox ORDER BY createdAt")
+    @Query("SELECT * FROM mutation_outbox ORDER BY rowid")
     suspend fun getPending(): List<OutboxEntity>
 
     @Query("DELETE FROM mutation_outbox WHERE id = :id")
@@ -43,4 +44,12 @@ interface OutboxDao {
 
     @Query("UPDATE mutation_outbox SET attemptCount = attemptCount + 1, lastError = :error WHERE id = :id")
     suspend fun recordFailure(id: String, error: String?)
+
+    /** Preserve SQLite rowid/FIFO order while pausing an intent for explicit user review. */
+    @Query("UPDATE mutation_outbox SET operation = 'review', lastError = :reason WHERE id = :id")
+    suspend fun markForReview(id: String, reason: String): Int
+
+    /** Explicit reviewed replacement gets a fresh operation ID without changing FIFO rowid. */
+    @Query("UPDATE mutation_outbox SET id = :newId, operation = :newOperation, payloadJson = :newPayload, attemptCount = 0, lastError = NULL WHERE id = :oldId AND entityType = 'title' AND operation = 'review' AND payloadJson = :originalPayload")
+    suspend fun replaceReviewedTitle(oldId: String, originalPayload: String, newId: String, newOperation: String, newPayload: String): Int
 }

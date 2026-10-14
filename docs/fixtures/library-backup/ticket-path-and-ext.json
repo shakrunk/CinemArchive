@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "format": "cinemarchive-library",
+  "exportedAt": "2026-10-08T12:00:00Z",
+  "titles": [
+    {
+      "id": "xt", "tmdbId": 700, "type": "tv", "title": "Ext Show", "status": "watching", "tags": [],
+      "futureTitleField": { "receipts": [ { "id": "arch-receipt" } ], "keep": "yes", "nested": { "TOKEN": "t", "deep": { "outbox": [1], "ok": 2 } } },
+      "physicalMedia": [ { "id": "pm-archive", "format": "Blu-ray", "edition": "Steelbook", "notes": "boxed", "token": "x" }, "stray" ],
+      "ext": { "existing": 1, "userId": "someone", "futureTitleField2": true },
+      "seasons": [ { "id": "xs", "seasonNumber": 1, "seasonFuture": 5, "episodes": [ { "id": "xe", "episodeNumber": 1, "epFuture": [1, 2], "watchEvents": [ { "id": "xw", "watchedAt": "2026-01-01", "wFuture": "w" } ] } ] } ],
+      "viewings": [ { "id": "xv", "titleId": "xt", "date": "2026-01-02", "viewingFuture": { "operationId": "op" }, "operationId": "op2" } ]
+    }
+  ],
+  "outings": [
+    {
+      "id": "xo", "titleId": "xt", "showtime": "2026-01-02T19:00:00Z", "endsAt": "2026-01-02T21:00:00Z", "status": "scheduled",
+      "ticketBarcodePayload": "PAYLOAD-123", "ticketBarcodeFormat": "qr",
+      "ticketImagePath": "/data/user/0/app/files/tickets/x.jpg",
+      "ticketManaged": true,
+      "ticketAttachment": { "objectKey": "owner/x", "sha256": "ab" },
+      "outingFuture": { "aliases": ["a"], "id": "inert-id" }
+    }
+  ],
+  "lists": [
+    { "id": "xl", "name": "L", "listFuture": 1, "items": [ { "id": "item-id", "titleId": "xt", "position": 0, "itemFuture": "i" } ] }
+  ]
+}

@@ -1,0 +1,349 @@
+{
+  "titles": [
+    {
+      "id": "cast",
+      "tmdbId": 1,
+      "title": "Cast",
+      "type": "movie",
+      "status": "watched",
+      "year": 2020,
+      "genres": [
+        "Drama"
+      ],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [
+        {
+          "tmdbPersonId": 42,
+          "name": "Same Name",
+          "character": "Guest",
+          "order": 0
+        }
+      ],
+      "crew": [],
+      "seasons": []
+    },
+    {
+      "id": "namesake",
+      "tmdbId": 2,
+      "title": "Namesake",
+      "type": "movie",
+      "status": "watched",
+      "year": 2020,
+      "genres": [],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [
+        {
+          "tmdbPersonId": 84,
+          "name": "Same Name",
+          "character": "Guest",
+          "order": 0
+        }
+      ],
+      "crew": [],
+      "seasons": []
+    },
+    {
+      "id": "crew",
+      "tmdbId": 3,
+      "title": "Crew",
+      "type": "movie",
+      "status": "watched",
+      "year": 2020,
+      "genres": [],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [],
+      "crew": [
+        {
+          "tmdbPersonId": 42,
+          "name": "Same Name",
+          "job": "Writer"
+        }
+      ],
+      "seasons": []
+    },
+    {
+      "id": "season",
+      "tmdbId": 4,
+      "title": "Season",
+      "type": "tv",
+      "status": "watched",
+      "year": 2020,
+      "genres": [
+        "Drama"
+      ],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [],
+      "crew": [],
+      "seasons": [
+        {
+          "id": "season-s",
+          "seasonNumber": 1,
+          "episodeCount": 1,
+          "episodesWatched": 0,
+          "cast": [
+            {
+              "tmdbPersonId": 42,
+              "name": "Same Name",
+              "character": "Guest",
+              "order": 0
+            },
+            {
+              "tmdbPersonId": 103,
+              "name": "Season Only",
+              "character": "Guest",
+              "order": 0
+            }
+          ],
+          "episodes": [
+            {
+              "id": "season-e",
+              "episodeNumber": 1,
+              "crew": [],
+              "watchEvents": [],
+              "ratings": [],
+              "reviews": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "special",
+      "tmdbId": 5,
+      "title": "Special",
+      "type": "tv",
+      "status": "watched",
+      "year": 2020,
+      "genres": [],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [],
+      "crew": [],
+      "seasons": [
+        {
+          "id": "special-s",
+          "seasonNumber": 0,
+          "episodeCount": 1,
+          "episodesWatched": 0,
+          "cast": [
+            {
+              "tmdbPersonId": 42,
+              "name": "Same Name",
+              "character": "Guest",
+              "order": 0
+            },
+            {
+              "tmdbPersonId": 104,
+              "name": "Special Only",
+              "character": "Guest",
+              "order": 0
+            }
+          ],
+          "episodes": [
+            {
+              "id": "special-e",
+              "episodeNumber": 1,
+              "crew": [
+                {
+                  "tmdbPersonId": 84,
+                  "name": "Same Name",
+                  "job": "Writer"
+                }
+              ],
+              "watchEvents": [],
+              "ratings": [],
+              "reviews": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "episode",
+      "tmdbId": 6,
+      "title": "Episode",
+      "type": "tv",
+      "status": "watchlist",
+      "year": 2020,
+      "genres": [],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [],
+      "crew": [],
+      "seasons": [
+        {
+          "id": "episode-s",
+          "seasonNumber": 1,
+          "episodeCount": 1,
+          "episodesWatched": 0,
+          "cast": [],
+          "episodes": [
+            {
+              "id": "episode-e",
+              "episodeNumber": 1,
+              "crew": [
+                {
+                  "tmdbPersonId": 42,
+                  "name": "Same Name",
+                  "job": "Writer"
+                },
+                {
+                  "tmdbPersonId": 105,
+                  "name": "Episode Only",
+                  "job": "Writer"
+                }
+              ],
+              "watchEvents": [],
+              "ratings": [],
+              "reviews": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "none",
+      "tmdbId": 7,
+      "title": "None",
+      "type": "movie",
+      "status": "watched",
+      "year": 2020,
+      "genres": [],
+      "addedAt": "2026-01-01T00:00:00Z",
+      "cast": [],
+      "crew": [],
+      "seasons": []
+    }
+  ],
+  "cases": [
+    {
+      "name": "all credited roles including Specials",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 42
+        }
+      },
+      "expected": [
+        "cast",
+        "crew",
+        "season",
+        "special",
+        "episode"
+      ]
+    },
+    {
+      "name": "same name distinct IDs",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 84
+        }
+      },
+      "expected": [
+        "namesake",
+        "special"
+      ]
+    },
+    {
+      "name": "season-only person",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 103
+        }
+      },
+      "expected": [
+        "season"
+      ]
+    },
+    {
+      "name": "Specials-only person",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 104
+        }
+      },
+      "expected": [
+        "special"
+      ]
+    },
+    {
+      "name": "episode-only person",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 105
+        }
+      },
+      "expected": [
+        "episode"
+      ]
+    },
+    {
+      "name": "missing person",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 999
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "person AND media type",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 42
+        },
+        "type": "movie"
+      },
+      "expected": [
+        "cast",
+        "crew"
+      ]
+    },
+    {
+      "name": "person AND genre",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 42
+        },
+        "genres": [
+          "Drama"
+        ]
+      },
+      "expected": [
+        "cast",
+        "season"
+      ]
+    },
+    {
+      "name": "person AND status",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 42
+        },
+        "status": "watchlist"
+      },
+      "expected": [
+        "episode"
+      ]
+    },
+    {
+      "name": "person AND search",
+      "filters": {
+        "person": {
+          "name": "Label must not affect identity",
+          "id": 42
+        },
+        "search": "Special"
+      },
+      "expected": [
+        "special"
+      ]
+    }
+  ]
+}

@@ -1,19 +1,15 @@
+import 'fake-indexeddb/auto'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { User } from '@supabase/supabase-js'
 import { RefreshMetadataModal } from './RefreshMetadataModal'
 import { useAppStore } from 'src/store/useAppStore'
 import { fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
-import { updateTitleInDb } from 'src/lib/db'
+import { IndexedDbOfflineStore } from 'src/lib/offline/storage'
 import type { Title } from 'src/store/mockData'
 
 vi.mock('src/lib/refreshMetadata', async (original) => ({
   ...await original<typeof import('src/lib/refreshMetadata')>(),
   fetchRefreshedTitlePatch: vi.fn(),
-}))
-vi.mock('src/lib/db', async (original) => ({
-  ...await original<typeof import('src/lib/db')>(),
-  updateTitleInDb: vi.fn(),
 }))
 
 const title: Title = {
@@ -23,11 +19,14 @@ const title: Title = {
 }
 const patch = { synopsis: 'Fresh synopsis', cast: [{ tmdbPersonId: 1, name: 'Updated cast', order: 0 }] }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(fetchRefreshedTitlePatch).mockResolvedValue(patch)
-  vi.mocked(updateTitleInDb).mockResolvedValue(undefined)
+  useAppStore.getState().setUser(null)
+  await vi.waitFor(() => expect(useAppStore.getState().offlineStatus.hydrated).toBe(true))
+  await useAppStore.getState().setTitles([])
+  await useAppStore.getState().addTitle(title)
   useAppStore.setState({
-    user: { id: 'metadata-owner' } as User, titles: [title], selectedTitleId: title.id,
+    selectedTitleId: title.id,
     isRefreshMetadataOpen: true, notifications: [],
   })
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -42,7 +41,6 @@ it('closes after applying fresh metadata even when the browser cache is full', a
   render(<RefreshMetadataModal />)
   fireEvent.click(screen.getByRole('button', { name: 'Re-fetch current match' }))
   await waitFor(() => expect(useAppStore.getState().titles[0].synopsis).toBe('Fresh synopsis'))
-  expect(updateTitleInDb).toHaveBeenCalledWith('metadata-owner', title.id, patch)
   expect(useAppStore.getState().titles[0]).toMatchObject({ rating: 4, notes: 'Keep this' })
   expect(useAppStore.getState().isRefreshMetadataOpen).toBe(false)
   expect(screen.queryByText('Could not fetch fresh metadata. Please try again.')).not.toBeInTheDocument()
@@ -53,15 +51,15 @@ it('keeps a real fetch failure visible and leaves the original metadata intact',
   vi.mocked(fetchRefreshedTitlePatch).mockRejectedValue(new Error('Service unavailable'))
   render(<RefreshMetadataModal />)
   fireEvent.click(screen.getByRole('button', { name: 'Re-fetch current match' }))
-  expect(await screen.findByText('Could not fetch fresh metadata. Please try again.')).toBeInTheDocument()
+  expect(await screen.findByText('Service unavailable')).toBeInTheDocument()
   expect(useAppStore.getState().titles[0].synopsis).toBe('Old synopsis')
-  expect(updateTitleInDb).not.toHaveBeenCalled()
 })
 
-it('reports a remote save failure separately from fetching metadata', async () => {
-  vi.mocked(updateTitleInDb).mockRejectedValue(new Error('Offline'))
+it('keeps the form and original metadata when durable storage fails', async () => {
+  vi.spyOn(IndexedDbOfflineStore.prototype, 'applyLocal').mockRejectedValueOnce(new Error('Storage quota exceeded'))
   render(<RefreshMetadataModal />)
   fireEvent.click(screen.getByRole('button', { name: 'Re-fetch current match' }))
-  await waitFor(() => expect(useAppStore.getState().isRefreshMetadataOpen).toBe(false))
-  expect(useAppStore.getState().notifications.some((n) => n.message.includes("Couldn't save changes"))).toBe(true)
+  expect(await screen.findByText('Storage quota exceeded')).toBeInTheDocument()
+  expect(useAppStore.getState().isRefreshMetadataOpen).toBe(true)
+  expect(useAppStore.getState().titles[0].synopsis).toBe('Old synopsis')
 })

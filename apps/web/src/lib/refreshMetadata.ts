@@ -2,7 +2,6 @@
 // modal and the library-wide bulk refresh in Profile settings.
 
 import { fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult } from 'src/lib/media'
-import { insertSeasonsInDb, upsertEpisodeMetadataInDb, bulkUpsertSeasonCastInDb, bulkUpsertEpisodeCrewInDb } from 'src/lib/db'
 import { SPECIALS_SEASON_NUMBER, isSpecialsSeason } from 'src/store/episodeUtils'
 import type { Title, Season, Episode, EpisodeCrew } from 'src/store/mockData'
 
@@ -36,14 +35,13 @@ const EP_CREW_JOBS = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
 
 /**
  * Re-fetch `base` from TMDB/OMDb and build the patch to apply to `title`.
- * For TV titles, also refreshes episode/season-cast/crew data and fires off
- * the corresponding DB writes (gated on `userId`). Does not itself call
- * `updateTitle` — callers apply the returned patch.
+ * For TV titles, also refreshes episode/season-cast/crew metadata. Callers
+ * submit the returned patch through the durable store; this fetch never writes.
  */
 export async function fetchRefreshedTitlePatch(
   title: Title,
   base: SearchResult,
-  userId: string | undefined
+  _userId?: string
 ): Promise<Partial<Title>> {
   const { result, tmdbSeasons } = await fetchMediaDetails(base)
   const patch: Partial<Title> = {
@@ -95,10 +93,6 @@ export async function fetchRefreshedTitlePatch(
         }))
       )
     )
-
-    const allEpisodeUpdates: Parameters<typeof upsertEpisodeMetadataInDb>[2] = []
-    const allEpisodeCrew: Array<{ episodeId: string; crew: EpisodeCrew[] }> = []
-    const allSeasonCast: Array<{ seasonId: string; cast: NonNullable<Title['cast']> }> = []
 
     const refreshedSeasons = seasonsToRefresh.map((s) => {
       const match = settled.find(
@@ -153,26 +147,6 @@ export async function fetchRefreshedTitlePatch(
         })
       }
 
-      for (const ep of updatedEpisodes) {
-        allEpisodeUpdates.push({
-          id: ep.id,
-          seasonNumber: s.seasonNumber,
-          episodeNumber: ep.episodeNumber,
-          episodeName: ep.episodeName,
-          airDate: ep.airDate,
-          runtime: ep.runtime,
-          synopsis: ep.synopsis,
-          stillUrl: ep.stillUrl,
-        })
-        if (ep.crew && ep.crew.length > 0) {
-          allEpisodeCrew.push({ episodeId: ep.id, crew: ep.crew })
-        }
-      }
-
-      if (seasonCast && seasonCast.length > 0) {
-        allSeasonCast.push({ seasonId: s.id, cast: seasonCast })
-      }
-
       return {
         ...s,
         episodes: updatedEpisodes,
@@ -187,33 +161,7 @@ export async function fetchRefreshedTitlePatch(
 
     patch.seasons = updatedSeasons
 
-    if (userId) {
-      // Awaited, not fire-and-forget: the row must exist (with this client id)
-      // before season-cast rows reference it, and before the caller's
-      // updateTitle upserts seasons by (title_id, season_number) without an id.
-      if (addedSeasons.length > 0) {
-        try {
-          await insertSeasonsInDb(userId, title.id, addedSeasons)
-        } catch (e) {
-          console.error('Season insert during refresh failed:', e)
-        }
-      }
-      if (allEpisodeUpdates.length > 0) {
-        upsertEpisodeMetadataInDb(userId, title.id, allEpisodeUpdates).catch((e) =>
-          console.error('Episode metadata refresh DB write failed:', e)
-        )
-      }
-      if (allSeasonCast.length > 0) {
-        bulkUpsertSeasonCastInDb(userId, title.id, allSeasonCast).catch((e) =>
-          console.error('Season cast refresh DB write failed:', e)
-        )
-      }
-      if (allEpisodeCrew.length > 0) {
-        bulkUpsertEpisodeCrewInDb(userId, title.id, allEpisodeCrew).catch((e) =>
-          console.error('Episode crew refresh DB write failed:', e)
-        )
-      }
-    }
+
   }
 
   return patch

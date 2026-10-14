@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { scaledTextSize } from 'src/lib/textScale'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Send, Check, Loader2, Search, RefreshCw, Share2, Download, Ticket, X } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { useModalFocusAndEscape } from 'src/lib/useModalFocusAndEscape'
 import { ModalBackdrop } from 'src/components/ui/modal-backdrop'
 import { ModalCloseButton } from 'src/components/ui/modal-close-button'
-import { listFriendships, type FriendshipView } from 'src/lib/auth'
+import type { FriendshipView } from 'src/lib/auth'
+import { listOutingShareFriends } from 'src/lib/db'
+import type { SharedOutingSnapshot } from 'src/lib/outingSharing'
 import { formatCompanions } from 'src/store/outings'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSnippet, shareOutingSnippet } from 'src/lib/ics'
 import type { CinemaOuting, Title } from 'src/store/mockData'
@@ -28,6 +31,17 @@ function friendName(f: FriendshipView): string {
 }
 
 export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelProps) {
+  const session = useAppStore((s) => s.librarySession)
+  const ownerId = useAppStore((s) => s.user?.id)
+  const currentOuting = useAppStore((s) => s.outings.find((row) => row.id === outing.id))
+  const currentTitle = useAppStore((s) => s.titles.find((row) => row.id === title.id))
+  const ownerView = useAppStore((s) => !s.isSharedView && s.viewerContext.kind === 'owner')
+  // Do not fall back to prop snapshots after account change, deletion or refresh.
+  if (!ownerView || !currentOuting || !currentTitle) return null
+  return <CurrentShareOutingPanel key={`${session}:${ownerId}:${outing.id}`} outing={currentOuting} title={currentTitle} onClose={onClose} />
+}
+
+function CurrentShareOutingPanel({ outing, title, onClose }: ShareOutingPanelProps) {
   const shareOutingPlans = useAppStore((s) => s.shareOutingPlans)
   const pushNotification = useAppStore((s) => s.pushNotification)
   const closeButtonRef = useModalFocusAndEscape<HTMLButtonElement>(onClose)
@@ -38,20 +52,39 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
   const [search, setSearch] = useState('')
   const [shareState, setShareState] = useState<Record<string, ShareState>>({})
   const [copying, setCopying] = useState(false)
+  const [confirmations, setConfirmations] = useState<Record<string, SharedOutingSnapshot>>({})
+  const attempts = useRef(new Map<string, { operationId: string; state: ShareState }>())
+  const mounted = useRef(true)
+  const [session] = useState(() => useAppStore.getState().librarySession)
+  const [ownerId] = useState(() => useAppStore.getState().user?.id)
+  const abort = useRef(new AbortController())
+  const isCurrent = useCallback(() => mounted.current && useAppStore.getState().librarySession === session && useAppStore.getState().user?.id === ownerId && !useAppStore.getState().isSharedView, [session, ownerId])
+  const [now, setNow] = useState(() => Date.now())
+  const upcoming = outing.status === 'scheduled' && Date.parse(outing.endsAt) > now
 
-  async function loadFriends() {
+  useEffect(() => {
+    mounted.current = true
+    abort.current = new AbortController()
+    const clock = setInterval(() => setNow(Date.now()), 1000)
+    return () => { mounted.current = false; abort.current.abort(); clearInterval(clock) }
+  }, [])
+
+  const loadFriends = useCallback(async () => {
+    if (!isCurrent() || !ownerId) { setLoadingFriends(false); return }
     setLoadingFriends(true)
     setFriendsError(false)
     try {
-      const friendList = await listFriendships()
+      const friendList = await listOutingShareFriends({ scope: { projectId: import.meta.env.VITE_SUPABASE_URL || 'local', userId: ownerId }, signal: abort.current.signal, isCurrent })
+      if (!isCurrent()) return
       setFriends(friendList.filter((f) => f.status === 'accepted'))
     } catch (err) {
+      if (!isCurrent()) return
       console.error('Failed to load friends for outing share:', err)
       setFriendsError(true)
     } finally {
-      setLoadingFriends(false)
+      if (isCurrent()) setLoadingFriends(false)
     }
-  }
+  }, [isCurrent, ownerId])
 
   useEffect(() => {
     // Deferred to a macrotask so the initial setLoadingFriends(true) doesn't
@@ -59,40 +92,54 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
     // same idiom as SendRecommendationPanel's friend fetch.
     const t = setTimeout(() => loadFriends(), 0)
     return () => clearTimeout(t)
-  }, [])
+  }, [loadFriends])
 
-  async function handleShareToFriend(friend: FriendshipView) {
-    if (shareState[friend.friend_user_id] === 'sending') return
+  const handleShareToFriend = useCallback(async (friend: FriendshipView) => {
+    if (!isCurrent() || !upcoming || !(Date.parse(outing.endsAt) > Date.now())) return
+    const prior = attempts.current.get(friend.friend_user_id)
+    if (prior?.state === 'sending') return
+    // Explicit Share again after success creates a new intent. Failed/unknown
+    // delivery retries the same receipt, even when the plan has since changed.
+    const attempt = { operationId: prior && prior.state !== 'sent' ? prior.operationId : crypto.randomUUID(), state: 'sending' as ShareState }
+    attempts.current.set(friend.friend_user_id, attempt)
     const name = friendName(friend)
     setShareState((s) => ({ ...s, [friend.friend_user_id]: 'sending' }))
     try {
-      await shareOutingPlans(outing.id, [friend.friend_user_id])
+      const confirmation = await shareOutingPlans(outing.id, [friend.friend_user_id], attempt.operationId)
+      if (!isCurrent()) return
+      attempt.state = 'sent'
+      setConfirmations((s) => ({ ...s, [friend.friend_user_id]: confirmation }))
       setShareState((s) => ({ ...s, [friend.friend_user_id]: 'sent' }))
-      pushNotification({ message: `Shared your plans with ${name}.`, kind: 'tip', autoClose: 4000 })
+      pushNotification({ message: `Shared ${confirmation.title} plans with ${name}.`, kind: 'tip', autoClose: 4000 })
     } catch {
+      if (!isCurrent()) return
+      attempt.state = 'error'
       // shareOutingPlans already pushed its own error toast — just reflect
       // the per-row failure state here.
       setShareState((s) => ({ ...s, [friend.friend_user_id]: 'error' }))
     }
-  }
+  }, [isCurrent, upcoming, outing.endsAt, outing.id, shareOutingPlans, pushNotification])
 
   async function handleCopyOrShare() {
+    if (!isCurrent() || !upcoming || !(Date.parse(outing.endsAt) > Date.now())) return
     setCopying(true)
     try {
       const snippet = formatOutingShareSnippet(title.title, outing.showtime, outing.venue, outing.format, formatSeatShort(outing))
       const outcome = await shareOutingSnippet(snippet)
-      if (outcome === 'copied') {
+      if (outcome === 'copied' && isCurrent()) {
         pushNotification({ message: "Copied — paste it wherever you're texting your friends.", kind: 'tip', autoClose: 4000 })
       }
     } catch (err) {
+      if (!isCurrent()) return
       console.error('Failed to share outing plans out-of-app:', err)
       pushNotification({ message: "Couldn't share your plans — check your connection." })
     } finally {
-      setCopying(false)
+      if (isCurrent()) setCopying(false)
     }
   }
 
   function handleDownloadIcs() {
+    if (!isCurrent() || !upcoming || !(Date.parse(outing.endsAt) > Date.now())) return
     const ics = buildOutingIcs(outing, title.title)
     downloadIcsFile(outingIcsFilename(title.title, outing.showtime), ics)
   }
@@ -138,7 +185,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
           <div className="flex-1 min-w-0 pt-1">
             <div
               className="font-mono uppercase tracking-widest"
-              style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+              style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
             >
               Share your plans
             </div>
@@ -156,7 +203,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
         <div className="px-5 pb-4 shrink-0 flex gap-2">
           <button type="button"
             onClick={handleCopyOrShare}
-            disabled={copying}
+            disabled={copying || !upcoming}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 font-mono text-xs transition-colors hover:text-amber disabled:opacity-60"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           >
@@ -165,6 +212,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
           </button>
           <button type="button"
             onClick={handleDownloadIcs}
+            disabled={!upcoming}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 font-mono text-xs transition-colors hover:text-amber"
             style={{ background: 'var(--inset)', border: '1px solid var(--line)', color: 'var(--paper)' }}
           >
@@ -175,11 +223,12 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
 
         <p
           className="px-5 pb-2 font-mono uppercase tracking-widest shrink-0"
-          style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
+          style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.14em' }}
         >
           Or share in-app
         </p>
 
+        {!upcoming && <p role="status" className="px-5 pb-3 text-sm">Only upcoming scheduled outings can be shared.</p>}
         {/* Friend search */}
         {friends.length > 5 && (
           <div className="px-5 pb-2 shrink-0">
@@ -251,7 +300,7 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                     key={f.friend_user_id}
                     type="button"
                     onClick={() => handleShareToFriend(f)}
-                    disabled={state === 'sending'}
+                    disabled={state === 'sending' || !upcoming}
                     className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors focus:outline-hidden focus-visible:bg-(--wash) disabled:cursor-default"
                     style={{ background: 'transparent' }}
                     onMouseEnter={(e) => { if (state !== 'sending') e.currentTarget.style.background = 'var(--wash)' }}
@@ -265,19 +314,20 @@ export function ShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                     </div>
                     <span className="flex-1 min-w-0 truncate font-sans text-sm" style={{ color: 'var(--paper)' }}>
                       {name}
+                      {confirmations[f.friend_user_id] && <span className="block text-xs font-normal whitespace-normal">Shared {confirmations[f.friend_user_id].title} · {new Date(confirmations[f.friend_user_id].showtime).toLocaleString()} · {confirmations[f.friend_user_id].venue || 'Venue not specified'}</span>}
                     </span>
                     {state === 'sending' && (
                       <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--paper-faint)' }} />
                     )}
                     {state === 'sent' && (
-                      <span className="flex items-center gap-1 font-mono shrink-0" style={{ fontSize: '10px', color: 'var(--amber)' }}>
+                      <span className="flex items-center gap-1 font-mono shrink-0" style={{ fontSize: scaledTextSize('10px'), color: 'var(--amber)' }}>
                         <Check className="w-3.5 h-3.5" />
-                        Shared
+                        Share again
                       </span>
                     )}
                     {state === 'error' && (
-                      <span className="font-mono shrink-0" style={{ fontSize: '10px', color: 'var(--ember)' }}>
-                        Failed — tap to retry
+                      <span className="font-mono shrink-0" style={{ fontSize: scaledTextSize('10px'), color: 'var(--ember)' }}>
+                        Not confirmed — retry same send
                       </span>
                     )}
                     {state === 'idle' && (

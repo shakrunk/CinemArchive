@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState, useEffect, useMemo } from 'react'
 import { Users, UserPlus, Check, Trash2, Eye, Ban, ShieldOff, Settings2, Inbox, X, Activity, Star, Loader2, Ticket, Link2 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -464,7 +465,7 @@ function InboxSection() {
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1 font-mono mt-1 text-amber/80 hover:text-amber transition-colors"
-                      style={{ fontSize: '9px' }}
+                      style={{ fontSize: scaledTextSize('9px') }}
                     >
                       <Link2 className="w-2.5 h-2.5" />
                       Where to watch

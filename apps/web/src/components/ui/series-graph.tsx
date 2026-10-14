@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useState, useRef } from 'react'
 import { cn } from 'src/lib/utils'
 import { avgEpisodeRating } from 'src/store/episodeUtils'
@@ -107,13 +108,13 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
             whiteSpace: 'nowrap',
           }}
         >
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--paper)' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: scaledTextSize('10px'), color: 'var(--paper)' }}>
             {tooltip.label}
           </span>
           {tooltip.rating && (
             <span style={{
               fontFamily: 'var(--mono)',
-              fontSize: '10px',
+              fontSize: scaledTextSize('10px'),
               color: tooltip.rating.startsWith('★') ? 'var(--amber)' : 'var(--paper-faint)',
             }}>
               {tooltip.rating}
@@ -132,7 +133,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
           <div
             key={i}
             className="text-center font-mono leading-none"
-            style={{ fontSize: '9px', color: 'var(--paper-faint)' }}
+            style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}
           >
             {i + 1}
           </div>
@@ -149,7 +150,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
           {/* Row label */}
           <div
             className="flex items-center font-mono"
-            style={{ fontSize: '10px', color: 'var(--paper-faint)' }}
+            style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)' }}
           >
             S{season.seasonNumber}
           </div>
@@ -201,7 +202,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
 
       {/* Legend */}
       <div className="flex items-center gap-3 mt-3 flex-wrap">
-        <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)', letterSpacing: '0.1em' }}>
+        <span className="font-mono" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)', letterSpacing: '0.1em' }}>
           RATING
         </span>
         {LEGEND.map((l) => (
@@ -210,7 +211,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
               className="rounded-sm"
               style={{ width: 10, height: 10, background: l.color, border: '1px solid var(--line)' }}
             />
-            <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+            <span className="font-mono" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
               {l.label}
             </span>
           </div>
@@ -220,7 +221,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
             className="rounded-sm"
             style={{ width: 10, height: 10, background: ratingColor(null), border: '1px solid var(--line)' }}
           />
-          <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+          <span className="font-mono" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
             unrated
           </span>
         </div>
@@ -234,7 +235,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
             className="series-graph__cell--watched rounded-sm"
             style={{ width: 10, height: 10, background: ratingColor(null), border: '1px solid var(--line)', position: 'relative', overflow: 'hidden' }}
           />
-          <span className="font-mono" style={{ fontSize: '9px', color: 'var(--paper-faint)' }}>
+          <span className="font-mono" style={{ fontSize: scaledTextSize('9px'), color: 'var(--paper-faint)' }}>
             watched
           </span>
         </div>

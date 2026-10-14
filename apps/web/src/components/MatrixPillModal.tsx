@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { ChoiceModal, ChoiceCard } from 'src/components/ui/choice-modal'
 
 interface MatrixPillModalProps {
@@ -33,7 +34,7 @@ export function MatrixPillModal({ open, onBlue, onRed }: MatrixPillModalProps) {
       <h2
         style={{
           fontFamily: 'var(--serif)',
-          fontSize: 'clamp(20px, 5vw, 28px)',
+          fontSize: scaledTextSize('clamp(20px, 5vw, 28px)'),
           color: '#00ff41',
           marginBottom: '8px',
           textAlign: 'center',
@@ -47,7 +48,7 @@ export function MatrixPillModal({ open, onBlue, onRed }: MatrixPillModalProps) {
       <p
         style={{
           fontFamily: 'var(--mono)',
-          fontSize: '11px',
+          fontSize: scaledTextSize('11px'),
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
           color: 'rgba(0, 255, 65, 0.45)',
@@ -74,7 +75,7 @@ export function MatrixPillModal({ open, onBlue, onRed }: MatrixPillModalProps) {
             <div
               style={{
                 fontFamily: 'var(--serif)',
-                fontSize: '15px',
+                fontSize: scaledTextSize('15px'),
                 color: '#7fb3f5',
                 marginBottom: '5px',
                 fontVariationSettings: '"opsz" 24',
@@ -85,7 +86,7 @@ export function MatrixPillModal({ open, onBlue, onRed }: MatrixPillModalProps) {
             <div
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: '10px',
+                fontSize: scaledTextSize('10px'),
                 color: 'rgba(127, 179, 245, 0.55)',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -111,7 +112,7 @@ export function MatrixPillModal({ open, onBlue, onRed }: MatrixPillModalProps) {
             <div
               style={{
                 fontFamily: 'var(--serif)',
-                fontSize: '15px',
+                fontSize: scaledTextSize('15px'),
                 color: '#f87171',
                 marginBottom: '5px',
                 fontVariationSettings: '"opsz" 24',
@@ -122,7 +123,7 @@ export function MatrixPillModal({ open, onBlue, onRed }: MatrixPillModalProps) {
             <div
               style={{
                 fontFamily: 'var(--mono)',
-                fontSize: '10px',
+                fontSize: scaledTextSize('10px'),
                 color: 'rgba(248, 113, 113, 0.55)',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',

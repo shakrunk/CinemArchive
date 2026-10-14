@@ -1,3 +1,4 @@
+import { scaledTextSize } from 'src/lib/textScale'
 import { useMemo } from 'react'
 import { Film, Tv } from 'lucide-react'
 import { useAppStore, titleHasPerson } from 'src/store/useAppStore'
@@ -67,12 +68,12 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
               {person.name}
             </div>
             {person.character && (
-              <div className="font-sans mt-1.5" style={{ fontSize: '12px', color: 'var(--paper-faint)' }}>
+              <div className="font-sans mt-1.5" style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper-faint)' }}>
                 as {person.character}
               </div>
             )}
             {person.job && !person.character && (
-              <div className="font-mono mt-1.5" style={{ fontSize: '11px', color: 'var(--paper-faint)' }}>
+              <div className="font-mono mt-1.5" style={{ fontSize: scaledTextSize('11px'), color: 'var(--paper-faint)' }}>
                 {person.job}
               </div>
             )}
@@ -95,13 +96,13 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
                   )}
                   <span
                     className="font-sans flex-1 min-w-0 truncate"
-                    style={{ fontSize: '13px', color: 'var(--paper-dim)' }}
+                    style={{ fontSize: scaledTextSize('13px'), color: 'var(--paper-dim)' }}
                   >
                     {t.title}
                   </span>
                   <span
                     className="font-mono shrink-0"
-                    style={{ fontSize: '10px', color: 'var(--paper-faint)' }}
+                    style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)' }}
                   >
                     {t.year}
                   </span>

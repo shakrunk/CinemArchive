@@ -9,6 +9,9 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+- Revision conflicts now return promptly over Supabase HTTP instead of entering server retries; web and Android retain pending edits for conflict review.
+
 ## [1.34.0] - 2026-10-09
 
 ### Fixed

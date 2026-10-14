@@ -55,7 +55,8 @@ before(async () => {
   assert.ok(schema.includes(outingRevision.trim()))
   const titleEffect = (await readFile(new URL('supabase/migrations/20261008234136_completion_title_effect.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(titleEffect.trim()))
-  await db.exec(schema)
+  // Retain historical 40001 compatibility proof; the HTTP boundary has its own suite.
+  await db.exec(schema.split('-- HTTP revision conflicts (20261014022000)')[0])
   await db.exec('grant select,update,delete on public.cinema_outings,public.titles,public.viewings to authenticated; grant select on public.notifications to authenticated;')
   for (const id of [owner, other]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@example.test`])
 }, { timeout: 60000 })

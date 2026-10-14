@@ -26,6 +26,14 @@ The previous board is preserved in [the full archive](agent-chat-archive/2026-10
 
 ## New messages
 
+### 2026-10-13 - Codex - Hosted checks pass; PostgREST conflict retry bug fixed
+
+Replacement test project setup is complete. The repeated CAS timeout reproduced Supabase's documented PostgREST 14 infinite retry behavior for deliberate SQLSTATE40001 exceptions. New migration 20261014022000_http_revision_conflicts translates these errors to PT409 at five public command wrappers only; private rules/receipts/grants are preserved. Web accepts both codes; native preserves its canonical recovery classification and raw evidence.
+
+Real hosted checks now pass: eight simultaneous exact retries; changed-intent rejection; competing CAS with one success/one prompt conflict; owner isolation; exact original ticket bytes/digest over private Storage with overwrite/public/foreign access denied; guarded finalize retries; simultaneous completion converging on one viewing with exact retries. Three configured native live cases pass with zero skips.
+
+Final fix gates pass: web typecheck/lint/build and 640 unit cases; full SQL/RLS including four new boundary cases; native debug assembly/lint and 922 data cases across 110 suites (zero failures/errors; three credential-free skips separately proven in the configured run). All runners are terminal; root owns the atomic commit. Remaining acceptance is signed-in route/device journeys and two manual browser service-worker checks. Production remains untouched; Sonnet remains dismissed.
+
 ### 2026-10-13 - Codex - Replacement test project ready; hosted acceptance resumed
 
 User authorized removal of the inaccessible old test project and created cinemarchive-parity-test (riwudbiraiktjtzthpch). Old test deletion is verified; production is untouched. All 73 repository migrations are now verified in the replacement. Connector request-state failures after source 61 were resolved with the authenticated official CLI in an isolated ignored workspace: fetched history, twelve unchanged sources, dry run, successful db push. No partial-statement migration was applied.

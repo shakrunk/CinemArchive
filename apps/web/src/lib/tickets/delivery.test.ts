@@ -108,12 +108,14 @@ it('detaches with the same receipt protocol and never reads or uploads bytes', a
   expect(s.readBlob).not.toHaveBeenCalled()
 })
 
-it('classifies CAS refusal as conflict while retaining the pending original', async () => {
+it.each(['40001', 'PT409'])('classifies CAS refusal as conflict while retaining the pending original (%s)', async (code) => {
   const s = await setup()
+  const original = JSON.stringify(s.command)
   s.fetch.mockResolvedValueOnce(json(null)).mockResolvedValueOnce(json({ attachment: s.attachment, state: 'attached' }))
-    .mockResolvedValueOnce(json({ code: '40001', message: 'Another device replaced this ticket' }, 409))
+    .mockResolvedValueOnce(json({ code, message: 'Another device replaced this ticket' }, 409))
   expect(await s.deliver(s.command, s.context)).toEqual({ kind: 'conflict', message: 'Another device replaced this ticket' })
   expect(s.fetchBase).not.toHaveBeenCalled()
+  expect(JSON.stringify(s.command)).toBe(original)
 })
 
 it('retains a confirmed command until the descriptor refresh is authoritative', async () => {

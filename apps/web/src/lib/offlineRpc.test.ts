@@ -103,7 +103,7 @@ describe('atomic command payloads',()=>{
 })
 
 describe('account-fenced delivery',()=>{
-  it.each(['40001', '23505'])('records venue rejection only from the write transaction (%s)', async (code) => {
+  it.each(['40001', 'PT409', '23505'])('records venue rejection only from the write transaction (%s)', async (code) => {
     const ownerScope = { ...scope, userId: '10000000-0000-4000-8000-000000000001' }
     getSession.mockResolvedValue({ data: { session: { user: { id: ownerScope.userId }, access_token: 'captured' } }, error: null })
     const pending = createCommand(ownerScope, venueChange({ venue: '__proto__', userId: ownerScope.userId, baseline: null }, ''))
@@ -184,6 +184,7 @@ describe('account-fenced delivery',()=>{
   it('separates conflicts, invalid data, authentication and temporary service failures',()=>{
     expect(classifyLibraryError(409,'23505','duplicate').kind).toBe('conflict')
     expect(classifyLibraryError(400,'40001','changed').kind).toBe('conflict')
+    expect(classifyLibraryError(409,'PT409','changed')).toEqual({kind:'conflict',message:'changed'})
     expect(classifyLibraryError(400,'23514','invalid').kind).toBe('failed')
     expect(classifyLibraryError(401,'PGRST301','expired').kind).toBe('auth')
     expect(classifyLibraryError(503,undefined,'down').kind).toBe('retry')

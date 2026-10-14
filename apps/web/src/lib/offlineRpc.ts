@@ -176,7 +176,9 @@ export function assertDeliverableCommand(command: PendingCommand): void {
 
 export function classifyLibraryError(status: number, code: string | undefined, message: string): DeliveryResult {
   if (status===401 || code==='PGRST301' || code==='PGRST302') return {kind:'auth',message}
-  if (code==='40001' || code==='23505' || code==='P0002') return {kind:'conflict',message}
+  // PT409 is the RPC boundary's business conflict code. Keep legacy 40001
+  // support for projects that have not yet installed the boundary migration.
+  if (code==='PT409' || code==='40001' || code==='23505' || code==='P0002') return {kind:'conflict',message}
   if (status===408 || status===429 || status>=500 || status===0) return {kind:'retry',message}
   return {kind:'failed',message}
 }

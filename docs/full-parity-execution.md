@@ -205,9 +205,19 @@ All 73 repository migration sources are applied and verified in the replacement'
 
 Two synthetic accounts were created and password sign-in verified for both; credentials and API keys remain in ignored local scratch. Live native checks and pooled HTTP acceptance are in progress. Eight simultaneous exact command retries returned identical receipts and changed-intent UUID reuse was rejected. A later competing-update request timed out; this is not a passing concurrency result, and its repeat remains under investigation. The former inaccessible-database blocker is resolved; signed-in route/device acceptance and the remaining manual browser checks are still unproven.
 
+### Hosted conflict diagnosis and proof
+
+The three previously skipped native live-service tests now pass with real configured credentials: three cases, zero failures/errors/skips. These test two independent sessions and Ledger persistence; they do not replace signed-in device journeys.
+
+The repeated competing-command timeout reproduced Supabase's documented PostgREST 14 retry loop for deliberate SQLSTATE `40001` exceptions ([official diagnosis](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b)). Migration `20261014022000_http_revision_conflicts.sql` translates these failures to `PT409` only in the five public command wrappers. Private SQL semantics, receipts, default arguments, invoker security and existing grants remain intact. Both clients retain old-code support; Android normalizes the new code to its existing recovery classification while preserving the raw response. Existing conflict-object responses remain unchanged.
+
+After applying this additional migration to the test project only, the complete real HTTP harness passed: eight simultaneous exact retries return the original receipt; changed-intent UUID reuse is rejected; two competing CAS writers produce exactly one success and one prompt `PT409`; a foreign owner cannot read or mutate the fixture; original PNG bytes and SHA-256 survive real Storage upload/download; overwrite, foreign-owner and public retrieval are denied; guarded ticket finalize retries preserve the original receipt. Simultaneous outing completions return applied/already-completed results pointing to one canonical viewing; exact retries and foreign-owner denial also pass. A subsequent activity check finds only idle authenticator connections, with no lingering retry request. This closes these hosted infrastructure checks, not the remaining signed-in route/device journeys or manual browser acceptance.
+
+Conflict-fix gates passed: web typecheck, lint, production build and 640 unit cases; the full SQL/RLS suite including four new boundary regressions; native compiler/debug assembly/lint and 922 data cases across 110 suites, zero failures/errors, including three new boundary tests. The normal native data run has three live-test skips because its environment is credential-free; the separate configured live run proves those three cases with zero skips. All runners are terminal. No production migration, push or release was performed.
+
 Full parity remains incomplete. The complete acceptance inventory above remains authoritative. The identified implementation groups are committed; remaining work is acceptance evidence, not additional feature scope:
 
 - Complete account/auth/invite/notification/deep-link acceptance and live signed-in cross-client/device journeys.
-- Finish credential-free browser acceptance and hosted pooled command/concurrency, owner isolation and ticket-byte verification.
+- Complete the two manual Firefox/Safari service-worker navigation checks. Credential-free automated browser acceptance and the hosted command/concurrency, owner-isolation and ticket-byte checks described above have passed.
 
 The backup contract distinguishes current web parity from enhancements absent on both clients, including merged duplicate histories and embedded photo bytes. Current local checks do not prove the remaining requirements.

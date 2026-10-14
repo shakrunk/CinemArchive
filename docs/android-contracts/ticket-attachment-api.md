@@ -12,6 +12,8 @@ The returned descriptor adds `id` and `objectKey`. The private bucket is `ticket
 
 ## Association and durable retries
 
+Public command RPCs translate internal SQLSTATE `40001` revision failures to `PT409` (HTTP 409) in migration `20261014022000_http_revision_conflicts.sql`. This avoids PostgREST 14's automatic transaction retry loop for deliberate conflicts. Private SQL functions retain `40001`; both clients accept historical `40001` and current HTTP conflicts without changing saved intent or receipts. Ordinary completion/review responses that return a conflict object remain unchanged.
+
 - `finalize_ticket_attachment(p_operation_id, p_outing_id, p_attachment_id, p_expected_attachment_id, p_expected_updated_at default null, p_expected_operation_id default null)` associates a prepared upload.
 - `detach_ticket_attachment(p_operation_id, p_outing_id, p_expected_attachment_id, p_expected_updated_at default null, p_expected_operation_id default null)` clears the association and sets managed mode even when clearing legacy content.
 - `get_ticket_command_receipt(p_operation_id)` returns the original receipt or null. Call this before retrying preparation/upload, because a previously successful attachment may since have been replaced and retired.

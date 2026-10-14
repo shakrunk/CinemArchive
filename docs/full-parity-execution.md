@@ -221,3 +221,11 @@ Full parity remains incomplete. The complete acceptance inventory above remains 
 - Complete the two manual Firefox/Safari service-worker navigation checks. Credential-free automated browser acceptance and the hosted command/concurrency, owner-isolation and ticket-byte checks described above have passed.
 
 The backup contract distinguishes current web parity from enhancements absent on both clients, including merged duplicate histories and embedded photo bytes. Current local checks do not prove the remaining requirements.
+
+### Hosted identity, invite and inbox acceptance (2026-10-13)
+
+Real HTTP checks against `riwudbiraiktjtzthpch` passed existing-account password sign-in, refresh, identity lookup and invalid-session rejection; profile update/read, unique usernames and foreign-owner read/write isolation; invite creation/listing, the two-code cap, foreign-owner denial and deletion restoring capacity. The friend lifecycle passed request, recipient notification, recipient-only read marking, acceptance, block, blocked-request denial and unblock. Thirty-five synthetic inbox events covered all nine event types, thirty-row pagination without missing/duplicate fixture IDs, unread counts, mark-all, dismissal and recipient isolation. Notification fixtures were removed after verification; synthetic accounts remain available for client journeys.
+
+The repository's unchanged `redeem-invite` Edge Function was deployed only to the replacement test project. Live checks passed malformed email, missing/invalid code, existing account without consuming the code, successful new-account redemption, used-code rejection, redeemed-code deletion protection, invite-redeemed notification and invite-connection discovery. No email was sent. The redeemed synthetic account/code remain as test evidence. Ignored local harnesses and result files are under `.parity-tmp/hosted-acceptance/` (`check_accounts.py`, `account-results.json`, `check_invite.py`, `invite-results.json`); credentials are not committed.
+
+These are shared backend acceptance results, not signed-in rendered-client, callback/deep-link or device account-switch evidence. Those journeys and the two manual browser offline-navigation checks remain open. No shipped source changed in this checkpoint, so prior code gates remain applicable. Production was not modified.

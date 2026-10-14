@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-10-14
+
 ### Fixed
 - Android can log a selected title from its known catalog snapshot when metadata lookup is unavailable, matching web behavior.
 - Android recommendation inbox entries now open owned titles or the preselected add flow and expose valid watch links.

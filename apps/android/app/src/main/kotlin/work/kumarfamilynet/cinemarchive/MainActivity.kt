@@ -148,6 +148,8 @@ class MainActivity : ComponentActivity() {
     private var callbackFailed by mutableStateOf(false)
     private var sharedToken by mutableStateOf<String?>(null)
     private var sharedLaunch by androidx.compose.runtime.mutableLongStateOf(0L)
+    private var pendingNavigation by mutableStateOf<PendingNavigation?>(null)
+    private var navigationSequence = 0L
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -160,6 +162,7 @@ class MainActivity : ComponentActivity() {
         val app = application as CinemArchiveApplication
         val token = SharingRules.tokenFromLink(uri.toString())
         if (token != null) {
+            pendingNavigation = null
             sharedToken = token
             sharedLaunch++
         }
@@ -173,6 +176,13 @@ class MainActivity : ComponentActivity() {
                 } catch (_: Exception) {
                     callbackFailed = true
                 }
+            }
+        }
+        else {
+            IncomingNavigation.parse(uri.toString())?.let { destination ->
+                sharedToken = null
+                pendingNavigation = PendingNavigation(destination, app.authRepository.observeIdentity().value,
+                    ++navigationSequence)
             }
         }
     }
@@ -273,6 +283,13 @@ class MainActivity : ComponentActivity() {
                                             appUpdateRepository,
                                             apkInstaller,
                                             initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
+                                            pendingNavigation = pendingNavigation,
+                                            onNavigationConsumed = { consumed ->
+                                                if (pendingNavigation == consumed) {
+                                                    pendingNavigation = null
+                                                    intent.data = null
+                                                }
+                                            },
                                             appVersionName = BuildConfig.VERSION_NAME,
                                             isDebugBuild = isDebugBuild,
                                              onOpenSharedLink = { sharedToken = it },
@@ -434,6 +451,8 @@ private fun CinemArchiveApp(
     appUpdateRepository: AppUpdateRepository,
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
+    pendingNavigation: PendingNavigation? = null,
+    onNavigationConsumed: (PendingNavigation) -> Unit = {},
     appVersionName: String,
     isDebugBuild: Boolean,
     onOpenSharedLink: (String) -> Unit,
@@ -460,6 +479,28 @@ private fun CinemArchiveApp(
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
     var shareOutingId by remember { mutableStateOf<String?>(null) }
     var globalSearch by remember(runtime) { mutableStateOf(false) }
+    var linkedListId by remember { mutableStateOf<String?>(null) }
+    var linkedListSequence by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    LaunchedEffect(pendingNavigation) {
+        val pending = pendingNavigation ?: return@LaunchedEffect
+        if (pending.canOpen(runtime.identity) && runtime.isCurrent()) {
+            val route = pending.destination
+            Tab.entries.firstOrNull { it.key == route.view }?.let { tab = it }
+            globalSearch = false
+            recommendTitleId = null
+            shareOutingId = null
+            linkedListId = route.listId
+            linkedListSequence = pending.sequence
+            overlay = when {
+                route.add -> Overlay.Add()
+                route.titleId != null -> Overlay.Detail(route.titleId)
+                route.view == "profile" -> Overlay.Profile
+                route.view == "friends" -> Overlay.Friends
+                else -> null
+            }
+        }
+        onNavigationConsumed(pending)
+    }
     val commandTitlesFlow = remember(repository) { repository.observeLibrary() }
     val commandTitles by commandTitlesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val commandFocus = remember(runtime) { FocusRequester() }
@@ -756,6 +797,9 @@ private fun CinemArchiveApp(
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 onFabExpandedChange = { fabExpanded = it },
+                                requestedListId = linkedListId,
+                                requestSequence = linkedListSequence,
+                                onListRequestConsumed = { linkedListSequence = 0L; linkedListId = null },
                             )
                         }
                     }

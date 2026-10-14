@@ -265,12 +265,15 @@ fun TitleDetailRoute(
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
     initialSchedule: Boolean = false,
+    schedulePrefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
+    initialPostShow: Boolean = false,
+    onInitialPostShowConsumed: () -> Unit = {},
     onInitialScheduleConsumed: () -> Unit = {},
     onScheduled: () -> Unit = {},
     noirPins: work.kumarfamilynet.cinemarchive.data.TitlePinsRepository? = null,
     onNoirMode: (String?) -> Unit = {},
 ) {
-    val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle(initialValue = emptyList())
+    val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle<List<CinemaOuting>?>(initialValue = null)
     val viewModel: TitleDetailViewModel =
         viewModel(key = titleId, factory = TitleDetailViewModelFactory(repository, outingsRepository, listsRepository, titleId, catalogExtrasSource))
     val detail by viewModel.uiState.collectAsStateWithLifecycle()
@@ -332,10 +335,14 @@ fun TitleDetailRoute(
             onScheduled()
         },
         initialSchedule = initialSchedule,
+        schedulePrefill = schedulePrefill,
+        initialPostShow = initialPostShow,
+        onInitialPostShowConsumed = onInitialPostShowConsumed,
+        ticketOutingsLoaded = ticketOutings != null,
         onInitialScheduleConsumed = onInitialScheduleConsumed,
         onCancelOuting = viewModel::onCancelOuting,
         onViewTicket = onViewTicket,
-        ticketOutings = ticketOutings,
+        ticketOutings = ticketOutings.orEmpty(),
         onPreparePostShow = viewModel::preparePostShow,
         onSavePostShow = viewModel::savePostShow,
         onRevertPostShow = viewModel::revertPostShow,
@@ -420,12 +427,17 @@ fun TitleDetailScreen(
     episodeBulkContent: (@Composable (TitleDetail, Int) -> Unit)? = null,
     noirContent: (@Composable (TitleDetail) -> Unit)? = null,
     initialSchedule: Boolean = false,
+    schedulePrefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
+    initialPostShow: Boolean = false,
+    onInitialPostShowConsumed: () -> Unit = {},
+    ticketOutingsLoaded: Boolean = true,
     onInitialScheduleConsumed: () -> Unit = {},
 ) {
     var scheduleOpening by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
     var preparingSchedule by remember { mutableStateOf(false) }
     var scheduleError by remember { mutableStateOf<String?>(null) }
     var scheduleTarget by remember { mutableStateOf<String?>(null) }
+    var schedulePrefillForOpening by remember { mutableStateOf(schedulePrefill) }
     val scheduleOriginal = scheduleOpening?.let { runCatching {
         work.kumarfamilynet.cinemarchive.data.capturedScheduleInitial(it, viewingOwnerId, viewingTitleId)
     } }
@@ -443,11 +455,12 @@ fun TitleDetailScreen(
     var deleting by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf<String?>(null) }
     val historyScope = rememberCoroutineScope()
-    fun openSchedule(outingId: String?) {
+    fun openSchedule(outingId: String?, prefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null) {
         if (preparingSchedule) return
         val openingOwner = viewingOwnerId
         val openingTitle = viewingTitleId
         scheduleTarget = outingId
+        schedulePrefillForOpening = prefill
         preparingSchedule = true
         scheduleError = null
         historyScope.launch {
@@ -464,7 +477,7 @@ fun TitleDetailScreen(
     androidx.compose.runtime.LaunchedEffect(initialSchedule, detail?.id, viewingOwnerId) {
         if (initialSchedule && detail?.type == MediaType.MOVIE) {
             onInitialScheduleConsumed()
-            if (scheduleOpening == null) openSchedule(null)
+            if (scheduleOpening == null) openSchedule(null, schedulePrefill)
         }
     }
     fun openViewing(viewing: Viewing?, deleting: Boolean = false) {
@@ -502,6 +515,16 @@ fun TitleDetailScreen(
             } catch (_: Exception) {
                 if (currentHistoryOwner == owner && currentHistoryTitle == current.id) viewingOpenError = "Couldn't open this viewing. Try again."
             } finally { preparingPostShow = false }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(initialPostShow, detail, ticketOutings, ticketOutingsLoaded) {
+        val current = detail ?: return@LaunchedEffect
+        if (initialPostShow && ticketOutingsLoaded) {
+            onInitialPostShowConsumed()
+            val pending = work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules.pendingFollowUp(
+                ticketOutings, current.viewings.associateBy { it.id }, Instant.now(),
+            ).maxByOrNull { Instant.parse(it.endsAt) }
+            current.viewings.firstOrNull { it.id == pending?.completedViewingId }?.let(::openPostShow)
         }
     }
     var showRemoveConfirm by rememberSaveable { mutableStateOf(false) }
@@ -854,6 +877,7 @@ fun TitleDetailScreen(
         OutingScheduleSheet(
             defaultRuntimeMinutes = detail?.runtime,
             initial = scheduleOriginal.getOrNull(),
+            prefill = schedulePrefillForOpening,
             onDismiss = { if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = null },
             onSave = { showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes ->
                 onSaveSchedule(opening, showtime, previews, runtime, venue, companions, format, price, seating, bookingRef, notes)

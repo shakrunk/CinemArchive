@@ -28,7 +28,13 @@ class SupabaseHttpException(
     message: String,
 ) : IllegalStateException(message) {
     val postgresCode: String? =
-        runCatching { JSONObject(responseBody).optString("code").takeIf { it.isNotEmpty() } }.getOrNull()
+        runCatching {
+            JSONObject(responseBody).optString("code").takeIf { it.isNotEmpty() }?.let { code ->
+                // Public RPCs use PT409 to avoid PostgREST retrying business conflicts as
+                // serialization failures. Keep the existing transport/recovery classification.
+                if (code == "PT409") "40001" else code
+            }
+        }.getOrNull()
 }
 
 /**

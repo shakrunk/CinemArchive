@@ -7,6 +7,9 @@ import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
@@ -151,19 +154,9 @@ class AddTitleViewModel(
         }
         detailsJob = viewModelScope.launch {
             val owned = libraryRepository.findLibraryTitleId(result.tmdbId, result.type)
-            runCatching { discoverRepository.fetchDetails(result) }
-                .onSuccess { details ->
-                    _uiState.update { it.copy(details = details, isLoadingDetails = false, alreadyOwnedTitleId = owned) }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            isLoadingDetails = false,
-                            detailsError = e.message ?: "Couldn't load this title",
-                            alreadyOwnedTitleId = owned,
-                        )
-                    }
-                }
+            val details = loadAddTitleDetails(result, discoverRepository::fetchDetails)
+            currentCoroutineContext().ensureActive()
+            _uiState.update { it.copy(details = details, isLoadingDetails = false, alreadyOwnedTitleId = owned) }
         }
     }
 
@@ -229,6 +222,30 @@ class AddTitleViewModel(
     private companion object {
         const val SEARCH_DEBOUNCE_MS = 400L
     }
+}
+
+/** Like web's selectResult, an unavailable metadata service must not block logging a known
+ * catalog snapshot. Keep unknown metadata empty; the normal library admission still owns writes. */
+internal suspend fun loadAddTitleDetails(
+    selected: MediaSearchResult,
+    fetch: suspend (MediaSearchResult) -> MediaDetails,
+): MediaDetails {
+    currentCoroutineContext().ensureActive()
+    val details = try {
+        fetch(selected)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        MediaDetails(
+            tmdbId = selected.tmdbId, type = selected.type, title = selected.title, year = selected.year,
+            posterUrl = selected.posterUrl, synopsis = selected.synopsis,
+            releaseDate = null, director = null, genres = emptyList(), backdropUrl = null,
+            runtime = null, network = null, originalLanguage = null, contentRating = null, imdbId = null,
+        )
+    }
+    // A superseded selection or disposed account may finish a non-cooperative fetch late.
+    currentCoroutineContext().ensureActive()
+    return details
 }
 
 class AddTitleViewModelFactory(

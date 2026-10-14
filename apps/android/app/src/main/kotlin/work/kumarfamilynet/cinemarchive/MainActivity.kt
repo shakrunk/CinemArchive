@@ -145,8 +145,11 @@ private val VoidColor = Color(0xFF0B0907)
 private val AmberColor = Color(0xFFE9B266)
 
 class MainActivity : ComponentActivity() {
+    private var callbackFailed by mutableStateOf(false)
     private var sharedToken by mutableStateOf<String?>(null)
     private var sharedLaunch by androidx.compose.runtime.mutableLongStateOf(0L)
+    private var pendingNavigation by mutableStateOf<PendingNavigation?>(null)
+    private var navigationSequence = 0L
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -159,12 +162,27 @@ class MainActivity : ComponentActivity() {
         val app = application as CinemArchiveApplication
         val token = SharingRules.tokenFromLink(uri.toString())
         if (token != null) {
+            pendingNavigation = null
             sharedToken = token
             sharedLaunch++
         }
         else if (app.authRepository.isAuthCallback(uri)) {
             lifecycleScope.launch {
-                withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
+                callbackFailed = false
+                try {
+                    withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    callbackFailed = true
+                }
+            }
+        }
+        else {
+            IncomingNavigation.parse(uri.toString())?.let { destination ->
+                sharedToken = null
+                pendingNavigation = PendingNavigation(destination, app.authRepository.observeIdentity().value,
+                    ++navigationSequence)
             }
         }
     }
@@ -265,6 +283,13 @@ class MainActivity : ComponentActivity() {
                                             appUpdateRepository,
                                             apkInstaller,
                                             initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
+                                            pendingNavigation = pendingNavigation,
+                                            onNavigationConsumed = { consumed ->
+                                                if (pendingNavigation == consumed) {
+                                                    pendingNavigation = null
+                                                    intent.data = null
+                                                }
+                                            },
                                             appVersionName = BuildConfig.VERSION_NAME,
                                             isDebugBuild = isDebugBuild,
                                              onOpenSharedLink = { sharedToken = it },
@@ -279,6 +304,16 @@ class MainActivity : ComponentActivity() {
                         // that's still up and over everything once it fades out.
                         if (showBuildBanner) {
                             DebugBuildBanner(isDebugBuild)
+                        }
+                        if (callbackFailed) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { callbackFailed = false },
+                                title = { Text("Couldn't finish sign-in") },
+                                text = { Text("Check your connection and open the sign-in link again. If it has expired, request a new link.") },
+                                confirmButton = {
+                                    androidx.compose.material3.TextButton(onClick = { callbackFailed = false }) { Text("OK") }
+                                },
+                            )
                         }
                         var showBrandedSplash by remember { mutableStateOf(true) }
                         AnimatedVisibility(
@@ -370,7 +405,12 @@ private fun DebugBuildBanner(isDebugBuild: Boolean) {
 private typealias Tab = work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 
 private sealed interface Overlay {
-    data class Detail(val titleId: String, val initialSchedule: Boolean = false) : Overlay
+    data class Detail(
+        val titleId: String,
+        val initialSchedule: Boolean = false,
+        val schedulePrefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
+        val initialPostShow: Boolean = false,
+    ) : Overlay
 
     /** [preselected] is set when the add was started from a specific Discover result rather
      *  than the FAB, so the overlay opens on its log step instead of an empty search box.
@@ -416,6 +456,8 @@ private fun CinemArchiveApp(
     appUpdateRepository: AppUpdateRepository,
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
+    pendingNavigation: PendingNavigation? = null,
+    onNavigationConsumed: (PendingNavigation) -> Unit = {},
     appVersionName: String,
     isDebugBuild: Boolean,
     onOpenSharedLink: (String) -> Unit,
@@ -442,6 +484,28 @@ private fun CinemArchiveApp(
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
     var shareOutingId by remember { mutableStateOf<String?>(null) }
     var globalSearch by remember(runtime) { mutableStateOf(false) }
+    var linkedListId by remember { mutableStateOf<String?>(null) }
+    var linkedListSequence by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    LaunchedEffect(pendingNavigation) {
+        val pending = pendingNavigation ?: return@LaunchedEffect
+        if (pending.canOpen(runtime.identity) && runtime.isCurrent()) {
+            val route = pending.destination
+            Tab.entries.firstOrNull { it.key == route.view }?.let { tab = it }
+            globalSearch = false
+            recommendTitleId = null
+            shareOutingId = null
+            linkedListId = route.listId
+            linkedListSequence = pending.sequence
+            overlay = when {
+                route.add -> Overlay.Add()
+                route.titleId != null -> Overlay.Detail(route.titleId)
+                route.view == "profile" -> Overlay.Profile
+                route.view == "friends" -> Overlay.Friends
+                else -> null
+            }
+        }
+        onNavigationConsumed(pending)
+    }
     val commandTitlesFlow = remember(repository) { repository.observeLibrary() }
     val commandTitles by commandTitlesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val commandFocus = remember(runtime) { FocusRequester() }
@@ -547,6 +611,23 @@ private fun CinemArchiveApp(
     // lifecycle, not the ViewModel layer, since it's app-shell-wide rather than one screen's.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val openSharedOuting: suspend (work.kumarfamilynet.cinemarchive.data.SharedOutingNotification) -> Unit = { shared ->
+        work.kumarfamilynet.cinemarchive.data.resolveSharedOutingNotification(
+            shared, runtime::isCurrent, repository::findLibraryTitleId, repository::addTitle,
+        )?.let { id ->
+            if (runtime.isCurrent()) {
+                runtime.syncTickets()
+                overlay = Overlay.Detail(id, initialSchedule = true, schedulePrefill = shared.prefill)
+            }
+        }
+    }
+    val openNotificationPostShow: (String) -> Unit = { id ->
+        if (runtime.isCurrent()) overlay = Overlay.Detail(id, initialPostShow = true)
+    }
+    val addSharedToCalendar: (work.kumarfamilynet.cinemarchive.data.SharedOutingNotification) -> Unit = { shared ->
+        if (runtime.isCurrent()) conflictContext.startActivity(
+            work.kumarfamilynet.cinemarchive.feature.friends.outingCalendarIntent(shared.plan))
+    }
     if (globalSearch && runtime.isCurrent()) OwnerGlobalSearch(
         "${runtime.ownerId}:${runtime.identity.generation}", commandTitles,
         onDismiss = { globalSearch = false },
@@ -605,8 +686,17 @@ private fun CinemArchiveApp(
                 // Pull remote changes (e.g. made on the web app while backgrounded) before
                 // deciding which outings are due, same ordering rationale as the launch path.
                 coroutineScope.launch {
-                    librarySyncRepository.syncNow()
-                    outingsRepository.completeDueOutings()
+                    try {
+                        librarySyncRepository.syncNow()
+                        if (authRepository.observeIdentity().value != runtime.identity) return@launch
+                        outingsRepository.completeDueOutings()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        if (authRepository.observeIdentity().value == runtime.identity) throw e
+                        // A callback can replace this runtime between sync and due-outing work.
+                        throw CancellationException("This sign-in has ended").also { it.initCause(e) }
+                    }
                 }
             }
         }
@@ -729,6 +819,9 @@ private fun CinemArchiveApp(
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
                                 onFabExpandedChange = { fabExpanded = it },
+                                requestedListId = linkedListId,
+                                requestSequence = linkedListSequence,
+                                onListRequestConsumed = { linkedListSequence = 0L; linkedListId = null },
                             )
                         }
                     }
@@ -891,6 +984,9 @@ private fun CinemArchiveApp(
                                 onOpenTitle = { overlay = Overlay.Detail(it) },
                                 onOpenProfile = { selectedSettingsCategory = SettingsCategory.IDENTITY },
                                 onOpenFriends = { overlay = Overlay.Friends },
+                                onOpenPostShow = openNotificationPostShow,
+                                onGotTicketsToo = openSharedOuting,
+                                onAddToCalendar = addSharedToCalendar,
                                 showBack = false,
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
@@ -936,6 +1032,9 @@ private fun CinemArchiveApp(
                     onBack = closeOverlay,
                     initialSchedule = current.initialSchedule,
                     onInitialScheduleConsumed = { if (overlay == current) overlay = current.copy(initialSchedule = false) },
+                    schedulePrefill = current.schedulePrefill,
+                    initialPostShow = current.initialPostShow,
+                    onInitialPostShowConsumed = { if (overlay == current) overlay = current.copy(initialPostShow = false) },
                     onScheduled = runtime::syncTickets,
                     onRequestNotificationPermission = requestNotificationPermission,
                     onRecommendTitle = { recommendTitleId = it },
@@ -1018,11 +1117,20 @@ private fun CinemArchiveApp(
                     onOpenTitle = { overlay = Overlay.Detail(it) },
                     onOpenProfile = openProfile,
                     onOpenFriends = { overlay = Overlay.Friends },
+                    onOpenPostShow = openNotificationPostShow,
+                    onGotTicketsToo = openSharedOuting,
+                    onAddToCalendar = addSharedToCalendar,
                 )
                 Overlay.Friends -> FriendsWithAccessEditor(
                     runtime, titleSocialSource,
                     onBack = openProfile,
                     onOpenFriendLibrary = { id, label -> overlay = Overlay.FriendLibrary(id, label) },
+                    onOpenRecommendation = { destination ->
+                        if (runtime.isCurrent()) overlay = when (destination) {
+                            is work.kumarfamilynet.cinemarchive.feature.friends.RecommendationNavigation.Owned -> Overlay.Detail(destination.titleId)
+                            is work.kumarfamilynet.cinemarchive.feature.friends.RecommendationNavigation.Add -> Overlay.Add(destination.title)
+                        }
+                    },
                 )
                 is Overlay.FriendLibrary -> FriendLibraryRoute(
                     runtime.friendsRepository,
@@ -1081,6 +1189,7 @@ private fun FriendsWithAccessEditor(
     socialSource: work.kumarfamilynet.cinemarchive.feature.friends.TitleSocialSource,
     onBack: () -> Unit,
     onOpenFriendLibrary: (String, String) -> Unit,
+    onOpenRecommendation: (work.kumarfamilynet.cinemarchive.feature.friends.RecommendationNavigation) -> Unit,
 ) {
     key(runtime) {
         val titles by runtime.libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -1090,6 +1199,13 @@ private fun FriendsWithAccessEditor(
         }
         var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
         FriendsRoute(runtime.friendsRepository, runtime.ownerId, onBack, onOpenFriendLibrary,
+            onOpenRecommendation = { recommendation ->
+                work.kumarfamilynet.cinemarchive.feature.friends.recommendationNavigation(
+                    recommendation, runtime::isCurrent,
+                    runtime.friendsRepository::markRecommendationRead,
+                    runtime.libraryRepository::findLibraryTitleId,
+                )?.let { if (runtime.isCurrent()) onOpenRecommendation(it) }
+            },
             onEditFriendAccess = { id, label -> editing = id to label })
         editing?.let { (id, label) ->
             work.kumarfamilynet.cinemarchive.feature.settings.ShareScopeEditorDialog(

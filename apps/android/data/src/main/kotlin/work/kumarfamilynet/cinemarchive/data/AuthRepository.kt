@@ -3,6 +3,7 @@ package work.kumarfamilynet.cinemarchive.data
 import android.content.Context
 import android.net.Uri
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -44,6 +45,10 @@ class AuthRepository(
 
     private val _session = MutableStateFlow(store.read())
     private val _identity = MutableStateFlow(_session.value?.let { AuthIdentity(it.userId, generation.incrementAndGet()) })
+    private val _reauthenticationRequired = MutableStateFlow(false)
+
+    /** Permanent refresh refusal; owner databases and pending changes are retained. */
+    fun observeReauthenticationRequired(): StateFlow<Boolean> = _reauthenticationRequired
 
     fun observeSession(): StateFlow<SupabaseSession?> = _session
 
@@ -51,8 +56,8 @@ class AuthRepository(
     fun observeIdentity(): StateFlow<AuthIdentity?> = _identity
 
     /** Refreshes an about-to-expire access token before handing the session back. Falls back to
-     *  the (stale) current session if the refresh call itself fails, so a transient network
-     *  hiccup surfaces as a retryable push failure rather than a forced sign-out. Blocking:
+     *  the current session on transient failure; a permanent refusal requests sign-in again.
+     *  A network hiccup remains a retryable push failure rather than a forced sign-out. Blocking:
      *  call from an IO thread. */
     override fun currentSession(): SupabaseSession? {
         val current = _session.value ?: return null
@@ -63,7 +68,24 @@ class AuthRepository(
             if (!needsRefresh(latest)) return latest
             val startGeneration = generation.get()
             val refreshToken = latest.refreshToken ?: return latest
-            val refreshed = runCatching { client.refreshSession(refreshToken) }.getOrNull() ?: return latest
+            val refreshed = try {
+                client.refreshSession(refreshToken)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                synchronized(identityLock) {
+                    // A late refusal must never end a newer sign-in, even for the same user.
+                    if (generation.get() != startGeneration || _session.value?.refreshToken != refreshToken) {
+                        return _session.value
+                    }
+                    if (isPermanentRefreshRefusal(failure)) {
+                        _reauthenticationRequired.value = true
+                        clearSession()
+                        return null
+                    }
+                    return _session.value
+                }
+            }
             synchronized(identityLock) {
                 val stillSame = generation.get() == startGeneration && _session.value?.refreshToken == refreshToken
                 if (!stillSame) return _session.value
@@ -134,6 +156,7 @@ class AuthRepository(
         synchronized(identityLock) {
             val gen = generation.incrementAndGet()
             persist(session)
+            _reauthenticationRequired.value = false
             _identity.value = AuthIdentity(session.userId, gen)
         }
     }
@@ -141,11 +164,31 @@ class AuthRepository(
     /** Invalidates immediately — never waits for an in-flight refresh. */
     fun signOut() {
         synchronized(identityLock) {
-            generation.incrementAndGet()
-            store.clear()
-            _session.value = null
-            _identity.value = null
+            _reauthenticationRequired.value = false
+            clearSession()
         }
+    }
+
+    /** Clears credentials only, never the owner-scoped database or outbox. Caller holds identityLock. */
+    private fun clearSession() {
+        generation.incrementAndGet()
+        store.clear()
+        _session.value = null
+        _identity.value = null
+    }
+
+    private fun isPermanentRefreshRefusal(failure: Exception): Boolean {
+        if (failure !is SupabaseHttpException || failure.status !in 400..499 || failure.status == 429) return false
+        // GoTrue's error_code is distinct from PostgREST's code. Do not classify by message
+        // or by HTTP 400 alone: conflicts, rate limits and server failures are retryable.
+        val code = runCatching {
+            val body = org.json.JSONObject(failure.responseBody)
+            body.optString("error_code").ifEmpty { body.optString("code") }
+        }.getOrNull()
+        return code in setOf(
+            "refresh_token_not_found", "refresh_token_already_used",
+            "session_not_found", "session_expired", "user_not_found", "user_banned",
+        )
     }
 
     private fun needsRefresh(session: SupabaseSession): Boolean {

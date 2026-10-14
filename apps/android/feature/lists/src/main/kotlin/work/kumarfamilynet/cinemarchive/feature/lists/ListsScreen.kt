@@ -112,6 +112,9 @@ fun ListsRoute(
     onOpenProfile: () -> Unit = {},
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
+    requestedListId: String? = null,
+    requestSequence: Long = 0L,
+    onListRequestConsumed: () -> Unit = {},
 ) {
     val viewModel: ListsViewModel = viewModel(factory = ListsViewModelFactory(listsRepository, libraryRepository))
     val lists by viewModel.lists.collectAsStateWithLifecycle()
@@ -125,6 +128,13 @@ fun ListsRoute(
     // MainActivity) — plain `remember` would silently drop back to the grid every time the
     // user returns to a list they had open.
     var selectedListId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(requestSequence) {
+        if (requestSequence != 0L) {
+            // Keep the ID while the owner-scoped list Flow hydrates after sign-in/sync.
+            selectedListId = requestedListId
+            onListRequestConsumed()
+        }
+    }
     val selectedList = lists.find { it.id == selectedListId }
 
     if (selectedList != null) {

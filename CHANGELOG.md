@@ -9,6 +9,20 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-10-14
+
+### Fixed
+- Android can log a selected title from its known catalog snapshot when metadata lookup is unavailable, matching web behavior.
+- Android recommendation inbox entries now open owned titles or the preselected add flow and expose valid watch links.
+- Android shared-outing notifications now open calendar and prefilled scheduling actions; completed-outing notifications open the pending post-show editor.
+- Android now requests a fresh sign-in when the server permanently rejects a session refresh, while retaining saved changes and tolerating temporary network failures.
+- Android now opens title, list, and add-title destinations from ordinary CinemArchive links.
+- Web changes made while startup synchronization is finishing now trigger a follow-up sync instead of waiting for another browser event.
+- Web shared and friend libraries now show failed-load errors with a retry action instead of presenting an empty archive.
+- Android account changes now cancel obsolete background synchronization instead of crashing while retaining account isolation.
+- Android sign-in callback failures now show a recoverable error instead of closing the app.
+- Revision conflicts now return promptly over Supabase HTTP instead of entering server retries; web and Android retain pending edits for conflict review.
+
 ## [1.34.0] - 2026-10-09
 
 ### Fixed

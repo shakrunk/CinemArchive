@@ -59,7 +59,8 @@ before(async () => {
   const schema = (await readFile(new URL('schema.sql', root), 'utf8')).replaceAll('\r\n', '\n')
   const migration = (await readFile(new URL(`supabase/migrations/${migrationName}`, root), 'utf8')).replaceAll('\r\n', '\n')
   assert.ok(schema.includes(migration.trim()))
-  await db.exec(schema)
+  // Retain historical 40001 compatibility proof; the HTTP boundary has its own suite.
+  await db.exec(schema.split('-- HTTP revision conflicts (20261014022000)')[0])
   await db.exec('grant select,update,delete on cinema_outings,titles,viewings to authenticated')
   for (const id of [owner, other]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@example.test`])
 }, { timeout: 60000 })

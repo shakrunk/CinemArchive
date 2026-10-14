@@ -375,6 +375,10 @@ export function Library() {
   const setFilter = useAppStore((s) => s.setFilter)
   const setViewMode = useAppStore((s) => s.setViewMode)
   const setGridSize = useAppStore((s) => s.setGridSize)
+  const viewerContext = useAppStore((s) => s.viewerContext)
+  const libraryLoadError = useAppStore((s) => s.libraryLoadError)
+  const loadSharedLibrary = useAppStore((s) => s.loadSharedLibrary)
+  const loadFriendLibrary = useAppStore((s) => s.loadFriendLibrary)
   const [filterOpen, setFilterOpen] = useState(false)
   const { copiedId, copy } = useCopyFeedback()
   const copied = copiedId === 'rec-prompt'
@@ -434,6 +438,27 @@ export function Library() {
     if (filters.groupByFranchise) count++
     return count
   }, [filters])
+
+  if (libraryLoadError && viewerContext.kind !== 'owner') {
+    return (
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
+        <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">The Library</h1>
+        <div role="alert">
+          <EmptyState
+            Icon={Film}
+            title="This library couldn't be loaded."
+            subtext={libraryLoadError}
+            ctaLabel="Try again"
+            ctaClassName="mt-6"
+            onCta={() => {
+              if (viewerContext.kind === 'shared-link') void loadSharedLibrary(viewerContext.token)
+              else void loadFriendLibrary(viewerContext.userId, viewerContext.displayName)
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">

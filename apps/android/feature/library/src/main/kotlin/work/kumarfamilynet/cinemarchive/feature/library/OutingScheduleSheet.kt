@@ -97,6 +97,7 @@ fun OutingScheduleSheet(
     onEditVenueNote: ((String) -> Unit)? = null,
     /** Portable ticket capture lives in the account-scoped viewer after the outing is saved. */
     onManageTicket: ((CinemaOuting) -> Unit)? = null,
+    prefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
 ) {
     val zoneId = rememberSaveable { ZoneId.systemDefault().id }
     val zone = remember(zoneId) { ZoneId.of(zoneId) }
@@ -105,12 +106,12 @@ fun OutingScheduleSheet(
     var saving by remember { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = saving) {}
-    val initialInstant = initial?.showtime?.let { Instant.parse(it) } ?: Instant.now().plusSeconds(3600)
+    val initialInstant = (initial?.showtime ?: prefill?.showtime)?.let { Instant.parse(it) } ?: Instant.now().plusSeconds(3600)
     var date by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalDate().toString()) }
     var time by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalTime().withSecond(0).withNano(0).toString()) }
-    var venue by rememberSaveable { mutableStateOf(initial?.venue ?: "") }
+    var venue by rememberSaveable { mutableStateOf(initial?.venue ?: prefill?.venue ?: "") }
     var companionsText by rememberSaveable { mutableStateOf(initial?.companions?.joinToString(", ") ?: "") }
-    var format by rememberSaveable { mutableStateOf(initial?.format ?: CinemaFormat.STANDARD) }
+    var format by rememberSaveable { mutableStateOf(initial?.format ?: prefill?.format ?: CinemaFormat.STANDARD) }
     var formatChanged by rememberSaveable { mutableStateOf(false) }
     var previews by rememberSaveable { mutableStateOf((initial?.previewsMinutes ?: 20).toString()) }
     var runtime by rememberSaveable { mutableStateOf((initial?.runtimeMinutes ?: defaultRuntimeMinutes ?: 120).toString()) }

@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android:** the header profile avatar now shows the user's display-name initial on launch instead of an email-derived letter until Settings was opened.
+
 ## [1.35.0] - 2026-10-14
 
 ### Changed

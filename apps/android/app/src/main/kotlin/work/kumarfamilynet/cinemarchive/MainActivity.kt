@@ -575,6 +575,9 @@ private fun CinemArchiveApp(
         accountRepository.onSessionChanged(session?.userId)
         notificationsRepository.onSessionChanged(session?.userId)
         if (session != null) {
+            // Header avatar reads the cached profile; without this it falls back to the
+            // email-derived initial until a settings screen happens to fetch it.
+            runCatching { accountRepository.refreshProfile() }
             // STARTED-gated: refreshes once on every resume, never polls while backgrounded.
             pollOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
                 while (true) {

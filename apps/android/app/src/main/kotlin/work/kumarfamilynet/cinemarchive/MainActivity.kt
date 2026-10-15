@@ -429,6 +429,8 @@ private sealed interface Overlay {
     data class FriendLibrary(val friendUserId: String, val label: String) : Overlay
     data object Appearance : Overlay
     data object Navigation : Overlay
+    data object Moviegoing : Overlay
+    data object DataRecovery : Overlay
     data object ImportSync : Overlay
     data object About : Overlay
     data object Permissions : Overlay
@@ -716,13 +718,48 @@ private fun CinemArchiveApp(
     // gesture instead of popping the instant the finger lifts: `backProgress` tracks the
     // swipe (0..1) and drives the transform below. Only a *completed* gesture commits the
     // navigation; a cancelled one springs the overlay back to rest.
+    // Shared by the phone overlay stack and the wide-layout detail pane, which show the same screens.
+    val moviegoingScreen: @Composable (() -> Unit, Boolean) -> Unit = { onBack, showBack ->
+        work.kumarfamilynet.cinemarchive.feature.settings.SettingsPanelScreen(
+            title = "Moviegoing",
+            description = "Venue notes and theater interest follow your account.",
+            onBack = onBack,
+            showBack = showBack,
+        ) {
+            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
+                work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
+            }
+        }
+    }
+    val dataRecoveryScreen: @Composable (() -> Unit, Boolean) -> Unit = { onBack, showBack ->
+        work.kumarfamilynet.cinemarchive.feature.settings.DataRecoveryRoute(
+            legacyLoadStatus = runtime::legacyStatus,
+            legacyRestore = runtime::restoreLegacy,
+            onBack = onBack,
+            showBack = showBack,
+            outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
+            lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
+                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
+            listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
+                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
+            titleChangesContent = {
+                work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
+                work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
+            },
+            viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
+                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
+            ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
+            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
+        )
+    }
+
     val backProgress = remember { Animatable(0f) }
     PredictiveBackHandler(enabled = overlay != null) { progress ->
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
             overlay = when (overlay) {
                 Overlay.Identity, Overlay.Invites, Overlay.Notifications, Overlay.Friends,
-                Overlay.Appearance, Overlay.ImportSync, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
+                Overlay.Appearance, Overlay.Moviegoing, Overlay.ImportSync, Overlay.DataRecovery, Overlay.About, Overlay.Permissions, Overlay.DeveloperSettings -> Overlay.Profile
                 is Overlay.FriendLibrary -> Overlay.Friends
                 else -> null
             }
@@ -903,7 +940,9 @@ private fun CinemArchiveApp(
                 Overlay.Sharing -> SettingsCategory.SHARING
                 Overlay.Appearance -> SettingsCategory.APPEARANCE
                 Overlay.Navigation -> SettingsCategory.NAVIGATION
+                Overlay.Moviegoing -> SettingsCategory.MOVIEGOING
                 Overlay.ImportSync -> SettingsCategory.IMPORT_SYNC
+                Overlay.DataRecovery -> SettingsCategory.DATA_RECOVERY
                 Overlay.Permissions -> SettingsCategory.PERMISSIONS
                 Overlay.About -> SettingsCategory.ABOUT
                 Overlay.DeveloperSettings -> SettingsCategory.DEVELOPER
@@ -947,29 +986,13 @@ private fun CinemArchiveApp(
                             onOpenSharing = { selectedSettingsCategory = SettingsCategory.SHARING },
                             onOpenAppearance = { selectedSettingsCategory = SettingsCategory.APPEARANCE },
                             onOpenNavigation = { selectedSettingsCategory = SettingsCategory.NAVIGATION },
+                            onOpenMoviegoing = { selectedSettingsCategory = SettingsCategory.MOVIEGOING },
                             onOpenImportSync = { selectedSettingsCategory = SettingsCategory.IMPORT_SYNC },
+                            onOpenDataRecovery = { selectedSettingsCategory = SettingsCategory.DATA_RECOVERY },
                             onOpenAbout = { selectedSettingsCategory = SettingsCategory.ABOUT },
                             onOpenPermissions = { selectedSettingsCategory = SettingsCategory.PERMISSIONS },
                             devSettingsUnlocked = devSettingsUnlocked,
                             onOpenDeveloperSettings = { selectedSettingsCategory = SettingsCategory.DEVELOPER },
-                            legacyLoadStatus = runtime::legacyStatus,
-                            legacyRestore = runtime::restoreLegacy,
-                            outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
-                            lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
-                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
-                            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
-                            listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
-                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
-                            titleChangesContent = {
-                        work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
-                        work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
-                    },
-                            ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
-                            moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
-                                work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
-                            } },
-                            viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
-                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                             selectedCategory = activeCategory,
                         )
                     }
@@ -994,6 +1017,8 @@ private fun CinemArchiveApp(
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.NAVIGATION -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.MOVIEGOING -> moviegoingScreen(closeOverlay, false)
+                            SettingsCategory.DATA_RECOVERY -> dataRecoveryScreen(closeOverlay, false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
                                 backupContent = { Column {
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
@@ -1087,29 +1112,13 @@ private fun CinemArchiveApp(
                     onOpenSharing = { overlay = Overlay.Sharing },
                     onOpenAppearance = { overlay = Overlay.Appearance },
                     onOpenNavigation = { overlay = Overlay.Navigation },
+                    onOpenMoviegoing = { overlay = Overlay.Moviegoing },
                     onOpenImportSync = { overlay = Overlay.ImportSync },
+                    onOpenDataRecovery = { overlay = Overlay.DataRecovery },
                     onOpenAbout = { overlay = Overlay.About },
                     onOpenPermissions = { overlay = Overlay.Permissions },
                     devSettingsUnlocked = devSettingsUnlocked,
                     onOpenDeveloperSettings = { overlay = Overlay.DeveloperSettings },
-                    legacyLoadStatus = runtime::legacyStatus,
-                    legacyRestore = runtime::restoreLegacy,
-                    outingRecovery = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingRecoveryRepository) },
-                    lifecycleChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.outingLifecycleRecovery,
-                        subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIFECYCLE) },
-                            catalogRefreshContent = { androidx.compose.runtime.key(runtime) { work.kumarfamilynet.cinemarchive.feature.settings.CatalogRefreshSection(runtime.creditRefreshRepository::refreshAll) } },
-                            listChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.listMembershipRecovery,
-                                subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.LIST) },
-                    titleChangesContent = {
-                        work.kumarfamilynet.cinemarchive.feature.library.TitleMetadataRecoveryPanel(runtime.titleMetadataRepository)
-                        work.kumarfamilynet.cinemarchive.feature.library.EpisodeBulkRecoveryPanel(runtime.episodeBulkRepository)
-                    },
-                    ticketChangesContent = { work.kumarfamilynet.cinemarchive.feature.library.SavedTicketsSection(runtime.tickets) { id, title -> overlay = Overlay.Ticket(id, title) } },
-                    moviegoingContent = { work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
-                        work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
-                    } },
-                    viewingChangesContent = { work.kumarfamilynet.cinemarchive.feature.settings.OutingRecoverySection(runtime.viewingRecoveryRepository,
-                        subject = work.kumarfamilynet.cinemarchive.feature.settings.RecoverySubject.VIEWING) },
                 )
                 Overlay.Identity -> IdentityRoute(accountRepository, onBack = openProfile)
                 Overlay.Invites -> InvitesRoute(accountRepository, onBack = openProfile)
@@ -1145,6 +1154,8 @@ private fun CinemArchiveApp(
                 )
                 Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
                 Overlay.Navigation -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = openProfile)
+                Overlay.Moviegoing -> moviegoingScreen(openProfile, true)
+                Overlay.DataRecovery -> dataRecoveryScreen(openProfile, true)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
                     backupContent = { Column {
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)

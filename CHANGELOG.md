@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- **Android:** Profile settings are now grouped into Account, Social, Preferences, Data and App sections. Moviegoing has its own screen, and the saved-change recovery tools, legacy restore and catalog refresh moved from the bottom of Profile into a new Data & recovery screen.
+
 ## [1.35.1] - 2026-10-14
 
 ### Fixed

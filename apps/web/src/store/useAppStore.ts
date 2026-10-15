@@ -110,6 +110,10 @@ export interface AppNotification {
   /** Auto-dismiss after this many ms (tips only). */
   autoClose?: number
   retry?: () => Promise<void>
+  /** A secondary control that leaves the notification in place (e.g. "Review"). */
+  action?: { label: string; run: () => void }
+  /** Called whenever the notification is dismissed (✕, auto-close, or successful retry). */
+  onDismiss?: () => void
 }
 
 export interface LibraryFilters {
@@ -180,6 +184,9 @@ interface UISlice {
   selectedListId: string | null
   isSharedView: boolean
   isCommandPaletteOpen: boolean
+  // Review dialog for this device's unsynced library changes and cache
+  // recovery, opened from the sync toast or Settings → Data.
+  isLibrarySyncOpen: boolean
   // A top-level view requested by a component that can't reach App's currentView
   // (e.g. the detail drawer). App consumes and clears it. null = nothing pending.
   pendingView: AppView | null
@@ -218,6 +225,8 @@ interface UISlice {
   setIsSharedView: (isSharedView: boolean) => void
   openCommandPalette: () => void
   closeCommandPalette: () => void
+  openLibrarySync: () => void
+  closeLibrarySync: () => void
   requestView: (view: AppView | null) => void
   // Filter the library to titles featuring a person, then surface it: close the
   // drawer and request the Library view.
@@ -863,6 +872,11 @@ export const useAppStore = create<AppStore>()(
   openCommandPalette: () => set({ isCommandPaletteOpen: true }),
   closeCommandPalette: () => set({ isCommandPaletteOpen: false }),
 
+  isLibrarySyncOpen: false,
+  // Owner-only: pending work is never exposed while viewing a shared library.
+  openLibrarySync: () => { if (!get().isSharedView) set({ isLibrarySyncOpen: true }) },
+  closeLibrarySync: () => set({ isLibrarySyncOpen: false }),
+
   pendingView: null,
   requestView: (pendingView) => set({ pendingView }),
 
@@ -906,10 +920,13 @@ export const useAppStore = create<AppStore>()(
       }
     }),
 
-  dismissNotification: (id) =>
+  dismissNotification: (id) => {
+    const dismissed = get().notifications.find((n) => n.id === id)
     set((s) => ({
       notifications: s.notifications.filter((n) => n.id !== id),
-    })),
+    }))
+    dismissed?.onDismiss?.()
+  },
 
   notificationInbox: [],
   unreadNotificationCount: 0,
@@ -1058,12 +1075,13 @@ export const useAppStore = create<AppStore>()(
       offlineStatus: { ownerId: user?.id ?? null, hydrated: false, commands: [], quarantined: [] },
       viewerContext: { kind: 'owner' }, isSharedView: false, viewedLedgerWidgets: null,
       selectedTitleId: null, selectedListId: null, isDetailDrawerOpen: false, isAddTitleOpen: false,
-      isOutingScheduleOpen: false, isPostShowSheetOpen: false, postShowOutingId: null,
+      isOutingScheduleOpen: false, isPostShowSheetOpen: false, postShowOutingId: null, isLibrarySyncOpen: false,
     }))
     window.clearInterval(notificationPollTimer)
     notificationPollTimer = undefined
     if (get().legacyCacheAvailable) get().pushNotification({ dedupeKey: 'legacy-library-recovery', kind: 'tip',
       message: 'An older library cache is preserved on this device for recovery. It has not been assigned to this account.',
+      action: { label: 'Review', run: () => get().openLibrarySync() },
     })
     if (user && isDevMockUser(user)) {
       void loadAnonymousLibrary().catch(reportOfflineStorageError).finally(() => {
@@ -1137,7 +1155,7 @@ export const useAppStore = create<AppStore>()(
     const generation = libraryGeneration
     ownerLibraryRequest = undefined
     set((s) => ({ ...snapshotState(emptySnapshot(), s), loadingUser: true, isSharedView: true,
-      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
+      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] }, isLibrarySyncOpen: false,
       viewedLedgerWidgets: null, viewerContext: { kind: 'shared-link', token }, libraryLoadError: null }))
     try {
       const { titles: dbTitles, ledgerWidgets } = await fetchSharedLibrary(token)
@@ -1161,7 +1179,7 @@ export const useAppStore = create<AppStore>()(
     ownerLibraryRequest = undefined
     set((s) => ({
       ...snapshotState(emptySnapshot(), s), viewedLedgerWidgets: null,
-      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] },
+      offlineStatus: { ownerId: null, hydrated: false, commands: [], quarantined: [] }, isLibrarySyncOpen: false,
       loadingUser: true,
       isSharedView: true,
       libraryLoadError: null,

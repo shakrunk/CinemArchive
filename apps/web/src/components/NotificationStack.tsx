@@ -84,6 +84,14 @@ function NotificationCard({
             {retrying ? 'Retrying…' : 'Retry'}
           </button>
         )}
+        {notification.action && (
+          <button type="button"
+            onClick={notification.action.run}
+            className="mt-2 font-sans text-[10px] uppercase tracking-widest text-amber hover:text-amber/70 transition-opacity focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+          >
+            {notification.action.label}
+          </button>
+        )}
       </div>
       <button type="button"
         onClick={onDismiss}

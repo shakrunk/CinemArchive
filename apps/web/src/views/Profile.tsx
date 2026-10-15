@@ -40,6 +40,7 @@ import { isThemeDiscovered } from 'src/lib/easterEggThemes'
 import { InviteRedeemForm } from 'src/components/InviteRedeemForm'
 import { MessageBanner, type Message } from 'src/components/ui/message-banner'
 import { SyncConnections } from 'src/components/SyncConnections'
+import { useLibrarySyncNeedsReview } from 'src/lib/useLibrarySyncNeedsReview'
 import { Section } from 'src/components/ui/section'
 import { LoadingRow, EmptyRow } from 'src/components/ui/loading-row'
 import { Eyebrow } from 'src/components/ui/typography'
@@ -985,6 +986,8 @@ function DataSection() {
   const updateTitle = useAppStore((s) => s.updateTitle)
   const outings = useAppStore((s) => s.outings)
   const importLibrary = useAppStore((s) => s.importLibrary)
+  const openLibrarySync = useAppStore((s) => s.openLibrarySync)
+  const syncNeedsReview = useLibrarySyncNeedsReview()
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1086,6 +1089,18 @@ function DataSection() {
       description="Export your entire library as a JSON file, import a previously exported archive, bring your watch history and ratings over from a Letterboxd CSV export, or import from Simkl, Plex and Emby. Duplicates are skipped on import."
     >
       <MessageBanner message={message} />
+      {syncNeedsReview && (
+        <div className="flex items-center gap-3 max-w-md rounded-lg border border-amber/30 p-3">
+          <RefreshCw className="w-3.5 h-3.5 text-amber shrink-0" aria-hidden="true" />
+          <p className="flex-1 font-sans text-xs text-paper">This device has library changes or recovery data to review.</p>
+          <Button
+            onClick={openLibrarySync}
+            className="bg-secondary/60 hover:bg-amber/20 hover:text-amber text-paper font-sans text-xs border border-border transition-colors"
+          >
+            Review sync
+          </Button>
+        </div>
+      )}
       <div className="flex gap-2 max-w-md">
         <Button
           onClick={handleExport}

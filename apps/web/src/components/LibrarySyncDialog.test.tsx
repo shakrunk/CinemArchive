@@ -1,17 +1,17 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { LibrarySyncStatus } from './LibrarySyncStatus'
+import { LibrarySyncDialog } from './LibrarySyncDialog'
 import { useAppStore } from '../store/useAppStore'
 import { createCommand } from '../lib/offline/commands'
 
 const command = { ...createCommand({ projectId: 'project', userId: 'owner' }, { kind: 'title.patch', titleId: 'title', patch: { notes: 'Keep this' } }), state: 'conflict' as const, lastError: 'A newer edit exists' }
-beforeEach(() => useAppStore.setState({ isSharedView: false, offlineStorageError: null, offlineSyncError: null, legacyCacheAvailable: false,
+beforeEach(() => useAppStore.setState({ isSharedView: false, isLibrarySyncOpen: true, offlineStorageError: null, offlineSyncError: null, legacyCacheAvailable: false,
   offlineStatus: { ownerId: 'owner', hydrated: true, commands: [command], quarantined: [] } }))
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 it('keeps failed work visible and reports a refused prerequisite discard', async () => {
   vi.spyOn(useAppStore.getState(), 'discardPendingCommand').mockRejectedValueOnce(new Error('Resolve dependent commands first'))
-  render(<LibrarySyncStatus />)
+  render(<LibrarySyncDialog />)
   expect(screen.getByText('A newer edit exists')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Discard…' }))
   fireEvent.click(screen.getByRole('button', { name: 'Confirm discard' }))
@@ -21,6 +21,20 @@ it('keeps failed work visible and reports a refused prerequisite discard', async
 
 it('never exposes owner pending work while viewing a shared library', () => {
   useAppStore.setState({ isSharedView: true })
-  render(<LibrarySyncStatus />)
+  render(<LibrarySyncDialog />)
   expect(screen.queryByLabelText('Library sync')).not.toBeInTheDocument()
+})
+
+it('stays closed until opened from the toast or Settings', () => {
+  useAppStore.setState({ isLibrarySyncOpen: false })
+  render(<LibrarySyncDialog />)
+  expect(screen.queryByLabelText('Library sync')).not.toBeInTheDocument()
+  useAppStore.getState().openLibrarySync()
+  expect(useAppStore.getState().isLibrarySyncOpen).toBe(true)
+})
+
+it('refuses to open while viewing a shared library', () => {
+  useAppStore.setState({ isSharedView: true, isLibrarySyncOpen: false })
+  useAppStore.getState().openLibrarySync()
+  expect(useAppStore.getState().isLibrarySyncOpen).toBe(false)
 })

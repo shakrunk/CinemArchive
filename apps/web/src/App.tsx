@@ -11,7 +11,8 @@ import { useOutingReconciler } from 'src/lib/useOutingReconciler'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
 import { NotificationStack } from 'src/components/NotificationStack'
-import { LibrarySyncStatus } from 'src/components/LibrarySyncStatus'
+import { LibrarySyncToast } from 'src/components/LibrarySyncToast'
+import { LibrarySyncDialog } from 'src/components/LibrarySyncDialog'
 import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
@@ -291,7 +292,6 @@ export default function App() {
           />
 
           <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
-            <LibrarySyncStatus key={librarySession} />
             <Suspense fallback={<ViewLoadingFallback />}>
               {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
               {currentView === 'library' && <Library />}
@@ -325,6 +325,11 @@ export default function App() {
           {postShowSheetEverOpened && (
             <Suspense fallback={null}><PostShowSheet key={librarySession} /></Suspense>
           )}
+          {/* Unsynced local changes surface as a toast (see NotificationStack
+              below); its Review action opens the full sync dialog. Kept outside
+              <main>, which remounts on every view change. */}
+          <LibrarySyncToast key={librarySession} />
+          <LibrarySyncDialog key={`sync-${librarySession}`} />
         </>
       )}
       {commandPaletteEverOpened && (

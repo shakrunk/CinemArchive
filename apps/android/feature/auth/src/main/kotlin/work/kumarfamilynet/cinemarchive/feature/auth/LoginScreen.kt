@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.auth
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -173,7 +175,7 @@ private fun MagicLinkPane(onSend: suspend (String) -> Unit, modifier: Modifier =
                 scope.launch {
                     status = runCatching { onSend(email.trim()) }.fold(
                         onSuccess = { MagicLinkStatus.Sent },
-                        onFailure = { MagicLinkStatus.Error(it.message ?: "Something went wrong — try again.") },
+                        onFailure = { MagicLinkStatus.Error(it.userMessage("Something went wrong — try again.")) },
                     )
                 }
             },
@@ -250,7 +252,7 @@ private fun InvitePane(onRedeem: suspend (String, String) -> Unit, modifier: Mod
                 scope.launch {
                     status = runCatching { onRedeem(email.trim(), code.trim()) }.fold(
                         onSuccess = { MagicLinkStatus.Sent },
-                        onFailure = { MagicLinkStatus.Error(it.message ?: "Failed to redeem invite code.") },
+                        onFailure = { MagicLinkStatus.Error(it.userMessage("Failed to redeem invite code.")) },
                     )
                 }
             },

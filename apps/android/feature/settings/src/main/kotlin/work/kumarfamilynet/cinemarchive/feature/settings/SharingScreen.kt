@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -78,7 +80,7 @@ fun SharingRoute(
             keys = repository.listSharedKeys()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            status = (e.message ?: "Couldn't load share links.") to true
+            status = (e.userMessage("Couldn't load share links.")) to true
         }
         loading = false
     }
@@ -131,7 +133,7 @@ fun SharingRoute(
                                     reload()
                                 } catch (e: Exception) {
                                     if (e is kotlinx.coroutines.CancellationException) throw e
-                                    status = (e.message ?: "Couldn't create the link.") to true
+                                    status = (e.userMessage("Couldn't create the link.")) to true
                                 } finally {
                                     creating = false
                                 }
@@ -194,7 +196,7 @@ fun SharingRoute(
                             reload()
                         } catch (e: Exception) {
                             if (e is kotlinx.coroutines.CancellationException) throw e
-                            status = (e.message ?: "Couldn't revoke the link.") to true
+                            status = (e.userMessage("Couldn't revoke the link.")) to true
                         }
                     }
                 }) { Text("Revoke") }

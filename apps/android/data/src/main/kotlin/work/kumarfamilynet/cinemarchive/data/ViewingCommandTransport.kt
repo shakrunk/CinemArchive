@@ -50,9 +50,9 @@ internal class ViewingCommandTransport(
         catch (error: SupabaseHttpException) {
             if (!accepted && error.postgresCode in setOf("40001", "P0002", "23505"))
                 PushResult.Review("This viewing changed or was removed. Review your saved change before applying it again.")
-            else PushResult.Retry(error.message ?: "Could not confirm viewing sync. Retry the same saved command.")
+            else PushResult.Retry(error.userMessage("Could not confirm viewing sync. Retry the same saved command."))
         } catch (error: Exception) {
-            PushResult.Retry(error.message ?: "Could not confirm viewing sync. Retry the same saved command.")
+            PushResult.Retry(error.userMessage("Could not confirm viewing sync. Retry the same saved command."))
         }
     }
 }

@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -162,7 +164,7 @@ private fun ImportSyncContent(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (services.repository.isCurrent()) message = true to (e.message?.takeIf { it.isNotBlank() } ?: fallback)
+                if (services.repository.isCurrent()) message = true to (e.userMessage(fallback))
             } finally {
                 if (services.repository.isCurrent()) {
                     busy = null
@@ -268,7 +270,7 @@ private fun ImportSyncContent(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (services.repository.isCurrent()) message = true to (e.message ?: "Could not disconnect.")
+                if (services.repository.isCurrent()) message = true to (e.userMessage("Could not disconnect."))
             }
         }
     }

@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.discover
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -109,7 +111,7 @@ class AddTitleViewModel(
                 result
                     .onSuccess { hits -> _uiState.update { it.copy(results = hits, isSearching = false, searchError = null) } }
                     .onFailure { e ->
-                        _uiState.update { it.copy(results = emptyList(), isSearching = false, searchError = e.message ?: "Search failed") }
+                        _uiState.update { it.copy(results = emptyList(), isSearching = false, searchError = e.userMessage("Search failed")) }
                     }
             }
             .launchIn(viewModelScope)
@@ -132,7 +134,7 @@ class AddTitleViewModel(
         viewModelScope.launch {
             runCatching { discoverRepository.searchMedia(query) }
                 .onSuccess { hits -> _uiState.update { it.copy(results = hits, isSearching = false, searchError = null) } }
-                .onFailure { e -> _uiState.update { it.copy(isSearching = false, searchError = e.message ?: "Search failed") } }
+                .onFailure { e -> _uiState.update { it.copy(isSearching = false, searchError = e.userMessage("Search failed")) } }
         }
     }
 
@@ -214,7 +216,7 @@ class AddTitleViewModel(
                     onAdded(id)
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isSaving = false, saveError = e.message ?: "Couldn't add this title") }
+                    _uiState.update { it.copy(isSaving = false, saveError = e.userMessage("Couldn't add this title")) }
                 }
         }
     }

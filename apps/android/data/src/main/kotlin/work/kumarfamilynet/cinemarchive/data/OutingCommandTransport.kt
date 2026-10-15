@@ -45,9 +45,9 @@ internal class OutingCommandTransport(
         catch (error: SupabaseHttpException) {
             if (!receiptReceived && error.postgresCode in setOf("40001", "P0002", "23505"))
                 PushResult.Review("The outing changed or is no longer available. Open Profile > Saved outing changes to compare your saved fields.")
-            else PushResult.Retry(error.message ?: "Could not confirm outing sync. Retry the same saved command.")
+            else PushResult.Retry(error.userMessage("Could not confirm outing sync. Retry the same saved command."))
         } catch (error: Exception) {
-            PushResult.Retry(error.message ?: "Could not confirm outing sync. Retry the same saved command.")
+            PushResult.Retry(error.userMessage("Could not confirm outing sync. Retry the same saved command."))
         }
     }
 }

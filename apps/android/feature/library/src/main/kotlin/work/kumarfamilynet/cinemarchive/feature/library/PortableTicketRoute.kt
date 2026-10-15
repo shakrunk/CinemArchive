@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -61,7 +63,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
         scope.launch {
             try { work() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "Could not finish. Your saved ticket is retained." }
+            catch (failure: Exception) { error = failure.userMessage("Could not finish. Your saved ticket is retained.") }
             finally { busy = false }
         }
     }
@@ -108,7 +110,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
         if (state.association?.attachment != null) {
             try { photo = runtime.photo(outingId)?.file }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "Original unavailable. Reconnect to download it." }
+            catch (failure: Exception) { error = failure.userMessage("Original unavailable. Reconnect to download it.") }
         }
     }
     LaunchedEffect(runtime, outingId) {

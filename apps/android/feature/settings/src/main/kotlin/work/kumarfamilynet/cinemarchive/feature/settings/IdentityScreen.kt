@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,7 +47,7 @@ fun IdentityRoute(accountRepository: AccountRepository, onBack: () -> Unit, show
             accountRepository.refreshProfile()
             loadError = null
         } catch (e: Exception) {
-            loadError = e.message ?: "Couldn't load your profile."
+            loadError = e.userMessage("Couldn't load your profile.")
         }
         loading = false
     }
@@ -132,7 +134,7 @@ private fun IdentityForm(accountRepository: AccountRepository, savedName: String
                             accountRepository.updateProfile(edit)
                             true to "Profile saved."
                         } catch (e: Exception) {
-                            false to (e.message?.takeIf { !it.startsWith("PATCH ") } ?: "Failed to save profile.")
+                            false to (e.userMessage("Failed to save profile."))
                         }
                         saving = false
                     }

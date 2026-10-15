@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -28,7 +30,7 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
         scope.launch {
             try { action() }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { if (source.isCurrent()) message = error.message ?: "The saved import is still available. Try again." }
+            catch (error: Exception) { if (source.isCurrent()) message = error.userMessage("The saved import is still available. Try again.") }
             finally { busy = false }
         }
     }

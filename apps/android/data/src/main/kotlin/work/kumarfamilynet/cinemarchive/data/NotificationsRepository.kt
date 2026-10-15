@@ -200,7 +200,7 @@ class NotificationsRepository(
             }
             refreshUnreadCount()
         } catch (e: Exception) {
-            updateIfCurrent(session.userId) { it.copy(loaded = true, error = e.message ?: "Couldn't load notifications.") }
+            updateIfCurrent(session.userId) { it.copy(loaded = true, error = e.userMessage("Couldn't load notifications.")) }
         }
     }
 

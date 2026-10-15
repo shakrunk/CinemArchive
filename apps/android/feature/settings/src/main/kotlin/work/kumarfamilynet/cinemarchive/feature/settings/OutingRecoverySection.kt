@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -46,7 +48,7 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
                 }
                 if (source.isActive()) exportMessage = "Original saved change exported."
             } catch (error: Exception) {
-                if (source.isActive()) exportMessage = error.message ?: "Could not export the original."
+                if (source.isActive()) exportMessage = error.userMessage("Could not export the original.")
             }
         }
     }

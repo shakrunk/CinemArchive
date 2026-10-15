@@ -268,16 +268,10 @@ object FriendsRules {
     /** Web toggle: tapping your current emoji clears it (null), otherwise sets it. */
     fun nextReaction(current: String?, tapped: String): String? = if (current == tapped) null else tapped
 
-    /** Web `getErrorMessage(err, fallback)` for a PostgREST failure: the server's `message`
-     *  (e.g. "Cannot send a friend request to this user"), else [fallback]. The raw
+    /** Web `getErrorMessage(err, fallback)` for a PostgREST failure: the server's deliberately authored `message`
+     *  (e.g. "Cannot send a friend request to this user"), else a classified [userMessage] or [fallback]. The raw
      *  [SupabaseHttpException] message embeds the URL, so it is never surfaced. */
-    fun errorMessage(e: Throwable, fallback: String): String {
-        if (e is SupabaseHttpException) {
-            val serverMessage = runCatching { JSONObject(e.responseBody).optString("message") }.getOrNull()
-            return serverMessage?.takeIf { it.isNotBlank() } ?: fallback
-        }
-        return e.message?.takeIf { it.isNotBlank() } ?: fallback
-    }
+    fun errorMessage(e: Throwable, fallback: String): String = e.userMessage(fallback)
 }
 
 private fun JSONObject.optIntOrNull(key: String): Int? = if (isNull(key) || !has(key)) null else optInt(key)

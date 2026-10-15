@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,7 +29,7 @@ internal fun CreditRefreshControl(titleId: String, refresh: suspend () -> Boolea
                     throw cancelled
                 } catch (error: Exception) {
                     failed = true
-                    message = error.message ?: "Could not refresh metadata. Try again."
+                    message = error.userMessage("Could not refresh metadata. Try again.")
                 } finally { busy = false }
             }
         }) { Text(if (busy) "Refreshing metadata…" else "Refresh metadata") }

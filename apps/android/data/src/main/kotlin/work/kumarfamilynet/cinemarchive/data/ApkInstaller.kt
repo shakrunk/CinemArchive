@@ -100,7 +100,7 @@ class ApkInstaller(
                 }
             }
         }.onFailure { error ->
-            installStateFlow.value = ApkInstallState.Failed(error.message ?: "Download failed")
+            installStateFlow.value = ApkInstallState.Failed(error.userMessage("Download failed"))
         }
     }
 

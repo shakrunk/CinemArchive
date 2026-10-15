@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -70,7 +72,7 @@ internal fun ViewingEditorSheet(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            error = e.message ?: "Couldn't save viewing. Try again."
+                            error = e.userMessage("Couldn't save viewing. Try again.")
                         } finally {
                             saving = false
                         }

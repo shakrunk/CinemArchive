@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -112,7 +114,7 @@ fun NotificationsRoute(
                                         repository.markRead(n.id)
                                         onGotTicketsToo(shared)
                                     } catch (cancelled: CancellationException) { throw cancelled
-                                    } catch (failure: Exception) { actionError = failure.message ?: "Couldn't open these plans. Try again."
+                                    } catch (failure: Exception) { actionError = failure.userMessage("Couldn't open these plans. Try again.")
                                     } finally { opening = false }
                                 }
                             }

@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -69,7 +71,7 @@ internal fun EpisodeHistoryPanel(
                     scope.launch {
                         try { onDelete(episode.id, watch.id); deleteWatch = null }
                         catch (e: CancellationException) { throw e }
-                        catch (e: Exception) { error = e.message ?: "Couldn't delete watch. Try again." }
+                        catch (e: Exception) { error = e.userMessage("Couldn't delete watch. Try again.") }
                         finally { deleting = false }
                     }
                 }) { Text(if (deleting) "Deleting…" else "Delete watch", color = MaterialTheme.colorScheme.error) }
@@ -113,7 +115,7 @@ private fun EpisodeLogSheet(episode: EpisodeDetail, isSpiderNoir: Boolean, onSav
                     rating.takeIf { it > 0 }, review.trim().takeIf { it.isNotEmpty() }, colorMode))
                 onDismiss()
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error = e.message ?: "Couldn't save episode log. Retry the same request." }
+            catch (e: Exception) { error = e.userMessage("Couldn't save episode log. Retry the same request.") }
             finally { saving = false }
         }
     }

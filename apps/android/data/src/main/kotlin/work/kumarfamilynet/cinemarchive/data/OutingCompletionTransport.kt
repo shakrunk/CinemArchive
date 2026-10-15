@@ -45,9 +45,9 @@ internal class OutingCompletionTransport(
         catch (error: SupabaseHttpException) {
             if (!accepted && error.postgresCode in setOf("40001", "23505"))
                 PushResult.Review("Completion needs review. Your provisional history and pending edits are preserved.")
-            else PushResult.Retry(error.message ?: "Could not confirm completion. Retry the same saved command.")
+            else PushResult.Retry(error.userMessage("Could not confirm completion. Retry the same saved command."))
         } catch (error: Exception) {
-            PushResult.Retry(error.message ?: "Could not confirm completion. Retry the same saved command.")
+            PushResult.Retry(error.userMessage("Could not confirm completion. Retry the same saved command."))
         }
     }
 }

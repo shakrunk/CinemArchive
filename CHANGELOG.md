@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android:** Network and server failures now show a plain-language message (for example "Can't reach CinemArchive. Check your connection and try again.") instead of raw technical text such as "Software caused connection abort".
+
 ### Changed
 
 - **Android:** Profile settings are now grouped into Account, Social, Preferences, Data and App sections. Moviegoing has its own screen, and the saved-change recovery tools, legacy restore and catalog refresh moved from the bottom of Profile into a new Data & recovery screen.

@@ -41,7 +41,7 @@ class CreditRefreshRepository(
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
                 check(isCurrentOwner()) { "This sign-in has ended" }
-                failures += "${title.title}: ${failure.message ?: "Could not refresh"}"
+                failures += "${title.title}: ${failure.userMessage("Could not refresh")}"
             }
             progress(CatalogRefreshProgress(index + 1, titles.size, title.title))
         }

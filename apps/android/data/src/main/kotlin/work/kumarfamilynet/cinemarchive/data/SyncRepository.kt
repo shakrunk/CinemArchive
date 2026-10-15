@@ -114,7 +114,7 @@ class SyncRepository(
                             throw error
                         } catch (error: Exception) {
                             fence()
-                            if (resolved) failed += "$label: ${error.message ?: "could not save"}" else unmatched += label
+                            if (resolved) failed += "$label: ${error.userMessage("could not save")}" else unmatched += label
                         } finally {
                             if (current()) onProgress(done.incrementAndGet(), items.size)
                         }

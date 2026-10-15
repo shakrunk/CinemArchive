@@ -281,9 +281,9 @@ class FriendsRepositoryTest {
         }
         val repo = friendsRepo(http)
         expectFailure("Cannot send a friend request to this user") { repo.sendFriendRequest("x") }
-        expectFailure("permission denied for function send_friend_request") { repo.sendFriendRequest("x") }
         expectFailure("Failed to send friend request.") { repo.sendFriendRequest("x") }
         expectFailure("Failed to send friend request.") { repo.sendFriendRequest("x") }
+        expectFailure("CinemArchive is having trouble right now. Try again in a moment.") { repo.sendFriendRequest("x") }
     }
 
     @Test fun cancelMapsServerMessageAndFallback() = runTest {
@@ -293,7 +293,7 @@ class FriendsRepositoryTest {
         }
         val repo = friendsRepo(http)
         expectFailure("No pending friend request to this user") { repo.cancelFriendRequest("x") }
-        expectFailure("Failed to cancel friend request.") { repo.cancelFriendRequest("x") }
+        expectFailure(OFFLINE_MESSAGE) { repo.cancelFriendRequest("x") }
     }
 
     @Test fun errorCauseIsPreserved() = runTest {

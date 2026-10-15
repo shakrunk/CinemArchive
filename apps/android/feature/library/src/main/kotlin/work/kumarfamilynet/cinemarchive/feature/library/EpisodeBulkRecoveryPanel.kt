@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -37,7 +39,7 @@ fun EpisodeBulkRecoveryPanel(source: EpisodeBulkRepository) {
                     }
                     if (source.isActive()) message = "Original requests exported."
                 } catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { if (source.isActive()) message = failure.message ?: "Could not export originals." }
+                catch (failure: Exception) { if (source.isActive()) message = failure.userMessage("Could not export originals.") }
             }
         }
         if (source.isActive()) {
@@ -67,7 +69,7 @@ fun EpisodeBulkRecoveryPanel(
         coroutine.launch {
             try { action() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "Could not confirm this request. Retry." }
+            catch (failure: Exception) { error = failure.userMessage("Could not confirm this request. Retry.") }
             finally { busy = false }
         }
     }

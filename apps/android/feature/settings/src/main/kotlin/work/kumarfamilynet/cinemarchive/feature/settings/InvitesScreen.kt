@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,7 +58,7 @@ fun InvitesRoute(accountRepository: AccountRepository, onBack: () -> Unit, showB
         try {
             codes = accountRepository.listInviteCodes()
         } catch (e: Exception) {
-            error = e.message ?: "Couldn't load invites."
+            error = e.userMessage("Couldn't load invites.")
         }
         loading = false
     }
@@ -99,7 +101,7 @@ fun InvitesRoute(accountRepository: AccountRepository, onBack: () -> Unit, showB
                                 accountRepository.createInviteCode()
                                 reload()
                             } catch (e: Exception) {
-                                error = e.message?.takeIf { !it.startsWith("POST ") } ?: "Failed to generate invite code."
+                                error = e.userMessage("Failed to generate invite code.")
                             }
                             generating = false
                         }

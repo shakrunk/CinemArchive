@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.friends
 
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -115,7 +117,7 @@ private fun CoroutineScope.runAction(
             if (successMessage != null) onStatus(successMessage, false)
             reload()
         } catch (e: Exception) {
-            onStatus(e.message ?: "Something went wrong.", true)
+            onStatus(e.userMessage("Something went wrong."), true)
         }
     }
 }
@@ -140,7 +142,7 @@ private fun FriendsList(
             friendships = repository.listFriendships()
             suggestions = runCatching { repository.listInviteConnections() }.getOrDefault(emptyList())
         } catch (e: Exception) {
-            status = (e.message ?: "Couldn't load friends.") to true
+            status = (e.userMessage("Couldn't load friends.")) to true
         }
         loading = false
     }
@@ -173,7 +175,7 @@ private fun FriendsList(
                                     reload()
                                 }
                             } catch (e: Exception) {
-                                status = (e.message ?: FriendsRules.SEND_REQUEST_FAILED) to true
+                                status = (e.userMessage(FriendsRules.SEND_REQUEST_FAILED)) to true
                             }
                         }
                     },
@@ -297,7 +299,7 @@ private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspe
         try {
             items = repository.fetchRecommendations().filter { it.status != work.kumarfamilynet.cinemarchive.data.RecommendationStatus.DISMISSED }
         } catch (e: Exception) {
-            status = (e.message ?: "Couldn't load your inbox.") to true
+            status = (e.userMessage("Couldn't load your inbox.")) to true
         }
         loading = false
     }
@@ -323,7 +325,7 @@ private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspe
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
                                     } catch (e: Exception) {
-                                        status = (e.message ?: "Couldn't open recommendation.") to true
+                                        status = (e.userMessage("Couldn't open recommendation.")) to true
                                     } finally {
                                         opening = null
                                     }
@@ -360,7 +362,7 @@ private fun ActivityList(repository: FriendsRepository, onOpenFriendLibrary: (St
             hasMore = FriendsRules.hasMore(page.size)
             status = null
         } catch (e: Exception) {
-            status = e.message ?: "Couldn't load activity."
+            status = e.userMessage("Couldn't load activity.")
         }
         loading = false
     }

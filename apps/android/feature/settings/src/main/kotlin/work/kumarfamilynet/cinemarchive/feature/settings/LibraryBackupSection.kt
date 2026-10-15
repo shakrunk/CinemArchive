@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -51,7 +53,7 @@ fun LibraryBackupSection(source: LibraryBackupSource): Unit = key(source) {
                     }
                     if (source.isCurrent()) message = "Exported ${snapshot.titleCount} titles and ${snapshot.outingCount} outings."
                 } catch (e: CancellationException) { throw e }
-                catch (e: Exception) {
+                catch (e: Exception) { e.rethrowIfCancelled();
                     if (source.isCurrent()) message = "Export did not finish: ${e.userMessage("Could not write the file.")} The selected file may be incomplete; choose Export JSON to try again."
                 } finally { busy = false }
             }
@@ -67,7 +69,7 @@ fun LibraryBackupSection(source: LibraryBackupSource): Unit = key(source) {
                 if (source.isCurrent()) { prepared = snapshot; picker.launch(snapshot.fileName) }
                 else busy = false
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
+            catch (e: Exception) { e.rethrowIfCancelled();
                 if (source.isCurrent()) {
                     message = e.userMessage("Could not prepare the export.")
                     recovery = e is CompanionRecoveryRequired

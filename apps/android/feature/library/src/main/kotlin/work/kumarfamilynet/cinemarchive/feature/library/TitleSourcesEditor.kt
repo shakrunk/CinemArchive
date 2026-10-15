@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.*
@@ -45,7 +47,7 @@ private fun TitleSourcesDialog(titleId: String, prepare: suspend () -> String,
             watchUrl = values.watchUrl; home = values.homeCollection; copies = values.copiesJson
             opening = captured; error = null
         } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { error = e.userMessage("Could not open these saved values.") }
+        catch (e: Exception) { e.rethrowIfCancelled(); error = e.userMessage("Could not open these saved values.") }
     }
     AlertDialog(onDismissRequest = { if (!busy) dismiss() },
         title = { Text("Watch link and collection") },
@@ -99,7 +101,7 @@ private fun TitleSourcesDialog(titleId: String, prepare: suspend () -> String,
                 scope.launch {
                     try { save(captured, TitleSourcesValues(watchUrl, home, copies)); dismiss() }
                     catch (e: CancellationException) { throw e }
-                    catch (e: Exception) { error = e.userMessage("Could not save. Your draft is still here.") }
+                    catch (e: Exception) { e.rethrowIfCancelled(); error = e.userMessage("Could not save. Your draft is still here.") }
                     finally { busy = false }
                 }
             }

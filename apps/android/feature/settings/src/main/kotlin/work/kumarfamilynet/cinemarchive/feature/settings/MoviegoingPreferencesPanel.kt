@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import android.content.ClipData
@@ -38,7 +40,7 @@ fun MoviegoingPreferencesPanel(repository: MoviegoingPreferencesRepository,
         scope.launch {
             try { action() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error = e.userMessage("The saved change is retained. Try again.") }
+            catch (e: Exception) { e.rethrowIfCancelled(); error = e.userMessage("The saved change is retained. Try again.") }
             finally { busy = false }
         }
     }

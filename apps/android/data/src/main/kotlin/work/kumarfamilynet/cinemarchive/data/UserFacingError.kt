@@ -50,3 +50,11 @@ private fun SupabaseHttpException.serverMessage(): String? =
 private fun looksAuthoredForPeople(message: String): Boolean =
     !message.contains("http", ignoreCase = true) &&
         listOf("GET ", "POST ", "PATCH ", "PUT ", "DELETE ").none { message.startsWith(it) }
+
+/**
+ * Call first in a broad `catch (e: Exception)` inside a coroutine: cancellation (leaving a screen,
+ * a superseded request) is control flow, not a failure to report, and must keep propagating.
+ */
+fun Throwable.rethrowIfCancelled() {
+    if (this is kotlinx.coroutines.CancellationException) throw this
+}

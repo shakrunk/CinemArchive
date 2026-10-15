@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.discover
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.lifecycle.ViewModel
@@ -237,7 +239,7 @@ internal suspend fun loadAddTitleDetails(
         fetch(selected)
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Exception) {
+    } catch (cause: Exception) { cause.rethrowIfCancelled();
         MediaDetails(
             tmdbId = selected.tmdbId, type = selected.type, title = selected.title, year = selected.year,
             posterUrl = selected.posterUrl, synopsis = selected.synopsis,

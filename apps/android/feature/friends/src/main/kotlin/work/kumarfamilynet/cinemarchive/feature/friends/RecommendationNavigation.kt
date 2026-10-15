@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.friends
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import java.net.URI
 import kotlinx.coroutines.CancellationException
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
@@ -25,7 +27,7 @@ suspend fun recommendationNavigation(
             markRead(recommendation.id)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (cause: Exception) { cause.rethrowIfCancelled();
             // A read-receipt outage must not prevent opening the recommendation.
         }
     }

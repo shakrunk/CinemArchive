@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusable
 import androidx.compose.material.icons.Icons
@@ -60,7 +62,7 @@ fun SharedLibraryRoute(token: String, repository: SharingRepository, onClose: ()
             snapshot = buildSharedLibrarySnapshot(context, repository.fetchSharedLibrary(token))
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (failure: Exception) {
+        } catch (failure: Exception) { failure.rethrowIfCancelled();
             // Never display backend bodies (which may echo credentials) in the viewer.
             error = if (failure is SharedLinkUnavailableException) failure.message
                 else "The shared archive could not be loaded. Check your connection and retry."

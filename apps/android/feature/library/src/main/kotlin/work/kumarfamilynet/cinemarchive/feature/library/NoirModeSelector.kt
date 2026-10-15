@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.*
@@ -41,7 +43,7 @@ fun NoirDetailControls(detail: TitleDetail, source: TitlePinsSource, loggedMode:
                     scope.launch {
                         try { source.set(detail.id, variant) }
                         catch (cancelled: CancellationException) { throw cancelled }
-                        catch (failure: Exception) { error = failure.userMessage("Could not save the filter. Retry.") }
+                        catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("Could not save the filter. Retry.") }
                         finally { busy = false }
                     }
                 }

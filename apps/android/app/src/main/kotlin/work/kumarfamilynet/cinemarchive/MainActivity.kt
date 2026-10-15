@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 
 import android.Manifest
 import android.content.Intent
@@ -173,7 +175,7 @@ class MainActivity : ComponentActivity() {
                     withContext(Dispatchers.IO) { app.authRepository.completeMagicLinkCallback(uri) }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (cause: Exception) { cause.rethrowIfCancelled();
                     callbackFailed = true
                 }
             }
@@ -697,7 +699,7 @@ private fun CinemArchiveApp(
                         outingsRepository.completeDueOutings()
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Exception) { e.rethrowIfCancelled();
                         if (authRepository.observeIdentity().value == runtime.identity) throw e
                         // A callback can replace this runtime between sync and due-outing work.
                         throw CancellationException("This sign-in has ended").also { it.initCause(e) }

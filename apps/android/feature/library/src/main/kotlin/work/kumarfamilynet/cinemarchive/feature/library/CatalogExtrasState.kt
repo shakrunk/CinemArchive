@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,7 +66,7 @@ class CatalogExtrasController(private val source: CatalogExtrasSource, private v
         CatalogLoad.Ready(block())
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Exception) {
+    } catch (cause: Exception) { cause.rethrowIfCancelled();
         CatalogLoad.Failed
     }
 }

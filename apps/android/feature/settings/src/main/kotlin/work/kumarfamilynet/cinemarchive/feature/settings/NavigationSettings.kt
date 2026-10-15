@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -35,7 +37,7 @@ fun NavigationSettingsRoute(repository: PreferencesRepository, onBack: () -> Uni
         scope.launch {
             try { action(); error = null }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { error = "Navigation could not be saved. Try again." }
+            catch (cause: Exception) { cause.rethrowIfCancelled(); error = "Navigation could not be saved. Try again." }
             finally { saving = false }
         }
     }

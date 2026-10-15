@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,7 +29,7 @@ fun ProviderMergeSection(source: ProviderMergeSource): Unit = key(source) {
         busy = true; error = null
         scope.launch {
             try { block() } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { if (source.isCurrent()) error = failure.userMessage("Could not finish. The saved request is retained.") }
+            catch (failure: Exception) { failure.rethrowIfCancelled(); if (source.isCurrent()) error = failure.userMessage("Could not finish. The saved request is retained.") }
             finally { if (source.isCurrent()) busy = false }
         }
     }

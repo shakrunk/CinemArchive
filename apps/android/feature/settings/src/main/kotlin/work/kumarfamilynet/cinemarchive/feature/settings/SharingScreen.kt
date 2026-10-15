@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import android.content.Intent
@@ -78,7 +80,7 @@ fun SharingRoute(
     suspend fun reload() {
         try {
             keys = repository.listSharedKeys()
-        } catch (e: Exception) {
+        } catch (e: Exception) { e.rethrowIfCancelled();
             if (e is kotlinx.coroutines.CancellationException) throw e
             status = (e.userMessage("Couldn't load share links.")) to true
         }
@@ -131,7 +133,7 @@ fun SharingRoute(
                                     label = ""
                                     status = "Link created." to false
                                     reload()
-                                } catch (e: Exception) {
+                                } catch (e: Exception) { e.rethrowIfCancelled();
                                     if (e is kotlinx.coroutines.CancellationException) throw e
                                     status = (e.userMessage("Couldn't create the link.")) to true
                                 } finally {
@@ -194,7 +196,7 @@ fun SharingRoute(
                         try {
                             repository.revokeSharedKey(k.id)
                             reload()
-                        } catch (e: Exception) {
+                        } catch (e: Exception) { e.rethrowIfCancelled();
                             if (e is kotlinx.coroutines.CancellationException) throw e
                             status = (e.userMessage("Couldn't revoke the link.")) to true
                         }

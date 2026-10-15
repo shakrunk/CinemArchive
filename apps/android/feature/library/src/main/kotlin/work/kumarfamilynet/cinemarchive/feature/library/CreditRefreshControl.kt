@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.Column
@@ -27,7 +29,7 @@ internal fun CreditRefreshControl(titleId: String, refresh: suspend () -> Boolea
                     message = if (changed) "Metadata refresh saved. Missing episodes will appear after sync." else "Metadata is up to date."
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (error: Exception) {
+                } catch (error: Exception) { error.rethrowIfCancelled();
                     failed = true
                     message = error.userMessage("Could not refresh metadata. Try again.")
                 } finally { busy = false }

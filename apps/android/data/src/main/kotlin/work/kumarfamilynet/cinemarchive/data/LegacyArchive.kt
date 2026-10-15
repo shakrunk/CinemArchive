@@ -336,14 +336,14 @@ class LegacyArchive(private val context: Context) {
             try {
                 countOutbox(workFile)
             } catch (t: Exception) {
-                return LegacyRestoreResult.Failure("The legacy archive could not be read: ${t.message ?: t.javaClass.simpleName}")
+                return LegacyRestoreResult.Failure("The legacy archive could not be read: ${t.userMessage("an unexpected problem occurred")}")
             }
             val opened = LibraryDatabase.createForRecovery(context, WORK_DB_NAME)
             legacyDb = opened
             val source = try {
                 opened.openHelper.readableDatabase
             } catch (t: Exception) {
-                return LegacyRestoreResult.Failure("The legacy archive could not be opened: ${t.message ?: t.javaClass.simpleName}")
+                return LegacyRestoreResult.Failure("The legacy archive could not be opened: ${t.userMessage("an unexpected problem occurred")}")
             }
             // Durable claim BEFORE the target transaction. If it cannot be recorded, nothing changes.
             val hadClaim = readClaim() != null
@@ -351,7 +351,7 @@ class LegacyArchive(private val context: Context) {
                 writeClaim(ownerKey, PENDING)
             } catch (t: Exception) {
                 return LegacyRestoreResult.Failure(
-                    "Couldn't record the recovery claim, nothing was restored: ${t.message ?: t.javaClass.simpleName}",
+                    "Couldn't record the recovery claim, nothing was restored: ${t.userMessage("an unexpected problem occurred")}",
                 )
             }
             val hook = beforeCommitHook
@@ -383,7 +383,7 @@ class LegacyArchive(private val context: Context) {
         } catch (ce: CancellationException) {
             throw ce
         } catch (t: Exception) {
-            return LegacyRestoreResult.Failure(t.message ?: t.javaClass.simpleName)
+            return LegacyRestoreResult.Failure(t.userMessage("The legacy archive could not be restored."))
         } finally {
             try {
                 legacyDb?.close()

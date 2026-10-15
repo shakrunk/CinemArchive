@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.*
@@ -29,7 +31,7 @@ fun TitleMetadataRecoveryPanel(source: TitleMetadataRecoverySource, titleId: Str
         scope.launch {
             try { block() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.userMessage("Couldn't finish this saved change. Try again.") }
+            catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("Couldn't finish this saved change. Try again.") }
             finally { busy = false }
         }
     }

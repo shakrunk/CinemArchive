@@ -46,4 +46,9 @@ class UserFacingErrorTest {
         assertEquals("f", RuntimeException("SQLiteConstraintException: UNIQUE").userMessage("f"))
         assertEquals("Got an unexpected response from the server. Try again in a moment.", JSONException("bad").userMessage("f"))
     }
+
+    @Test fun cancellationIsRethrownNotReported() {
+        try { kotlinx.coroutines.CancellationException("left screen").rethrowIfCancelled(); org.junit.Assert.fail() } catch (_: kotlinx.coroutines.CancellationException) {}
+        IllegalStateException("x").rethrowIfCancelled()
+    }
 }

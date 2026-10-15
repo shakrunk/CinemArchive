@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.upnext
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import kotlinx.coroutines.CancellationException
@@ -50,7 +52,7 @@ class UpNextEpisodeActions(
                     }
                 }
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { put(snapshot.id, EpisodeActionState(snapshot, error = e.userMessage("Couldn't log episode. Try again."))) }
+            catch (e: Exception) { e.rethrowIfCancelled(); put(snapshot.id, EpisodeActionState(snapshot, error = e.userMessage("Couldn't log episode. Try again."))) }
         }
     }
 
@@ -69,7 +71,7 @@ class UpNextEpisodeActions(
                 action(receipt)
                 mutable.update { it - titleId }
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
+            catch (e: Exception) { e.rethrowIfCancelled();
                 // Keep the exact receipt for retry, including after the ordinary six-second window.
                 put(titleId, current.copy(error = e.userMessage("Couldn't save this change. Try again.")))
             }

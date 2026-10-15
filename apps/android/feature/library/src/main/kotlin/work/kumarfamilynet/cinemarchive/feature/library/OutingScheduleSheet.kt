@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.Arrangement
@@ -372,7 +374,7 @@ fun OutingScheduleSheet(
                     )
                     onDismiss()
                     } catch (cancelled: CancellationException) { throw cancelled
-                    } catch (failure: Exception) {
+                    } catch (failure: Exception) { failure.rethrowIfCancelled();
                         error = failure.userMessage("Tickets could not be saved. Retry the same details.")
                     } finally { saving = false }
                     }

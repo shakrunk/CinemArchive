@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -42,7 +44,7 @@ fun FriendLibraryRoute(
                 snapshot = loaded
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (cause: Exception) { cause.rethrowIfCancelled();
                 if (socialSource.isActive()) error = "This friend archive could not be loaded. Check your connection and friendship, then retry."
             }
         }

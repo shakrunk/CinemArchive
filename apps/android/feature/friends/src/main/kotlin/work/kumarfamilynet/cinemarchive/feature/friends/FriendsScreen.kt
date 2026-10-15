@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.friends
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.background
@@ -116,7 +118,7 @@ private fun CoroutineScope.runAction(
             block()
             if (successMessage != null) onStatus(successMessage, false)
             reload()
-        } catch (e: Exception) {
+        } catch (e: Exception) { e.rethrowIfCancelled();
             onStatus(e.userMessage("Something went wrong."), true)
         }
     }
@@ -141,7 +143,7 @@ private fun FriendsList(
         try {
             friendships = repository.listFriendships()
             suggestions = runCatching { repository.listInviteConnections() }.getOrDefault(emptyList())
-        } catch (e: Exception) {
+        } catch (e: Exception) { e.rethrowIfCancelled();
             status = (e.userMessage("Couldn't load friends.")) to true
         }
         loading = false
@@ -174,7 +176,7 @@ private fun FriendsList(
                                     email = ""
                                     reload()
                                 }
-                            } catch (e: Exception) {
+                            } catch (e: Exception) { e.rethrowIfCancelled();
                                 status = (e.userMessage(FriendsRules.SEND_REQUEST_FAILED)) to true
                             }
                         }
@@ -298,7 +300,7 @@ private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspe
     suspend fun reload() {
         try {
             items = repository.fetchRecommendations().filter { it.status != work.kumarfamilynet.cinemarchive.data.RecommendationStatus.DISMISSED }
-        } catch (e: Exception) {
+        } catch (e: Exception) { e.rethrowIfCancelled();
             status = (e.userMessage("Couldn't load your inbox.")) to true
         }
         loading = false
@@ -324,7 +326,7 @@ private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspe
                                         onOpenRecommendation(r)
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
-                                    } catch (e: Exception) {
+                                    } catch (e: Exception) { e.rethrowIfCancelled();
                                         status = (e.userMessage("Couldn't open recommendation.")) to true
                                     } finally {
                                         opening = null
@@ -334,7 +336,7 @@ private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspe
                             recommendationWatchUrl(r.watchUrl)?.let { url ->
                                 TextButton(onClick = {
                                     try { uriHandler.openUri(url) }
-                                    catch (_: Exception) { status = "Couldn't open watch link." to true }
+                                    catch (cause: Exception) { cause.rethrowIfCancelled(); status = "Couldn't open watch link." to true }
                                 }) { Text("Watch") }
                             }
                             if (r.isUnread) OutlinedButton(onClick = { scope.runAction(report, null, ::reload) { repository.markRecommendationRead(r.id) } }) { Text("Mark read") }
@@ -361,7 +363,7 @@ private fun ActivityList(repository: FriendsRepository, onOpenFriendLibrary: (St
             events = if (before == null) page else events + page
             hasMore = FriendsRules.hasMore(page.size)
             status = null
-        } catch (e: Exception) {
+        } catch (e: Exception) { e.rethrowIfCancelled();
             status = e.userMessage("Couldn't load activity.")
         }
         loading = false

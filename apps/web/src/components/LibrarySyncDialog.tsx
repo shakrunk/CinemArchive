@@ -50,7 +50,7 @@ export function LibrarySyncDetails() {
     </h2>
     <div className="mt-3 space-y-3 text-sm">
       {(storageError || syncError || error) && <p role="alert">{error ?? storageError ?? syncError}</p>}
-      {nothingToReview && !error && <p role="status">Everything saved on this device has synced.</p>}
+      {nothingToReview && !error && <p role="status">Nothing on this device is waiting to sync.</p>}
       {status.commands.length > 0 && <>
         <p>These changes are saved on this device. Keep this browser’s site data until they have synced.</p>
         <div className="flex flex-wrap gap-2">

@@ -75,8 +75,9 @@ export function LibrarySyncToast() {
       const wasShowing = !!shown.current && !!toast && !toast.autoClose
       shown.current = null
       if (wasShowing && !shared && !ownerChanged) {
+        // Neutral wording: the queue also empties when the owner discards changes from the dialog.
         store.pushNotification({ dedupeKey: LIBRARY_SYNC_TOAST_KEY, kind: 'tip', autoClose: SYNCED_AUTO_CLOSE_MS,
-          message: 'All changes saved on this device have synced.' })
+          message: 'Nothing on this device is waiting to sync.' })
       } else if (toast && !toast.autoClose) {
         withdrawToast(toast.id)
       }

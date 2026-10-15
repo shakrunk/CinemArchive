@@ -43,11 +43,11 @@ it('shows changes needing review immediately and opens the dialog from Review', 
   expect(useAppStore.getState().isLibrarySyncOpen).toBe(true)
 })
 
-it('confirms once everything has synced', () => {
+it('confirms once nothing is left waiting (delivered or discarded)', () => {
   render(<LibrarySyncToast />)
   setCommands([pending('a', 'failed')])
   setCommands([])
-  expect(syncToast()).toMatchObject({ kind: 'tip', message: 'All changes saved on this device have synced.' })
+  expect(syncToast()).toMatchObject({ kind: 'tip', message: 'Nothing on this device is waiting to sync.' })
   expect(syncToast()?.autoClose).toBeGreaterThan(0)
 })
 

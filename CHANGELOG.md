@@ -9,6 +9,9 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+- Web: Refresh Metadata now rebuilds seasons and episodes for a series that was saved without any, instead of skipping it.
+
 ## [1.35.0] - 2026-10-14
 
 ### Changed

@@ -73,16 +73,24 @@ export async function fetchRefreshedTitlePatch(
     collectionName: result.collectionName,
   }
 
-  // For TV shows, also refresh episode metadata for all seasons
-  if (result.type === 'tv' && title.seasons && title.seasons.length > 0) {
+  // For TV shows, also refresh episode metadata for all seasons. A series saved
+  // with no seasons at all (its details fetch failed when it was added) is
+  // rebuilt from TMDB's season list as empty shells the episode fetch fills in.
+  const storedSeasons: Season[] = title.seasons && title.seasons.length > 0
+    ? title.seasons
+    : tmdbSeasons
+        .filter((s) => s.season_number >= 1)
+        .sort((a, b) => a.season_number - b.season_number)
+        .map((s) => ({ id: crypto.randomUUID(), seasonNumber: s.season_number, episodeCount: s.episode_count, episodesWatched: 0, episodes: [] }))
+  if (result.type === 'tv' && storedSeasons.length > 0) {
     // Backfill Specials (TMDB season 0) for series added before they were
     // tracked: start from an empty shell and let the episode fetch below fill
     // it in, exactly like a stored season that has no episode rows yet.
     const tmdbHasSpecials = tmdbSeasons.some((s) => s.season_number === SPECIALS_SEASON_NUMBER && s.episode_count > 0)
-    const specialsShell: Season | null = tmdbHasSpecials && !title.seasons.some(isSpecialsSeason)
+    const specialsShell: Season | null = tmdbHasSpecials && !storedSeasons.some(isSpecialsSeason)
       ? { id: crypto.randomUUID(), seasonNumber: SPECIALS_SEASON_NUMBER, episodeCount: 0, episodesWatched: 0, episodes: [] }
       : null
-    const seasonsToRefresh = specialsShell ? [...title.seasons, specialsShell] : title.seasons
+    const seasonsToRefresh = specialsShell ? [...storedSeasons, specialsShell] : storedSeasons
 
     const settled = await Promise.allSettled(
       seasonsToRefresh.map((s) =>

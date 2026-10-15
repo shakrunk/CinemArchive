@@ -9,13 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
-### Fixed
-- Web: Refresh Metadata now rebuilds seasons and episodes for a series that was saved without any, instead of skipping it.
-
 ## [1.35.0] - 2026-10-14
 
 ### Changed
 - Web: unsynced library changes now surface as a toast instead of a banner above every view. Changes that sync within a few seconds stay quiet; changes that fail or conflict show right away. The toast's **Review** action, and a new **Review sync** button in Settings → Data & Portability, open a dialog for retrying, exporting, and discarding saved changes and for recovering damaged or older caches.
+
+### Fixed
+- Web: Refresh Metadata now rebuilds seasons and episodes for a series that was saved without any, instead of skipping it.
 
 ## [1.34.2] - 2026-10-14
 

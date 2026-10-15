@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -103,7 +105,7 @@ class OutingCompletionReceiver : BroadcastReceiver() {
                 .allowHardware(false)
                 .build()
             (context.imageLoader.execute(request) as? SuccessResult)?.drawable?.toBitmap()
-        } catch (e: Exception) {
+        } catch (e: Exception) { e.rethrowIfCancelled();
             null
         }
     }

@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.discover
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -106,9 +110,9 @@ class DiscoverViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (error: Exception) { error.rethrowIfCancelled();
                 if (isActive && version == requestVersion) _uiState.update {
-                    it.copy(isLoadingMore = false, moreError = error.message ?: "Couldn't load more titles")
+                    it.copy(isLoadingMore = false, moreError = error.userMessage("Couldn't load more titles"))
                 }
             }
         }
@@ -151,9 +155,9 @@ class DiscoverViewModel(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (error: Exception) { error.rethrowIfCancelled();
                 if (isActive && version == requestVersion) {
-                    _uiState.update { it.copy(isLoading = false, isRefreshing = false, error = error.message ?: "Couldn't load titles") }
+                    _uiState.update { it.copy(isLoading = false, isRefreshing = false, error = error.userMessage("Couldn't load titles")) }
                 }
             }
         }

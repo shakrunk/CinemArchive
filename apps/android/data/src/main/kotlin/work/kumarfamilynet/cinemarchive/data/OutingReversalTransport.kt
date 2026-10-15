@@ -36,8 +36,8 @@ internal class OutingReversalTransport(private val client: SupabaseRestClient, p
         } catch (error: CancellationException) { throw error }
         catch (error: SupabaseHttpException) {
             if (!accepted && error.postgresCode in setOf("40001", "23505")) PushResult.Review("The saved reversal needs comparison with current history.")
-            else PushResult.Retry(error.message ?: "Could not confirm reversal. Retry the original saved command.")
-        } catch (error: Exception) { PushResult.Retry(error.message ?: "Could not confirm reversal.") }
+            else PushResult.Retry(error.userMessage("Could not confirm reversal. Retry the original saved command."))
+        } catch (error: Exception) { PushResult.Retry(error.userMessage("Could not confirm reversal.")) }
     }
 }
 

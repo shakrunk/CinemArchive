@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
@@ -28,7 +32,7 @@ fun VenueNoteEditor(repository: MoviegoingPreferencesRepository, venue: String, 
             text = JSONObject(captured).getString("notes")
             opening = captured; error = null
         } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { error = e.message ?: "Could not open this venue note." }
+        catch (e: Exception) { e.rethrowIfCancelled(); error = e.userMessage("Could not open this venue note.") }
     }
     fun save(value: String?) {
         val captured = opening ?: return
@@ -36,7 +40,7 @@ fun VenueNoteEditor(repository: MoviegoingPreferencesRepository, venue: String, 
         scope.launch {
             try { repository.saveVenue(captured, value); onDismiss() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error = e.message ?: "The note is still here. Try again." }
+            catch (e: Exception) { e.rethrowIfCancelled(); error = e.userMessage("The note is still here. Try again.") }
             finally { busy = false }
         }
     }

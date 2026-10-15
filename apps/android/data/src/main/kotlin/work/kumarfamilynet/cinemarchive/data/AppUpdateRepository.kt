@@ -36,7 +36,7 @@ class AppUpdateRepository(
         runCatching { fetchLatestRelease() }.fold(
             onSuccess = { it },
             onFailure = { e ->
-                UpdateCheckResult.Failed(e.message ?: "Couldn't reach GitHub to check for updates")
+                UpdateCheckResult.Failed(e.userMessage("Couldn't reach GitHub to check for updates"))
             },
         )
     }

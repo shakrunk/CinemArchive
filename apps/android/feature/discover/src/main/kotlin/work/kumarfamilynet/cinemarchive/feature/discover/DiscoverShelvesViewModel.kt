@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.discover
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -106,7 +108,7 @@ class DiscoverShelvesViewModel(
                     it.copy(recommendations = DiscoverShelfResult(titles.distinctBy(TrendingTitle::mediaIdentity)))
                 }
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) {
+            } catch (cause: Exception) { cause.rethrowIfCancelled();
                 if (isActive && visible && version == recommendationVersion) mutable.update {
                     it.copy(recommendations = DiscoverShelfResult(error = "Recommendations could not be loaded. Retry when connected."))
                 }
@@ -127,7 +129,7 @@ class DiscoverShelvesViewModel(
                     it.copy(starring = DiscoverShelfResult(titles.distinctBy(TrendingTitle::mediaIdentity)))
                 }
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) {
+            } catch (cause: Exception) { cause.rethrowIfCancelled();
                 if (isActive && visible && version == starringVersion) mutable.update {
                     it.copy(starring = DiscoverShelfResult(error = "Filmography could not be loaded. Retry when connected."))
                 }

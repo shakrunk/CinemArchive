@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,7 +34,7 @@ fun TitleTagsEditor(titleId: String, tags: List<String>, onSave: suspend (List<S
         scope.launch {
             try { onSave(next); if (clearInput) input = "" }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { error = "Couldn't save tags. Your input is still here; try again." }
+            catch (cause: Exception) { cause.rethrowIfCancelled(); error = "Couldn't save tags. Your input is still here; try again." }
             finally { saving = false }
         }
     }

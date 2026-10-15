@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,7 +41,7 @@ fun PrePlatformWatchControl(
         coroutine.launch {
             try { block() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "Could not save. Retry the same request." }
+            catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("Could not save. Retry the same request.") }
             finally { busy = false }
         }
     }

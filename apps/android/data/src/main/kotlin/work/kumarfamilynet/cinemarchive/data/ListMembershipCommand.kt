@@ -79,7 +79,7 @@ internal class ListMembershipTransport(
             currentMembership(entry, envelope, session.userId)
             PushResult.Applied(envelope)
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (error: Exception) { PushResult.Retry(error.message ?: "Could not confirm the saved list change. Retry the same command.") }
+        catch (error: Exception) { PushResult.Retry(error.userMessage("Could not confirm the saved list change. Retry the same command.")) }
     }
 }
 

@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -112,7 +116,7 @@ fun NotificationsRoute(
                                         repository.markRead(n.id)
                                         onGotTicketsToo(shared)
                                     } catch (cancelled: CancellationException) { throw cancelled
-                                    } catch (failure: Exception) { actionError = failure.message ?: "Couldn't open these plans. Try again."
+                                    } catch (failure: Exception) { failure.rethrowIfCancelled(); actionError = failure.userMessage("Couldn't open these plans. Try again.")
                                     } finally { opening = false }
                                 }
                             }
@@ -120,7 +124,7 @@ fun NotificationsRoute(
                         onAddToCalendar = { shared ->
                             scope.launch { repository.markRead(n.id) }
                             try { onAddToCalendar(shared) }
-                            catch (_: Exception) { actionError = "No calendar app is available to open these plans." }
+                            catch (cause: Exception) { cause.rethrowIfCancelled(); actionError = "No calendar app is available to open these plans." }
                         },
                     )
                 }

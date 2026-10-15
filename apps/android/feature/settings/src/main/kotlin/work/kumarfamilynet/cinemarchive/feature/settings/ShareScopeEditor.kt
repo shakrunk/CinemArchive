@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -93,7 +95,7 @@ class ShareScopeEditorController(
                     custom = value != null, genres = value?.allowedGenres.orEmpty().toSet(),
                     statuses = value?.allowedStatuses.orEmpty().toSet())
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) {
+            } catch (cause: Exception) { cause.rethrowIfCancelled();
                 if (active()) mutable.value = state.value.copy(loading = false,
                     error = "Access could not be loaded. Check your connection and retry.")
             }
@@ -118,7 +120,7 @@ class ShareScopeEditorController(
                 currentCoroutineContext().ensureActive()
                 if (active()) mutable.value = state.value.copy(saving = false, saved = true)
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) {
+            } catch (cause: Exception) { cause.rethrowIfCancelled();
                 if (active()) mutable.value = state.value.copy(saving = false,
                     error = "Access could not be saved. Your selections are kept; retry when connected.")
             }

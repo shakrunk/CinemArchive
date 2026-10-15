@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.friends
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -50,7 +54,7 @@ class OutingPlansController(private val source: OutingPlansSource, private val o
                 checkActive()
                 mutable.value = state.value.copy(friends = friends)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (active()) mutable.value = state.value.copy(error = e.message ?: "Could not load plans.") }
+            catch (e: Exception) { e.rethrowIfCancelled(); if (active()) mutable.value = state.value.copy(error = e.userMessage("Could not load plans.")) }
             finally { if (active()) mutable.value = state.value.copy(loading = false) else clear() }
         }
     }
@@ -70,15 +74,15 @@ class OutingPlansController(private val source: OutingPlansSource, private val o
                     checkActive()
                     mutable.value = state.value.copy(plan = current, error = null)
                 } catch (e: CancellationException) { throw e }
-                catch (e: Exception) {
-                    if (active()) mutable.value = state.value.copy(plan = null, error = e.message ?: "Could not refresh current plans.")
+                catch (e: Exception) { e.rethrowIfCancelled();
+                    if (active()) mutable.value = state.value.copy(plan = null, error = e.userMessage("Could not refresh current plans."))
                 }
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
+            catch (e: Exception) { e.rethrowIfCancelled();
                 if (active()) mutable.value = state.value.copy(
                     plan = if (e is OutingPlanUnavailableException) null else state.value.plan,
                     error = if (e is OutingPlanUnavailableException) e.message else state.value.error,
-                    failures = state.value.failures + (recipientId to (e.message ?: "Could not send plans.")),
+                    failures = state.value.failures + (recipientId to (e.userMessage("Could not send plans."))),
                 )
             }
             finally { if (active()) mutable.value = state.value.copy(sending = state.value.sending - recipientId) else clear() }
@@ -95,7 +99,7 @@ class OutingPlansController(private val source: OutingPlansSource, private val o
                 mutable.value = state.value.copy(plan = plan)
                 onReady(plan)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (active()) mutable.value = state.value.copy(plan = null, error = e.message ?: "Could not open sharing.") }
+            catch (e: Exception) { e.rethrowIfCancelled(); if (active()) mutable.value = state.value.copy(plan = null, error = e.userMessage("Could not open sharing.")) }
             finally { if (active()) mutable.value = state.value.copy(preparing = false) else clear() }
         }
     }

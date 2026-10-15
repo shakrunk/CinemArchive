@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,7 +29,7 @@ fun CatalogRefreshSection(refresh: suspend ((CatalogRefreshProgress) -> Unit) ->
             scope.launch {
                 try { report = refresh { progress = it } }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (failure: Exception) { error = failure.message ?: "Could not finish refreshing. Saved changes are kept." }
+                catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("Could not finish refreshing. Saved changes are kept.") }
                 finally { busy = false }
             }
         }) { Text(if (busy) "Refreshing library…" else "Refresh all metadata") }

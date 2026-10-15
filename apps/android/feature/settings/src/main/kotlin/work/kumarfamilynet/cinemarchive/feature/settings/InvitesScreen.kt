@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,8 +59,8 @@ fun InvitesRoute(accountRepository: AccountRepository, onBack: () -> Unit, showB
     suspend fun reload() {
         try {
             codes = accountRepository.listInviteCodes()
-        } catch (e: Exception) {
-            error = e.message ?: "Couldn't load invites."
+        } catch (e: Exception) { e.rethrowIfCancelled();
+            error = e.userMessage("Couldn't load invites.")
         }
         loading = false
     }
@@ -98,8 +102,8 @@ fun InvitesRoute(accountRepository: AccountRepository, onBack: () -> Unit, showB
                             try {
                                 accountRepository.createInviteCode()
                                 reload()
-                            } catch (e: Exception) {
-                                error = e.message?.takeIf { !it.startsWith("POST ") } ?: "Failed to generate invite code."
+                            } catch (e: Exception) { e.rethrowIfCancelled();
+                                error = e.userMessage("Failed to generate invite code.")
                             }
                             generating = false
                         }
@@ -130,7 +134,7 @@ fun InvitesRoute(accountRepository: AccountRepository, onBack: () -> Unit, showB
                                         try {
                                             accountRepository.deleteInviteCode(c.id)
                                             reload()
-                                        } catch (e: Exception) {
+                                        } catch (e: Exception) { e.rethrowIfCancelled();
                                             error = "Failed to delete invite code."
                                         }
                                     }

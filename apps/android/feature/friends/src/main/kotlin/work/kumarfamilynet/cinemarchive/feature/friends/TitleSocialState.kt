@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.friends
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -116,7 +120,7 @@ class TitleDiscussionController(
         job = scope.launch {
             try { ensureCurrent(); action() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (active()) mutable.value = state.value.copy(error = e.message ?: "Could not update discussion.") }
+            catch (e: Exception) { e.rethrowIfCancelled(); if (active()) mutable.value = state.value.copy(error = e.userMessage("Could not update discussion.")) }
             finally {
                 if (active()) mutable.value = state.value.copy(busy = false, loading = false)
                 else mutable.value = TitleDiscussionState(loading = false)
@@ -161,7 +165,7 @@ class RecommendationController(
                 ensureCurrent()
                 mutable.value = state.value.copy(friends = friends, sent = sent.keys)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (active()) mutable.value = state.value.copy(error = e.message ?: "Could not load friends.") }
+            catch (e: Exception) { e.rethrowIfCancelled(); if (active()) mutable.value = state.value.copy(error = e.userMessage("Could not load friends.")) }
             finally { if (active()) mutable.value = state.value.copy(loading = false) else clear() }
         }
     }
@@ -175,8 +179,8 @@ class RecommendationController(
                 ensureCurrent()
                 mutable.value = state.value.copy(sent = state.value.sent + recipientId)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                if (active()) mutable.value = state.value.copy(errors = state.value.errors + (recipientId to (e.message ?: "Could not send.")))
+            catch (e: Exception) { e.rethrowIfCancelled();
+                if (active()) mutable.value = state.value.copy(errors = state.value.errors + (recipientId to (e.userMessage("Could not send."))))
             } finally { if (active()) mutable.value = state.value.copy(sending = state.value.sending - recipientId) else clear() }
         }
     }

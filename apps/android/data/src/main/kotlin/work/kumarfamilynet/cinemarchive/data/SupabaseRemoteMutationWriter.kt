@@ -71,7 +71,7 @@ class SupabaseRemoteMutationWriter(
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            PushResult.Retry(e.message ?: e.javaClass.simpleName)
+            PushResult.Retry(e.userMessage(e.javaClass.simpleName))
         }
     }
 

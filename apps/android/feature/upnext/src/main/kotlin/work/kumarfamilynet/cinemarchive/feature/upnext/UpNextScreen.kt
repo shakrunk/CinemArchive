@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.feature.upnext
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
 import android.content.Intent
 import android.provider.CalendarContract
 import androidx.compose.animation.core.animateFloatAsState
@@ -251,7 +253,7 @@ fun UpNextScreen(
                 if (!isActive) return@launch
                 if (currentOwner == owner) postShowState = savePostShow(owner, entry.outing.titleId, entry.titleName, opening, entry.outing.id)
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) { if (currentOwner == owner) postShowError = "Couldn't open this viewing. Try again."
+            } catch (cause: Exception) { cause.rethrowIfCancelled(); if (currentOwner == owner) postShowError = "Couldn't open this viewing. Try again."
             } finally { preparingPostShow = false }
         }
     }

@@ -78,8 +78,8 @@ internal class TicketAttachmentTransport(
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (error: SupabaseHttpException) {
             if (!accepted && finalizing && error.postgresCode in setOf("40001", "23505")) PushResult.Review(ticketRejection(entry, error.postgresCode!!))
-            else PushResult.Retry(error.message ?: "Ticket sync was not confirmed. Retry the same saved intent.")
-        } catch (error: Exception) { PushResult.Retry(error.message ?: "Ticket sync was not confirmed. Retry the same saved intent.") }
+            else PushResult.Retry(error.userMessage("Ticket sync was not confirmed. Retry the same saved intent."))
+        } catch (error: Exception) { PushResult.Retry(error.userMessage("Ticket sync was not confirmed. Retry the same saved intent.")) }
     }
 
     private fun confirm(command: TicketAttachmentCommand, receipt: JSONObject, session: SupabaseSession, current: () -> Unit): PushResult {

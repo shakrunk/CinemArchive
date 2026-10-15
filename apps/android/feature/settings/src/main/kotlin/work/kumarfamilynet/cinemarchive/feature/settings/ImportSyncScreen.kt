@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -106,7 +110,7 @@ private fun ImportSyncContent(
         ensureCurrent()
         val latest = try { services.repository.connections() } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) { emptyList() }
+        } catch (cause: Exception) { cause.rethrowIfCancelled(); emptyList() }
         ensureCurrent()
         connections = latest
     }
@@ -145,7 +149,7 @@ private fun ImportSyncContent(
         message = result.failed.isNotEmpty() to describe(result)
         if (result.added > 0 || result.updated > 0 || result.unchanged > 0) scope.launch {
             try { services.repository.synchronize() } catch (error: CancellationException) { throw error }
-            catch (_: Exception) { /* Durable commands remain available in Saved imports. */ }
+            catch (cause: Exception) { cause.rethrowIfCancelled(); /* Durable commands remain available in Saved imports. */ }
         }
     }
 
@@ -161,8 +165,8 @@ private fun ImportSyncContent(
                 ensureCurrent()
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                if (services.repository.isCurrent()) message = true to (e.message?.takeIf { it.isNotBlank() } ?: fallback)
+            } catch (e: Exception) { e.rethrowIfCancelled();
+                if (services.repository.isCurrent()) message = true to (e.userMessage(fallback))
             } finally {
                 if (services.repository.isCurrent()) {
                     busy = null
@@ -267,8 +271,8 @@ private fun ImportSyncContent(
                 message = false to "Disconnected. Previously imported titles stay in your library."
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                if (services.repository.isCurrent()) message = true to (e.message ?: "Could not disconnect.")
+            } catch (e: Exception) { e.rethrowIfCancelled();
+                if (services.repository.isCurrent()) message = true to (e.userMessage("Could not disconnect."))
             }
         }
     }

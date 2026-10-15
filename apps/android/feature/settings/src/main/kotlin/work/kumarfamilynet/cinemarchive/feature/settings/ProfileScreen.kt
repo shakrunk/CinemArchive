@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,7 +27,11 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Theaters
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +58,7 @@ import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 /** The settings sub-screens reachable from Profile — named here (rather than left as bare
  *  navigation calls) so the foldable/tablet split view can track which one is showing in the
  *  trailing pane alongside this leading [ProfileRoute] list. */
-enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, SHARING, APPEARANCE, NAVIGATION, IMPORT_SYNC, PERMISSIONS, ABOUT, DEVELOPER }
+enum class SettingsCategory { IDENTITY, INVITES, NOTIFICATIONS, SHARING, APPEARANCE, NAVIGATION, MOVIEGOING, IMPORT_SYNC, DATA_RECOVERY, PERMISSIONS, ABOUT, DEVELOPER }
 
 @Composable
 fun ProfileRoute(
@@ -69,7 +75,10 @@ fun ProfileRoute(
     onOpenFriends: () -> Unit,
     onOpenSharing: () -> Unit,
     onOpenAppearance: () -> Unit,
+    onOpenNavigation: () -> Unit,
+    onOpenMoviegoing: () -> Unit,
     onOpenImportSync: () -> Unit,
+    onOpenDataRecovery: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     // Governs the Developer Settings row's visibility — see
@@ -78,22 +87,11 @@ fun ProfileRoute(
     // overrides it.
     devSettingsUnlocked: Boolean,
     onOpenDeveloperSettings: () -> Unit,
-    legacyLoadStatus: suspend () -> work.kumarfamilynet.cinemarchive.data.LegacyArchiveStatus,
-    legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     // Non-null only in the wide/split layout, where this list sits permanently alongside its
     // detail pane rather than being replaced by it — highlights which category is showing
     // opposite it. Full-screen (phone) navigation has no such concept: the row tap itself is
     // the only feedback needed before the screen it names takes over.
     selectedCategory: SettingsCategory? = null,
-    outingRecovery: (@Composable () -> Unit)? = null,
-    titleChangesContent: (@Composable () -> Unit)? = null,
-    viewingChangesContent: (@Composable () -> Unit)? = null,
-    ticketChangesContent: (@Composable () -> Unit)? = null,
-    moviegoingContent: (@Composable () -> Unit)? = null,
-    lifecycleChangesContent: (@Composable () -> Unit)? = null,
-    listChangesContent: (@Composable () -> Unit)? = null,
-    catalogRefreshContent: (@Composable () -> Unit)? = null,
-    onOpenNavigation: (() -> Unit)? = null,
 ) {
     val titles by libraryRepository.observeLibrary().collectAsStateWithLifecycle(initialValue = emptyList())
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
@@ -119,24 +117,16 @@ fun ProfileRoute(
         appVersionName = appVersionName,
         onClose = onClose,
         onOpenAppearance = onOpenAppearance,
+        onOpenNavigation = onOpenNavigation,
+        onOpenMoviegoing = onOpenMoviegoing,
         onOpenImportSync = onOpenImportSync,
+        onOpenDataRecovery = onOpenDataRecovery,
         onOpenAbout = onOpenAbout,
         onOpenPermissions = onOpenPermissions,
         devSettingsUnlocked = devSettingsUnlocked,
         onOpenDeveloperSettings = onOpenDeveloperSettings,
-        legacyLoadStatus = legacyLoadStatus,
-        legacyRestore = legacyRestore,
         onSignOut = authRepository::signOut,
         selectedCategory = selectedCategory,
-        outingRecovery = outingRecovery,
-        titleChangesContent = titleChangesContent,
-        viewingChangesContent = viewingChangesContent,
-        ticketChangesContent = ticketChangesContent,
-        moviegoingContent = moviegoingContent,
-        lifecycleChangesContent = lifecycleChangesContent,
-        listChangesContent = listChangesContent,
-        catalogRefreshContent = catalogRefreshContent,
-        onOpenNavigation = onOpenNavigation,
     )
 }
 
@@ -190,27 +180,21 @@ private fun ProfileScreen(
     appVersionName: String,
     onClose: () -> Unit,
     onOpenAppearance: () -> Unit,
+    onOpenNavigation: () -> Unit,
+    onOpenMoviegoing: () -> Unit,
     onOpenImportSync: () -> Unit,
+    onOpenDataRecovery: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenPermissions: () -> Unit,
     devSettingsUnlocked: Boolean,
     onOpenDeveloperSettings: () -> Unit,
-    legacyLoadStatus: suspend () -> work.kumarfamilynet.cinemarchive.data.LegacyArchiveStatus,
-    legacyRestore: suspend (Boolean) -> work.kumarfamilynet.cinemarchive.data.LegacyRestoreResult,
     onSignOut: () -> Unit,
     selectedCategory: SettingsCategory? = null,
-    outingRecovery: (@Composable () -> Unit)? = null,
-    titleChangesContent: (@Composable () -> Unit)? = null,
-    viewingChangesContent: (@Composable () -> Unit)? = null,
-    ticketChangesContent: (@Composable () -> Unit)? = null,
-    moviegoingContent: (@Composable () -> Unit)? = null,
-    lifecycleChangesContent: (@Composable () -> Unit)? = null,
-    listChangesContent: (@Composable () -> Unit)? = null,
-    catalogRefreshContent: (@Composable () -> Unit)? = null,
-    onOpenNavigation: (() -> Unit)? = null,
 ) {
     val displayName = heading ?: profileDisplayName(signedInEmail)
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    val signedIn = signedInEmail != null
+    val cs = MaterialTheme.colorScheme
+    Column(modifier = Modifier.fillMaxSize().background(cs.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
             IconButton(onClick = onClose) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
@@ -226,12 +210,12 @@ private fun ProfileScreen(
                 ReadingWidthColumn {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 26.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp),
                     ) {
                         Surface(
                             shape = RoundedCornerShape(28.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = cs.primaryContainer,
+                            contentColor = cs.onPrimaryContainer,
                             modifier = Modifier.size(76.dp),
                         ) {
                             Row(
@@ -249,186 +233,179 @@ private fun ProfileScreen(
                         Text(
                             "a private film archive",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = cs.onSurfaceVariant,
                         )
                     }
-                }
-            }
-
-            if (signedInEmail != null) {
-                item {
-                    ReadingWidthColumn {
-                        ProfileRow(
-                            icon = Icons.Filled.Person,
-                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
-                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            title = "Identity",
-                            subtitle = "Display name & username",
-                            onClick = onOpenIdentity,
-                            selected = selectedCategory == SettingsCategory.IDENTITY,
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                        ProfileRow(
-                            icon = Icons.Filled.Notifications,
-                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            title = "Notifications",
-                            subtitle = if (unreadNotifications > 0) "$unreadNotifications unread" else "You're all caught up",
-                            onClick = onOpenNotifications,
-                            selected = selectedCategory == SettingsCategory.NOTIFICATIONS,
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                        ProfileRow(
-                            icon = Icons.Filled.People,
-                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
-                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            title = "Friends",
-                            subtitle = "Requests, inbox & activity",
-                            onClick = onOpenFriends,
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                        ProfileRow(
-                            icon = Icons.Filled.People,
-                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            title = "Share links",
-                            subtitle = "Read-only access & visibility",
-                            onClick = onOpenSharing,
-                            selected = selectedCategory == SettingsCategory.SHARING,
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                        ProfileRow(
-                            icon = Icons.Filled.ConfirmationNumber,
-                            iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
-                            iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            title = "Invites",
-                            subtitle = "Invite people to the archive",
-                            onClick = onOpenInvites,
-                            selected = selectedCategory == SettingsCategory.INVITES,
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                    }
-                }
-            }
-            item {
-                ReadingWidthColumn {
-                    ProfileRow(
-                        icon = Icons.Filled.Palette,
-                        iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
-                        iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        title = "Appearance",
-                        subtitle = appearanceSummary,
-                        onClick = onOpenAppearance,
-                        selected = selectedCategory == SettingsCategory.APPEARANCE,
-                    )
-                }
-            }
-            if (onOpenNavigation != null) item {
-                ReadingWidthColumn {
-                    ProfileRow(
-                        icon = Icons.Filled.Palette,
-                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        title = "Navigation",
-                        subtitle = "Tab order, visibility & compact labels",
-                        onClick = onOpenNavigation,
-                        selected = selectedCategory == SettingsCategory.NAVIGATION,
-                        modifier = Modifier.padding(top = 10.dp),
-                    )
-                }
-            }
-            item {
-                ReadingWidthColumn {
-                    ProfileRow(
-                        icon = Icons.Filled.Sync,
-                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        title = "Import & sync",
-                        subtitle = "Letterboxd, Simkl, Plex & Emby",
-                        onClick = onOpenImportSync,
-                        selected = selectedCategory == SettingsCategory.IMPORT_SYNC,
-                        modifier = Modifier.padding(top = 10.dp),
-                    )
-                }
-            }
-            item {
-                ReadingWidthColumn {
-                    ProfileRow(
-                        icon = Icons.Filled.Lock,
-                        iconContainer = MaterialTheme.colorScheme.primaryContainer,
-                        iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        title = "Permissions",
-                        subtitle = "Camera, notifications & alarms",
-                        onClick = onOpenPermissions,
-                        selected = selectedCategory == SettingsCategory.PERMISSIONS,
-                        modifier = Modifier.padding(top = 10.dp),
-                    )
-                }
-            }
-            item {
-                ReadingWidthColumn {
-                    ProfileRow(
-                        icon = Icons.Filled.Info,
-                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        title = "About & Legal",
-                        subtitle = "Version $appVersionName",
-                        onClick = onOpenAbout,
-                        selected = selectedCategory == SettingsCategory.ABOUT,
-                        modifier = Modifier.padding(top = 10.dp, bottom = if (devSettingsUnlocked) 10.dp else 22.dp),
-                    )
-                }
-            }
-            if (devSettingsUnlocked) {
-                item {
-                    ReadingWidthColumn {
-                        ProfileRow(
-                            icon = Icons.Filled.DeveloperMode,
-                            iconContainer = MaterialTheme.colorScheme.errorContainer,
-                            iconTint = MaterialTheme.colorScheme.onErrorContainer,
-                            title = "Developer Settings",
-                            subtitle = "Debug tools & build indicator",
-                            onClick = onOpenDeveloperSettings,
-                            selected = selectedCategory == SettingsCategory.DEVELOPER,
-                            modifier = Modifier.padding(bottom = 22.dp),
-                        )
-                    }
-                }
-            }
-
-            item {
-                ReadingWidthColumn {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 22.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         StatTile(value = ownedCount.toString(), label = "Titles logged", modifier = Modifier.weight(1f))
                         StatTile(value = watchedCount.toString(), label = "Watched", modifier = Modifier.weight(1f))
                     }
                 }
             }
 
+            if (signedIn) {
+                settingsSection("Account") {
+                    ProfileRow(
+                        icon = Icons.Filled.Person,
+                        iconContainer = cs.primaryContainer,
+                        iconTint = cs.onPrimaryContainer,
+                        title = "Identity",
+                        subtitle = "Display name & username",
+                        onClick = onOpenIdentity,
+                        selected = selectedCategory == SettingsCategory.IDENTITY,
+                    )
+                    ProfileRow(
+                        icon = Icons.Filled.ConfirmationNumber,
+                        iconContainer = cs.tertiaryContainer,
+                        iconTint = cs.onTertiaryContainer,
+                        title = "Invites",
+                        subtitle = "Invite people to the archive",
+                        onClick = onOpenInvites,
+                        selected = selectedCategory == SettingsCategory.INVITES,
+                    )
+                }
+                settingsSection("Social") {
+                    ProfileRow(
+                        icon = Icons.Filled.People,
+                        iconContainer = cs.primaryContainer,
+                        iconTint = cs.onPrimaryContainer,
+                        title = "Friends",
+                        subtitle = "Requests, inbox & activity",
+                        onClick = onOpenFriends,
+                    )
+                    ProfileRow(
+                        icon = Icons.Filled.Share,
+                        iconContainer = cs.secondaryContainer,
+                        iconTint = cs.onSecondaryContainer,
+                        title = "Share links",
+                        subtitle = "Read-only access & visibility",
+                        onClick = onOpenSharing,
+                        selected = selectedCategory == SettingsCategory.SHARING,
+                    )
+                    ProfileRow(
+                        icon = Icons.Filled.Notifications,
+                        iconContainer = cs.tertiaryContainer,
+                        iconTint = cs.onTertiaryContainer,
+                        title = "Notifications",
+                        subtitle = if (unreadNotifications > 0) "$unreadNotifications unread" else "You're all caught up",
+                        onClick = onOpenNotifications,
+                        selected = selectedCategory == SettingsCategory.NOTIFICATIONS,
+                    )
+                }
+            }
+
+            settingsSection("Preferences") {
+                ProfileRow(
+                    icon = Icons.Filled.Palette,
+                    iconContainer = cs.tertiaryContainer,
+                    iconTint = cs.onTertiaryContainer,
+                    title = "Appearance",
+                    subtitle = appearanceSummary,
+                    onClick = onOpenAppearance,
+                    selected = selectedCategory == SettingsCategory.APPEARANCE,
+                )
+                ProfileRow(
+                    icon = Icons.Filled.Tune,
+                    iconContainer = cs.secondaryContainer,
+                    iconTint = cs.onSecondaryContainer,
+                    title = "Navigation",
+                    subtitle = "Tab order, visibility & compact labels",
+                    onClick = onOpenNavigation,
+                    selected = selectedCategory == SettingsCategory.NAVIGATION,
+                )
+                if (signedIn) ProfileRow(
+                    icon = Icons.Filled.Theaters,
+                    iconContainer = cs.primaryContainer,
+                    iconTint = cs.onPrimaryContainer,
+                    title = "Moviegoing",
+                    subtitle = "Venue notes & theater interest",
+                    onClick = onOpenMoviegoing,
+                    selected = selectedCategory == SettingsCategory.MOVIEGOING,
+                )
+            }
+
+            settingsSection("Data") {
+                ProfileRow(
+                    icon = Icons.Filled.Sync,
+                    iconContainer = cs.secondaryContainer,
+                    iconTint = cs.onSecondaryContainer,
+                    title = "Import & sync",
+                    subtitle = "Letterboxd, Simkl, Plex & Emby",
+                    onClick = onOpenImportSync,
+                    selected = selectedCategory == SettingsCategory.IMPORT_SYNC,
+                )
+                if (signedIn) ProfileRow(
+                    icon = Icons.Filled.Restore,
+                    iconContainer = cs.tertiaryContainer,
+                    iconTint = cs.onTertiaryContainer,
+                    title = "Data & recovery",
+                    subtitle = "Unsynced changes, restore & catalog refresh",
+                    onClick = onOpenDataRecovery,
+                    selected = selectedCategory == SettingsCategory.DATA_RECOVERY,
+                )
+            }
+
+            settingsSection("App") {
+                ProfileRow(
+                    icon = Icons.Filled.Lock,
+                    iconContainer = cs.primaryContainer,
+                    iconTint = cs.onPrimaryContainer,
+                    title = "Permissions",
+                    subtitle = "Camera, notifications & alarms",
+                    onClick = onOpenPermissions,
+                    selected = selectedCategory == SettingsCategory.PERMISSIONS,
+                )
+                ProfileRow(
+                    icon = Icons.Filled.Info,
+                    iconContainer = cs.secondaryContainer,
+                    iconTint = cs.onSecondaryContainer,
+                    title = "About & Legal",
+                    subtitle = "Version $appVersionName",
+                    onClick = onOpenAbout,
+                    selected = selectedCategory == SettingsCategory.ABOUT,
+                )
+                if (devSettingsUnlocked) ProfileRow(
+                    icon = Icons.Filled.DeveloperMode,
+                    iconContainer = cs.errorContainer,
+                    iconTint = cs.onErrorContainer,
+                    title = "Developer Settings",
+                    subtitle = "Debug tools & build indicator",
+                    onClick = onOpenDeveloperSettings,
+                    selected = selectedCategory == SettingsCategory.DEVELOPER,
+                )
+            }
+
             item {
                 ReadingWidthColumn {
-                    if (signedInEmail != null) LegacyRecoverySection(legacyLoadStatus, legacyRestore)
-                    if (signedInEmail != null) outingRecovery?.invoke()
-                    if (signedInEmail != null) lifecycleChangesContent?.invoke()
-                    if (signedInEmail != null) listChangesContent?.invoke()
-                    if (signedInEmail != null) titleChangesContent?.invoke()
-                    if (signedInEmail != null) viewingChangesContent?.invoke()
-                    if (signedInEmail != null) ticketChangesContent?.invoke()
-                    if (signedInEmail != null) moviegoingContent?.invoke()
-                    if (signedInEmail != null) catalogRefreshContent?.invoke()
-                    OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
                         Text("Sign out")
                     }
                     if (signedInEmail != null) {
                         Text(
                             "Signed in as $signedInEmail",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = cs.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+/** One titled group of [ProfileRow]s, evenly spaced — replaces the per-row top/bottom padding
+ *  that used to space the flat list by hand. */
+private fun LazyListScope.settingsSection(title: String, rows: @Composable ColumnScope.() -> Unit) {
+    item {
+        ReadingWidthColumn {
+            Text(
+                title.uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp, top = 24.dp, bottom = 8.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = rows)
         }
     }
 }

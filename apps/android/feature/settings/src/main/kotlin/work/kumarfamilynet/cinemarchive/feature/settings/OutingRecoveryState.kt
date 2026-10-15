@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.settings
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -41,8 +45,8 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
         job = scope.launch {
             try { action(); checkActive() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                if (active()) mutable.value = state.value.copy(error = e.message ?: "Could not load saved changes.")
+            catch (e: Exception) { e.rethrowIfCancelled();
+                if (active()) mutable.value = state.value.copy(error = e.userMessage("Could not load saved changes."))
             } finally {
                 if (active()) mutable.value = state.value.copy(busy = false)
                 else mutable.value = OutingRecoveryState()
@@ -73,7 +77,7 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
         if (!review.pendingAttempt && value.selected.isEmpty()) return
         run {
             val result = try { source.apply(review.id, review.remoteVersion, value.selected) }
-            catch (error: Exception) {
+            catch (error: Exception) { error.rethrowIfCancelled();
                 if (error is CancellationException) throw error
                 val pending = source.pendingAttempt(review.id)
                 checkActive()

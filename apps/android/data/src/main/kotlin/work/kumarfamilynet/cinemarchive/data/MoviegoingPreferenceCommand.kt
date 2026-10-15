@@ -101,8 +101,8 @@ internal class MoviegoingPreferenceTransport(private val client: SupabaseRestCli
         } catch (e: CancellationException) { throw e }
         catch (e: SupabaseHttpException) {
             if (!accepted && e.postgresCode in setOf("40001", "23505", "P0002")) PushResult.Review("Compare your saved moviegoing preference with the current value in Profile.")
-            else PushResult.Retry(e.message ?: "Retry this same saved preference.")
-        } catch (e: Exception) { PushResult.Retry(e.message ?: "Retry this same saved preference.") }
+            else PushResult.Retry(e.userMessage("Retry this same saved preference."))
+        } catch (e: Exception) { PushResult.Retry(e.userMessage("Retry this same saved preference.")) }
     }
 }
 

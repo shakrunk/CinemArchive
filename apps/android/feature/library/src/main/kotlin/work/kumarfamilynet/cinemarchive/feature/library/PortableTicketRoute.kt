@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -61,7 +65,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
         scope.launch {
             try { work() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "Could not finish. Your saved ticket is retained." }
+            catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("Could not finish. Your saved ticket is retained.") }
             finally { busy = false }
         }
     }
@@ -108,13 +112,13 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
         if (state.association?.attachment != null) {
             try { photo = runtime.photo(outingId)?.file }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { error = failure.message ?: "Original unavailable. Reconnect to download it." }
+            catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("Original unavailable. Reconnect to download it.") }
         }
     }
     LaunchedEffect(runtime, outingId) {
         try { runtime.refresh() }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { /* Same-owner cached originals remain available offline. */ }
+        catch (cause: Exception) { cause.rethrowIfCancelled(); /* Same-owner cached originals remain available offline. */ }
     }
     val outing = state.outing
     val content: @Composable () -> Unit = {
@@ -162,7 +166,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
                     currentPhoto = null
                     try { currentPhoto = runtime.currentPhoto(checkNotNull(review))?.file }
                     catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { /* Identity and revision comparison remain explicit if a photo cannot download. */ }
+                    catch (cause: Exception) { cause.rethrowIfCancelled(); /* Identity and revision comparison remain explicit if a photo cannot download. */ }
                 } }, enabled = !busy) { Text("Compare with current ticket") }
                 if (change.hasOriginal) TextButton(onClick = { perform {
                     val original = runtime.original(change.id)

@@ -1,5 +1,9 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
+import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+
+import work.kumarfamilynet.cinemarchive.data.userMessage
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -127,7 +131,7 @@ class TitleDetailViewModel(
             _titleEditError.value = null
             try { block() }
             catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) { _titleEditError.value = "Couldn't save this title change. Try again." }
+            catch (cause: Exception) { cause.rethrowIfCancelled(); _titleEditError.value = "Couldn't save this title change. Try again." }
         }
     }
     suspend fun saveTags(tags: List<String>) = repository.updateTitleTags(titleId, tags)
@@ -468,9 +472,9 @@ fun TitleDetailScreen(
                 val opening = checkNotNull(onPrepareSchedule) { "Ticket scheduling is unavailable." }(outingId)
                 if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = opening
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (failure: Exception) {
+            } catch (failure: Exception) { failure.rethrowIfCancelled();
                 if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle)
-                    scheduleError = failure.message ?: "Please try again."
+                    scheduleError = failure.userMessage("Please try again.")
             } finally { preparingSchedule = false }
         }
     }
@@ -494,7 +498,7 @@ fun TitleDetailScreen(
                 val saved = saveViewingEditor(openingOwner, openingTitle, draft, viewing == null)
                 if (deleting) { deletingViewingState = saved; deleteError = null } else editingViewingState = saved
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (currentHistoryOwner == openingOwner) viewingOpenError = e.message ?: "Couldn't open this viewing." }
+            catch (e: Exception) { e.rethrowIfCancelled(); if (currentHistoryOwner == openingOwner) viewingOpenError = e.userMessage("Couldn't open this viewing.") }
             finally { preparingViewing = false }
         }
     }
@@ -512,7 +516,7 @@ fun TitleDetailScreen(
                     postShowState = savePostShow(owner, current.id, current.title, opening)
                 }
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) {
+            } catch (cause: Exception) { cause.rethrowIfCancelled();
                 if (currentHistoryOwner == owner && currentHistoryTitle == current.id) viewingOpenError = "Couldn't open this viewing. Try again."
             } finally { preparingPostShow = false }
         }
@@ -933,8 +937,8 @@ fun TitleDetailScreen(
                             deletingViewingState = null
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Exception) {
-                            deleteError = e.message ?: "Couldn't delete viewing. Try again."
+                        } catch (e: Exception) { e.rethrowIfCancelled();
+                            deleteError = e.userMessage("Couldn't delete viewing. Try again.")
                         } finally { deleting = false }
                     }
                 }) { Text(if (deleting) "Deleting…" else "Delete viewing", color = MaterialTheme.colorScheme.error) }

@@ -9,9 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.35.2] - 2026-10-15
+
 ### Fixed
 
 - **Android:** Network and server failures now show a plain-language message (for example "Can't reach CinemArchive. Check your connection and try again.") instead of raw technical text such as "Software caused connection abort".
+- **Android:** Leaving a screen while a request is in flight no longer shows a spurious error, and legacy-archive restore failures use plain-language messages.
 
 ### Changed
 

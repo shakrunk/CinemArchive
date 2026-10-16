@@ -66,27 +66,57 @@ class DiscoverBrowseScreenTest {
             when (page) { 1 -> listOf(movie, tv).filter { type == null || it.type == type }; 2 -> listOf(movie.copy(tmdbId = 84, title = "Next movie")); else -> emptyList() }
         })
         waitFor("View more")
-        compose.onNodeWithText("Genre: All genres").performClick()
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("Drama").performClick()
-        waitFor("Genre: Drama")
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
+        waitFor("Drama")
+        compose.onNodeWithTag("discover-grid").performScrollToKey("load-more")
         compose.onNodeWithText("View more").performClick()
         waitFor("Retry more")
         compose.onNodeWithText("Connection lost").assertIsDisplayed()
         compose.onNodeWithText("Movie 42").assertExists()
+        compose.onNodeWithTag("discover-grid").performScrollToKey("load-more")
         compose.onNodeWithText("Retry more").performClick()
         waitFor("3 titles")
+        compose.onNodeWithTag("discover-grid").performScrollToKey("load-more")
         compose.onNodeWithText("View more").performClick()
         compose.waitUntil { compose.onAllNodesWithText("View more").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("discover-grid").performScrollToIndex(0)
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("TV", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         waitFor("1 titles")
-        compose.onNodeWithText("Genre: All genres").assertIsDisplayed()
-        compose.onNodeWithText("Genre: All genres").performClick()
+        compose.onNodeWithTag("discover-filters").assertIsDisplayed()
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("Action & Adventure").assertExists()
         compose.onNodeWithText("Action & Adventure").performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         compose.runOnIdle {
             assertEquals(2, requests.count { it == Triple(null, 18, 2) })
             assertEquals(Triple(MediaType.TV, 10759, 1), requests.last())
         }
+    }
+
+    @Test fun filtersKeepDraftChangesUntilAppliedAndPreserveSearch() {
+        val requests = mutableListOf<MediaType?>()
+        show({ type, _, _ -> requests += type; listOf(movie, tv) })
+        waitFor("View more")
+        compose.onNodeWithTag("discover-filters").performClick()
+        compose.onNodeWithText("Reset").assertIsNotEnabled()
+        compose.onNodeWithText("Movies").performClick()
+        compose.onNodeWithText("Reset").assertIsEnabled()
+        compose.runOnIdle { assertEquals(listOf<MediaType?>(null), requests) }
+        compose.onNodeWithText("Reset").performScrollTo().performClick()
+        compose.onNodeWithText("Reset").assertIsNotEnabled()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(listOf<MediaType?>(null), requests) }
+        compose.onNodeWithTag("discover-search").performTextInput("Series")
+        waitFor("Search hit")
+        compose.onNodeWithTag("discover-filters").performClick()
+        compose.onNodeWithText("TV").performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
+        waitFor("Search hit")
+        compose.onNodeWithTag("discover-search").assertTextContains("Series")
     }
 
     @Test fun ownershipAndAddKeepSameNumberMovieAndTvDistinctAndSearchHidesPagination() {

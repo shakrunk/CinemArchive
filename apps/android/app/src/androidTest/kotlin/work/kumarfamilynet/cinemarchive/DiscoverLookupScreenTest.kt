@@ -54,6 +54,7 @@ class DiscoverLookupScreenTest {
     @Test fun peopleCreditsKeepMediaIdentityAndCanReturnToSearchAtLargeFont() {
         val added = mutableListOf<TrendingTitle>()
         show(onAdd = added::add)
+        compose.onNodeWithText("Titles").performClick()
         compose.onNodeWithText("People", useUnmergedTree = true).performClick()
         waitText("Search for a person")
         compose.onNode(hasSetTextAction()).performTextInput("Person")
@@ -61,7 +62,9 @@ class DiscoverLookupScreenTest {
         waitText("Shared TV")
         compose.onNodeWithText("+ Add").performClick()
         compose.runOnIdle { assertEquals(listOf(tv), added) }
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("TV", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         waitText("1 titles"); compose.onAllNodesWithText("Shared Movie").assertCountEquals(0)
         compose.onNodeWithText("Back to people").performClick()
         waitText("Search for a person"); compose.onAllNodesWithText("Shared TV").assertCountEquals(0)
@@ -71,11 +74,14 @@ class DiscoverLookupScreenTest {
         var calls = 0
         val kinds = mutableListOf<MediaType?>()
         show(studios = { _, type -> kinds += type; if (++calls == 1) error("Offline studio") else listOf(tv) })
+        compose.onNodeWithText("Titles").performClick()
         compose.onNodeWithText("Studios", useUnmergedTree = true).performClick()
         compose.onNode(hasSetTextAction()).performTextInput("Studio")
         waitText("US"); compose.onNodeWithText("A Studio").performClick()
         waitText("Offline studio"); compose.onNodeWithText("Retry").performClick()
-        waitText("Shared TV"); compose.onNodeWithText("TV", useUnmergedTree = true).performClick()
+        waitText("Shared TV"); compose.onNodeWithTag("discover-filters").performClick()
+        compose.onNodeWithText("TV", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         compose.waitUntil { kinds.lastOrNull() == MediaType.TV }
         compose.onNodeWithText("Back to studios").performClick(); waitText("Search for a studio")
     }

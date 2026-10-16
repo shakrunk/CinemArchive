@@ -83,7 +83,7 @@ class DiscoverViewModel(
             } else fetch(showFullScreenLoading = true)
             return
         }
-        _uiState.update { it.copy(typeFilter = type, genreId = null, query = "", titles = emptyList()) }
+        _uiState.update { it.copy(typeFilter = type, genreId = null, titles = emptyList()) }
         fetch(showFullScreenLoading = true)
     }
 

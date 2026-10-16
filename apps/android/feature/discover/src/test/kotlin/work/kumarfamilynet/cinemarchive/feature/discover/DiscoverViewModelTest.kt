@@ -59,6 +59,19 @@ class DiscoverViewModelTest {
         assertEquals(listOf(trending), model.uiState.value.titles)
     }
 
+    @Test fun `changing media type retains and filters the active search`() = runTest(dispatcher) {
+        val queries = mutableListOf<String>()
+        val model = model { queries += it; listOf(result(2), result(3, MediaType.TV)) }
+        runCurrent()
+        model.onQueryChange("Dune"); advanceTimeBy(300); runCurrent()
+        model.onTypeChange(TypeFilter.TV); runCurrent()
+        assertEquals("Dune", model.uiState.value.query)
+        assertEquals(listOf("Dune", "Dune"), queries)
+        assertEquals(3, model.uiState.value.titles.single().tmdbId)
+        model.onTypeChange(TypeFilter.ALL); runCurrent()
+        assertEquals(2, model.uiState.value.titles.size)
+    }
+
     @Test fun `rapid typing starts only the latest search`() = runTest(dispatcher) {
         val queries = mutableListOf<String>()
         val model = model { queries += it; emptyList() }

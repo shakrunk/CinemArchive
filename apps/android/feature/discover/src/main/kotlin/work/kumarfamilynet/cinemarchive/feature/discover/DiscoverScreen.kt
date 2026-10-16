@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,14 +31,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -67,14 +61,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
-import work.kumarfamilynet.cinemarchive.core.designsystem.ContentReadingMaxWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterMinTileWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
-import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
@@ -244,67 +235,13 @@ fun DiscoverScreen(
             exit = fadeOut() + shrinkVertically(),
         ) {
             Column {
-                SegmentedGroup(
-                    options = DiscoverMode.entries.map { ChoiceOption(it, it.label) },
-                    selected = mode, onSelect = onModeChange,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                DiscoverControls(
+                    search = search, onSearchChange = onSearchChange,
+                    mode = mode, onModeChange = onModeChange,
+                    typeFilter = typeFilter, onTypeFilterChange = onTypeFilterChange,
+                    genreId = genreId, onGenreChange = onGenreChange,
+                    showTypeFilter = mode == DiscoverMode.TITLES || selectedLookup != null,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                        .widthIn(max = ContentReadingMaxWidth)
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .padding(horizontal = 16.dp),
-                ) {
-                    Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    androidx.compose.foundation.text.BasicTextField(
-                        value = search,
-                        onValueChange = onSearchChange,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                        modifier = Modifier.padding(start = 10.dp).fillMaxWidth(),
-                        decorationBox = { inner ->
-                            if (search.isEmpty()) {
-                                Text(
-                                    when (mode) {
-                                        DiscoverMode.TITLES -> "Search movies & TV…"
-                                        DiscoverMode.PEOPLE -> "Search actors, directors & crew…"
-                                        DiscoverMode.STUDIOS -> "Search studios & companies…"
-                                    },
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            inner()
-                        },
-                    )
-                }
-
-                SegmentedGroup(
-                    options = listOf(
-                        ChoiceOption(TypeFilter.ALL, "All"),
-                        ChoiceOption(TypeFilter.MOVIE, "Movies"),
-                        ChoiceOption(TypeFilter.TV, "TV"),
-                    ),
-                    selected = typeFilter,
-                    onSelect = onTypeFilterChange,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-                if (mode == DiscoverMode.TITLES) Box(Modifier.padding(horizontal = 20.dp)) {
-                    var genresExpanded by remember { mutableStateOf(false) }
-                    val genres = discoverGenres(typeFilter)
-                    TextButton(onClick = { genresExpanded = true }) {
-                        Text("Genre: ${genres.firstOrNull { it.id == genreId }?.name ?: "All genres"}")
-                    }
-                    DropdownMenu(expanded = genresExpanded, onDismissRequest = { genresExpanded = false }) {
-                        DropdownMenuItem(text = { Text("All genres") }, onClick = { genresExpanded = false; onGenreChange(null) })
-                        genres.forEach { genre ->
-                            DropdownMenuItem(text = { Text(genre.name) }, onClick = { genresExpanded = false; onGenreChange(genre.id) })
-                        }
-                    }
-                }
                 if (selectedLookup != null) TextButton(onClick = onLookupBack, modifier = Modifier.padding(horizontal = 12.dp)) {
                     Text("Back to ${mode.label.lowercase()}")
                 }
@@ -369,12 +306,7 @@ fun DiscoverScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f).padding(vertical = 12.dp),
                         )
-                        if (search.isBlank() && hasMore) TextButton(onClick = onLoadMore, enabled = !isLoadingMore && !isRefreshing) {
-                            Text(if (isLoadingMore) "Loading more…" else if (moreError != null) "Retry more" else "View more")
-                        }
                     }
-                    if (moreError != null) Text(moreError, color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp))
 
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
@@ -404,6 +336,28 @@ fun DiscoverScreen(
                                 onOpen = { onOpenTitle(title) },
                                 onAdd = { onAdd(title) },
                             )
+                        }
+                        if (search.isBlank() && hasMore) {
+                            item(key = "load-more", span = { GridItemSpan(maxLineSpan) }) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().testTag("discover-pagination"),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    if (moreError != null) Text(
+                                        moreError, color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    )
+                                    OutlinedButton(
+                                        onClick = onLoadMore,
+                                        enabled = !isLoadingMore && !isRefreshing,
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                    ) {
+                                        Text(if (isLoadingMore) "Loading more…" else if (moreError != null) "Retry more" else "View more")
+                                    }
+                                }
+                            }
                         }
                         if (showShelves) {
                             item(key = "recommendations", span = { GridItemSpan(maxLineSpan) }) {
@@ -460,13 +414,7 @@ private fun DiscoverShelf(
                 TextButton(onClick = onRetry) { Text(if (tag == "recommendations") "Retry recommendations" else "Retry filmography") }
             }
             titles.isEmpty() -> Text(emptyMessage, style = MaterialTheme.typography.bodyMedium)
-            else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(titles, key = TrendingTitle::catalogKey) { title ->
-                    Box(Modifier.width(160.dp).testTag("$tag-${title.catalogKey}")) {
-                        DiscoverCard(title, isAdded = false, columns = 2, onOpen = { onOpen(title) }, onAdd = { onAdd(title) })
-                    }
-                }
-            }
+            else -> DiscoverFilmStrip(titles, tag, onOpen, onAdd)
         }
     }
     if (choosing) AlertDialog(onDismissRequest = { choosing = false }, title = { Text(pickerLabel) },

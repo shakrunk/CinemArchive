@@ -9,6 +9,16 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android:** Discover disables Reset at default filter settings and places View more, loading, and retry feedback below the title grid.
+
+- **Android:** Added consistent vertical gaps between Discover filter chips and tightened film-strip captions by placing metadata and Add on the same row.
+
+### Changed
+
+- **Android:** Discover now uses compact search scope and filter controls with a bottom sheet, retains the search query when changing media type, and recommendation carousels use the desktop-inspired film-strip frames and sprocket rails.
+
 ## [1.35.2] - 2026-10-15
 
 ### Fixed

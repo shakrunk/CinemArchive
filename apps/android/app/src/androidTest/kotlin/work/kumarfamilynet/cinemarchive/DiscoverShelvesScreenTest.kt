@@ -73,7 +73,7 @@ class DiscoverShelvesScreenTest {
         waitFor("Because You Watched")
         shelf("recommendations")
         compose.onNodeWithTag("recommendations-MOVIE:42").assertDoesNotExist()
-        val poster = hasText("Unowned series") and hasClickAction()
+        val poster = hasContentDescription("Preview Unowned series")
         compose.onNodeWithTag("discover-grid").performScrollToNode(poster)
         val card = compose.onNode(poster).assertIsDisplayed()
         val cardBounds = card.getUnclippedBoundsInRoot()
@@ -83,7 +83,7 @@ class DiscoverShelvesScreenTest {
         val visibleArtworkHeight = card.fetchSemanticsNode().boundsInRoot.height
         card.performTouchInput { click(Offset(center.x, visibleArtworkHeight * 0.25f)) }
         compose.runOnIdle { assertEquals("Physical poster tap opens preview; bounds=$cardBounds", listOf(tv), opened) }
-        val add = hasText("+ Add") and hasAnyAncestor(hasTestTag("recommendations-TV:42"))
+        val add = hasContentDescription("Add Unowned series to library") and hasAnyAncestor(hasTestTag("recommendations-TV:42"))
         // Reveal the lower action with the same physical vertical scroll a phone user makes.
         compose.onNodeWithTag("discover-grid").performTouchInput {
             swipe(Offset(center.x, height * 0.8f), Offset(center.x, height * 0.45f), durationMillis = 500)
@@ -96,12 +96,16 @@ class DiscoverShelvesScreenTest {
         button.performClick()
         compose.runOnIdle { assertEquals("Physical Add tap starts add flow; bounds=$buttonBounds", listOf(tv), added) }
         top()
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("Movies", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         shelf("recommendations")
         compose.onNodeWithText("No recommendations found for this title — try picking another.").assertExists()
         compose.runOnIdle { assertEquals(listOf(42 to MediaType.MOVIE), seeds) }
         top()
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("TV", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         shelf("recommendations")
         compose.onNodeWithTag("recommendations-TV:42").assertExists()
         compose.runOnIdle { library.value = library.value.copy(titles = library.value.titles + DiscoverLibraryTitle("owned-tv", 42, "Owned TV", MediaType.TV)) }
@@ -141,12 +145,15 @@ class DiscoverShelvesScreenTest {
         compose.onNodeWithTag("discover-shelf-recommendations").assertDoesNotExist()
         compose.onNode(hasSetTextAction()).performTextClearance()
         waitFor("Because You Watched")
-        compose.onNodeWithText("Genre: All genres").performClick()
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("Drama").performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         compose.onNodeWithTag("discover-shelf-recommendations").assertDoesNotExist()
-        compose.onNodeWithText("Genre: Drama").performClick()
+        compose.onNodeWithTag("discover-filters").performClick()
         compose.onNodeWithText("All genres").performClick()
+        compose.onNodeWithText("Show results").performScrollTo().performClick()
         waitFor("Because You Watched")
+        compose.onNodeWithText("Titles").performClick()
         compose.onNodeWithText("People", useUnmergedTree = true).performClick()
         compose.onNodeWithTag("discover-shelf-recommendations").assertDoesNotExist()
         compose.onNodeWithTag("discover-shelf-starring").assertDoesNotExist()

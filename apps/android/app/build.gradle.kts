@@ -130,3 +130,30 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+// Generate offline notices from each variant's resolved runtime graph (including transitive
+// libraries), so dependency updates cannot silently outgrow the credits inventory.
+androidComponents.onVariants { variant ->
+    val artifacts = variant.runtimeConfiguration.incoming.artifactView {
+        componentFilter { it is org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+    }.artifacts.resolvedArtifacts
+    val dependencyHandler = dependencies
+    val notices = tasks.register<GenerateLicenseNotices>("generate${variant.name.replaceFirstChar { it.uppercase() }}LicenseNotices") {
+        licenseDirectory.set(rootProject.layout.projectDirectory.dir("licenses"))
+        outputDirectory.set(layout.buildDirectory.dir("generated/licenseAssets/${variant.name}"))
+        libraries.set(artifacts.map { results ->
+            results.associate { artifact -> artifact.id.componentIdentifier.displayName to artifact.file }
+        })
+        poms.set(artifacts.map { results ->
+            dependencyHandler.createArtifactResolutionQuery()
+                .forComponents(results.map { it.id.componentIdentifier })
+                .withArtifacts(org.gradle.maven.MavenModule::class.java, org.gradle.maven.MavenPomArtifact::class.java)
+                .execute().resolvedComponents.mapNotNull { component ->
+                    val pom = component.getArtifacts(org.gradle.maven.MavenPomArtifact::class.java)
+                        .filterIsInstance<org.gradle.api.artifacts.result.ResolvedArtifactResult>().firstOrNull()
+                    pom?.let { component.id.displayName to it.file }
+                }.toMap()
+        })
+    }
+    variant.sources.assets?.addGeneratedSourceDirectory(notices, GenerateLicenseNotices::getOutputDirectory)
+}

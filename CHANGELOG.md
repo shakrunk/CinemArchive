@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.35.4] - 2026-10-16
+
 ### Added
 
 - **Android:** Credits now includes offline license texts and notices, generated from each build’s runtime dependencies, plus full font licenses.

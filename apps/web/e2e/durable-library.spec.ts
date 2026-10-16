@@ -1,6 +1,8 @@
 import { expect, test } from 'playwright/test'
 
-test.use({ timezoneId: 'America/Denver' })
+// IndexedDB durability does not depend on PWA caching. Isolate these navigation-heavy
+// tests from WebKit service-worker registration races; offline tests retain coverage.
+test.use({ timezoneId: 'America/Denver', serviceWorkers: 'block' })
 
 test.beforeEach(async ({ context, page }) => {
   await context.route(/^https?:\/\/(?!127\.0\.0\.1:4178(?:\/|$))/, (route) => route.abort())

@@ -103,8 +103,10 @@ private data class CreditEntry(
 
 private data class CreditSection(val title: String, val entries: List<CreditEntry>)
 
-// Sourced from apps/android/gradle/libs.versions.toml and CinemArchiveTypography.kt — keep in
-// sync when a dependency or Google Font is added, swapped, or dropped.
+// Sourced from module runtime dependencies, gradle/libs.versions.toml, and
+// CinemArchiveTypography.kt — keep in sync when a dependency or Google Font changes.
+// Check :app:dependencies --configuration releaseRuntimeClasspath for transitive additions.
+// Do not include test-only libraries (for example, JSON-java); Android provides org.json.
 private val CREDIT_SECTIONS = listOf(
     CreditSection(
         title = "Data & Media",
@@ -171,15 +173,16 @@ private val CREDIT_SECTIONS = listOf(
             ),
             CreditEntry(
                 name = "Jetpack Compose & AndroidX",
-                detail = "UI toolkit, Activity, Lifecycle, Core, and DataStore.",
+                detail = "UI toolkit, Material icons, Activity, Lifecycle, Core, SplashScreen, " +
+                    "and DataStore.",
                 license = "Apache License 2.0",
                 url = "https://developer.android.com/jetpack",
             ),
             CreditEntry(
-                name = "Material Components for Android",
-                detail = "Material 3 design system components.",
+                name = "AndroidX Compose Material 3",
+                detail = "Material 3 design system components for Jetpack Compose.",
                 license = "Apache License 2.0",
-                url = "https://github.com/material-components/material-components-android",
+                url = "https://developer.android.com/jetpack/androidx/releases/compose-material3",
             ),
             CreditEntry(
                 name = "AndroidX Room",
@@ -218,10 +221,87 @@ private val CREDIT_SECTIONS = listOf(
                 url = "https://github.com/square/okhttp",
             ),
             CreditEntry(
-                name = "JSON-java (org.json)",
-                detail = "JSON parsing.",
-                license = "The JSON License",
-                url = "https://github.com/stleary/JSON-java",
+                name = "ZXing Core",
+                detail = "QR-code and barcode decoding and rendering for movie tickets.",
+                license = "Apache License 2.0",
+                url = "https://github.com/zxing/zxing/blob/zxing-3.5.3/LICENSE",
+            ),
+        ),
+    ),
+    CreditSection(
+        title = "Supporting Open Source Libraries",
+        entries = listOf(
+            CreditEntry(
+                name = "libyuv",
+                detail = "Image processing used by CameraX.",
+                license = "BSD 3-Clause License and patent grant",
+                url = "https://chromium.googlesource.com/libyuv/libyuv/+/refs/heads/main/LICENSE",
+            ),
+            CreditEntry(
+                name = "Okio",
+                detail = "I/O support for networking and image loading.",
+                license = "Apache License 2.0",
+                url = "https://github.com/square/okio",
+            ),
+            CreditEntry(
+                name = "Tink",
+                detail = "Cryptography used by AndroidX Security Crypto.",
+                license = "Apache License 2.0",
+                url = "https://github.com/tink-crypto/tink-java",
+            ),
+            CreditEntry(
+                name = "Gson",
+                detail = "JSON serialization used by supporting libraries.",
+                license = "Apache License 2.0",
+                url = "https://github.com/google/gson",
+            ),
+            CreditEntry(
+                name = "Accompanist Drawable Painter",
+                detail = "Drawable rendering used by Coil Compose.",
+                license = "Apache License 2.0",
+                url = "https://github.com/google/accompanist",
+            ),
+            CreditEntry(
+                name = "Firebase Android SDK components",
+                detail = "Component discovery, annotations, and encoders used by ML Kit.",
+                license = "Apache License 2.0",
+                url = "https://github.com/firebase/firebase-android-sdk",
+            ),
+            CreditEntry(
+                name = "Android Data Transport",
+                detail = "Event transport used by ML Kit.",
+                license = "Apache License 2.0",
+                url = "https://github.com/firebase/firebase-android-sdk/tree/main/transport",
+            ),
+            CreditEntry(
+                name = "Guava ListenableFuture",
+                detail = "Asynchronous result interfaces used by AndroidX and Google libraries.",
+                license = "Apache License 2.0",
+                url = "https://github.com/google/guava",
+            ),
+            CreditEntry(
+                name = "Auto Value Annotations",
+                detail = "Value-type annotations used by supporting libraries.",
+                license = "Apache License 2.0",
+                url = "https://github.com/google/auto",
+            ),
+            CreditEntry(
+                name = "Javax Inject",
+                detail = "Dependency injection annotations used by supporting libraries.",
+                license = "Apache License 2.0",
+                url = "https://github.com/javax-inject/javax-inject",
+            ),
+            CreditEntry(
+                name = "JetBrains Java Annotations",
+                detail = "Code contract annotations used by Kotlin and supporting libraries.",
+                license = "Apache License 2.0",
+                url = "https://github.com/JetBrains/java-annotations",
+            ),
+            CreditEntry(
+                name = "JSpecify",
+                detail = "Nullness annotations used by supporting libraries.",
+                license = "Apache License 2.0",
+                url = "https://github.com/jspecify/jspecify",
             ),
         ),
     ),
@@ -232,8 +312,15 @@ private val CREDIT_SECTIONS = listOf(
                 name = "Google ML Kit — Barcode Scanning",
                 detail = "On-device QR-code recognition for invite redemption. Proprietary — " +
                     "not open source.",
-                license = "Google APIs Terms of Service",
-                url = "https://developers.google.com/ml-kit/vision/barcode-scanning",
+                license = "ML Kit Terms of Service and Google APIs Terms of Service",
+                url = "https://developers.google.com/ml-kit/terms",
+            ),
+            CreditEntry(
+                name = "Google Play services & ODML Image",
+                detail = "Supporting services and image containers for ML Kit. Proprietary — " +
+                    "not open source.",
+                license = "Android Software Development Kit License",
+                url = "https://developer.android.com/studio/terms.html",
             ),
         ),
     ),
@@ -526,6 +613,11 @@ private fun LegalRow(title: String, onClick: () -> Unit) {
 
 @Composable
 private fun CreditsScreen(onBack: () -> Unit) {
+    var showLicenseTexts by remember { mutableStateOf(false) }
+    if (showLicenseTexts) {
+        OfflineLicensesScreen(onBack = { showLicenseTexts = false })
+        return
+    }
     val uriHandler = LocalUriHandler.current
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
@@ -552,6 +644,16 @@ private fun CreditsScreen(onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 20.dp),
                     )
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    OutlinedButton(
+                        onClick = { showLicenseTexts = true },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    ) {
+                        Text("View license texts & notices")
+                    }
                 }
             }
             CREDIT_SECTIONS.forEachIndexed { sectionIndex, section ->

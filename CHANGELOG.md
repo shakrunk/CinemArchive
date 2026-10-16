@@ -9,6 +9,14 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Android:** Credits now includes offline license texts and notices, generated from each build’s runtime dependencies, plus full font licenses.
+
+### Fixed
+
+- **Android:** Updated Credits & Open Source Licenses with ZXing Core and missing runtime dependency credits, corrected the Compose Material 3 attribution and ML Kit terms link, and removed the test-only JSON-java entry.
+
 ## [1.35.3] - 2026-10-16
 
 ### Fixed

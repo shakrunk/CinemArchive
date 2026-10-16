@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.35.3] - 2026-10-16
+
 ### Fixed
 
 - **Android:** Discover disables Reset at default filter settings and places View more, loading, and retry feedback below the title grid.

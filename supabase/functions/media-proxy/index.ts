@@ -4,6 +4,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { buildCorsHeaders, handleOptions, errorMessage } from '../_shared/http.ts'
+import { createTvdb } from './tvdb.ts'
 
 const TMDB_BASE = 'https://api.themoviedb.org/3'
 const OMDB_BASE = 'https://www.omdbapi.com'
@@ -17,6 +18,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 const corsHeaders = buildCorsHeaders('GET, OPTIONS, POST')
+
+const tvdb = createTvdb({
+  apiKey: Deno.env.get('TVDB_API_KEY'),
+  pin: Deno.env.get('TVDB_PIN'),
+  getCached,
+  setCached,
+})
 
 async function getCached(key: string): Promise<unknown | null> {
   try {
@@ -86,13 +94,17 @@ async function getTMDBDetails(tmdbId: number, type: 'movie' | 'tv') {
   const appendix = type === 'movie' ? 'credits,release_dates' : 'credits,aggregate_credits,seasons,content_ratings,external_ids'
   const url = `${TMDB_BASE}/${type}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=${appendix}&language=en-US`
   // Cache key bumped to v3 — v3 adds aggregate_credits for TV (episode counts per cast member).
-  return cachedFetch(`tmdb:details:v3:${type}:${tmdbId}`, url)
+  const details = await cachedFetch(`tmdb:details:v3:${type}:${tmdbId}`, url)
+  return type === 'tv' ? tvdb.details(details) : details
 }
 
 async function getTMDBSeasonDetails(tmdbId: number, seasonNumber: number) {
   const url = `${TMDB_BASE}/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=credits`
   // Cache key bumped to v3 — ensures episode_count is present in season credits cast
-  return cachedFetch(`tmdb:season:v3:${tmdbId}:${seasonNumber}`, url)
+  const season = await cachedFetch(`tmdb:season:v3:${tmdbId}:${seasonNumber}`, url)
+  if (!tvdb.enabled) return season
+  const show = await getTMDBDetails(tmdbId, 'tv')
+  return tvdb.season(season, show, seasonNumber)
 }
 
 async function getTMDBEpisodeCredits(tmdbId: number, seasonNumber: number, episodeNumber: number) {

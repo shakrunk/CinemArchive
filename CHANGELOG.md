@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-10-16
+
 ### Added
 
 - **TV metadata:** The shared backend now prefers TVDB show and compatible episode metadata when configured, with automatic TMDB fallback and preserved viewing-history identities on web and Android.

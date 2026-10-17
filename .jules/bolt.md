@@ -100,3 +100,6 @@
 ## 2024-03-24 - Node.js ES Modules Extension
 **Learning:** When creating ad-hoc Node.js scripts (such as patching scripts) inside a directory with `"type": "module"` defined in `package.json` (like `apps/web`), running a `.js` file with `require()` will throw a `ReferenceError: require is not defined in ES module scope`.
 **Action:** Always use the `.cjs` file extension when creating temporary Node.js scripts that use CommonJS `require()` syntax inside projects that enforce ES modules to prevent execution errors.
+## 2024-05-18 - Title Search Flattening Optimization
+**Learning:** When filtering across multiple text properties in frequent loops (like global search filters), map nested string arrays into a single flattened string and cache it using an O(1) WeakMap keyed by the object instance to eliminate O(N*M) CPU overhead.
+**Action:** Replace `Array.prototype.some` lookups inside `.filter` with a single `.includes()` check against a pre-flattened string cache in search operations.

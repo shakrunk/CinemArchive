@@ -51,11 +51,11 @@ class FriendLibraryScreenTest {
         listOf("Edit", "Log viewing", "Book an outing", "Delete", "Add to list", "Tickets").forEach {
             compose.onAllNodesWithText(it).assertCountEquals(0)
         }
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("The Ledger").performClick()
         compose.onNodeWithText("Friend cinema history").performScrollTo().assertIsDisplayed()
         compose.onAllNodesWithText("Edit").assertCountEquals(0)
-        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithContentDescription("Close").performClick()
         compose.runOnIdle { assertTrue(closed) }
     }
 

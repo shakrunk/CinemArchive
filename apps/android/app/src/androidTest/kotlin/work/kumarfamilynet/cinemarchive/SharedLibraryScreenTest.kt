@@ -42,11 +42,11 @@ class SharedLibraryScreenTest {
         listOf("Edit", "Log viewing", "Book an outing", "Delete", "Add to list").forEach {
             compose.onAllNodesWithText(it).assertCountEquals(0)
         }
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("The Ledger").performClick()
         compose.onNodeWithText("Shared cinema history").performScrollTo().assertIsDisplayed()
         compose.onAllNodesWithText("Edit").assertCountEquals(0)
-        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithContentDescription("Close").performClick()
         compose.runOnIdle { org.junit.Assert.assertTrue(closed) }
     }
 

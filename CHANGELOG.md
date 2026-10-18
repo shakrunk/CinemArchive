@@ -14,6 +14,7 @@ number is chosen.
 - **Android:** Title detail gathers tags, watch link and collection, metadata refresh, earlier-watch backfill and removal into a collapsed Manage title card; tag chips show the tag with a remove icon, episode history opens on demand, and ticket buttons show a readable date.
 - **Android:** Data & recovery no longer stacks empty "Saved … changes" panels, and saved imports and provider changes keep their retry, export and review actions in a per-item menu.
 - **Android:** Moviegoing settings show venue notes and unsynced changes directly on the screen instead of behind a button that opened a dialog.
+- **Android:** Shared and friend archives use an icon back button, a read-only badge and real Library/Ledger tabs, and their title detail is laid out in cards like your own instead of a raw field list.
 
 ## [1.36.0] - 2026-10-16
 

@@ -68,7 +68,7 @@ class ArchiveLibraryFiltersScreenTest {
         compose.onAllNodesWithText("Beta Series").assertCountEquals(0)
         compose.onNodeWithText("Alpha Film").performScrollTo().performClick()
         compose.onNodeWithText("Alpha shared notes").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("1 of 3 titles").assertIsDisplayed()
         compose.onNodeWithText("The Ledger").performClick()
         compose.onNodeWithText("Library (3)").performClick()

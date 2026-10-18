@@ -419,22 +419,17 @@ function timeOf(dateStr: string | undefined): number {
   return dateStr ? new Date(dateStr).getTime() : -Infinity
 }
 
-// ⚡ Bolt: Cache flattened search index string in a WeakMap to prevent O(N*M) redundant computations and array allocations
+// Searchable fields joined into one lowercased string, so the search filter is a
+// single includes() per title. The \0 separator keeps a query from matching across
+// two fields (it can't be typed into the search box).
 const titleSearchCache = new WeakMap<Title, string>()
 
 function getTitleSearch(t: Title): string {
   let index = titleSearchCache.get(t)
-  if (!index) {
-    // ⚡ Bolt: Map nested string arrays into a single flattened string to eliminate O(N*M) CPU overhead
-    // during search filtering. Delimit with a null byte to prevent cross-field false positive matches.
-    const fields = [
-      t.title,
-      t.director || '',
-      ...t.genres,
-      ...t.tags,
-      ...(t.cast?.map((c) => c.name) || [])
-    ]
-    index = fields.join('\0').toLowerCase()
+  if (index === undefined) {
+    index = [t.title, t.director ?? '', ...t.genres, ...t.tags, ...(t.cast?.map((c) => c.name) ?? [])]
+      .join('\0')
+      .toLowerCase()
     titleSearchCache.set(t, index)
   }
   return index

@@ -15,6 +15,7 @@ number is chosen.
 - **Android:** Data & recovery no longer stacks empty "Saved … changes" panels, and saved imports and provider changes keep their retry, export and review actions in a per-item menu.
 - **Android:** Moviegoing settings show venue notes and unsynced changes directly on the screen instead of behind a button that opened a dialog.
 - **Android:** Shared and friend archives use an icon back button, a read-only badge and real Library/Ledger tabs, and their title detail is laid out in cards like your own instead of a raw field list.
+- **Android:** Share link rows keep a share button and move copy, edit access and revoke into a menu; opening someone else's link moved below your own links.
 
 ## [1.36.0] - 2026-10-16
 

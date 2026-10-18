@@ -5,9 +5,16 @@ import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
@@ -65,18 +72,36 @@ fun NoirModeSelector(
     onRetry: () -> Unit = {},
 ) {
     if (progress.unlocked.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+        Text("Viewing mode", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
             FilterChip(selected == null, onClick = { onSelect(null) }, enabled = !busy, label = { Text("Normal") })
             for (mode in listOf("bw", "color").filter(progress.unlocked::contains)) {
                 val label = if (mode == "bw") "B&W" else "Color"
                 FilterChip(selected == mode, onClick = { onSelect(mode) }, enabled = !busy, label = { Text(label) })
-                if (selected == mode && mode in progress.earned) TextButton(enabled = !busy,
-                    onClick = { onPin(if (pinned == mode) null else mode) }) { Text(if (pinned == mode) "Unpin $label mode" else "Pin $label mode") }
+            }
+            // Pinning keeps the selected earned mode on after leaving the title.
+            val pinnable = selected?.takeIf { it in progress.earned }
+            if (pinnable != null) {
+                val label = if (pinnable == "bw") "B&W" else "Color"
+                IconToggleButton(checked = pinned == pinnable, enabled = !busy,
+                    onCheckedChange = { onPin(if (pinned == pinnable) null else pinnable) },
+                    modifier = Modifier.semantics { contentDescription = if (pinned == pinnable) "Unpin $label mode" else "Pin $label mode" }) {
+                    Icon(if (pinned == pinnable) Icons.Filled.PushPin else Icons.Outlined.PushPin, contentDescription = null)
+                }
             }
         }
-        if (pinned != null) Text("Filter stays on when you leave", style = MaterialTheme.typography.labelSmall)
-        if (pending) Text("Filter saved on this device. Waiting for sync.", style = MaterialTheme.typography.labelSmall)
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(enabled = !busy, onClick = onRetry) { Text("Retry filter sync") } }
+        val note = when {
+            pending -> "Saved on this device; syncing soon."
+            pinned != null -> "Stays on when you leave this title."
+            else -> null
+        }
+        note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        error?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                TextButton(enabled = !busy, onClick = onRetry) { Text("Retry") }
+            }
+        }
     }
 }

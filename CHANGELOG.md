@@ -17,6 +17,7 @@ number is chosen.
 - **Android:** Shared and friend archives use an icon back button, a read-only badge and real Library/Ledger tabs, and their title detail is laid out in cards like your own instead of a raw field list.
 - **Android:** Share link rows keep a share button and move copy, edit access and revoke into a menu; opening someone else's link moved below your own links.
 - **Android:** Friend rows keep Block and Edit access in a menu instead of next to View library, and sharing outing plans or recommending a title opens a bottom sheet instead of a crowded dialog.
+- **Android:** The Spider-Noir viewing mode pin is an icon toggle with plain status text, and the "Opening tickets…" and "Opening viewing…" spinners can be cancelled.
 
 ## [1.36.0] - 2026-10-16
 

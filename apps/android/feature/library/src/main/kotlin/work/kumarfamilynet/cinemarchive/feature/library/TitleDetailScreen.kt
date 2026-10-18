@@ -441,6 +441,9 @@ fun TitleDetailScreen(
 ) {
     var scheduleOpening by rememberSaveable(viewingOwnerId, viewingTitleId) { mutableStateOf<String?>(null) }
     var preparingSchedule by remember { mutableStateOf(false) }
+    // The "Opening…" dialogs can be cancelled; the preparation job is cancelled with them.
+    var scheduleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var postShowJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var scheduleError by remember { mutableStateOf<String?>(null) }
     var scheduleTarget by remember { mutableStateOf<String?>(null) }
     var schedulePrefillForOpening by remember { mutableStateOf(schedulePrefill) }
@@ -469,7 +472,7 @@ fun TitleDetailScreen(
         schedulePrefillForOpening = prefill
         preparingSchedule = true
         scheduleError = null
-        historyScope.launch {
+        scheduleJob = historyScope.launch {
             try {
                 val opening = checkNotNull(onPrepareSchedule) { "Ticket scheduling is unavailable." }(outingId)
                 if (currentHistoryOwner == openingOwner && currentHistoryTitle == openingTitle) scheduleOpening = opening
@@ -510,7 +513,7 @@ fun TitleDetailScreen(
         val owner = viewingOwnerId
         preparingPostShow = true
         viewingOpenError = null
-        historyScope.launch {
+        postShowJob = historyScope.launch {
             try {
                 val opening = checkNotNull(onPreparePostShow) { "Post-show editing is unavailable." }(viewing.id)
                 if (!isActive) return@launch
@@ -874,8 +877,8 @@ fun TitleDetailScreen(
         }
     }
 
-    if (preparingSchedule) AlertDialog(onDismissRequest = {}, title = { Text("Opening tickets…") },
-        text = { CircularProgressIndicator() }, confirmButton = {})
+    if (preparingSchedule) AlertDialog(onDismissRequest = { scheduleJob?.cancel() }, title = { Text("Opening tickets…") },
+        text = { CircularProgressIndicator() }, confirmButton = { TextButton(onClick = { scheduleJob?.cancel() }) { Text("Cancel") } })
     if (scheduleError != null || scheduleOriginal?.isFailure == true) AlertDialog(
         onDismissRequest = { scheduleError = null; if (scheduleOriginal?.isFailure == true) scheduleOpening = null },
         title = { Text("Couldn't open tickets") },
@@ -918,8 +921,8 @@ fun TitleDetailScreen(
             )
         }
     }
-    if (preparingPostShow) AlertDialog(onDismissRequest = {}, title = { Text("Opening viewing…") },
-        text = { CircularProgressIndicator() }, confirmButton = {})
+    if (preparingPostShow) AlertDialog(onDismissRequest = { postShowJob?.cancel() }, title = { Text("Opening viewing…") },
+        text = { CircularProgressIndicator() }, confirmButton = { TextButton(onClick = { postShowJob?.cancel() }) { Text("Cancel") } })
 
     viewingOpenError?.let { message ->
         AlertDialog(onDismissRequest = { viewingOpenError = null }, title = { Text("Viewing unavailable") }, text = { Text(message) },

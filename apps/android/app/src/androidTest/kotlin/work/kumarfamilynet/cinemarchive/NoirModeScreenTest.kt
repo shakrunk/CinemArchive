@@ -50,9 +50,9 @@ class NoirModeScreenTest {
         } }
         compose.onNodeWithText("Normal").assertIsSelected()
         compose.onNodeWithText("Color").performClick()
-        compose.onAllNodesWithText("Pin Color mode").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Pin Color mode").assertCountEquals(0)
         compose.onNodeWithText("B&W").performClick()
-        compose.onNodeWithText("Pin B&W mode").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Pin B&W mode").assertIsDisplayed()
     }
     @Test fun actualArtworkFilterPinsAcrossCloseAndUnpinRestoresNormal() {
         val open = mutableStateOf(true); val mode = mutableStateOf<String?>(null); val pins = mutableStateOf<Map<String, String>>(emptyMap())
@@ -65,10 +65,10 @@ class NoirModeScreenTest {
         } } }
         val original = pixel()
         compose.onNodeWithText("B&W").performClick(); gray()
-        compose.onNodeWithText("Pin B&W mode").performClick()
+        compose.onNodeWithContentDescription("Pin B&W mode").performClick()
         compose.onNodeWithText("Close detail").performClick(); gray()
         compose.onNodeWithText("Open detail").performClick()
-        compose.onNodeWithText("Unpin B&W mode").performClick()
+        compose.onNodeWithContentDescription("Unpin B&W mode").performClick()
         compose.onNodeWithText("Color").performClick()
         val colored = pixel(); assertTrue(kotlin.math.abs(colored.red - original.red) > .03f || kotlin.math.abs(colored.blue - original.blue) > .03f)
         compose.onNodeWithText("Close detail").performClick()
@@ -78,14 +78,14 @@ class NoirModeScreenTest {
         val source = Source(); source.state.value = TitlePinsState(loaded = true, pins = mapOf("noir" to "bw"))
         val blocker = CompletableDeferred<Unit>(); source.save = { blocker.await(); error("Disk full") }
         compose.setContent { CinemArchiveTheme { NoirDetailControls(detail(), source, null, {}) } }
-        compose.waitUntil { compose.onAllNodesWithText("Unpin B&W mode").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil { compose.onAllNodesWithContentDescription("Unpin B&W mode").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("B&W").assertIsSelected()
-        compose.onNodeWithText("Unpin B&W mode").performClick()
+        compose.onNodeWithContentDescription("Unpin B&W mode").performClick()
         compose.onNodeWithText("Normal").assertIsNotEnabled()
         compose.runOnIdle { blocker.complete(Unit) }
         compose.waitUntil { compose.onAllNodesWithText("Disk full").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Unpin B&W mode").assertIsEnabled()
-        compose.onNodeWithText("Retry filter sync").performClick()
+        compose.onNodeWithContentDescription("Unpin B&W mode").assertIsEnabled()
+        compose.onNodeWithText("Retry").performClick()
         compose.runOnIdle { assertEquals(1, source.retries) }
     }
     @Test fun successfulLogSwitchesModeAndNewOwnerCannotInheritPreviewOrPins() {
@@ -100,7 +100,7 @@ class NoirModeScreenTest {
                 else NoirDetailControls(detail().copy(tmdbId = 42), sourceB, null) { preview = it }
             }
         } } }
-        compose.waitUntil { compose.onAllNodesWithText("Unpin B&W mode").fetchSemanticsNodes().isNotEmpty() }; gray()
+        compose.waitUntil { compose.onAllNodesWithContentDescription("Unpin B&W mode").fetchSemanticsNodes().isNotEmpty() }; gray()
         compose.runOnIdle { logged.value = "new-review|color" }
         compose.waitForIdle(); val color = pixel(); assertTrue(kotlin.math.abs(color.red - color.green) > .05f)
         compose.runOnIdle { owner.value = "B" }

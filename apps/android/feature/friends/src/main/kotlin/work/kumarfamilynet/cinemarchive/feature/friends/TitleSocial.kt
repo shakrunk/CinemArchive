@@ -5,11 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -139,50 +135,41 @@ fun RecommendDialog(source: TitleSocialSource, viewerUserId: String, draft: Reco
         var query by remember { mutableStateOf("") }
         var note by remember { mutableStateOf("") }
         var url by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text("Recommend \"${draft.title}\"") },
-            text = {
-                Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(note, { note = it.take(280) }, label = { Text("Note (optional)") },
-                        supportingText = { Text("${note.length}/280") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(url, { url = it }, label = { Text("Where to watch (optional URL)") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(query, { query = it }, label = { Text("Search friends") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
-                    if (state.loading) Text("Loading friends…")
-                    state.error?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = controller::load) { Text("Retry loading friends") }
-                    }
-                    if (!state.loading && state.error == null && state.friends.isEmpty()) Text("Add a friend first — recommendations go to accepted friends.")
-                    val shown = state.friends.filter {
-                        it.name.contains(query, ignoreCase = true) || it.username.orEmpty().contains(query, ignoreCase = true)
-                    }
-                    if (state.friends.isNotEmpty() && shown.isEmpty()) Text("No matching friends.")
-                    shown.forEach { friend ->
-                        val sending = friend.friendUserId in state.sending
-                        val sent = friend.friendUserId in state.sent
-                        val error = state.errors[friend.friendUserId]
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(friend.name, modifier = Modifier.weight(1f))
-                                TextButton(
-                                    enabled = !sending,
-                                    onClick = { controller.send(friend.friendUserId, note, url) },
-                                    modifier = Modifier.semantics {
-                                        contentDescription = if (sent) "Send again to ${friend.name}" else "Send to ${friend.name}"
-                                    },
-                                ) { Text(if (sending) "Sending…" else if (error != null) "Retry" else if (sent) "Send again" else "Send") }
-                            }
-                            if (sent) Text("Sent", style = MaterialTheme.typography.bodySmall)
-                            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                        }
-                    }
+        SocialSheet("Recommend \"${draft.title}\"", onDismiss) {
+            OutlinedTextField(note, { note = it.take(280) }, label = { Text("Note (optional)") },
+                supportingText = { Text("${note.length}/280") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(url, { url = it }, label = { Text("Where to watch (optional URL)") },
+                singleLine = true, modifier = Modifier.fillMaxWidth())
+            Text("Send to friends", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+            OutlinedTextField(query, { query = it }, label = { Text("Search friends") },
+                singleLine = true, modifier = Modifier.fillMaxWidth())
+            if (state.loading) Text("Loading friends…")
+            state.error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = controller::load) { Text("Retry loading friends") }
+            }
+            if (!state.loading && state.error == null && state.friends.isEmpty()) Text("Add a friend first — recommendations go to accepted friends.")
+            val shown = state.friends.filter {
+                it.name.contains(query, ignoreCase = true) || it.username.orEmpty().contains(query, ignoreCase = true)
+            }
+            if (state.friends.isNotEmpty() && shown.isEmpty()) Text("No matching friends.")
+            shown.forEach { friend ->
+                val sending = friend.friendUserId in state.sending
+                val sent = friend.friendUserId in state.sent
+                val error = state.errors[friend.friendUserId]
+                FriendPickerRow(friend.name, action = {
+                    TextButton(
+                        enabled = !sending,
+                        onClick = { controller.send(friend.friendUserId, note, url) },
+                        modifier = Modifier.semantics {
+                            contentDescription = if (sent) "Send again to ${friend.name}" else "Send to ${friend.name}"
+                        },
+                    ) { Text(when { sending -> "Sending…"; error != null -> "Retry"; sent -> "Send again"; else -> "Send" }) }
+                }) {
+                    if (sent) Text("Sent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 }
-            },
-            confirmButton = { OutlinedButton(onClick = onDismiss) { Text("Done") } },
-        )
+            }
+        }
     }
 }

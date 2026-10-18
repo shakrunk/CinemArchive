@@ -29,6 +29,12 @@ class FriendScopeEditorScreenTest {
     @get:Rule val compose = createComposeRule()
     private val target = ShareScopeTarget.Friend("friend")
 
+    // Edit access lives in the friend row's overflow menu.
+    private fun openEditAccess() {
+        compose.onNodeWithContentDescription("More for A friend").performClick()
+        compose.onNodeWithText("Edit access").performClick()
+    }
+
     @Test fun acceptedFriendCanEditReopenAndClearAccessOnNarrowLargeTextScreen() {
         val source = Source(ShareScope(listOf("Drama"), listOf("watched")))
         val relation = mutableStateOf(FriendshipRelation.FRIENDS)
@@ -42,32 +48,32 @@ class FriendScopeEditorScreenTest {
                 }
             }
         } }
-        compose.onNodeWithText("Edit access").performClick()
+        openEditAccess()
         waitText("Custom")
         compose.onNodeWithText("Drama").performScrollTo().assertIsSelected()
         compose.onNodeWithText("Comedy").performScrollTo().performClick()
         compose.onNodeWithText("Watching").performScrollTo().performClick()
         compose.onNodeWithText("Save").performClick()
-        waitText("Edit access")
+        waitText("View library")
         compose.runOnIdle {
             assertEquals(ShareScope(listOf("Drama", "Comedy"), listOf("watched", "watching")), source.value)
             assertEquals(target, source.saved.single().first)
         }
-        compose.onNodeWithText("Edit access").performClick()
+        openEditAccess()
         waitText("Custom")
         compose.onNodeWithText("Full library").performScrollTo().performClick()
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertEquals(1, source.saved.size) }
-        compose.onNodeWithText("Edit access").performClick()
+        openEditAccess()
         waitText("Custom")
         compose.onNodeWithText("Full library").performScrollTo().performClick()
         compose.onNodeWithText("Save").performClick()
         compose.waitUntil { source.saved.size == 2 }
         compose.runOnIdle { assertNull(source.value) }
         compose.runOnIdle { relation.value = FriendshipRelation.REQUEST_SENT }
-        compose.onAllNodesWithText("Edit access").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("More for A friend").assertCountEquals(0)
         compose.runOnIdle { relation.value = FriendshipRelation.BLOCKED_BY_ME }
-        compose.onAllNodesWithText("Edit access").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("More for A friend").assertCountEquals(0)
     }
 
     @Test fun failuresKeepEditorAndDraftForVisibleRetry() {

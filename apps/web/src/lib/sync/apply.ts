@@ -17,13 +17,21 @@ export interface IntegrationConnection {
   lastSyncedAt?: string
 }
 
+interface ConnectionRow {
+  provider: SyncProvider
+  direction: IntegrationConnection['direction']
+  server_url: string | null
+  account_label: string | null
+  last_synced_at: string | null
+}
+
 export async function fetchConnections(): Promise<IntegrationConnection[]> {
   if (!(isSupabaseConfigured && supabase)) return []
   const { data, error } = await supabase
     .from('integration_connections')
     .select('provider, direction, server_url, account_label, last_synced_at')
   if (error) throw error
-  return (data ?? []).map((r: any) => ({
+  return ((data ?? []) as ConnectionRow[]).map((r) => ({
     provider: r.provider,
     direction: r.direction,
     serverUrl: r.server_url ?? undefined,

@@ -68,14 +68,21 @@ export interface PlexServer {
   uri: string
 }
 
+interface PlexResource {
+  name: string
+  provides?: string
+  owned?: boolean
+  connections?: { protocol: string; local?: boolean; uri: string }[]
+}
+
 export async function listPlexServers(token: string): Promise<PlexServer[]> {
   const res = await fetch(`${PLEX_TV}/resources?includeHttps=1&includeRelay=0`, { headers: plexHeaders(token) })
   if (!res.ok) throw new Error('Could not list your Plex servers.')
-  const resources: any[] = await res.json()
+  const resources: PlexResource[] = await res.json()
   const servers: PlexServer[] = []
   for (const r of resources) {
     if (!String(r.provides ?? '').includes('server') || !r.owned) continue
-    const conns: any[] = r.connections ?? []
+    const conns = r.connections ?? []
     const best = conns.find((c) => c.protocol === 'https' && !c.local) ?? conns.find((c) => c.protocol === 'https')
     if (best) servers.push({ name: r.name, uri: best.uri })
   }
@@ -128,7 +135,7 @@ export async function fetchPlexItems(serverUri: string, token: string): Promise<
   const base = serverUri.replace(/\/+$/, '')
   const sectionsRes = await fetch(`${base}/library/sections`, { headers: plexHeaders(token) })
   if (!sectionsRes.ok) throw new Error('Could not reach your Plex server.')
-  const sections: any[] = (await sectionsRes.json())?.MediaContainer?.Directory ?? []
+  const sections: { type: string; key: string }[] = (await sectionsRes.json())?.MediaContainer?.Directory ?? []
   const all: PlexMetadata[] = []
   for (const s of sections) {
     if (s.type !== 'movie' && s.type !== 'show') continue

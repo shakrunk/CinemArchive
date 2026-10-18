@@ -40,9 +40,12 @@ class CreditRefreshScreenTest {
         } }
         openManage()
         compose.onNodeWithText("Refresh metadata").performClick()
-        compose.onNodeWithText("No connection. Try again.").assertIsDisplayed()
+        scrollTo("No connection. Try again."); compose.onNodeWithText("No connection. Try again.").assertIsDisplayed()
         compose.onNodeWithText("Refresh metadata").performClick()
         compose.onNodeWithText("Metadata refresh saved. Missing episodes will appear after sync.").assertExists()
+        // Credits sit above the Manage card, so bring the recovered person back into view.
+        compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+            .performScrollToNode(hasTestTag("credit-Cast-84"))
         compose.onNodeWithTag("credit-Cast-84").performClick()
         compose.runOnIdle { assertEquals(LibraryPerson(84,"Recovered person"),selected); assertEquals(2,calls) }
     }

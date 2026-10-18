@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android:** Title detail gathers tags, watch link and collection, metadata refresh, earlier-watch backfill and removal into a collapsed Manage title card; tag chips show the tag with a remove icon, episode history opens on demand, and ticket buttons show a readable date.
+
 ## [1.36.0] - 2026-10-16
 
 ### Added

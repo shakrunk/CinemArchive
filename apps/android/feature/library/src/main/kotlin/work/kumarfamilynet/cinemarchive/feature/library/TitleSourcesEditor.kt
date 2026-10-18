@@ -6,6 +6,7 @@ import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -57,9 +58,10 @@ private fun TitleSourcesDialog(titleId: String, prepare: suspend () -> String,
                 OutlinedTextField(watchUrl, { watchUrl = it }, enabled = !busy, label = { Text("Watch link for friends") },
                     modifier = Modifier.fillMaxWidth())
                 Text("Leave the link empty to remove it.", style = MaterialTheme.typography.bodySmall)
-                Row {
-                    Checkbox(home, { home = it }, enabled = !busy)
-                    Text("In my home collection", Modifier.padding(top = 12.dp))
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()
+                    .toggleable(home, enabled = !busy, role = androidx.compose.ui.semantics.Role.Checkbox) { home = it }) {
+                    Checkbox(home, onCheckedChange = null, enabled = !busy)
+                    Text("In my home collection", Modifier.padding(start = 12.dp))
                 }
                 Text("Physical copies", style = MaterialTheme.typography.titleSmall)
                 val visibleCopies = remember(copies) { TitleSourcesValues("", false, copies).copies }

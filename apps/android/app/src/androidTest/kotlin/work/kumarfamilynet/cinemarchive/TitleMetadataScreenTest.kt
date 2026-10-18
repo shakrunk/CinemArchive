@@ -40,16 +40,16 @@ class TitleMetadataScreenTest {
                 TitleTagsEditor(titleId, tags) { next -> if (failSave) error("Disk full") else tags = next }
             }
         } }
-        compose.onNodeWithText("New tag name").performTextInput("  noir,,")
+        compose.onNodeWithText("Add a tag").performTextInput("  noir,,")
         compose.onNodeWithText("Couldn't save tags. Your input is still here; try again.").assertIsDisplayed()
-        compose.onNodeWithText("New tag name").assertTextContains("  noir,,")
+        compose.onNodeWithText("Add a tag").assertTextContains("  noir,,")
         compose.runOnIdle { failSave = false }
-        compose.onNodeWithText("Add tag").performClick()
-        compose.onNodeWithText("Remove tag Noir").assertIsDisplayed()
-        compose.onNodeWithText("Remove tag noir").assertIsDisplayed()
-        compose.onNodeWithText("New tag name").performTextInput("Noir,")
+        compose.onNodeWithContentDescription("Add tag").performClick()
+        compose.onNodeWithContentDescription("Remove tag Noir").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Remove tag noir").assertIsDisplayed()
+        compose.onNodeWithText("Add a tag").performTextInput("Noir,")
         compose.runOnIdle { assertEquals(listOf("Noir", "noir"), tags) }
-        compose.onNodeWithText("Remove tag noir").performClick()
+        compose.onNodeWithContentDescription("Remove tag noir").performClick()
         compose.onNodeWithText("Clear all tags").performClick()
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertEquals(listOf("Noir"), tags) }
@@ -61,9 +61,9 @@ class TitleMetadataScreenTest {
     @Test fun switchingTitleDropsPrivateUnsavedInput() {
         var selected by mutableStateOf("first")
         compose.setContent { CinemArchiveTheme { TitleTagsEditor(selected, emptyList()) {} } }
-        compose.onNodeWithText("New tag name").performTextInput("Private unfinished tag")
+        compose.onNodeWithText("Add a tag").performTextInput("Private unfinished tag")
         compose.runOnIdle { selected = "second" }
-        compose.onNodeWithText("New tag name").assertTextEquals("New tag name", "")
+        compose.onNodeWithText("Add a tag").assertTextEquals("Add a tag", "")
     }
 
     @Test fun retainedDraftRequiresComparisonAndExplicitDiscardKeepsServerValues() = runBlocking {

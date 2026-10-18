@@ -35,8 +35,8 @@ fun TitleMetadataRecoveryPanel(source: TitleMetadataRecoverySource, titleId: Str
             finally { busy = false }
         }
     }
-    if (changes.isNotEmpty()) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    if (changes.isNotEmpty()) Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Saved title changes", style = MaterialTheme.typography.titleMedium)
             changes.forEach { change ->
                 Text("${change.title} · ${change.count} saved change${if (change.count == 1) "" else "s"}")

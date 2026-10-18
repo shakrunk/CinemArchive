@@ -21,6 +21,11 @@ class CreditRefreshScreenTest {
         LibraryStatus.WATCHED,4.5,"My notes",emptyList(),emptyList(),emptyList())
     private fun scrollTo(text:String) = compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
         .performScrollToNode(hasText(text))
+    // Metadata refresh lives in the collapsed "Manage title" card.
+    private fun openManage() {
+        scrollTo("Manage title"); compose.onNodeWithText("Manage title").performClick()
+        scrollTo("Refresh metadata")
+    }
 
     @Test fun failedRefreshCanRetryAndRecoveredCreditNavigatesByProviderIdentity() {
         var calls=0; var selected:LibraryPerson?=null
@@ -33,7 +38,7 @@ class CreditRefreshScreenTest {
                 true
             })
         } }
-        scrollTo("Refresh metadata")
+        openManage()
         compose.onNodeWithText("Refresh metadata").performClick()
         compose.onNodeWithText("No connection. Try again.").assertIsDisplayed()
         compose.onNodeWithText("Refresh metadata").performClick()
@@ -47,7 +52,7 @@ class CreditRefreshScreenTest {
         compose.setContent { CinemArchiveTheme {
             TitleDetailScreen(detail(),{},onRefreshCredits={calls++; result.await()})
         } }
-        scrollTo("Refresh metadata")
+        openManage()
         compose.onNodeWithText("Refresh metadata").performClick()
         compose.onNodeWithText("Refreshing metadata…").assertIsNotEnabled()
         compose.runOnIdle { assertEquals(1,calls); result.complete(false) }

@@ -37,12 +37,12 @@ class OwnerEpisodeHistoryScreenTest {
         compose.setContent { CinemArchiveTheme {
             TitleDetailScreen(detail, {}, onSaveEpisodeLog = { id, draft -> saved += id to draft }, onDeleteEpisodeWatch = { id, event -> deleted += id to event })
         } }
-        scrollTo("Add rating, review, or rewatch")
-        compose.onNodeWithText("Add rating, review, or rewatch").performClick()
+        scrollTo("Rate or rewatch")
+        compose.onNodeWithText("Rate or rewatch").performClick()
         compose.onNodeWithText("Cancel").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(saved.isEmpty()) }
-        scrollTo("Add rating, review, or rewatch")
-        compose.onNodeWithText("Add rating, review, or rewatch").performClick()
+        scrollTo("Rate or rewatch")
+        compose.onNodeWithText("Rate or rewatch").performClick()
         compose.onAllNodes(isToggleable())[1].performScrollTo().performClick()
         compose.onNodeWithText("Watch notes (optional)").performScrollTo().performTextInput("Before joining memory")
         compose.onNodeWithText("Save").performScrollTo().performClick()
@@ -53,8 +53,9 @@ class OwnerEpisodeHistoryScreenTest {
             assertEquals("Before joining memory", saved.single().second.watchNotes)
             assertNotEquals("original-watch", saved.single().second.watchEventId)
         }
-        scrollTo("Delete watch")
-        compose.onNodeWithText("Delete watch").performClick()
+        scrollTo("Show history")
+        compose.onNodeWithText("Show history").performClick()
+        compose.onNodeWithContentDescription("Delete watch").performScrollTo().performClick()
         compose.onNode(hasText("Delete watch") and hasAnyAncestor(isDialog())).performClick()
         compose.waitUntil { deleted.size == 1 }
         compose.runOnIdle { assertEquals(listOf("episode" to "original-watch"), deleted) }

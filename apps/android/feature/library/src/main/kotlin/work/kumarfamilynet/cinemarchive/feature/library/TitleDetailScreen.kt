@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.LocalMovies
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -566,7 +568,11 @@ fun TitleDetailScreen(
 
                     if (onViewTicket != null) ticketOutings.forEach { outing ->
                         TextButton(onClick = { onViewTicket(outing, detail.title) }) {
-                            Text("Ticket · ${outing.venue ?: "Cinema"} · ${outing.showtime.take(10)}")
+                            Icon(Icons.Filled.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(
+                                "View ticket · ${outing.venue ?: "Cinema"} · ${formatShowtimeDate(outing.showtime)}",
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
                         }
                     }
 
@@ -725,15 +731,13 @@ fun TitleDetailScreen(
 
             item(key = "catalog-details") {
                 ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
-                    CatalogDetailsSection(detail, showTags = onSaveTags == null)
-                    titleSourcesContent?.invoke()
+                    CatalogDetailsSection(detail)
                 }
             }
-            if (onSaveTags != null || titleEditError != null || titleMetadataRecovery != null) {
+            if (titleEditError != null || titleMetadataRecovery != null) {
                 item(key = "title-metadata-edits") {
-                    ReadingWidthColumn(Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+                    ReadingWidthColumn(Modifier.padding(horizontal = 22.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            onSaveTags?.let { TitleTagsEditor(detail.id, detail.tags, it) }
                             titleEditError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                             titleMetadataRecovery?.let { TitleMetadataRecoveryPanel(it, detail.id) }
                         }
@@ -748,12 +752,11 @@ fun TitleDetailScreen(
                 }
             }
 
-            if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty() || onRefreshCredits != null) {
+            if (detail.cast.isNotEmpty() || detail.crew.isNotEmpty()) {
                 item(key = "title-credits") {
                     ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
                         PersonCreditsSection("Cast", detail.cast, onBrowsePerson)
                         PersonCreditsSection("Crew", detail.crew, onBrowsePerson)
-                        onRefreshCredits?.let { CreditRefreshControl(detail.id, it) }
                     }
                 }
             }
@@ -791,9 +794,6 @@ fun TitleDetailScreen(
 
                 val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
                     ?: detail.seasons.orderedForDisplay().first()
-                episodeBulkContent?.let { content -> item(key = "pre-platform-watches") {
-                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) { content(detail, selectedSeason.seasonNumber) }
-                } }
                 if (selectedSeason.cast.isNotEmpty()) item(key = "season-credits") {
                     ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
                         PersonCreditsSection("Season cast", selectedSeason.cast, onBrowsePerson)
@@ -841,23 +841,32 @@ fun TitleDetailScreen(
             if (socialContent != null) {
                 item(key = "social") { ReadingWidthColumn { socialContent(detail) } }
             }
-            item {
-                ReadingWidthColumn {
-                    TextButton(
-                        onClick = { showRemoveConfirm = true },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.DeleteOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            "Remove from library",
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(start = 6.dp),
-                        )
+            item(key = "manage-title") {
+                // Maintenance and rarely-used edits live behind one collapsed card instead of
+                // being scattered between the title's content sections.
+                ReadingWidthColumn(modifier = Modifier.padding(22.dp, 16.dp, 22.dp, 0.dp)) {
+                    ManageTitleSection(detail.id) {
+                        titleSourcesContent?.invoke()
+                        onSaveTags?.let { TitleTagsEditor(detail.id, detail.tags, it) }
+                        onRefreshCredits?.let { CreditRefreshControl(detail.id, it) }
+                        if (detail.seasons.isNotEmpty()) episodeBulkContent?.let { content ->
+                            val season = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
+                                ?: detail.seasons.orderedForDisplay().first()
+                            content(detail, season.seasonNumber)
+                        }
+                        TextButton(onClick = { showRemoveConfirm = true }) {
+                            Icon(
+                                Icons.Filled.DeleteOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                "Remove from library",
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -1003,6 +1012,42 @@ private fun ScheduledOutingBanner(outing: CinemaOuting, onEdit: () -> Unit, onCa
     }
 }
 
+/** Collapsed-by-default card for the title's maintenance actions: watch link and physical
+ *  collection, tags, metadata refresh, earlier-watch backfill and removal. */
+@Composable
+private fun ManageTitleSection(titleId: String, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by rememberSaveable(titleId) { mutableStateOf(false) }
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = if (expanded) "Collapse" else "Expand") { expanded = !expanded }
+                    .padding(16.dp),
+            ) {
+                Icon(Icons.Filled.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text("Manage title", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Tags, watch link, collection, metadata & removal",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+            }
+            if (expanded) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    content = content,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun DetailHero(detail: TitleDetail, onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
@@ -1077,6 +1122,12 @@ private fun NextEpisodeBanner(next: ScheduledEpisode, onClick: () -> Unit, modif
 private fun formatAirDate(iso: String): String =
     runCatching { LocalDate.parse(iso).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)) }
         .getOrDefault(iso)
+
+/** A showtime is a full instant, so it is shown in the device's zone (where the theater is). */
+private fun formatShowtimeDate(iso: String): String =
+    runCatching {
+        Instant.parse(iso).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
+    }.getOrDefault(iso.take(10))
 
 /** Horizontally scrollable season tabs — the same underlying "pick one of N" interaction as the
  *  web app's season pills/dropdown (`TVSeriesSection`), but a single scrollable-chip idiom
@@ -1188,20 +1239,21 @@ private fun EpisodeRow(
                 )
             }
             PersonCreditsSection("Episode crew", episode.crew, onBrowsePerson)
-            EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch, isSpiderNoir)
-            TextButton(
-                onClick = {
-                    castExpanded = !castExpanded
-                    if (castExpanded) onShowCast()
-                },
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                Text(if (castExpanded) "Hide cast" else "Cast")
-                Icon(
-                    if (castExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier.padding(start = 2.dp).size(18.dp),
-                )
+            EpisodeHistoryPanel(episode, onSaveEpisodeLog, onDeleteEpisodeWatch, isSpiderNoir) {
+                TextButton(
+                    onClick = {
+                        castExpanded = !castExpanded
+                        if (castExpanded) onShowCast()
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                ) {
+                    Text(if (castExpanded) "Hide cast" else "Cast")
+                    Icon(
+                        if (castExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 2.dp).size(18.dp),
+                    )
+                }
             }
             if (castExpanded) {
                 EpisodeCastSection(cast, onBrowsePerson, modifier = Modifier.padding(top = 4.dp))

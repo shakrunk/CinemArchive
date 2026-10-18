@@ -42,15 +42,15 @@ fun ProviderMergeSection(source: ProviderMergeSource): Unit = key(source) {
     if (source.isCurrent() && rows.isNotEmpty()) Surface(shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Saved provider changes", style = MaterialTheme.typography.titleMedium)
-            Text("Changes to existing titles remain visible offline until confirmed. Retrying keeps the same request.")
+            Text("Changes to existing titles stay visible offline until they sync. Retrying resends the same request.", style = MaterialTheme.typography.bodySmall)
             rows.forEach { row ->
-                Text(row.title, style = MaterialTheme.typography.titleSmall)
-                Text(row.message ?: "Waiting for confirmation.", style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(enabled = !busy, onClick = { run { source.retry(row.id) } }) { Text("Retry ${row.title}") }
-                OutlinedButton(enabled = !busy, onClick = { exporting = row.id; picker.launch("cinemarchive-provider-change.json") }) { Text("Export saved request for ${row.title}") }
-                if (row.review) OutlinedButton(enabled = !busy, onClick = { run {
-                    val result = source.compare(row.id); if (source.isCurrent()) comparison = result
-                } }) { Text("Compare ${row.title}") }
+                SavedChangeRow(row.title, row.message ?: "Waiting for confirmation.", enabled = !busy) {
+                    DropdownMenuItem(text = { Text("Retry") }, onClick = { dismiss(); run { source.retry(row.id) } })
+                    DropdownMenuItem(text = { Text("Export saved request") }, onClick = { dismiss(); exporting = row.id; picker.launch("cinemarchive-provider-change.json") })
+                    if (row.review) DropdownMenuItem(text = { Text("Compare with library") }, onClick = { dismiss(); run {
+                        val result = source.compare(row.id); if (source.isCurrent()) comparison = result
+                    } })
+                }
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }

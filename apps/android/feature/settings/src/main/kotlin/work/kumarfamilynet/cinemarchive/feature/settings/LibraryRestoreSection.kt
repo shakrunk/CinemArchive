@@ -40,7 +40,7 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
         val id = exportId; exportId = null
         if (uri != null && id != null) run {
             source.exportSaved(id) { context.contentResolver.openOutputStream(uri, "wt") ?: error("Could not open the destination.") }
-            if (source.isCurrent()) message = "Saved the original imported graph. Later edits can be exported with Export JSON above."
+            if (source.isCurrent()) message = "Saved the original imported graph. Later edits can be exported with Export JSON."
         }
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -59,8 +59,17 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
             }
             preview?.let { prepared ->
                 Text("${prepared.titleCount} new titles and ${prepared.outingCount} outings ready. ${prepared.skippedTitles} existing or duplicate titles and ${prepared.skippedOutings} associated outings skipped.")
-                prepared.issues.take(50).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-                if (prepared.issues.size > 50) Text("${prepared.issues.size - 50} more notices. Only the validated titles above will be saved; the original file is unchanged.")
+                if (prepared.issues.isNotEmpty()) {
+                    var showIssues by remember(prepared) { mutableStateOf(false) }
+                    TextButton(onClick = { showIssues = !showIssues }) {
+                        Text(if (showIssues) "Hide ${prepared.issues.size} notices" else "Show ${prepared.issues.size} notices")
+                    }
+                    if (showIssues) {
+                        prepared.issues.take(50).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        if (prepared.issues.size > 50) Text("${prepared.issues.size - 50} more notices. Only the validated titles above will be saved; the original file is unchanged.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 Text("Each title and its history are saved together. If storage fills, earlier titles remain saved and the report identifies how many are left.")
                 Button(enabled = !busy && prepared.titleCount > 0, onClick = { run {
                     val result = source.admit(prepared)
@@ -79,11 +88,11 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
                 Text("New titles from JSON and connected providers stay here until their complete import is confirmed.", style = MaterialTheme.typography.bodySmall)
             }
             saved.forEach { item ->
-                Text(item.title)
-                Text(item.message ?: "Saved on this device; waiting for confirmation.", style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(enabled = !busy, onClick = { run { source.retry(item.id) } }) { Text("Retry ${item.title}") }
-                OutlinedButton(enabled = !busy, onClick = { exportId = item.id; export.launch("cinemarchive-saved-import.json") }) { Text("Export saved ${item.title}") }
-                if (item.review) OutlinedButton(enabled = !busy, onClick = { removing = item }) { Text("Review removal of ${item.title}") }
+                SavedChangeRow(item.title, item.message ?: "Saved on this device; waiting for confirmation.", enabled = !busy) {
+                    DropdownMenuItem(text = { Text("Retry") }, onClick = { dismiss(); run { source.retry(item.id) } })
+                    DropdownMenuItem(text = { Text("Export saved import") }, onClick = { dismiss(); exportId = item.id; export.launch("cinemarchive-saved-import.json") })
+                    if (item.review) DropdownMenuItem(text = { Text("Review removal") }, onClick = { dismiss(); removing = item })
+                }
             }
         }
     }

@@ -62,14 +62,19 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
     LaunchedEffect(source) { source.changes.collect { controller.refresh() } }
     if (!source.isActive()) return
 
-    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+    // Nothing to review: render nothing, so Data & recovery doesn't stack empty panels.
+    val empty = state.cards.isEmpty() && state.error == null && state.message == null && exportMessage == null
+    if (!empty) Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+    ) { Column(Modifier.padding(16.dp)) {
         Text(if (lifecycle) "Saved outing completions" else "Saved " + subject.label + " changes", style = MaterialTheme.typography.titleMedium)
-        Text("Review changes that could not be safely synced. Originals remain available to export.",
+        Text("These changes couldn't sync automatically. Review each one; the original is always kept for export.",
             style = MaterialTheme.typography.bodySmall)
         state.error?.takeIf { state.focusedId == null }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         state.message?.takeIf { state.focusedId == null }?.let { Text(it) }
         exportMessage?.let { Text(it) }
-        if (state.cards.isEmpty()) Text(if (state.busy) "Loading…" else if (lifecycle) "No saved outing completions." else "No saved " + subject.label + " changes.", style = MaterialTheme.typography.bodySmall)
         state.cards.forEach { card ->
             Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                 Text(card.title, style = MaterialTheme.typography.titleSmall)
@@ -85,7 +90,7 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
             }
         }
         TextButton(onClick = controller::refresh, enabled = !state.busy) { Text("Refresh saved changes") }
-    }
+    } }
 
     if (state.focusedId != null) {
         val review = state.review

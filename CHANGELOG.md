@@ -12,6 +12,7 @@ number is chosen.
 ### Fixed
 
 - **Android:** Title detail gathers tags, watch link and collection, metadata refresh, earlier-watch backfill and removal into a collapsed Manage title card; tag chips show the tag with a remove icon, episode history opens on demand, and ticket buttons show a readable date.
+- **Android:** Data & recovery no longer stacks empty "Saved … changes" panels, and saved imports and provider changes keep their retry, export and review actions in a per-item menu.
 
 ## [1.36.0] - 2026-10-16
 

@@ -22,10 +22,10 @@ import { watchTextPreferences } from 'src/lib/textPreferences'
 
 // Code-split everything that isn't part of the unauthenticated landing path
 // (LandingScreen + ProfileModal stay eagerly bundled — that's the actual
-// first-paint route for a new visitor). Only one of the seven views below is
+// first-paint route for a new visitor). Only one of the eight views below is
 // ever rendered at a time (see `currentView === '…' &&` below), so lazy
 // imports mean a page load only fetches the JS for the view actually shown,
-// not all seven.
+// not all eight.
 const UpNext = lazy(() => import('src/views/UpNext').then((m) => ({ default: m.UpNext })))
 const Library = lazy(() => import('src/views/Library').then((m) => ({ default: m.Library })))
 const Ledger = lazy(() => import('src/views/Ledger').then((m) => ({ default: m.Ledger })))
@@ -33,6 +33,7 @@ const Discover = lazy(() => import('src/views/Discover').then((m) => ({ default:
 const Lists = lazy(() => import('src/views/Lists').then((m) => ({ default: m.Lists })))
 const Profile = lazy(() => import('src/views/Profile').then((m) => ({ default: m.Profile })))
 const Friends = lazy(() => import('src/views/Friends').then((m) => ({ default: m.Friends })))
+const Calendar = lazy(() => import('src/views/Calendar').then((m) => ({ default: m.Calendar })))
 
 // These modals/sheets are unconditionally rendered (they manage their own
 // open/closed *visual* state internally, reading their store flag) rather
@@ -293,13 +294,14 @@ export default function App() {
 
           <main id="main-content" key={currentView} className="animate-view-in pb-24 sm:pb-12">
             <Suspense fallback={<ViewLoadingFallback />}>
-              {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} />}
+              {currentView === 'upnext' && <UpNext onBrowseLibrary={() => setCurrentView('library')} onOpenCalendar={() => setCurrentView('calendar')} />}
               {currentView === 'library' && <Library />}
               {currentView === 'ledger' && <Ledger />}
               {currentView === 'discover' && <Discover />}
               {currentView === 'lists' && <Lists />}
               {currentView === 'profile' && <Profile />}
               {currentView === 'friends' && <Friends />}
+              {currentView === 'calendar' && <Calendar onBrowseDiscover={() => setCurrentView('discover')} />}
             </Suspense>
           </main>
 

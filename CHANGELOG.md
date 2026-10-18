@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Web:** A Calendar view, opened from Up Next or the command palette, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
+
 ### Fixed
 
 - Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.

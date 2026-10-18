@@ -36,14 +36,14 @@ class ListMembershipRecoveryScreenTest {
     }
     @Test fun membershipRequiresSelectionAndConfirmationAndReportsQueuedNotDelivered() {
         val source = Source(); show(source)
-        compose.onNodeWithText("Queue saved membership").assertIsNotEnabled()
+        compose.onNodeWithText("Reapply list change").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Reapply List membership").performScrollTo().performClick()
-        compose.onNodeWithText("Queue saved membership").performClick()
+        compose.onNodeWithText("Reapply list change").performClick()
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertEquals(0, source.calls) }
-        compose.onNodeWithText("Queue saved membership").performClick()
-        compose.onNodeWithText("Queue membership change").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Saved membership queued for sync. The original remains available to export.").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Reapply list change").performClick()
+        compose.onNodeWithText("Reapply change").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("List change saved; it will sync shortly. The original remains available to export.").fetchSemanticsNodes().isNotEmpty() }
         compose.runOnIdle { assertEquals(setOf("membership"), source.selected); assertEquals("captured", source.version) }
     }
     @Test fun discardExplainsDeliveredChangesAndPreservesExport() {

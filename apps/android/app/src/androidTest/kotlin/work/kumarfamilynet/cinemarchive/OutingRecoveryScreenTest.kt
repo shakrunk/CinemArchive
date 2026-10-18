@@ -38,7 +38,7 @@ class OutingRecoveryScreenTest {
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertEquals(0, source.applies) }
         compose.onNodeWithText("Apply selected fields").performClick()
-        compose.onNodeWithText("Apply selected and keep other current values").performClick()
+        compose.onNodeWithText("Apply selected").performClick()
         compose.onNodeWithText("Selected fields applied. The original remains available to export.").assertIsDisplayed()
         compose.runOnIdle { assertEquals(setOf("venue"), source.selected) }
         compose.onNodeWithText("Close").performClick()
@@ -58,7 +58,7 @@ class OutingRecoveryScreenTest {
         compose.onAllNodesWithText("Review saved change")[0].performClick()
         compose.onNodeWithContentDescription("Reapply Theater").performClick()
         compose.onNodeWithText("Apply selected fields").performClick()
-        compose.onNodeWithText("Apply selected and keep other current values").performClick()
+        compose.onNodeWithText("Apply selected").performClick()
         compose.onNodeWithText("Connection lost").assertIsDisplayed()
         compose.onNodeWithContentDescription("Reapply Theater").assertIsNotEnabled()
         compose.onNodeWithText("Discard saved change").performScrollTo().assertIsNotEnabled()
@@ -75,7 +75,7 @@ class OutingRecoveryScreenTest {
             Column(Modifier.verticalScroll(rememberScrollState())) { OutingRecoverySection(source) { exported = it } }
         } }
         compose.onNodeWithText("Unreadable saved outing change").assertIsDisplayed()
-        compose.onNodeWithText("Export preserved raw data").performScrollTo().performClick()
+        compose.onNodeWithText("Export raw data").performScrollTo().performClick()
         compose.runOnIdle { assertEquals("{broken", exported) }
         compose.onAllNodesWithText("Review saved change").assertCountEquals(2)
         compose.onAllNodesWithText("Review saved change")[0].performScrollTo().performClick()

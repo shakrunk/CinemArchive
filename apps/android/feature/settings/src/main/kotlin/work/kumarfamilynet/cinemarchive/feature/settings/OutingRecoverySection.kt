@@ -38,6 +38,7 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
     val deleting = subject == RecoverySubject.VIEWING && "delete" in state.selected
     val lifecycle = subject == RecoverySubject.LIFECYCLE
     val lifecycleAction = state.review?.fields?.firstOrNull { it.key == "lifecycleAction" }?.label ?: "Apply outing action"
+    val copy = recoveryCopy(subject, lifecycleAction, deleting)
     val document = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         val original = preparedExport
         preparedExport = null
@@ -78,13 +79,13 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
         state.cards.forEach { card ->
             Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                 Text(card.title, style = MaterialTheme.typography.titleSmall)
-                Text(card.error ?: if (card.resolved) "Resolved · original retained" else "Needs review", style = MaterialTheme.typography.bodySmall)
+                Text(card.error ?: if (card.resolved) "Resolved" else "Needs review", style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!card.resolved && card.error == null) OutlinedButton(onClick = { controller.open(card.id) }, enabled = !state.busy) {
                         Text("Review saved change")
                     }
                     TextButton(onClick = { export(card.id) }, enabled = !state.busy) {
-                        Text(if (card.error == null) "Export original" else "Export preserved raw data")
+                        Text(if (card.error == null) "Export original" else "Export raw data")
                     }
                 }
             }
@@ -104,7 +105,7 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
                     state.message?.let { Text(it) }
                     review?.message?.let { Text(it) }
                     if (review?.pendingAttempt == true) Text(
-                        "A previous attempt could not be confirmed. Retry that same attempt before changing or discarding it."
+                        "An earlier attempt may not have gone through. Confirm it first, then you can change or discard this."
                     )
                     review?.fields?.forEach { field ->
                         Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
@@ -132,14 +133,14 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
                         OutlinedButton(onClick = { confirmation = "discard" },
                             enabled = !state.busy && review?.pendingAttempt != true) { Text("Discard saved change") }
                     }
-                    TextButton(onClick = { controller.open(state.focusedId!!) }, enabled = !state.busy) { Text("Reload current " + subject.item) }
+                    TextButton(onClick = { controller.open(state.focusedId!!) }, enabled = !state.busy) { Text("Reload latest") }
                 }
             },
             confirmButton = {
                 if (review != null && !review.resolved) TextButton(
                     onClick = { if (review.pendingAttempt) controller.apply() else confirmation = "apply" },
                     enabled = !state.busy && (review.pendingAttempt || (review.remoteExists && state.selected.isNotEmpty())),
-                ) { Text(if (review.pendingAttempt) "Confirm previous attempt" else if (lifecycle) lifecycleAction else if (deleting) "Delete this viewing" else if (subject == RecoverySubject.LIST) "Queue saved membership" else "Apply selected fields") }
+                ) { Text(if (review.pendingAttempt) "Confirm previous attempt" else copy.applyButton) }
             },
             dismissButton = { TextButton(onClick = controller::dismiss) { Text("Close") } },
         )
@@ -147,23 +148,62 @@ fun OutingRecoverySection(source: OutingRecoverySource, subject: RecoverySubject
     confirmation?.let { action ->
         AlertDialog(
             onDismissRequest = { confirmation = null },
-            title = { Text(if (action == "apply") { if (subject == RecoverySubject.LIST) "Queue this saved membership?" else if (lifecycle) "$lifecycleAction?" else if (deleting) "Delete this exact viewing?" else "Apply only selected fields?" } else "Discard this saved change?") },
-            text = { Text(when {
-                action == "apply" && subject == RecoverySubject.LIST -> "Queue the saved add or remove action for this list and title. It will sync in its original order; the original remains available to export."
-                action == "apply" && lifecycle -> "Apply this whole action only against the current outing shown here. If the outing or its linked history changed, review the new state before trying again. The original saved action remains available to export."
-                action == "apply" && deleting -> "Delete only this viewing if it has not changed. Other viewing history and the title's status and rating are preserved. The original saved change remains available to export."
-                action == "apply" -> "Selected saved values will replace the current values only if the " + subject.item + " has not changed. The other saved values will be discarded. The original remains available to export."
-                lifecycle -> "Discard this saved outing action? Its original remains available to export. Dependent saved edits are preserved for separate review; discarding does not authorize them to overwrite current history."
-                subject == RecoverySubject.LIST -> "Remove only this queued membership change. Changes already delivered are not undone, and other pending changes are preserved. The original remains available to export."
-                subject == RecoverySubject.OUTING -> "This removes only this saved change from the queue and keeps the current plan. Viewing history and other pending changes are preserved. The original remains available to export."
-                else -> "This removes only this saved change from the queue and keeps the current viewing. Other viewing history and pending changes are preserved. The original remains available to export."
-            }) },
+            title = { Text(if (action == "apply") copy.applyTitle else "Discard this saved change?") },
+            text = { Text(if (action == "apply") copy.applyBody else copy.discardBody) },
             confirmButton = { TextButton(onClick = {
                 confirmation = null
                 if (action == "apply") controller.apply() else controller.discard()
-            }) { Text(if (action == "apply") { if (subject == RecoverySubject.LIST) "Queue membership change" else if (lifecycle) "Confirm outing action" else if (deleting) "Delete only this viewing" else "Apply selected and keep other current values" } else "Discard this change") } },
+            }) { Text(if (action == "apply") copy.applyConfirm else "Discard this change") } },
             dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
         )
     }
 }
 
+/** User-facing wording for one recovery subject's review and confirmation dialogs. */
+private data class RecoveryCopy(
+    val applyButton: String,
+    val applyTitle: String,
+    val applyBody: String,
+    val applyConfirm: String,
+    val discardBody: String,
+)
+
+private fun recoveryCopy(subject: RecoverySubject, lifecycleAction: String, deleting: Boolean): RecoveryCopy = when {
+    subject == RecoverySubject.LIFECYCLE -> RecoveryCopy(
+        applyButton = lifecycleAction,
+        applyTitle = "$lifecycleAction?",
+        applyBody = "This applies the saved action to the outing as it is now. If the outing or its history changed since, " +
+            "you'll be asked to review it again. The original is kept for export.",
+        applyConfirm = "Confirm outing action",
+        discardBody = "Discard this saved outing action? The original is kept for export. Later edits that depend on it " +
+            "stay saved for their own review.",
+    )
+    subject == RecoverySubject.LIST -> RecoveryCopy(
+        applyButton = "Reapply list change",
+        applyTitle = "Reapply this list change?",
+        applyBody = "The saved add or remove for this list and title will sync after your earlier changes. " +
+            "The original is kept for export.",
+        applyConfirm = "Reapply change",
+        discardBody = "Remove only this saved list change. Changes that already synced stay, and your other unsynced " +
+            "changes are kept. The original is kept for export.",
+    )
+    deleting -> RecoveryCopy(
+        applyButton = "Delete this viewing",
+        applyTitle = "Delete this viewing?",
+        applyBody = "Deletes only this viewing, and only if it hasn't changed. Your other history and the title's " +
+            "status and rating stay. The original is kept for export.",
+        applyConfirm = "Delete only this viewing",
+        discardBody = discardKeeping("viewing"),
+    )
+    else -> RecoveryCopy(
+        applyButton = "Apply selected fields",
+        applyTitle = "Apply only the selected fields?",
+        applyBody = "The selected saved values replace the current ones, as long as the ${subject.item} hasn't changed. " +
+            "Unselected saved values are dropped. The original is kept for export.",
+        applyConfirm = "Apply selected",
+        discardBody = discardKeeping(if (subject == RecoverySubject.OUTING) "plan" else "viewing"),
+    )
+}
+
+private fun discardKeeping(item: String) = "This removes only this saved change and keeps the current $item. Your " +
+    "history and other unsynced changes are kept. The original is kept for export."

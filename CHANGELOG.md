@@ -19,6 +19,7 @@ number is chosen.
 - **Android:** Friend rows keep Block and Edit access in a menu instead of next to View library, and sharing outing plans or recommending a title opens a bottom sheet instead of a crowded dialog.
 - **Android:** The Spider-Noir viewing mode pin is an icon toggle with plain status text, and the "Opening tickets…" and "Opening viewing…" spinners can be cancelled.
 - **Android:** Saved-change review dialogs in Data & recovery use plainer wording ("Reapply list change", "Apply selected").
+- **Android:** Moviegoing settings only offer to move device preferences to your account when some are still stored only on this device.
 
 ## [1.36.0] - 2026-10-16
 

@@ -34,6 +34,7 @@ fun MoviegoingPreferencesPanel(repository: MoviegoingPreferencesRepository,
     val notes by repository.notes.collectAsState(emptyList())
     val changes by repository.changes.collectAsState(emptyList())
     val originals by repository.preservedOriginals.collectAsState(emptyMap())
+    val deviceOnly by repository.deviceOnlyCount.collectAsState(0)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var venue by rememberSaveable { mutableStateOf("") }
@@ -106,8 +107,8 @@ fun MoviegoingPreferencesPanel(repository: MoviegoingPreferencesRepository,
             }
         }
         // Older notes and theater interest saved before account sync stay on this device until moved.
-        TextButton(onClick = { run { repository.syncDevicePreferences() } }, enabled = !busy) {
-            Text("Move this device's preferences to your account")
+        if (deviceOnly > 0) TextButton(onClick = { run { repository.syncDevicePreferences() } }, enabled = !busy) {
+            Text("Move $deviceOnly preference${if (deviceOnly == 1) "" else "s"} from this device to your account")
         }
         if (originals.isNotEmpty() || changes.isNotEmpty()) TextButton(onClick = { run {
             val data = repository.exportOriginals()

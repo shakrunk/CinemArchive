@@ -1,9 +1,13 @@
 package work.kumarfamilynet.cinemarchive
 
 import android.content.Context
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.room.Room
@@ -82,8 +86,9 @@ class MoviegoingPreferencesScreenTest {
     }
     @Test fun profileComparesRejectedNoteAndExplicitlyDiscardsWithoutLosingOriginal() {
         runBlocking { repo.saveVenue(repo.captureVenue("Cinema"), "Saved offline note"); box.flush() }
-        compose.setContent { CinemArchiveTheme { MoviegoingPreferencesPanel(repo) { venue, dismiss -> VenueNoteEditor(repo, venue, dismiss) } } }
-        compose.onNodeWithText("Venue notes and theater interest", substring = true).performClick()
+        compose.setContent { CinemArchiveTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+            MoviegoingPreferencesPanel(repo) { venue, dismiss -> VenueNoteEditor(repo, venue, dismiss) }
+        } } }
         compose.onNodeWithText("Compare saved change").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Current account: Current account note").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Current account: Current account note").performScrollTo().assertIsDisplayed()

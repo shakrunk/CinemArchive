@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Lists:** Watchlist and Currently Watching now appear on the Lists tab on web and Android as automatic lists that fill themselves from each title's status.
+
 ## [1.36.1] - 2026-10-18
 
 ### Fixed

@@ -39,7 +39,7 @@ npm run lint       # ESLint
 - **PWA:** vite-plugin-pwa
 - **Deploy:** GitHub Actions → GitHub Pages (`.github/workflows/deploy.yml`, at the repo root)
 - **DB migrations:** Supabase CLI migrations applied by `.github/workflows/db-migrate.yml` (repo root), against `supabase/migrations/` (repo root, shared across clients)
-- **Edge Function deploy:** `media-proxy` deployed by `.github/workflows/deploy-functions.yml` (triggers on `supabase/functions/**` changes, repo root). Functions deploy independently of migrations — editing `index.ts` without deploying leaves the live function stale.
+- **Edge Function deploy:** `media-proxy` deployed by `.github/workflows/deploy-functions.yml` (triggers on `supabase/functions/**` changes, repo root). Functions deploy independently of migrations — editing `index.ts` without deploying leaves the live function stale. Optional `TVDB_API_KEY`/`TVDB_PIN` secrets enable the TVDB TV-metadata overlay with TMDB fallback ([docs/tvdb-setup.md](../../docs/tvdb-setup.md)).
 
 ### Source Layout
 ```

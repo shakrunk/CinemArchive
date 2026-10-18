@@ -27,8 +27,8 @@ class NoirEpisodeScreenTest {
     }
     private fun openLog() {
         compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
-            .performScrollToNode(hasText("Log watch, rating, or review"))
-        compose.onNodeWithText("Log watch, rating, or review").performClick()
+            .performScrollToNode(hasText("Log watch"))
+        compose.onNodeWithText("Log watch").performClick()
     }
     private fun save() = compose.onNodeWithText("Save").performScrollTo().performClick()
 
@@ -36,14 +36,14 @@ class NoirEpisodeScreenTest {
         val saved = mutableListOf<EpisodeLogDraft>()
         val blocked = CompletableDeferred<Unit>()
         show { draft -> saved += draft; if (saved.size == 1) { blocked.await(); error("Disk full") } }
-        compose.onNodeWithText("Review (optional, logged independently)").performScrollTo().performTextInput("Noir review")
+        compose.onNodeWithText("Review (optional)").performScrollTo().performTextInput("Noir review")
         save()
         compose.runOnIdle { assertTrue(saved.isEmpty()) }
         compose.onNodeWithText("Authentic Black & White").performClick()
         compose.onNodeWithText("Cancel").assertIsNotEnabled()
         compose.runOnIdle { blocked.complete(Unit) }
         compose.waitUntil { compose.onAllNodesWithText("Retry").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Review (optional, logged independently)").assertIsNotEnabled()
+        compose.onNodeWithText("Review (optional)").assertIsNotEnabled()
         compose.onNodeWithText("Retry").performScrollTo().performClick()
         compose.waitUntil { saved.size == 2 }
         compose.runOnIdle {
@@ -56,7 +56,7 @@ class NoirEpisodeScreenTest {
         val saved = mutableListOf<EpisodeLogDraft>()
         show { saved += it }
         compose.onAllNodes(isToggleable())[0].performClick()
-        compose.onNodeWithText("Review (optional, logged independently)").performScrollTo().performTextInput("Color review")
+        compose.onNodeWithText("Review (optional)").performScrollTo().performTextInput("Color review")
         save()
         compose.onNodeWithText("True-Hue Full Color").performClick()
         compose.waitUntil { saved.size == 1 }

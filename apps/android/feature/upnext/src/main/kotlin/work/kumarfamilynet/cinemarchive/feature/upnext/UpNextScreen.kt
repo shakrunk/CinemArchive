@@ -238,6 +238,7 @@ fun UpNextScreen(
     var postShowState by rememberSaveable(postShowOwnerId) { mutableStateOf<String?>(null) }
     val postShow = restorePostShow(postShowState, postShowOwnerId)
     var preparingPostShow by remember { mutableStateOf(false) }
+    var postShowJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var postShowError by remember { mutableStateOf<String?>(null) }
     val currentOwner by rememberUpdatedState(postShowOwnerId)
     val postShowScope = rememberCoroutineScope()
@@ -247,7 +248,7 @@ fun UpNextScreen(
         val owner = postShowOwnerId
         preparingPostShow = true
         postShowError = null
-        postShowScope.launch {
+        postShowJob = postShowScope.launch {
             try {
                 val opening = checkNotNull(onPreparePostShow) { "Post-show editing is unavailable." }(entry.outing.titleId, viewingId)
                 if (!isActive) return@launch
@@ -423,8 +424,9 @@ fun UpNextScreen(
             )
         }
     }
-    if (preparingPostShow) androidx.compose.material3.AlertDialog(onDismissRequest = {}, title = { Text("Opening viewing…") },
-        text = { androidx.compose.material3.CircularProgressIndicator() }, confirmButton = {})
+    if (preparingPostShow) androidx.compose.material3.AlertDialog(onDismissRequest = { postShowJob?.cancel() }, title = { Text("Opening viewing…") },
+        text = { androidx.compose.material3.CircularProgressIndicator() },
+        confirmButton = { TextButton(onClick = { postShowJob?.cancel() }) { Text("Cancel") } })
     postShowError?.let { message -> androidx.compose.material3.AlertDialog(onDismissRequest = { postShowError = null },
         title = { Text("Viewing unavailable") }, text = { Text(message) }, confirmButton = {
             TextButton(onClick = { postShowError = null }) { Text("Close") }

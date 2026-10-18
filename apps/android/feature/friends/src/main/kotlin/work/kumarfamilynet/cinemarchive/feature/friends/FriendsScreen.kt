@@ -6,6 +6,7 @@ import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,8 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -278,8 +282,15 @@ fun FriendRow(
                     FriendshipRelation.REQUEST_SENT -> OutlinedButton(onClick = onCancel) { Text("Cancel request") }
                     FriendshipRelation.FRIENDS -> {
                         Button(onClick = onViewLibrary) { Text("View library") }
-                        if (onEditAccess != null) OutlinedButton(onClick = onEditAccess) { Text("Edit access") }
-                        OutlinedButton(onClick = onBlock) { Text("Block") }
+                        // Access and blocking are occasional; keep them out of the everyday actions.
+                        Box {
+                            var menuOpen by remember { mutableStateOf(false) }
+                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More for ${f.name}") }
+                            DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
+                                if (onEditAccess != null) DropdownMenuItem(text = { Text("Edit access") }, onClick = { menuOpen = false; onEditAccess() })
+                                DropdownMenuItem(text = { Text("Block", color = MaterialTheme.colorScheme.error) }, onClick = { menuOpen = false; onBlock() })
+                            }
+                        }
                     }
                     FriendshipRelation.BLOCKED_BY_ME -> OutlinedButton(onClick = onUnblock) { Text("Unblock") }
                     FriendshipRelation.UNAVAILABLE, FriendshipRelation.UNKNOWN -> Unit

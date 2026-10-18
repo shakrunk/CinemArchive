@@ -21,6 +21,11 @@ class CreditRefreshScreenTest {
         LibraryStatus.WATCHED,4.5,"My notes",emptyList(),emptyList(),emptyList())
     private fun scrollTo(text:String) = compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
         .performScrollToNode(hasText(text))
+    // Metadata refresh lives in the collapsed "Manage title" card.
+    private fun openManage() {
+        scrollTo("Manage title"); compose.onNodeWithText("Manage title").performClick()
+        scrollTo("Refresh metadata")
+    }
 
     @Test fun failedRefreshCanRetryAndRecoveredCreditNavigatesByProviderIdentity() {
         var calls=0; var selected:LibraryPerson?=null
@@ -33,11 +38,14 @@ class CreditRefreshScreenTest {
                 true
             })
         } }
-        scrollTo("Refresh metadata")
+        openManage()
         compose.onNodeWithText("Refresh metadata").performClick()
-        compose.onNodeWithText("No connection. Try again.").assertIsDisplayed()
+        scrollTo("No connection. Try again."); compose.onNodeWithText("No connection. Try again.").assertIsDisplayed()
         compose.onNodeWithText("Refresh metadata").performClick()
         compose.onNodeWithText("Metadata refresh saved. Missing episodes will appear after sync.").assertExists()
+        // Credits sit above the Manage card, so bring the recovered person back into view.
+        compose.onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+            .performScrollToNode(hasTestTag("credit-Cast-84"))
         compose.onNodeWithTag("credit-Cast-84").performClick()
         compose.runOnIdle { assertEquals(LibraryPerson(84,"Recovered person"),selected); assertEquals(2,calls) }
     }
@@ -47,7 +55,7 @@ class CreditRefreshScreenTest {
         compose.setContent { CinemArchiveTheme {
             TitleDetailScreen(detail(),{},onRefreshCredits={calls++; result.await()})
         } }
-        scrollTo("Refresh metadata")
+        openManage()
         compose.onNodeWithText("Refresh metadata").performClick()
         compose.onNodeWithText("Refreshing metadata…").assertIsNotEnabled()
         compose.runOnIdle { assertEquals(1,calls); result.complete(false) }

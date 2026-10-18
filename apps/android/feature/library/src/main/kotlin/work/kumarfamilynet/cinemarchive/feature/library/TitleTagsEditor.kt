@@ -5,6 +5,9 @@ import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,21 +48,22 @@ fun TitleTagsEditor(titleId: String, tags: List<String>, onSave: suspend (List<S
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Tags", style = MaterialTheme.typography.titleMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             tags.forEach { tag ->
                 InputChip(selected = false, enabled = !saving, onClick = { save(tags.filterNot { it == tag }) },
-                    label = { Text("Remove tag $tag") })
+                    label = { Text(tag) },
+                    trailingIcon = { Icon(Icons.Filled.Close, contentDescription = "Remove tag $tag", modifier = Modifier.size(InputChipDefaults.IconSize)) })
             }
         }
         OutlinedTextField(value = input, onValueChange = { value ->
             input = value
             if (value.endsWith(',')) commit(value)
-        }, enabled = !saving, label = { Text("New tag name") }, modifier = Modifier.fillMaxWidth(),
+        }, enabled = !saving, label = { Text("Add a tag") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                IconButton(onClick = { commit() }, enabled = !saving && input.isNotBlank()) { Icon(Icons.Filled.Add, contentDescription = "Add tag") }
+            },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { commit() }))
-        Row {
-            TextButton(onClick = { commit() }, enabled = !saving && input.isNotBlank()) { Text("Add tag") }
-            if (tags.isNotEmpty()) TextButton(onClick = { confirmClear = true }, enabled = !saving) { Text("Clear all tags") }
-        }
+        if (tags.isNotEmpty()) TextButton(onClick = { confirmClear = true }, enabled = !saving) { Text("Clear all tags") }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false }, title = { Text("Clear all tags?") },

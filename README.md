@@ -70,7 +70,7 @@ The Supabase project, schema, and Edge Functions are genuinely shared infrastruc
 
 - **`schema.sql`** — the canonical, human-readable copy of the full DB schema and RLS policies.
 - **`supabase/migrations/`** — versioned migrations applied by CI. The baseline migration (`20260620084847_initial_schema.sql`) captures the schema as of the multi-client split and is already marked **applied** on the remote.
-- **`supabase/functions/media-proxy/`** — Edge Function proxying TMDB/OMDb (keeps API keys server-side).
+- **`supabase/functions/media-proxy/`** — Edge Function proxying TMDB/OMDb, with optional TheTVDB overlay for TV metadata (keeps API keys server-side; see [docs/tvdb-setup.md](docs/tvdb-setup.md)).
 - **`supabase/functions/redeem-invite/`** — Edge Function that creates an account server-side from an invite code (accounts are invite-only).
 
 The schema covers core library and episode tracking (`titles`, `seasons`, `episodes`, the three independent `episode_watch_events` / `episode_ratings` / `episode_reviews` logs, `viewings`), cinema outings, custom lists (`lists` / `list_items`, owner-only), cached TMDB credits, scoped read-only sharing, invite-only accounts and the friend/social graph, per-user preferences, and the `sync_tombstones` deletion log the Android client's incremental sync consumes.

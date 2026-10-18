@@ -35,7 +35,14 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 
 /** Begin device sign-in. `write` requests media:write — only for the explicit two-way opt-in. */
 export async function startSimklAuth(write = false): Promise<SimklDeviceCode> {
-  const d = await call<any>({ action: 'start', write })
+  const d = await call<{
+    device_code: string
+    user_code: string
+    verification_uri: string
+    verification_uri_complete?: string
+    interval: number
+    expires_in: number
+  }>({ action: 'start', write })
   return {
     deviceCode: d.device_code,
     userCode: d.user_code,

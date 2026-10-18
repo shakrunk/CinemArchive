@@ -5,16 +5,23 @@ import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -23,41 +30,63 @@ import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatch
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun EpisodeHistoryPanel(
     episode: EpisodeDetail,
     onSave: suspend (String, EpisodeLogDraft) -> Unit,
     onDelete: suspend (String, String) -> Unit,
     isSpiderNoir: Boolean = false,
+    extraActions: @Composable () -> Unit = {},
 ) {
     var showLog by rememberSaveable(episode.id) { mutableStateOf(false) }
+    var showHistory by rememberSaveable(episode.id) { mutableStateOf(false) }
     var deleteWatch by remember(episode.id) { mutableStateOf<EpisodeWatch?>(null) }
     var deleting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val hasHistory = episode.watchEvents.isNotEmpty() || episode.ratings.isNotEmpty() || episode.reviews.isNotEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        episode.averageRating?.let { Text("Average rating: ${"%.1f".format(it)} / 5", style = MaterialTheme.typography.bodySmall) }
-        if (episode.watchEvents.isNotEmpty()) Text("Watch history", style = MaterialTheme.typography.titleSmall)
-        episode.watchEvents.forEach { watch ->
-            Row(Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    Text(watch.watchedAt?.take(10) ?: "Before CinemArchive", style = MaterialTheme.typography.bodySmall)
-                    EpisodeColorModeBadge(watch.colorMode)
-                    watch.notes?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                }
-                TextButton(onClick = { deleteWatch = watch; error = null }) { Text("Delete watch") }
+        // One compact action row per episode; the full history only renders on request so the
+        // season list doesn't grow with every logged watch.
+        FlowRow(verticalArrangement = Arrangement.Center) {
+            TextButton(onClick = { showLog = true }, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                Text(if (episode.watchCount > 0) "Rate or rewatch" else "Log watch")
             }
+            if (hasHistory) TextButton(onClick = { showHistory = !showHistory }, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                Text(if (showHistory) "Hide history" else "Show history")
+            }
+            extraActions()
         }
-        if (episode.ratings.isNotEmpty()) Text("Rating history", style = MaterialTheme.typography.titleSmall)
-        episode.ratings.forEach { Text("${it.rating} / 5 · ${it.ratedAt}", style = MaterialTheme.typography.bodySmall) }
-        if (episode.reviews.isNotEmpty()) Text("Reviews", style = MaterialTheme.typography.titleSmall)
-        episode.reviews.forEach {
-            EpisodeColorModeBadge(it.colorMode)
-            Text(it.reviewText, style = MaterialTheme.typography.bodySmall)
-            Text(it.reviewedAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        TextButton(onClick = { showLog = true }) {
-            Text(if (episode.watchCount > 0) "Add rating, review, or rewatch" else "Log watch, rating, or review")
+        if (showHistory && hasHistory) Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                episode.averageRating?.let { Text("Average rating ${"%.1f".format(it)} / 5", style = MaterialTheme.typography.labelLarge) }
+                if (episode.watchEvents.isNotEmpty()) Text("Watches", style = MaterialTheme.typography.titleSmall)
+                episode.watchEvents.forEach { watch ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(watch.watchedAt?.let(::formatLogDate) ?: "Before CinemArchive", style = MaterialTheme.typography.bodyMedium)
+                            EpisodeColorModeBadge(watch.colorMode)
+                            watch.notes?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        }
+                        IconButton(onClick = { deleteWatch = watch; error = null }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = "Delete watch", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+                if (episode.ratings.isNotEmpty()) Text("Ratings", style = MaterialTheme.typography.titleSmall)
+                episode.ratings.forEach { Text("${it.rating} / 5 · ${formatLogDate(it.ratedAt)}", style = MaterialTheme.typography.bodyMedium) }
+                if (episode.reviews.isNotEmpty()) Text("Reviews", style = MaterialTheme.typography.titleSmall)
+                episode.reviews.forEach {
+                    EpisodeColorModeBadge(it.colorMode)
+                    Text(it.reviewText, style = MaterialTheme.typography.bodyMedium)
+                    Text(formatLogDate(it.reviewedAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
     if (showLog) EpisodeLogSheet(episode, isSpiderNoir, onSave = { onSave(episode.id, it) }, onDismiss = { showLog = false })
@@ -65,7 +94,7 @@ internal fun EpisodeHistoryPanel(
         AlertDialog(
             onDismissRequest = { if (!deleting) deleteWatch = null },
             title = { Text("Delete this watch event?") },
-            text = { Text(error ?: "Remove this watch from ${watch.watchedAt?.take(10) ?: "before joining"}? Other watches, ratings, and reviews stay in your history.") },
+            text = { Text(error ?: "Remove this watch from ${watch.watchedAt?.let(::formatLogDate) ?: "before joining"}? Other watches, ratings, and reviews stay in your history.") },
             dismissButton = { TextButton(enabled = !deleting, onClick = { deleteWatch = null }) { Text("Cancel") } },
             confirmButton = {
                 TextButton(enabled = !deleting, onClick = {
@@ -124,22 +153,19 @@ private fun EpisodeLogSheet(episode: EpisodeDetail, isSpiderNoir: Boolean, onSav
     ModalBottomSheet(onDismissRequest = { if (!saving) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(episode.episodeName ?: "Episode ${episode.episodeNumber}", style = MaterialTheme.typography.headlineSmall)
-            Row {
-                Checkbox(includeWatch, { includeWatch = it }, enabled = editable)
-                Text("Log a watch event", Modifier.padding(top = 12.dp))
-            }
+            CheckboxRow("Log a watch event", includeWatch, editable) { includeWatch = it }
             if (includeWatch) {
-                Row {
-                    Checkbox(prePlatform, { prePlatform = it }, enabled = editable)
-                    Text("Watched before joining (no date)", Modifier.padding(top = 12.dp))
+                CheckboxRow("Watched before joining (no date)", prePlatform, editable) { prePlatform = it }
+                if (!prePlatform) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Watched ${formatLogDate(date)}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    TextButton(enabled = editable, onClick = { showDate = true }) { Text("Change date") }
                 }
-                if (!prePlatform) TextButton(enabled = editable, onClick = { showDate = true }) { Text("Watched on $date · Change date") }
                 OutlinedTextField(watchNotes, { watchNotes = it }, label = { Text("Watch notes (optional)") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
             }
-            Text("Rating (optional, logged independently)", style = MaterialTheme.typography.labelLarge)
+            Text("Rating (optional)", style = MaterialTheme.typography.labelLarge)
             if (editable) DraggableStarRating(rating, { rating = it }) else Text("$rating / 5")
             TextButton(enabled = editable && rating > 0, onClick = { rating = 0.0 }) { Text("Clear rating") }
-            OutlinedTextField(review, { review = it }, label = { Text("Review (optional, logged independently)") }, modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = editable)
+            OutlinedTextField(review, { review = it }, label = { Text("Review (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = editable)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(enabled = !saving, onClick = onDismiss) { Text("Cancel") }
@@ -170,6 +196,27 @@ private fun EpisodeLogSheet(episode: EpisodeDetail, isSpiderNoir: Boolean, onSav
             }) { Text("Choose date") }
         }, dismissButton = { TextButton(onClick = { showDate = false }) { Text("Cancel") } }) { DatePicker(picker) }
     }
+}
+
+/** The whole row toggles the box, so the label is a real tap target and stays aligned. */
+@Composable
+private fun CheckboxRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange),
+    ) {
+        Checkbox(checked, onCheckedChange = null, enabled = enabled)
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+/** History dates arrive either as a plain YYYY-MM-DD or as a full instant. */
+internal fun formatLogDate(value: String): String {
+    val format = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+    // An instant is shown in the device's zone so an evening entry doesn't land on the UTC day.
+    return runCatching { Instant.parse(value).atZone(java.time.ZoneId.systemDefault()).format(format) }
+        .recoverCatching { LocalDate.parse(value.take(10)).format(format) }
+        .getOrDefault(value)
 }
 
 @Composable

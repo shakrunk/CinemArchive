@@ -42,7 +42,7 @@ class ViewingRecoveryScreenTest {
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertTrue(source.selected.isEmpty()) }
         compose.onNodeWithText("Apply selected fields").performClick()
-        compose.onNodeWithText("Apply selected and keep other current values").performClick()
+        compose.onNodeWithText("Apply selected").performClick()
         compose.runOnIdle { assertEquals(setOf("notes"), source.selected) }
         compose.onNodeWithText("Close").performClick()
         compose.onNodeWithText("Review saved change").performScrollTo().assertIsDisplayed()
@@ -58,7 +58,7 @@ class ViewingRecoveryScreenTest {
         compose.onNodeWithText("Apply selected fields").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Reapply Delete this viewing").performClick()
         compose.onAllNodesWithText("Delete this viewing").filterToOne(hasClickAction()).performClick()
-        compose.onNodeWithText("Delete this exact viewing?").assertIsDisplayed()
+        compose.onNodeWithText("Delete this viewing?").assertIsDisplayed()
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertTrue(source.selected.isEmpty()) }
         compose.onAllNodesWithText("Delete this viewing").filterToOne(hasClickAction()).performClick()

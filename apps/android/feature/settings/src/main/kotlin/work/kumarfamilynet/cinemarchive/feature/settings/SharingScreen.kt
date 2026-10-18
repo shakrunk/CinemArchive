@@ -6,7 +6,7 @@ import work.kumarfamilynet.cinemarchive.data.userMessage
 
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,12 +17,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -97,14 +100,6 @@ fun SharingRoute(
         LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp, 4.dp, 20.dp, 28.dp)) {
             item {
                 ReadingWidthColumn {
-                    OutlinedTextField(pastedLink, { pastedLink = it }, label = { Text("Open a shared link") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextButton(enabled = SharingRules.parseToken(pastedLink) != null,
-                        onClick = { SharingRules.parseToken(pastedLink)?.let(onOpenSharedLink) }) { Text("Open archive") }
-                }
-            }
-            item {
-                ReadingWidthColumn {
                     Text(
                         "Anyone with a link can browse a read-only copy of your library — nothing else. Up to ${SharingRules.MAX_ACTIVE_LINKS} active links.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -159,26 +154,50 @@ fun SharingRoute(
             }
             items(active, key = { it.id }) { k ->
                 ReadingWidthColumn {
+                    val name = k.label?.takeIf { it.isNotBlank() } ?: "Untitled link"
+                    var menuOpen by remember { mutableStateOf(false) }
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                        Column(modifier = Modifier.padding(14.dp, 10.dp)) {
-                            Text(k.label?.takeIf { it.isNotBlank() } ?: "Untitled link", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                (k.expiresAt?.take(10)?.let { "Expires $it" } ?: "Never expires") +
-                                    (k.lastUsedAt?.take(10)?.let { " · last opened $it" } ?: ""),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                                OutlinedButton(onClick = { clipboard.setText(AnnotatedString(SharingRules.shareLink(k.token))) }) { Text("Copy") }
-                                OutlinedButton(onClick = {
-                                    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, SharingRules.shareLink(k.token))
-                                    context.startActivity(Intent.createChooser(send, "Share link"))
-                                }) { Text("Share") }
-                                OutlinedButton(onClick = { editing = k }) { Text("Scope") }
-                                TextButton(onClick = { revoking = k }) { Text("Revoke") }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    (k.expiresAt?.let { "Expires ${formatLinkDate(it)}" } ?: "Never expires") +
+                                        (k.lastUsedAt?.let { " · last opened ${formatLinkDate(it)}" } ?: ""),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            // Sharing is the common action; the rest sit in the overflow menu.
+                            IconButton(onClick = {
+                                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, SharingRules.shareLink(k.token))
+                                context.startActivity(Intent.createChooser(send, "Share link"))
+                            }) { Icon(Icons.Filled.Share, contentDescription = "Share $name") }
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More for $name") }
+                                DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    DropdownMenuItem(text = { Text("Copy link") }, onClick = {
+                                        menuOpen = false
+                                        clipboard.setText(AnnotatedString(SharingRules.shareLink(k.token)))
+                                        status = "Link copied." to false
+                                    })
+                                    DropdownMenuItem(text = { Text("Edit access") }, onClick = { menuOpen = false; editing = k })
+                                    DropdownMenuItem(text = { Text("Revoke", color = MaterialTheme.colorScheme.error) },
+                                        onClick = { menuOpen = false; revoking = k })
+                                }
                             }
                         }
                     }
+                }
+            }
+            item {
+                ReadingWidthColumn(modifier = Modifier.padding(top = 28.dp)) {
+                    Text("Open someone's archive", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(pastedLink, { pastedLink = it }, label = { Text("Paste a share link") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        trailingIcon = {
+                            TextButton(enabled = SharingRules.parseToken(pastedLink) != null,
+                                onClick = { SharingRules.parseToken(pastedLink)?.let(onOpenSharedLink) }) { Text("Open") }
+                        })
                 }
             }
         }
@@ -213,3 +232,9 @@ fun SharingRoute(
             onClose = { editing = null })
     }
 }
+
+/** Link timestamps are instants; show the local calendar day. */
+private fun formatLinkDate(value: String): String = runCatching {
+    java.time.Instant.parse(value).atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.US))
+}.getOrDefault(value.take(10))

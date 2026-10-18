@@ -95,7 +95,7 @@ class OutingRecoveryController(private val source: OutingRecoverySource, private
             mutable.value = state.value.copy(review = updated, cards = cards, message = when (result) {
                 OutingRecoveryOutcome.APPLIED -> if (subject == RecoverySubject.VIEWING && "delete" in value.selected)
                     "Selected viewing deleted. Other history is preserved and the original remains available to export."
-                    else if (subject == RecoverySubject.LIST) "Saved membership queued for sync. The original remains available to export."
+                    else if (subject == RecoverySubject.LIST) "List change saved; it will sync shortly. The original remains available to export."
                     else if (subject == RecoverySubject.LIFECYCLE) "Saved outing action applied. The original remains available to export."
                     else "Selected fields applied. The original remains available to export."
                 OutingRecoveryOutcome.CONFIRMED -> "Original " + subject.label + " change confirmed. The current " + subject.item + " has been refreshed and the original remains available to export."

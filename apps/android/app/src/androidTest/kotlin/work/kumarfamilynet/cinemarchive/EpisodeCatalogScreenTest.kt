@@ -74,13 +74,14 @@ class EpisodeCatalogScreenTest {
                 detail?.let { TitleDetailScreen(it,{},onRefreshCredits={refresh.refresh(titleId)},onSaveEpisodeLog=repository::saveEpisodeLog) }
             } }
             compose.waitUntil(10_000) { compose.onAllNodesWithText("Synthetic catalog show").fetchSemanticsNodes().isNotEmpty() }
-            scrollTo("Refresh credits"); compose.onNodeWithText("Refresh credits").performClick()
-            compose.waitUntil(10_000) { compose.onAllNodesWithText("Credit refresh saved. Missing episodes will appear after sync.").fetchSemanticsNodes().isNotEmpty() }
+            scrollTo("Manage title"); compose.onNodeWithText("Manage title").performClick()
+            scrollTo("Refresh metadata"); compose.onNodeWithText("Refresh metadata").performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("Metadata refresh saved. Missing episodes will appear after sync.").fetchSemanticsNodes().isNotEmpty() }
             runBlocking { assertTrue(db.episodeDao().observeEpisodes(titleId).first().isEmpty()) }
-            compose.onAllNodesWithText("Log watch, rating, or review").assertCountEquals(0)
+            compose.onAllNodesWithText("Log watch").assertCountEquals(0)
             runBlocking(Dispatchers.IO) { outbox.flush(); assertTrue(db.outboxDao().getPending().isEmpty()) }
             compose.waitForIdle()
-            scrollTo("Log watch, rating, or review"); compose.onNodeWithText("Log watch, rating, or review").performClick()
+            scrollTo("Log watch"); compose.onNodeWithText("Log watch").performClick()
             compose.onNodeWithText("Watch notes (optional)").performScrollTo().performTextInput("Canonical parent watch")
             compose.onNodeWithText("Save").performScrollTo().performClick()
             compose.waitUntil(10_000) { compose.onAllNodesWithText("Save").fetchSemanticsNodes().isEmpty() }

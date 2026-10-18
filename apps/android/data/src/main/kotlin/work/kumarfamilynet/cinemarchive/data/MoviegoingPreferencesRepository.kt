@@ -2,6 +2,7 @@ package work.kumarfamilynet.cinemarchive.data
 
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -32,6 +33,13 @@ class MoviegoingPreferencesRepository(
         MoviegoingChange(it.id, it.entityId, describe(it), it.lastError, it.operation == "review")
     } }
     val preservedOriginals = archive.records
+    /** Preferences saved only on this device that [syncDevicePreferences] would still upload. */
+    val deviceOnlyCount = combine(database.venueNoteDao().observeAll(), database.theaterInterestDao().observeAll(),
+        database.outboxDao().observePending()) { notes, interests, pending ->
+        notes.count { note -> note.serverUpdatedAt == null && pending.none { it.entityType == "venue_note" && it.entityId == note.venue } } +
+            interests.count { interest -> interest.serverUpdatedAt == null &&
+                pending.none { it.entityType == "theater_interest" && it.entityId == interest.titleId } }
+    }
 
     private fun checkOwner() { check(isCurrent() && session()?.userId == ownerId) { "This sign-in has ended." } }
 

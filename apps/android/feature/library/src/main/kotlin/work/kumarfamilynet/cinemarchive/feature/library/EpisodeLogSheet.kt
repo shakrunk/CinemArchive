@@ -213,7 +213,10 @@ private fun CheckboxRow(label: String, checked: Boolean, enabled: Boolean, onCha
 /** History dates arrive either as a plain YYYY-MM-DD or as a full instant. */
 internal fun formatLogDate(value: String): String {
     val format = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
-    return runCatching { LocalDate.parse(value.take(10)).format(format) }.getOrDefault(value)
+    // An instant is shown in the device's zone so an evening entry doesn't land on the UTC day.
+    return runCatching { Instant.parse(value).atZone(java.time.ZoneId.systemDefault()).format(format) }
+        .recoverCatching { LocalDate.parse(value.take(10)).format(format) }
+        .getOrDefault(value)
 }
 
 @Composable

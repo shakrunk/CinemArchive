@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Web:** Upcoming episodes of the series you track now stay current on their own. When the app opens, it checks each series that isn't dropped, at most once a day. Newly announced seasons, newly listed episodes and moved air dates appear without a manual metadata refresh. The check never changes your watch history.
+
 ### Fixed
 
 - Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.

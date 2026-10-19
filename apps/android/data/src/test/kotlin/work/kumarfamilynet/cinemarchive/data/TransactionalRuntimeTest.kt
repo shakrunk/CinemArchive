@@ -119,6 +119,7 @@ class TransactionalRuntimeTest {
         preferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>? = null,
         pushPending: suspend () -> Unit = outbox::flush,
         sessionUserId: String = "user-a",
+        transactor: work.kumarfamilynet.cinemarchive.core.database.LocalTransactor = RoomTransactor(db),
     ) = LibrarySyncRepository(
         dataStore = preferences ?: PreferenceDataStoreFactory.create(scope = scope) { file },
         client = SupabaseRestClient("https://x.supabase.co", "anon", http.client),
@@ -127,7 +128,7 @@ class TransactionalRuntimeTest {
         watchEventDao = db.episodeWatchEventDao(), ratingDao = db.episodeRatingDao(), reviewDao = db.episodeReviewDao(),
         viewingDao = db.viewingDao(), cinemaOutingDao = db.cinemaOutingDao(), titleCastDao = db.titleCastDao(),
         titleCrewDao = db.titleCrewDao(), listDao = db.listDao(), listItemDao = db.listItemDao(),
-        pushPending = pushPending, pendingKeys = outbox::pendingEntityKeys, transactor = RoomTransactor(db),
+        pushPending = pushPending, pendingKeys = outbox::pendingEntityKeys, transactor = transactor,
         personCreditsDao = db.personCreditsDao(),
     )
 
@@ -227,8 +228,101 @@ class TransactionalRuntimeTest {
         verifyAckBeforeProcessInterruption("title_credits")
     }
 
-    @Test fun catalogAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {
-        verifyAckBeforeProcessInterruption("title_catalog")
+    @Test fun catalogAckReplaysSkippedCreditsFromFloorInsteadOfEpoch() = runBlocking {
+        verifyCatalogFloorReplay(ackInsideSync = true)
+    }
+
+    @Test fun catalogAckOutsideSyncStillReplaysSkippedCreditsFromFloor() = runBlocking {
+        verifyCatalogFloorReplay(ackInsideSync = false)
+    }
+
+    private val caughtUp = "2026-10-08T00:00:00Z"
+    private val laterEdit = "2026-10-09T00:00:00Z"
+
+    private fun remoteCredit(name: String) = creditRow("title_cast", "cast", JSONObject()
+        .put("titleId", "show").put("tmdbPersonId", 42).put("name", name).put("castOrder", 0)).put("updated_at", laterEdit)
+
+    private suspend fun currentSchema(prefs: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>) =
+        prefs.edit { it[intPreferencesKey("sync_schema_version")] = 13; it[stringPreferencesKey("last_synced_at")] = caughtUp }
+
+    private suspend fun verifyCatalogFloorReplay(ackInsideSync: Boolean) {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show")))
+        db.titleCastDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity("cast", "show", 42, "Local name", null, 0)))
+        val file = tmpFile("catalog-floor")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        val cursor = stringPreferencesKey("last_synced_at")
+        currentSchema(prefs)
+        val writer = ScriptedWriter { PushResult.Retry("offline") }
+        val queue = outbox(db, writer)
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray(), JSONArray().put(remoteCredit("Remote name")), JSONArray().put(remoteCredit("Remote name")))))
+        val sync = syncRepository(db, queue, http, file, prefs, pushPending = { if (ackInsideSync) queue.flush() })
+        sync.syncNow() // Nothing pending yet: floor tracking starts here, as on an upgraded install.
+        queue.enqueue("title_catalog", "show", "ensure", JSONObject())
+        sync.syncNow()
+        assertEquals("Skipped while the catalog command is pending", "Local name", db.titleCastDao().observeAllCast().first().single().name)
+        assertEquals(laterEdit, prefs.data.first()[cursor])
+        writer.next = {
+            runBlocking { assertEquals("No epoch rewind before the ACK", laterEdit, prefs.data.first()[cursor]) }
+            PushResult.Success
+        }
+        if (!ackInsideSync) queue.flush()
+        sync.syncNow()
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertEquals("Skipped row replayed after ACK", "Remote name", db.titleCastDao().observeAllCast().first().single().name)
+        sync.syncNow()
+        assertEquals(listOf(caughtUp, caughtUp, caughtUp, laterEdit), http.requests.map { it.getString("p_since") })
+    }
+
+    @Test fun catalogSkipBehindInterruptedPullIsReplayedFromThatPullsStart() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show")))
+        db.titleCastDao().upsertAll(listOf(work.kumarfamilynet.cinemarchive.core.database.TitleCastEntity("cast", "show", 42, "Local name", null, 0)))
+        val file = tmpFile("catalog-floor-crash")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        currentSchema(prefs)
+        val writer = ScriptedWriter { PushResult.Retry("offline") }
+        val queue = outbox(db, writer)
+        syncRepository(db, queue, SyncHttp(ArrayDeque()), file, prefs).syncNow()
+        queue.enqueue("title_catalog", "show", "ensure", JSONObject())
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray().put(remoteCredit("Remote name")), JSONArray().put(remoteCredit("Remote name")))))
+        var transactions = 0
+        val dying = object : work.kumarfamilynet.cinemarchive.core.database.LocalTransactor {
+            override suspend fun <T> run(block: suspend () -> T): T {
+                // The page commits and moves the cursor; the process dies at the final flush.
+                if (++transactions == 2) error("process ended")
+                return RoomTransactor(db).run(block)
+            }
+        }
+        assertTrue(runCatching { syncRepository(db, queue, http, file, prefs, transactor = dying).syncNow() }.isFailure)
+        assertEquals(laterEdit, prefs.data.first()[stringPreferencesKey("last_synced_at")])
+        writer.next = { PushResult.Success }
+        syncRepository(db, queue, http, file, prefs).syncNow()
+        assertEquals(listOf(caughtUp, caughtUp), http.requests.map { it.getString("p_since") })
+        assertEquals("Remote name", db.titleCastDao().observeAllCast().first().single().name)
+    }
+
+    @Test fun catalogPendingAcrossUpgradeReplaysFromEpochOnce() = runBlocking {
+        val db = memoryDb()
+        db.titleDao().upsertAll(listOf(title("show")))
+        val file = tmpFile("catalog-floor-upgrade")
+        val prefs = PreferenceDataStoreFactory.create(scope = scope) { file }
+        currentSchema(prefs)
+        val queue = outbox(db, ScriptedWriter { PushResult.Success })
+        // Queued under the old epoch-rewind code, whose pull may already have skipped past rows.
+        queue.enqueue("title_catalog", "show", "ensure", JSONObject())
+        val http = SyncHttp(ArrayDeque(listOf(JSONArray().put(remoteCredit("Unchanged old credit")))))
+        val interrupted = syncRepository(db, queue, http, file, prefs, pushPending = {
+            queue.flush()
+            throw kotlinx.coroutines.CancellationException("process interrupted after local ACK")
+        })
+        assertTrue(runCatching { interrupted.syncNow() }.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertTrue(queue.pendingEntries().isEmpty())
+        val sync = syncRepository(db, queue, http, file, prefs)
+        sync.syncNow()
+        sync.syncNow()
+        assertEquals(listOf("1970-01-01T00:00:00Z", laterEdit), http.requests.map { it.getString("p_since") })
+        assertEquals("Unchanged old credit", db.titleCastDao().observeAllCast().first().single().name)
     }
 
     @Test fun titleMetadataAckBeforeProcessInterruptionLeavesDurableEpochForNextSync() = runBlocking {

@@ -419,26 +419,17 @@ function timeOf(dateStr: string | undefined): number {
   return dateStr ? new Date(dateStr).getTime() : -Infinity
 }
 
-interface TitleSearchIndex {
-  title: string
-  director: string | undefined
-  genres: string[]
-  tags: string[]
-  cast: string[]
-}
+// Searchable fields joined into one lowercased string, so the search filter is a
+// single includes() per title. The \0 separator keeps a query from matching across
+// two fields (it can't be typed into the search box).
+const titleSearchCache = new WeakMap<Title, string>()
 
-const titleSearchCache = new WeakMap<Title, TitleSearchIndex>()
-
-function getTitleSearch(t: Title): TitleSearchIndex {
+function getTitleSearch(t: Title): string {
   let index = titleSearchCache.get(t)
-  if (!index) {
-    index = {
-      title: t.title.toLowerCase(),
-      director: t.director?.toLowerCase(),
-      genres: t.genres.map((g) => g.toLowerCase()),
-      tags: t.tags.map((tag) => tag.toLowerCase()),
-      cast: t.cast?.map((c) => c.name.toLowerCase()) || [],
-    }
+  if (index === undefined) {
+    index = [t.title, t.director ?? '', ...t.genres, ...t.tags, ...(t.cast?.map((c) => c.name) ?? [])]
+      .join('\0')
+      .toLowerCase()
     titleSearchCache.set(t, index)
   }
   return index
@@ -480,13 +471,7 @@ function applyFiltersToTitles(titles: Title[], filters: LibraryFilters): Title[]
     const q = filters.search.toLowerCase()
     result = result.filter((t) => {
       const idx = getTitleSearch(t)
-      return (
-        idx.title.includes(q) ||
-        idx.director?.includes(q) ||
-        idx.genres.some((g) => g.includes(q)) ||
-        idx.tags.some((tag) => tag.includes(q)) ||
-        idx.cast.some((c) => c.includes(q))
-      )
+      return idx.includes(q)
     })
   }
 

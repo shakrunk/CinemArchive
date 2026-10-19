@@ -172,6 +172,7 @@ fun UpNextRoute(
     profileInitial: String = "C",
     onFabExpandedChange: (Boolean) -> Unit = {},
     onRecommendTitle: ((String) -> Unit)? = null,
+    onOpenCalendar: () -> Unit = {},
 ) {
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
@@ -199,6 +200,7 @@ fun UpNextRoute(
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refresh,
         onRecommendTitle = onRecommendTitle,
+        onOpenCalendar = onOpenCalendar,
     )
 }
 
@@ -224,6 +226,7 @@ fun UpNextScreen(
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
     onRecommendTitle: ((String) -> Unit)? = null,
+    onOpenCalendar: () -> Unit = {},
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -290,6 +293,10 @@ fun UpNextScreen(
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Text("Up Next", style = MaterialTheme.typography.headlineLarge)
+                    }
+                    TextButton(onClick = onOpenCalendar) {
+                        Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Calendar", modifier = Modifier.padding(start = 6.dp))
                     }
                     ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
                 }

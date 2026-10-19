@@ -322,4 +322,14 @@ class MediaProxyParsingTest {
         assertNull(scores.rtScore)
         assertNull(scores.metacriticScore)
     }
+
+    @Test fun `tv schedule keeps status next episode season and raw season counts`() {
+        val schedule = parseTvSchedule("""{"status":"Returning Series","next_episode_to_air":{"season_number":3,"episode_number":1},
+            "seasons":[{"season_number":0,"episode_count":2},{"season_number":3,"episode_count":0,"air_date":"2027-02-01"},{"episode_count":4}]}""")!!
+        assertEquals("Returning Series", schedule.status)
+        assertEquals(3, schedule.nextEpisodeSeason)
+        assertEquals(listOf(ScheduleSeason(0, 2, null), ScheduleSeason(3, 0, 2027)), schedule.seasons)
+        assertNull(parseTvSchedule("""{"status":"Ended"}"""))
+        assertNull(parseTvSchedule("""{"seasons":[]}""")!!.nextEpisodeSeason)
+    }
 }

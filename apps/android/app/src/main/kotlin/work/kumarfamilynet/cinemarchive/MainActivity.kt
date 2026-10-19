@@ -476,6 +476,9 @@ private fun CinemArchiveApp(
     // Both owner and sign-in generation fence saved person labels and every Library filter.
     val libraryFiltersState = rememberAccountLibraryFilters("${runtime.ownerId}:${runtime.identity.generation}")
     var tab by remember { mutableStateOf(Tab.LIBRARY) }
+    // The Calendar (issue #340) is a sub-view of the Up Next tab rather than an overlay, so a
+    // title detail opened from it closes back onto the calendar instead of replacing it.
+    var upNextCalendar by remember { mutableStateOf(false) }
     var overlay by remember { mutableStateOf<Overlay?>(initialTitleId?.let { Overlay.Detail(it) }) }
     var noirPreview by remember(runtime) { mutableStateOf<work.kumarfamilynet.cinemarchive.core.model.NoirPreview?>(null) }
     val noirPins by runtime.titlePins.state.collectAsStateWithLifecycle(initialValue = work.kumarfamilynet.cinemarchive.data.TitlePinsState())
@@ -495,6 +498,8 @@ private fun CinemArchiveApp(
         if (pending.canOpen(runtime.identity) && runtime.isCurrent()) {
             val route = pending.destination
             Tab.entries.firstOrNull { it.key == route.view }?.let { tab = it }
+            upNextCalendar = route.view == "calendar"
+            if (upNextCalendar) tab = Tab.UP_NEXT
             globalSearch = false
             recommendTitleId = null
             shareOutingId = null
@@ -648,8 +653,9 @@ private fun CinemArchiveApp(
                 "friends" -> overlay = Overlay.Friends
                 else -> {
                     overlay = null
+                    upNextCalendar = id == "calendar"
                     tab = when (id) {
-                        "upnext", "marquee" -> Tab.UP_NEXT
+                        "upnext", "marquee", "calendar" -> Tab.UP_NEXT
                         "ledger" -> Tab.LEDGER
                         "discover" -> Tab.DISCOVER
                         "lists" -> Tab.LISTS
@@ -686,7 +692,7 @@ private fun CinemArchiveApp(
     // reset to expanded on every tab switch so a collapse from the tab just left doesn't
     // leak into a tab that never reports back in.
     var fabExpanded by remember { mutableStateOf(true) }
-    LaunchedEffect(tab) { fabExpanded = true }
+    LaunchedEffect(tab, upNextCalendar) { fabExpanded = true }
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -756,6 +762,10 @@ private fun CinemArchiveApp(
     }
 
     val backProgress = remember { Animatable(0f) }
+    // Mutually exclusive with the overlay handler below: only while no overlay covers the tab.
+    androidx.activity.compose.BackHandler(enabled = overlay == null && tab == Tab.UP_NEXT && upNextCalendar) {
+        upNextCalendar = false
+    }
     PredictiveBackHandler(enabled = overlay != null) { progress ->
         try {
             progress.collect { backEvent -> backProgress.snapTo(backEvent.progress) }
@@ -835,7 +845,12 @@ private fun CinemArchiveApp(
                                 onTitleClick = { overlay = Overlay.Detail(it) },
                                 onFabExpandedChange = { fabExpanded = it },
                             )
-                            Tab.UP_NEXT -> UpNextRoute(
+                            Tab.UP_NEXT -> if (upNextCalendar) work.kumarfamilynet.cinemarchive.feature.upnext.CalendarRoute(
+                                repository,
+                                onTitleClick = { overlay = Overlay.Detail(it) },
+                                onBack = { upNextCalendar = false },
+                                onBrowseDiscover = { upNextCalendar = false; tab = Tab.DISCOVER },
+                            ) else UpNextRoute(
                                 repository,
                                 outingsRepository,
                                 librarySyncRepository,
@@ -845,6 +860,7 @@ private fun CinemArchiveApp(
                                 onTitleClick = { overlay = Overlay.Detail(it) },
                                 onViewTicket = { overlay = Overlay.Ticket(it.outing.id, it.titleName) },
                                 onFabExpandedChange = { fabExpanded = it },
+                                onOpenCalendar = { upNextCalendar = true },
                             )
                             Tab.LEDGER -> LedgerRoute(
                                 ledgerRepository,
@@ -896,7 +912,7 @@ private fun CinemArchiveApp(
                     MorphingNavigationRail(
                         destinations = navDestinations,
                         selected = tab,
-                        onSelect = { if (it == null) globalSearch = true else tab = it },
+                        onSelect = { if (it == null) globalSearch = true else { upNextCalendar = false; tab = it } },
                         compact = navigationPreferences.compact,
                     )
                     Scaffold(
@@ -911,7 +927,7 @@ private fun CinemArchiveApp(
                         MorphingBottomNav(
                             destinations = navDestinations,
                             selected = tab,
-                            onSelect = { if (it == null) globalSearch = true else tab = it },
+                            onSelect = { if (it == null) globalSearch = true else { upNextCalendar = false; tab = it } },
                             compact = navigationPreferences.compact,
                         )
                     },

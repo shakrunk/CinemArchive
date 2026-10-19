@@ -2,11 +2,12 @@
 // by scripts/verify-navigation-logic.mjs. The URL is the source of truth for the
 // active view and which modal (detail drawer / add) is open.
 
-export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'lists' | 'profile' | 'friends'
+export type AppView = 'upnext' | 'library' | 'ledger' | 'discover' | 'lists' | 'profile' | 'friends' | 'calendar'
 
 // The destinations that appear in the customizable nav (TopBar pill nav +
 // BottomNav). 'profile' and 'friends' are excluded — they're fixed account/social
-// icons, not reorderable nav tabs.
+// icons, not reorderable nav tabs. 'calendar' is likewise reached from Up Next's
+// header rather than its own tab.
 export type NavItemId = 'discover' | 'library' | 'upnext' | 'ledger' | 'lists'
 
 export const DEFAULT_NAV_ORDER: NavItemId[] = ['discover', 'library', 'upnext', 'ledger', 'lists']
@@ -31,7 +32,7 @@ export interface NavState {
   add: boolean
 }
 
-const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'lists', 'profile', 'friends']
+const APP_VIEWS: AppView[] = ['upnext', 'library', 'ledger', 'discover', 'lists', 'profile', 'friends', 'calendar']
 
 // Params that are not part of NavState but must survive every navigation write.
 // 'friend' additionally gets overridden by useNavigationSync from the live

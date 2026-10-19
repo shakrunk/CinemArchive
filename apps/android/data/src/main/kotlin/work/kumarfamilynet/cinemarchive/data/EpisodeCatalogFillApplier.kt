@@ -47,17 +47,24 @@ class EpisodeCatalogFillApplier(private val database: LibraryDatabase, private v
         for (index in 0 until catalog.length()) {
             val planned = catalog.getJSONObject(index)
             val number = planned.getInt("seasonNumber")
-            val serverSeason = current.singleOrNull { it.getString("table") == "seasons" && it.getJSONObject("key").getInt("season_number") == number }
-                ?.getJSONObject("row") ?: continue // Deleted since the historical receipt.
+            // A stored season gaining rows may carry no season operation at all.
+            val serverSeason = current.singleOrNull { it.getString("table") == "seasons" && it.getJSONObject("row").getInt("season_number") == number }
+                ?.getJSONObject("row")
             val localSeason = database.seasonDao().observeSeasons(entry.entityId).first().singleOrNull { it.seasonNumber == number }
             if (!planned.isNull("localSeasonId") && localSeason == null) continue // Locally removed while in flight.
-            val seasonId = serverSeason.getString("id")
+            if (serverSeason == null && localSeason == null) continue // Deleted since the historical receipt.
+            val seasonId = serverSeason?.getString("id") ?: localSeason!!.id
             require(localSeason == null || localSeason.id == seasonId) { "Season identity needs reconciliation; saved history has been retained" }
             if (localSeason == null) {
-                val count = serverSeason.getInt("episode_count")
+                val count = serverSeason!!.getInt("episode_count")
                 val watched = serverSeason.getInt("episodes_watched")
                 require(count >= 0 && watched in 0..count)
-                database.seasonDao().upsertAll(listOf(SeasonEntity(seasonId, entry.entityId, number, count, watched, serverSeason.nullInt("air_year"))))
+                database.seasonDao().upsertAll(listOf(SeasonEntity(seasonId, entry.entityId, number, count, watched,
+                    serverSeason.nullInt("air_year"), serverSeason.nullText("updated_at"))))
+            } else if (serverSeason != null && planned.optBoolean("countUpdated") && !laterCatalog) {
+                // Only the guarded count changed; progress stays the local projection's.
+                database.seasonDao().upsertAll(listOf(localSeason.copy(episodeCount = serverSeason.getInt("episode_count"),
+                    updatedAt = serverSeason.nullText("updated_at") ?: localSeason.updatedAt)))
             }
             val cast = planned.getJSONArray("cast")
             for (castIndex in 0 until cast.length()) {
@@ -71,7 +78,7 @@ class EpisodeCatalogFillApplier(private val database: LibraryDatabase, private v
                 val plannedEpisode = plannedEpisodes.getJSONObject(episodeIndex)
                 val episodeNumber = plannedEpisode.getInt("episodeNumber")
                 val serverEpisode = current.singleOrNull { it.getString("table") == "episodes" &&
-                    it.getJSONObject("key").getInt("season_number") == number && it.getJSONObject("key").getInt("episode_number") == episodeNumber }
+                    it.getJSONObject("row").getInt("season_number") == number && it.getJSONObject("row").getInt("episode_number") == episodeNumber }
                     ?.getJSONObject("row") ?: continue
                 val localEpisode = database.episodeDao().observeEpisodes(entry.entityId).first()
                     .singleOrNull { it.seasonId == seasonId && it.episodeNumber == episodeNumber }

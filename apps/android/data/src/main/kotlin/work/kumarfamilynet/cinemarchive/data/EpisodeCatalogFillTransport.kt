@@ -13,8 +13,16 @@ internal class EpisodeCatalogFillTransport(private val client: SupabaseRestClien
         val session = sessionProvider()
         fun checkOwner() { check(sessionProvider().userId == session.userId) { "This sign-in has ended" } }
         val operations = episodeCatalogOperations(entry, session.userId)
-        val receipt = JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
-            .put("p_operations", operations).toString(), session.accessToken))
+        val receipt = try {
+            JSONObject(client.rpc("apply_library_command", JSONObject().put("p_operation_id", entry.id)
+                .put("p_operations", operations).toString(), session.accessToken))
+        } catch (error: SupabaseHttpException) {
+            // The command is provider catalog data only, rejected before any effect: another
+            // device already added the row, or a guarded row changed or vanished. Drop it so it
+            // cannot hold the queue; the following pull and the next refresh see the winner.
+            if (error.postgresCode in CATALOG_RACE_CODES) return@withContext PushResult.Success
+            throw error
+        }
         currentCoroutineContext().ensureActive(); checkOwner()
         val confirmed = checkedLibraryCommandReceipt(entry.id, operations, receipt, session.userId)
             .filter { it.getString("table") != "titles" }
@@ -38,3 +46,6 @@ internal class EpisodeCatalogFillTransport(private val client: SupabaseRestClien
         PushResult.Applied(envelope)
     }
 }
+
+/** Identity conflict, stale revision, missing parent season, row no longer exists. */
+private val CATALOG_RACE_CODES = setOf("23505", "40001", "23503", "P0002")

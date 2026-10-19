@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
@@ -48,6 +49,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
@@ -55,6 +57,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.LibraryTitle
+import work.kumarfamilynet.cinemarchive.core.model.SmartList
 import work.kumarfamilynet.cinemarchive.core.model.TitleList
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
@@ -71,6 +74,10 @@ class ListsViewModel(
 
     private val titles = libraryRepository.observeLibrary()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Automatic lists derived from each title's status — never stored as a [TitleList]. */
+    val smartListMembers = titles.map { t -> SmartList.entries.associateWith { it.members(t) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /** listId -> its member LibraryTitles, resolved against the whole library — the Android
      *  analogue of the web app's `titles.filter(t => listMemberships[id]?.has(t.id))`. */
@@ -119,6 +126,7 @@ fun ListsRoute(
     val viewModel: ListsViewModel = viewModel(factory = ListsViewModelFactory(listsRepository, libraryRepository))
     val lists by viewModel.lists.collectAsStateWithLifecycle()
     val membersByList by viewModel.membersByList.collectAsStateWithLifecycle()
+    val smartListMembers by viewModel.smartListMembers.collectAsStateWithLifecycle()
 
     // Lists has no scroll-collapse signal of its own yet — the shared FAB just stays expanded.
     androidx.compose.runtime.LaunchedEffect(Unit) { onFabExpandedChange(true) }
@@ -136,11 +144,23 @@ fun ListsRoute(
         }
     }
     val selectedList = lists.find { it.id == selectedListId }
+    val selectedSmartList = SmartList.fromId(selectedListId)
 
-    if (selectedList != null) {
+    if (selectedSmartList != null) {
         ListDetailScreen(
-            list = selectedList,
+            name = selectedSmartList.displayName,
+            description = "${selectedSmartList.description} Updates automatically from each title's status.",
+            members = smartListMembers[selectedSmartList] ?: emptyList(),
+            emptyMessage = selectedSmartList.emptyMessage,
+            onBack = { selectedListId = null },
+            onTitleClick = onTitleClick,
+        )
+    } else if (selectedList != null) {
+        ListDetailScreen(
+            name = selectedList.name,
+            description = selectedList.description,
             members = membersByList[selectedList.id] ?: emptyList(),
+            emptyMessage = "Nothing in this list yet — add titles from their detail screen.",
             onBack = { selectedListId = null },
             onTitleClick = onTitleClick,
             onRemoveTitle = { titleId -> viewModel.removeTitleFromList(selectedList.id, titleId) },
@@ -150,6 +170,7 @@ fun ListsRoute(
         ListsGridScreen(
             lists = lists,
             membersByList = membersByList,
+            smartListMembers = smartListMembers,
             onOpenList = { selectedListId = it },
             onCreateList = viewModel::createList,
             onOpenProfile = onOpenProfile,
@@ -162,6 +183,7 @@ fun ListsRoute(
 private fun ListsGridScreen(
     lists: List<TitleList>,
     membersByList: Map<String, List<LibraryTitle>>,
+    smartListMembers: Map<SmartList, List<LibraryTitle>>,
     onOpenList: (String) -> Unit,
     onCreateList: (String) -> Unit,
     onOpenProfile: () -> Unit,
@@ -195,6 +217,28 @@ private fun ListsGridScreen(
             }
         }
 
+        item {
+            ReadingWidthColumn {
+                SectionLabel("AUTOMATIC")
+            }
+        }
+        items(SmartList.entries, key = SmartList::id) { smart ->
+            ReadingWidthColumn {
+                ListRow(
+                    name = smart.displayName,
+                    description = smart.description,
+                    members = smartListMembers[smart] ?: emptyList(),
+                    automatic = true,
+                    onClick = { onOpenList(smart.id) },
+                )
+            }
+        }
+        item {
+            ReadingWidthColumn {
+                SectionLabel("YOUR LISTS", modifier = Modifier.padding(top = 16.dp))
+            }
+        }
+
         if (lists.isEmpty()) {
             item {
                 ReadingWidthColumn {
@@ -209,7 +253,7 @@ private fun ListsGridScreen(
             }
             items(lists, key = TitleList::id) { list ->
                 ReadingWidthColumn {
-                    ListRow(list, membersByList[list.id] ?: emptyList(), onClick = { onOpenList(list.id) })
+                    ListRow(list.name, list.description, membersByList[list.id] ?: emptyList(), onClick = { onOpenList(list.id) })
                 }
             }
         }
@@ -217,11 +261,21 @@ private fun ListsGridScreen(
 }
 
 @Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(vertical = 4.dp),
+    )
+}
+
+@Composable
 private fun EmptyLists(onCreate: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxSize().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = modifier.fillMaxWidth().padding(top = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.AutoMirrored.Filled.ListAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            "No lists yet.",
+            "No custom lists yet.",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 12.dp),
         )
@@ -236,7 +290,13 @@ private fun EmptyLists(onCreate: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ListRow(list: TitleList, members: List<LibraryTitle>, onClick: () -> Unit) {
+private fun ListRow(
+    name: String,
+    description: String?,
+    members: List<LibraryTitle>,
+    onClick: () -> Unit,
+    automatic: Boolean = false,
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -258,8 +318,24 @@ private fun ListRow(list: TitleList, members: List<LibraryTitle>, onClick: () ->
                 }
             }
             Column(modifier = Modifier.weight(2f).padding(start = 12.dp)) {
-                Text(list.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                list.description?.takeIf { it.isNotEmpty() }?.let { description ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (automatic) {
+                        Icon(
+                            Icons.Filled.AutoAwesome,
+                            contentDescription = "Automatic list",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 6.dp).size(14.dp),
+                        )
+                    }
+                }
+                description?.takeIf { it.isNotEmpty() }?.let { description ->
                     Text(description, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -276,19 +352,22 @@ private fun ListRow(list: TitleList, members: List<LibraryTitle>, onClick: () ->
 
 @Composable
 private fun ListDetailScreen(
-    list: TitleList,
+    name: String,
+    description: String?,
     members: List<LibraryTitle>,
+    emptyMessage: String,
     onBack: () -> Unit,
     onTitleClick: (String) -> Unit,
-    onRemoveTitle: (String) -> Unit,
-    onDelete: () -> Unit,
+    // Null for an automatic list: membership follows status, so there's nothing to remove/delete.
+    onRemoveTitle: ((String) -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
 ) {
     var confirmingDelete by remember { mutableStateOf(false) }
 
-    if (confirmingDelete) {
+    if (confirmingDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete \"${list.name}\"?") },
+            title = { Text("Delete \"$name\"?") },
             text = { Text("This removes the list. Titles stay in your library.") },
             confirmButton = {
                 TextButton(onClick = { confirmingDelete = false; onDelete() }) {
@@ -305,13 +384,15 @@ private fun ListDetailScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "All lists") }
-            Text(list.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            IconButton(onClick = { confirmingDelete = true }) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete list", tint = MaterialTheme.colorScheme.error)
+            Text(name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            if (onDelete != null) {
+                IconButton(onClick = { confirmingDelete = true }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete list", tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
 
-        list.description?.takeIf { it.isNotEmpty() }?.let { description ->
+        description?.takeIf { it.isNotEmpty() }?.let { description ->
             Text(description, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
@@ -319,7 +400,7 @@ private fun ListDetailScreen(
 
         if (members.isEmpty()) {
             Text(
-                "Nothing in this list yet — add titles from their detail screen.",
+                emptyMessage,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(20.dp),
@@ -339,7 +420,7 @@ private fun ListDetailScreen(
                             imageUrl = title.posterUrl,
                             onClick = { onTitleClick(title.id) },
                         )
-                        IconButton(
+                        if (onRemoveTitle != null) IconButton(
                             onClick = { onRemoveTitle(title.id) },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
@@ -350,7 +431,7 @@ private fun ListDetailScreen(
                         ) {
                             Icon(
                                 Icons.Filled.Close,
-                                contentDescription = "Remove ${title.name} from ${list.name}",
+                                contentDescription = "Remove ${title.name} from $name",
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(16.dp),
                             )

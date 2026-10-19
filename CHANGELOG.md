@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- **Android:** Refreshing episode details no longer makes the next sync download the whole library again; only the changes it held back are fetched again.
+
 ## [1.37.0] - 2026-10-18
 
 ### Added

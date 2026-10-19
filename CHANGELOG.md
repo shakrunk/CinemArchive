@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Android:** A Calendar, opened from the Up Next header, the command palette or a `?view=calendar` link, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
+
 ## [1.37.0] - 2026-10-18
 
 ### Added

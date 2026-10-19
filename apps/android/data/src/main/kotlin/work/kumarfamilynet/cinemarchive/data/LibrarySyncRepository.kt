@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -145,6 +146,13 @@ class LibrarySyncRepository(
 
     private val cursorKey = stringPreferencesKey("last_synced_at")
     private val schemaVersionKey = intPreferencesKey("sync_schema_version")
+    /** Oldest `p_since` whose rows a pull skipped for a pending `title_catalog` command. The
+     *  next pull starts no later than this, then clears it once nothing was skipped again. */
+    private val replayFloorKey = stringPreferencesKey("catalog_replay_floor")
+    /** `p_since` of a pull that has not finished. Its skips are unknown, so it becomes a floor. */
+    private val runSinceKey = stringPreferencesKey("catalog_replay_run_since")
+    /** Set once the floor is tracked. Before that, a pending catalog skipped behind an unknown cursor. */
+    private val replayFloorTrackedKey = booleanPreferencesKey("catalog_replay_floor_tracked")
 
     /** No-ops when signed out. Safe to call repeatedly (launch, sign-in, resume) — same
      *  "call it whenever, entries/cursor just don't move if there's nothing new" contract
@@ -195,8 +203,20 @@ class LibrarySyncRepository(
         ensureSessionActive(session)
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
         // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
-        if (pendingKeys().any { key -> listOf("title_credits:", "title_catalog:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
+        val pendingAtStart = pendingKeys()
+        if (pendingAtStart.any { key -> listOf("title_credits:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
             dataStore.edit { it[cursorKey] = EPOCH }
+        }
+        // Catalog commands replay from a durable floor instead: the daily episode-schedule check
+        // queues them often, and an epoch pull each time re-reads the whole library. The floor is
+        // recorded by the pull that skipped, so it holds wherever the ACK happens.
+        dataStore.edit { prefs ->
+            var floor = prefs[replayFloorKey]
+            prefs[runSinceKey]?.let { floor = earlierCursor(floor, it) } // That pull never finished.
+            if (prefs[replayFloorTrackedKey] != true && pendingAtStart.any { it.startsWith(CATALOG_PREFIX) }) floor = EPOCH
+            if (floor != null) prefs[replayFloorKey] = floor
+            prefs.remove(runSinceKey)
+            prefs[replayFloorTrackedKey] = true
         }
         // Push first (best effort — offline just leaves entries queued and protected below).
         try {
@@ -211,14 +231,19 @@ class LibrarySyncRepository(
         // An install that predates SYNC_SCHEMA_VERSION has no stored version at all — treat
         // that as version 1, so every pre-existing install also gets the one-time reset.
         val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
-        var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH else (prefs[cursorKey] ?: EPOCH)
+        var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH
+            else earlierCursor(prefs[replayFloorKey], prefs[cursorKey] ?: EPOCH)
+        // Durable before the first page moves the cursor: a deferred row can be skipped at the
+        // final flush, behind cursors already persisted.
+        val runSince = cursor
+        dataStore.edit { ensureSessionActive(session); it[runSinceKey] = runSince }
         var metadataSchemaAvailable = true
         var sawMetadataTitle = false
         var personSchemaAvailable = true
         var richTitleSchemaAvailable = true
         var backupGraphSchemaAvailable = true
         var moviegoingSchemaAvailable = true
-        var skippedBackfillRows = false
+        val skips = Skips()
         val deferred = DeferredRows()
         while (true) {
             val params = JSONObject().put("p_since", cursor).put("p_limit", PAGE_SIZE).toString()
@@ -243,7 +268,7 @@ class LibrarySyncRepository(
             }
             transactor.run {
                 ensureSessionActive(session)
-                if (applyPage(rows, deferred)) skippedBackfillRows = true
+                applyPage(rows, deferred, skips)
                 ensureSessionActive(session)
             }
             cursor = rows.getJSONObject(rows.length() - 1).getString("updated_at")
@@ -255,9 +280,16 @@ class LibrarySyncRepository(
         }
         transactor.run {
             ensureSessionActive(session)
-            if (deferred.flush()) skippedBackfillRows = true
+            deferred.flush(skips)
             ensureSessionActive(session)
         }
+        // Rows from runSince on were all applied or skipped above, so only this run's skips remain.
+        dataStore.edit {
+            ensureSessionActive(session)
+            if (skips.catalog) it[replayFloorKey] = runSince else it.remove(replayFloorKey)
+            it.remove(runSinceKey)
+        }
+        val skippedBackfillRows = skips.any
         transactor.run {
             ensureSessionActive(session)
             val protected = pendingKeys()
@@ -392,16 +424,15 @@ class LibrarySyncRepository(
             }
         }
 
-        suspend fun flush(): Boolean {
+        suspend fun flush(skips: Skips) {
             // A title can arrive pages after a child. While the next HTTP page is loading,
             // the user may edit its now-visible graph; final deferred writes need the same
             // transactional protection check as ordinary page writes.
             val pending = pendingKeys()
-            var skipped = false
             fun protected(type: String, id: String, titleId: String? = null, listId: String? = null): Boolean {
                 val row = JSONObject().put("entity_type", type).put("entity_id", id)
                     .put("payload", JSONObject().put("titleId", titleId).put("listId", listId))
-                return isProtectedFromPull(row, pending).also { if (it) skipped = true }
+                return isProtectedFromPull(row, pending).also { if (it) skips.record(pending) }
             }
             seasons.removeAll { protected("season", it.id, it.titleId) }
             episodes.removeAll { protected("episode", it.getString("id"), it.getString("titleId")) }
@@ -434,7 +465,6 @@ class LibrarySyncRepository(
             reviewDao.upsertAll(reviews.filter { episodeDao.getById(it.episodeId) != null })
 
             listItemDao.upsertAll(listItems.filter { listDao.getById(it.listId) != null && titleDao.getById(it.titleId) != null })
-            return skipped
         }
     }
 
@@ -445,11 +475,11 @@ class LibrarySyncRepository(
      *  Anything whose parent isn't in the local DB yet goes through [deferred] instead of a
      *  direct DAO call — see [DeferredRows]'s kdoc for why that's necessary even though title
      *  is always applied first *within* a page. */
-    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows): Boolean {
+    private suspend fun applyPage(rows: JSONArray, deferred: DeferredRows, skips: Skips) {
         // Re-read per page: edits enqueued while an earlier page was applying are protected too.
         val pending = pendingKeys()
         val allRows = (0 until rows.length()).map { rows.getJSONObject(it) }
-        val skipped = allRows.any { isProtectedFromPull(it, pending) }
+        if (allRows.any { isProtectedFromPull(it, pending) }) skips.record(pending)
         val byType = allRows
             .filterNot { isProtectedFromPull(it, pending) }
             .groupBy { it.getString("entity_type") }
@@ -545,7 +575,6 @@ class LibrarySyncRepository(
                 }
             }
         }
-        return skipped
     }
 
     private fun JSONObject.payload(): JSONObject = getJSONObject("payload")
@@ -753,6 +782,26 @@ class LibrarySyncRepository(
         updatedAt = getString("updatedAt"),
     )
 }
+
+private const val CATALOG_PREFIX = "title_catalog:"
+
+/** Protected rows a pull skipped. [catalog] is judged with the same pending snapshot that
+ *  skipped them, so a concurrent ACK cannot hide the reason. */
+internal class Skips {
+    var any = false
+        private set
+    var catalog = false
+        private set
+
+    fun record(pending: Set<String>) {
+        any = true
+        if (pending.any { it.startsWith(CATALOG_PREFIX) }) catalog = true
+    }
+}
+
+/** Compares as instants: `updated_at` strings differ in fraction digits and offset form. */
+internal fun earlierCursor(a: String?, b: String): String =
+    if (a != null && java.time.Instant.parse(a) < java.time.Instant.parse(b)) a else b
 
 /** True for a pulled row (upsert or tombstone) whose entity has a queued local mutation. */
 internal fun isProtectedFromPull(row: JSONObject, pending: Set<String>): Boolean {

@@ -7,14 +7,51 @@ import org.junit.Test
 import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSeason
 
-/** Catalog growth planning, ported from the web app's refresh and schedule tests. */
+/** Ports the web app's apps/web/src/lib/episodeSchedule.test.ts planning cases. */
 class EpisodeScheduleTest {
     private val titleId = "6f1c2a4e-3b5d-4c7e-9f10-2a3b4c5d6e7f"
+    private val today = "2026-10-18"
+    private val day = SCHEDULE_CHECK_INTERVAL_MS
 
     private fun stored(number: Int, vararg dates: String?, count: Int = dates.size, updatedAt: String? = "2026-01-01T00:00:00Z") =
         StoredSeason("s$number", number, count, updatedAt, dates.mapIndexed { index, date -> StoredEpisode("s$number-e${index + 1}", index + 1, "Episode ${index + 1}", date) })
+    private fun schedule(vararg seasons: Pair<Int, Int>, status: String? = "Returning Series", next: Int? = null) =
+        TvSchedule(status, next, seasons.map { (number, count) -> ScheduleSeason(number, count) })
     private fun remote(number: Int, vararg dates: String?) =
         MediaSeason(number, dates.size, 2026, dates.mapIndexed { index, date -> MediaEpisode(index + 1, "Episode ${index + 1}", date, 45) })
+
+    @Test fun picksTrackedNonDroppedSeriesNotCheckedInTheLastDayOldestFirst() {
+        val titles = listOf(
+            ScheduleCandidate("a", 1, "TV", "WATCHING"), ScheduleCandidate("b", 2, "TV", "WATCHED"),
+            ScheduleCandidate("c", 3, "TV", "DROPPED"), ScheduleCandidate("d", 4, "MOVIE", "WATCHLIST"),
+            ScheduleCandidate("e", 5, "TV", "WATCHLIST"), ScheduleCandidate("f", 0, "TV", "WATCHING"),
+        )
+        val now = 10 * day
+        val due = seriesDueForScheduleCheck(titles, mapOf("a" to now - day + 1, "b" to now - 2 * day, "e" to now - 3 * day), now)
+        assertEquals(listOf("e", "b"), due.map { it.id })
+        // Never checked sorts first.
+        assertEquals(listOf("a"), seriesDueForScheduleCheck(titles, mapOf("b" to now - 2 * day, "e" to now - 3 * day), now, limit = 1).map { it.id })
+    }
+
+    @Test fun fetchesANewlyAnnouncedSeason() {
+        assertEquals(listOf(2), seasonsToCheck(listOf(stored(1, "2025-01-01")), schedule(1 to 1, 2 to 8), today))
+    }
+
+    @Test fun fetchesAStoredSeasonTmdbNowCountsMoreEpisodesForEvenOnceTheShowEnded() {
+        assertEquals(listOf(1), seasonsToCheck(listOf(stored(1, "2025-01-01")), schedule(1 to 2, status = "Ended"), today))
+    }
+
+    @Test fun rechecksUndatedOrUpcomingEpisodesOnlyWhileTheShowIsRunning() {
+        val seasons = listOf(stored(1, "2025-01-01"), stored(2, "2026-10-18", null))
+        assertEquals(listOf(2), seasonsToCheck(seasons, schedule(1 to 1, 2 to 2), today))
+        assertEquals(emptyList<Int>(), seasonsToCheck(seasons, schedule(1 to 1, 2 to 2, status = "Canceled"), today))
+        assertEquals(listOf(2, 3), seasonsToCheck(seasons, schedule(1 to 1, 2 to 2, next = 3), today))
+    }
+
+    @Test fun skipsFinishedSeasonsSpecialsTmdbAddsAndCoarseCountSeasons() {
+        val seasons = listOf(stored(1, "2025-01-01"), StoredSeason("coarse", 2, 10, null, emptyList()))
+        assertEquals(emptyList<Int>(), seasonsToCheck(seasons, schedule(0 to 3, 1 to 1, 2 to 12, next = 2), today))
+    }
 
     @Test fun addsANewSeasonWithItsEpisodesUnderCatalogIds() {
         val additions = catalogAdditions(titleId, listOf(stored(1, "2025-01-01")), listOf(remote(2, "2026-11-01", null)), fillCoarse = false)

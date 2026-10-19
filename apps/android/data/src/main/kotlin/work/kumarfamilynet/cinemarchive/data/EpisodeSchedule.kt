@@ -4,8 +4,16 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSeason
 
 // Pure planning for catalog growth: which TMDB seasons/episodes a stored series is missing, and
-// which known episodes have a new air date or name. Used by the manual metadata refresh
-// (EpisodeCatalogFill.kt). Mirrors the web app's apps/web/src/lib/refreshMetadata.ts.
+// which known episodes have a new air date or name. Shared by the manual metadata refresh
+// (EpisodeCatalogFill.kt) and the background schedule check (EpisodeScheduleRefresher.kt).
+// Mirrors the web app's apps/web/src/lib/refreshMetadata.ts and apps/web/src/lib/episodeSchedule.ts.
+
+/** How long a series stays checked. Matches the media-proxy cache TTL. */
+internal const val SCHEDULE_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
+/** Series checked per run, least recently checked first. */
+internal const val SCHEDULE_CHECK_BATCH = 20
+
+private val FINISHED_STATUSES = setOf("Ended", "Canceled")
 
 /** The local catalog graph of one series, as the planner needs it. */
 internal data class StoredSeason(
@@ -17,6 +25,61 @@ internal data class StoredSeason(
 )
 
 internal data class StoredEpisode(val id: String, val episodeNumber: Int, val name: String?, val airDate: String?)
+
+/** TMDB-only series schedule from the `details` proxy action: status, season list, next episode. */
+data class TvSchedule(
+    /** TMDB series status, e.g. "Returning Series", "Ended", "Canceled". */
+    val status: String?,
+    /** Season of TMDB's next_episode_to_air, when one is announced. */
+    val nextEpisodeSeason: Int?,
+    val seasons: List<ScheduleSeason>,
+)
+
+data class ScheduleSeason(val seasonNumber: Int, val episodeCount: Int, val airYear: Int? = null)
+
+internal data class ScheduleCandidate(val id: String, val tmdbId: Int, val type: String, val status: String)
+
+/** Series eligible for a schedule check, least recently checked first. */
+internal fun seriesDueForScheduleCheck(
+    titles: List<ScheduleCandidate>,
+    checkedAt: Map<String, Long>,
+    now: Long,
+    limit: Int = SCHEDULE_CHECK_BATCH,
+): List<ScheduleCandidate> = titles
+    .filter { it.type == "TV" && it.status != "DROPPED" && it.tmdbId > 0 }
+    .filter { now - (checkedAt[it.id] ?: 0L) >= SCHEDULE_CHECK_INTERVAL_MS }
+    .sortedBy { checkedAt[it.id] ?: 0L }
+    .take(limit)
+
+/**
+ * Season numbers worth a season-details fetch:
+ * - a season TMDB lists that isn't stored yet (newly announced);
+ * - a stored season TMDB now counts more episodes for;
+ * - for a series still running, a stored season with an undated or upcoming episode (dates get
+ *   set and moved), and the season of the next episode.
+ * A stored season without episode rows (an old coarse count) is left to a manual refresh.
+ */
+internal fun seasonsToCheck(stored: List<StoredSeason>, schedule: TvSchedule, today: String): List<Int> {
+    val byNumber = stored.associateBy { it.seasonNumber }
+    val running = schedule.status !in FINISHED_STATUSES
+    val due = sortedSetOf<Int>()
+    for (tmdb in schedule.seasons) {
+        val season = byNumber[tmdb.seasonNumber]
+        if (season == null) {
+            if (tmdb.seasonNumber >= 1 && tmdb.episodeCount > 0) due += tmdb.seasonNumber
+            continue
+        }
+        if (season.episodes.isEmpty()) continue
+        if (tmdb.episodeCount > season.episodes.size) due += tmdb.seasonNumber
+        else if (running && season.episodes.any { it.airDate.isNullOrBlank() || it.airDate >= today }) due += tmdb.seasonNumber
+    }
+    val next = schedule.nextEpisodeSeason
+    if (running && next != null) {
+        val season = byNumber[next]
+        if (if (season == null) next >= 1 else season.episodes.isNotEmpty()) due += next
+    }
+    return due.toList()
+}
 
 /** Rows to add for one season. [newSeasonId] is null for a stored season or a new Specials season. */
 internal data class SeasonAddition(

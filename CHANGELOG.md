@@ -13,6 +13,10 @@ number is chosen.
 
 - **Android:** A Calendar, opened from the Up Next header, the command palette or a `?view=calendar` link, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
 
+### Fixed
+
+- Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.
+
 ## [1.37.0] - 2026-10-18
 
 ### Added

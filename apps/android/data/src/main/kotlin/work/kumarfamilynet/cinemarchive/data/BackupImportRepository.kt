@@ -35,6 +35,9 @@ interface LibraryRestoreSource {
     suspend fun synchronize()
 }
 
+/** Identity tables checked for repeats before an import is previewed; lists are not imported. */
+private val IMPORT_IDENTITY_TABLES = setOf("title", "season", "episode", "episode watch", "episode rating", "episode review", "viewing", "outing")
+
 class BackupImportRepository(
     private val database: LibraryDatabase,
     private val outbox: MutationOutbox,
@@ -63,6 +66,11 @@ class BackupImportRepository(
         val document = when (parsed) {
             is LibraryBackupCodec.ParseResult.Success -> parsed.document
             is LibraryBackupCodec.ParseResult.Failure -> error(parsed.message)
+        }
+        // Web import refuses the whole file on a repeated identity, including rows it would skip.
+        val duplicated = LibraryBackupCodec.duplicateIdentityTables(document, IMPORT_IDENTITY_TABLES)
+        require(duplicated.isEmpty()) {
+            "Duplicate ${duplicated.first()} identity in this file. Nothing was imported; correct the file and try again."
         }
         val existing = RoomTransactor(database).run {
             fence()

@@ -58,7 +58,8 @@ function updateSeasonMetadata(existing: Season | undefined, incoming: Season): S
   })
   const merged = { ...existing, ...incoming, episodesWatched: existing?.episodesWatched ?? 0 }
   if (episodes) {
-    merged.episodes = mergeMissing(episodes, existing?.episodes ?? [], rowId)
+    // A put may carry only newly discovered episodes; keep the season in airing order.
+    merged.episodes = mergeMissing(episodes, existing?.episodes ?? [], rowId).sort((a, b) => a.episodeNumber - b.episodeNumber)
     merged.episodesWatched = merged.episodes.filter((ep) => ep.watchEvents.length > 0).length
   }
   return merged

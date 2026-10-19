@@ -65,6 +65,12 @@ export function createLibraryActions(write: LibraryWrite, afterOutingRevert?: (o
     }),
     updateTitle: (id: string, patch: Partial<Title>) => save((state) => titlePatchCommand(title(state, id), patch)),
     updateTitleMetadata: (id: string, patch: Partial<Title>) => save((state) => titlePatchCommand(title(state, id), patch, { metadataOnly: true })),
+    /** Background catalog refresh: `build` runs against the title's latest
+     *  projection inside the write boundary, and is skipped once it is gone. */
+    applyCatalogRefresh: (id: string, build: (title: Title) => TrackingMutation[]) => save((state) => {
+      const found = state.titles.find((row) => row.id === id)
+      return found ? compound(build(found)) : null
+    }),
     removeTitle: (id: string) => save(() => ({ kind: 'title.delete', titleId: id })),
     setTitles: (values: Title[]) => save((state) => compound([
       ...values.flatMap((value) => { const old = state.titles.find((row) => row.id === value.id); return old ? leaves(titlePatchCommand(old, value)) : [{ kind: 'title.create' as const, title: value }] }),

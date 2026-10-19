@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android:** Refresh metadata now adds seasons and episodes announced after a series was added to your library. Before, it only filled seasons that had no episodes saved yet.
+
 ## [1.37.0] - 2026-10-18
 
 ### Added

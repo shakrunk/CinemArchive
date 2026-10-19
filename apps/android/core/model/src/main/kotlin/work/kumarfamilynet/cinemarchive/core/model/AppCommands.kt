@@ -13,6 +13,7 @@ fun titleCommand(id: String, name: String, year: Int?, director: String?, series
 fun ownerCommands(titles: List<LibraryTitle>): List<AppCommand> = listOf(
     AppCommand("add", "Add a title", "new", "create new movie series"),
     AppCommand("upnext", "Go to Up Next", keywords = "continue watching"),
+    AppCommand("calendar", "Go to Calendar", "view", "upcoming schedule episodes air dates releases premieres"),
     AppCommand("tickets", "I've got tickets…", "schedule", "cinema outing movie showtime theater venue"),
     AppCommand("marquee", "On the Marquee", keywords = "cinema outings tickets up next showtime"),
     AppCommand("library", "Go to the Library", keywords = "collection posters"),

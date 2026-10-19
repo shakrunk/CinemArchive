@@ -35,7 +35,7 @@ class EpisodeCatalogScreenTest {
         val name="catalog-device-${UUID.randomUUID()}.db"
         val db=LibraryDatabase.create(context,name)
         val owner=UUID.randomUUID().toString(); val titleId=UUID.randomUUID().toString()
-        val seasonId=UUID.randomUUID().toString(); val canonicalEpisode=UUID.randomUUID().toString()
+        val seasonId=UUID.randomUUID().toString(); var canonicalEpisode=UUID.randomUUID().toString()
         val writer=object:RemoteMutationWriter {
             override suspend fun push(entry:OutboxEntity):PushResult {
                 check(entry.entityType=="title_catalog")
@@ -45,6 +45,8 @@ class EpisodeCatalogScreenTest {
                     val op=operations.getJSONObject(index); val table=op.getString("table"); val key=op.getJSONObject("key")
                     val row=JSONObject(op.getJSONObject("values").toString())
                     key.keys().forEach { row.put(it,key.get(it)) }
+                    // New episode rows carry their catalog id; the server keeps it.
+                    if(table=="episodes" && key.has("id")) canonicalEpisode=key.getString("id")
                     row.put("user_id",owner).put("id",when(table) { "titles"->titleId; "seasons"->seasonId; else->canonicalEpisode })
                     if(table=="seasons") row.put("episodes_watched",0)
                     val result=JSONObject().put("table",table).put("key",key).put("row",row)

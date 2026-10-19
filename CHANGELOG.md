@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-10-18
+
 ### Added
 
 - **Web:** A Calendar view, opened from Up Next or the command palette, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.

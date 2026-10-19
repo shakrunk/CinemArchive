@@ -9,6 +9,7 @@ import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.MediaDetails
 import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
+import work.kumarfamilynet.cinemarchive.core.model.MediaSeason
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.core.model.isSpecials
@@ -150,6 +151,25 @@ class DiscoverRepository(
                 )
             }.getOrDefault(emptyList())
         }
+
+    /**
+     * TMDB-only series schedule for the background episode-schedule check. Reads the same
+     * `details` proxy action (and so the same server cache entry) as [fetchDetails], without its
+     * OMDb enrichment or per-season calls. Null when the payload has no season list.
+     */
+    suspend fun fetchTvSchedule(tmdbId: Int): TvSchedule? = withContext(Dispatchers.IO) {
+        parseTvSchedule(client.invokeFunction("media-proxy", "action=details&id=$tmdbId&type=tv", accessToken()))
+    }
+
+    /** One season's episode rows and cast, for the background episode-schedule check. Empty when
+     *  the call fails, like [fetchDetails]'s per-season fetch; an empty season is never written. */
+    suspend fun fetchScheduleSeason(tmdbId: Int, seasonNumber: Int): MediaSeason = withContext(Dispatchers.IO) {
+        val (episodes, cast) = runCatching {
+            val body = client.invokeFunction("media-proxy", "action=season&id=$tmdbId&season=$seasonNumber", accessToken())
+            parseSeasonEpisodes(body) to parseSeasonCast(body)
+        }.getOrDefault(emptyList<MediaEpisode>() to emptyList())
+        MediaSeason(seasonNumber, episodes.size, null, episodes, cast)
+    }
 
     /** Per-episode cast for the title detail screen — the web app's `fetchEpisodeCast`. Fetched
      *  on demand when an episode's cast is opened rather than at add-time, since TMDB bills it

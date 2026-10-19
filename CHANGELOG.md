@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.
+
 ## [1.37.0] - 2026-10-18
 
 ### Added

@@ -630,6 +630,37 @@ object LibraryBackupCodec {
         }
     }
 
+    /** Visits every row identity as (table, raw id, owning title index — or outing/list index). */
+    private fun forEachIdentity(document: BackupDocument, block: (String, Any?, Int) -> Unit) {
+        document.titles.forEachIndexed { i, t ->
+            block("title", t.opt("id"), i)
+            forEachObject(t.opt("seasons")) { s ->
+                block("season", s.opt("id"), i)
+                forEachObject(s.opt("episodes")) { e ->
+                    block("episode", e.opt("id"), i)
+                    for ((key, table) in EPISODE_ROW_TABLES) forEachObject(e.opt(key)) { r -> block(table, r.opt("id"), i) }
+                }
+            }
+            forEachObject(t.opt("viewings")) { v -> block("viewing", v.opt("id"), i) }
+        }
+        document.outings.forEachIndexed { i, o -> block("outing", o.opt("id"), i) }
+        document.lists.forEachIndexed { i, l -> block("list", l.opt("id"), i) }
+    }
+
+    /**
+     * Tables in which a string identity appears on more than one row, limited to [tables]. Installed
+     * restore uses this to refuse the whole file before saving anything, matching web import.
+     */
+    fun duplicateIdentityTables(document: BackupDocument, tables: Set<String>): Set<String> {
+        val seen = HashMap<String, HashSet<String>>()
+        val duplicated = LinkedHashSet<String>()
+        forEachIdentity(document) { table, raw, _ ->
+            val id = raw as? String
+            if (table in tables && id != null && !seen.getOrPut(table) { HashSet() }.add(id)) duplicated += table
+        }
+        return duplicated
+    }
+
     private fun analyze(document: BackupDocument): Analysis {
         val issues = ArrayList<Issue>()
         fun fatal(path: String, msg: String) { issues += Issue(path, msg, true) }
@@ -663,19 +694,14 @@ object LibraryBackupCodec {
         }
         fun ambiguous(table: String, id: String) = (counts[table]?.get(id) ?: 0) > 1
 
-        document.titles.forEachIndexed { i, t ->
-            see("title", t.opt("id"))?.let { titleIdx[it] = i }
-            forEachObject(t.opt("seasons")) { s ->
-                see("season", s.opt("id"))
-                forEachObject(s.opt("episodes")) { e ->
-                    see("episode", e.opt("id"))
-                    for ((key, table) in EPISODE_ROW_TABLES) forEachObject(e.opt(key)) { r -> see(table, r.opt("id")) }
-                }
+        forEachIdentity(document) { table, raw, i ->
+            val id = see(table, raw) ?: return@forEachIdentity
+            when (table) {
+                "title" -> titleIdx[id] = i
+                "viewing" -> viewingOwner[id] = i
+                "outing" -> outingIdx[id] = i
             }
-            forEachObject(t.opt("viewings")) { v -> see("viewing", v.opt("id"))?.let { viewingOwner[it] = i } }
         }
-        document.outings.forEachIndexed { i, o -> see("outing", o.opt("id"))?.let { outingIdx[it] = i } }
-        document.lists.forEach { l -> see("list", l.opt("id")) }
         var ambiguousRows = 0
         for (table in counts.values) for (n in table.values) if (n > 1) ambiguousRows += n
 

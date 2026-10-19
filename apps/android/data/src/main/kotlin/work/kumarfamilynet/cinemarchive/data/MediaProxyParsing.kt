@@ -223,6 +223,23 @@ internal fun parseSeasons(data: JSONObject, type: MediaType): List<MediaSeason> 
         .sortedWith(compareBy({ it.isSpecials }, { it.seasonNumber }))
 }
 
+/**
+ * TMDB-only series schedule from one `action=details&type=tv` payload: status, raw season list
+ * and next episode. The web app's `fetchTvSchedule`; null when the payload has no season list.
+ */
+internal fun parseTvSchedule(body: String): TvSchedule? {
+    val data = JSONObject(body)
+    val seasons = data.optJSONArray("seasons") ?: return null
+    return TvSchedule(
+        status = data.stringOrNull("status"),
+        nextEpisodeSeason = data.optJSONObject("next_episode_to_air")?.intOrNull("season_number"),
+        seasons = seasons.objects().mapNotNull { season ->
+            ScheduleSeason(season.intOrNull("season_number") ?: return@mapNotNull null,
+                season.optInt("episode_count", 0), season.stringOrNull("air_date").yearOrNull())
+        },
+    )
+}
+
 /** Maps one `action=season` payload into the episode rows for that season. Still images are
  *  resolved to a full URL here (not a bare TMDB path), matching how the web app's backfill
  *  effect stores `stillUrl` — see `apps/web/src/components/TitleDetailDrawer.tsx`. */

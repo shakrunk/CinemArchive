@@ -282,6 +282,16 @@ class AppAccountRuntime(
         }, ownerId, isCurrentOwner = { auth.observeIdentity().value == identity },
     )
 
+    private val episodeScheduleRefresher = work.kumarfamilynet.cinemarchive.data.EpisodeScheduleRefresher(
+        database, outbox,
+        object : work.kumarfamilynet.cinemarchive.data.EpisodeScheduleSource {
+            override suspend fun fetchTvSchedule(tmdbId: Int) = discoverRepository.fetchTvSchedule(tmdbId)
+            override suspend fun fetchSeason(tmdbId: Int, seasonNumber: Int) = discoverRepository.fetchScheduleSeason(tmdbId, seasonNumber)
+        },
+        work.kumarfamilynet.cinemarchive.data.DataStoreScheduleCheckStore(dataStore("cinemarchive_episode_schedule")),
+        ownerId, ::isCurrent,
+    )
+
     private val outingLifecycle = work.kumarfamilynet.cinemarchive.data.OutingLifecycleRepository(database, outbox, ownerId) {
         auth.observeIdentity().value == identity
     }
@@ -361,6 +371,8 @@ class AppAccountRuntime(
             librarySyncRepository.syncNow()
             // Must run after sync so a trip completed on another device already reflects locally.
             outingsRepository.completeDueOutings()
+            // Also after sync: queued schedule changes carry the revisions that pull just cached.
+            if (episodeScheduleRefresher.refresh() > 0) librarySyncRepository.syncNow()
         }
         scope.launch { ledgerLayoutRepository.reconcile() }
     }

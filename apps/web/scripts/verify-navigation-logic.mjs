@@ -9,7 +9,7 @@ function assert(label, actual, expected) {
   else { console.error(`  ✗ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); fail++ }
 }
 
-const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'lists', 'profile', 'friends']
+const APP_VIEWS = ['upnext', 'library', 'ledger', 'discover', 'lists', 'profile', 'friends', 'calendar']
 const PRESERVED_KEYS = ['share', 'friend']
 function parseNav(search, fallbackView) {
   const p = new URLSearchParams(search)

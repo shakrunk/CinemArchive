@@ -1,7 +1,8 @@
 // Shared TMDB re-fetch logic used by both the single-title Refresh Metadata
 // modal and the library-wide bulk refresh in Profile settings.
 
-import { fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type SearchResult } from 'src/lib/media'
+import { fetchMediaDetails, fetchSeasonDetails, TMDB_STILL_BASE, type RawTmdbEpisode, type SearchResult } from 'src/lib/media'
+import { catalogEpisodeId, catalogSeasonId } from 'src/lib/catalogRowIds'
 import { SPECIALS_SEASON_NUMBER, isSpecialsSeason } from 'src/store/episodeUtils'
 import type { Title, Season, Episode, EpisodeCrew } from 'src/store/mockData'
 
@@ -32,6 +33,39 @@ export function titleToSearchResult(t: Title): SearchResult {
 }
 
 const EP_CREW_JOBS = new Set(['Director', 'Writer', 'Teleplay', 'Story'])
+
+function episodeCrew(tmdbEp: RawTmdbEpisode): EpisodeCrew[] {
+  return (tmdbEp.crew ?? [])
+    .filter((c) => EP_CREW_JOBS.has(c.job))
+    .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
+}
+
+/** A new library episode row built from TMDB, with no watch history. */
+export function episodeFromTmdb(tmdbEp: RawTmdbEpisode, id: string): Episode {
+  const epCrew = episodeCrew(tmdbEp)
+  return {
+    id,
+    episodeNumber: tmdbEp.episode_number,
+    episodeName: tmdbEp.name || undefined,
+    airDate: tmdbEp.air_date || undefined,
+    runtime: tmdbEp.runtime || undefined,
+    synopsis: tmdbEp.overview || undefined,
+    stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
+    director: epCrew.find((c) => c.job === 'Director')?.name,
+    writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
+    crew: epCrew.length > 0 ? epCrew : undefined,
+    watchEvents: [],
+    ratings: [],
+    reviews: [],
+  }
+}
+
+/** TMDB episodes `existing` doesn't hold yet, as new rows with catalog IDs. */
+export async function newEpisodesFromTmdb(titleId: string, seasonNumber: number, existing: Episode[], tmdbEps: RawTmdbEpisode[]): Promise<Episode[]> {
+  const known = new Set(existing.map((ep) => ep.episodeNumber))
+  const missing = tmdbEps.filter((ep) => !known.has(ep.episode_number))
+  return Promise.all(missing.map(async (ep) => episodeFromTmdb(ep, await catalogEpisodeId(titleId, seasonNumber, ep.episode_number))))
+}
 
 /**
  * Re-fetch `base` from TMDB/OMDb and build the patch to apply to `title`.
@@ -90,7 +124,15 @@ export async function fetchRefreshedTitlePatch(
     const specialsShell: Season | null = tmdbHasSpecials && !storedSeasons.some(isSpecialsSeason)
       ? { id: crypto.randomUUID(), seasonNumber: SPECIALS_SEASON_NUMBER, episodeCount: 0, episodesWatched: 0, episodes: [] }
       : null
-    const seasonsToRefresh = specialsShell ? [...storedSeasons, specialsShell] : storedSeasons
+    // Seasons TMDB announced after the series was saved, likewise as shells.
+    const storedNumbers = new Set(storedSeasons.map((s) => s.seasonNumber))
+    const newSeasonShells: Season[] = await Promise.all(tmdbSeasons
+      .filter((s) => s.season_number >= 1 && s.episode_count > 0 && !storedNumbers.has(s.season_number))
+      .sort((a, b) => a.season_number - b.season_number)
+      .map(async (s) => ({ id: await catalogSeasonId(title.id, s.season_number), seasonNumber: s.season_number, episodeCount: 0, episodesWatched: 0, episodes: [] })))
+    const shells = [...newSeasonShells, ...(specialsShell ? [specialsShell] : [])]
+    const shellIds = new Set(shells.map((s) => s.id))
+    const seasonsToRefresh = [...storedSeasons, ...shells]
 
     const settled = await Promise.allSettled(
       seasonsToRefresh.map((s) =>
@@ -102,7 +144,7 @@ export async function fetchRefreshedTitlePatch(
       )
     )
 
-    const refreshedSeasons = seasonsToRefresh.map((s) => {
+    const refreshedSeasons = await Promise.all(seasonsToRefresh.map(async (s) => {
       const match = settled.find(
         (r) => r.status === 'fulfilled' && r.value.season.seasonNumber === s.seasonNumber
       )
@@ -110,37 +152,14 @@ export async function fetchRefreshedTitlePatch(
 
       const { tmdbEps, seasonCast } = match.value
       const existingEpisodes = s.episodes || []
-      let updatedEpisodes: Episode[]
-
-      if (existingEpisodes.length === 0) {
-        updatedEpisodes = tmdbEps.map((tmdbEp) => {
-          const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
-            .filter((c) => EP_CREW_JOBS.has(c.job))
-            .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
-          return {
-            id: crypto.randomUUID(),
-            episodeNumber: tmdbEp.episode_number,
-            episodeName: tmdbEp.name || undefined,
-            airDate: tmdbEp.air_date || undefined,
-            runtime: tmdbEp.runtime || undefined,
-            synopsis: tmdbEp.overview || undefined,
-            stillUrl: tmdbEp.still_path ? `${TMDB_STILL_BASE}${tmdbEp.still_path}` : undefined,
-            director: epCrew.find((c) => c.job === 'Director')?.name,
-            writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
-            crew: epCrew.length > 0 ? epCrew : undefined,
-            watchEvents: [],
-            ratings: [],
-            reviews: [],
-          }
-        })
-      } else {
-        const tmdbEpMap = new Map(tmdbEps.map((e) => [e.episode_number, e]))
-        updatedEpisodes = existingEpisodes.map((ep) => {
+      const tmdbEpMap = new Map(tmdbEps.map((e) => [e.episode_number, e]))
+      // Existing rows keep their ids and history; episodes TMDB added since
+      // (a season still airing) are appended.
+      const updatedEpisodes: Episode[] = [
+        ...existingEpisodes.map((ep) => {
           const tmdbEp = tmdbEpMap.get(ep.episodeNumber)
           if (!tmdbEp) return ep
-          const epCrew: EpisodeCrew[] = (tmdbEp.crew ?? [])
-            .filter((c) => EP_CREW_JOBS.has(c.job))
-            .map((c) => ({ tmdbPersonId: c.id, name: c.name, job: c.job }))
+          const epCrew = episodeCrew(tmdbEp)
           return {
             ...ep,
             episodeName: tmdbEp.name || ep.episodeName,
@@ -152,8 +171,9 @@ export async function fetchRefreshedTitlePatch(
             writers: epCrew.filter((c) => c.job !== 'Director').map((c) => c.name),
             crew: epCrew.length > 0 ? epCrew : ep.crew,
           }
-        })
-      }
+        }),
+        ...await newEpisodesFromTmdb(title.id, s.seasonNumber, existingEpisodes, tmdbEps),
+      ].sort((a, b) => a.episodeNumber - b.episodeNumber)
 
       return {
         ...s,
@@ -161,11 +181,10 @@ export async function fetchRefreshedTitlePatch(
         episodeCount: updatedEpisodes.length,
         cast: seasonCast && seasonCast.length > 0 ? seasonCast : s.cast,
       }
-    })
+    }))
 
-    // A Specials shell TMDB returned no episodes for is dropped, not stored empty.
-    const addedSeasons = refreshedSeasons.filter((s) => s.id === specialsShell?.id && (s.episodes?.length ?? 0) > 0)
-    const updatedSeasons = refreshedSeasons.filter((s) => s.id !== specialsShell?.id || addedSeasons.length > 0)
+    // A shell TMDB returned no episodes for is dropped, not stored empty.
+    const updatedSeasons = refreshedSeasons.filter((s) => !shellIds.has(s.id) || (s.episodes?.length ?? 0) > 0)
 
     patch.seasons = updatedSeasons
 

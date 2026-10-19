@@ -352,6 +352,16 @@ class SharedLibraryFetchTest {
         }
     }
 
+    @Test fun linkRevokedBetweenPagesRejectsTheWholeLoad() = runTest {
+        val http = ShareScript().apply {
+            reply(200, page(listOf(titleJson("a")), more = true))
+            reply(401, """{"code":"42501","message":"Invalid or expired share link"}""")
+        }
+        try { shareRepoAt(http).fetchSharedLibrary("tok-live"); fail() } catch (_: SharedLinkUnavailableException) {}
+        assertEquals(2, http.requests.size)
+        assertEquals(listOf("tok-live", "tok-live"), http.bodies.map { JSONObject(it).getString("p_token") })
+    }
+
     @Test fun continuationFailureNeverReturnsPartialLibrary() = runTest {
         val http = ShareScript().apply {
             reply(200, page(listOf(titleJson("a")), more = true))

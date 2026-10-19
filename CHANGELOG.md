@@ -13,6 +13,10 @@ number is chosen.
 
 - **Lists:** Watchlist and Currently Watching now appear on the Lists tab on web and Android as automatic lists that fill themselves from each title's status.
 
+### Fixed
+
+- Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.
+
 ## [1.36.1] - 2026-10-18
 
 ### Fixed

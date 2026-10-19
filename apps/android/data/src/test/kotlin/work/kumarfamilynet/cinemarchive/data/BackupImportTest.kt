@@ -165,6 +165,57 @@ class BackupImportTest {
         assertEquals(BackupImportFixture.id(20), retained.getJSONObject(0).getString("friendUserId"))
     }
 
+    /** Combines fixture graphs; each gets its own identity prefix so only planted repeats collide. */
+    private fun combined(vararg tmdbIds: Int): JSONObject {
+        val parts = tmdbIds.mapIndexed { index, tmdb ->
+            exactMetadataObject(metadataJson(BackupImportFixture.document(tmdb)).replace("80000000-0000-4000-8000-", "8000000$index-0000-4000-8000-"))
+        }
+        return parts.first().put("titles", JSONArray(parts.map { it.getJSONArray("titles").getJSONObject(0) }))
+            .put("outings", JSONArray(parts.map { it.getJSONArray("outings").getJSONObject(0) }))
+    }
+    private fun JSONObject.title(index: Int) = getJSONArray("titles").getJSONObject(index)
+    private fun JSONObject.firstEpisode() = getJSONArray("seasons").getJSONObject(0).getJSONArray("episodes").getJSONObject(0)
+    private suspend fun assertRefusedBeforeSaving(document: JSONObject, table: String) {
+        val failure = runCatching { prepare(document) }.exceptionOrNull()
+        assertTrue(failure?.message.orEmpty(), failure?.message.orEmpty().contains("Duplicate $table identity"))
+        assertEquals(0, db.titleDao().count()); assertTrue(db.outboxDao().getPending().isEmpty())
+    }
+
+    @Test fun cleanCombinedGraphsAllPreview() = runBlocking {
+        assertEquals(3, prepare(combined(42, 43, 44)).titleCount)
+    }
+
+    @Test fun repeatedNestedWatchIdentityRefusesTheWholeFile() = runBlocking {
+        val document = combined(42, 43, 44)
+        val watches = document.title(2).firstEpisode().getJSONArray("watchEvents")
+        watches.put(exactMetadataObject(metadataJson(watches.getJSONObject(0))))
+        assertRefusedBeforeSaving(document, "episode watch")
+    }
+
+    @Test fun viewingIdentitySharedAcrossTitlesRefusesTheWholeFile() = runBlocking {
+        val document = combined(42, 43)
+        document.title(1).getJSONArray("viewings").getJSONObject(0).put("id", document.title(0).getJSONArray("viewings").getJSONObject(0).getString("id"))
+        assertRefusedBeforeSaving(document, "viewing")
+    }
+
+    @Test fun repeatedIdentityInAnExistingTitleStillRefusesTheFile() = runBlocking {
+        val source = source(); source.admit(source.prepareImport { metadataJson(BackupImportFixture.document(42)).byteInputStream() })
+        val existing = db.titleDao().count(); assertEquals(1, existing)
+        val document = combined(42, 43)
+        val episode = document.title(0).firstEpisode()
+        episode.getJSONArray("ratings").put(exactMetadataObject(metadataJson(episode.getJSONArray("ratings").getJSONObject(0))))
+        val failure = runCatching { prepare(document) }.exceptionOrNull()
+        assertTrue(failure?.message.orEmpty().contains("Duplicate episode rating identity"))
+        assertEquals(existing, db.titleDao().count())
+    }
+
+    @Test fun repeatedListIdentitiesDoNotBlockTitlesBecauseListsAreNotImported() = runBlocking {
+        val list = JSONObject().put("id", "list").put("name", "List").put("createdAt", BackupImportFixture.at)
+            .put("updatedAt", BackupImportFixture.at).put("items", JSONArray())
+        val document = BackupImportFixture.document().put("lists", JSONArray().put(list).put(exactMetadataObject(metadataJson(list))))
+        assertEquals(1, prepare(document).titleCount)
+    }
+
     @Test fun malformedGraphNeverAdmitsPartialHistoryOrRoundedValues() = runBlocking {
         val bad = BackupImportFixture.document()
         bad.getJSONArray("titles").getJSONObject(0).getJSONArray("viewings").getJSONObject(0).put("rating", 4.55)

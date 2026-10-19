@@ -45,6 +45,8 @@ fun LibraryRestoreSection(source: LibraryRestoreSource): Unit = key(source) {
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) run {
+            // A refused file must not leave an earlier file's preview ready to save.
+            preview = null
             val prepared = source.prepareImport { context.contentResolver.openInputStream(uri) ?: error("Could not open this file.") }
             if (source.isCurrent()) { preview = prepared; message = null }
         }

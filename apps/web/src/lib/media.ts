@@ -496,6 +496,34 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
   return { result, tmdbSeasons: data.seasons ?? [] }
 }
 
+export interface TvSchedule {
+  /** TMDB series status, e.g. "Returning Series", "Ended", "Canceled". */
+  status?: string
+  /** Season of TMDB's next_episode_to_air, when one is announced. */
+  nextEpisodeSeason?: number
+  seasons: RawTmdbSeason[]
+}
+
+/**
+ * TMDB-only series schedule: season list, status and next episode. Reads the
+ * same `details` proxy action (and so the same server cache entry) as
+ * fetchMediaDetails, without its OMDb ratings/accolades calls — cheap enough
+ * for the background episode-schedule refresh. Null when unavailable.
+ */
+export async function fetchTvSchedule(tmdbId: number): Promise<TvSchedule | null> {
+  if (!(isSupabaseConfigured && supabase)) return null
+
+  const { data, error } = await supabase.functions.invoke(`media-proxy?action=details&id=${tmdbId}&type=tv`)
+  if (error) throw error
+  if (!data || !Array.isArray(data.seasons)) return null
+  const nextSeason = data.next_episode_to_air?.season_number
+  return {
+    status: typeof data.status === 'string' ? data.status : undefined,
+    nextEpisodeSeason: typeof nextSeason === 'number' ? nextSeason : undefined,
+    seasons: data.seasons as RawTmdbSeason[],
+  }
+}
+
 /**
  * Fetch episode-level details and season cast for one season from TMDB.
  * Returns empty arrays when Supabase isn't configured or the call fails.

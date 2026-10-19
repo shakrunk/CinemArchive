@@ -8,6 +8,7 @@ import { ProfileModal } from 'src/components/ProfileModal'
 import { parseNav, type AppView } from 'src/lib/navigation'
 import { useNavigationSync } from 'src/lib/useNavigationSync'
 import { useOutingReconciler } from 'src/lib/useOutingReconciler'
+import { useEpisodeScheduleRefresh } from 'src/lib/useEpisodeScheduleRefresh'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
 import { NotificationStack } from 'src/components/NotificationStack'
@@ -82,6 +83,7 @@ export default function App() {
 
   useNavigationSync({ currentView, setCurrentView })
   useOutingReconciler()
+  useEpisodeScheduleRefresh()
   useSmoothScroll()
   useTabVisibility()
 

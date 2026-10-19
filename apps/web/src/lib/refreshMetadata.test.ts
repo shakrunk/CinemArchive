@@ -48,4 +48,15 @@ describe('fetchRefreshedTitlePatch', () => {
 
     expect(patch.seasons).toBeUndefined()
   })
+
+  it('appends episodes and seasons TMDB listed since the series was saved, keeping history', async () => {
+    const watchedEp = { id: 'e1', episodeNumber: 1, airDate: '2017-12-01', watchEvents: [{ id: 'w1' }], ratings: [], reviews: [] }
+    const saved: Title = { ...series, seasons: [{ id: 's1', seasonNumber: 1, episodeCount: 1, episodesWatched: 1, episodes: [watchedEp] }] }
+
+    const patch = await fetchRefreshedTitlePatch(saved, titleToSearchResult(saved))
+
+    expect(patch.seasons?.map((s) => [s.seasonNumber, s.episodes?.map((ep) => ep.episodeNumber)])).toEqual([[1, [1, 2, 3]], [2, [1, 2]]])
+    expect(patch.seasons?.[0].episodes?.[0]).toMatchObject({ id: 'e1', watchEvents: [{ id: 'w1' }] })
+    expect(patch.seasons?.[0].episodeCount).toBe(3)
+  })
 })

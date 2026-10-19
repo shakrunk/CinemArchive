@@ -12,10 +12,12 @@ number is chosen.
 ### Added
 
 - **Web:** A Calendar view, opened from Up Next or the command palette, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
+- **Web:** Upcoming episodes of the series you track now stay current on their own. When the app opens, it checks each series that isn't dropped, at most once a day. Newly announced seasons, newly listed episodes and moved air dates appear without a manual metadata refresh. The check never changes your watch history.
 
 ### Fixed
 
 - Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.
+- **Web:** Refresh Metadata now adds seasons and episodes announced after a series was added to your library. Before, it only updated the episodes already saved.
 
 ## [1.37.0] - 2026-10-18
 

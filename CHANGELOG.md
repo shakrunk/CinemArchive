@@ -13,6 +13,7 @@ number is chosen.
 
 - **Web:** Upcoming episodes of the series you track now stay current on their own. When the app opens, it checks each series that isn't dropped, at most once a day. Newly announced seasons, newly listed episodes and moved air dates appear without a manual metadata refresh. The check never changes your watch history.
 - **Android:** Upcoming episodes of the series you track now stay current on their own. When the app opens, it checks each series that isn't dropped, at most once a day. Newly announced seasons, newly listed episodes and moved air dates appear without a manual metadata refresh. The check never changes your watch history.
+- **Android:** A Calendar, opened from the Up Next header, the command palette or a `?view=calendar` link, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
 
 ### Fixed
 

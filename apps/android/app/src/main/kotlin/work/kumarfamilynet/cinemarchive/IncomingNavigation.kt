@@ -12,7 +12,7 @@ internal data class IncomingNavigation(
     val add: Boolean,
 ) {
     companion object {
-        private val views = setOf("discover", "library", "upnext", "ledger", "lists", "profile", "friends")
+        private val views = setOf("discover", "library", "upnext", "ledger", "lists", "profile", "friends", "calendar")
 
         fun parse(input: String): IncomingNavigation? = runCatching {
             val uri = URI(input)

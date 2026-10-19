@@ -37,6 +37,10 @@ import work.kumarfamilynet.cinemarchive.core.database.ViewingDao
 import work.kumarfamilynet.cinemarchive.core.database.ViewingEntity
 import work.kumarfamilynet.cinemarchive.core.model.AddTitleRequest
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
+import work.kumarfamilynet.cinemarchive.core.model.CalendarEpisode
+import work.kumarfamilynet.cinemarchive.core.model.CalendarSeason
+import work.kumarfamilynet.cinemarchive.core.model.CalendarTitle
+import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
@@ -71,6 +75,9 @@ private data class EpisodeAggregate(
     val ratings: List<EpisodeRatingEntity>,
     val reviews: List<EpisodeReviewEntity>,
 )
+
+/** See [LibraryRepository.observeCalendar]. */
+data class CalendarSources(val titles: List<CalendarTitle>, val outings: List<CinemaOuting>)
 
 private data class UpNextCoreSources(
     val titles: List<TitleEntity>,
@@ -487,6 +494,42 @@ class LibraryRepository(
             )
         }
         UpNextBoard(watching, watchlist, onTheMarquee, freshFromTheLobby, onThisDay)
+    }
+
+    /** Raw inputs for the Calendar view (issue #340): every title with its locally synced
+     *  seasons/episodes, plus every outing. The event derivation itself is the pure
+     *  [work.kumarfamilynet.cinemarchive.core.model.computeCalendarEvents], run by the screen so
+     *  its "today" can roll over at midnight. Episodes join their season by `seasonId`, never by
+     *  DAO order (which sorts by the season's UUID). This repository is owner-only, so outings
+     *  are always the signed-in owner's own. */
+    fun observeCalendar(): Flow<CalendarSources> = combine(
+        titleDao.observeAllTitles(),
+        seasonDao.observeAllSeasons(),
+        episodeDao.observeAllEpisodes(),
+        cinemaOutingDao.observeAllOutings(),
+    ) { titles, seasons, episodes, outingRows ->
+        val episodesBySeason = episodes.groupBy { it.seasonId }
+        val seasonsByTitle = seasons.groupBy { it.titleId }
+        CalendarSources(
+            titles = titles.map { row ->
+                CalendarTitle(
+                    id = row.id,
+                    name = row.title,
+                    posterUrl = row.posterUrl,
+                    type = MediaType.valueOf(row.type),
+                    status = LibraryStatus.valueOf(row.status),
+                    releaseDate = row.releaseDate,
+                    seasons = seasonsByTitle[row.id].orEmpty().sortedBy { it.seasonNumber }.map { season ->
+                        CalendarSeason(
+                            season.seasonNumber,
+                            episodesBySeason[season.id].orEmpty().sortedBy { it.episodeNumber }
+                                .map { CalendarEpisode(it.episodeNumber, it.airDate, it.episodeName) },
+                        )
+                    },
+                )
+            },
+            outings = outingRows.map { it.toDomain() },
+        )
     }
 
     /** Marks the next unwatched episode of [titleId] as watched (season/episode order, main

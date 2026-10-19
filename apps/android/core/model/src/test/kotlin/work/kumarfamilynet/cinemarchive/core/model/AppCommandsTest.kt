@@ -31,7 +31,8 @@ class AppCommandsTest {
     @Test fun everyOwnerActionHasStableIdentityIncludingHiddenNavigationAndTickets() {
         val commands = ownerCommands(emptyList())
         assertEquals(commands.size, commands.map { it.id }.toSet().size)
-        assertTrue(commands.map { it.id }.containsAll(listOf("add", "tickets", "marquee", "profile", "friends", "grid", "list", "discover", "library", "ledger", "upnext", "lists")))
+        assertTrue(commands.map { it.id }.containsAll(listOf("add", "tickets", "marquee", "profile", "friends", "grid", "list", "discover", "library", "ledger", "upnext", "calendar", "lists")))
+        assertEquals("calendar", rankCommands(commands, "calendar").first().id)
         assertEquals("tickets", rankCommands(commands, "I've got tickets").first().id)
     }
 }

@@ -9,9 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-10-18
+
 ### Added
 
 - **Lists:** Watchlist and Currently Watching now appear on the Lists tab on web and Android as automatic lists that fill themselves from each title's status.
+
+### Changed
+
+- **Web:** Library search filters faster on large libraries by caching a flattened search string per title.
 
 ## [1.36.1] - 2026-10-18
 

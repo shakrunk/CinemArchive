@@ -137,6 +137,15 @@ class CalendarTest {
         assertEquals(1, computeCalendarEvents(listOf(airing), emptyList(), localToday, la).size)
     }
 
+    @Test fun ignoresPartialDatesThatWouldSortAfterToday() {
+        val titles = listOf(
+            movie("year", releaseDate = "2027"),
+            movie("blank", releaseDate = ""),
+            show("tv", status = LibraryStatus.WATCHLIST, releaseDate = "2027-01", seasons = listOf(season(1, episode(1, "2027")))),
+        )
+        assertTrue(computeCalendarEvents(titles, emptyList(), today, la).isEmpty())
+    }
+
     @Test fun groupsConsecutiveEventsByDate() {
         val titles = listOf(
             movie("a", "A", releaseDate = "2026-11-01"),

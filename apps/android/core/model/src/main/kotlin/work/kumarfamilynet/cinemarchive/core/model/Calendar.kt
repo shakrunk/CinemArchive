@@ -61,6 +61,12 @@ data class CalendarDay(val date: String, val events: List<CalendarEvent>)
 fun localTodayYmd(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String =
     now.atZone(zone).toLocalDate().toString()
 
+// Only full calendar days take part: a partial date such as a year-only "2027" would otherwise
+// sort after today as a string and then fail to parse as a day.
+private val Ymd = Regex("""\d{4}-\d{2}-\d{2}""")
+
+private fun String?.calendarDay(): String? = this?.takeIf { Ymd.matches(it) }
+
 private fun CalendarEvent.kindOrder(): Int = when (this) {
     is CalendarEvent.Outing -> 0
     is CalendarEvent.Premiere -> 1
@@ -92,7 +98,7 @@ fun computeCalendarEvents(
 
     for (title in titles) {
         if (title.type == MediaType.MOVIE) {
-            val date = title.releaseDate
+            val date = title.releaseDate.calendarDay()
             if (title.status == LibraryStatus.WATCHLIST && date != null && date >= today) {
                 events += CalendarEvent.Release("release:${title.id}", date, title)
             }
@@ -105,7 +111,7 @@ fun computeCalendarEvents(
             // LinkedHashMap keeps first-seen order, like the web Map; the final sort fixes it anyway.
             val byDay = linkedMapOf<String, MutableList<CalendarEpisode>>()
             for (episode in season.episodes) {
-                val airDate = episode.airDate ?: continue
+                val airDate = episode.airDate.calendarDay() ?: continue
                 if (airDate < today) continue
                 byDay.getOrPut(airDate) { mutableListOf() } += episode
             }
@@ -123,7 +129,7 @@ fun computeCalendarEvents(
             }
         }
 
-        val premiere = title.releaseDate
+        val premiere = title.releaseDate.calendarDay()
         if (title.status == LibraryStatus.WATCHLIST && premiere != null && premiere >= today && premiere !in episodeDays) {
             events += CalendarEvent.Premiere("premiere:${title.id}", premiere, title)
         }

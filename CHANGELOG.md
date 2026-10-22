@@ -9,10 +9,6 @@ number is chosen.
 
 ## [Unreleased]
 
-### Fixed
-
-- **Web:** Up Next and the upcoming list now judge whether an episode has aired by your local date instead of UTC, so tomorrow's episode no longer shows a Mark as watched button in the evening.
-
 ## [1.38.0] - 2026-10-18
 
 ### Added
@@ -28,6 +24,7 @@ number is chosen.
 
 ### Fixed
 
+- **Web:** Up Next and the upcoming list now judge whether an episode has aired by your local date instead of UTC, so tomorrow's episode no longer shows a Mark as watched button in the evening.
 - Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.
 - **Web:** Refresh Metadata now adds seasons and episodes announced after a series was added to your library. Before, it only updated the episodes already saved.
 - **Android:** Refresh metadata now adds seasons and episodes announced after a series was added to your library. Before, it only filled seasons that had no episodes saved yet.

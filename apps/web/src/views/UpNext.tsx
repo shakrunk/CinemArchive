@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { TicketButton } from '../components/TicketViewer'
-import { nextUnwatchedEpisode } from 'src/store/episodeUtils'
+import { isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
@@ -132,8 +132,7 @@ function LiveCard({
 
   const { title, season, episode, watchedCount, totalCount } = entry
   const epName = episode.episodeName ?? `Episode ${episode.episodeNumber}`
-  const today = new Date().toISOString().slice(0, 10)
-  const hasNotAired = !!episode.airDate && episode.airDate > today
+  const hasNotAired = isUnaired(episode)
 
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)
   const [showNoirModal, setShowNoirModal] = useState(false)

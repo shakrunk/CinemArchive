@@ -17,6 +17,7 @@ import type { TicketCapture } from '../lib/tickets/types'
 import { createCommand } from '../lib/offline/commands'
 import { createLibraryActions, type LibraryWrite } from './libraryActions'
 import { computeUpNextShows, computeUpcomingTitles, type UpNextEntry, type UpcomingEntry } from './upNext'
+import { localTodayYmd } from './episodeUtils'
 import type { OutingSchedulePrefill } from './outings'
 import type { User } from '@supabase/supabase-js'
 import { isDevMockUser } from '../lib/devAuth'
@@ -1443,7 +1444,7 @@ export const useUpcomingTitles = (): UpcomingEntry[] => {
   const titles = useAppStore((s) => s.titles)
   const outings = useAppStore((s) => s.outings)
   return useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localTodayYmd()
     return computeUpcomingTitles(titles, today, outings)
   }, [titles, outings])
 }

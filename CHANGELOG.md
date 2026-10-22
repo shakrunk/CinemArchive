@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Web:** Up Next and the upcoming list now judge whether an episode has aired by your local date instead of UTC, so tomorrow's episode no longer shows a Mark as watched button in the evening.
+
 ### Added
 
 - **Lists:** Watchlist and Currently Watching now appear on the Lists tab on web and Android as automatic lists that fill themselves from each title's status.

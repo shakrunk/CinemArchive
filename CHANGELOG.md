@@ -12,10 +12,34 @@ number is chosen.
 ### Fixed
 
 - **Web:** Up Next and the upcoming list now judge whether an episode has aired by your local date instead of UTC, so tomorrow's episode no longer shows a Mark as watched button in the evening.
+## [1.38.0] - 2026-10-18
+
+### Added
+
+- **Web:** A Calendar view, opened from Up Next or the command palette, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
+- **Web:** Upcoming episodes of the series you track now stay current on their own. When the app opens, it checks each series that isn't dropped, at most once a day. Newly announced seasons, newly listed episodes and moved air dates appear without a manual metadata refresh. The check never changes your watch history.
+- **Android:** Upcoming episodes of the series you track now stay current on their own. When the app opens, it checks each series that isn't dropped, at most once a day. Newly announced seasons, newly listed episodes and moved air dates appear without a manual metadata refresh. The check never changes your watch history.
+- **Android:** A Calendar, opened from the Up Next header, the command palette or a `?view=calendar` link, shows upcoming episode airings for your series, release days for watchlist movies and series premieres, and your scheduled cinema outings in a month grid with a day-by-day agenda.
+
+### Changed
+
+- **Android:** Refreshing episode details no longer makes the next sync download the whole library again; only the changes it held back are fetched again.
+
+### Fixed
+
+- Android JSON restore now refuses a file with repeated record identities before previewing or saving any title, matching web import.
+- **Web:** Refresh Metadata now adds seasons and episodes announced after a series was added to your library. Before, it only updated the episodes already saved.
+- **Android:** Refresh metadata now adds seasons and episodes announced after a series was added to your library. Before, it only filled seasons that had no episodes saved yet.
+
+## [1.37.0] - 2026-10-18
 
 ### Added
 
 - **Lists:** Watchlist and Currently Watching now appear on the Lists tab on web and Android as automatic lists that fill themselves from each title's status.
+
+### Changed
+
+- **Web:** Library search filters faster on large libraries by caching a flattened search string per title.
 
 ## [1.36.1] - 2026-10-18
 

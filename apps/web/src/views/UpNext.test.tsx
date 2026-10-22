@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 it('renders an anniversary as content and opens its title with the linked viewing details', () => {
-  render(<UpNext onBrowseLibrary={vi.fn()} />)
+  render(<UpNext onBrowseLibrary={vi.fn()} onOpenCalendar={vi.fn()} />)
   expect(screen.getByRole('heading', { name: 'On this day' })).toBeInTheDocument()
   expect(screen.getByText('1 year ago today')).toBeInTheDocument()
   expect(screen.getByText('Private cinema')).toBeInTheDocument()
@@ -48,7 +48,7 @@ it.each(['shared-link', 'friend'] as const)('never displays owner-only memories 
     ? { kind, userId: 'friend', displayName: 'Friend' }
     : { kind, token: 'shared-token' },
   })
-  render(<UpNext onBrowseLibrary={vi.fn()} />)
+  render(<UpNext onBrowseLibrary={vi.fn()} onOpenCalendar={vi.fn()} />)
   expect(screen.queryByRole('heading', { name: 'On this day' })).not.toBeInTheDocument()
   expect(screen.queryByText('Private cinema')).not.toBeInTheDocument()
   expect(screen.queryByText('With Sam')).not.toBeInTheDocument()
@@ -57,7 +57,7 @@ it.each(['shared-link', 'friend'] as const)('never displays owner-only memories 
 
 it('removes yesterday’s memories when the existing clock tick crosses local midnight', () => {
   vi.setSystemTime(new Date(2026, 9, 8, 23, 59, 30))
-  render(<UpNext onBrowseLibrary={vi.fn()} />)
+  render(<UpNext onBrowseLibrary={vi.fn()} onOpenCalendar={vi.fn()} />)
   expect(screen.getByText('1 year ago today')).toBeInTheDocument()
   act(() => { vi.advanceTimersByTime(60_000) })
   expect(screen.queryByText('1 year ago today')).not.toBeInTheDocument()
@@ -67,7 +67,7 @@ it.each([undefined, '2026-10-08', '2026-09-01'])('offers scheduling for interest
   const schedule = vi.fn()
   useAppStore.setState({ user: { id: 'owner' } as User, titles: [{ ...title, status: 'watchlist', releaseDate }], outings: [],
     theaterInterest: [{ id: title.id, titleId: title.id, userId: 'owner', createdAt: '2026-10-08', updatedAt: '2026-10-08' }], openOutingSchedule: schedule })
-  render(<UpNext onBrowseLibrary={vi.fn()} />)
+  render(<UpNext onBrowseLibrary={vi.fn()} onOpenCalendar={vi.fn()} />)
   expect(screen.getByText('Now playing — tap to schedule an outing')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Open Anniversary film' }))
   expect(schedule).toHaveBeenCalledWith(title.id)
@@ -76,7 +76,7 @@ it.each([undefined, '2026-10-08', '2026-09-01'])('offers scheduling for interest
 it('retains future release labels, suppresses booked duplicates and never reveals stale private interest in friend views', () => {
   useAppStore.setState({ user: { id: 'owner' } as User, titles: [{ ...title, status: 'watchlist', releaseDate: '2099-01-01' }], outings: [],
     theaterInterest: [{ id: title.id, titleId: title.id, userId: 'owner', createdAt: '2026-10-08', updatedAt: '2026-10-08' }] })
-  const view = render(<UpNext onBrowseLibrary={vi.fn()} />)
+  const view = render(<UpNext onBrowseLibrary={vi.fn()} onOpenCalendar={vi.fn()} />)
   expect(screen.getByText('Releases January 1, 2099')).toBeInTheDocument()
   expect(screen.queryByText('Now playing — tap to schedule an outing')).not.toBeInTheDocument()
   act(() => useAppStore.setState({ titles: [{ ...title, status: 'watchlist', releaseDate: undefined }], viewerContext: { kind: 'friend', userId: 'friend', displayName: 'Friend' } }))

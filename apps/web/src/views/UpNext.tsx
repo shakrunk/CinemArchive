@@ -8,6 +8,7 @@ import {
   Bookmark,
   Ticket,
   CalendarPlus,
+  CalendarDays,
   MoreVertical,
   Clapperboard,
   Star,
@@ -566,7 +567,7 @@ function OutingMemoryCard({ entry, delayMs }: { entry: OutingMemory; delayMs?: n
   )
 }
 
-export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
+export function UpNext({ onBrowseLibrary, onOpenCalendar }: { onBrowseLibrary: () => void; onOpenCalendar: () => void }) {
   const shows = useUpNextShows()
   const upcoming = useUpcomingTitles()
   const [finished, setFinished] = useState<FinishedCard[]>([])
@@ -637,11 +638,21 @@ export function UpNext({ onBrowseLibrary }: { onBrowseLibrary: () => void }) {
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
-      <header className="mb-6">
-        <p className="kicker">
-          <span className="dot" /> continue watching
-        </p>
-        <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">Up Next</h1>
+      <header className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <p className="kicker">
+            <span className="dot" /> continue watching
+          </p>
+          <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">Up Next</h1>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenCalendar}
+          className="mb-2 shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs text-amber/85 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
+          style={{ border: '1px solid var(--line)' }}
+        >
+          <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" /> Calendar
+        </button>
       </header>
       {isEmpty ? (
         <UpNextEmptyState onBrowseLibrary={onBrowseLibrary} />

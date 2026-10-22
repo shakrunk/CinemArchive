@@ -19,7 +19,7 @@ class IncomingNavigationTest {
     }
 
     @Test fun `all web views are accepted and invalid view keeps current destination`() {
-        listOf("discover", "library", "upnext", "ledger", "lists", "profile", "friends").forEach {
+        listOf("discover", "library", "upnext", "ledger", "lists", "profile", "friends", "calendar").forEach {
             assertEquals(it, IncomingNavigation.parse("${origin}?view=$it")!!.view)
         }
         assertEquals(IncomingNavigation(null, null, null, false),

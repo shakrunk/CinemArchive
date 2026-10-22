@@ -33,6 +33,8 @@ export function AppCommandPalette({ onNavigate }: AppCommandPaletteProps) {
     }
     list.push({ id: 'action:view-upnext', kind: 'action', label: 'Go to Up Next', hint: 'view', keywords: 'continue watching' })
     map['action:view-upnext'] = () => onNavigate('upnext')
+    list.push({ id: 'action:view-calendar', kind: 'action', label: 'Go to Calendar', hint: 'view', keywords: 'upcoming schedule episodes air dates releases premieres' })
+    map['action:view-calendar'] = () => onNavigate('calendar')
     if (!isSharedView) {
       list.push({ id: 'action:tickets', kind: 'action', label: "I've got tickets…", hint: 'schedule', keywords: 'cinema outing movie showtime theater venue' })
       map['action:tickets'] = () => openOutingSchedule()

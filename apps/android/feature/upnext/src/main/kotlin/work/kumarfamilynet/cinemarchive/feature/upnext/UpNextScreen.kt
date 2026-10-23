@@ -97,6 +97,7 @@ import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 
 class UpNextViewModel(
     private val repository: LibraryRepository,
@@ -277,7 +278,7 @@ fun UpNextScreen(
     ) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp),
+            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.fillMaxSize(),
         ) {

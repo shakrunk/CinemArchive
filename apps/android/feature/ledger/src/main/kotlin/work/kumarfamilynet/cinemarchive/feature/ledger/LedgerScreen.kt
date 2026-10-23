@@ -101,6 +101,7 @@ import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
 import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 
 private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
     LedgerWidgetId.RUNTIMES to "Feature Lengths",
@@ -276,7 +277,7 @@ fun LedgerScreen(
 
         if (uiState == null || layout == null) {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(bottom = LocalBottomBarClearance.current),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -354,7 +355,7 @@ private fun LedgerBoardContent(
     val (stats, boards) = uiState
     val isGrid = isWideLayout
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBottomBarClearance.current),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier,
     ) {
@@ -686,7 +687,7 @@ private fun LedgerEditModeContent(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBottomBarClearance.current),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
     ) {

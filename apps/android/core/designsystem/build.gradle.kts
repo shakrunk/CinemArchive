@@ -27,6 +27,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.graphics.shapes)
+    implementation(libs.haze)
     implementation(libs.coil.compose)
     implementation(libs.zxing.core)
     debugImplementation(libs.androidx.compose.ui.tooling)

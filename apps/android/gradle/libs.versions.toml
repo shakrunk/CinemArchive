@@ -23,6 +23,9 @@ security-crypto = "1.1.0"
 camerax = "1.4.1"
 mlkit-barcode = "17.3.0"
 graphics-shapes = "1.1.0"
+# 1.7.2 is the newest Haze built against Kotlin 2.2 and Compose <= 1.10; 2.x needs Kotlin 2.4
+# and Compose 1.12, ahead of this catalog's kotlin and compose-bom.
+haze = "1.7.2"
 zxing-core = "3.5.3"
 
 [libraries]
@@ -63,6 +66,7 @@ androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", versi
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode" }
 androidx-graphics-shapes = { module = "androidx.graphics:graphics-shapes", version.ref = "graphics-shapes" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing-core" }
 
 [plugins]

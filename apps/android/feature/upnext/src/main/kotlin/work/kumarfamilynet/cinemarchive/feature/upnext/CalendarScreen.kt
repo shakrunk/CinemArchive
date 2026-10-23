@@ -70,6 +70,7 @@ import work.kumarfamilynet.cinemarchive.core.model.localTodayYmd
 import work.kumarfamilynet.cinemarchive.core.model.monthGrid
 import work.kumarfamilynet.cinemarchive.data.CalendarSources
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 
 private val Weekdays = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
@@ -132,7 +133,7 @@ fun CalendarScreen(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp),
+        contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
         modifier = Modifier.fillMaxSize(),
     ) {
         item {

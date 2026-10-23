@@ -62,6 +62,7 @@ import work.kumarfamilynet.cinemarchive.core.model.TitleList
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 
 class ListsViewModel(
     private val listsRepository: ListsRepository,
@@ -200,7 +201,7 @@ private fun ListsGridScreen(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp),
+        contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -409,7 +410,7 @@ private fun ListDetailScreen(
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 100.dp),
+                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 100.dp + LocalBottomBarClearance.current),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),

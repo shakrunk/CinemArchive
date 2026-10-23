@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -94,6 +95,7 @@ fun AppearanceRoute(
     val palette by preferencesRepository.observePalette().collectAsStateWithLifecycle(initialValue = ArchivePalette.BRAND)
     val fontFamily by preferencesRepository.observeFontFamily().collectAsStateWithLifecycle(initialValue = ArchiveFontFamily.DEFAULT)
     val fontScale by preferencesRepository.observeFontScale().collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
+    val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
     val scope = rememberCoroutineScope()
 
     AppearanceScreen(
@@ -101,10 +103,12 @@ fun AppearanceRoute(
         palette = palette,
         fontFamily = fontFamily,
         fontScale = fontScale,
+        glassBlur = glassBlur,
         onSetThemeMode = { mode -> scope.launch { preferencesRepository.setThemeMode(mode) } },
         onSetPalette = { p -> scope.launch { preferencesRepository.setPalette(p) } },
         onSetFontFamily = { f -> scope.launch { preferencesRepository.setFontFamily(f) } },
         onSetFontScale = { s -> scope.launch { preferencesRepository.setFontScale(s) } },
+        onSetGlassBlur = { enabled -> scope.launch { preferencesRepository.setGlassBlur(enabled) } },
         onBack = onBack,
         showBack = showBack,
     )
@@ -116,10 +120,12 @@ private fun AppearanceScreen(
     palette: ArchivePalette,
     fontFamily: ArchiveFontFamily,
     fontScale: ArchiveFontScale,
+    glassBlur: Boolean,
     onSetThemeMode: (ArchiveThemeMode) -> Unit,
     onSetPalette: (ArchivePalette) -> Unit,
     onSetFontFamily: (ArchiveFontFamily) -> Unit,
     onSetFontScale: (ArchiveFontScale) -> Unit,
+    onSetGlassBlur: (Boolean) -> Unit,
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -181,6 +187,15 @@ private fun AppearanceScreen(
                             isLast = index == PALETTE_SWATCHES.lastIndex,
                         ),
                         onClick = { onSetPalette(swatch.palette) },
+                    )
+                }
+            }
+            item {
+                ReadingWidthColumn {
+                    GlassBlurCard(
+                        enabled = glassBlur,
+                        onToggle = onSetGlassBlur,
+                        modifier = Modifier.padding(top = 18.dp),
                     )
                 }
             }
@@ -335,6 +350,38 @@ private fun TextPreview(fontFamily: ArchiveFontFamily, fontScale: ArchiveFontSca
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * Whether the bottom navigation bar is glass, blurring the posters that scroll on beneath it, or
+ * the solid bar it used to be. The whole row toggles, not just the switch, as a settings row does.
+ */
+@Composable
+private fun GlassBlurCard(enabled: Boolean, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        checked = enabled,
+        onCheckedChange = onToggle,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(16.dp, 14.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text("Blur behind navigation", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "The navigation bar softly shows what scrolls beneath it",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Null handler: the Surface owns the toggle, so the switch only shows its state and
+            // a screen reader hears one control rather than a row and a switch.
+            Switch(checked = enabled, onCheckedChange = null)
         }
     }
 }

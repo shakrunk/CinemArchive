@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -67,10 +68,15 @@ fun <T> MorphingBottomNav(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
+    // Over a [LocalGlassBackdrop] the bar is glass, blurring the content that scrolls on beneath
+    // it; without one it stays the solid surface it has always been.
+    val backdrop = LocalGlassBackdrop.current
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = if (backdrop != null) Color.Transparent else MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .glassFill(backdrop, color = MaterialTheme.colorScheme.surface, background = MaterialTheme.colorScheme.background),
     ) {
         BoxWithConstraints(
             modifier = Modifier

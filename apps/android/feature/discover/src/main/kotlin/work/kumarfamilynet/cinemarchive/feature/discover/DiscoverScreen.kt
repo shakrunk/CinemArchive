@@ -72,6 +72,7 @@ import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.CatalogLookup
 import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 
 private class DiscoverViewModelFactory(
     private val repository: DiscoverRepository,
@@ -269,7 +270,7 @@ fun DiscoverScreen(
                 Button(onClick = onRetry) { Text("Retry") }
             }
             mode != DiscoverMode.TITLES && selectedLookup == null -> LazyColumn(
-                modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+                modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp + LocalBottomBarClearance.current),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (lookups.isEmpty()) item {
@@ -309,7 +310,7 @@ fun DiscoverScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
                         state = gridState,
-                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier

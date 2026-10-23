@@ -89,6 +89,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import work.kumarfamilynet.cinemarchive.core.designsystem.GlassBackdrop
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalGlassBackdrop
+import work.kumarfamilynet.cinemarchive.core.designsystem.glassBackdropSource
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberGlassBackdrop
 import work.kumarfamilynet.cinemarchive.core.designsystem.noirVisualEffect
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePillFab
 import work.kumarfamilynet.cinemarchive.core.designsystem.MediumWindowBreakpoint
@@ -541,6 +550,7 @@ private fun CinemArchiveApp(
     // flash once, on cold start.
     val libraryViewMode by preferencesRepository.observeLibraryViewMode()
         .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
+    val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
     val navigationFlow = remember(preferencesRepository) { preferencesRepository.observeNavigation() }
     val navigationPreferences by navigationFlow.collectAsStateWithLifecycle(
         initialValue = work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences())
@@ -817,9 +827,23 @@ private fun CinemArchiveApp(
             } + NavDestination<Tab?>(null, "Search", Icons.Outlined.Search)
 
             @Composable
-            fun TabScaffoldContent(innerPadding: PaddingValues) {
+            fun TabScaffoldContent(innerPadding: PaddingValues, glassBackdrop: GlassBackdrop? = null) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.padding(innerPadding)) {
+                    // The tabs run on under the bottom nav rather than stopping at its top edge, so a
+                    // glass nav has something to blur; each tab's scrolling list ends with
+                    // LocalBottomBarClearance of padding so its last row still scrolls clear of the bar.
+                    // Beside a rail there is no bottom bar, so the clearance is zero.
+                    val layoutDirection = LocalLayoutDirection.current
+                    Box(
+                        modifier = Modifier
+                            .padding(
+                                start = innerPadding.calculateStartPadding(layoutDirection),
+                                top = innerPadding.calculateTopPadding(),
+                                end = innerPadding.calculateEndPadding(layoutDirection),
+                            )
+                            .then(if (glassBackdrop != null) Modifier.glassBackdropSource(glassBackdrop) else Modifier),
+                    ) {
+                    CompositionLocalProvider(LocalBottomBarClearance provides innerPadding.calculateBottomPadding()) {
                         when (tab) {
                             Tab.DISCOVER -> DiscoverRoute(
                                 discoverRepository,
@@ -883,6 +907,7 @@ private fun CinemArchiveApp(
                             )
                         }
                     }
+                    }
 
                     if (tab != Tab.LEDGER && tab != Tab.DISCOVER && tab != Tab.LISTS) {
                         ExpressivePillFab(
@@ -921,17 +946,24 @@ private fun CinemArchiveApp(
                     ) { innerPadding -> TabScaffoldContent(innerPadding) }
                 }
             } else {
+                // Null with blur off in Appearance: the tabs still run under the nav, which then
+                // stands solid over them instead of blurring them.
+                val glassBackdrop = rememberGlassBackdrop().takeIf { glassBlur }
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     bottomBar = {
-                        MorphingBottomNav(
-                            destinations = navDestinations,
-                            selected = tab,
-                            onSelect = { if (it == null) globalSearch = true else { upNextCalendar = false; tab = it } },
-                            compact = navigationPreferences.compact,
-                        )
+                        // Provided to the bar alone: content inside the backdrop it blurs must
+                        // never read it, or a surface there would blur the layer it's drawn into.
+                        CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
+                            MorphingBottomNav(
+                                destinations = navDestinations,
+                                selected = tab,
+                                onSelect = { if (it == null) globalSearch = true else { upNextCalendar = false; tab = it } },
+                                compact = navigationPreferences.compact,
+                            )
+                        }
                     },
-                ) { innerPadding -> TabScaffoldContent(innerPadding) }
+                ) { innerPadding -> TabScaffoldContent(innerPadding, glassBackdrop) }
             }
 
             // The overlay's predictive-back transform: shrink it and ease it toward the trailing

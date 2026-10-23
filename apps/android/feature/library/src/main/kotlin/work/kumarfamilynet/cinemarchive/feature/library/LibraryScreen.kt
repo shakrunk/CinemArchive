@@ -86,6 +86,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 
 data class LibraryUiState(val titles: List<LibraryTitle> = emptyList())
 
@@ -292,12 +293,12 @@ fun LibraryScreen(
                 )
 
                 if (titles.isEmpty()) {
-                    EmptyLibrary(filtered = allTitles.isNotEmpty(), onReset = { filters = LibraryFilters() }, modifier = Modifier.fillMaxSize())
+                    EmptyLibrary(filtered = allTitles.isNotEmpty(), onReset = { filters = LibraryFilters() }, modifier = Modifier.fillMaxSize().padding(bottom = LocalBottomBarClearance.current))
                 } else if (viewMode == LibraryViewMode.GRID) {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
                         state = gridState,
-                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier
@@ -323,7 +324,7 @@ fun LibraryScreen(
                 } else {
                     LazyColumn(
                         state = listState,
-                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
                         verticalArrangement = Arrangement.spacedBy(GroupedSeamGap),
                     ) {
                         groupedTitles.forEach { (key, label, group) ->

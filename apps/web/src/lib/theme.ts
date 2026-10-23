@@ -1,4 +1,4 @@
-import { useAppStore, type Theme, type ThemeMode } from 'src/store/useAppStore'
+import { isLightTheme, useAppStore, type Theme, type ThemeMode } from 'src/store/useAppStore'
 import { prefersReducedMotion } from './motion'
 
 type ViewTransitionResult = { ready: Promise<void>; finished: Promise<void> }
@@ -19,6 +19,10 @@ const THEME_COLORS: Record<Theme, string> = {
   light: '#f4ede0',
   noir: '#0d0d0f',
   matrix: '#020403',
+  'catppuccin-latte': '#eff1f5',
+  'catppuccin-frappe': '#303446',
+  'catppuccin-macchiato': '#24273a',
+  'catppuccin-mocha': '#1e1e2e',
 }
 
 /** Apply a theme to the document: sets [data-theme] and the address-bar color.
@@ -157,7 +161,7 @@ export function chooseThemeMode(mode: ThemeMode, origin?: { clientX: number; cli
  *  'system' is active jumps to the opposite of whatever it resolved to —
  *  same escape-system-follow behavior as picking a theme from the grid. */
 export function toggleTheme(origin?: { clientX: number; clientY: number }): void {
-  const next: ThemeMode = useAppStore.getState().theme === 'dark' ? 'light' : 'dark'
+  const next: ThemeMode = isLightTheme(useAppStore.getState().theme) ? 'dark' : 'light'
   chooseThemeMode(next, origin)
 }
 

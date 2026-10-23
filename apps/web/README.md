@@ -139,7 +139,7 @@ scripts are covered in [web startup](../../docs/web-startup.md).
 - **Fonts:** `Fraunces` (serif titles), `Hanken Grotesk` (UI sans), `DM Mono` (stats/numbers).
 - **Atmosphere:** `.projector-beam` (flickering amber glow), `.dust`, `.vignette`, and a `.grain` overlay rendered once as fixed full-viewport siblings.
 - **Mobile-first:** bottom-sheet modals on mobile, `TopBar` + `BottomNav` shell.
-- **Themes:** default, `light`, `noir` (Spider-Noir) and `matrix`, selected by `data-theme` on `:root`.
+- **Themes:** default, `light`, `noir` (Spider-Noir), `matrix`, and the four Catppuccin flavors (`catppuccin-latte`, `-frappe`, `-macchiato`, `-mocha`), selected by `data-theme` on `:root`.
 
 The token reference, per-theme rules, voice/copy conventions and component conventions are in the
 wiki's [Design System](https://github.com/shakrunk/CinemArchive/wiki/Design-System) page;

@@ -52,7 +52,57 @@ export type ViewMode = 'grid' | 'list'
 /** Poster-wall density. Drives how narrow a grid column is allowed to get, so
  *  'compact' fits more (smaller) posters per row and 'large' fewer. */
 export type GridSize = 'compact' | 'default' | 'large'
-export type Theme = 'dark' | 'light' | 'noir' | 'matrix'
+export type Theme =
+  | 'dark'
+  | 'light'
+  | 'noir'
+  | 'matrix'
+  | 'catppuccin-latte'
+  | 'catppuccin-frappe'
+  | 'catppuccin-macchiato'
+  | 'catppuccin-mocha'
+
+/** Every theme id, in Settings display order. Keep in sync with the COLORS
+ *  map in public/bootstrap.js and the [data-theme] blocks in index.css. */
+export const THEMES: readonly Theme[] = [
+  'dark',
+  'light',
+  'noir',
+  'matrix',
+  'catppuccin-latte',
+  'catppuccin-frappe',
+  'catppuccin-macchiato',
+  'catppuccin-mocha',
+]
+
+/** Themes anyone can pick without an easter-egg unlock. noir/matrix are the
+ *  only gated ones; `unlockedThemes` tracks just those. */
+export const ALWAYS_AVAILABLE_THEMES: readonly Theme[] = [
+  'dark',
+  'light',
+  'catppuccin-latte',
+  'catppuccin-frappe',
+  'catppuccin-macchiato',
+  'catppuccin-mocha',
+]
+
+/** The Catppuccin flavors, light to dark. Settings shows them as one theme
+ *  card with a flavor picker rather than four separate cards. */
+export const CATPPUCCIN_FLAVORS: readonly { value: Theme; label: string }[] = [
+  { value: 'catppuccin-latte', label: 'Latte' },
+  { value: 'catppuccin-frappe', label: 'Frappé' },
+  { value: 'catppuccin-macchiato', label: 'Macchiato' },
+  { value: 'catppuccin-mocha', label: 'Mocha' },
+]
+
+/** Light-on-dark vs dark-on-light, for the quick toggle's light/dark bucket. */
+export function isLightTheme(theme: Theme): boolean {
+  return theme === 'light' || theme === 'catppuccin-latte'
+}
+
+export function isThemeAvailable(theme: Theme, unlockedThemes: readonly Theme[]): boolean {
+  return ALWAYS_AVAILABLE_THEMES.includes(theme) || unlockedThemes.includes(theme)
+}
 
 /** The quick-toggle's 3-way choice — independent of the locked/secret
  *  noir/matrix styles, which are only picked from the full Appearance grid
@@ -164,9 +214,9 @@ interface UISlice {
   // The persisted 3-way quick-toggle choice (light/dark/system) driving
   // `theme` above. See `ThemeMode`'s doc comment.
   themeMode: ThemeMode
-  // Themes beyond dark/light are locked until earned via an in-app easter egg
-  // (e.g. Spider-Noir black & white, The Matrix red pill). Always includes
-  // 'dark' and 'light'.
+  // noir/matrix are locked until earned via an in-app easter egg (Spider-Noir
+  // black & white, The Matrix red pill). Always includes 'dark' and 'light';
+  // the Catppuccin flavors need no entry (see `isThemeAvailable`).
   unlockedThemes: Theme[]
   navPrefs: NavPrefs
   ledgerPrefs: LedgerPrefs
@@ -198,7 +248,8 @@ interface UISlice {
   setGridSize: (size: GridSize) => void
   // Explicit theme pick (Settings → Appearance grid, incl. noir/matrix).
   // Always breaks out of 'system' mode — dark/light set themeMode to match;
-  // noir/matrix (both dark-on-black styles) bucket into 'dark'.
+  // the other styles bucket by appearance (Catppuccin Latte into 'light',
+  // everything else into 'dark').
   setTheme: (theme: Theme) => void
   // The quick-toggle's 3-way pick. 'system' resolves `theme` to the current
   // OS preference and keeps tracking it live; 'light'/'dark' set both fields
@@ -789,13 +840,12 @@ export const useAppStore = create<AppStore>()(
 
   setGridSize: (gridSize) => set({ gridSize }),
 
-  setTheme: (theme) => set({ theme, themeMode: theme === 'light' ? 'light' : 'dark' }),
+  setTheme: (theme) => set({ theme, themeMode: isLightTheme(theme) ? 'light' : 'dark' }),
 
   setThemeMode: (mode) => set({ themeMode: mode, theme: mode === 'system' ? getSystemTheme() : mode }),
 
   unlockTheme: (theme) => {
-    if (theme === 'dark' || theme === 'light') return
-    if (get().unlockedThemes.includes(theme)) return
+    if (isThemeAvailable(theme, get().unlockedThemes)) return
     set((s) => ({ unlockedThemes: [...s.unlockedThemes, theme] }))
     const label = theme === 'noir' ? 'Spider-Man Noir' : 'The Construct'
     get().pushNotification({
@@ -1332,7 +1382,7 @@ export const useAppStore = create<AppStore>()(
         // persisted theme as an explicit choice rather than opting them into
         // live system-tracking they never asked for.
         if (state.themeMode === undefined) {
-          state.themeMode = state.theme === 'light' ? 'light' : 'dark'
+          state.themeMode = isLightTheme(state.theme) ? 'light' : 'dark'
         }
         // A 'system' mode may be stale after time away — re-resolve against
         // the current OS preference now, same as the FOUC script does.

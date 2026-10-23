@@ -68,7 +68,19 @@ private val PALETTE_SWATCHES = listOf(
     PaletteSwatch(ArchivePalette.MATERIAL_YOU, "Dynamic color from your device", Color(0xFFBCC2FF), Color(0xFFC6C2DB), Color(0xFFE6B8D0)),
     PaletteSwatch(ArchivePalette.NOIR, "Unlocked · watched Spider-Man: Noir in B&W", Color(0xFFC8C8CD), Color(0xFFA0AAB4), Color(0xFFC85A41)),
     PaletteSwatch(ArchivePalette.MATRIX, "Unlocked · took the red pill in The Matrix", Color(0xFF4ADE80), Color(0xFF5AD2D2), Color(0xFFDC4646)),
+    // Stands for all four Catppuccin flavors: one card, with the flavor picked inside it once
+    // selected, so they don't crowd the list. Mocha's mauve, blue and red are the swatch.
+    PaletteSwatch(ArchivePalette.CATPPUCCIN_MOCHA, "Soothing pastels in four flavors", Color(0xFFCBA6F7), Color(0xFF89B4FA), Color(0xFFF38BA8)),
 )
+
+private val CATPPUCCIN_FLAVORS = listOf(
+    ChoiceOption(ArchivePalette.CATPPUCCIN_LATTE, "Latte"),
+    ChoiceOption(ArchivePalette.CATPPUCCIN_FRAPPE, "Frappé"),
+    ChoiceOption(ArchivePalette.CATPPUCCIN_MACCHIATO, "Macchiato"),
+    ChoiceOption(ArchivePalette.CATPPUCCIN_MOCHA, "Mocha"),
+)
+
+private fun ArchivePalette.isCatppuccin(): Boolean = CATPPUCCIN_FLAVORS.any { it.value == this }
 
 internal fun ArchiveFontFamily.label(): String = when (this) {
     ArchiveFontFamily.DEFAULT -> "Default"
@@ -177,16 +189,31 @@ private fun AppearanceScreen(
             // One grouped container rather than a flat run of separate cards, so the
             // palettes read as a single set of mutually exclusive options (#141).
             itemsIndexed(PALETTE_SWATCHES) { index, swatch ->
+                val catppuccin = swatch.palette.isCatppuccin()
+                val selected = if (catppuccin) palette.isCatppuccin() else swatch.palette == palette
                 ReadingWidthColumn {
                     PaletteCard(
                         swatch = swatch,
-                        label = swatch.palette.label(),
-                        selected = swatch.palette == palette,
+                        label = if (catppuccin) "Catppuccin" else swatch.palette.label(),
+                        selected = selected,
                         shape = groupedItemShape(
                             isFirst = index == 0,
                             isLast = index == PALETTE_SWATCHES.lastIndex,
                         ),
-                        onClick = { onSetPalette(swatch.palette) },
+                        // Re-tapping the selected Catppuccin card keeps its current flavor.
+                        onClick = { if (!selected) onSetPalette(swatch.palette) },
+                        flavorPicker = if (catppuccin && selected) {
+                            {
+                                SegmentedGroup(
+                                    options = CATPPUCCIN_FLAVORS,
+                                    selected = palette,
+                                    onSelect = onSetPalette,
+                                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+                                )
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -393,6 +420,7 @@ private fun PaletteCard(
     selected: Boolean,
     shape: Shape,
     onClick: () -> Unit,
+    flavorPicker: (@Composable () -> Unit)? = null,
 ) {
     Surface(
         onClick = onClick,
@@ -407,23 +435,26 @@ private fun PaletteCard(
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier.fillMaxWidth().padding(bottom = GroupedSeamGap),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth().padding(14.dp, 16.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Swatch(swatch.c1, offset = 0.dp)
-                Swatch(swatch.c2, offset = (-8).dp)
-                Swatch(swatch.c3, offset = (-16).dp)
-                Column(modifier = Modifier.padding(start = 4.dp)) {
-                    Text(label, style = MaterialTheme.typography.titleSmall)
-                    Text(swatch.caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().padding(14.dp, 16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Swatch(swatch.c1, offset = 0.dp)
+                    Swatch(swatch.c2, offset = (-8).dp)
+                    Swatch(swatch.c3, offset = (-16).dp)
+                    Column(modifier = Modifier.padding(start = 4.dp)) {
+                        Text(label, style = MaterialTheme.typography.titleSmall)
+                        Text(swatch.caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (selected) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
-            if (selected) {
-                Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            }
+            flavorPicker?.invoke()
         }
     }
 }

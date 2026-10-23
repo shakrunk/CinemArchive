@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Loader2, type LucideIcon,
   Download, Upload, Eye, EyeOff, Settings2,
-  UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
+  UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock, Coffee,
   LayoutGrid, GripVertical, Ticket, RefreshCw, Info, ExternalLink,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -33,7 +33,7 @@ import { applySyncOutcome } from 'src/lib/sync/apply'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { captureLibrarySession } from 'src/lib/localSave'
 import { applyTheme } from 'src/lib/theme'
-import type { Theme } from 'src/store/useAppStore'
+import { CATPPUCCIN_FLAVORS, isThemeAvailable, type Theme } from 'src/store/useAppStore'
 import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
@@ -374,6 +374,8 @@ function AppearanceSection() {
   const unlockedThemes = useAppStore((s) => s.unlockedThemes)
   const titles = useAppStore((s) => s.titles)
 
+  const activeFlavor = CATPPUCCIN_FLAVORS.find((f) => f.value === theme)
+
   function choose(next: Theme) {
     if (next === theme) return
     applyTheme(next)
@@ -397,6 +399,17 @@ function AppearanceSection() {
       Icon: Terminal,
       lockedHint: 'Unlock it: take the red pill while logging a viewing of The Matrix.',
     },
+    // One card for all four flavors (picked in the row below the grid), so
+    // Catppuccin doesn't crowd out the house styles. Choosing the card keeps
+    // the active flavor, or starts on Mocha.
+    {
+      value: activeFlavor?.value ?? 'catppuccin-mocha',
+      label: 'Catppuccin',
+      hint: activeFlavor
+        ? `Soothing pastels — ${activeFlavor.label}. Pick another flavor below.`
+        : 'Soothing pastels in four flavors, from light Latte to dark Mocha.',
+      Icon: Coffee,
+    },
   ]
 
   // Secret themes stay off this list entirely until their linked title has
@@ -404,10 +417,8 @@ function AppearanceSection() {
   // not a spoiler list of "locked" cards.
   const visibleOptions = options.filter(
     ({ value }) =>
-      value === 'dark' ||
-      value === 'light' ||
-      unlockedThemes.includes(value) ||
-      isThemeDiscovered(value as 'noir' | 'matrix', titles)
+      isThemeAvailable(value, unlockedThemes) ||
+      ((value === 'noir' || value === 'matrix') && isThemeDiscovered(value, titles))
   )
 
   return (
@@ -426,7 +437,7 @@ function AppearanceSection() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
         {visibleOptions.map(({ value, label, hint, Icon, lockedHint }) => {
-          const locked = !unlockedThemes.includes(value)
+          const locked = !isThemeAvailable(value, unlockedThemes)
           return (
             <button
               key={value}
@@ -458,6 +469,30 @@ function AppearanceSection() {
           )
         })}
       </div>
+      {activeFlavor && (
+        <div className="mt-3">
+          <span className="block font-sans text-xs text-muted-foreground mb-2">Catppuccin flavor</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Catppuccin flavor">
+            {CATPPUCCIN_FLAVORS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={theme === value}
+                onClick={() => choose(value)}
+                className={cn(
+                  'rounded-lg border py-2 font-sans text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60',
+                  theme === value
+                    ? 'border-amber/50 bg-amber/10 text-amber'
+                    : 'border-border bg-secondary/20 text-muted-foreground hover:border-amber/25'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <TextPreferences />
     </Section>
   )

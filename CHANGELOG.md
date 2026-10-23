@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.38.1] - 2026-10-22
+
 ### Fixed
 
 - Episode names, synopses, runtimes and air dates from TheTVDB now apply to series with more than one season or with specials; before, they reached only single-season series. Air dates that TMDB lists a day early (often streaming releases) now take TheTVDB's release date, so an episode no longer shows as available the evening before it comes out. Upcoming episodes pick up the corrected date on the next daily schedule check.

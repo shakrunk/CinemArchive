@@ -86,6 +86,15 @@ export const ALWAYS_AVAILABLE_THEMES: readonly Theme[] = [
   'catppuccin-mocha',
 ]
 
+/** The Catppuccin flavors, light to dark. Settings shows them as one theme
+ *  card with a flavor picker rather than four separate cards. */
+export const CATPPUCCIN_FLAVORS: readonly { value: Theme; label: string }[] = [
+  { value: 'catppuccin-latte', label: 'Latte' },
+  { value: 'catppuccin-frappe', label: 'Frappé' },
+  { value: 'catppuccin-macchiato', label: 'Macchiato' },
+  { value: 'catppuccin-mocha', label: 'Mocha' },
+]
+
 /** Light-on-dark vs dark-on-light, for the quick toggle's light/dark bucket. */
 export function isLightTheme(theme: Theme): boolean {
   return theme === 'light' || theme === 'catppuccin-latte'

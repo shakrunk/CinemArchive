@@ -13,7 +13,7 @@ number is chosen.
 
 ### Added
 
-- **Web & Android:** The four [Catppuccin](https://catppuccin.com) flavors are now available as themes: Latte (light), Frappé, Macchiato and Mocha. Pick one in Settings → Appearance; no unlock needed.
+- **Web & Android:** The four [Catppuccin](https://catppuccin.com) flavors are now available as themes: Latte (light), Frappé, Macchiato and Mocha. Choose Catppuccin in Settings → Appearance, then pick a flavor. No unlock is needed.
 
 ### Fixed
 

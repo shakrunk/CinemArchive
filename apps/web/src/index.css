@@ -219,6 +219,16 @@
        (amber stays a mid-warm tone in both), so it must NOT flip with --void. */
     --on-amber: #25160a;
 
+    /* ── Discover film strip (see .film-strip) ──
+       A cinema artifact like the poster art, so it stays dark on light themes
+       too. --film-stock is the sprocket rail and frame dividers (one token so
+       they can't drift apart), --film-frame each frame's fill, --film-mat the
+       mat around the art, --film-caption the caption's wash. */
+    --film-stock: 38 36 32;
+    --film-frame: #0a0a0a;
+    --film-mat: #000000;
+    --film-caption: var(--poster-ink);
+
     /* ── Theme-aware interaction washes & insets (overridden in light) ── */
     --inset: rgba(0, 0, 0, 0.3);
     --inset-strong: rgba(0, 0, 0, 0.42);
@@ -355,6 +365,11 @@
 
     --on-amber: #141414;
 
+    --film-stock: 36 36 38;
+    --film-frame: #0a0a0a;
+    --film-mat: #000000;
+    --film-caption: 15 15 16;
+
     --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.9), 0 4px 14px -8px rgba(0, 0, 0, 0.65);
     --shadow-lift: 0 40px 90px -32px rgba(0, 0, 0, 0.94), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
     --glow: 0 0 0 1px rgba(200, 200, 205, 0.32), 0 18px 50px -18px rgba(200, 200, 205, 0.26);
@@ -410,6 +425,11 @@
 
     --on-amber: #03150a;
 
+    --film-stock: 18 36 19;
+    --film-frame: #050a06;
+    --film-mat: #020402;
+    --film-caption: 6 12 7;
+
     --shadow: 0 24px 60px -28px rgba(0, 10, 2, 0.9), 0 4px 14px -8px rgba(0, 10, 2, 0.65);
     --shadow-lift: 0 40px 90px -32px rgba(0, 10, 2, 0.94), 0 10px 30px -12px rgba(0, 10, 2, 0.75);
     --glow: 0 0 0 1px rgba(74, 222, 128, 0.35), 0 18px 50px -18px rgba(74, 222, 128, 0.3);
@@ -464,6 +484,12 @@
     --wash: rgba(76, 79, 105, 0.05);
 
     --on-amber: #eff1f5;
+
+    /* Mocha's film tones: the strip stays dark stock on the light page. */
+    --film-stock: 49 50 68;
+    --film-frame: #0a0a10;
+    --film-mat: #060609;
+    --film-caption: 17 17 27;
 
     --shadow: 0 24px 50px -30px rgba(76, 79, 105, 0.3), 0 4px 12px -8px rgba(76, 79, 105, 0.18);
     --shadow-lift:
@@ -521,6 +547,11 @@
 
     --on-amber: #232634;
 
+    --film-stock: 65 69 89;
+    --film-frame: #15171f;
+    --film-mat: #0c0d12;
+    --film-caption: 35 38 52;
+
     --shadow: 0 24px 60px -28px rgba(35, 38, 52, 0.85), 0 4px 14px -8px rgba(35, 38, 52, 0.6);
     --shadow-lift:
       0 40px 90px -32px rgba(35, 38, 52, 0.9), 0 10px 30px -12px rgba(35, 38, 52, 0.7);
@@ -577,6 +608,11 @@
 
     --on-amber: #181926;
 
+    --film-stock: 54 58 79;
+    --film-frame: #0e0f17;
+    --film-mat: #08090d;
+    --film-caption: 24 25 38;
+
     --shadow: 0 24px 60px -28px rgba(24, 25, 38, 0.85), 0 4px 14px -8px rgba(24, 25, 38, 0.6);
     --shadow-lift:
       0 40px 90px -32px rgba(24, 25, 38, 0.9), 0 10px 30px -12px rgba(24, 25, 38, 0.7);
@@ -632,6 +668,11 @@
     --wash: rgba(205, 214, 244, 0.05);
 
     --on-amber: #11111b;
+
+    --film-stock: 49 50 68;
+    --film-frame: #0a0a10;
+    --film-mat: #060609;
+    --film-caption: 17 17 27;
 
     --shadow: 0 24px 60px -28px rgba(17, 17, 27, 0.85), 0 4px 14px -8px rgba(17, 17, 27, 0.6);
     --shadow-lift:
@@ -884,10 +925,9 @@
         carousel, not a flat color. ── */
   .film-strip {
     position: relative;
-    /* Shared film-stock tone for the sprocket rail (.reel-strip) and the vertical
-         frame dividers (.film-frame's left/right border) — kept as one variable so
-         they can't drift apart. */
-    --film-stock: 38 36 32;
+    /* Film colors come from the --film-* tokens on :root: the brand's warm stock
+         by default, overridden per theme (noir, matrix, each Catppuccin flavor) so
+         the strip takes that palette's tone instead of reading as a brown cutout. */
     /* Clean, straight edge — no border-radius. */
     border-radius: 0;
     /* Simplified, subtle inner depth on the top and bottom edges.
@@ -1030,8 +1070,8 @@
   .film-frame {
     display: flex;
     flex-direction: column;
-    /* Single, deep black color, not the theme-swapping gradient, to maintain continuous black film stock. */
-    background: #0a0a0a;
+    /* Single, deep near-black, not the theme-swapping gradient, to maintain continuous film stock. */
+    background: var(--film-frame);
     border-top: 1px solid rgb(0 0 0 / 0.6);
     border-bottom: 1px solid rgb(0 0 0 / 0.6);
     /* Thick 5px borders on left and right become a 10px continuous frame separator,
@@ -1044,11 +1084,11 @@
   /* Thin black mat around the poster art itself, making it look nested. */
   .film-frame__window {
     padding: 3px;
-    background: rgb(0 0 0);
+    background: var(--film-mat);
   }
   .film-frame__caption {
     /* Gradient base that fits seamlessly with the frame separator logic. */
-    background: linear-gradient(180deg, rgb(var(--poster-ink) / 0.6), transparent);
+    background: linear-gradient(180deg, rgb(var(--film-caption) / 0.6), transparent);
   }
 
   /* ── Editorial helpers ── */

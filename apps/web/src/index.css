@@ -205,11 +205,13 @@
     --paper-dim: rgb(var(--paper-dim-rgb));
     --paper-faint: rgb(var(--paper-faint-rgb));
 
-    /* ── Theme-independent constants ──
-       Poster art is a cinema artifact (stays dark in both themes) and text over
-       poster scrims / the noir takeover must stay light regardless of theme. */
+    /* ── Light/dark-independent constants ──
+       Poster art is a cinema artifact (stays dark in both light and dark) and text
+       over poster scrims / the noir takeover must stay light regardless. The
+       styled themes (noir, matrix, Catppuccin) re-tint these within the same
+       dark range so empty posters match their palette. */
     --ivory: 243 234 217; /* constant light — text over dark art */
-    --poster-ink: 17 13 11; /* constant dark poster surfaces */
+    --poster-ink: 17 13 11; /* dark poster surfaces: stay dark on light themes, tinted per theme */
     --poster-ink-2: 30 23 20;
     /* Amber marks sitting on a dark art scrim (hero chips, poster badges). The
        theme-aware --amber deepens on light to stay legible on ivory, which goes
@@ -369,6 +371,9 @@
     --film-frame: #0a0a0a;
     --film-mat: #000000;
     --film-caption: 15 15 16;
+    --poster-ink: 15 15 16;
+    --poster-ink-2: 27 27 29;
+    --ivory: 235 235 232;
 
     --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.9), 0 4px 14px -8px rgba(0, 0, 0, 0.65);
     --shadow-lift: 0 40px 90px -32px rgba(0, 0, 0, 0.94), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
@@ -429,6 +434,9 @@
     --film-frame: #050a06;
     --film-mat: #020402;
     --film-caption: 6 12 7;
+    --poster-ink: 6 12 7;
+    --poster-ink-2: 13 26 14;
+    --ivory: 200 245 210;
 
     --shadow: 0 24px 60px -28px rgba(0, 10, 2, 0.9), 0 4px 14px -8px rgba(0, 10, 2, 0.65);
     --shadow-lift: 0 40px 90px -32px rgba(0, 10, 2, 0.94), 0 10px 30px -12px rgba(0, 10, 2, 0.75);
@@ -490,6 +498,9 @@
     --film-frame: #0a0a10;
     --film-mat: #060609;
     --film-caption: 17 17 27;
+    --poster-ink: 17 17 27;
+    --poster-ink-2: 30 30 46;
+    --ivory: 205 214 244;
 
     --shadow: 0 24px 50px -30px rgba(76, 79, 105, 0.3), 0 4px 12px -8px rgba(76, 79, 105, 0.18);
     --shadow-lift:
@@ -551,6 +562,9 @@
     --film-frame: #15171f;
     --film-mat: #0c0d12;
     --film-caption: 35 38 52;
+    --poster-ink: 35 38 52;
+    --poster-ink-2: 48 52 70;
+    --ivory: 198 208 245;
 
     --shadow: 0 24px 60px -28px rgba(35, 38, 52, 0.85), 0 4px 14px -8px rgba(35, 38, 52, 0.6);
     --shadow-lift:
@@ -612,6 +626,9 @@
     --film-frame: #0e0f17;
     --film-mat: #08090d;
     --film-caption: 24 25 38;
+    --poster-ink: 24 25 38;
+    --poster-ink-2: 36 39 58;
+    --ivory: 202 211 245;
 
     --shadow: 0 24px 60px -28px rgba(24, 25, 38, 0.85), 0 4px 14px -8px rgba(24, 25, 38, 0.6);
     --shadow-lift:
@@ -673,6 +690,9 @@
     --film-frame: #0a0a10;
     --film-mat: #060609;
     --film-caption: 17 17 27;
+    --poster-ink: 17 17 27;
+    --poster-ink-2: 30 30 46;
+    --ivory: 205 214 244;
 
     --shadow: 0 24px 60px -28px rgba(17, 17, 27, 0.85), 0 4px 14px -8px rgba(17, 17, 27, 0.6);
     --shadow-lift:

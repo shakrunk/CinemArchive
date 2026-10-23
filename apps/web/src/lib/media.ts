@@ -285,6 +285,18 @@ function mapTmdbCast(list: TmdbCastEntry[], opts: { aggregate?: boolean } = {}):
   }))
 }
 
+/**
+ * Top-billed cast kept per title/season. Full TMDB TV aggregate credits run to
+ * 1,600+ people per series, which pushed a whole-library fetch past the 8s
+ * statement timeout. Library reads in db.ts apply the same cap.
+ */
+export const MAX_STORED_CAST = 50
+
+/** Keep the `MAX_STORED_CAST` top-billed entries of a cast that gets persisted. */
+function capStoredCast(cast: CastMember[]): CastMember[] {
+  return [...cast].sort((a, b) => a.order - b.order).slice(0, MAX_STORED_CAST)
+}
+
 /** Alternate-push two lists so the top of each stays visible, capped at `limit`. */
 function interleave<T>(a: T[], b: T[], limit: number): T[] {
   const combined: T[] = []
@@ -425,7 +437,7 @@ export async function fetchMediaDetails(base: SearchResult): Promise<MediaDetail
     ? (data.aggregate_credits?.cast ?? data.credits?.cast ?? [])
     : (data.credits?.cast ?? [])
 
-  const cast: CastMember[] = mapTmdbCast(rawCast, { aggregate: base.type === 'tv' })
+  const cast: CastMember[] = capStoredCast(mapTmdbCast(rawCast, { aggregate: base.type === 'tv' }))
 
   const seenCrewKey = new Set<string>()
   const crew: CrewMember[] = []
@@ -539,7 +551,7 @@ export async function fetchSeasonDetails(tmdbId: number, seasonNumber: number): 
 
     const episodes = (data?.episodes ?? []) as RawTmdbEpisode[]
 
-    const cast: CastMember[] = mapTmdbCast(data?.credits?.cast ?? [])
+    const cast: CastMember[] = capStoredCast(mapTmdbCast(data?.credits?.cast ?? []))
 
     return { episodes, cast }
   } catch (e) {

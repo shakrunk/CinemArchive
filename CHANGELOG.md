@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- **Android:** Lists now animate as they change. Filtering or sorting the Library, marking an episode watched in Up Next, and answering a friend request let rows fade in and out and glide into place instead of jumping.
+- **Android:** Segmented choices, filter toggles, the navigation bar, the New Title button and Up Next's mark-watched button give a light haptic tick when tapped, and all of them use the same press-and-release motion.
+- Titles and seasons now keep the 50 top-billed cast members instead of TMDB's full list, which runs past 1,600 people for some long-running series. Titles already in your library keep their stored cast until their credits are next refreshed.
+
 ## [1.38.1] - 2026-10-22
 
 ### Fixed

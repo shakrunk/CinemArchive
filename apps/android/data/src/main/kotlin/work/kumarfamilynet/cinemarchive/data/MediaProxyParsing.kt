@@ -32,6 +32,11 @@ private const val TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
 private const val TMDB_STILL_BASE = "https://image.tmdb.org/t/p/w300"
 private const val TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w185"
 
+/** Top-billed cast kept per title/season, matching `MAX_STORED_CAST` in the web app's
+ *  `media.ts`. Full TV aggregate credits run to 1,600+ people per series, which pushed the
+ *  web app's whole-library fetch past the 8s statement timeout. */
+internal const val MAX_STORED_CAST = 50
+
 /** Title-level crew jobs worth keeping, matching `TITLE_CREW_JOBS` in the web app's
  *  `fetchMediaDetails`. TMDB's full crew list runs to hundreds of rows for a big production. */
 private val TITLE_CREW_JOBS = setOf(
@@ -153,7 +158,8 @@ internal fun parseCertification(data: JSONObject, type: MediaType): String? =
  *
  *  De-duplicated by person: TMDB bills an actor once per role, so anyone playing two parts
  *  appears twice — and `title_cast`'s `unique (title_id, tmdb_person_id)` (schema.sql) would
- *  reject the second row, failing the whole add. Keeps the highest-billed entry. */
+ *  reject the second row, failing the whole add. Keeps the highest-billed entry, capped at
+ *  [MAX_STORED_CAST]. */
 internal fun parseCast(data: JSONObject, type: MediaType): List<MediaCredit> {
     val aggregate = type == MediaType.TV && data.optJSONObject("aggregate_credits") != null
     val raw = if (aggregate) {
@@ -175,7 +181,7 @@ internal fun parseCast(data: JSONObject, type: MediaType): List<MediaCredit> {
             profileUrl = entry.stringOrNull("profile_path")?.let { "$TMDB_PROFILE_BASE$it" },
             episodeCount = if (aggregate) entry.intOrNull("total_episode_count") else null,
         )
-    }.sortedBy { it.order }.distinctBy { it.tmdbPersonId }
+    }.sortedBy { it.order }.distinctBy { it.tmdbPersonId }.take(MAX_STORED_CAST)
 }
 
 /** Filtered to [TITLE_CREW_JOBS] and de-duplicated by (person, job) — TMDB lists a person once

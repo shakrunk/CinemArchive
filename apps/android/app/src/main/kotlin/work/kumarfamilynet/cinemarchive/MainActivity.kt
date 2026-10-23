@@ -885,6 +885,7 @@ private fun CinemArchiveApp(
                                 onFabExpandedChange = { fabExpanded = it },
                                 onTitleClick = { overlay = Overlay.Detail(it) },
                                 onAddTitle = { overlay = Overlay.Add(it.asSearchResult()) },
+                                catalogExtrasSource = runtime.catalogExtrasRepository,
                             )
                             Tab.LIBRARY -> LibraryRoute(
                                 repository,

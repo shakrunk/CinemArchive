@@ -67,6 +67,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberCollapseOnScroll
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.asSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
@@ -103,6 +104,7 @@ fun DiscoverRoute(
     onFabExpandedChange: (Boolean) -> Unit = {},
     onTitleClick: (String) -> Unit = {},
     onAddTitle: (TrendingTitle) -> Unit = {},
+    catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
 ) {
     val viewModel: DiscoverViewModel = viewModel(factory = DiscoverViewModelFactory(repository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -159,8 +161,10 @@ fun DiscoverRoute(
     )
 
     preview?.let { title ->
-        TrendingTitlePreviewSheet(
-            title = title,
+        DiscoverPreviewSheet(
+            repository = repository,
+            extrasSource = catalogExtrasSource,
+            result = title.asSearchResult(),
             isAdded = title.mediaIdentity in idsByTmdbKey,
             onAdd = { preview = null; onAddTitle(title) },
             onDismiss = { preview = null },
@@ -530,55 +534,6 @@ private fun DiscoverCard(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-/**
- * Preview sheet for a trending result *not yet* in the real library (#119/KP-049) — styled
- * after the Library title-detail screen's header (poster tint, title, meta line, synopsis)
- * for visual parity, but it can't be the same component: there's no [TitleDetail] to show
- * (no status, rating, or viewing history) until the title is actually added. A result already
- * in the real library skips this sheet entirely and opens the real detail screen instead
- * (see [DiscoverRoute]).
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TrendingTitlePreviewSheet(title: TrendingTitle, isAdded: Boolean, onAdd: () -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 28.dp)) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp)) {
-                PosterSurface(
-                    tint = tintForKey(title.tmdbId.toString()),
-                    imageUrl = title.posterUrl,
-                    modifier = Modifier.size(width = 72.dp, height = 100.dp),
-                    aspectRatio = 72f / 100f,
-                    cornerRadius = 12.dp,
-                )
-                Column(modifier = Modifier.padding(start = 14.dp).align(Alignment.CenterVertically)) {
-                    Text(title.title, style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "${title.year ?: "—"}" + if (title.type == MediaType.TV) " · TV Series" else " · Movie",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-            }
-
-            Text("Synopsis", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-            Text(
-                title.synopsis ?: "No synopsis available.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 22.dp),
-            )
-
-            if (isAdded) {
-                TextButton(onClick = onDismiss, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Added") }
-            } else {
-                Button(onClick = { onAdd(); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Add to library") }
             }
         }
     }

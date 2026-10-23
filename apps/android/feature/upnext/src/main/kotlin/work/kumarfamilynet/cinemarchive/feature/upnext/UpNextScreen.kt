@@ -4,13 +4,10 @@ import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 
 import android.content.Intent
 import android.provider.CalendarContract
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,8 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,7 +66,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
-import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
+import work.kumarfamilynet.cinemarchive.core.designsystem.pressScale
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberHapticClick
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberPressScale
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
 import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
@@ -719,20 +718,15 @@ private fun ContinueWatchingCard(
             // borrows the poster's own corner rounding instead of that badge shape, plus a
             // press-shrink so it reads as a button on contact (matches SegmentedControls).
             val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val pressScale by animateFloatAsState(
-                targetValue = if (isPressed) 0.92f else 1f,
-                animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
-                label = "markWatchedPressScale",
-            )
+            val pressScale = rememberPressScale(interactionSource, enabled = action?.busy != true)
             Surface(
-                onClick = onMarkWatched,
+                onClick = rememberHapticClick(HapticFeedbackType.Confirm, onMarkWatched),
                 enabled = action?.busy != true,
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 interactionSource = interactionSource,
-                modifier = Modifier.size(44.dp).scale(pressScale),
+                modifier = Modifier.size(44.dp).pressScale(pressScale),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.Check, contentDescription = "Mark episode watched", modifier = Modifier.size(20.dp))

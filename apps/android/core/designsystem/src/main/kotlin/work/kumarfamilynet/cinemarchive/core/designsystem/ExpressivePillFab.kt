@@ -2,7 +2,6 @@ package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 /** The design handoff's "New Title" FAB: a pill that shrinks and rounds further into a full
@@ -39,14 +37,14 @@ fun ExpressivePillFab(
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressRadius by animateDpAsState(if (isPressed) 28.dp else 20.dp, label = "fabRadius")
     val radius by animateDpAsState(if (expanded) pressRadius else 28.dp, label = "fabCollapseRadius")
-    val scale by animateFloatAsState(if (isPressed) 0.92f else 1f, label = "fabScale")
+    val scale = rememberPressScale(interactionSource)
     val horizontalPadding by animateDpAsState(if (expanded) 22.dp else 16.dp, label = "fabPadding")
 
     Surface(
-        onClick = onClick,
+        onClick = rememberHapticClick(onClick = onClick),
         modifier = modifier
             .height(56.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale },
+            .pressScale(scale),
         shape = RoundedCornerShape(radius),
         color = MaterialTheme.colorScheme.tertiary,
         contentColor = MaterialTheme.colorScheme.onTertiary,

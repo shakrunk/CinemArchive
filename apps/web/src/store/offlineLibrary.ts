@@ -337,7 +337,7 @@ export function pickDevicePreferences(value: unknown): Record<string, unknown> {
   const state = value as Record<string, unknown>
   const result: Record<string, unknown> = {}
   for (const [key, allowed] of Object.entries({ viewMode: ['grid', 'list'], gridSize: ['compact', 'default', 'large'],
-    theme: ['dark', 'light', 'noir', 'matrix'], themeMode: ['light', 'dark', 'system'],
+    theme: ['dark', 'light', 'noir', 'matrix', 'catppuccin-latte', 'catppuccin-frappe', 'catppuccin-macchiato', 'catppuccin-mocha'], themeMode: ['light', 'dark', 'system'],
   })) if (typeof state[key] === 'string' && allowed.includes(state[key])) result[key] = state[key]
   if (Array.isArray(state.unlockedThemes)) result.unlockedThemes = [...new Set(['dark', 'light', ...state.unlockedThemes.filter((v) => v === 'noir' || v === 'matrix')])]
   if (state.navPrefs && typeof state.navPrefs === 'object') {

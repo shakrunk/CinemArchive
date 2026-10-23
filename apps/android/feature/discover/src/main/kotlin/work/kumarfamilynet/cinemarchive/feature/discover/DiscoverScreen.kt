@@ -73,6 +73,7 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.CatalogLookup
 import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 private class DiscoverViewModelFactory(
     private val repository: DiscoverRepository,
@@ -208,6 +209,7 @@ fun DiscoverScreen(
 ) {
     val showShelves = mode == DiscoverMode.TITLES && search.isBlank() && genreId == null && shelves.library.titles.isNotEmpty()
     val gridState = rememberLazyGridState()
+    ScrollToTopOnReselect(gridState)
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 

@@ -96,6 +96,8 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import work.kumarfamilynet.cinemarchive.core.designsystem.GlassBackdrop
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalGlassBackdrop
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalTabReselect
+import work.kumarfamilynet.cinemarchive.core.designsystem.TabReselect
 import work.kumarfamilynet.cinemarchive.core.designsystem.glassBackdropSource
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberGlassBackdrop
 import work.kumarfamilynet.cinemarchive.core.designsystem.noirVisualEffect
@@ -551,6 +553,7 @@ private fun CinemArchiveApp(
     val libraryViewMode by preferencesRepository.observeLibraryViewMode()
         .collectAsStateWithLifecycle(initialValue = LibraryViewMode.GRID)
     val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
+    val tabReselect = remember { TabReselect() }
     val navigationFlow = remember(preferencesRepository) { preferencesRepository.observeNavigation() }
     val navigationPreferences by navigationFlow.collectAsStateWithLifecycle(
         initialValue = work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences())
@@ -826,6 +829,16 @@ private fun CinemArchiveApp(
                 NavDestination<Tab?>(item.value, item.label, item.icon, item.selectedIcon)
             } + NavDestination<Tab?>(null, "Search", Icons.Outlined.Search)
 
+            // Re-tapping the tab already on screen scrolls its list back to the top (see TabReselect);
+            // in Up Next's calendar it returns to the board instead, as it always has.
+            fun selectTab(destination: Tab?) {
+                when {
+                    destination == null -> globalSearch = true
+                    destination == tab && !upNextCalendar -> tabReselect.reselect()
+                    else -> { upNextCalendar = false; tab = destination }
+                }
+            }
+
             @Composable
             fun TabScaffoldContent(innerPadding: PaddingValues, glassBackdrop: GlassBackdrop? = null) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -843,7 +856,10 @@ private fun CinemArchiveApp(
                             )
                             .then(if (glassBackdrop != null) Modifier.glassBackdropSource(glassBackdrop) else Modifier),
                     ) {
-                    CompositionLocalProvider(LocalBottomBarClearance provides innerPadding.calculateBottomPadding()) {
+                    CompositionLocalProvider(
+                        LocalBottomBarClearance provides innerPadding.calculateBottomPadding(),
+                        LocalTabReselect provides tabReselect,
+                    ) {
                         when (tab) {
                             Tab.DISCOVER -> DiscoverRoute(
                                 discoverRepository,
@@ -937,7 +953,7 @@ private fun CinemArchiveApp(
                     MorphingNavigationRail(
                         destinations = navDestinations,
                         selected = tab,
-                        onSelect = { if (it == null) globalSearch = true else { upNextCalendar = false; tab = it } },
+                        onSelect = { selectTab(it) },
                         compact = navigationPreferences.compact,
                     )
                     Scaffold(
@@ -958,7 +974,7 @@ private fun CinemArchiveApp(
                             MorphingBottomNav(
                                 destinations = navDestinations,
                                 selected = tab,
-                                onSelect = { if (it == null) globalSearch = true else { upNextCalendar = false; tab = it } },
+                                onSelect = { selectTab(it) },
                                 compact = navigationPreferences.compact,
                             )
                         }

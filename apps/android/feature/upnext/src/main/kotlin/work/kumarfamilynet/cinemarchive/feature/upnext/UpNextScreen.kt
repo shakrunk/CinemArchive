@@ -98,6 +98,7 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 class UpNextViewModel(
     private val repository: LibraryRepository,
@@ -268,6 +269,7 @@ fun UpNextScreen(
     val watching = board.watching.filterNot { it.id in finaleIds }
 
     val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
     val collapsed = rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 

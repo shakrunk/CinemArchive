@@ -71,6 +71,8 @@ import work.kumarfamilynet.cinemarchive.core.model.monthGrid
 import work.kumarfamilynet.cinemarchive.data.CalendarSources
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import androidx.compose.foundation.lazy.rememberLazyListState
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 private val Weekdays = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
@@ -132,7 +134,10 @@ fun CalendarScreen(
         cursorKey = cursor.plusMonths(delta).toString()
     }
 
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
         modifier = Modifier.fillMaxSize(),
     ) {

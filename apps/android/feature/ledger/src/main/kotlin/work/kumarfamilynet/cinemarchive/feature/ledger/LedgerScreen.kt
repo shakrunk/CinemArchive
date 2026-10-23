@@ -102,6 +102,8 @@ import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import androidx.compose.foundation.lazy.rememberLazyListState
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 private val PANEL_LABELS: Map<LedgerWidgetId, String> = mapOf(
     LedgerWidgetId.RUNTIMES to "Feature Lengths",
@@ -354,7 +356,10 @@ private fun LedgerBoardContent(
 ) {
     val (stats, boards) = uiState
     val isGrid = isWideLayout
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBottomBarClearance.current),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier,

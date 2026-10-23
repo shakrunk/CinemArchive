@@ -87,6 +87,7 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 data class LibraryUiState(val titles: List<LibraryTitle> = emptyList())
 
@@ -177,6 +178,8 @@ fun LibraryScreen(
 
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
+    ScrollToTopOnReselect(gridState)
+    ScrollToTopOnReselect(listState)
     val collapsed = if (viewMode == LibraryViewMode.GRID) {
         rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, headerShape)
     } else {

@@ -20,6 +20,7 @@ number is chosen.
 - **Android:** In Up Next and the Library's list view, grouped rows now round their corners smoothly when a neighbor leaves or arrives, so the group re-forms around the gap instead of snapping.
 - **Android:** The bottom navigation bar is now glass: lists scroll on beneath it, and it blurs the posters passing underneath. To keep a solid bar, turn off **Blur behind navigation** in Appearance.
 - **Android:** The Spider-Noir palette is now fully black and white: status badges, the navigation's selection pill and the colored placeholders shown for titles without a poster all turn grey. Its one red accent stays.
+- **Android:** Tap the tab you're already on to scroll its list back to the top.
 - Titles and seasons now keep the 50 top-billed cast members instead of TMDB's full list, which runs past 1,600 people for some long-running series. The web library and friend libraries on both clients show only the top 50 straight away. Elsewhere, such as the Android library and shared links, titles already in your library keep their full cast until their credits are next refreshed.
 
 ## [1.38.1] - 2026-10-22

@@ -63,6 +63,8 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import androidx.compose.foundation.lazy.rememberLazyListState
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 class ListsViewModel(
     private val listsRepository: ListsRepository,
@@ -200,7 +202,10 @@ private fun ListsGridScreen(
         )
     }
 
+    val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = Modifier.fillMaxSize(),

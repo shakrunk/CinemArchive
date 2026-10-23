@@ -1,6 +1,12 @@
 // Runs synchronously before first paint; theme storage matches useAppStore.
 (function () {
-  var COLORS = { dark: '#0b0907', light: '#f4ede0', noir: '#0d0d0f', matrix: '#020403' };
+  var COLORS = {
+    dark: '#0b0907', light: '#f4ede0', noir: '#0d0d0f', matrix: '#020403',
+    'catppuccin-latte': '#eff1f5', 'catppuccin-frappe': '#303446',
+    'catppuccin-macchiato': '#24273a', 'catppuccin-mocha': '#1e1e2e'
+  };
+  // Only the easter-egg themes need an unlock (see isThemeAvailable).
+  var GATED = ['noir', 'matrix'];
   function systemTheme() {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   }
@@ -12,7 +18,7 @@
     // themeMode 'system' always re-resolves against the live OS
     // preference rather than trusting whatever was last persisted.
     if (state && state.themeMode === 'system') theme = systemTheme();
-    if (!Object.prototype.hasOwnProperty.call(COLORS, theme) || unlocked.indexOf(theme) === -1) theme = systemTheme();
+    if (!Object.prototype.hasOwnProperty.call(COLORS, theme) || (GATED.indexOf(theme) !== -1 && unlocked.indexOf(theme) === -1)) theme = systemTheme();
     document.documentElement.setAttribute('data-theme', theme);
     if (theme !== 'dark') {
       var m = document.querySelector('meta[name="theme-color"]');

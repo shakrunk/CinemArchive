@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Mail, Key, Plus, Trash2, Copy, Check, LogOut, Loader2, type LucideIcon,
   Download, Upload, Eye, EyeOff, Settings2,
-  UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock,
+  UserCircle, Sun, Moon, Pencil, CalendarDays, Film, Aperture, Terminal, Lock, Coffee,
   LayoutGrid, GripVertical, Ticket, RefreshCw, Info, ExternalLink,
 } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -33,7 +33,7 @@ import { applySyncOutcome } from 'src/lib/sync/apply'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { captureLibrarySession } from 'src/lib/localSave'
 import { applyTheme } from 'src/lib/theme'
-import type { Theme } from 'src/store/useAppStore'
+import { isThemeAvailable, type Theme } from 'src/store/useAppStore'
 import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
@@ -397,6 +397,10 @@ function AppearanceSection() {
       Icon: Terminal,
       lockedHint: 'Unlock it: take the red pill while logging a viewing of The Matrix.',
     },
+    { value: 'catppuccin-latte', label: 'Catppuccin Latte', hint: 'Catppuccin’s light flavor — soft pastels on cream.', Icon: Coffee },
+    { value: 'catppuccin-frappe', label: 'Catppuccin Frappé', hint: 'Catppuccin’s muted dark flavor — pastels on slate.', Icon: Coffee },
+    { value: 'catppuccin-macchiato', label: 'Catppuccin Macchiato', hint: 'Catppuccin’s deeper dark flavor — pastels on navy.', Icon: Coffee },
+    { value: 'catppuccin-mocha', label: 'Catppuccin Mocha', hint: 'Catppuccin’s darkest flavor — pastels on midnight.', Icon: Coffee },
   ]
 
   // Secret themes stay off this list entirely until their linked title has
@@ -404,10 +408,8 @@ function AppearanceSection() {
   // not a spoiler list of "locked" cards.
   const visibleOptions = options.filter(
     ({ value }) =>
-      value === 'dark' ||
-      value === 'light' ||
-      unlockedThemes.includes(value) ||
-      isThemeDiscovered(value as 'noir' | 'matrix', titles)
+      isThemeAvailable(value, unlockedThemes) ||
+      ((value === 'noir' || value === 'matrix') && isThemeDiscovered(value, titles))
   )
 
   return (
@@ -426,7 +428,7 @@ function AppearanceSection() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Theme">
         {visibleOptions.map(({ value, label, hint, Icon, lockedHint }) => {
-          const locked = !unlockedThemes.includes(value)
+          const locked = !isThemeAvailable(value, unlockedThemes)
           return (
             <button
               key={value}

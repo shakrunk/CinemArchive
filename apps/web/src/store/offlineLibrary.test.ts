@@ -207,6 +207,7 @@ describe('safe cache migration and strict owner refresh', () => {
     expect(prefs).not.toHaveProperty('ledgerPrefs')
     expect(storage.getItem()).toBe(raw)
     expect(pickDevicePreferences({ theme: 'invalid', user: { id: 'a' }, titles: [title] })).toEqual({})
+    expect(pickDevicePreferences({ theme: 'catppuccin-mocha' })).toEqual({ theme: 'catppuccin-mocha' })
   })
 
   it('rejects a partial snapshot when pins fail instead of clearing that domain', async () => {

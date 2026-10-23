@@ -75,7 +75,14 @@ test('keeps readability controls usable at 320px with extra large Lexend', async
     expect(box!.x + box!.width).toBeLessThanOrEqual(320)
   }
   expect(await controls.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
-  await page.getByLabel('Small', { exact: true }).check()
+  // Late font and section loads can shift the radio between Playwright's scroll and
+  // its click, which then lands on the section container instead; retry until it takes.
+  await page.evaluate(() => document.fonts.ready)
+  const small = page.getByLabel('Small', { exact: true })
+  await expect(async () => {
+    await small.check()
+    await expect(small).toBeChecked({ timeout: 1000 })
+  }).toPass()
   await page.getByRole('button', { name: 'Apply text preferences' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-text-size', 'small')
 })

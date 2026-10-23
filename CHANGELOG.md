@@ -14,6 +14,7 @@ number is chosen.
 ### Fixed
 
 - **Web:** Large libraries no longer fail to load with "Loading your library timed out". Your library now loads in batches of 100 titles, and each title brings its 50 top-billed cast members rather than the full credits list.
+- **Android:** The settings sections on the Profile page now read as single grouped containers, with rounded outer corners and tight seams between rows, like the rest of the app's grouped lists.
 
 ### Changed
 

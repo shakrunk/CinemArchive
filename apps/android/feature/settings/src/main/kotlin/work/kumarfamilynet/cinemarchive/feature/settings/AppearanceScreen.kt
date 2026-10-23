@@ -68,6 +68,11 @@ private val PALETTE_SWATCHES = listOf(
     PaletteSwatch(ArchivePalette.MATERIAL_YOU, "Dynamic color from your device", Color(0xFFBCC2FF), Color(0xFFC6C2DB), Color(0xFFE6B8D0)),
     PaletteSwatch(ArchivePalette.NOIR, "Unlocked · watched Spider-Man: Noir in B&W", Color(0xFFC8C8CD), Color(0xFFA0AAB4), Color(0xFFC85A41)),
     PaletteSwatch(ArchivePalette.MATRIX, "Unlocked · took the red pill in The Matrix", Color(0xFF4ADE80), Color(0xFF5AD2D2), Color(0xFFDC4646)),
+    // Swatches are each flavor's mauve, blue and red: the accent, secondary and error roles.
+    PaletteSwatch(ArchivePalette.CATPPUCCIN_LATTE, "Light · soft pastels on cream", Color(0xFF8839EF), Color(0xFF1E66F5), Color(0xFFD20F39)),
+    PaletteSwatch(ArchivePalette.CATPPUCCIN_FRAPPE, "Dark · pastels on slate", Color(0xFFCA9EE6), Color(0xFF8CAAEE), Color(0xFFE78284)),
+    PaletteSwatch(ArchivePalette.CATPPUCCIN_MACCHIATO, "Dark · pastels on navy", Color(0xFFC6A0F6), Color(0xFF8AADF4), Color(0xFFED8796)),
+    PaletteSwatch(ArchivePalette.CATPPUCCIN_MOCHA, "Dark · pastels on midnight", Color(0xFFCBA6F7), Color(0xFF89B4FA), Color(0xFFF38BA8)),
 )
 
 internal fun ArchiveFontFamily.label(): String = when (this) {

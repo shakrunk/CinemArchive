@@ -166,6 +166,10 @@ internal fun ArchivePalette.label(): String = when (this) {
     ArchivePalette.MATERIAL_YOU -> "Material You"
     ArchivePalette.NOIR -> "Spider-Noir"
     ArchivePalette.MATRIX -> "The Construct"
+    ArchivePalette.CATPPUCCIN_LATTE -> "Catppuccin Latte"
+    ArchivePalette.CATPPUCCIN_FRAPPE -> "Catppuccin Frappé"
+    ArchivePalette.CATPPUCCIN_MACCHIATO -> "Catppuccin Macchiato"
+    ArchivePalette.CATPPUCCIN_MOCHA -> "Catppuccin Mocha"
 }
 
 @Composable

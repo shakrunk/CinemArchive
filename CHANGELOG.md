@@ -17,6 +17,7 @@ number is chosen.
 
 - **Android:** Lists now animate as they change. Filtering or sorting the Library, marking an episode watched in Up Next, and answering a friend request let rows fade in and out and glide into place instead of jumping.
 - **Android:** Segmented choices, filter toggles, the navigation bar, the New Title button and Up Next's mark-watched button give a light haptic tick when tapped, and all of them use the same press-and-release motion.
+- **Android:** In Up Next and the Library's list view, grouped rows now round their corners smoothly when a neighbor leaves or arrives, so the group re-forms around the gap instead of snapping.
 - Titles and seasons now keep the 50 top-billed cast members instead of TMDB's full list, which runs past 1,600 people for some long-running series. The web library and friend libraries on both clients show only the top 50 straight away. Elsewhere, such as the Android library and shared links, titles already in your library keep their full cast until their credits are next refreshed.
 
 ## [1.38.1] - 2026-10-22

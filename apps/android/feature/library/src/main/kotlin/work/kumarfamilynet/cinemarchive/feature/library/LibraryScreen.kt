@@ -70,7 +70,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ProfileAvatarButton
 import work.kumarfamilynet.cinemarchive.core.designsystem.StatusBadge
-import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
+import work.kumarfamilynet.cinemarchive.core.designsystem.animateGroupedItemShape
 import work.kumarfamilynet.cinemarchive.core.designsystem.ContentReadingMaxWidth
 import work.kumarfamilynet.cinemarchive.core.designsystem.pinchToResizeGrid
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
@@ -335,7 +335,7 @@ fun LibraryScreen(
                             itemsIndexed(group, key = { _, title -> title.id }) { index, title ->
                                 LibraryListRow(
                                     title,
-                                    shape = groupedItemShape(isFirst = index == 0, isLast = index == group.lastIndex),
+                                    shape = animateGroupedItemShape(isFirst = index == 0, isLast = index == group.lastIndex),
                                     onClick = { onTitleClick(title.id) },
                                     modifier = Modifier.animatedListItem(this),
                                 )

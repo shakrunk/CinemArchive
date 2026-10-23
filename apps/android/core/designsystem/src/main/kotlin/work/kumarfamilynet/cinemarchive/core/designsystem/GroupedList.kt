@@ -1,7 +1,11 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /* ── M3 Expressive grouped list container ─────────────────────────────────────
@@ -24,3 +28,29 @@ fun groupedItemShape(isFirst: Boolean, isLast: Boolean): Shape = RoundedCornerSh
     bottomEnd = if (isLast) GroupedOuterCorner else GroupedInnerCorner,
     bottomStart = if (isLast) GroupedOuterCorner else GroupedInnerCorner,
 )
+
+/**
+ * [groupedItemShape] for a group whose rows come and go, such as a filtered or synced list: when a
+ * neighbour leaves or arrives the row's corners ease between [outerCorner] and [innerCorner]
+ * instead of snapping, so the group re-forms around the gap as the rows glide into place (see
+ * [animatedListItem]). A static group keeps [groupedItemShape].
+ */
+@Composable
+fun animateGroupedItemShape(
+    isFirst: Boolean,
+    isLast: Boolean,
+    outerCorner: Dp = GroupedOuterCorner,
+    innerCorner: Dp = GroupedInnerCorner,
+): Shape {
+    val top by animateDpAsState(
+        targetValue = if (isFirst) outerCorner else innerCorner,
+        animationSpec = ArchiveMotion.defaultSpatialSpec(),
+        label = "groupedTopCorner",
+    )
+    val bottom by animateDpAsState(
+        targetValue = if (isLast) outerCorner else innerCorner,
+        animationSpec = ArchiveMotion.defaultSpatialSpec(),
+        label = "groupedBottomCorner",
+    )
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomEnd = bottom, bottomStart = bottom)
+}

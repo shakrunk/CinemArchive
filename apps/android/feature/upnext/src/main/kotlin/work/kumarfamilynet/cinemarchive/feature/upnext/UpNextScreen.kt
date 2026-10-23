@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
+import work.kumarfamilynet.cinemarchive.core.designsystem.animateGroupedItemShape
 import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 import work.kumarfamilynet.cinemarchive.core.designsystem.pressScale
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberHapticClick
@@ -306,7 +307,7 @@ fun UpNextScreen(
                 ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     FreshFromTheLobbyCard(
                         entry,
-                        shape = groupShape(index, board.freshFromTheLobby.size),
+                        shape = upNextGroupShape(index, board.freshFromTheLobby.size),
                         onOpen = { openPostShow(entry) },
                     )
                 }
@@ -317,7 +318,7 @@ fun UpNextScreen(
                     MarqueeCard(
                         entry,
                         now,
-                        shape = groupShape(index, board.onTheMarquee.size),
+                        shape = upNextGroupShape(index, board.onTheMarquee.size),
                         onOpen = { onTitleClick(entry.outing.titleId) },
                         onCancel = { onCancelOuting(entry.outing.id) },
                         onViewTicket = { onViewTicket(entry) },
@@ -341,7 +342,7 @@ fun UpNextScreen(
                 ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     OnThisDayCard(
                         entry,
-                        shape = groupShape(index, board.onThisDay.size),
+                        shape = upNextGroupShape(index, board.onThisDay.size),
                         onOpen = { onTitleClick(entry.outing.titleId) },
                     )
                 }
@@ -375,7 +376,7 @@ fun UpNextScreen(
                 ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     CaughtUpCard(
                         action = action,
-                        shape = groupShape(index, finales.size),
+                        shape = upNextGroupShape(index, finales.size),
                         onOpen = { onTitleClick(action.snapshot.id) },
                         onUndo = { onUndoEpisode(action.snapshot.id) },
                         onFinish = { onMarkSeriesWatched(action.snapshot.id) },
@@ -386,7 +387,7 @@ fun UpNextScreen(
                 ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     ContinueWatchingCard(
                         title,
-                        shape = groupShape(index, watching.size),
+                        shape = upNextGroupShape(index, watching.size),
                         onOpen = { onTitleClick(title.id) },
                         onMarkWatched = { onMarkWatched(title) },
                         action = episodeActions[title.id],
@@ -409,7 +410,7 @@ fun UpNextScreen(
             }
             itemsIndexed(board.watchlist, key = { _, it -> it.id }) { index, title ->
                 ReadingWidthColumn(Modifier.animatedListItem(this)) {
-                    WatchlistCard(title, shape = groupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
+                    WatchlistCard(title, shape = upNextGroupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
                 }
             }
         }
@@ -447,13 +448,16 @@ private val GroupInnerCorner = 6.dp
 /** Rows of the same card type stacked back-to-back (no header between them) read as one
  *  group rather than a stack of independent cards: only the group's outermost corners get
  *  the full radius, the touching edges in between get a small one, and [Arrangement.spacedBy]
- *  above still leaves a thin seam between rows so they don't fuse into a single hitbox. */
-private fun groupShape(index: Int, count: Int): RoundedCornerShape {
-    if (count <= 1) return RoundedCornerShape(GroupOuterCorner)
-    val top = if (index == 0) GroupOuterCorner else GroupInnerCorner
-    val bottom = if (index == count - 1) GroupOuterCorner else GroupInnerCorner
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
-}
+ *  above still leaves a thin seam between rows so they don't fuse into a single hitbox. Rows
+ *  leave the board as they're watched or cancelled, so the corners ease rather than snap. */
+@Composable
+private fun upNextGroupShape(index: Int, count: Int): Shape =
+    animateGroupedItemShape(
+        isFirst = index == 0,
+        isLast = index == count - 1,
+        outerCorner = GroupOuterCorner,
+        innerCorner = GroupInnerCorner,
+    )
 
 @Composable
 private fun FreshFromTheLobbyCard(entry: UpNextOuting, shape: Shape, onOpen: () -> Unit) {

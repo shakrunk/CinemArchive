@@ -34,9 +34,15 @@ unaffected. Artwork, people/credits, genres, season inventories, recommendations
 trailers, and streaming availability continue to come from TMDB. These provider
 IDs and artwork paths are not interchangeable with TVDB's.
 
-Episode metadata uses TVDB's official aired order in English. It is applied only
-when the complete episode-number set agrees with TMDB, the season numbers match,
-and known air dates do not conflict. Disagreements retain the TMDB season so a
+Episode metadata uses TVDB's official aired order in English. That listing ignores
+its `season` parameter and returns every season, so the adapter keeps only the
+requested season's rows. Metadata is applied only when that season's complete
+episode-number set agrees with TMDB and known air dates agree. Air dates agree when
+every dated episode matches, or when every one is shifted by the same single day
+(TMDB often lists a streaming release on the evening before TVDB's US Eastern or
+official release date); TVDB's date then wins. A one-day shift is rejected when any
+two releases in the season are a day apart, because on a daily show that is what
+an off-by-one numbering mismatch looks like. Disagreements retain the TMDB season so a
 provider switch cannot silently move watched episodes. Empty TVDB fields retain
 TMDB values. Missing keys, missing mappings, and upstream errors also fall back.
 Successful TVDB overlays include `metadata_source: "tvdb"` and `tvdb_id` in the

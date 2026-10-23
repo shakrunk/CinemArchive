@@ -4,6 +4,19 @@ const record = (value: unknown): RecordData =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordData : {}
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value : undefined
 const positiveId = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) > 0
+const day = (date: string) => Date.parse(`${date}T00:00:00Z`) / (24 * 60 * 60 * 1000)
+
+/** Known [TMDB, TVDB] air-date pairs agree, or all differ by the same single
+ *  day: TMDB often lists a release on the evening before TVDB's US Eastern or
+ *  official release date. A one-day shift is only trusted when no two releases
+ *  are a day apart, since on a daily show it is what misnumbering looks like. */
+function airDatesAgree(pairs: [string, string][]): boolean {
+  const shifts = pairs.map(([tmdb, tvdb]) => day(tvdb) - day(tmdb))
+  if (shifts.every(shift => shift === 0)) return true
+  if (Math.abs(shifts[0]) !== 1 || shifts.some(shift => shift !== shifts[0])) return false
+  const releases = [...new Set(pairs.map(([tmdb]) => day(tmdb)))].sort((a, b) => a - b)
+  return releases.every((release, i) => i === 0 || release - releases[i - 1] > 1)
+}
 
 interface Options {
   apiKey?: string
@@ -104,21 +117,25 @@ export function createTvdb(options: Options) {
         const body = await request(`/series/${id}/episodes/official/eng?season=${seasonNumber}&page=${page}`)
         const rows = record(body.data).episodes
         if (!Array.isArray(rows)) return base
-        episodes.push(...rows.map(record))
+        // The translated episode listing ignores `season` and returns every season.
+        episodes.push(...rows.map(record).filter(episode => episode.seasonNumber === seasonNumber))
         if (!record(body.links).next) break
         if (page === 19) return base // Never apply a truncated season.
       }
       // A numbering disagreement can attach metadata to the wrong watched episode.
-      // Require equal episode sets and matching known air dates before applying it.
+      // Require equal episode sets and agreeing known air dates before applying it.
       const mapped = new Map(episodes.map(episode => [episode.number, episode]))
       if (mapped.size !== episodes.length || episodes.length !== tmdb.episodes.length) return base
-      const compatible = tmdb.episodes.every(value => {
+      const dated: [string, string][] = []
+      for (const value of tmdb.episodes) {
         const episode = record(value)
         const match = mapped.get(episode.episode_number)
-        return match && match.seasonNumber === seasonNumber &&
-          !(text(episode.air_date) && text(match.aired) && episode.air_date !== match.aired)
-      })
-      if (!compatible) return base
+        if (!match) return base
+        const tmdbDate = text(episode.air_date)
+        const tvdbDate = text(match.aired)
+        if (tmdbDate && tvdbDate) dated.push([tmdbDate, tvdbDate])
+      }
+      if (!airDatesAgree(dated)) return base
       return {
         ...tmdb,
         metadata_source: 'tvdb',

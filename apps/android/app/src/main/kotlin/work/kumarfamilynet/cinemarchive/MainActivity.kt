@@ -60,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -76,10 +77,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
@@ -91,6 +94,7 @@ import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import work.kumarfamilynet.cinemarchive.core.designsystem.GlassBackdrop
@@ -255,6 +259,16 @@ class MainActivity : ComponentActivity() {
             val showBuildBannerFlow = remember(isDebugBuild) { preferencesRepository.observeDevShowBuildBanner(isDebugBuild) }
             val showBuildBanner by showBuildBannerFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
+                // The window theme pins light-on-dark system bar icons, which vanish against a
+                // light palette (Light, Catppuccin Latte); follow the resolved background instead.
+                val lightSystemBars = MaterialTheme.colorScheme.background.luminance() > 0.5f
+                val view = LocalView.current
+                SideEffect {
+                    WindowCompat.getInsetsController(window, view).apply {
+                        isAppearanceLightStatusBars = lightSystemBars
+                        isAppearanceLightNavigationBars = lightSystemBars
+                    }
+                }
                 Surface {
                     Box(modifier = Modifier.fillMaxSize()) {
                         val openedToken = sharedToken

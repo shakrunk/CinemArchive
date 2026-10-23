@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-10-22
+
 ### Fixed
 
 - **Web:** Large libraries no longer fail to load with "Loading your library timed out". Your library now loads in batches of 100 titles, and each title brings its 50 top-billed cast members rather than the full credits list.

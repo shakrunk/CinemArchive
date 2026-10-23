@@ -1095,7 +1095,7 @@ private fun CinemArchiveApp(
                                 onAddToCalendar = addSharedToCalendar,
                                 showBack = false,
                             )
-                            SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
+                            SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false, libraryTmdbIds = remember(repository) { repository.observeLibraryTmdbIds() })
                             SettingsCategory.NAVIGATION -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.MOVIEGOING -> moviegoingScreen(closeOverlay, false)
                             SettingsCategory.DATA_RECOVERY -> dataRecoveryScreen(closeOverlay, false)
@@ -1155,6 +1155,7 @@ private fun CinemArchiveApp(
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refreshMetadata(current.titleId) },
                     noirPins = runtime.titlePins,
+                    onUnlockPalette = { palette -> coroutineScope.launch { preferencesRepository.unlockPalette(palette) } },
                     onNoirMode = { mode ->
                         if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)
                             noirPreview = work.kumarfamilynet.cinemarchive.core.model.NoirPreview(current.titleId, mode)
@@ -1232,7 +1233,7 @@ private fun CinemArchiveApp(
                     socialSource = titleSocialSource,
                     onBack = { overlay = Overlay.Friends },
                 )
-                Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile)
+                Overlay.Appearance -> AppearanceRoute(preferencesRepository, onBack = openProfile, libraryTmdbIds = remember(repository) { repository.observeLibraryTmdbIds() })
                 Overlay.Navigation -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = openProfile)
                 Overlay.Moviegoing -> moviegoingScreen(openProfile, true)
                 Overlay.DataRecovery -> dataRecoveryScreen(openProfile, true)

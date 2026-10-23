@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -48,6 +50,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
@@ -59,15 +64,32 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
+import work.kumarfamilynet.cinemarchive.core.model.discoveredSecretPalettes
+import work.kumarfamilynet.cinemarchive.core.model.isPaletteAvailable
+import work.kumarfamilynet.cinemarchive.core.model.isSecret
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
-private data class PaletteSwatch(val palette: ArchivePalette, val caption: String, val c1: Color, val c2: Color, val c3: Color)
+private data class PaletteSwatch(
+    val palette: ArchivePalette,
+    val caption: String,
+    val c1: Color,
+    val c2: Color,
+    val c3: Color,
+    /** Shown instead of [caption] while a secret palette is discovered but not yet earned. */
+    val lockedCaption: String? = null,
+)
 
 private val PALETTE_SWATCHES = listOf(
     PaletteSwatch(ArchivePalette.BRAND, "The cinematic amber default", Color(0xFFE9B266), Color(0xFF8FB6CB), Color(0xFFD76A49)),
     PaletteSwatch(ArchivePalette.MATERIAL_YOU, "Dynamic color from your device", Color(0xFFBCC2FF), Color(0xFFC6C2DB), Color(0xFFE6B8D0)),
-    PaletteSwatch(ArchivePalette.NOIR, "Unlocked · watched Spider-Man: Noir in B&W", Color(0xFFC8C8CD), Color(0xFFA0AAB4), Color(0xFFC85A41)),
-    PaletteSwatch(ArchivePalette.MATRIX, "Unlocked · took the red pill in The Matrix", Color(0xFF4ADE80), Color(0xFF5AD2D2), Color(0xFFDC4646)),
+    PaletteSwatch(
+        ArchivePalette.NOIR, "Unlocked · watched Spider-Man: Noir in B&W", Color(0xFFC8C8CD), Color(0xFFA0AAB4), Color(0xFFC85A41),
+        lockedCaption = "Unlock it: watch every episode of Spider-Noir in black & white.",
+    ),
+    PaletteSwatch(
+        ArchivePalette.MATRIX, "Unlocked · took the red pill in The Matrix", Color(0xFF4ADE80), Color(0xFF5AD2D2), Color(0xFFDC4646),
+        lockedCaption = "Unlock it: take the red pill after logging a viewing of The Matrix.",
+    ),
     // Stands for all four Catppuccin flavors: one card, with the flavor picked inside it once
     // selected, so they don't crowd the list. Mocha's mauve, blue and red are the swatch.
     PaletteSwatch(ArchivePalette.CATPPUCCIN_MOCHA, "Soothing pastels in four flavors", Color(0xFFCBA6F7), Color(0xFF89B4FA), Color(0xFFF38BA8)),
@@ -102,9 +124,15 @@ fun AppearanceRoute(
     // trailing pane rather than having been navigated to — a back arrow there would point at
     // nothing to go back to.
     showBack: Boolean = true,
+    // TMDB ids of everything in the library: a secret palette's card appears (locked) only once
+    // its title has been added in some form.
+    libraryTmdbIds: Flow<Set<Int>> = emptyFlow(),
 ) {
     val themeMode by preferencesRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ArchiveThemeMode.DARK)
     val palette by preferencesRepository.observePalette().collectAsStateWithLifecycle(initialValue = ArchivePalette.BRAND)
+    val unlockedPalettes by preferencesRepository.observeUnlockedPalettes().collectAsStateWithLifecycle(initialValue = emptySet())
+    val discoveredPalettes by remember(libraryTmdbIds) { libraryTmdbIds.map(::discoveredSecretPalettes) }
+        .collectAsStateWithLifecycle(initialValue = emptySet())
     val fontFamily by preferencesRepository.observeFontFamily().collectAsStateWithLifecycle(initialValue = ArchiveFontFamily.DEFAULT)
     val fontScale by preferencesRepository.observeFontScale().collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
     val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
@@ -113,6 +141,8 @@ fun AppearanceRoute(
     AppearanceScreen(
         themeMode = themeMode,
         palette = palette,
+        unlockedPalettes = unlockedPalettes,
+        discoveredPalettes = discoveredPalettes,
         fontFamily = fontFamily,
         fontScale = fontScale,
         glassBlur = glassBlur,
@@ -130,6 +160,8 @@ fun AppearanceRoute(
 private fun AppearanceScreen(
     themeMode: ArchiveThemeMode,
     palette: ArchivePalette,
+    unlockedPalettes: Set<ArchivePalette>,
+    discoveredPalettes: Set<ArchivePalette>,
     fontFamily: ArchiveFontFamily,
     fontScale: ArchiveFontScale,
     glassBlur: Boolean,
@@ -188,17 +220,27 @@ private fun AppearanceScreen(
             }
             // One grouped container rather than a flat run of separate cards, so the
             // palettes read as a single set of mutually exclusive options (#141).
-            itemsIndexed(PALETTE_SWATCHES) { index, swatch ->
+            // Secret palettes stay off the list until their title is in the library (or they are
+            // already earned/active), so an unfound easter egg isn't spoiled by a locked card.
+            val visibleSwatches = PALETTE_SWATCHES.filter { swatch ->
+                !swatch.palette.isSecret ||
+                    swatch.palette in unlockedPalettes ||
+                    swatch.palette in discoveredPalettes ||
+                    swatch.palette == palette
+            }
+            itemsIndexed(visibleSwatches) { index, swatch ->
                 val catppuccin = swatch.palette.isCatppuccin()
                 val selected = if (catppuccin) palette.isCatppuccin() else swatch.palette == palette
+                val locked = !isPaletteAvailable(swatch.palette, unlockedPalettes) && !selected
                 ReadingWidthColumn {
                     PaletteCard(
                         swatch = swatch,
                         label = if (catppuccin) "Catppuccin" else swatch.palette.label(),
                         selected = selected,
+                        locked = locked,
                         shape = groupedItemShape(
                             isFirst = index == 0,
-                            isLast = index == PALETTE_SWATCHES.lastIndex,
+                            isLast = index == visibleSwatches.lastIndex,
                         ),
                         // Re-tapping the selected Catppuccin card keeps its current flavor.
                         onClick = { if (!selected) onSetPalette(swatch.palette) },
@@ -420,10 +462,12 @@ private fun PaletteCard(
     selected: Boolean,
     shape: Shape,
     onClick: () -> Unit,
+    locked: Boolean = false,
     flavorPicker: (@Composable () -> Unit)? = null,
 ) {
     Surface(
         onClick = onClick,
+        enabled = !locked,
         shape = shape,
         // The selected row lifts to a higher container tone as well as taking the outline —
         // inside a grouped container a border alone reads as a seam, not a selection.
@@ -433,7 +477,7 @@ private fun PaletteCard(
             MaterialTheme.colorScheme.surfaceContainer
         },
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = Modifier.fillMaxWidth().padding(bottom = GroupedSeamGap),
+        modifier = Modifier.fillMaxWidth().padding(bottom = GroupedSeamGap).alpha(if (locked) 0.55f else 1f),
     ) {
         Column {
             Row(
@@ -447,10 +491,16 @@ private fun PaletteCard(
                     Swatch(swatch.c3, offset = (-16).dp)
                     Column(modifier = Modifier.padding(start = 4.dp)) {
                         Text(label, style = MaterialTheme.typography.titleSmall)
-                        Text(swatch.caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (locked) swatch.lockedCaption ?: swatch.caption else swatch.caption,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
-                if (selected) {
+                if (locked) {
+                    Icon(Icons.Filled.Lock, contentDescription = "Locked", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else if (selected) {
                     Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }

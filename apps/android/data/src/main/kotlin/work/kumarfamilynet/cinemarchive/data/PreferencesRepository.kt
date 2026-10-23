@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -15,6 +16,7 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 import work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences
+import work.kumarfamilynet.cinemarchive.core.model.isSecret
 
 private val Context.preferencesDataStore by preferencesDataStore(name = "cinemarchive_prefs")
 
@@ -28,7 +30,8 @@ class PreferencesRepository(context: Context) {
     private val dataStore = context.preferencesDataStore
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val paletteKey = stringPreferencesKey("palette")
-    private val fontFamilyKey = stringPreferencesKey("font_family")
+    private val unlockedPalettesKey = stringSetPreferencesKey("unlocked_palettes")
+    private val fontFamilyKey =stringPreferencesKey("font_family")
     private val fontScaleKey = stringPreferencesKey("font_scale")
     private val libraryViewModeKey = stringPreferencesKey("library_view_mode")
     private val autoCheckUpdatesKey = booleanPreferencesKey("auto_check_updates")
@@ -78,6 +81,20 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setPalette(palette: ArchivePalette) {
         dataStore.edit { it[paletteKey] = palette.name }
+    }
+
+    /** Secret palettes earned on this device (Spider-Noir, The Construct). Only gated palettes
+     *  are tracked; everything else is always available. */
+    fun observeUnlockedPalettes(): Flow<Set<ArchivePalette>> = dataStore.data.map { preferences ->
+        preferences[unlockedPalettesKey].orEmpty()
+            .mapNotNull { stored -> runCatching { ArchivePalette.valueOf(stored) }.getOrNull() }
+            .filter { it.isSecret }
+            .toSet()
+    }
+
+    suspend fun unlockPalette(palette: ArchivePalette) {
+        if (!palette.isSecret) return
+        dataStore.edit { it[unlockedPalettesKey] = it[unlockedPalettesKey].orEmpty() + palette.name }
     }
 
     fun observeFontFamily(): Flow<ArchiveFontFamily> = dataStore.data.map { preferences ->

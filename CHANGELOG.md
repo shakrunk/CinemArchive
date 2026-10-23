@@ -9,6 +9,9 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android:** The Spider-Noir and The Construct (Matrix) themes are now secret, as on the web: hidden until the title is in your library, then locked until earned (watching Spider-Noir in black & white, or taking the red pill after logging The Matrix).
 ## [1.40.0] - 2026-10-23
 
 ### Added

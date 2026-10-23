@@ -282,6 +282,8 @@ fun TitleDetailRoute(
     onScheduled: () -> Unit = {},
     noirPins: work.kumarfamilynet.cinemarchive.data.TitlePinsRepository? = null,
     onNoirMode: (String?) -> Unit = {},
+    // Called when this title earns a secret palette (Spider-Noir B&W, The Matrix red pill).
+    onUnlockPalette: (work.kumarfamilynet.cinemarchive.core.model.ArchivePalette) -> Unit = {},
 ) {
     val ticketOutings by remember(outingsRepository, titleId) { outingsRepository.observeOutingsForTitle(titleId) }.collectAsStateWithLifecycle<List<CinemaOuting>?>(initialValue = null)
     val viewModel: TitleDetailViewModel =
@@ -290,6 +292,10 @@ fun TitleDetailRoute(
     var noirLoggedMode by rememberSaveable(titleId) { mutableStateOf<String?>(null) }
     val titleEditError by viewModel.titleEditError.collectAsStateWithLifecycle()
     val languageTag = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].toLanguageTag()
+    val noirBwEarned = detail?.let { "bw" in work.kumarfamilynet.cinemarchive.core.model.noirProgress(it).earned } == true
+    androidx.compose.runtime.LaunchedEffect(noirBwEarned) {
+        if (noirBwEarned) onUnlockPalette(work.kumarfamilynet.cinemarchive.core.model.ArchivePalette.NOIR)
+    }
     val catalogKey = detail?.let { current -> current.tmdbId?.takeIf { it > 0 }?.let {
             work.kumarfamilynet.cinemarchive.core.model.CatalogExtrasKey(it, current.type,
                 work.kumarfamilynet.cinemarchive.core.model.catalogWatchRegion(languageTag))
@@ -329,7 +335,10 @@ fun TitleDetailRoute(
                 onNoirMode(draft.colorMode)
             }
         },
-        noirContent = noirPins?.let { source -> { current -> NoirDetailControls(current, source, noirLoggedMode, onNoirMode) } },
+        noirContent = { current ->
+            noirPins?.let { source -> NoirDetailControls(current, source, noirLoggedMode, onNoirMode) }
+            MatrixPillControls(current) { onUnlockPalette(work.kumarfamilynet.cinemarchive.core.model.ArchivePalette.MATRIX) }
+        },
         onDeleteEpisodeWatch = viewModel::deleteEpisodeWatch,
         onSaveViewing = viewModel::saveViewing,
         onDeleteViewing = viewModel::deleteViewing,

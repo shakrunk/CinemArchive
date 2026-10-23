@@ -52,6 +52,7 @@ import work.kumarfamilynet.cinemarchive.data.ShareScopeTarget
 import work.kumarfamilynet.cinemarchive.data.SharedAccessKey
 import work.kumarfamilynet.cinemarchive.data.SharingRepository
 import work.kumarfamilynet.cinemarchive.data.SharingRules
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 /**
  * Share-link management (web `Profile.tsx` SharingSection): create a read-only link with a
@@ -153,7 +154,7 @@ fun SharingRoute(
                 ReadingWidthColumn { Text("No active links.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp)) }
             }
             items(active, key = { it.id }) { k ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     val name = k.label?.takeIf { it.isNotBlank() } ?: "Untitled link"
                     var menuOpen by remember { mutableStateOf(false) }
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {

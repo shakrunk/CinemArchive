@@ -1,13 +1,10 @@
 package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,7 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -42,6 +39,9 @@ import androidx.compose.ui.zIndex
  *  glyph is centred in the pill rather than in the taller bar. */
 private val INDICATOR_TOP_INSET = 10.dp
 private val INDICATOR_HEIGHT = 34.dp
+
+/** How far a destination's icon sinks while held, see [rememberPressScale]. */
+private const val NavIconPressedScale = 0.8f
 
 /**
  * [icon] is the resting/unselected glyph (typically an outlined variant); [selectedIcon]
@@ -68,10 +68,15 @@ fun <T> MorphingBottomNav(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
+    // Over a [LocalGlassBackdrop] the bar is glass, blurring the content that scrolls on beneath
+    // it; without one it stays the solid surface it has always been.
+    val backdrop = LocalGlassBackdrop.current
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = if (backdrop != null) Color.Transparent else MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .glassFill(backdrop, color = MaterialTheme.colorScheme.surface, background = MaterialTheme.colorScheme.background),
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -107,14 +112,9 @@ fun <T> MorphingBottomNav(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
                         val interactionSource = remember { MutableInteractionSource() }
-                        val isPressed by interactionSource.collectIsPressedAsState()
-                        // Press-down is a quick, crisp shrink; release springs back past 1x
-                        // before settling — the bounce itself reads as "bolder" on landing.
-                        val iconScale by animateFloatAsState(
-                            targetValue = if (isPressed) 0.8f else 1f,
-                            animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
-                            label = "navIconScale",
-                        )
+                        // The icon sinks further than a button does: it is small, and the bounce
+                        // back past 1x is what reads as "bolder" on landing.
+                        val iconScale = rememberPressScale(interactionSource, pressedScale = NavIconPressedScale)
                         // Lay the item out from the indicator's own top inset rather
                         // than centring icon+label in the full 80dp bar: centring
                         // pushed the icon's centre below the pill's, so the glyph
@@ -126,7 +126,8 @@ fun <T> MorphingBottomNav(
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = LocalIndication.current,
-                                ) { onSelect(destination.value) }
+                                    onClick = rememberHapticClick { onSelect(destination.value) },
+                                )
                                 .padding(top = INDICATOR_TOP_INSET),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Top,
@@ -139,7 +140,7 @@ fun <T> MorphingBottomNav(
                                     if (isSelected) destination.selectedIcon else destination.icon,
                                     contentDescription = destination.label,
                                     tint = color,
-                                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                                    modifier = Modifier.pressScale(iconScale),
                                 )
                             }
                             if (!compact) Text(
@@ -217,12 +218,7 @@ fun <T> MorphingNavigationRail(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
                         val interactionSource = remember { MutableInteractionSource() }
-                        val isPressed by interactionSource.collectIsPressedAsState()
-                        val iconScale by animateFloatAsState(
-                            targetValue = if (isPressed) 0.8f else 1f,
-                            animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
-                            label = "railIconScale",
-                        )
+                        val iconScale = rememberPressScale(interactionSource, pressedScale = NavIconPressedScale)
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -230,7 +226,8 @@ fun <T> MorphingNavigationRail(
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = LocalIndication.current,
-                                ) { onSelect(destination.value) }
+                                    onClick = rememberHapticClick { onSelect(destination.value) },
+                                )
                                 .padding(top = INDICATOR_TOP_INSET),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Top,
@@ -243,7 +240,7 @@ fun <T> MorphingNavigationRail(
                                     if (isSelected) destination.selectedIcon else destination.icon,
                                     contentDescription = destination.label,
                                     tint = color,
-                                    modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                                    modifier = Modifier.pressScale(iconScale),
                                 )
                             }
                             if (!compact) Text(

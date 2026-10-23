@@ -1,5 +1,6 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -171,6 +172,17 @@ class MediaProxyParsingTest {
 
         assertEquals(listOf("Bryan Cranston", "Aaron Paul"), cast.map { it.name })
         assertEquals("Walter White", cast.first().characterName)
+    }
+
+    /** Long-running series list 1,600+ aggregate cast members; only the top-billed are stored. */
+    @Test
+    fun `tv cast keeps only the top-billed members`() {
+        val members = (MAX_STORED_CAST + 20 downTo 1).joinToString(",") {
+            """{"id": $it, "name": "Actor $it", "order": $it, "roles": []}"""
+        }
+        val cast = parseCast(JSONObject("""{"aggregate_credits": {"cast": [$members]}}"""), MediaType.TV)
+
+        assertEquals((1..MAX_STORED_CAST).toList(), cast.map { it.tmdbPersonId })
     }
 
     @Test

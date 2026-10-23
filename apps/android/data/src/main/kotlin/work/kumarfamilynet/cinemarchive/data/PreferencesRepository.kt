@@ -38,6 +38,7 @@ class PreferencesRepository(context: Context) {
     private val navigationOrderKey = stringPreferencesKey("navigation_order")
     private val navigationHiddenKey = stringPreferencesKey("navigation_hidden")
     private val navigationCompactKey = booleanPreferencesKey("navigation_compact")
+    private val glassBlurKey = booleanPreferencesKey("glass_blur")
 
     fun observeNavigation(): Flow<NavigationPreferences> = dataStore.data.map(::navigation)
 
@@ -97,6 +98,16 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setFontScale(fontScale: ArchiveFontScale) {
         dataStore.edit { it[fontScaleKey] = fontScale.name }
+    }
+
+    /** Whether the bottom navigation bar blurs the content scrolling beneath it, rather than
+     *  standing as a solid bar. On by default; Android-only, like the rest of these prefs. */
+    fun observeGlassBlur(): Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[glassBlurKey] ?: true
+    }
+
+    suspend fun setGlassBlur(enabled: Boolean) {
+        dataStore.edit { it[glassBlurKey] = enabled }
     }
 
     fun observeLibraryViewMode(): Flow<LibraryViewMode> = dataStore.data.map { preferences ->

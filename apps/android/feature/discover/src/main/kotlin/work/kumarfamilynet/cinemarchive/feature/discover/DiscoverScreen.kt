@@ -1,10 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.discover
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +57,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import work.kumarfamilynet.cinemarchive.core.designsystem.ArchiveMotion
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
@@ -74,6 +71,9 @@ import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.CatalogLookup
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 
 private class DiscoverViewModelFactory(
     private val repository: DiscoverRepository,
@@ -209,6 +209,7 @@ fun DiscoverScreen(
 ) {
     val showShelves = mode == DiscoverMode.TITLES && search.isBlank() && genreId == null && shelves.library.titles.isNotEmpty()
     val gridState = rememberLazyGridState()
+    ScrollToTopOnReselect(gridState)
     val collapsed = rememberCollapseOnScroll(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
     androidx.compose.runtime.LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
@@ -231,8 +232,8 @@ fun DiscoverScreen(
 
         AnimatedVisibility(
             visible = !collapsed,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+            enter = ArchiveMotion.foldIn,
+            exit = ArchiveMotion.foldOut,
         ) {
             Column {
                 DiscoverControls(
@@ -271,7 +272,7 @@ fun DiscoverScreen(
                 Button(onClick = onRetry) { Text("Retry") }
             }
             mode != DiscoverMode.TITLES && selectedLookup == null -> LazyColumn(
-                modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
+                modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp + LocalBottomBarClearance.current),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (lookups.isEmpty()) item {
@@ -311,7 +312,7 @@ fun DiscoverScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = posterMinTileWidth(gridColumns)),
                         state = gridState,
-                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp),
+                        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier
@@ -335,6 +336,7 @@ fun DiscoverScreen(
                                 columns = gridColumns,
                                 onOpen = { onOpenTitle(title) },
                                 onAdd = { onAdd(title) },
+                                modifier = Modifier.animatedListItem(this),
                             )
                         }
                         if (search.isBlank() && hasMore) {
@@ -442,6 +444,7 @@ private fun DiscoverCard(
     columns: Int,
     onOpen: () -> Unit,
     onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val showMeta = columns <= 2
     val showTitle = columns <= 3
@@ -450,6 +453,7 @@ private fun DiscoverCard(
         imageUrl = title.posterUrl,
         cornerRadius = posterGridCornerRadius(columns),
         onClick = onOpen,
+        modifier = modifier,
     ) {
         // Both states share the same corner now — only the fill (solid vs. tonal) and icon
         // change. A solid-vs-solid circle that swapped corners by state (#??) read as two

@@ -80,6 +80,14 @@ private val NoirScheme = DarkScheme.copy(
     primaryContainer = Color(0xFF3A3833),
     onPrimaryContainer = Color(0xFFEDE9E1),
     secondary = Color(0xFF9AABC2),
+    // Neutral containers rather than the material baseline's purples, which DarkScheme leaves in
+    // place and Noir would otherwise inherit: the status badges and the nav's selection pill read
+    // grey, as the web's noir badges do off its greyed --amber/--moon. Tertiary itself stays the
+    // ember red Noir keeps as its one accent.
+    secondaryContainer = Color(0xFF2E2E33),
+    onSecondaryContainer = Color(0xFFDCDCE0),
+    tertiaryContainer = Color(0xFF3A3A3F),
+    onTertiaryContainer = Color(0xFFE6E6EA),
     background = Color(0xFF0D0D0E),
     onBackground = Color(0xFFEDECEE),
     surface = Color(0xFF171719),
@@ -150,9 +158,12 @@ fun CinemArchiveTheme(
     val baseDensity = LocalDensity.current
     val scaledDensity = Density(density = baseDensity.density, fontScale = baseDensity.fontScale * fontScale.multiplier)
 
-    CompositionLocalProvider(LocalDensity provides scaledDensity) {
+    val traits = ThemeTraits(monochrome = palette == ArchivePalette.NOIR)
+
+    CompositionLocalProvider(LocalDensity provides scaledDensity, LocalThemeTraits provides traits) {
         MaterialTheme(
             colorScheme = colors,
+            motionScheme = ArchiveMotion,
             typography = cinemArchiveTypography(fontFamily),
             shapes = CinemArchiveShapes,
             content = content,

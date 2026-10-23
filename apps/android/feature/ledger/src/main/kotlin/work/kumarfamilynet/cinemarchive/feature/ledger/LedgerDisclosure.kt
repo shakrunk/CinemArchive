@@ -2,10 +2,6 @@ package work.kumarfamilynet.cinemarchive.feature.ledger
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import work.kumarfamilynet.cinemarchive.core.designsystem.ArchiveMotion
 
 /**
  * Progressive disclosure for the Ledger's widget cards.
@@ -85,8 +82,8 @@ internal fun ColumnScope.PanelDetail(
     if (disclosure.onToggle == null) return
     AnimatedVisibility(
         visible = disclosure.expanded,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut(),
+        enter = ArchiveMotion.foldIn,
+        exit = ArchiveMotion.foldOut,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),

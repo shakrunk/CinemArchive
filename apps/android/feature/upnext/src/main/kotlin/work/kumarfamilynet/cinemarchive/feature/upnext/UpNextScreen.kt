@@ -4,13 +4,10 @@ import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 
 import android.content.Intent
 import android.provider.CalendarContract
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,8 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,7 +66,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
-import work.kumarfamilynet.cinemarchive.core.designsystem.expressiveSpring
+import work.kumarfamilynet.cinemarchive.core.designsystem.animateGroupedItemShape
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
+import work.kumarfamilynet.cinemarchive.core.designsystem.pressScale
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberHapticClick
+import work.kumarfamilynet.cinemarchive.core.designsystem.rememberPressScale
 import work.kumarfamilynet.cinemarchive.core.designsystem.PostShowSheet
 import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
 import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
@@ -96,6 +97,9 @@ import work.kumarfamilynet.cinemarchive.core.model.UpNextWatching
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
+import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
+import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
 
 class UpNextViewModel(
     private val repository: LibraryRepository,
@@ -266,6 +270,7 @@ fun UpNextScreen(
     val watching = board.watching.filterNot { it.id in finaleIds }
 
     val listState = rememberLazyListState()
+    ScrollToTopOnReselect(listState)
     val collapsed = rememberCollapseOnScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     LaunchedEffect(collapsed) { onFabExpandedChange(!collapsed) }
 
@@ -276,7 +281,7 @@ fun UpNextScreen(
     ) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp),
+            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 100.dp + LocalBottomBarClearance.current),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -303,21 +308,21 @@ fun UpNextScreen(
             }
 
             itemsIndexed(board.freshFromTheLobby, key = { _, it -> "lobby-${it.outing.id}" }) { index, entry ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     FreshFromTheLobbyCard(
                         entry,
-                        shape = groupShape(index, board.freshFromTheLobby.size),
+                        shape = upNextGroupShape(index, board.freshFromTheLobby.size),
                         onOpen = { openPostShow(entry) },
                     )
                 }
             }
 
             itemsIndexed(board.onTheMarquee, key = { _, it -> "marquee-${it.outing.id}" }) { index, entry ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     MarqueeCard(
                         entry,
                         now,
-                        shape = groupShape(index, board.onTheMarquee.size),
+                        shape = upNextGroupShape(index, board.onTheMarquee.size),
                         onOpen = { onTitleClick(entry.outing.titleId) },
                         onCancel = { onCancelOuting(entry.outing.id) },
                         onViewTicket = { onViewTicket(entry) },
@@ -326,8 +331,8 @@ fun UpNextScreen(
             }
 
             if (board.onThisDay.isNotEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "header-on-this-day") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "ON THIS DAY",
                             style = MaterialTheme.typography.labelSmall,
@@ -338,18 +343,18 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(board.onThisDay, key = { _, it -> "on-this-day-${it.outing.id}" }) { index, entry ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     OnThisDayCard(
                         entry,
-                        shape = groupShape(index, board.onThisDay.size),
+                        shape = upNextGroupShape(index, board.onThisDay.size),
                         onOpen = { onTitleClick(entry.outing.titleId) },
                     )
                 }
             }
 
             if (board.watching.isEmpty() && finales.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "empty") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "Nothing queued up yet — start something from your Library.",
                             style = MaterialTheme.typography.bodyLarge,
@@ -360,8 +365,8 @@ fun UpNextScreen(
             }
 
             if (watching.isNotEmpty() || finales.isNotEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "header-next-episode") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "NEXT EPISODE",
                             style = MaterialTheme.typography.labelSmall,
@@ -372,10 +377,10 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(finales, key = { _, it -> "finale-${it.snapshot.id}" }) { index, action ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     CaughtUpCard(
                         action = action,
-                        shape = groupShape(index, finales.size),
+                        shape = upNextGroupShape(index, finales.size),
                         onOpen = { onTitleClick(action.snapshot.id) },
                         onUndo = { onUndoEpisode(action.snapshot.id) },
                         onFinish = { onMarkSeriesWatched(action.snapshot.id) },
@@ -383,10 +388,10 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(watching, key = { _, it -> it.id }) { index, title ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     ContinueWatchingCard(
                         title,
-                        shape = groupShape(index, watching.size),
+                        shape = upNextGroupShape(index, watching.size),
                         onOpen = { onTitleClick(title.id) },
                         onMarkWatched = { onMarkWatched(title) },
                         action = episodeActions[title.id],
@@ -396,8 +401,8 @@ fun UpNextScreen(
             }
 
             if (board.watchlist.isNotEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "header-watchlist") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "ON YOUR WATCHLIST",
                             style = MaterialTheme.typography.labelSmall,
@@ -408,8 +413,8 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(board.watchlist, key = { _, it -> it.id }) { index, title ->
-                ReadingWidthColumn {
-                    WatchlistCard(title, shape = groupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
+                    WatchlistCard(title, shape = upNextGroupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
                 }
             }
         }
@@ -447,13 +452,16 @@ private val GroupInnerCorner = 6.dp
 /** Rows of the same card type stacked back-to-back (no header between them) read as one
  *  group rather than a stack of independent cards: only the group's outermost corners get
  *  the full radius, the touching edges in between get a small one, and [Arrangement.spacedBy]
- *  above still leaves a thin seam between rows so they don't fuse into a single hitbox. */
-private fun groupShape(index: Int, count: Int): RoundedCornerShape {
-    if (count <= 1) return RoundedCornerShape(GroupOuterCorner)
-    val top = if (index == 0) GroupOuterCorner else GroupInnerCorner
-    val bottom = if (index == count - 1) GroupOuterCorner else GroupInnerCorner
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
-}
+ *  above still leaves a thin seam between rows so they don't fuse into a single hitbox. Rows
+ *  leave the board as they're watched or cancelled, so the corners ease rather than snap. */
+@Composable
+private fun upNextGroupShape(index: Int, count: Int): Shape =
+    animateGroupedItemShape(
+        isFirst = index == 0,
+        isLast = index == count - 1,
+        outerCorner = GroupOuterCorner,
+        innerCorner = GroupInnerCorner,
+    )
 
 @Composable
 private fun FreshFromTheLobbyCard(entry: UpNextOuting, shape: Shape, onOpen: () -> Unit) {
@@ -576,7 +584,8 @@ private fun MarqueeCard(entry: UpNextOuting, now: Instant, shape: Shape, onOpen:
                 }
             }
         }
-        Row(modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState())) {
+        val actionsScroll = rememberScrollState()
+        Row(modifier = Modifier.padding(top = 8.dp).horizontalEdgeFade(actionsScroll).horizontalScroll(actionsScroll)) {
             TextButton(onClick = onViewTicket) {
                 Icon(Icons.Filled.QrCode, contentDescription = null, modifier = Modifier.size(16.dp))
                 Text("View ticket", modifier = Modifier.padding(start = 6.dp))
@@ -719,20 +728,15 @@ private fun ContinueWatchingCard(
             // borrows the poster's own corner rounding instead of that badge shape, plus a
             // press-shrink so it reads as a button on contact (matches SegmentedControls).
             val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val pressScale by animateFloatAsState(
-                targetValue = if (isPressed) 0.92f else 1f,
-                animationSpec = if (isPressed) tween(durationMillis = 100) else expressiveSpring(),
-                label = "markWatchedPressScale",
-            )
+            val pressScale = rememberPressScale(interactionSource, enabled = action?.busy != true)
             Surface(
-                onClick = onMarkWatched,
+                onClick = rememberHapticClick(HapticFeedbackType.Confirm, onMarkWatched),
                 enabled = action?.busy != true,
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 interactionSource = interactionSource,
-                modifier = Modifier.size(44.dp).scale(pressScale),
+                modifier = Modifier.size(44.dp).pressScale(pressScale),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.Check, contentDescription = "Mark episode watched", modifier = Modifier.size(20.dp))

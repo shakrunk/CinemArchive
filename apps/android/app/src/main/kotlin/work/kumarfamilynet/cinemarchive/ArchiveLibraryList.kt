@@ -16,6 +16,7 @@ import work.kumarfamilynet.cinemarchive.core.model.libraryFilterChoices
 import work.kumarfamilynet.cinemarchive.data.SharedLibraryTitle
 import work.kumarfamilynet.cinemarchive.data.toLibraryFilterTitle
 import work.kumarfamilynet.cinemarchive.feature.library.LibraryFilterSheet
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 /** Friend and anonymous viewers share read-only controls over their already-scoped graph. */
 @Composable
@@ -45,10 +46,10 @@ internal fun ArchiveLibraryList(
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (shown.isEmpty()) item { Text(if (titles.isEmpty()) emptyMessage else "No matching titles. Reset filters to see the shared archive.") }
             groups.forEach { group ->
-                group.label?.let { label -> item(key = "group:${group.key}") { Text(label, style = MaterialTheme.typography.titleMedium) } }
+                group.label?.let { label -> item(key = "group:${group.key}") { Text(label, Modifier.animatedListItem(this), style = MaterialTheme.typography.titleMedium) } }
                 items(group.titles, key = { it.id }) { title ->
                     Surface(onClick = { onSelect(title.id) }, shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                        color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.animatedListItem(this).fillMaxWidth()) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             AsyncImage(title.posterUrl, contentDescription = null, modifier = Modifier.size(48.dp, 72.dp))
                             Column(Modifier.padding(start = 12.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

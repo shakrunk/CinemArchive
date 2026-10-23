@@ -348,8 +348,8 @@ alter table share_scopes enable row level security;
 
 create policy "share_scopes: owner full access"
   on share_scopes for all
-  using (auth.uid() = owner_user_id)
-  with check (auth.uid() = owner_user_id);
+  using ((select auth.uid()) = owner_user_id)
+  with check ((select auth.uid()) = owner_user_id);
 
 create trigger share_scopes_updated_at
   before update on share_scopes
@@ -413,8 +413,8 @@ $$;
 -- Authenticated owner: full CRUD
 create policy "titles: owner full access"
   on titles for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- Shared-link visitor or accepted friend, subject to any share_scopes
 -- narrowing (see can_view_title above). Replaces the former separate
@@ -431,8 +431,8 @@ create policy "titles: shared/friend read"
 
 create policy "seasons: owner full access"
   on seasons for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "seasons: shared/friend read"
   on seasons for select
@@ -450,8 +450,8 @@ create policy "seasons: shared/friend read"
 
 create policy "viewings: owner full access"
   on viewings for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "viewings: shared/friend read"
   on viewings for select
@@ -470,8 +470,8 @@ create policy "viewings: shared/friend read"
 
 create policy "episodes: owner full access"
   on episodes for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "episodes: shared/friend read"
   on episodes for select
@@ -485,8 +485,8 @@ create policy "episodes: shared/friend read"
 
 create policy "episode_watch_events: owner full access"
   on episode_watch_events for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "episode_watch_events: shared/friend read"
   on episode_watch_events for select
@@ -501,8 +501,8 @@ create policy "episode_watch_events: shared/friend read"
 
 create policy "episode_ratings: owner full access"
   on episode_ratings for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "episode_ratings: shared/friend read"
   on episode_ratings for select
@@ -517,8 +517,8 @@ create policy "episode_ratings: shared/friend read"
 
 create policy "episode_reviews: owner full access"
   on episode_reviews for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "episode_reviews: shared/friend read"
   on episode_reviews for select
@@ -537,7 +537,7 @@ create policy "episode_reviews: shared/friend read"
 
 create policy "title_cast: owner full access"
   on title_cast for all
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "title_cast: shared/friend read"
   on title_cast for select
   using (case when user_id = (select auth.uid()) then false else
@@ -550,7 +550,7 @@ create policy "title_cast: shared/friend read"
 
 create policy "title_crew: owner full access"
   on title_crew for all
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "title_crew: shared/friend read"
   on title_crew for select
   using (case when user_id = (select auth.uid()) then false else
@@ -563,7 +563,7 @@ create policy "title_crew: shared/friend read"
 
 create policy "season_cast: owner full access"
   on season_cast for all
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "season_cast: shared/friend read"
   on season_cast for select
   using (case when user_id = (select auth.uid()) then false else
@@ -576,7 +576,7 @@ create policy "season_cast: shared/friend read"
 
 create policy "episode_crew: owner full access"
   on episode_crew for all
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "episode_crew: shared/friend read"
   on episode_crew for select
   using (case when user_id = (select auth.uid()) then false else
@@ -594,8 +594,8 @@ create policy "episode_crew: shared/friend read"
 -- Only the owner can manage their own keys
 create policy "shared_keys: owner full access"
   on shared_access_keys for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- ============================================================
 -- USER TITLE PINS (easter egg pin storage)
@@ -614,8 +614,8 @@ alter table user_title_pins enable row level security;
 
 create policy "user_title_pins: owner full access"
   on user_title_pins for all
-  using  (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using  ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- ============================================================
 -- LISTS (user-created custom title lists)
@@ -654,8 +654,8 @@ alter table lists enable row level security;
 
 create policy "lists: owner full access"
   on lists for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create table list_items (
   id         uuid primary key default gen_random_uuid(),
@@ -677,8 +677,8 @@ alter table list_items enable row level security;
 
 create policy "list_items: owner full access"
   on list_items for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- ============================================================
 -- THIRD-PARTY SYNC (Letterboxd, Simkl, Plex, Emby)
@@ -718,8 +718,8 @@ alter table integration_connections enable row level security;
 
 create policy "integration_connections: owner full access"
   on integration_connections for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create trigger integration_connections_updated_at before update on integration_connections
   for each row execute function update_updated_at();
@@ -750,8 +750,8 @@ alter table external_title_links enable row level security;
 
 create policy "external_title_links: owner full access"
   on external_title_links for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- ============================================================
 -- API CACHE (used by media-proxy Edge Function)
@@ -795,8 +795,8 @@ alter table profiles enable row level security;
 -- table directly. Friend lookup goes through find_user_by_email instead.
 create policy "profiles: owner full access"
   on profiles for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- Auto-create a profile row whenever a new auth.users row is inserted.
 create or replace function handle_new_user()
@@ -866,7 +866,7 @@ alter table friendships enable row level security;
 -- bypassed by a raw insert/update from the client.
 create policy "friendships: parties can read"
   on friendships for select
-  using (auth.uid() = user_id_a or auth.uid() = user_id_b);
+  using ((select auth.uid()) = user_id_a or (select auth.uid()) = user_id_b);
 
 -- Used by Phase 3 friend-read RLS policies to check accepted friendship.
 create or replace function is_friend(user_a uuid, user_b uuid)
@@ -1104,8 +1104,8 @@ alter table user_prefs enable row level security;
 
 create policy "user_prefs: owner full access"
   on user_prefs for all
-  using  (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using  ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- Shared-token and friend viewers may READ the owner's prefs so their Ledger
 -- renders with the owner's board arrangement (mirrors the titles policies).
@@ -1117,7 +1117,7 @@ create policy "user_prefs: shared key read"
 
 create policy "user_prefs: friend read"
   on user_prefs for select
-  using (is_friend(auth.uid(), user_id));
+  using (is_friend((select auth.uid()), user_id));
 
 create trigger user_prefs_updated_at
   before update on user_prefs
@@ -1164,11 +1164,11 @@ alter table recommendations enable row level security;
 -- someone else or edit a snapshot after the fact.
 create policy "recommendations: recipient can read"
   on recommendations for select
-  using (auth.uid() = recipient_user_id);
+  using ((select auth.uid()) = recipient_user_id);
 
 create policy "recommendations: sender can read"
   on recommendations for select
-  using (auth.uid() = sender_user_id);
+  using ((select auth.uid()) = sender_user_id);
 
 create or replace function send_recommendation(
   recipient_id uuid,
@@ -1479,16 +1479,16 @@ alter table notifications enable row level security;
 
 create policy "notifications: recipient can read"
   on notifications for select
-  using (auth.uid() = recipient_id);
+  using ((select auth.uid()) = recipient_id);
 
 create policy "notifications: recipient can mark read/delete"
   on notifications for update
-  using (auth.uid() = recipient_id)
-  with check (auth.uid() = recipient_id);
+  using ((select auth.uid()) = recipient_id)
+  with check ((select auth.uid()) = recipient_id);
 
 create policy "notifications: recipient can delete"
   on notifications for delete
-  using (auth.uid() = recipient_id);
+  using ((select auth.uid()) = recipient_id);
 
 create or replace function list_notifications(p_before timestamptz default null, p_limit integer default 30)
 returns table (
@@ -1689,21 +1689,21 @@ alter table invite_codes enable row level security;
 
 create policy "invite_codes: owner can view own"
   on invite_codes for select
-  using (auth.uid() = created_by);
+  using ((select auth.uid()) = created_by);
 
 create policy "invite_codes: capped insert"
   on invite_codes for insert
   with check (
-    auth.uid() = created_by
+    (select auth.uid()) = created_by
     and (
-      (select is_owner from profiles where user_id = auth.uid()) = true
-      or (select count(*) from invite_codes where created_by = auth.uid()) < 2
+      (select is_owner from profiles where user_id = (select auth.uid())) = true
+      or (select count(*) from invite_codes where created_by = (select auth.uid())) < 2
     )
   );
 
 create policy "invite_codes: owner can delete own unredeemed"
   on invite_codes for delete
-  using (auth.uid() = created_by and redeemed_by is null);
+  using ((select auth.uid()) = created_by and redeemed_by is null);
 
 -- No update policy: redemption is written exclusively by the redeem-invite
 -- Edge Function using the service role key, which bypasses RLS.
@@ -1809,7 +1809,7 @@ create index cinema_outings_title_idx on cinema_outings(title_id);
 
 alter table cinema_outings enable row level security;
 create policy "cinema_outings: owner full access" on cinema_outings
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 -- deliberately NO shared-token / friend read policies (v1 privacy stance)
 
 create trigger cinema_outings_updated_at
@@ -2020,7 +2020,7 @@ alter table sync_tombstones enable row level security;
 
 create policy "sync_tombstones: owner read"
   on sync_tombstones for select
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
 
 create or replace function record_tombstone()
 returns trigger language plpgsql security definer as $$
@@ -7042,3 +7042,11 @@ exception when serialization_failure then
   raise sqlstate 'PT409' using message = SQLERRM;
 end;
 $$;
+
+-- 20261022000000_rls_auth_uid_initplan: the policies above are written with
+-- (select auth.uid()) so it is evaluated once per statement. These two come from
+-- the moviegoing-preferences migration, which this file reproduces verbatim.
+alter policy "venue notes: owner read" on public.venue_notes
+  using (user_id = (select auth.uid()));
+alter policy "theater interest: owner read" on public.theater_interest
+  using (user_id = (select auth.uid()));

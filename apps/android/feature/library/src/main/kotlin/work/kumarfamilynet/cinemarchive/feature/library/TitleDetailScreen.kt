@@ -117,6 +117,10 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import coil.compose.AsyncImage
+import work.kumarfamilynet.cinemarchive.core.designsystem.ThemeTraitsDefaults
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
+import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
+import androidx.compose.foundation.lazy.rememberLazyListState
 
 class TitleDetailViewModel(
     private val repository: LibraryRepository,
@@ -831,7 +835,7 @@ fun TitleDetailScreen(
                 }
             }
             items(detail.viewings, key = Viewing::id) { viewing ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     ViewingRow(
                         viewing,
                         onRateClick = { openPostShow(viewing) },
@@ -1054,7 +1058,7 @@ private fun ManageTitleSection(titleId: String, content: @Composable ColumnScope
 @Composable
 private fun DetailHero(detail: TitleDetail, onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-        Box(modifier = Modifier.fillMaxSize().background(tintForKey(detail.id)))
+        Box(modifier = Modifier.fillMaxSize().background(ThemeTraitsDefaults.decorativeTint(tintForKey(detail.id))))
         detail.backdropUrl?.let { url ->
             AsyncImage(model = url, contentDescription = null, modifier = Modifier.fillMaxSize())
         }
@@ -1141,9 +1145,12 @@ private fun SeasonSelector(
     selectedSeasonNumber: Int,
     onSelect: (Int) -> Unit,
 ) {
+    val rowState = rememberLazyListState()
     LazyRow(
+        state = rowState,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 22.dp),
+        modifier = Modifier.horizontalEdgeFade(rowState),
     ) {
         items(seasons, key = SeasonDetail::id) { season ->
             val pct = if (season.episodeCount > 0) season.episodesWatched * 100 / season.episodeCount else 0
@@ -1298,7 +1305,8 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>, onBr
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        val rowState = rememberLazyListState()
+        LazyRow(state = rowState, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.horizontalEdgeFade(rowState)) {
             items(members, key = EpisodeCastMember::tmdbPersonId) { member ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1309,7 +1317,7 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>, onBr
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(tintForKey(member.tmdbPersonId.toString())),
+                            .background(ThemeTraitsDefaults.decorativeTint(tintForKey(member.tmdbPersonId.toString()))),
                     ) {
                         Text(
                             member.name.take(1).uppercase(),

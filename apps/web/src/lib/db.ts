@@ -21,6 +21,7 @@ import type {
 } from '../store/mockData'
 import { normalizeLedgerWidgets, type LedgerWidget } from './ledgerPanels'
 import { normalizeCompanions } from '../store/companions'
+import { MAX_STORED_CAST } from './media'
 
 // Throws (after logging) when a Supabase call reports an error — the same
 // three-line shape this file used to repeat at every call site.
@@ -260,23 +261,52 @@ const TITLE_SELECT = `
   )
 `
 
+// Titles per library request. Each page is a separate statement, so a large
+// library never has to fit inside one statement timeout.
+const LIBRARY_PAGE_SIZE = 100
+
+// Keyset-paginated (by id) so a title added mid-load can't shift a page
+// boundary and drop or duplicate a row the way offset paging would.
+async function fetchTitleRows(userId: string, message: string): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = []
+  let lastId: string | undefined
+  for (;;) {
+    let query = supabase!
+      .from('titles')
+      .select(TITLE_SELECT)
+      .eq('user_id', userId)
+      .order('cast_order', { referencedTable: 'title_cast' })
+      .limit(MAX_STORED_CAST, { referencedTable: 'title_cast' })
+      .order('cast_order', { referencedTable: 'seasons.season_cast' })
+      .limit(MAX_STORED_CAST, { referencedTable: 'seasons.season_cast' })
+      .order('id')
+      .limit(LIBRARY_PAGE_SIZE)
+    if (lastId) query = query.gt('id', lastId)
+    const { data, error } = await query
+    unwrap(error, message)
+    const page = data || []
+    rows.push(...page)
+    if (page.length < LIBRARY_PAGE_SIZE) return rows
+    lastId = page[page.length - 1].id as string
+  }
+}
+
 // Cinema outings are owner-private (rule §9) — folded into the owner's own
 // library fetch only, never into fetchSharedLibrary/fetchFriendLibrary below.
 export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[]; rowRevisions?: Record<string, string> }> {
   if (!supabase) return { titles: [], outings: [] }
 
-  const [{ data, error }, { data: outingRows, error: outingsError }] = await Promise.all([
-    supabase.from('titles').select(TITLE_SELECT).eq('user_id', userId),
+  const [data, { data: outingRows, error: outingsError }] = await Promise.all([
+    fetchTitleRows(userId, 'Error fetching user library:'),
     supabase.from('cinema_outings').select('*').eq('user_id', userId),
   ])
 
-  unwrap(error, 'Error fetching user library:')
   unwrap(outingsError, 'Error fetching cinema outings:')
 
   return {
-    titles: (data || []).map(mapDbTitleToLocal),
+    titles: data.map(mapDbTitleToLocal),
     outings: (outingRows || []).map(mapDbOutingToLocal),
-    rowRevisions: collectRowRevisions(data || [], outingRows || []),
+    rowRevisions: collectRowRevisions(data, outingRows || []),
   }
 }
 
@@ -316,14 +346,8 @@ export async function fetchSharedLibrary(
 export async function fetchFriendLibrary(friendUserId: string): Promise<Title[]> {
   if (!supabase) return []
 
-  const { data, error } = await supabase
-    .from('titles')
-    .select(TITLE_SELECT)
-    .eq('user_id', friendUserId)
-
-  unwrap(error, 'Error fetching friend library:')
-
-  return (data || []).map(mapDbTitleToLocal)
+  const data = await fetchTitleRows(friendUserId, 'Error fetching friend library:')
+  return data.map(mapDbTitleToLocal)
 }
 
 export interface Recommendation {

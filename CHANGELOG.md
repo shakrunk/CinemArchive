@@ -9,6 +9,25 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-10-22
+
+### Fixed
+
+- **Web:** Large libraries no longer fail to load with "Loading your library timed out". Your library now loads in batches of 100 titles, and each title brings its 50 top-billed cast members rather than the full credits list.
+- **Android:** The settings sections on the Profile page now read as single grouped containers, with rounded outer corners and tight seams between rows, like the rest of the app's grouped lists.
+
+### Changed
+
+- **Android:** Lists now animate as they change. Filtering or sorting the Library, marking an episode watched in Up Next, and answering a friend request let rows fade in and out and glide into place instead of jumping.
+- **Android:** Segmented choices, filter toggles, the navigation bar, the New Title button and Up Next's mark-watched button give a light haptic tick when tapped, and all of them use the same press-and-release motion.
+- **Android:** In Up Next and the Library's list view, grouped rows now round their corners smoothly when a neighbor leaves or arrives, so the group re-forms around the gap instead of snapping.
+- **Android:** The bottom navigation bar is now glass: lists scroll on beneath it, and it blurs the posters passing underneath. To keep a solid bar, turn off **Blur behind navigation** in Appearance.
+- **Android:** The Spider-Noir palette is now fully black and white: status badges, the navigation's selection pill and the colored placeholders shown for titles without a poster all turn grey. Its one red accent stays.
+- **Android:** Tap the tab you're already on to scroll its list back to the top.
+- **Android:** Sideways rows, such as Discover's film strips, cast and season pickers, fade out at an edge that has more to scroll to.
+- **Android:** Pull-to-refresh now shows Material 3's expressive morphing loading indicator, with a checkmark when the refresh finishes.
+- Titles and seasons now keep the 50 top-billed cast members instead of TMDB's full list, which runs past 1,600 people for some long-running series. The web library and friend libraries on both clients show only the top 50 straight away. Elsewhere, such as the Android library and shared links, titles already in your library keep their full cast until their credits are next refreshed.
+
 ## [1.38.1] - 2026-10-22
 
 ### Fixed

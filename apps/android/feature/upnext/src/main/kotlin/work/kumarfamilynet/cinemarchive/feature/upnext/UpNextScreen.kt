@@ -99,6 +99,7 @@ import work.kumarfamilynet.cinemarchive.data.LibrarySyncRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
+import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
 
 class UpNextViewModel(
     private val repository: LibraryRepository,
@@ -583,7 +584,8 @@ private fun MarqueeCard(entry: UpNextOuting, now: Instant, shape: Shape, onOpen:
                 }
             }
         }
-        Row(modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState())) {
+        val actionsScroll = rememberScrollState()
+        Row(modifier = Modifier.padding(top = 8.dp).horizontalEdgeFade(actionsScroll).horizontalScroll(actionsScroll)) {
             TextButton(onClick = onViewTicket) {
                 Icon(Icons.Filled.QrCode, contentDescription = null, modifier = Modifier.size(16.dp))
                 Text("View ticket", modifier = Modifier.padding(start = 6.dp))

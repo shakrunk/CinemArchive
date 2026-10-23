@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
 import work.kumarfamilynet.cinemarchive.core.model.LibraryPersonChoice
 import work.kumarfamilynet.cinemarchive.core.model.PersonCredit
+import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
+import androidx.compose.foundation.lazy.rememberLazyListState
 
 /** ID-based links remain useful offline, including credits belonging only to a season or episode. */
 @Composable
@@ -24,7 +26,8 @@ internal fun PersonCreditsSection(label: String, credits: List<PersonCredit>, on
     } }
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 6.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val rowState = rememberLazyListState()
+        LazyRow(state = rowState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalEdgeFade(rowState)) {
             items(people, key = PersonCredit::tmdbPersonId) { credit ->
                 TextButton(
                     onClick = { onBrowsePerson?.invoke(credit.person) }, enabled = onBrowsePerson != null,

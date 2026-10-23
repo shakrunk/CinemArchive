@@ -23,6 +23,8 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
+import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
+import androidx.compose.foundation.lazy.rememberLazyListState
 
 private val FilmStock = Color(0xFF262420)
 private val FilmInk = Color(0xFFF3EAD9)
@@ -35,7 +37,11 @@ internal fun DiscoverFilmStrip(
     onOpen: (TrendingTitle) -> Unit,
     onAdd: (TrendingTitle) -> Unit,
 ) {
-    LazyRow(Modifier.fillMaxWidth().testTag("discover-film-strip-$tag")) {
+    val stripState = rememberLazyListState()
+    LazyRow(
+        state = stripState,
+        modifier = Modifier.fillMaxWidth().horizontalEdgeFade(stripState).testTag("discover-film-strip-$tag"),
+    ) {
         items(titles, key = { title -> title.catalogKey }) { title ->
             Column(Modifier.width(168.dp).testTag("$tag-${title.catalogKey}")) {
                 FilmPerforations()

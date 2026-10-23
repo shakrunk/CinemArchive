@@ -39,7 +39,7 @@ fun PosterSurface(
         modifier = modifier
             .aspectRatio(aspectRatio)
             .clip(RoundedCornerShape(cornerRadius))
-            .background(tint)
+            .background(ThemeTraitsDefaults.decorativeTint(tint))
             .let { if (onClick != null) it.clickable(onClick = onClick) else it },
     ) {
         if (imageUrl != null) {

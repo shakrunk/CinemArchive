@@ -117,6 +117,7 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import coil.compose.AsyncImage
+import work.kumarfamilynet.cinemarchive.core.designsystem.ThemeTraitsDefaults
 import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 class TitleDetailViewModel(
@@ -1055,7 +1056,7 @@ private fun ManageTitleSection(titleId: String, content: @Composable ColumnScope
 @Composable
 private fun DetailHero(detail: TitleDetail, onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-        Box(modifier = Modifier.fillMaxSize().background(tintForKey(detail.id)))
+        Box(modifier = Modifier.fillMaxSize().background(ThemeTraitsDefaults.decorativeTint(tintForKey(detail.id))))
         detail.backdropUrl?.let { url ->
             AsyncImage(model = url, contentDescription = null, modifier = Modifier.fillMaxSize())
         }
@@ -1310,7 +1311,7 @@ private fun EpisodeCastRow(label: String, members: List<EpisodeCastMember>, onBr
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(tintForKey(member.tmdbPersonId.toString())),
+                            .background(ThemeTraitsDefaults.decorativeTint(tintForKey(member.tmdbPersonId.toString()))),
                     ) {
                         Text(
                             member.name.take(1).uppercase(),

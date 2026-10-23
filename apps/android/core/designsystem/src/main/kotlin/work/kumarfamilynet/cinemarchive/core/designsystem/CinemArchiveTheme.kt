@@ -153,6 +153,7 @@ fun CinemArchiveTheme(
     CompositionLocalProvider(LocalDensity provides scaledDensity) {
         MaterialTheme(
             colorScheme = colors,
+            motionScheme = ArchiveMotion,
             typography = cinemArchiveTypography(fontFamily),
             shapes = CinemArchiveShapes,
             content = content,

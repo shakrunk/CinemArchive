@@ -15,6 +15,7 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.LazyGridItemScope
+import androidx.compose.material3.MotionScheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
@@ -32,10 +33,9 @@ fun <T> expressiveSpring(): SpringSpec<T> =
  * the same springs and a retune lands everywhere at once.
  *
  * The spatial/effects springs are M3 Expressive's own token values (material3's internal
- * `ExpressiveMotionTokens`), named after `MotionScheme`'s slots. material3 1.4.0 keeps
- * `MotionScheme` and the `MaterialTheme(motionScheme = …)` overload internal, so these can't be
- * handed to the library's components yet; once a material3 bump makes them public, this object is
- * the scheme to pass.
+ * `ExpressiveMotionTokens`). This object is the [MotionScheme] [CinemArchiveTheme] hands to
+ * `MaterialTheme`, so material3's own components (sheets, switches, the pull-to-refresh
+ * `LoadingIndicator`) move on the same springs as the app's hand-built motion.
  *
  * Spatial springs move things (position, size, shape) and may overshoot; effects springs change
  * color and opacity and never do, since an alpha past 1 or a color past its target reads as a glitch.
@@ -45,13 +45,13 @@ fun <T> expressiveSpring(): SpringSpec<T> =
  * "Remove animations" snaps these springs, the list placement and infinite loops to their end.
  * Motion driven any other way — a hand-rolled frame loop — would have to check that setting itself.
  */
-object ArchiveMotion {
-    fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 380f)
-    fun <T> fastSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.6f, stiffness = 800f)
-    fun <T> slowSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 200f)
-    fun <T> defaultEffectsSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 1600f)
-    fun <T> fastEffectsSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 3800f)
-    fun <T> slowEffectsSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 800f)
+object ArchiveMotion : MotionScheme {
+    override fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 380f)
+    override fun <T> fastSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.6f, stiffness = 800f)
+    override fun <T> slowSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 200f)
+    override fun <T> defaultEffectsSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 1600f)
+    override fun <T> fastEffectsSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 3800f)
+    override fun <T> slowEffectsSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 800f)
 
     /** How long a press takes to sink. Short and linear-ish, so the control answers on contact. */
     private const val PRESS_DOWN_MILLIS = 100

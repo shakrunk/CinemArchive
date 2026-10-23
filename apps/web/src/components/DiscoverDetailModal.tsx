@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Check, Film, Plus, Tv } from 'lucide-react'
-import { fetchMediaDetails, fetchTitleImages, fetchTitleVideos, fetchWatchProviders, type SearchResult, type TitleVideo, type WatchProviders } from 'src/lib/media'
+import { fetchMediaDetails, fetchTitleImages, fetchTitleVideos, fetchWatchProviders, type RawTmdbSeason, type SearchResult, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { cn, fmtRuntime, fmtReleaseDate, languageName } from 'src/lib/utils'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { ReviewBadges, ExternalLinks } from 'src/components/ui/media-badges'
 import { SubsectionLabel } from 'src/components/ui/typography'
 import { TrailerRow } from 'src/components/ui/trailer-row'
 import { WatchProviderListings } from 'src/components/ui/watch-providers'
+import { DiscoverEpisodeBrowser } from 'src/components/DiscoverEpisodeBrowser'
+import { FranchiseSection } from 'src/components/FranchiseSection'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import type { PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
@@ -30,6 +32,7 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
   const [details, setDetails] = useState<SearchResult | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [videos, setVideos] = useState<TitleVideo[] | null>(null)
+  const [tmdbSeasons, setTmdbSeasons] = useState<RawTmdbSeason[]>([])
   const [providers, setProviders] = useState<WatchProviders | null | undefined>(undefined)
   const [expanded, setExpanded] = useState(false)
   const [scrollBody, setScrollBody] = useState<HTMLDivElement | null>(null)
@@ -39,7 +42,7 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
   useEffect(() => {
     let cancelled = false
     fetchMediaDetails(result)
-      .then(({ result: r }) => { if (!cancelled) setDetails(r) })
+      .then(({ result: r, tmdbSeasons: seasons }) => { if (!cancelled) { setDetails(r); setTmdbSeasons(seasons) } })
       .catch(() => { if (!cancelled) setDetails(result) })
     fetchTitleImages(result.tmdbId, result.type).then(({ logoUrl: logo }) => {
       if (!cancelled) setLogoUrl(logo)
@@ -231,6 +234,24 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
               />
             </div>
           ) : null}
+
+          {data.type === 'tv' && tmdbSeasons.length > 0 && (
+            <div className="mb-5">
+              <DiscoverEpisodeBrowser tmdbId={data.tmdbId} seasons={tmdbSeasons} />
+            </div>
+          )}
+
+          {data.type === 'movie' && data.collectionId != null && (
+            <div className="mb-5">
+              <FranchiseSection
+                collectionId={data.collectionId}
+                collectionName={data.collectionName}
+                currentTmdbId={data.tmdbId}
+                isSharedView={isSharedView}
+                onNavigate={onClose}
+              />
+            </div>
+          )}
 
           <div className="mb-5">
             {hydrating && !data.cast && !data.crew ? (

@@ -39,6 +39,11 @@ fun <T> expressiveSpring(): SpringSpec<T> =
  *
  * Spatial springs move things (position, size, shape) and may overshoot; effects springs change
  * color and opacity and never do, since an alpha past 1 or a color past its target reads as a glitch.
+ *
+ * Reduced motion needs no gating here: Compose scales every animation by the system's animator
+ * duration scale (it observes `Settings.Global.ANIMATOR_DURATION_SCALE` for each window), so
+ * "Remove animations" snaps these springs, the list placement and infinite loops to their end.
+ * Motion driven any other way — a hand-rolled frame loop — would have to check that setting itself.
  */
 object ArchiveMotion {
     fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.8f, stiffness = 380f)

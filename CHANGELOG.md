@@ -24,6 +24,7 @@ number is chosen.
 - **Android:** The Spider-Noir palette is now fully black and white: status badges, the navigation's selection pill and the colored placeholders shown for titles without a poster all turn grey. Its one red accent stays.
 - **Android:** Tap the tab you're already on to scroll its list back to the top.
 - **Android:** Sideways rows, such as Discover's film strips, cast and season pickers, fade out at an edge that has more to scroll to.
+- **Android:** Pull-to-refresh now shows Material 3's expressive morphing loading indicator, with a checkmark when the refresh finishes.
 - Titles and seasons now keep the 50 top-billed cast members instead of TMDB's full list, which runs past 1,600 people for some long-running series. The web library and friend libraries on both clients show only the top 50 straight away. Elsewhere, such as the Android library and shared links, titles already in your library keep their full cast until their credits are next refreshed.
 
 ## [1.38.1] - 2026-10-22

@@ -1,13 +1,15 @@
 [versions]
-agp = "8.9.1"
+agp = "9.4.1"
 kotlin = "2.2.21"
 androidx-core = "1.16.0"
 androidx-splashscreen = "1.0.1"
 activity-compose = "1.10.1"
 lifecycle = "2.9.1"
-# Carries material3 1.4.0, the stable release that ships M3 Expressive — the
-# expressive LoadingIndicator and shape scale this app's design language targets.
-compose-bom = "2026.06.01"
+# Compose 1.12.1, which needs AGP 9.1+ and compileSdk 37.
+compose-bom = "2026.09.00"
+# Pinned ahead of the BOM's material3: 1.5 makes M3 Expressive's LoadingIndicator, MotionScheme
+# and the MaterialTheme(motionScheme = …) overload public.
+material3 = "1.5.0-beta01"
 room = "2.7.1"
 datastore = "1.1.1"
 junit = "4.13.2"
@@ -23,8 +25,8 @@ security-crypto = "1.1.0"
 camerax = "1.4.1"
 mlkit-barcode = "17.3.0"
 graphics-shapes = "1.1.0"
-# 1.7.2 is the newest Haze built against Kotlin 2.2 and Compose <= 1.10; 2.x needs Kotlin 2.4
-# and Compose 1.12, ahead of this catalog's kotlin and compose-bom.
+# 1.7.2 is the newest Haze built against Kotlin 2.2 (and Compose <= 1.10, though it runs on this
+# catalog's 1.12); 2.x needs Kotlin 2.4, ahead of this catalog's kotlin.
 haze = "1.7.2"
 zxing-core = "3.5.3"
 
@@ -41,7 +43,7 @@ androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
-androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-compose-ui-text-google-fonts = { module = "androidx.compose.ui:ui-text-google-fonts" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
@@ -72,6 +74,5 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxing-core" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
+android-legacy-kapt = { id = "com.android.legacy-kapt", version.ref = "agp" }

@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-10-23
+
 ### Added
 
 - **Web & Android:** The four [Catppuccin](https://catppuccin.com) flavors are now available as themes: Latte (light), Frappé, Macchiato and Mocha. Pick one in Settings → Appearance; no unlock needed.

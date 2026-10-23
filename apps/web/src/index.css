@@ -1254,13 +1254,14 @@
   .btn-amber {
     background: linear-gradient(180deg, var(--amber-bright), var(--amber));
     color: var(--on-amber);
-    box-shadow: 0 6px 20px -8px rgba(233, 178, 102, 0.7);
+    /* Glow follows the theme's accent, so it doesn't stay gold on noir/matrix/Catppuccin. */
+    box-shadow: 0 6px 20px -8px rgb(var(--amber-rgb) / 0.7);
     transition:
       transform 0.18s var(--ease),
       box-shadow 0.25s;
   }
   .btn-amber:hover {
-    box-shadow: 0 10px 28px -8px rgba(233, 178, 102, 0.85);
+    box-shadow: 0 10px 28px -8px rgb(var(--amber-rgb) / 0.85);
     transform: translateY(-1px);
   }
   .btn-amber:active {
@@ -1324,7 +1325,7 @@
   .navtab.is-active {
     color: var(--on-amber);
     background: linear-gradient(180deg, var(--amber-bright), var(--amber));
-    box-shadow: 0 4px 16px -6px rgba(233, 178, 102, 0.6);
+    box-shadow: 0 4px 16px -6px rgb(var(--amber-rgb) / 0.6);
   }
 
   /* ── Segmented control / chips ── */

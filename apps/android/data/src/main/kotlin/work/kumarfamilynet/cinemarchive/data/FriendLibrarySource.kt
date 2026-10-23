@@ -17,6 +17,12 @@ interface FriendLibrarySource {
 // and every child. Do not substitute an owner sync RPC or fetch private outings.
 private const val FRIEND_GRAPH = "*,title_cast(*),title_crew(*),seasons(*,season_cast(*)),viewings(*),episodes(*,episode_crew(*),episode_watch_events(*),episode_ratings(*),episode_reviews(*))"
 
+// Top-billed cast only, matching web fetchTitleRows; rows stored before the write-side cap
+// can hold 1,600+ cast members per series.
+private const val FRIEND_CAST_CAP =
+    "&title_cast.order=cast_order.asc&title_cast.limit=$MAX_STORED_CAST" +
+        "&seasons.season_cast.order=cast_order.asc&seasons.season_cast.limit=$MAX_STORED_CAST"
+
 internal suspend fun readFriendLibrary(
     client: SupabaseRestClient,
     sessionProvider: () -> SupabaseSession?,
@@ -49,7 +55,7 @@ internal suspend fun readFriendLibrary(
     val titles = mutableListOf<SharedLibraryTitle>()
     var cursor: String? = null
     while (true) {
-        val query = "select=${URLEncoder.encode(FRIEND_GRAPH, "UTF-8")}&user_id=eq.$friendUserId&order=id.asc&limit=200" +
+        val query = "select=${URLEncoder.encode(FRIEND_GRAPH, "UTF-8")}&user_id=eq.$friendUserId&order=id.asc&limit=200" + FRIEND_CAST_CAP +
             (cursor?.let { "&id=gt.$it" } ?: "")
         val rows = request { parseSharedTitles(client.get("titles", query, session.accessToken), friendUserId) }
         if (rows.isEmpty()) break // Also handles a server cap below our requested limit.

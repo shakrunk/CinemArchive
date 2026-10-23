@@ -19,15 +19,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalThemeTraits
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
 import androidx.compose.foundation.lazy.rememberLazyListState
-
-private val FilmStock = Color(0xFF262420)
-private val FilmInk = Color(0xFFF3EAD9)
 
 /** Rails belong to each frame, so perforations move with the artwork during a swipe. */
 @Composable
@@ -37,6 +35,7 @@ internal fun DiscoverFilmStrip(
     onOpen: (TrendingTitle) -> Unit,
     onAdd: (TrendingTitle) -> Unit,
 ) {
+    val film = LocalThemeTraits.current.film
     val stripState = rememberLazyListState()
     LazyRow(
         state = stripState,
@@ -44,21 +43,21 @@ internal fun DiscoverFilmStrip(
     ) {
         items(titles, key = { title -> title.catalogKey }) { title ->
             Column(Modifier.width(168.dp).testTag("$tag-${title.catalogKey}")) {
-                FilmPerforations()
-                Column(Modifier.background(FilmStock).padding(horizontal = 5.dp)
-                    .background(Color(0xFF0A0A0A)).padding(3.dp)) {
+                FilmPerforations(film.stock)
+                Column(Modifier.background(film.stock).padding(horizontal = 5.dp)
+                    .background(film.frame).padding(3.dp)) {
                     Box(Modifier.semantics { contentDescription = "Preview ${title.title}" }) {
                         PosterSurface(tint = tintForKey(title.tmdbId.toString()), imageUrl = title.posterUrl,
                             cornerRadius = 0.dp, scrimStop = 0.98f, onClick = { onOpen(title) })
                     }
                     Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(top = 8.dp)) {
-                        Text(title.title, style = MaterialTheme.typography.titleSmall, color = FilmInk,
+                        Text(title.title, style = MaterialTheme.typography.titleSmall, color = film.ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth().clickable { onOpen(title) })
                         Row(Modifier.fillMaxWidth(),
                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                             Text("${title.year ?: "—"} · ${if (title.type == MediaType.TV) "TV" else "Movie"}",
-                                style = MaterialTheme.typography.labelSmall, color = FilmInk.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.labelSmall, color = film.ink.copy(alpha = 0.7f),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                             IconButton(onClick = { onAdd(title) }, modifier = Modifier.size(48.dp)) {
                                 Icon(Icons.Default.Add, "Add ${title.title} to library", tint = MaterialTheme.colorScheme.primary)
@@ -66,7 +65,7 @@ internal fun DiscoverFilmStrip(
                         }
                     }
                 }
-                FilmPerforations()
+                FilmPerforations(film.stock)
             }
         }
     }
@@ -74,18 +73,18 @@ internal fun DiscoverFilmStrip(
 
 /** Draw only the stock: the 8dp holes reveal the actual surface underneath. */
 @Composable
-private fun FilmPerforations() {
+private fun FilmPerforations(stock: Color) {
     Canvas(Modifier.fillMaxWidth().height(14.dp)) {
         val edge = 3.dp.toPx()
         val hole = 8.dp.toPx()
         val pitch = size.width / 5
-        drawRect(FilmStock, size = Size(size.width, edge))
-        drawRect(FilmStock, topLeft = Offset(0f, size.height - edge), size = Size(size.width, edge))
+        drawRect(stock, size = Size(size.width, edge))
+        drawRect(stock, topLeft = Offset(0f, size.height - edge), size = Size(size.width, edge))
         repeat(5) { index ->
             val start = index * pitch
             val inset = (pitch - hole) / 2
-            drawRect(FilmStock, Offset(start, edge), Size(inset, hole))
-            drawRect(FilmStock, Offset(start + inset + hole, edge), Size(inset, hole))
+            drawRect(stock, Offset(start, edge), Size(inset, hole))
+            drawRect(stock, Offset(start + inset + hole, edge), Size(inset, hole))
         }
     }
 }

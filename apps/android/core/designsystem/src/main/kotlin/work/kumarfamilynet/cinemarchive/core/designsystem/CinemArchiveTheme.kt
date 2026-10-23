@@ -320,7 +320,17 @@ fun CinemArchiveTheme(
     val baseDensity = LocalDensity.current
     val scaledDensity = Density(density = baseDensity.density, fontScale = baseDensity.fontScale * fontScale.multiplier)
 
-    val traits = ThemeTraits(monochrome = palette == ArchivePalette.NOIR)
+    val traits = ThemeTraits(
+        monochrome = palette == ArchivePalette.NOIR,
+        film = when (palette) {
+            ArchivePalette.NOIR -> FilmColors.Noir
+            ArchivePalette.MATRIX -> FilmColors.Matrix
+            ArchivePalette.CATPPUCCIN_LATTE, ArchivePalette.CATPPUCCIN_MOCHA -> FilmColors.CatppuccinMocha
+            ArchivePalette.CATPPUCCIN_FRAPPE -> FilmColors.CatppuccinFrappe
+            ArchivePalette.CATPPUCCIN_MACCHIATO -> FilmColors.CatppuccinMacchiato
+            else -> FilmColors.Brand
+        },
+    )
 
     CompositionLocalProvider(LocalDensity provides scaledDensity, LocalThemeTraits provides traits) {
         MaterialTheme(

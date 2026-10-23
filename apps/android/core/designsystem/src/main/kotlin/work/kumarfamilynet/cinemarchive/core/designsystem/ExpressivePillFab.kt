@@ -3,10 +3,6 @@ package work.kumarfamilynet.cinemarchive.core.designsystem
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -65,8 +61,8 @@ fun ExpressivePillFab(
             Icon(Icons.Filled.Add, contentDescription = if (expanded) null else label)
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn() + expandHorizontally(),
-                exit = fadeOut() + shrinkHorizontally(),
+                enter = ArchiveMotion.revealHorizontally,
+                exit = ArchiveMotion.concealHorizontally,
             ) {
                 Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
             }

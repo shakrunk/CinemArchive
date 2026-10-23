@@ -1,10 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.library
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -67,6 +63,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
+import work.kumarfamilynet.cinemarchive.core.designsystem.ArchiveMotion
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
@@ -207,8 +204,8 @@ fun LibraryScreen(
 
         AnimatedVisibility(
             visible = !collapsed,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+            enter = ArchiveMotion.foldIn,
+            exit = ArchiveMotion.foldOut,
         ) {
             Column {
                 Row(

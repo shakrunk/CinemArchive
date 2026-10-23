@@ -1,10 +1,6 @@
 package work.kumarfamilynet.cinemarchive.feature.discover
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +57,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import work.kumarfamilynet.cinemarchive.core.designsystem.ArchiveMotion
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.posterGridCornerRadius
@@ -231,8 +228,8 @@ fun DiscoverScreen(
 
         AnimatedVisibility(
             visible = !collapsed,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+            enter = ArchiveMotion.foldIn,
+            exit = ArchiveMotion.foldOut,
         ) {
             Column {
                 DiscoverControls(

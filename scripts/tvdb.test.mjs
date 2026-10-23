@@ -87,6 +87,31 @@ test('numbering or known air-date disagreement preserves the original season', a
   }
 })
 
+test('episodes from other seasons in the listing are ignored', async () => {
+  const { tvdb } = setup(() => ok({ episodes: [
+    { seasonNumber: 0, number: 1, name: 'Special' },
+    { seasonNumber: 1, number: 1, name: 'Season one', aired: '2020-01-01' },
+    { seasonNumber: 2, number: 1, name: 'Season two' },
+  ] }))
+  assert.equal((await tvdb.season(season, show, 1)).episodes[0].name, 'Season one')
+})
+
+test('a one-day air-date gap takes the TVDB date', async () => {
+  const { tvdb } = setup(() => ok({ episodes: [{ seasonNumber: 1, number: 1, aired: '2020-01-02' }] }))
+  assert.equal((await tvdb.season(season, show, 1)).episodes[0].air_date, '2020-01-02')
+})
+
+test('a one-day gap is rejected when it could be misnumbering or is not uniform', async () => {
+  const tmdbEpisodes = dates => ({ episodes: dates.map((air_date, i) => ({ id: i + 1, episode_number: i + 1, air_date })) })
+  const tvdbEpisodes = dates => ok({ episodes: dates.map((aired, i) => ({ seasonNumber: 1, number: i + 1, aired })) })
+  const daily = tmdbEpisodes(['2020-01-01', '2020-01-02', '2020-01-03'])
+  assert.equal(await setup(() => tvdbEpisodes(['2020-01-02', '2020-01-03', '2020-01-04'])).tvdb.season(daily, show, 1), daily)
+  const weekly = tmdbEpisodes(['2020-01-01', '2020-01-08', '2020-01-15'])
+  assert.equal(await setup(() => tvdbEpisodes(['2020-01-02', '2020-01-08', '2020-01-16'])).tvdb.season(weekly, show, 1), weekly)
+  const shifted = await setup(() => tvdbEpisodes(['2020-01-02', '2020-01-09', '2020-01-16'])).tvdb.season(weekly, show, 1)
+  assert.deepEqual(shifted.episodes.map(ep => ep.air_date), ['2020-01-02', '2020-01-09', '2020-01-16'])
+})
+
 test('pagination is exhausted before applying season metadata', async () => {
   const { tvdb, calls } = setup(url => url.endsWith('page=0')
     ? ok({ episodes: [] }, { next: 'https://api4.thetvdb.com/v4/next' })

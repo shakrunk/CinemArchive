@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Web:** Large libraries no longer fail to load with "Loading your library timed out". Your library now loads in batches of 100 titles, and each title brings its 50 top-billed cast members rather than the full credits list.
+
 ### Changed
 
 - **Android:** Lists now animate as they change. Filtering or sorting the Library, marking an episode watched in Up Next, and answering a friend request let rows fade in and out and glide into place instead of jumping.

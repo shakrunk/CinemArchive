@@ -95,6 +95,9 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
+import work.kumarfamilynet.cinemarchive.core.designsystem.CatalogExtrasSection
+import work.kumarfamilynet.cinemarchive.core.model.CatalogExtrasState
+import work.kumarfamilynet.cinemarchive.data.CatalogExtrasController
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCast
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeCastMember
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail

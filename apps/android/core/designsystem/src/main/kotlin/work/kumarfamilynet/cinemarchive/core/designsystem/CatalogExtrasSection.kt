@@ -1,4 +1,4 @@
-package work.kumarfamilynet.cinemarchive.feature.library
+package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,6 +9,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import work.kumarfamilynet.cinemarchive.core.model.CatalogExtrasState
+import work.kumarfamilynet.cinemarchive.core.model.CatalogLoad
 import work.kumarfamilynet.cinemarchive.core.model.CatalogProvider
 
 @Composable

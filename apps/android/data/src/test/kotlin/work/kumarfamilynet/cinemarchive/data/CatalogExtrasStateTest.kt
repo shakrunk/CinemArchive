@@ -1,11 +1,10 @@
-package work.kumarfamilynet.cinemarchive.feature.library
+package work.kumarfamilynet.cinemarchive.data
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
 import work.kumarfamilynet.cinemarchive.core.model.*
-import work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CatalogExtrasStateTest {

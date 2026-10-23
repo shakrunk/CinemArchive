@@ -18,6 +18,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
 import work.kumarfamilynet.cinemarchive.core.model.*
+import work.kumarfamilynet.cinemarchive.core.designsystem.CatalogExtrasSection
+import work.kumarfamilynet.cinemarchive.data.CatalogExtrasController
 import work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource
 import work.kumarfamilynet.cinemarchive.feature.library.*
 

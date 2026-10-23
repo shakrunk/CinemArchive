@@ -57,6 +57,7 @@ import work.kumarfamilynet.cinemarchive.data.FriendsRepository
 import work.kumarfamilynet.cinemarchive.data.FriendsRules
 import work.kumarfamilynet.cinemarchive.data.InviteConnection
 import work.kumarfamilynet.cinemarchive.data.Recommendation
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 private enum class FriendsSection { FRIENDS, INBOX, ACTIVITY }
 
@@ -195,7 +196,7 @@ private fun FriendsList(
             ReadingWidthColumn { Text("No friends yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp)) }
         }
         items(friendships, key = { it.friendUserId }) { f ->
-            ReadingWidthColumn {
+            ReadingWidthColumn(Modifier.animatedListItem(this)) {
                 FriendRow(
                     f,
                     f.relationFor(viewerUserId),
@@ -216,7 +217,7 @@ private fun FriendsList(
                 }
             }
             items(suggestions, key = { "s-" + it.userId }) { s ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(14.dp, 8.dp)) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -324,7 +325,7 @@ private fun InboxList(repository: FriendsRepository, onOpenRecommendation: suspe
         if (loading) item { ReadingWidthColumn { Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         else if (items.isEmpty()) item { ReadingWidthColumn { Text("No recommendations yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         items(items, key = { it.id }) { r ->
-            ReadingWidthColumn {
+            ReadingWidthColumn(Modifier.animatedListItem(this)) {
                 Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                     Column(modifier = Modifier.padding(14.dp, 10.dp)) {
                         Text("${r.senderName} sent you \"${r.title}\"" + (r.year?.let { " ($it)" } ?: ""), style = MaterialTheme.typography.titleSmall)

@@ -13,7 +13,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.grid.LazyGridItemScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
 
 /**
@@ -79,3 +82,25 @@ object ArchiveMotion {
     val concealHorizontally: ExitTransition = fadeOut(fastEffectsSpec()) + shrinkHorizontally(sizeSpec)
 }
 
+/**
+ * Lets a lazy list row fade in, fade out and glide to its new place when the list filters, sorts,
+ * or drops an item, rather than snapping. Needs a stable `key` on the item — without one, a row is
+ * identified by position and the wrong rows animate. Headers between keyed runs want this too, or
+ * they jump while the rows around them glide.
+ */
+fun Modifier.animatedListItem(scope: LazyItemScope): Modifier = with(scope) {
+    this@animatedListItem.animateItem(
+        fadeInSpec = ArchiveMotion.defaultEffectsSpec(),
+        placementSpec = ArchiveMotion.listPlacement(),
+        fadeOutSpec = ArchiveMotion.fastEffectsSpec(),
+    )
+}
+
+/** [animatedListItem] for a cell of a lazy grid, which also glides when the column count changes. */
+fun Modifier.animatedListItem(scope: LazyGridItemScope): Modifier = with(scope) {
+    this@animatedListItem.animateItem(
+        fadeInSpec = ArchiveMotion.defaultEffectsSpec(),
+        placementSpec = ArchiveMotion.listPlacement(),
+        fadeOutSpec = ArchiveMotion.fastEffectsSpec(),
+    )
+}

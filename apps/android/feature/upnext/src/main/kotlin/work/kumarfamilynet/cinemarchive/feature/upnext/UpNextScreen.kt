@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 import work.kumarfamilynet.cinemarchive.core.designsystem.pressScale
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberHapticClick
 import work.kumarfamilynet.cinemarchive.core.designsystem.rememberPressScale
@@ -302,7 +303,7 @@ fun UpNextScreen(
             }
 
             itemsIndexed(board.freshFromTheLobby, key = { _, it -> "lobby-${it.outing.id}" }) { index, entry ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     FreshFromTheLobbyCard(
                         entry,
                         shape = groupShape(index, board.freshFromTheLobby.size),
@@ -312,7 +313,7 @@ fun UpNextScreen(
             }
 
             itemsIndexed(board.onTheMarquee, key = { _, it -> "marquee-${it.outing.id}" }) { index, entry ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     MarqueeCard(
                         entry,
                         now,
@@ -325,8 +326,8 @@ fun UpNextScreen(
             }
 
             if (board.onThisDay.isNotEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "header-on-this-day") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "ON THIS DAY",
                             style = MaterialTheme.typography.labelSmall,
@@ -337,7 +338,7 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(board.onThisDay, key = { _, it -> "on-this-day-${it.outing.id}" }) { index, entry ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     OnThisDayCard(
                         entry,
                         shape = groupShape(index, board.onThisDay.size),
@@ -347,8 +348,8 @@ fun UpNextScreen(
             }
 
             if (board.watching.isEmpty() && finales.isEmpty() && board.watchlist.isEmpty() && board.onTheMarquee.isEmpty() && board.freshFromTheLobby.isEmpty() && board.onThisDay.isEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "empty") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "Nothing queued up yet — start something from your Library.",
                             style = MaterialTheme.typography.bodyLarge,
@@ -359,8 +360,8 @@ fun UpNextScreen(
             }
 
             if (watching.isNotEmpty() || finales.isNotEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "header-next-episode") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "NEXT EPISODE",
                             style = MaterialTheme.typography.labelSmall,
@@ -371,7 +372,7 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(finales, key = { _, it -> "finale-${it.snapshot.id}" }) { index, action ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     CaughtUpCard(
                         action = action,
                         shape = groupShape(index, finales.size),
@@ -382,7 +383,7 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(watching, key = { _, it -> it.id }) { index, title ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     ContinueWatchingCard(
                         title,
                         shape = groupShape(index, watching.size),
@@ -395,8 +396,8 @@ fun UpNextScreen(
             }
 
             if (board.watchlist.isNotEmpty()) {
-                item {
-                    ReadingWidthColumn {
+                item(key = "header-watchlist") {
+                    ReadingWidthColumn(Modifier.animatedListItem(this)) {
                         Text(
                             "ON YOUR WATCHLIST",
                             style = MaterialTheme.typography.labelSmall,
@@ -407,7 +408,7 @@ fun UpNextScreen(
                 }
             }
             itemsIndexed(board.watchlist, key = { _, it -> it.id }) { index, title ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     WatchlistCard(title, shape = groupShape(index, board.watchlist.size), onOpen = { onTitleClick(title.id) })
                 }
             }

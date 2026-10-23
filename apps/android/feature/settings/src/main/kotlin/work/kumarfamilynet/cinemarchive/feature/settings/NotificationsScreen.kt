@@ -46,6 +46,7 @@ import work.kumarfamilynet.cinemarchive.data.NotificationsRepository
 import work.kumarfamilynet.cinemarchive.data.NotificationType
 import work.kumarfamilynet.cinemarchive.data.SharedOutingNotification
 import work.kumarfamilynet.cinemarchive.data.parseSharedOutingNotification
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 /** The persistent inbox — web `NotificationCenter`: unread dots, mark one/all read, dismiss,
  *  load-more pagination, and tap routing (title detail / Profile). */
@@ -92,7 +93,7 @@ fun NotificationsRoute(
                 }
             }
             items(inbox.items, key = { it.id }) { n ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     NotificationRow(
                         n,
                         onClick = {

@@ -117,6 +117,7 @@ import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
 import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import coil.compose.AsyncImage
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 class TitleDetailViewModel(
     private val repository: LibraryRepository,
@@ -831,7 +832,7 @@ fun TitleDetailScreen(
                 }
             }
             items(detail.viewings, key = Viewing::id) { viewing ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     ViewingRow(
                         viewing,
                         onRateClick = { openPostShow(viewing) },

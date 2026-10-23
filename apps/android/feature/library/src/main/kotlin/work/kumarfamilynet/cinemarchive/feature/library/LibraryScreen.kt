@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 import work.kumarfamilynet.cinemarchive.core.designsystem.ArchiveMotion
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 import work.kumarfamilynet.cinemarchive.core.designsystem.ExpressivePullToRefresh
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
@@ -306,7 +307,7 @@ fun LibraryScreen(
                         groupedTitles.forEach { (key, label, group) ->
                             if (label != null) {
                                 item(span = { GridItemSpan(maxLineSpan) }, key = "header-$key") {
-                                    LibraryGroupHeader(label)
+                                    LibraryGroupHeader(label, Modifier.animatedListItem(this))
                                 }
                             }
                             items(group, key = LibraryTitle::id) { title ->
@@ -314,6 +315,7 @@ fun LibraryScreen(
                                     title,
                                     columns = gridColumns,
                                     onClick = { onTitleClick(title.id) },
+                                    modifier = Modifier.animatedListItem(this),
                                 )
                             }
                         }
@@ -327,7 +329,7 @@ fun LibraryScreen(
                         groupedTitles.forEach { (key, label, group) ->
                             if (label != null) {
                                 item(key = "header-$key") {
-                                    LibraryGroupHeader(label)
+                                    LibraryGroupHeader(label, Modifier.animatedListItem(this))
                                 }
                             }
                             itemsIndexed(group, key = { _, title -> title.id }) { index, title ->
@@ -335,6 +337,7 @@ fun LibraryScreen(
                                     title,
                                     shape = groupedItemShape(isFirst = index == 0, isLast = index == group.lastIndex),
                                     onClick = { onTitleClick(title.id) },
+                                    modifier = Modifier.animatedListItem(this),
                                 )
                             }
                         }
@@ -352,7 +355,7 @@ fun LibraryScreen(
  * keeping legible.
  */
 @Composable
-private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Unit) {
+private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val showTitle = columns <= 3
     val showMeta = columns <= 2
     val padding = if (columns >= 3) 8.dp else 12.dp
@@ -362,6 +365,7 @@ private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Un
         imageUrl = title.posterUrl,
         cornerRadius = posterGridCornerRadius(columns),
         onClick = onClick,
+        modifier = modifier,
     ) {
         // Two independently-aligned children, not one Row(SpaceBetween): a plain Row hands the
         // "FILM"/"SERIES" label first dibs on width and only gives the badge whatever's left,
@@ -420,12 +424,12 @@ private fun LibraryGridCard(title: LibraryTitle, columns: Int, onClick: () -> Un
 }
 
 @Composable
-private fun LibraryListRow(title: LibraryTitle, shape: Shape, onClick: () -> Unit) {
+private fun LibraryListRow(title: LibraryTitle, shape: Shape, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -468,12 +472,12 @@ private fun starGlyphs(rating: Double): String {
 }
 
 @Composable
-private fun LibraryGroupHeader(label: String) {
+private fun LibraryGroupHeader(label: String, modifier: Modifier = Modifier) {
     Text(
         label.uppercase(),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp),
     )
 }
 

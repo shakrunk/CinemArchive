@@ -71,6 +71,7 @@ import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.CatalogLookup
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 private class DiscoverViewModelFactory(
     private val repository: DiscoverRepository,
@@ -332,6 +333,7 @@ fun DiscoverScreen(
                                 columns = gridColumns,
                                 onOpen = { onOpenTitle(title) },
                                 onAdd = { onAdd(title) },
+                                modifier = Modifier.animatedListItem(this),
                             )
                         }
                         if (search.isBlank() && hasMore) {
@@ -439,6 +441,7 @@ private fun DiscoverCard(
     columns: Int,
     onOpen: () -> Unit,
     onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val showMeta = columns <= 2
     val showTitle = columns <= 3
@@ -447,6 +450,7 @@ private fun DiscoverCard(
         imageUrl = title.posterUrl,
         cornerRadius = posterGridCornerRadius(columns),
         onClick = onOpen,
+        modifier = modifier,
     ) {
         // Both states share the same corner now — only the fill (solid vs. tonal) and icon
         // change. A solid-vs-solid circle that swapped corners by state (#??) read as two

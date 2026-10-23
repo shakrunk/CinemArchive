@@ -61,6 +61,7 @@ import work.kumarfamilynet.cinemarchive.core.model.SmartList
 import work.kumarfamilynet.cinemarchive.core.model.TitleList
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
+import work.kumarfamilynet.cinemarchive.core.designsystem.animatedListItem
 
 class ListsViewModel(
     private val listsRepository: ListsRepository,
@@ -252,7 +253,7 @@ private fun ListsGridScreen(
                 }
             }
             items(lists, key = TitleList::id) { list ->
-                ReadingWidthColumn {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
                     ListRow(list.name, list.description, membersByList[list.id] ?: emptyList(), onClick = { onOpenList(list.id) })
                 }
             }
@@ -414,7 +415,7 @@ private fun ListDetailScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(members, key = LibraryTitle::id) { title ->
-                    Box {
+                    Box(Modifier.animatedListItem(this)) {
                         PosterSurface(
                             tint = tintForKey(title.id),
                             imageUrl = title.posterUrl,

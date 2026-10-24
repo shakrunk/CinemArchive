@@ -9,6 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Web & Android:** A **Pure black** switch in Appearance gives dark themes a true-black background for OLED screens. Light themes are unaffected.
+- **Web & Android:** **Sync appearance across devices** (off by default) keeps your theme and Pure black in step on every browser and device where you turn it on. Material You stays on Android, and a secret theme only follows you to devices where you've unlocked it.
+
+### Fixed
+
+- **Web:** The series graph's rating colors now follow the Spider-Noir, Construct and Catppuccin themes.
+
 ## [1.41.0] - 2026-10-24
 
 ### Fixed

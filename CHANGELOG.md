@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-10-24
+
 ### Fixed
 
 - **Android:** Viewing a friend's library (or a shared link) no longer shows your own Library bleeding through behind it, which made the screen unreadable.

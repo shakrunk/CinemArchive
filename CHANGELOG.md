@@ -11,6 +11,7 @@ number is chosen.
 
 ### Fixed
 
+- **Android:** Viewing a friend's library (or a shared link) no longer shows your own Library bleeding through behind it, which made the screen unreadable.
 - **Android:** The Discover preview now matches the Library title detail: trailers, where to watch, cast, critic scores and, for series, a season-by-season episode guide with synopses.
 - **Web:** The Discover preview now shows the season and episode guide for series and the franchise strip for movies, matching the Library drawer.
 - **Android:** The Spider-Noir and The Construct (Matrix) themes are now secret, as on the web: hidden until the title is in your library, then locked until earned (watching Spider-Noir in black & white, or taking the red pill after logging The Matrix).

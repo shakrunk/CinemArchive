@@ -3,6 +3,7 @@ package work.kumarfamilynet.cinemarchive
 import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -115,7 +116,8 @@ internal fun ArchiveViewer(
     }
     val back = { if (selectedId != null) selectedId = null else onClose() }
     BackHandler(onBack = back)
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().onPreviewKeyEvent {
+    // Opaque: this renders as an overlay, so without it the owner's own Library bleeds through.
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().onPreviewKeyEvent {
         if (it.opensGlobalSearch()) { search = true; true } else false
     }.focusRequester(searchFocus).focusable()) {
         LaunchedEffect(scopeKey) { searchFocus.requestFocus() }

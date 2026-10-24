@@ -137,6 +137,7 @@ fun AppearanceRoute(
     val fontScale by preferencesRepository.observeFontScale().collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
     val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
     val pureBlack by preferencesRepository.observePureBlack().collectAsStateWithLifecycle(initialValue = false)
+    val themeSync by preferencesRepository.observeThemeSyncEnabled().collectAsStateWithLifecycle(initialValue = false)
     val scope = rememberCoroutineScope()
 
     AppearanceScreen(
@@ -148,12 +149,14 @@ fun AppearanceRoute(
         fontScale = fontScale,
         glassBlur = glassBlur,
         pureBlack = pureBlack,
+        themeSync = themeSync,
         onSetThemeMode = { mode -> scope.launch { preferencesRepository.setThemeMode(mode) } },
         onSetPalette = { p -> scope.launch { preferencesRepository.setPalette(p) } },
         onSetFontFamily = { f -> scope.launch { preferencesRepository.setFontFamily(f) } },
         onSetFontScale = { s -> scope.launch { preferencesRepository.setFontScale(s) } },
         onSetGlassBlur = { enabled -> scope.launch { preferencesRepository.setGlassBlur(enabled) } },
         onSetPureBlack = { enabled -> scope.launch { preferencesRepository.setPureBlack(enabled) } },
+        onSetThemeSync = { enabled -> scope.launch { preferencesRepository.setThemeSyncEnabled(enabled) } },
         onBack = onBack,
         showBack = showBack,
     )
@@ -169,12 +172,14 @@ private fun AppearanceScreen(
     fontScale: ArchiveFontScale,
     glassBlur: Boolean,
     pureBlack: Boolean,
+    themeSync: Boolean,
     onSetThemeMode: (ArchiveThemeMode) -> Unit,
     onSetPalette: (ArchivePalette) -> Unit,
     onSetFontFamily: (ArchiveFontFamily) -> Unit,
     onSetFontScale: (ArchiveFontScale) -> Unit,
     onSetGlassBlur: (Boolean) -> Unit,
     onSetPureBlack: (Boolean) -> Unit,
+    onSetThemeSync: (Boolean) -> Unit,
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -278,6 +283,13 @@ private fun AppearanceScreen(
                         caption = "The navigation bar softly shows what scrolls beneath it",
                         enabled = glassBlur,
                         onToggle = onSetGlassBlur,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                    SettingSwitchCard(
+                        title = "Sync appearance across devices",
+                        caption = "Keeps your palette and Pure black in step with your other devices and browsers",
+                        enabled = themeSync,
+                        onToggle = onSetThemeSync,
                         modifier = Modifier.padding(top = 10.dp),
                     )
                 }

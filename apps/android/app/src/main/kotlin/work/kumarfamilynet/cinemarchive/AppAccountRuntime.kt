@@ -66,6 +66,7 @@ class AppAccountRuntime(
     client: SupabaseRestClient,
     discoverRepository: DiscoverRepository,
     plexClientId: String,
+    preferences: work.kumarfamilynet.cinemarchive.data.PreferencesRepository,
 ) : RuntimeHandle, ViewModelStoreOwner {
     val ownerId: String get() = identity.userId
     private val ownerKey = OwnerNamespace.key(identity.userId)
@@ -207,6 +208,10 @@ class AppAccountRuntime(
     }
 
     val ledgerLayoutRepository = LedgerLayoutRepository(dataStore("cinemarchive_ledger_layout"), session, SupabaseLedgerLayoutWriter(client))
+
+    // The appearance itself is device-level; only this account's copy is reconciled here, and
+    // both jobs die with the runtime's scope on sign-out or account switch.
+    private val themeSyncRepository = work.kumarfamilynet.cinemarchive.data.ThemeSyncRepository(preferences, session, client, ::isCurrent)
 
     val librarySyncRepository: LibrarySyncRepository = LibrarySyncRepository(
         dataStore = dataStore("cinemarchive_sync"),
@@ -375,6 +380,8 @@ class AppAccountRuntime(
             if (episodeScheduleRefresher.refresh() > 0) librarySyncRepository.syncNow()
         }
         scope.launch { ledgerLayoutRepository.reconcile() }
+        scope.launch { themeSyncRepository.reconcile() }
+        scope.launch { themeSyncRepository.watchLocalChanges() }
     }
 
     private val legacyArchive = LegacyArchive(context)

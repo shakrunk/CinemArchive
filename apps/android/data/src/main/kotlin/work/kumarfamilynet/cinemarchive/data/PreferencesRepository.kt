@@ -8,7 +8,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontFamily
 import work.kumarfamilynet.cinemarchive.core.model.ArchiveFontScale
 import work.kumarfamilynet.cinemarchive.core.model.ArchivePalette
@@ -16,15 +19,16 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 import work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences
+import work.kumarfamilynet.cinemarchive.core.model.SyncedAppearance
 import work.kumarfamilynet.cinemarchive.core.model.isSecret
 
 private val Context.preferencesDataStore by preferencesDataStore(name = "cinemarchive_prefs")
 
 /**
- * Local-only app preferences (theme, and future navigation/Ledger prefs) — deliberately
- * separate from [LibraryRepository] and the Room-backed sync layer: these never leave the
- * device and have no server counterpart (`docs/android-parity-matrix.md`'s
- * `user_prefs`-backed persistence is a distinct, still-unimplemented concern).
+ * Device app preferences (theme, navigation, text, updates) — deliberately separate from
+ * [LibraryRepository] and the Room-backed sync layer. They stay on the device, except the
+ * appearance (palette, mode, pure black), which [ThemeSyncRepository] mirrors to
+ * `user_prefs.theme_prefs` when the user opts in (docs/android-contracts/theme-sync.md).
  */
 class PreferencesRepository(context: Context) {
     private val dataStore = context.preferencesDataStore
@@ -43,6 +47,10 @@ class PreferencesRepository(context: Context) {
     private val navigationCompactKey = booleanPreferencesKey("navigation_compact")
     private val glassBlurKey = booleanPreferencesKey("glass_blur")
     private val pureBlackKey = booleanPreferencesKey("pure_black")
+    private val themeSyncEnabledKey = booleanPreferencesKey("theme_sync_enabled")
+    // ISO instant of the last user-made appearance change here, or of the synced copy last
+    // applied — what theme sync's last-write-wins compares against the account's copy.
+    private val themeUpdatedAtKey = stringPreferencesKey("theme_updated_at")
 
     fun observeNavigation(): Flow<NavigationPreferences> = dataStore.data.map(::navigation)
 
@@ -71,7 +79,10 @@ class PreferencesRepository(context: Context) {
     }
 
     suspend fun setThemeMode(mode: ArchiveThemeMode) {
-        dataStore.edit { it[themeModeKey] = mode.name }
+        dataStore.edit {
+            it[themeModeKey] = mode.name
+            it[themeUpdatedAtKey] = appearanceStamp()
+        }
     }
 
     fun observePalette(): Flow<ArchivePalette> = dataStore.data.map { preferences ->
@@ -81,7 +92,10 @@ class PreferencesRepository(context: Context) {
     }
 
     suspend fun setPalette(palette: ArchivePalette) {
-        dataStore.edit { it[paletteKey] = palette.name }
+        dataStore.edit {
+            it[paletteKey] = palette.name
+            it[themeUpdatedAtKey] = appearanceStamp()
+        }
     }
 
     /** Secret palettes earned on this device (Spider-Noir, The Construct). Only gated palettes
@@ -135,8 +149,59 @@ class PreferencesRepository(context: Context) {
     }
 
     suspend fun setPureBlack(enabled: Boolean) {
-        dataStore.edit { it[pureBlackKey] = enabled }
+        dataStore.edit {
+            it[pureBlackKey] = enabled
+            it[themeUpdatedAtKey] = appearanceStamp()
+        }
     }
+
+    /** Opt-in, per device: mirror the appearance to the signed-in account. Off by default. */
+    fun observeThemeSyncEnabled(): Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[themeSyncEnabledKey] ?: false
+    }
+
+    suspend fun setThemeSyncEnabled(enabled: Boolean) {
+        dataStore.edit { it[themeSyncEnabledKey] = enabled }
+    }
+
+    /** Moves only on a user-made appearance change (the setters above) or [applySyncedAppearance]. */
+    fun observeThemeUpdatedAt(): Flow<String?> = dataStore.data.map { it[themeUpdatedAtKey] }
+
+    /** One consistent read of everything theme sync compares and encodes. */
+    suspend fun appearanceSnapshot(): AppearanceSnapshot {
+        val prefs = dataStore.data.first()
+        return AppearanceSnapshot(
+            appearance = SyncedAppearance(
+                palette = prefs[paletteKey]?.let { runCatching { ArchivePalette.valueOf(it) }.getOrNull() } ?: ArchivePalette.BRAND,
+                mode = prefs[themeModeKey]?.let { runCatching { ArchiveThemeMode.valueOf(it) }.getOrNull() } ?: ArchiveThemeMode.DARK,
+                pureBlack = prefs[pureBlackKey] ?: false,
+            ),
+            updatedAt = prefs[themeUpdatedAtKey],
+            unlocked = prefs[unlockedPalettesKey].orEmpty()
+                .mapNotNull { runCatching { ArchivePalette.valueOf(it) }.getOrNull() }.filter { it.isSecret }.toSet(),
+            syncEnabled = prefs[themeSyncEnabledKey] ?: false,
+        )
+    }
+
+    /** Applies a synced copy, adopting its stamp so it isn't pushed straight back. */
+    suspend fun applySyncedAppearance(appearance: SyncedAppearance, updatedAt: String) {
+        dataStore.edit {
+            it[paletteKey] = appearance.palette.name
+            it[themeModeKey] = appearance.mode.name
+            it[pureBlackKey] = appearance.pureBlack
+            it[themeUpdatedAtKey] = updatedAt
+        }
+    }
+
+    /** Stamps a never-changed appearance so it can be compared and pushed. */
+    suspend fun stampAppearanceIfUnset(): String {
+        var stamp = ""
+        dataStore.edit { prefs -> stamp = prefs[themeUpdatedAtKey] ?: appearanceStamp().also { prefs[themeUpdatedAtKey] = it } }
+        return stamp
+    }
+
+    // Millisecond precision, matching the web client's Date#toISOString.
+    private fun appearanceStamp(): String = Instant.now().truncatedTo(ChronoUnit.MILLIS).toString()
 
     fun observeLibraryViewMode(): Flow<LibraryViewMode> = dataStore.data.map { preferences ->
         preferences[libraryViewModeKey]?.let { stored ->
@@ -196,3 +261,10 @@ class PreferencesRepository(context: Context) {
         const val DEFAULT_POSTER_GRID_COLUMNS = 2
     }
 }
+
+data class AppearanceSnapshot(
+    val appearance: SyncedAppearance,
+    val updatedAt: String?,
+    val unlocked: Set<ArchivePalette>,
+    val syncEnabled: Boolean,
+)

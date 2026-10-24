@@ -26,6 +26,7 @@ import {
   type MyProfile,
   type InviteCode,
 } from 'src/lib/auth'
+import { isDevMockUser } from 'src/lib/devAuth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import { parseLetterboxdCsv, letterboxdToSyncItems } from 'src/lib/letterboxd-import'
 import { resolveSyncItems } from 'src/lib/sync/core'
@@ -410,6 +411,10 @@ function AppearanceSection() {
   const titles = useAppStore((s) => s.titles)
   const pureBlack = useAppStore((s) => s.pureBlack)
   const setPureBlack = useAppStore((s) => s.setPureBlack)
+  const themeSyncEnabled = useAppStore((s) => s.themeSyncEnabled)
+  const setThemeSyncEnabled = useAppStore((s) => s.setThemeSyncEnabled)
+  const user = useAppStore((s) => s.user)
+  const canSync = isSupabaseConfigured && !!user && !isDevMockUser(user)
 
   const activeFlavor = CATPPUCCIN_FLAVORS.find((f) => f.value === theme)
 
@@ -541,6 +546,15 @@ function AppearanceSection() {
           hint={isLightTheme(theme)
             ? 'True-black background for OLED screens. Takes effect on dark themes.'
             : 'True-black background for OLED screens; cards keep their lifted surfaces.'}
+        />
+        <SettingToggle
+          checked={canSync && themeSyncEnabled}
+          disabled={!canSync}
+          onChange={setThemeSyncEnabled}
+          label="Sync appearance across devices"
+          hint={canSync
+            ? 'Keeps your theme and Pure black in step on every browser and Android device where this is on.'
+            : 'Sign in to keep your theme in step across your browsers and devices.'}
         />
       </div>
       <TextPreferences />

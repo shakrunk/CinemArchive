@@ -340,6 +340,8 @@ export function pickDevicePreferences(value: unknown): Record<string, unknown> {
     theme: ['dark', 'light', 'noir', 'matrix', 'catppuccin-latte', 'catppuccin-frappe', 'catppuccin-macchiato', 'catppuccin-mocha'], themeMode: ['light', 'dark', 'system'],
   })) if (typeof state[key] === 'string' && allowed.includes(state[key])) result[key] = state[key]
   if (typeof state.pureBlack === 'boolean') result.pureBlack = state.pureBlack
+  if (typeof state.themeSyncEnabled === 'boolean') result.themeSyncEnabled = state.themeSyncEnabled
+  if (typeof state.themeUpdatedAt === 'string' && !Number.isNaN(Date.parse(state.themeUpdatedAt))) result.themeUpdatedAt = state.themeUpdatedAt
   if (Array.isArray(state.unlockedThemes)) result.unlockedThemes = [...new Set(['dark', 'light', ...state.unlockedThemes.filter((v) => v === 'noir' || v === 'matrix')])]
   if (state.navPrefs && typeof state.navPrefs === 'object') {
     const nav = state.navPrefs as Record<string, unknown>

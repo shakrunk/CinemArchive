@@ -9,9 +9,18 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Web & Android:** A **Pure black** switch in Appearance gives dark themes a true-black background for OLED screens. Light themes are unaffected.
+- **Web & Android:** **Sync appearance across devices** (off by default) keeps your theme and Pure black in step on every browser and device where you turn it on. Material You stays on Android, and a secret theme only follows you to devices where you've unlocked it.
+
 ### Changed
 
 - **Web & Android:** A series' cast takes up much less room in the title detail. An open episode shows its guest stars up front and folds the series regulars into a "series regulars in this episode" toggle. The season cast is collapsed by default, and opening it lists the people new to that season first.
+
+### Fixed
+
+- **Web:** The series graph's rating colors now follow the Spider-Noir, Construct and Catppuccin themes.
 
 ## [1.41.0] - 2026-10-24
 

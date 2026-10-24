@@ -1097,6 +1097,8 @@ $$;
 create table user_prefs (
   user_id       uuid primary key references auth.users(id) on delete cascade,
   ledger_layout jsonb,  -- LedgerWidget[]: { id, panel, width, settings? }
+  theme_prefs   jsonb,  -- opt-in appearance sync: { palette, mode, pureBlack, updatedAt }
+                        -- (docs/android-contracts/theme-sync.md); last-write-wins on updatedAt
   updated_at    timestamptz not null default now()
 );
 
@@ -1110,7 +1112,9 @@ create policy "user_prefs: owner full access"
 -- Shared-token and friend viewers may READ the owner's prefs so their Ledger
 -- renders with the owner's board arrangement (mirrors the titles policies).
 -- NOTE: these read policies expose the whole row — don't add sensitive
--- columns to this table without revisiting them.
+-- columns to this table without revisiting them. theme_prefs (a palette name
+-- and a couple of flags) is deliberately non-sensitive, and friend/shared reads
+-- select ledger_layout only.
 create policy "user_prefs: shared key read"
   on user_prefs for select
   using (is_valid_shared_token(current_setting('app.shared_token', true), user_id));

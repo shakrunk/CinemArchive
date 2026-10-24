@@ -11,6 +11,7 @@ import { useOutingReconciler } from 'src/lib/useOutingReconciler'
 import { useEpisodeScheduleRefresh } from 'src/lib/useEpisodeScheduleRefresh'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
+import { startThemeSync } from 'src/lib/themeSync'
 import { NotificationStack } from 'src/components/NotificationStack'
 import { LibrarySyncToast } from 'src/components/LibrarySyncToast'
 import { LibrarySyncDialog } from 'src/components/LibrarySyncDialog'
@@ -140,6 +141,7 @@ export default function App() {
   useEffect(() => {
     applyTheme(useAppStore.getState().theme)
     watchSystemTheme()
+    startThemeSync()
   }, [])
 
   // ⌘K / Ctrl+K toggles the palette from anywhere.

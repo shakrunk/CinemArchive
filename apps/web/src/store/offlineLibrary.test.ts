@@ -208,6 +208,11 @@ describe('safe cache migration and strict owner refresh', () => {
     expect(storage.getItem()).toBe(raw)
     expect(pickDevicePreferences({ theme: 'invalid', user: { id: 'a' }, titles: [title] })).toEqual({})
     expect(pickDevicePreferences({ theme: 'catppuccin-mocha' })).toEqual({ theme: 'catppuccin-mocha' })
+    expect(pickDevicePreferences({ pureBlack: true })).toEqual({ pureBlack: true })
+    expect(pickDevicePreferences({ pureBlack: 'yes' })).toEqual({})
+    expect(pickDevicePreferences({ themeSyncEnabled: true, themeUpdatedAt: '2026-10-24T10:00:00.000Z' }))
+      .toEqual({ themeSyncEnabled: true, themeUpdatedAt: '2026-10-24T10:00:00.000Z' })
+    expect(pickDevicePreferences({ themeSyncEnabled: 1, themeUpdatedAt: 'yesterday' })).toEqual({})
   })
 
   it('rejects a partial snapshot when pins fail instead of clearing that domain', async () => {

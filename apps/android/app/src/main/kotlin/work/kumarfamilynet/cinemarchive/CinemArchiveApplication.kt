@@ -80,6 +80,7 @@ class CinemArchiveApplication : Application() {
                     client = supabaseClient,
                     discoverRepository = discoverRepository,
                     plexClientId = plexClientId,
+                    preferences = preferencesRepository,
                 ).also { it.startBackgroundWork() }
             },
         )

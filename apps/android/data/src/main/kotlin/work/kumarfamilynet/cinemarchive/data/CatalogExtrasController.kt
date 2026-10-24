@@ -1,25 +1,10 @@
-package work.kumarfamilynet.cinemarchive.feature.library
-
-import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
+package work.kumarfamilynet.cinemarchive.data
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import work.kumarfamilynet.cinemarchive.core.model.*
-import work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource
-
-sealed interface CatalogLoad<out T> {
-    data object Loading : CatalogLoad<Nothing>
-    data class Ready<T>(val value: T) : CatalogLoad<T>
-    data object Failed : CatalogLoad<Nothing>
-}
-
-data class CatalogExtrasState(
-    val key: CatalogExtrasKey? = null,
-    val videos: CatalogLoad<List<CatalogVideo>> = CatalogLoad.Loading,
-    val providers: CatalogLoad<CatalogProviders?> = CatalogLoad.Loading,
-)
 
 /** Screen-lifetime state. Late network replies cannot populate a different title or sign-in. */
 class CatalogExtrasController(private val source: CatalogExtrasSource, private val scope: CoroutineScope) {

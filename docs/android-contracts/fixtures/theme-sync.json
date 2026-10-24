@@ -1,0 +1,65 @@
+{
+  "comment": "Shared by apps/web/src/lib/themeSync.test.ts and the Android ThemeSyncParityTest. See docs/android-contracts/theme-sync.md.",
+  "encode": [
+    { "name": "web brand dark", "web": { "theme": "dark", "themeMode": "dark", "pureBlack": false }, "expected": { "palette": "brand", "mode": "dark", "pureBlack": false } },
+    { "name": "web brand following system", "web": { "theme": "light", "themeMode": "system", "pureBlack": true }, "expected": { "palette": "brand", "mode": "system", "pureBlack": true } },
+    { "name": "web catppuccin latte", "web": { "theme": "catppuccin-latte", "themeMode": "light", "pureBlack": false }, "expected": { "palette": "catppuccin-latte", "mode": "light", "pureBlack": false } },
+    { "name": "web noir", "web": { "theme": "noir", "themeMode": "dark", "pureBlack": true }, "expected": { "palette": "noir", "mode": "dark", "pureBlack": true } },
+    { "name": "android material you", "android": { "palette": "MATERIAL_YOU", "mode": "SYSTEM", "pureBlack": false }, "expected": { "palette": "material-you", "mode": "system", "pureBlack": false } },
+    { "name": "android brand light", "android": { "palette": "BRAND", "mode": "LIGHT", "pureBlack": false }, "expected": { "palette": "brand", "mode": "light", "pureBlack": false } },
+    { "name": "android catppuccin mocha", "android": { "palette": "CATPPUCCIN_MOCHA", "mode": "SYSTEM", "pureBlack": true }, "expected": { "palette": "catppuccin-mocha", "mode": "system", "pureBlack": true } },
+    { "name": "android matrix", "android": { "palette": "MATRIX", "mode": "DARK", "pureBlack": false }, "expected": { "palette": "matrix", "mode": "dark", "pureBlack": false } }
+  ],
+  "apply": [
+    {
+      "name": "brand with an explicit mode",
+      "remote": { "palette": "brand", "mode": "light", "pureBlack": false, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "catppuccin-mocha", "themeMode": "dark", "unlocked": [] }, "systemTheme": "dark", "expected": { "theme": "light", "themeMode": "light", "pureBlack": false } },
+      "android": { "current": { "palette": "CATPPUCCIN_MOCHA", "mode": "DARK", "unlocked": [] }, "expected": { "palette": "BRAND", "mode": "LIGHT", "pureBlack": false } }
+    },
+    {
+      "name": "brand following the system",
+      "remote": { "palette": "brand", "mode": "system", "pureBlack": true, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "light", "themeMode": "light", "unlocked": [] }, "systemTheme": "dark", "expected": { "theme": "dark", "themeMode": "system", "pureBlack": true } },
+      "android": { "current": { "palette": "BRAND", "mode": "LIGHT", "unlocked": [] }, "expected": { "palette": "BRAND", "mode": "SYSTEM", "pureBlack": true } }
+    },
+    {
+      "name": "catppuccin flavor keeps Android's own mode",
+      "remote": { "palette": "catppuccin-frappe", "mode": "dark", "pureBlack": false, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "dark", "themeMode": "system", "unlocked": [] }, "systemTheme": "light", "expected": { "theme": "catppuccin-frappe", "themeMode": "dark", "pureBlack": false } },
+      "android": { "current": { "palette": "BRAND", "mode": "SYSTEM", "unlocked": [] }, "expected": { "palette": "CATPPUCCIN_FRAPPE", "mode": "SYSTEM", "pureBlack": false } }
+    },
+    {
+      "name": "latte buckets into light on the web",
+      "remote": { "palette": "catppuccin-latte", "mode": "system", "pureBlack": true, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "dark", "themeMode": "dark", "unlocked": [] }, "systemTheme": "dark", "expected": { "theme": "catppuccin-latte", "themeMode": "light", "pureBlack": true } },
+      "android": { "current": { "palette": "BRAND", "mode": "DARK", "unlocked": [] }, "expected": { "palette": "CATPPUCCIN_LATTE", "mode": "DARK", "pureBlack": true } }
+    },
+    {
+      "name": "unlocked secret palette applies",
+      "remote": { "palette": "matrix", "mode": "dark", "pureBlack": false, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "light", "themeMode": "light", "unlocked": ["matrix"] }, "systemTheme": "dark", "expected": { "theme": "matrix", "themeMode": "dark", "pureBlack": false } },
+      "android": { "current": { "palette": "BRAND", "mode": "LIGHT", "unlocked": ["MATRIX"] }, "expected": { "palette": "MATRIX", "mode": "LIGHT", "pureBlack": false } }
+    },
+    {
+      "name": "locked secret palette keeps the current choice but applies pure black",
+      "remote": { "palette": "noir", "mode": "dark", "pureBlack": true, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "catppuccin-mocha", "themeMode": "dark", "unlocked": [] }, "systemTheme": "dark", "expected": { "theme": "catppuccin-mocha", "themeMode": "dark", "pureBlack": true } },
+      "android": { "current": { "palette": "CATPPUCCIN_MOCHA", "mode": "DARK", "unlocked": [] }, "expected": { "palette": "CATPPUCCIN_MOCHA", "mode": "DARK", "pureBlack": true } }
+    },
+    {
+      "name": "material you is Android-only",
+      "remote": { "palette": "material-you", "mode": "light", "pureBlack": false, "updatedAt": "2026-10-24T10:00:00.000Z" },
+      "web": { "current": { "theme": "catppuccin-macchiato", "themeMode": "dark", "unlocked": [] }, "systemTheme": "dark", "expected": { "theme": "catppuccin-macchiato", "themeMode": "dark", "pureBlack": false } },
+      "android": { "current": { "palette": "BRAND", "mode": "DARK", "unlocked": [] }, "expected": { "palette": "MATERIAL_YOU", "mode": "LIGHT", "pureBlack": false } }
+    }
+  ],
+  "invalid": [
+    { "name": "unknown palette from a newer client", "remote": { "palette": "solarized", "mode": "dark", "pureBlack": false, "updatedAt": "2026-10-24T10:00:00.000Z" } },
+    { "name": "unknown mode", "remote": { "palette": "brand", "mode": "dim", "pureBlack": false, "updatedAt": "2026-10-24T10:00:00.000Z" } },
+    { "name": "missing updatedAt", "remote": { "palette": "brand", "mode": "dark", "pureBlack": false } },
+    { "name": "unparseable updatedAt", "remote": { "palette": "brand", "mode": "dark", "pureBlack": false, "updatedAt": "yesterday" } },
+    { "name": "pureBlack not a boolean", "remote": { "palette": "brand", "mode": "dark", "pureBlack": "yes", "updatedAt": "2026-10-24T10:00:00.000Z" } },
+    { "name": "not an object", "remote": "brand" }
+  ]
+}

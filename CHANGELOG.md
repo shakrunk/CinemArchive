@@ -21,6 +21,7 @@ number is chosen.
 ### Fixed
 
 - **Web:** The series graph's rating colors now follow the Spider-Noir, Construct and Catppuccin themes.
+- **Web:** Trailer thumbnails, their play buttons and the trailer player now follow the Spider-Noir, Construct and Catppuccin themes instead of staying gold and brown.
 
 ## [1.41.0] - 2026-10-24
 

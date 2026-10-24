@@ -218,6 +218,9 @@ interface UISlice {
   // black & white, The Matrix red pill). Always includes 'dark' and 'light';
   // the Catppuccin flavors need no entry (see `isThemeAvailable`).
   unlockedThemes: Theme[]
+  // AMOLED "pure black": a true-black page on dark themes (ignored on light
+  // ones). Device preference, applied as <html data-pure-black> by applyTheme.
+  pureBlack: boolean
   navPrefs: NavPrefs
   ledgerPrefs: LedgerPrefs
   // The board arrangement of whoever is being viewed in a shared/friend view.
@@ -257,6 +260,7 @@ interface UISlice {
   setThemeMode: (mode: ThemeMode) => void
   // No-op if already unlocked or the theme is dark/light (always unlocked).
   unlockTheme: (theme: Theme) => void
+  setPureBlack: (pureBlack: boolean) => void
   moveNavItem: (id: NavItemId, direction: 'up' | 'down') => void
   reorderNav: (order: NavItemId[]) => void
   toggleNavItemHidden: (id: NavItemId) => void
@@ -827,6 +831,7 @@ export const useAppStore = create<AppStore>()(
   theme: getSystemTheme(),
   themeMode: 'system',
   unlockedThemes: ['dark', 'light'],
+  pureBlack: false,
   navPrefs: defaultNavPrefs,
   ledgerPrefs: defaultLedgerPrefs,
   viewedLedgerWidgets: null,
@@ -843,6 +848,8 @@ export const useAppStore = create<AppStore>()(
   setTheme: (theme) => set({ theme, themeMode: isLightTheme(theme) ? 'light' : 'dark' }),
 
   setThemeMode: (mode) => set({ themeMode: mode, theme: mode === 'system' ? getSystemTheme() : mode }),
+
+  setPureBlack: (pureBlack) => set({ pureBlack }),
 
   unlockTheme: (theme) => {
     if (isThemeAvailable(theme, get().unlockedThemes)) return
@@ -1373,6 +1380,7 @@ export const useAppStore = create<AppStore>()(
         theme: s.theme,
         themeMode: s.themeMode,
         unlockedThemes: s.unlockedThemes,
+        pureBlack: s.pureBlack,
         navPrefs: s.navPrefs,
       }),
       merge: (persisted, current) => ({ ...current, ...pickDevicePreferences(persisted) }),

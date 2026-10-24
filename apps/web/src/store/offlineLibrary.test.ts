@@ -208,6 +208,8 @@ describe('safe cache migration and strict owner refresh', () => {
     expect(storage.getItem()).toBe(raw)
     expect(pickDevicePreferences({ theme: 'invalid', user: { id: 'a' }, titles: [title] })).toEqual({})
     expect(pickDevicePreferences({ theme: 'catppuccin-mocha' })).toEqual({ theme: 'catppuccin-mocha' })
+    expect(pickDevicePreferences({ pureBlack: true })).toEqual({ pureBlack: true })
+    expect(pickDevicePreferences({ pureBlack: 'yes' })).toEqual({})
   })
 
   it('rejects a partial snapshot when pins fail instead of clearing that domain', async () => {

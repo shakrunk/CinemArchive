@@ -2540,3 +2540,18 @@ body.spider-noir-color .projector-beam {
   background: rgba(203, 166, 247, 0.3);
   color: #11111b;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PURE BLACK (AMOLED)
+   <html data-pure-black> is set by applyTheme / bootstrap.js only on dark
+   themes. The page itself goes true black while cards and sheets keep their
+   lifted ink surfaces. Unlayered and last, so it beats both the @layer base
+   theme tokens and every theme's unlayered atmosphere backdrop above.
+   ════════════════════════════════════════════════════════════════════════ */
+:root[data-pure-black] {
+  --void-rgb: 0 0 0;
+  --background: 0 0% 0%;
+}
+:root[data-pure-black] body::before {
+  background: #000;
+}

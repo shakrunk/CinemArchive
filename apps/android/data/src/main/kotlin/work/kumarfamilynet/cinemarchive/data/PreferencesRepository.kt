@@ -42,6 +42,7 @@ class PreferencesRepository(context: Context) {
     private val navigationHiddenKey = stringPreferencesKey("navigation_hidden")
     private val navigationCompactKey = booleanPreferencesKey("navigation_compact")
     private val glassBlurKey = booleanPreferencesKey("glass_blur")
+    private val pureBlackKey = booleanPreferencesKey("pure_black")
 
     fun observeNavigation(): Flow<NavigationPreferences> = dataStore.data.map(::navigation)
 
@@ -125,6 +126,16 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setGlassBlur(enabled: Boolean) {
         dataStore.edit { it[glassBlurKey] = enabled }
+    }
+
+    /** AMOLED "pure black": a true-black background and surface on dark palettes (light ones
+     *  ignore it). Off by default; mirrors the web app's Pure black toggle. */
+    fun observePureBlack(): Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[pureBlackKey] ?: false
+    }
+
+    suspend fun setPureBlack(enabled: Boolean) {
+        dataStore.edit { it[pureBlackKey] = enabled }
     }
 
     fun observeLibraryViewMode(): Flow<LibraryViewMode> = dataStore.data.map { preferences ->

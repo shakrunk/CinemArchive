@@ -25,13 +25,17 @@ const THEME_COLORS: Record<Theme, string> = {
   'catppuccin-mocha': '#1e1e2e',
 }
 
-/** Apply a theme to the document: sets [data-theme] and the address-bar color.
- *  Pure DOM — does not touch the store (callers decide when to persist). */
+/** Apply a theme to the document: sets [data-theme], [data-pure-black] (the
+ *  stored AMOLED preference, honored on dark themes only) and the address-bar
+ *  color. Reads the store but never writes it (callers decide when to persist). */
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement
   root.setAttribute('data-theme', theme)
+  const pureBlack = useAppStore.getState().pureBlack && !isLightTheme(theme)
+  if (pureBlack) root.setAttribute('data-pure-black', '')
+  else root.removeAttribute('data-pure-black')
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', THEME_COLORS[theme])
+  if (meta) meta.setAttribute('content', pureBlack ? '#000000' : THEME_COLORS[theme])
 }
 
 /** Build a 16-point starburst polygon centred at (cx, cy) with the given

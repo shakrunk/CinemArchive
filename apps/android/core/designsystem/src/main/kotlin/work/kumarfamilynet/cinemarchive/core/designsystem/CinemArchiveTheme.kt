@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -297,11 +298,13 @@ fun CinemArchiveTheme(
     palette: ArchivePalette = ArchivePalette.BRAND,
     fontFamily: ArchiveFontFamily = ArchiveFontFamily.DEFAULT,
     fontScale: ArchiveFontScale = ArchiveFontScale.DEFAULT,
+    // AMOLED: drops the background and surface to true black, on dark schemes only.
+    pureBlack: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isDark = mode.resolveIsDark()
     val context = LocalContext.current
-    val colors: ColorScheme = when (palette) {
+    val baseColors: ColorScheme = when (palette) {
         ArchivePalette.BRAND -> if (isDark) DarkScheme else LightScheme
         ArchivePalette.MATERIAL_YOU ->
             if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -311,6 +314,14 @@ fun CinemArchiveTheme(
         ArchivePalette.CATPPUCCIN_FRAPPE -> CatppuccinFrappeScheme
         ArchivePalette.CATPPUCCIN_MACCHIATO -> CatppuccinMacchiatoScheme
         ArchivePalette.CATPPUCCIN_MOCHA -> CatppuccinMochaScheme
+    }
+
+    // Judged from the resolved scheme rather than [mode]: fixed palettes ignore the mode, and
+    // Latte is light even when the device is dark. Containers keep their lift above the black.
+    val colors = if (pureBlack && baseColors.background.luminance() < 0.5f) {
+        baseColors.copy(background = Color.Black, surface = Color.Black, surfaceContainerLowest = Color.Black)
+    } else {
+        baseColors
     }
 
     // Stacks on top of the device's own font scale (rather than replacing it) so this setting

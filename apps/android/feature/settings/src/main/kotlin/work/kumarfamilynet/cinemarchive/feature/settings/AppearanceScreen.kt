@@ -136,6 +136,7 @@ fun AppearanceRoute(
     val fontFamily by preferencesRepository.observeFontFamily().collectAsStateWithLifecycle(initialValue = ArchiveFontFamily.DEFAULT)
     val fontScale by preferencesRepository.observeFontScale().collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
     val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
+    val pureBlack by preferencesRepository.observePureBlack().collectAsStateWithLifecycle(initialValue = false)
     val scope = rememberCoroutineScope()
 
     AppearanceScreen(
@@ -146,11 +147,13 @@ fun AppearanceRoute(
         fontFamily = fontFamily,
         fontScale = fontScale,
         glassBlur = glassBlur,
+        pureBlack = pureBlack,
         onSetThemeMode = { mode -> scope.launch { preferencesRepository.setThemeMode(mode) } },
         onSetPalette = { p -> scope.launch { preferencesRepository.setPalette(p) } },
         onSetFontFamily = { f -> scope.launch { preferencesRepository.setFontFamily(f) } },
         onSetFontScale = { s -> scope.launch { preferencesRepository.setFontScale(s) } },
         onSetGlassBlur = { enabled -> scope.launch { preferencesRepository.setGlassBlur(enabled) } },
+        onSetPureBlack = { enabled -> scope.launch { preferencesRepository.setPureBlack(enabled) } },
         onBack = onBack,
         showBack = showBack,
     )
@@ -165,11 +168,13 @@ private fun AppearanceScreen(
     fontFamily: ArchiveFontFamily,
     fontScale: ArchiveFontScale,
     glassBlur: Boolean,
+    pureBlack: Boolean,
     onSetThemeMode: (ArchiveThemeMode) -> Unit,
     onSetPalette: (ArchivePalette) -> Unit,
     onSetFontFamily: (ArchiveFontFamily) -> Unit,
     onSetFontScale: (ArchiveFontScale) -> Unit,
     onSetGlassBlur: (Boolean) -> Unit,
+    onSetPureBlack: (Boolean) -> Unit,
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -261,10 +266,19 @@ private fun AppearanceScreen(
             }
             item {
                 ReadingWidthColumn {
-                    GlassBlurCard(
+                    SettingSwitchCard(
+                        title = "Pure black",
+                        caption = "True-black background for OLED screens, on dark palettes",
+                        enabled = pureBlack,
+                        onToggle = onSetPureBlack,
+                        modifier = Modifier.padding(top = 18.dp),
+                    )
+                    SettingSwitchCard(
+                        title = "Blur behind navigation",
+                        caption = "The navigation bar softly shows what scrolls beneath it",
                         enabled = glassBlur,
                         onToggle = onSetGlassBlur,
-                        modifier = Modifier.padding(top = 18.dp),
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
             }
@@ -428,7 +442,13 @@ private fun TextPreview(fontFamily: ArchiveFontFamily, fontScale: ArchiveFontSca
  * the solid bar it used to be. The whole row toggles, not just the switch, as a settings row does.
  */
 @Composable
-private fun GlassBlurCard(enabled: Boolean, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+private fun SettingSwitchCard(
+    title: String,
+    caption: String,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         checked = enabled,
         onCheckedChange = onToggle,
@@ -441,9 +461,9 @@ private fun GlassBlurCard(enabled: Boolean, onToggle: (Boolean) -> Unit, modifie
             modifier = Modifier.fillMaxWidth().padding(16.dp, 14.dp),
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text("Blur behind navigation", style = MaterialTheme.typography.titleSmall)
+                Text(title, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "The navigation bar softly shows what scrolls beneath it",
+                    caption,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- **Web & Android:** A series' cast takes up much less room in the title detail. An open episode shows its guest stars up front and folds the series regulars into a "series regulars in this episode" toggle. The season cast is collapsed by default, and opening it lists the people new to that season first.
+
 ## [1.41.0] - 2026-10-24
 
 ### Fixed

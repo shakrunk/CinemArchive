@@ -21,6 +21,8 @@ number is chosen.
 ### Fixed
 
 - **Web:** The series graph's rating colors now follow the Spider-Noir, Construct and Catppuccin themes.
+- **Web:** Trailer thumbnails, their play buttons and the trailer player now follow the Spider-Noir, Construct and Catppuccin themes instead of staying gold and brown.
+- **Web:** Discover cards no longer repeat the release year under the title; it appears once, beside Movie or TV.
 
 ## [1.41.0] - 2026-10-24
 

@@ -278,7 +278,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
       aria-modal="true"
       aria-label={`${video.name} — trailer`}
       className="fixed inset-0 z-215 flex items-center justify-center"
-      style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(11,9,7,0.9) 0%, rgba(4,3,2,0.98) 100%)' }}
+      style={{ background: 'radial-gradient(ellipse at 50% 40%, rgb(var(--scrim-ink) / 0.9) 0%, rgb(var(--scrim-ink) / 0.98) 100%)' }}
       onClick={onClose}
     >
       {/* Film grain on backdrop */}
@@ -315,7 +315,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
             top: '-56px',
             width: '50%',
             height: '56px',
-            background: 'radial-gradient(ellipse at 50% 100%, rgba(233,178,102,0.1) 0%, transparent 70%)',
+            background: 'radial-gradient(ellipse at 50% 100%, rgb(var(--amber-rgb) / 0.1) 0%, transparent 70%)',
           }}
         />
 
@@ -325,9 +325,9 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
           style={{
             paddingBottom: '56.25%',
             boxShadow:
-              '0 0 0 1px rgba(233,178,102,0.18), ' +
+              '0 0 0 1px rgb(var(--amber-rgb) / 0.18), ' +
               '0 24px 80px -16px rgba(0,0,0,0.85), ' +
-              '0 0 60px -12px rgba(233,178,102,0.07)',
+              '0 0 60px -12px rgb(var(--amber-rgb) / 0.07)',
           }}
         >
           {/* YT player mounts here */}
@@ -347,7 +347,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
               className="absolute inset-x-0 bottom-0 pointer-events-none"
               style={{
                 height: '100px',
-                background: 'linear-gradient(to top, rgba(7,5,4,0.92) 0%, rgba(7,5,4,0.25) 65%, transparent 100%)',
+                background: 'linear-gradient(to top, rgb(var(--scrim-ink) / 0.92) 0%, rgb(var(--scrim-ink) / 0.25) 65%, transparent 100%)',
               }}
             />
 
@@ -360,7 +360,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
                 <div
                   className="w-10 h-10 rounded-full animate-spin"
                   style={{
-                    border: '2.5px solid rgba(233,178,102,0.2)',
+                    border: '2.5px solid rgb(var(--amber-rgb) / 0.2)',
                     borderTopColor: 'var(--amber)',
                   }}
                 />
@@ -375,7 +375,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
               {/* Scrubber */}
               <div
                 className="w-full h-1 rounded-full cursor-pointer group/scrub relative"
-                style={{ background: 'rgba(233,178,102,0.2)' }}
+                style={{ background: 'rgb(var(--amber-rgb) / 0.2)' }}
                 onMouseDown={handleScrubberMouseDown}
               >
                 <div
@@ -387,7 +387,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
                   style={{
                     left: `${progress}%`,
                     background: 'var(--amber)',
-                    boxShadow: '0 0 8px rgba(233,178,102,0.6)',
+                    boxShadow: '0 0 8px rgb(var(--amber-rgb) / 0.6)',
                   }}
                 />
               </div>
@@ -432,9 +432,9 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
             aria-label="Previous trailer"
             className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
-              background: 'rgba(11,9,7,0.6)',
+              background: 'rgb(var(--scrim-ink) / 0.6)',
               color: 'var(--paper-dim)',
-              border: '1px solid rgba(233,178,102,0.12)',
+              border: '1px solid rgb(var(--amber-rgb) / 0.12)',
             }}
             onMouseEnter={(e) => { if (videoIndex > 0) e.currentTarget.style.color = 'var(--amber)' }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--paper-dim)' }}
@@ -470,9 +470,9 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
             aria-label="Next trailer"
             className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
-              background: 'rgba(11,9,7,0.6)',
+              background: 'rgb(var(--scrim-ink) / 0.6)',
               color: 'var(--paper-dim)',
-              border: '1px solid rgba(233,178,102,0.12)',
+              border: '1px solid rgb(var(--amber-rgb) / 0.12)',
             }}
             onMouseEnter={(e) => { if (videoIndex < totalVideos - 1) e.currentTarget.style.color = 'var(--amber)' }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--paper-dim)' }}
@@ -491,7 +491,7 @@ function TrailerPlayer({ video, videoIndex, totalVideos, onPrev, onNext, onClose
                 style={{
                   width: i === videoIndex ? '20px' : '5px',
                   height: '5px',
-                  background: i === videoIndex ? 'var(--amber)' : 'rgba(233,178,102,0.22)',
+                  background: i === videoIndex ? 'var(--amber)' : 'rgb(var(--amber-rgb) / 0.22)',
                 }}
               />
             ))}
@@ -563,7 +563,7 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
               className="group shrink-0 w-[220px] sm:w-[260px] text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 rounded-lg"
             >
               <div
-                className="relative w-full rounded-lg overflow-hidden group-hover:shadow-[0_0_0_1.5px_rgba(233,178,102,0.5)]"
+                className="relative w-full rounded-lg overflow-hidden group-hover:shadow-[0_0_0_1.5px_rgb(var(--amber-rgb)/0.5)]"
                 style={{ paddingBottom: '56.25%' }}
               >
                 <img
@@ -571,28 +571,28 @@ export function TrailerRow({ videos }: { videos: TitleVideo[] }) {
                   alt={v.name}
                   className="absolute inset-0 w-full h-full object-cover saturate-[.68] sepia-[.08] brightness-[.78] transition-[filter,opacity] duration-200 group-hover:saturate-[.9] group-hover:brightness-[.88] group-hover:opacity-80"
                 />
-                {/* Warm thematic wash keeps YouTube artwork inside the archive palette. */}
+                {/* Thematic wash keeps YouTube artwork inside the current theme's palette. */}
                 <div
                   aria-hidden="true"
                   className="absolute inset-0 pointer-events-none"
-                  style={{ background: 'linear-gradient(135deg, rgb(var(--amber-rgb) / 0.1), rgba(7,5,4,0.24))' }}
+                  style={{ background: 'linear-gradient(135deg, rgb(var(--amber-rgb) / 0.1), rgb(var(--scrim-ink) / 0.24))' }}
                 />
                 {/* Vignette */}
                 <div
                   aria-hidden="true"
                   className="absolute inset-0 pointer-events-none"
                   style={{
-                    background: 'radial-gradient(ellipse at center, transparent 25%, rgba(7,5,4,0.5) 100%)',
+                    background: 'radial-gradient(ellipse at center, transparent 25%, rgb(var(--scrim-ink) / 0.5) 100%)',
                   }}
                 />
-                {/* Amber play button */}
+                {/* Accent play button */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div
                     className="rounded-full transition-all duration-200 group-hover:scale-110"
                     style={{
                       padding: '11px',
-                      background: 'rgba(7,5,4,0.62)',
-                      border: '1.5px solid rgba(233,178,102,0.4)',
+                      background: 'rgb(var(--scrim-ink) / 0.62)',
+                      border: '1.5px solid rgb(var(--amber-rgb) / 0.4)',
                       backdropFilter: 'blur(4px)',
                     }}
                   >

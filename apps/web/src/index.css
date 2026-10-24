@@ -213,6 +213,8 @@
     --ivory: 243 234 217; /* constant light — text over dark art */
     --poster-ink: 17 13 11; /* dark poster surfaces: stay dark on light themes, tinted per theme */
     --poster-ink-2: 30 23 20;
+    /* Near-black for scrims over video and art (trailer player, thumbnails). */
+    --scrim-ink: 7 5 4;
     /* Amber marks sitting on a dark art scrim (hero chips, poster badges). The
        theme-aware --amber deepens on light to stay legible on ivory, which goes
        muddy against black/55 — so those call sites pin this constant instead. */
@@ -382,6 +384,7 @@
     --poster-ink: 15 15 16;
     --poster-ink-2: 27 27 29;
     --ivory: 235 235 232;
+    --scrim-ink: 5 5 6;
     --rating-none: rgba(8, 8, 9, 0.55);
     --rating-1: rgba(200, 90, 65, 0.9);
     --rating-2: rgba(95, 95, 100, 0.85);
@@ -451,6 +454,7 @@
     --poster-ink: 6 12 7;
     --poster-ink-2: 13 26 14;
     --ivory: 200 245 210;
+    --scrim-ink: 2 4 2;
     --rating-none: rgba(3, 8, 4, 0.55);
     --rating-1: rgba(220, 70, 70, 0.9);
     --rating-2: rgba(230, 110, 100, 0.85);
@@ -521,6 +525,7 @@
     --poster-ink: 17 17 27;
     --poster-ink-2: 30 30 46;
     --ivory: 205 214 244;
+    --scrim-ink: 8 8 12;
     --rating-none: rgba(220, 224, 232, 0.9);
     --rating-1: rgba(210, 15, 57, 0.9);
     --rating-2: rgba(254, 100, 11, 0.85);
@@ -591,6 +596,7 @@
     --poster-ink: 35 38 52;
     --poster-ink-2: 48 52 70;
     --ivory: 198 208 245;
+    --scrim-ink: 15 16 22;
     --rating-none: rgba(35, 38, 52, 0.55);
     --rating-1: rgba(231, 130, 132, 0.9);
     --rating-2: rgba(239, 159, 118, 0.85);
@@ -661,6 +667,7 @@
     --poster-ink: 24 25 38;
     --poster-ink-2: 36 39 58;
     --ivory: 202 211 245;
+    --scrim-ink: 10 11 16;
     --rating-none: rgba(24, 25, 38, 0.55);
     --rating-1: rgba(237, 135, 150, 0.9);
     --rating-2: rgba(245, 169, 127, 0.85);
@@ -731,6 +738,7 @@
     --poster-ink: 17 17 27;
     --poster-ink-2: 30 30 46;
     --ivory: 205 214 244;
+    --scrim-ink: 8 8 12;
     --rating-none: rgba(17, 17, 27, 0.55);
     --rating-1: rgba(243, 139, 168, 0.9);
     --rating-2: rgba(250, 179, 135, 0.85);

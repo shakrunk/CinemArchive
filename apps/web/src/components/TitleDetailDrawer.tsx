@@ -12,7 +12,7 @@ import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } f
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { TicketButton } from './TicketViewer'
 import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
-import { CastCrewSection } from 'src/components/CastCrewSection'
+import { CastCrewSection, CastGrid } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
   avgSeasonRating,
@@ -27,6 +27,7 @@ import {
   orderSeasonsForDisplay,
   seasonLabel,
   seasonShortLabel,
+  seasonCastNewcomersFirst,
 } from 'src/store/episodeUtils'
 import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
@@ -36,7 +37,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
 import { formatCompanions, findPendingFollowUpOuting, companionSuggestions, venueSuggestions } from 'src/store/outings'
-import { CINEMA_FORMATS, type Title, type Viewing, type WatchStatus, type Season, type Episode, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
+import { CINEMA_FORMATS, type CastMember, type Title, type Viewing, type WatchStatus, type Season, type Episode, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, TMDB_STILL_BASE, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
@@ -659,6 +660,8 @@ interface TVSeriesSectionProps {
   titleId: string
   tmdbId: number
   seasons: Season[]
+  /** Series-level cast, used to lead the season cast with its newcomers. */
+  seriesCast?: CastMember[]
   isSharedView: boolean
   isSpiderNoir: boolean
   onPersonClick: (person: PersonDetailTarget) => void
@@ -674,7 +677,7 @@ function unwatchedEpisodeCount(seasons: Season[]): number {
   )
 }
 
-function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
+function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: TVSeriesSectionProps) {
   const markPrePlatformWatched = useAppStore((s) => s.markPrePlatformWatched)
   const [confirmPrePlatform, setConfirmPrePlatform] = useState<'series' | 'season' | null>(null)
   // Main seasons ascending, Specials last; series-level rollups use the main
@@ -683,6 +686,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
   const seriesSeasons = mainSeasons(seasons)
   const [selectedSeason, setSelectedSeason] = useState(orderedSeasons[0]?.seasonNumber ?? 1)
   const [selectedEpId, setSelectedEpId] = useState<string | null>(null)
+  const [showSeasonCast, setShowSeasonCast] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -994,43 +998,28 @@ function TVSeriesSection({ titleId, tmdbId, seasons, isSharedView, isSpiderNoir,
         </div>
       )}
 
-      {/* Season cast */}
+      {/* Season cast — collapsed by default; it mostly repeats the series cast,
+          so the people new to this season lead when it opens. */}
       {season?.cast && season.cast.length > 0 && (
-        <div className="pl-3 border-l-2" style={{ borderColor: 'var(--line)' }}>
-          <Eyebrow as="div" className="mb-2">
-            {seasonLabel(season.seasonNumber)} Cast
-          </Eyebrow>
-          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 -mx-6 px-6">
-            {season.cast.map((member) => (
-              <button
-                key={member.tmdbPersonId}
-                type="button"
-                onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
-                aria-label={`View details for ${member.name}`}
-                className="group shrink-0 w-[110px] overflow-hidden rounded-lg text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 transition-all"
-                style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
-              >
-                <div className="aspect-2/3 overflow-hidden">
-                  {member.profileUrl ? (
-                    <img src={member.profileUrl} alt={member.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--card)' }}>
-                      <span className="font-mono text-3xl" style={{ color: 'var(--paper-faint)' }}>{member.name.charAt(0).toUpperCase()}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-2">
-                  <div className="font-sans font-semibold line-clamp-1 transition-colors group-hover:text-amber" style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper)', lineHeight: 1.3 }} title={member.name}>{member.name}</div>
-                  <div className="font-mono line-clamp-1 mt-0.5" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: member.character ? 0.6 : 0 }} title={member.character}>{member.character || ' '}</div>
-                  {member.episodeCount != null && (
-                    <div className="font-mono mt-0.5" style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3, opacity: 0.7 }}>
-                      {member.episodeCount} ep{member.episodeCount !== 1 ? 's' : ''}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowSeasonCast((v) => !v)}
+            aria-expanded={showSeasonCast}
+            className="flex items-center gap-1.5 group focus:outline-hidden"
+          >
+            <Eyebrow as="span" className="group-hover:text-amber group-focus-visible:text-amber transition-colors">
+              {seasonLabel(season.seasonNumber)} Cast · {season.cast.length}
+            </Eyebrow>
+            <ChevronDown
+              className={cn('w-3 h-3 text-paper-faint transition-transform group-hover:text-amber', showSeasonCast && 'rotate-180')}
+            />
+          </button>
+          {showSeasonCast && (
+            <div className="mt-2">
+              <CastGrid cast={seasonCastNewcomersFirst(season.cast, seriesCast)} onPersonClick={onPersonClick} />
+            </div>
+          )}
         </div>
       )}
 
@@ -1905,6 +1894,7 @@ export function TitleDetailDrawer() {
                 titleId={title.id}
                 tmdbId={title.tmdbId}
                 seasons={title.seasons}
+                seriesCast={title.cast}
                 isSharedView={isSharedView}
                 isSpiderNoir={title.tmdbId === SPIDER_NOIR_TMDB_ID}
                 onPersonClick={setActivePerson}

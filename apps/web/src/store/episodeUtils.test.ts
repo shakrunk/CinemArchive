@@ -19,9 +19,10 @@ import {
   orderSeasonsForDisplay,
   seasonLabel,
   seasonShortLabel,
+  seasonCastNewcomersFirst,
 } from './episodeUtils'
 import { makeEpisode, makeRating, makeSeason, makeWatchEvent } from '@/test/fixtures'
-import type { Title } from './mockData'
+import type { CastMember, Title } from './mockData'
 
 describe('avgEpisodeRating', () => {
   it('returns null when there are no ratings', () => {
@@ -317,5 +318,20 @@ describe('Specials (season 0)', () => {
       makeSeason({ seasonNumber: 1, episodes: [makeEpisode({ watchEvents: [bw] })] }),
     ])
     expect(getEarnedModes(title).has('bw')).toBe(true)
+  })
+})
+
+describe('seasonCastNewcomersFirst', () => {
+  const member = (id: number): CastMember => ({ tmdbPersonId: id, name: `Actor ${id}`, order: id })
+
+  it('leads with people missing from the series cast, keeping billing order in each group', () => {
+    const season = [member(1), member(5), member(2), member(6)]
+    const series = [member(1), member(2), member(3)]
+    expect(seasonCastNewcomersFirst(season, series).map((m) => m.tmdbPersonId)).toEqual([5, 6, 1, 2])
+  })
+
+  it('keeps the season order when the series cast is unknown', () => {
+    const season = [member(2), member(1)]
+    expect(seasonCastNewcomersFirst(season).map((m) => m.tmdbPersonId)).toEqual([2, 1])
   })
 })

@@ -1,4 +1,4 @@
-import type { Episode, EpisodeWatchEvent, Season, Title } from './mockData'
+import type { CastMember, Episode, EpisodeWatchEvent, Season, Title } from './mockData'
 
 // ─── Specials (TMDB season 0) ────────────────────────────────────────────────
 //
@@ -171,4 +171,15 @@ export function getEarnedModes(title: Title): Set<'bw' | 'color'> {
     }
   }
   return earned
+}
+
+// Season cast with the people missing from the series' main cast first, so the
+// season's own additions lead instead of a repeat of the series regulars.
+// Billing order is kept within each group.
+export function seasonCastNewcomersFirst(seasonCast: CastMember[], seriesCast: CastMember[] = []): CastMember[] {
+  const seriesIds = new Set(seriesCast.map((member) => member.tmdbPersonId))
+  return [
+    ...seasonCast.filter((member) => !seriesIds.has(member.tmdbPersonId)),
+    ...seasonCast.filter((member) => seriesIds.has(member.tmdbPersonId)),
+  ]
 }

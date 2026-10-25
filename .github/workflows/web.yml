@@ -41,29 +41,65 @@ jobs:
       # Development-tooling advisories are tracked separately in #278.
       - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run build
+
+  # One job per browser engine, so each installs only its own engine and OS libraries, a slow
+  # or failing engine doesn't hold up the others, and "Re-run failed jobs" re-runs just that
+  # engine instead of the whole check.
+  browser:
+    name: Browser tests (${{ matrix.engine }})
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Both Chromium projects share one engine install.
+          - engine: chromium
+            projects: --project=chromium --project=mobile-chromium
+          - engine: firefox
+            projects: --project=firefox
+          - engine: webkit
+            projects: --project=webkit
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      VITE_SUPABASE_URL: ''
+      VITE_SUPABASE_ANON_KEY: ''
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
       - name: Resolve Playwright version
         id: playwright
         run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       # Browser binaries only change with the Playwright version, so most runs skip the download.
-      - name: Cache browser engines
+      - name: Cache browser engine
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      # WebKit and Firefox need OS libraries from apt. When the runner's Ubuntu mirror crawls,
-      # this used to trickle packages until the 15-minute job timeout cancelled the whole run,
-      # after every test had passed. Each attempt is capped instead, and retried; a healthy
-      # install takes under 80 s.
+          key: playwright-${{ runner.os }}-${{ matrix.engine }}-${{ steps.playwright.outputs.version }}
+      # WebKit and Firefox need OS libraries from apt (the runner image already has most of
+      # Chromium's). When the runner's Ubuntu mirror crawls, this used to trickle packages until
+      # the job timeout cancelled the run after every test had passed. Each attempt is capped
+      # instead, and retried; a healthy install takes under 80 s.
       - name: Install browser OS dependencies
         timeout-minutes: 10
         run: |
           printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
             | sudo tee /etc/apt/apt.conf.d/80-ci-network >/dev/null
           for attempt in 1 2 3; do
-            if timeout 240 npx --no-install playwright install-deps chromium firefox webkit; then
+            if timeout 240 npx --no-install playwright install-deps ${{ matrix.engine }}; then
               exit 0
             fi
-            echo "::warning::Browser OS dependency install attempt $attempt failed or timed out; retrying"
+            echo "::warning::${{ matrix.engine }} OS dependency install attempt $attempt failed or timed out; retrying"
             # timeout stops npx, not the apt it started under sudo; clear it before retrying.
             # [a]: keeps the pattern from matching this pkill's own sudo wrapper.
             sudo pkill -f '[a]pt-get' || true
@@ -71,15 +107,15 @@ jobs:
             sleep 5
           done
           exit 1
-      - name: Install browser engines
+      - name: Install browser engine
         timeout-minutes: 5
-        run: npx --no-install playwright install chromium firefox webkit
-      - run: npm run test:e2e
+        run: npx --no-install playwright install ${{ matrix.engine }}
+      - run: npm run test:e2e -- ${{ matrix.projects }}
       - name: Retain browser report and failure traces
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: web-browser-report
+          name: web-browser-report-${{ matrix.engine }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/

@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.45.1] - 2026-10-25
+
 ### Fixed
 
 - **Android crash when the network drops during a sync.** Losing the connection mid-sync (routine once the app goes to the background) crashed the app instead of leaving the sync for later. Launch, resume and pull-to-refresh syncs now fail quietly and retry on the next trigger.

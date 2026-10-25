@@ -120,8 +120,8 @@ class UpNextViewModel(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                librarySyncRepository.syncNow()
-                outingsRepository.completeDueOutings()
+                // Same as resume: only decide due outings against a successful pull.
+                if (librarySyncRepository.trySyncNow() == null) outingsRepository.completeDueOutings()
             } finally {
                 _isRefreshing.value = false
             }

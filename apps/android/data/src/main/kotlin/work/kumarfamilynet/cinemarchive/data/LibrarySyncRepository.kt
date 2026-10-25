@@ -181,6 +181,19 @@ class LibrarySyncRepository(
         }
     }
 
+    /** [syncNow] for best-effort triggers (launch, resume, pull-to-refresh) that run in UI
+     *  scopes with no exception handler. Losing the network mid-sync — routine once the app is
+     *  backgrounded — must leave the work for the next trigger, not crash the process: a crash
+     *  mid-resync restarts the whole pull from its floor on the next launch. Returns the failure
+     *  instead of throwing it; cancellation (including an ended sign-in) still propagates. */
+    suspend fun trySyncNow(): Throwable? = try {
+        syncNow()
+        null
+    } catch (e: Exception) {
+        e.rethrowIfCancelled()
+        e
+    }
+
     private suspend fun ensureSessionActive(session: SupabaseSession) {
         currentCoroutineContext().ensureActive()
         if (authRepository.currentSession()?.userId != session.userId) {

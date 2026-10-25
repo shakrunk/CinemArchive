@@ -144,6 +144,19 @@ class BackupGraphSyncTest {
         assertEquals(List(2) { "1970-01-01T00:00:00Z" }, requests.map { it.getString("p_since") })
     }
 
+    @Test fun trySyncReturnsOfflineFailureInsteadOfThrowing() = runBlocking {
+        oldCursor(); page = graph(); networkFails = true
+        assertTrue(repository().trySyncNow() is java.io.IOException)
+        assertEquals(10, prefs.data.first()[version]); networkFails = false
+        assertNull(repository().trySyncNow())
+        assertEquals(13, prefs.data.first()[version])
+    }
+
+    @Test fun trySyncStillPropagatesAnEndedSignIn() = runBlocking {
+        afterPull = { session = null; throw IllegalStateException("This sign-in has ended") }
+        assertTrue(runCatching { repository().trySyncNow() }.exceptionOrNull() is CancellationException)
+    }
+
     @Test fun endedSessionDuringInflightPullCancelsWithoutPublishingRowsCursorOrFollowUp() = runBlocking {
         oldCursor(); page = graph()
         var followUps = 0

@@ -696,7 +696,7 @@ create policy "list_items: owner full access"
 -- external_title_links: provenance (provider id -> title) so re-syncs never
 -- duplicate titles; viewings imported from a provider are deduped by date.
 
-create type integration_provider as enum ('letterboxd', 'simkl', 'plex', 'emby');
+create type integration_provider as enum ('letterboxd', 'simkl', 'plex', 'emby', 'jellyfin');
 create type integration_direction as enum ('import', 'two_way');
 
 create table integration_connections (

@@ -17,6 +17,14 @@ import {
 import { startSimklAuth, pollSimklAuth, fetchSimklItems, disconnectSimkl, type SimklDeviceCode } from 'src/lib/sync/simkl'
 import { startPlexPin, pollPlexPin, listPlexServers, fetchPlexItems } from 'src/lib/sync/plex'
 import { embySignIn, fetchEmbyItems } from 'src/lib/sync/emby'
+import { jellyfinSignIn, jellyfinSignOut, fetchJellyfinLibrary } from 'src/lib/sync/jellyfin'
+import {
+  checkJellyfin,
+  refreshJellyfinSession,
+  startJellyfinWatch,
+  stopJellyfinWatch,
+  useJellyfinQueue,
+} from 'src/lib/sync/jellyfinWatch'
 
 const btn =
   'bg-secondary/60 hover:bg-amber/20 hover:text-amber text-paper font-sans text-xs border border-border transition-colors gap-2'
@@ -37,6 +45,8 @@ export function SyncConnections() {
   const [message, setMessage] = useState<Message | null>(null)
   const [simklCode, setSimklCode] = useState<SimklDeviceCode | null>(null)
   const [embyForm, setEmbyForm] = useState({ url: '', username: '', password: '' })
+  const [jellyfinForm, setJellyfinForm] = useState({ url: '', username: '', password: '' })
+  const { authExpired: jellyfinExpired } = useJellyfinQueue()
   const cancelRef = useRef(false)
   // Plex token is held in memory only — it grants full account access.
   const plexTokenRef = useRef<string | null>(null)
@@ -143,10 +153,32 @@ export function SyncConnections() {
     await runImport(items)
   }, 'Emby sync failed.')
 
+  // Jellyfin: signing in only starts watching from now on. Plays that happen later are offered
+  // one at a time (JellyfinWatchPrompt); nothing is added without an explicit yes.
+  const connectJellyfin = (importHistory: boolean) => guarded('jellyfin', async () => {
+    if (!user) return
+    const session = await jellyfinSignIn(jellyfinForm.url, jellyfinForm.username, jellyfinForm.password)
+    setJellyfinForm((f) => ({ ...f, password: '' }))
+    if (connected('jellyfin')) refreshJellyfinSession(user.id, session)
+    else startJellyfinWatch(user.id, session)
+    await recordConnection(user.id, 'jellyfin', { serverUrl: session.baseUrl, accountLabel: session.username })
+    if (importHistory) {
+      setStatus('Reading your Jellyfin library…')
+      await runImport(await fetchJellyfinLibrary(session))
+    } else {
+      setMessage({ type: 'success', text: `Connected as ${session.username}. New watches will be offered for you to confirm.` })
+      await refresh()
+    }
+  }, 'Jellyfin sign-in failed.')
+
   async function disconnect(provider: SyncProvider) {
     if (!user) return
     setMessage(null)
     try {
+      if (provider === 'jellyfin') {
+        const session = stopJellyfinWatch(user.id)
+        if (session) await jellyfinSignOut(session)
+      }
       if (provider === 'simkl') await disconnectSimkl()
       else await removeConnection(user.id, provider)
       if (provider === 'plex') plexTokenRef.current = null
@@ -158,7 +190,7 @@ export function SyncConnections() {
   }
 
   const working = busy !== null
-  const row = (provider: SyncProvider, label: string, onSync: () => void, extra?: React.ReactNode) => {
+  const row = (provider: SyncProvider, label: string, onSync: () => void, extra?: React.ReactNode, labels?: { connect: string; sync: string }) => {
     const conn = connected(provider)
     return (
       <div className="rounded-lg border border-border p-3 space-y-2">
@@ -170,7 +202,7 @@ export function SyncConnections() {
           </span>
           <Button onClick={onSync} disabled={working} className={btn}>
             {busy === provider ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-amber" />}
-            {conn ? 'Sync now' : 'Connect & import'}
+            {conn ? (labels?.sync ?? 'Sync now') : (labels?.connect ?? 'Connect & import')}
           </Button>
           {conn && (
             <Button onClick={() => disconnect(provider)} disabled={working} className={btn} aria-label={`Disconnect ${label}`}>
@@ -202,6 +234,26 @@ export function SyncConnections() {
             <Input type="password" placeholder="Password" autoComplete="off" value={embyForm.password} onChange={(e) => setEmbyForm({ ...embyForm, password: e.target.value })} />
           </div>
         </div>)}
+      {row('jellyfin', 'Jellyfin', () => connectJellyfin(false),
+        <div className="grid gap-2">
+          {jellyfinExpired && (
+            <p role="alert" className="font-mono text-[10px] text-amber">
+              Your Jellyfin session expired. Sign in again to keep checking for new watches.
+            </p>
+          )}
+          <Input placeholder="Server (e.g. jellyfin.example.com)" value={jellyfinForm.url} onChange={(e) => setJellyfinForm({ ...jellyfinForm, url: e.target.value })} />
+          <div className="flex gap-2">
+            <Input placeholder="Username" autoComplete="off" value={jellyfinForm.username} onChange={(e) => setJellyfinForm({ ...jellyfinForm, username: e.target.value })} />
+            <Input type="password" placeholder="Password" autoComplete="off" value={jellyfinForm.password} onChange={(e) => setJellyfinForm({ ...jellyfinForm, password: e.target.value })} />
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => connectJellyfin(true)} disabled={working} className={btn}>Import existing history</Button>
+            {connected('jellyfin') && !jellyfinExpired && (
+              <Button onClick={() => { void checkJellyfin() }} disabled={working} className={btn}>Check for new watches</Button>
+            )}
+          </div>
+        </div>,
+        { connect: 'Connect', sync: 'Sign in again' })}
       {working && (
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] text-muted-foreground flex-1">{status ?? 'Working…'}</span>
@@ -210,8 +262,10 @@ export function SyncConnections() {
       )}
       <p className="font-mono text-[10px] text-muted-foreground">
         Import only: your watched titles and ratings are copied in. Nothing is sent back to these services, and existing
-        ratings and viewings in CinemArchive are never overwritten. Plex and Emby are contacted straight from your browser,
-        so the server must be reachable over https. Plex tokens and Emby passwords are not stored.
+        ratings and viewings in CinemArchive are never overwritten. Plex, Emby and Jellyfin are contacted straight from your
+        browser, so the server must be reachable over https. Plex tokens and Emby/Jellyfin passwords are not stored.
+        Jellyfin signs in as your own user, so only your watches are seen, and new ones are always offered for you to
+        confirm before anything is added. Its session token stays on this device; Disconnect signs it out.
       </p>
     </div>
   )

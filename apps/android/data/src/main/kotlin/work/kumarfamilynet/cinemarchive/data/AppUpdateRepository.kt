@@ -28,6 +28,8 @@ class AppUpdateRepository(
     private val installSourceProvider: InstallSourceProvider,
     private val currentVersionName: String,
     private val httpClient: OkHttpClient = OkHttpClient(),
+    /** Stand-in for the GitHub endpoint, for exercising updates on a device (debug builds only). */
+    private val latestReleaseUrl: String = LATEST_RELEASE_URL,
 ) {
     val installSource: InstallSource get() = installSourceProvider.source
 
@@ -45,7 +47,7 @@ class AppUpdateRepository(
 
     private fun fetchLatestRelease(): UpdateCheckResult {
         val request = Request.Builder()
-            .url(LATEST_RELEASE_URL)
+            .url(latestReleaseUrl)
             .header("Accept", "application/vnd.github+json")
             .build()
 

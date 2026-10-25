@@ -50,7 +50,12 @@ class CinemArchiveApplication : Application() {
     private val installSourceProvider: InstallSourceProvider by lazy { InstallSourceProvider(this) }
 
     val appUpdateRepository: AppUpdateRepository by lazy {
-        AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME)
+        val feedOverride = BuildConfig.UPDATE_FEED_URL.takeIf { it.isNotBlank() }
+        if (feedOverride == null) {
+            AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME)
+        } else {
+            AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME, latestReleaseUrl = feedOverride)
+        }
     }
 
     /** The one shared update check every surface reads; see [AppUpdateController]. */

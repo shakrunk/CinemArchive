@@ -41,6 +41,8 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY", "")}\"")
+        // Blank means the real GitHub Releases feed. Only debug builds can override it (below).
+        buildConfigField("String", "UPDATE_FEED_URL", "\"\"")
     }
 
     signingConfigs {
@@ -67,6 +69,16 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             manifestPlaceholders["appLabel"] = "CinemArchive Debug"
+            // Points the updater at a local stand-in for the GitHub `releases/latest` endpoint,
+            // so the download/install flow can be exercised on a device without publishing a
+            // release: `-Pcinemarchive.updateFeedUrl=http://127.0.0.1:8765/latest.json` with
+            // `adb reverse tcp:8765 tcp:8765`. Cleartext to localhost is allowed in debug only
+            // (src/debug/res/xml/network_security_config.xml).
+            buildConfigField(
+                "String",
+                "UPDATE_FEED_URL",
+                "\"${findProperty("cinemarchive.updateFeedUrl") as String? ?: ""}\"",
+            )
         }
         release {
             manifestPlaceholders["appLabel"] = "CinemArchive"

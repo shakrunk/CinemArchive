@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-10-24
+
 ### Added
 
 - **Web & Android:** A **Pure black** switch in Appearance gives dark themes a true-black background for OLED screens. Light themes are unaffected.

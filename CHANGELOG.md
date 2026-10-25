@@ -9,9 +9,15 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-10-24
+
 ### Added
 
 - **Jellyfin watch sync (web).** Settings → Import & sync can connect a Jellyfin account (signed in as the user, so only their own watches are visible). New movie and episode watches are offered one at a time ("Add to history?") and are never written without a yes; existing history can optionally be imported once.
+
+### Changed
+
+- **Web:** The Where to Watch link and the home-collection controls now sit behind an options toggle, keeping the title and home views tidier.
 
 ## [1.42.0] - 2026-10-24
 

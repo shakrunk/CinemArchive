@@ -1,4 +1,4 @@
-// Provider-agnostic core for third-party sync (Simkl, Plex, Emby, Letterboxd).
+// Provider-agnostic core for third-party sync (Simkl, Plex, Emby, Jellyfin, Letterboxd).
 // Every adapter maps its payload to `SyncItem`s; this module resolves them to
 // TMDB, merges them into the library without ever overwriting local data, and
 // reports what to insert/update. Pure helpers are unit-tested; the resolve
@@ -9,7 +9,7 @@ import { searchMedia, fetchMediaDetails, findMediaByExternalId, type SearchResul
 import { buildTitle, mapPool, pickBestMatch } from '../letterboxd-import'
 import type { MediaType, Title, Viewing, WatchStatus } from '../../store/mockData'
 
-export type SyncProvider = 'letterboxd' | 'simkl' | 'plex' | 'emby'
+export type SyncProvider = 'letterboxd' | 'simkl' | 'plex' | 'emby' | 'jellyfin'
 
 export interface ExternalIds {
   tmdb?: number
@@ -114,7 +114,7 @@ export interface SyncOutcome {
   unchanged: number
 }
 
-async function resolveTmdb(item: SyncItem): Promise<SearchResult | undefined> {
+export async function resolveTmdb(item: SyncItem): Promise<SearchResult | undefined> {
   if (item.ids.tmdb != null) {
     return { tmdbId: item.ids.tmdb, type: item.type, title: item.title, year: item.year ?? 0, genres: [] }
   }

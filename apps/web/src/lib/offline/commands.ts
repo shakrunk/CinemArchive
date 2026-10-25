@@ -36,7 +36,7 @@ export type TrackingMutation =
   | { kind: 'theaterInterest.set'; titleId: string; userId: string; present: boolean; createdAt: string }
   | { kind: 'pin.set'; titleId: string; easterEggKey: string; variant: 'bw' | 'color' | null }
   | { kind: 'ledger.set'; widgets: LedgerWidget[] }
-  | { kind: 'external.link'; titleId: string; provider: 'letterboxd' | 'simkl' | 'plex' | 'emby'; externalId: string }
+  | { kind: 'external.link'; titleId: string; provider: 'letterboxd' | 'simkl' | 'plex' | 'emby' | 'jellyfin'; externalId: string }
 
 /** A compound user action is one journal record and one delivery hook invocation.
  * The remote writer must supply transactional semantics for compound actions. */

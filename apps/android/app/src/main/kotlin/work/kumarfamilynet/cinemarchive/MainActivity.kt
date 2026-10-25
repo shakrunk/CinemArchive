@@ -65,6 +65,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -122,6 +123,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.asSearchResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.AppUpdateController
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
@@ -170,11 +172,23 @@ class MainActivity : ComponentActivity() {
     private var sharedLaunch by androidx.compose.runtime.mutableLongStateOf(0L)
     private var pendingNavigation by mutableStateOf<PendingNavigation?>(null)
     private var navigationSequence = 0L
+    // Bumped by a tap on an update notification; the app shell opens the update sheet on change.
+    private var openUpdateRequest by androidx.compose.runtime.mutableLongStateOf(0L)
+    // Set once per in-app update, on the first launch of the new version.
+    private var justUpdatedVersion by mutableStateOf<String?>(null)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingLink(intent)
+        handleUpdateIntent(intent)
+    }
+
+    private fun handleUpdateIntent(incoming: Intent) {
+        if (incoming.getBooleanExtra(EXTRA_OPEN_UPDATE, false)) {
+            incoming.removeExtra(EXTRA_OPEN_UPDATE)
+            openUpdateRequest++
+        }
     }
 
     private fun handleIncomingLink(incoming: Intent) {
@@ -211,6 +225,9 @@ class MainActivity : ComponentActivity() {
          *  title whose outing just completed (FLAG_ACTIVITY_CLEAR_TASK recreates this
          *  Activity, so onCreate always sees a fresh intent). */
         const val EXTRA_OPEN_TITLE_ID = "open_title_id"
+
+        /** Set by update notifications: open the update sheet. */
+        const val EXTRA_OPEN_UPDATE = "open_update"
 
         /** How long the app must hold the foreground before an unanswered install prompt
          *  counts as abandoned rather than still opening (morphe-manager uses the same). */
@@ -267,6 +284,12 @@ class MainActivity : ComponentActivity() {
 
         // Both cold and singleTop warm launches use the same share/auth dispatcher.
         handleIncomingLink(intent)
+        // Not on recreation: the system re-delivers the original intent, extra and all, and a
+        // rotation shouldn't reopen a sheet the user already closed.
+        if (savedInstanceState == null) handleUpdateIntent(intent)
+        // A self-update can't report its own success (the old process is killed), so the new
+        // version says so on its first launch. Not on recreation, which would repeat it.
+        if (savedInstanceState == null) justUpdatedVersion = apkInstaller.consumeJustUpdatedVersion()
 
         setContent {
             val themeMode by preferencesRepository.observeThemeMode()
@@ -359,6 +382,9 @@ class MainActivity : ComponentActivity() {
                                                 appVersionName = BuildConfig.VERSION_NAME,
                                                 isDebugBuild = isDebugBuild,
                                                  onOpenSharedLink = { sharedToken = it },
+                                                openUpdateRequest = openUpdateRequest,
+                                                justUpdatedVersion = justUpdatedVersion,
+                                                onJustUpdatedSeen = { justUpdatedVersion = null },
                                             )
                                         }
                                     }
@@ -531,6 +557,9 @@ private fun CinemArchiveApp(
     appVersionName: String,
     isDebugBuild: Boolean,
     onOpenSharedLink: (String) -> Unit,
+    openUpdateRequest: Long = 0L,
+    justUpdatedVersion: String? = null,
+    onJustUpdatedSeen: () -> Unit = {},
 ) {
     val repository = runtime.libraryRepository
     val ledgerRepository = runtime.ledgerRepository
@@ -760,6 +789,39 @@ private fun CinemArchiveApp(
     // reset to expanded on every tab switch so a collapse from the tab just left doesn't
     // leak into a tab that never reports back in.
     var fabExpanded by remember { mutableStateOf(true) }
+
+    // One update sheet for the whole app: the banner, Settings → About and notification taps
+    // all open this same instance over whatever is on screen.
+    var showUpdateSheet by remember { mutableStateOf(false) }
+    LaunchedEffect(openUpdateRequest) { if (openUpdateRequest > 0L) showUpdateSheet = true }
+    if (showUpdateSheet) {
+        work.kumarfamilynet.cinemarchive.feature.settings.UpdateSheetRoute(
+            appUpdateController = appUpdateController,
+            apkInstaller = apkInstaller,
+            preferencesRepository = preferencesRepository,
+            onDismiss = { showUpdateSheet = false },
+        )
+    }
+    val updateResult by appUpdateController.state.collectAsStateWithLifecycle()
+    val updateInstallState by apkInstaller.installState.collectAsStateWithLifecycle()
+    val dismissedUpdateVersion by remember(preferencesRepository) { preferencesRepository.observeDismissedUpdateVersion() }
+        .collectAsStateWithLifecycle(initialValue = null)
+    val updateBannerScope = rememberCoroutineScope()
+    justUpdatedVersion?.let { version ->
+        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onJustUpdatedSeen,
+            title = { Text("Updated to $version") },
+            text = { Text("CinemArchive installed the update and restarted.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = onJustUpdatedSeen) { Text("OK") } },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    onJustUpdatedSeen()
+                    uriHandler.openUri("https://github.com/shakrunk/CinemArchive/releases/tag/v$version")
+                }) { Text("What's new") }
+            },
+        )
+    }
     LaunchedEffect(tab, upNextCalendar) { fabExpanded = true }
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -902,13 +964,35 @@ private fun CinemArchiveApp(
                     // LocalBottomBarClearance of padding so its last row still scrolls clear of the bar.
                     // Beside a rail there is no bottom bar, so the clearance is zero.
                     val layoutDirection = LocalLayoutDirection.current
+                    Column(
+                        modifier = Modifier.padding(
+                            start = innerPadding.calculateStartPadding(layoutDirection),
+                            top = innerPadding.calculateTopPadding(),
+                            end = innerPadding.calculateEndPadding(layoutDirection),
+                        ),
+                    ) {
+                    // Above every tab, so an update is found without visiting Settings → About.
+                    val bannerRelease = updateResult as? UpdateCheckResult.Available
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = bannerRelease != null &&
+                            work.kumarfamilynet.cinemarchive.feature.settings.shouldShowUpdateBanner(
+                                updateResult, updateInstallState, dismissedUpdateVersion,
+                            ),
+                    ) {
+                        bannerRelease?.let { release ->
+                            work.kumarfamilynet.cinemarchive.feature.settings.UpdateBanner(
+                                result = release,
+                                installState = updateInstallState,
+                                onOpen = { showUpdateSheet = true },
+                                onDismiss = {
+                                    updateBannerScope.launch { preferencesRepository.setDismissedUpdateVersion(release.latestVersion) }
+                                },
+                            )
+                        }
+                    }
                     Box(
                         modifier = Modifier
-                            .padding(
-                                start = innerPadding.calculateStartPadding(layoutDirection),
-                                top = innerPadding.calculateTopPadding(),
-                                end = innerPadding.calculateEndPadding(layoutDirection),
-                            )
+                            .weight(1f)
                             .then(if (glassBackdrop != null) Modifier.glassBackdropSource(glassBackdrop) else Modifier),
                     ) {
                     CompositionLocalProvider(
@@ -978,6 +1062,7 @@ private fun CinemArchiveApp(
                                 onListRequestConsumed = { linkedListSequence = 0L; linkedListId = null },
                             )
                         }
+                    }
                     }
                     }
 
@@ -1153,6 +1238,7 @@ private fun CinemArchiveApp(
                                 apkInstaller,
                                 preferencesRepository,
                                 onBack = closeOverlay,
+                                onOpenUpdate = { showUpdateSheet = true },
                                 showBack = false,
                             )
                             SettingsCategory.PERMISSIONS -> PermissionsRoute(
@@ -1292,6 +1378,7 @@ private fun CinemArchiveApp(
                     apkInstaller,
                     preferencesRepository,
                     onBack = openProfile,
+                    onOpenUpdate = { showUpdateSheet = true },
                 )
                 Overlay.Permissions -> PermissionsRoute(onBack = openProfile, apkInstaller = apkInstaller, appUpdateRepository = appUpdateRepository)
                 Overlay.DeveloperSettings -> DeveloperSettingsRoute(

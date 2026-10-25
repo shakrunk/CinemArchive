@@ -6,7 +6,6 @@ import android.os.Bundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -15,6 +14,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
+import work.kumarfamilynet.cinemarchive.core.model.UpdateDownloadPolicy
 import work.kumarfamilynet.cinemarchive.data.AccountRuntimeManager
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
 import work.kumarfamilynet.cinemarchive.data.AppUpdateController
@@ -125,7 +125,15 @@ class CinemArchiveApplication : Application() {
             override fun onActivityResumed(activity: Activity) { resumedActivities++ }
             override fun onActivityPaused(activity: Activity) { resumedActivities-- }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
-            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityStarted(activity: Activity) {
+                // The first activity start of a process is the user opening the app: check
+                // then, rather than on every process start (alarms and the boot receiver start
+                // the process too, and shouldn't spend the GitHub rate limit or the battery).
+                if (!checkedOnOpen) {
+                    checkedOnOpen = true
+                    applicationScope.launch { runAutomaticUpdateCheck(fromBackground = false) }
+                }
+            }
             override fun onActivityStopped(activity: Activity) = Unit
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
@@ -139,7 +147,21 @@ class CinemArchiveApplication : Application() {
             if (apkInstaller.reconcileAfterLaunch()) UpdateInstallNotifier.clear(this@CinemArchiveApplication)
             restoreStagedUpdates()
         }
-        applicationScope.launch { checkAndDownloadUpdateIfDue() }
+        applicationScope.launch { keepPeriodicCheckScheduled() }
+    }
+
+    private var checkedOnOpen = false
+
+    /** Keeps the daily background check scheduled exactly while automatic checks are on. */
+    private suspend fun keepPeriodicCheckScheduled() {
+        if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
+        preferencesRepository.observeAutoCheckUpdates().collect { enabled ->
+            if (enabled) {
+                UpdateScheduler.schedulePeriodicCheck(this@CinemArchiveApplication)
+            } else {
+                UpdateScheduler.cancelPeriodicCheck(this@CinemArchiveApplication)
+            }
+        }
     }
 
     /**
@@ -153,49 +175,33 @@ class CinemArchiveApplication : Application() {
     }
 
     /**
-     * Sideloaded-install analogue of Play's own background auto-update (issue #166) — without
-     * this, "Automatically check for updates" only ever ran when Settings → About happened to be
-     * open, so granting the install permission and turning the toggle on still required
-     * remembering to open that screen. Play-installed builds are untouched (see
-     * #147/AppUpdateRepository.checkForUpdate's own gate); without the install permission
-     * granted, this changes nothing from #146's original behavior — no silent download.
+     * The automatic update check — on opening the app, and daily from [UpdateCheckWorker].
+     * Sideloaded-install analogue of Play's own background auto-update (issue #166);
+     * Play-installed builds are untouched (see #147/AppUpdateRepository.checkForUpdate's own
+     * gate).
      *
-     * This only ever downloads. It stops at [ApkInstallState.Ready] and leaves the install to a
-     * tap: it can run from a background process start (an alarm, a boot receiver), where
-     * Android blocks the system's confirmation prompt, which used to strand the update in
-     * "waiting for the system installer" with nothing on screen.
+     * A found update is downloaded in the background when the download policy allows it and the
+     * install permission is granted, via [UpdateDownloadWorker] so the policy's network
+     * constraint applies. It stops at "ready": installing always waits for a tap, since Android
+     * can block the system's prompt from the background. Otherwise a check that ran with the app
+     * in the background announces the update in a notification; in the foreground the banner
+     * already does.
      */
-    private suspend fun checkAndDownloadUpdateIfDue() {
+    suspend fun runAutomaticUpdateCheck(fromBackground: Boolean) {
         if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
         if (!preferencesRepository.observeAutoCheckUpdates().first()) return
 
         val result = appUpdateController.check() as? UpdateCheckResult.Available ?: return
-        if (result.apkUrl == null || !apkInstaller.canRequestInstalls()) return
-
-        coroutineScope {
-            val progressJob = launch {
-                // The installer publishes progress every 100 ms for the in-app bar; Android
-                // rate-limits notification updates and drops the excess, so repost at most once
-                // a second, and only when the whole percentage moved.
-                var lastPercent = -1
-                var lastPostedAt = 0L
-                apkInstaller.installState.filterIsInstance<ApkInstallState.Downloading>().collect { state ->
-                    val percent = state.fraction?.let { (it * 100).toInt() } ?: -1
-                    val now = System.currentTimeMillis()
-                    if (lastPostedAt == 0L || (percent != lastPercent && now - lastPostedAt >= 1_000)) {
-                        lastPercent = percent
-                        lastPostedAt = now
-                        UpdateInstallNotifier.postDownloading(this@CinemArchiveApplication, result.latestVersion, state.fraction)
-                    }
-                }
-            }
-            apkInstaller.download(result)
-            progressJob.cancel()
-            when (val state = apkInstaller.installState.value) {
-                is ApkInstallState.Ready -> UpdateInstallNotifier.postReady(this@CinemArchiveApplication, state.version)
-                is ApkInstallState.Failed -> UpdateInstallNotifier.postFailed(this@CinemArchiveApplication, state.message)
-                else -> UpdateInstallNotifier.clear(this@CinemArchiveApplication)
-            }
+        val policy = preferencesRepository.observeUpdateDownloadPolicy().first()
+        val canDownload = result.apkUrl != null && apkInstaller.canRequestInstalls()
+        when {
+            apkInstaller.installState.value is ApkInstallState.Ready -> Unit
+            canDownload && policy != UpdateDownloadPolicy.NOTIFY_ONLY ->
+                UpdateScheduler.enqueueDownload(this, policy)
+            // Daily runs would otherwise repeat the same announcement; a dismissed banner means
+            // the user has seen this version.
+            fromBackground && preferencesRepository.observeDismissedUpdateVersion().first() != result.latestVersion ->
+                UpdateInstallNotifier.postAvailable(this, result.latestVersion)
         }
     }
 }

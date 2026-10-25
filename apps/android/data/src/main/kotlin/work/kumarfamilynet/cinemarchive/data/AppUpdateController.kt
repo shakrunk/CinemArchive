@@ -35,6 +35,16 @@ class AppUpdateController(
     /** The latest check result. [UpdateCheckResult.Idle] until the first check runs. */
     val state: StateFlow<UpdateCheckResult> = stateFlow.asStateFlow()
 
+    private val checkingFlow = MutableStateFlow(false)
+
+    /**
+     * Whether a check is in flight. Re-checking while an update is already available keeps
+     * [state] on that update rather than flashing [UpdateCheckResult.Checking] — a banner or a
+     * download in progress shouldn't blink away because the daily check ran — so a spinner for
+     * a manual re-check reads this instead.
+     */
+    val isChecking: StateFlow<Boolean> = checkingFlow.asStateFlow()
+
     private val mutex = Mutex()
     private var inFlight: Deferred<UpdateCheckResult>? = null
     private var lastResolvedAt: Long? = null
@@ -47,12 +57,16 @@ class AppUpdateController(
      * out to the launch check and the About screen at once, and each would otherwise be its
      * own GitHub request against a 60-per-hour unauthenticated limit. A failed check is never
      * reused, so pressing Check again after an error always retries.
+     *
+     * [force] skips the reuse window (an in-flight check is still shared): a manual "Check" or
+     * "Check again" tap means the user wants a fresh answer, e.g. once a release's APK finishes
+     * uploading.
      */
-    suspend fun check(): UpdateCheckResult {
+    suspend fun check(force: Boolean = false): UpdateCheckResult {
         val pending = mutex.withLock {
             val current = stateFlow.value
             val resolvedAt = lastResolvedAt
-            if (resolvedAt != null && current !is UpdateCheckResult.Failed &&
+            if (!force && resolvedAt != null && current !is UpdateCheckResult.Failed &&
                 clock() - resolvedAt < RESULT_REUSE_WINDOW_MILLIS
             ) {
                 return current
@@ -64,7 +78,8 @@ class AppUpdateController(
 
     // Called with mutex held.
     private fun startCheck(): Deferred<UpdateCheckResult> {
-        stateFlow.value = UpdateCheckResult.Checking
+        checkingFlow.value = true
+        if (stateFlow.value !is UpdateCheckResult.Available) stateFlow.value = UpdateCheckResult.Checking
         return scope.async {
             var result: UpdateCheckResult = UpdateCheckResult.Failed("Update check was interrupted")
             try {
@@ -78,6 +93,7 @@ class AppUpdateController(
                         stateFlow.value = result
                         lastResolvedAt = clock()
                         inFlight = null
+                        checkingFlow.value = false
                     }
                 }
             }

@@ -77,6 +77,39 @@ class AppUpdateControllerTest {
     }
 
     @Test
+    fun `re-checking keeps an available update on screen until the new answer arrives`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var fetches = 0
+        val controller = controller {
+            fetches++
+            if (fetches > 1) gate.await()
+            available
+        }
+        controller.check()
+
+        val recheck = async { controller.check(force = true) }
+        runCurrent()
+        assertEquals(available, controller.state.value)
+        assertTrue(controller.isChecking.value)
+
+        gate.complete(Unit)
+        recheck.await()
+        assertEquals(false, controller.isChecking.value)
+    }
+
+    @Test
+    fun `a forced check skips the reuse window`() = runTest {
+        var fetches = 0
+        val controller = controller { fetches++; available }
+
+        controller.check()
+        now += 1_000
+        controller.check(force = true)
+
+        assertEquals(2, fetches)
+    }
+
+    @Test
     fun `a failed check is never reused`() = runTest {
         var fetches = 0
         val controller = controller {

@@ -68,6 +68,21 @@ sealed interface ApkInstallState {
 }
 
 /**
+ * When an update the automatic check finds is downloaded without asking. Installing always
+ * waits for a tap; this only decides whether the APK is already staged by then.
+ */
+enum class UpdateDownloadPolicy {
+    /** Announce the update; download only when the user taps Download. */
+    NOTIFY_ONLY,
+
+    /** Download in the background on an unmetered network. The default. */
+    WIFI_ONLY,
+
+    /** Download in the background on any network. */
+    ANY_NETWORK,
+}
+
+/**
  * Compares two `MAJOR.MINOR.PATCH` version strings, ignoring a leading `v` and any
  * pre-release/build suffix. Returns >0 when [a] is newer than [b], 0 when equal, <0 when older.
  *

@@ -1,6 +1,6 @@
 # Android Self-Update UX — Implementation Plan
 
-**Status:** Approved — decisions recorded in §9; Phase 1 in progress
+**Status:** Implemented through Phase 6 — see §10 for where the build differs from this plan
 **Date:** 2026-10-25
 **Scope:** Android only (sideloaded installs). Every shipped-source commit carries
 `Parity: n/a: the web app has no installable package to update`.
@@ -347,3 +347,32 @@ Needs two signed release builds with consecutive versions (debug → release fai
    only finds on one tab is the discoverability gap this plan exists to close.
 5. **Fully automatic install:** **Wait for the user to tap Install** in v1. A background
    install kills the process and could lose unsaved input.
+
+---
+
+## 10. As built (2026-10-25)
+
+Where the implementation differs from the phases above, and why:
+
+- **No 6-hour throttle (Phase 6).** The automatic check runs on the first activity start of a
+  process, i.e. when the user opens the app, instead of in `Application.onCreate`. That alone
+  stops alarm and boot-receiver process starts from checking, and a throttle would have left
+  the banner empty on most launches (the shared state starts at `Idle` each process). Daily
+  checks for users who rarely open the app come from `UpdateCheckWorker`.
+- **Toggle kept, policy added (Phase 6).** "Automatically check for updates" still governs
+  checking; a separate "Download updates automatically" setting (Wi-Fi only / Any network /
+  Never) governs downloading. Folding both into one three-way choice hid the fact that "Never"
+  still checks.
+- **"Updated to vX" is a dialog (Phase 4).** The app has no snackbar host; a one-time dialog
+  with a "What's new" link to the release page does the same job.
+- **Re-checks don't flash `Checking` (Phase 1 follow-up).** A re-check over an available update
+  keeps that update in `AppUpdateController.state` and reports progress via `isChecking`, so the
+  banner and sheet don't blink away when the daily check runs.
+- **PR breakdown.** Phases 4, 5 and 6 share most of their files (the sheet, About, preferences)
+  and landed as one PR rather than two. A debug-only local update feed
+  (`-Pcinemarchive.updateFeedUrl`, see `app/build.gradle.kts`) was added so the flow can be
+  verified on a device without publishing a release.
+- **Step 0 of Phase 3 not reproduced.** Reproducing the background-start stall needs a build of
+  the pre-fix code, which installs the real GitHub release and would have updated the user's
+  live release install. The stall is removed by design instead: automatic paths never commit an
+  install session.

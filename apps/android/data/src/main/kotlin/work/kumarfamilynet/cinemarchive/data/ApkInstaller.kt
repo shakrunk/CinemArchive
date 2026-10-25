@@ -31,6 +31,12 @@ import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState.Failed.Stage
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.core.model.compareVersions
 
+/**
+ * A download that arrived intact but can't be trusted (wrong checksum, not an APK, another
+ * app, not newer). Downloading it again won't help, unlike a dropped connection.
+ */
+class UpdateVerificationException(message: String) : IOException(message)
+
 /** What [ApkInstaller] needs to know about a downloaded APK before trusting it. */
 data class ApkArchiveInfo(val packageName: String, val versionName: String?)
 
@@ -149,7 +155,7 @@ class ApkInstaller(
                 val expectedSha = release.checksumUrl?.let { fetchExpectedSha256(it, apkUrl) }
                 val actualSha = downloadTo(apkUrl, part, release.apkSizeBytes)
                 if (expectedSha != null && !expectedSha.equals(actualSha, ignoreCase = true)) {
-                    throw IOException("The downloaded update didn't match its published checksum")
+                    throw UpdateVerificationException("The downloaded update didn't match its published checksum")
                 }
                 verifyArchive(part)
                 val staged = stagedFile(release.latestVersion)
@@ -418,14 +424,14 @@ class ApkInstaller(
 
     /** Throws unless [file] is an APK of this package, newer than the running build. */
     private fun verifyArchive(file: File): Boolean {
-        if (!file.hasZipHeader()) throw IOException("The downloaded update isn't an APK")
-        val info = inspectArchive(file) ?: throw IOException("The downloaded update couldn't be read as an APK")
+        if (!file.hasZipHeader()) throw UpdateVerificationException("The downloaded update isn't an APK")
+        val info = inspectArchive(file) ?: throw UpdateVerificationException("The downloaded update couldn't be read as an APK")
         if (info.packageName != context.packageName) {
-            throw IOException("The downloaded update is for a different app (${info.packageName})")
+            throw UpdateVerificationException("The downloaded update is for a different app (${info.packageName})")
         }
-        val version = info.versionName ?: throw IOException("The downloaded update has no version")
+        val version = info.versionName ?: throw UpdateVerificationException("The downloaded update has no version")
         if (compareVersions(version, currentVersionName) <= 0) {
-            throw IOException("The downloaded update ($version) isn't newer than this build ($currentVersionName)")
+            throw UpdateVerificationException("The downloaded update ($version) isn't newer than this build ($currentVersionName)")
         }
         return true
     }

@@ -12,9 +12,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
 /**
- * Posts progress for an update downloaded automatically at app launch (issue #166). The
- * automatic path stops once the APK is staged, so the last word is always "ready to install",
- * and every notification opens the app.
+ * Posts progress for an update found or downloaded in the background (issue #166). The
+ * automatic path stops once the APK is staged, so the last word is always "ready — tap to
+ * install", and every notification opens the update sheet, where that is one tap away.
  * Same permission-gated, best-effort pattern as [OutingCompletionReceiver]'s notification: if
  * `POST_NOTIFICATIONS` isn't granted, the download still proceeds, it's just silent.
  */
@@ -29,10 +29,11 @@ object UpdateInstallNotifier {
             setOnlyAlertOnce(true)
         }
 
+    fun postAvailable(context: Context, versionName: String) =
+        notify(context, "Update available", "CinemArchive $versionName is available. Tap to see what's new.", ongoing = false)
+
     fun postReady(context: Context, versionName: String) =
-        // Tapping opens the app; the install itself is in Settings → About until the update
-        // sheet can be opened straight from here.
-        notify(context, "Update ready to install", "CinemArchive $versionName is downloaded. Install it from Settings → About.", ongoing = false)
+        notify(context, "Update ready to install", "CinemArchive $versionName is downloaded. Tap to install.", ongoing = false)
 
     /** The install prompt arrived after the user left the app; it reopens with them. */
     fun postReadyToConfirm(context: Context) =
@@ -72,6 +73,7 @@ object UpdateInstallNotifier {
             context,
             NOTIFICATION_ID,
             Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_OPEN_UPDATE, true)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -82,7 +84,7 @@ object UpdateInstallNotifier {
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "App updates", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Progress for updates downloaded automatically in the background."
+                description = "New versions found, and progress for updates downloaded in the background."
             },
         )
     }

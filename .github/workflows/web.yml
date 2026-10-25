@@ -41,8 +41,39 @@ jobs:
       # Development-tooling advisories are tracked separately in #278.
       - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run build
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      # Browser binaries only change with the Playwright version, so most runs skip the download.
+      - name: Cache browser engines
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # WebKit and Firefox need OS libraries from apt. When the runner's Ubuntu mirror crawls,
+      # this used to trickle packages until the 15-minute job timeout cancelled the whole run,
+      # after every test had passed. Each attempt is capped instead, and retried; a healthy
+      # install takes under 80 s.
+      - name: Install browser OS dependencies
+        timeout-minutes: 10
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-network >/dev/null
+          for attempt in 1 2 3; do
+            if timeout 240 npx --no-install playwright install-deps chromium firefox webkit; then
+              exit 0
+            fi
+            echo "::warning::Browser OS dependency install attempt $attempt failed or timed out; retrying"
+            # timeout stops npx, not the apt it started under sudo; clear it before retrying.
+            # [a]: keeps the pattern from matching this pkill's own sudo wrapper.
+            sudo pkill -f '[a]pt-get' || true
+            sudo dpkg --configure -a || true
+            sleep 5
+          done
+          exit 1
       - name: Install browser engines
-        run: npx --no-install playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 5
+        run: npx --no-install playwright install chromium firefox webkit
       - run: npm run test:e2e
       - name: Retain browser report and failure traces
         if: always()

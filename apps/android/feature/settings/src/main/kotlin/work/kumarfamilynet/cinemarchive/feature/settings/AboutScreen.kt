@@ -58,6 +58,7 @@ import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateController
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
@@ -330,6 +331,7 @@ private val CREDIT_SECTIONS = listOf(
 fun AboutRoute(
     appVersionName: String,
     appUpdateRepository: AppUpdateRepository,
+    appUpdateController: AppUpdateController,
     apkInstaller: ApkInstaller,
     preferencesRepository: PreferencesRepository,
     onBack: () -> Unit,
@@ -369,7 +371,8 @@ fun AboutRoute(
 
     val autoCheck by preferencesRepository.observeAutoCheckUpdates()
         .collectAsStateWithLifecycle(initialValue = true)
-    var updateResult by remember { mutableStateOf<UpdateCheckResult>(UpdateCheckResult.Idle) }
+    // Shared with the launch-time check, so an update it already found shows here at once.
+    val updateResult by appUpdateController.state.collectAsStateWithLifecycle()
     // Owned by ApkInstaller rather than this screen: the decisive transitions arrive on a
     // manifest receiver (InstallStatusReceiver) that outlives this composable.
     val installState by apkInstaller.installState.collectAsStateWithLifecycle()
@@ -378,10 +381,7 @@ fun AboutRoute(
     val canInstallDirectly = apkInstaller.canRequestInstalls()
 
     fun runCheck() {
-        scope.launch {
-            updateResult = UpdateCheckResult.Checking
-            updateResult = appUpdateRepository.checkForUpdate()
-        }
+        scope.launch { appUpdateController.check() }
     }
 
     // The automatic check the toggle governs. Runs once per entry into About; the manual

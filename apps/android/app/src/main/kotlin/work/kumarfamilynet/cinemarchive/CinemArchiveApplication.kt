@@ -17,6 +17,7 @@ import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
 import work.kumarfamilynet.cinemarchive.data.AccountRuntimeManager
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateController
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
@@ -50,6 +51,11 @@ class CinemArchiveApplication : Application() {
 
     val appUpdateRepository: AppUpdateRepository by lazy {
         AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME)
+    }
+
+    /** The one shared update check every surface reads; see [AppUpdateController]. */
+    val appUpdateController: AppUpdateController by lazy {
+        AppUpdateController(fetch = appUpdateRepository::checkForUpdate)
     }
 
     val apkInstaller: ApkInstaller by lazy { ApkInstaller(this) }
@@ -123,7 +129,7 @@ class CinemArchiveApplication : Application() {
         if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
         if (!preferencesRepository.observeAutoCheckUpdates().first()) return
 
-        val result = appUpdateRepository.checkForUpdate()
+        val result = appUpdateController.check()
         val apkUrl = (result as? UpdateCheckResult.Available)?.apkUrl ?: return
         if (!apkInstaller.canRequestInstalls()) return
 

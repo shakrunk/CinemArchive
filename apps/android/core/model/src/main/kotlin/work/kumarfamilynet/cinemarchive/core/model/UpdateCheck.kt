@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.model
 
+import java.time.Instant
+
 /** Outcome of an update check, for the Settings screen to render inline. */
 sealed interface UpdateCheckResult {
     /** No check has run yet this session. */
@@ -16,6 +18,13 @@ sealed interface UpdateCheckResult {
         val apkUrl: String?,
         /** The release's own page, used as the fallback when we can't install directly. */
         val releasePageUrl: String,
+        /** The release body as published on GitHub (Markdown), blank when it has none. */
+        val releaseNotes: String = "",
+        val publishedAt: Instant? = null,
+        /** Size of [apkUrl]'s asset, for download progress when the server omits a length. */
+        val apkSizeBytes: Long? = null,
+        /** The release's `SHA256SUMS` asset, which CI publishes alongside every APK. */
+        val checksumUrl: String? = null,
     ) : UpdateCheckResult
 
     data class Failed(val message: String) : UpdateCheckResult

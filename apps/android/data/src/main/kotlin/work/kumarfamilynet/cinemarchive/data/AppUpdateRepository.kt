@@ -1,9 +1,11 @@
 package work.kumarfamilynet.cinemarchive.data
 
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
@@ -56,35 +58,55 @@ class AppUpdateRepository(
             }
             val body = response.body?.string().orEmpty()
             if (body.isBlank()) return UpdateCheckResult.Failed("Empty response from GitHub")
-
-            val json = JSONObject(body)
-            val tag = json.optString("tag_name").takeIf { it.isNotBlank() }
-                ?: return UpdateCheckResult.Failed("Release has no tag")
-            val latest = tag.removePrefix("v")
-
-            if (compareVersions(latest, currentVersionName) <= 0) {
-                return UpdateCheckResult.UpToDate(currentVersionName)
-            }
-
-            return UpdateCheckResult.Available(
-                currentVersion = currentVersionName,
-                latestVersion = latest,
-                apkUrl = firstApkAsset(json),
-                releasePageUrl = json.optString("html_url").takeIf { it.isNotBlank() }
-                    ?: RELEASES_PAGE_URL,
-            )
+            return parseLatestRelease(body, currentVersionName)
         }
-    }
-
-    private fun firstApkAsset(release: JSONObject): String? {
-        val assets = release.optJSONArray("assets") ?: return null
-        for (i in 0 until assets.length()) {
-            val asset = assets.optJSONObject(i) ?: continue
-            val name = asset.optString("name")
-            if (name.endsWith(".apk", ignoreCase = true)) {
-                return asset.optString("browser_download_url").takeIf { it.isNotBlank() }
-            }
-        }
-        return null
     }
 }
+
+/**
+ * Maps a `releases/latest` response body to a check result. Kept apart from the HTTP call so
+ * the mapping can be tested against fixture JSON without a network.
+ */
+internal fun parseLatestRelease(body: String, currentVersionName: String): UpdateCheckResult {
+    val json = JSONObject(body)
+    val tag = json.optString("tag_name").takeIf { it.isNotBlank() }
+        ?: return UpdateCheckResult.Failed("Release has no tag")
+    val latest = tag.removePrefix("v")
+
+    if (compareVersions(latest, currentVersionName) <= 0) {
+        return UpdateCheckResult.UpToDate(currentVersionName)
+    }
+
+    val assets = json.optJSONArray("assets")
+    val apk = assets.firstAsset { it.optString("name").endsWith(".apk", ignoreCase = true) }
+    val checksums = assets.firstAsset { it.optString("name") == CHECKSUMS_ASSET_NAME }
+
+    return UpdateCheckResult.Available(
+        currentVersion = currentVersionName,
+        latestVersion = latest,
+        apkUrl = apk?.downloadUrl(),
+        releasePageUrl = json.optString("html_url").takeIf { it.isNotBlank() }
+            ?: RELEASES_PAGE_URL,
+        // optString maps a JSON null to the string "null", so a missing body is checked first.
+        releaseNotes = if (json.isNull("body")) "" else json.optString("body").trim(),
+        publishedAt = json.optString("published_at").takeIf { it.isNotBlank() }
+            ?.let { runCatching { Instant.parse(it) }.getOrNull() },
+        apkSizeBytes = apk?.optLong("size")?.takeIf { it > 0 },
+        checksumUrl = checksums?.downloadUrl(),
+    )
+}
+
+/** The checksum file `deploy.yml` attaches next to each release APK. */
+private const val CHECKSUMS_ASSET_NAME = "SHA256SUMS"
+
+private fun JSONArray?.firstAsset(predicate: (JSONObject) -> Boolean): JSONObject? {
+    if (this == null) return null
+    for (i in 0 until length()) {
+        val asset = optJSONObject(i) ?: continue
+        if (predicate(asset)) return asset
+    }
+    return null
+}
+
+private fun JSONObject.downloadUrl(): String? =
+    optString("browser_download_url").takeIf { it.isNotBlank() }

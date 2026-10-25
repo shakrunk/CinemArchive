@@ -121,6 +121,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.asSearchResult
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateController
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
@@ -229,6 +230,7 @@ class MainActivity : ComponentActivity() {
         val preferencesRepository = app.preferencesRepository
         val authRepository = app.authRepository
         val appUpdateRepository = app.appUpdateRepository
+        val appUpdateController = app.appUpdateController
         val apkInstaller = app.apkInstaller
         val initialTitleId = intent.getStringExtra(EXTRA_OPEN_TITLE_ID)
         val initialTitleOwnerId = intent.getStringExtra(OutingCompletionReceiver.EXTRA_OWNER_ID)
@@ -314,6 +316,7 @@ class MainActivity : ComponentActivity() {
                                                 preferencesRepository,
                                                 authRepository,
                                                 appUpdateRepository,
+                                                appUpdateController,
                                                 apkInstaller,
                                                 initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
                                                 pendingNavigation = pendingNavigation,
@@ -490,6 +493,7 @@ private fun CinemArchiveApp(
     preferencesRepository: PreferencesRepository,
     authRepository: AuthRepository,
     appUpdateRepository: AppUpdateRepository,
+    appUpdateController: AppUpdateController,
     apkInstaller: ApkInstaller,
     initialTitleId: String? = null,
     pendingNavigation: PendingNavigation? = null,
@@ -1115,6 +1119,7 @@ private fun CinemArchiveApp(
                             SettingsCategory.ABOUT -> AboutRoute(
                                 appVersionName,
                                 appUpdateRepository,
+                                appUpdateController,
                                 apkInstaller,
                                 preferencesRepository,
                                 onBack = closeOverlay,
@@ -1253,6 +1258,7 @@ private fun CinemArchiveApp(
                 Overlay.About -> AboutRoute(
                     appVersionName,
                     appUpdateRepository,
+                    appUpdateController,
                     apkInstaller,
                     preferencesRepository,
                     onBack = openProfile,

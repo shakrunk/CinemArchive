@@ -411,6 +411,8 @@ function AppearanceSection() {
   const titles = useAppStore((s) => s.titles)
   const pureBlack = useAppStore((s) => s.pureBlack)
   const setPureBlack = useAppStore((s) => s.setPureBlack)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
+  const setSpoilerProtection = useAppStore((s) => s.setSpoilerProtection)
   const themeSyncEnabled = useAppStore((s) => s.themeSyncEnabled)
   const setThemeSyncEnabled = useAppStore((s) => s.setThemeSyncEnabled)
   const user = useAppStore((s) => s.user)
@@ -555,6 +557,12 @@ function AppearanceSection() {
           hint={canSync
             ? 'Keeps your theme and Pure black in step on every browser and Android device where this is on.'
             : 'Sign in to keep your theme in step across your browsers and devices.'}
+        />
+        <SettingToggle
+          checked={spoilerProtection}
+          onChange={setSpoilerProtection}
+          label="Hide episode spoilers"
+          hint="Hides the still, title, and synopsis of episodes you haven’t watched yet. Applies on this device."
         />
       </div>
       <TextPreferences />

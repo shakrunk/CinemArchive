@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -88,6 +89,7 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.savePostShow
 import work.kumarfamilynet.cinemarchive.core.designsystem.restorePostShow
 import work.kumarfamilynet.cinemarchive.core.model.PostShowOpening
 import kotlinx.coroutines.isActive
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
@@ -109,6 +111,7 @@ import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
+import work.kumarfamilynet.cinemarchive.core.model.isEpisodeSpoilerHidden
 import work.kumarfamilynet.cinemarchive.core.model.newcomersFirst
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.core.model.ViewingDraft
@@ -1116,6 +1119,7 @@ private fun DetailHero(detail: TitleDetail, onBack: () -> Unit) {
 @Composable
 private fun NextEpisodeBanner(next: ScheduledEpisode, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val episode = next.episode
+    val spoilerHidden = isEpisodeSpoilerHidden(episode.watchCount > 0, LocalSpoilerProtection.current)
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -1136,7 +1140,7 @@ private fun NextEpisodeBanner(next: ScheduledEpisode, onClick: () -> Unit, modif
                 )
                 Text(
                     "${seasonShortLabel(next.season.seasonNumber)} E${episode.episodeNumber}" +
-                        (episode.episodeName?.let { " · $it" } ?: ""),
+                        (episode.episodeName?.takeUnless { spoilerHidden }?.let { " · $it" } ?: ""),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1208,6 +1212,10 @@ private fun EpisodeRow(
     val watched = episode.watchCount > 0
     var castExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
     var synopsisExpanded by rememberSaveable(episode.id) { mutableStateOf(false) }
+    // A one-off reveal for this episode, like the web panel's Reveal.
+    var revealed by rememberSaveable(episode.id) { mutableStateOf(false) }
+    val spoilerHidden = !revealed && isEpisodeSpoilerHidden(watched, LocalSpoilerProtection.current)
+    val hasSpoilers = episode.episodeName != null || episode.stillUrl != null || !episode.synopsis.isNullOrBlank()
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -1218,11 +1226,19 @@ private fun EpisodeRow(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PosterSurface(
                     tint = tintForKey(episode.id),
-                    imageUrl = episode.stillUrl,
+                    imageUrl = episode.stillUrl.takeUnless { spoilerHidden },
                     modifier = Modifier.width(128.dp),
                     aspectRatio = 16f / 9f,
                     cornerRadius = 10.dp,
                 ) {
+                    if (spoilerHidden) {
+                        Icon(
+                            Icons.Filled.VisibilityOff,
+                            contentDescription = "Hidden to avoid spoilers",
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.align(Alignment.Center).size(20.dp),
+                        )
+                    }
                     if (watched) {
                         Icon(
                             Icons.Filled.CheckCircle,
@@ -1237,7 +1253,7 @@ private fun EpisodeRow(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "E${episode.episodeNumber}" + (episode.episodeName?.let { " · $it" } ?: ""),
+                        "E${episode.episodeNumber}" + (episode.episodeName?.takeUnless { spoilerHidden }?.let { " · $it" } ?: ""),
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -1263,7 +1279,19 @@ private fun EpisodeRow(
                     }
                 }
             }
-            episode.synopsis?.takeIf { it.isNotBlank() }?.let { synopsis ->
+            if (spoilerHidden && hasSpoilers) {
+                TextButton(
+                    onClick = { revealed = true },
+                    contentPadding = PaddingValues(horizontal = 0.dp),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        "Hidden to avoid spoilers · Reveal",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+            episode.synopsis?.takeIf { it.isNotBlank() && !spoilerHidden }?.let { synopsis ->
                 Text(
                     synopsis,
                     style = MaterialTheme.typography.bodySmall,

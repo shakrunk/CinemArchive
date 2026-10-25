@@ -1,9 +1,9 @@
 import { saveSucceeded } from 'src/lib/localSave'
 import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useRef, useState } from 'react'
-import { Eye, Check, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Check, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
-import { avgEpisodeRating, isUnaired } from 'src/store/episodeUtils'
+import { avgEpisodeRating, isEpisodeSpoilerHidden, isUnaired } from 'src/store/episodeUtils'
 import { StarRating } from 'src/components/ui/star-rating'
 import { Eyebrow } from 'src/components/ui/typography'
 import { Input } from 'src/components/ui/input'
@@ -17,6 +17,10 @@ import type { CastMember, Episode, Season } from 'src/store/mockData'
 function stillSrcFor(episode: Episode): string | null {
   if (!episode.stillUrl) return null
   return episode.stillUrl.startsWith('http') ? episode.stillUrl : `${TMDB_STILL_BASE}${episode.stillUrl}`
+}
+
+function episodeLabel(episode: Episode, spoilerHidden: boolean): string {
+  return (spoilerHidden ? null : episode.episodeName) ?? `Episode ${episode.episodeNumber}`
 }
 
 function ColorModePill({ mode, className }: { mode: 'bw' | 'color'; className?: string }) {
@@ -57,7 +61,10 @@ export function EpisodeCard({
   isSharedView,
 }: EpisodeCardProps) {
   const logEpisode = useAppStore((s) => s.logEpisode)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
   const watched = episode.watchEvents.length > 0
+  const spoilerHidden = isEpisodeSpoilerHidden(episode, spoilerProtection, isSharedView)
+  const name = episodeLabel(episode, spoilerHidden)
 
   function handleQuickWatch(e: React.MouseEvent) {
     e.stopPropagation()
@@ -67,7 +74,7 @@ export function EpisodeCard({
     })
   }
 
-  const stillSrc = stillSrcFor(episode)
+  const stillSrc = spoilerHidden ? null : stillSrcFor(episode)
   const unaired = isUnaired(episode)
 
   return (
@@ -78,7 +85,7 @@ export function EpisodeCard({
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       aria-expanded={isSelected}
       data-episode-id={episode.id}
-      aria-label={`${episode.episodeName ?? `Episode ${episode.episodeNumber}`} — click to ${isSelected ? 'collapse' : 'expand'} details`}
+      aria-label={`${name} — click to ${isSelected ? 'collapse' : 'expand'} details`}
       className={cn(
         'group shrink-0 w-[240px] text-left rounded-lg overflow-hidden border transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 cursor-pointer',
         isSelected ? 'border-amber/50' : 'border-(--line) hover:border-amber/30',
@@ -90,16 +97,17 @@ export function EpisodeCard({
         {stillSrc ? (
           <img
             src={stillSrc}
-            alt={episode.episodeName ?? `Episode ${episode.episodeNumber}`}
+            alt={name}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
           <div
-            className="absolute inset-0 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center gap-1.5"
             style={{ background: 'var(--wash)' }}
           >
+            {spoilerHidden && <EyeOff className="w-3.5 h-3.5" style={{ color: 'var(--paper-faint)' }} aria-hidden="true" />}
             <span className="font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
-              No preview
+              {spoilerHidden ? 'Hidden to avoid spoilers' : 'No preview'}
             </span>
           </div>
         )}
@@ -146,7 +154,7 @@ export function EpisodeCard({
           className="font-sans font-medium line-clamp-1"
           style={{ fontSize: scaledTextSize('13px'), color: 'var(--paper)' }}
         >
-          {episode.episodeName ?? `Episode ${episode.episodeNumber}`}
+          {name}
         </div>
         {unaired ? (
           <div className="font-mono" style={{ fontSize: scaledTextSize('10px'), color: 'var(--amber)' }}>
@@ -160,7 +168,7 @@ export function EpisodeCard({
             {episode.runtime ? fmtRuntime(episode.runtime) : ''}
           </div>
         )}
-        {episode.synopsis && (
+        {episode.synopsis && !spoilerHidden && (
           <p
             className="font-sans line-clamp-2"
             style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper-dim)', lineHeight: 1.5 }}
@@ -298,6 +306,7 @@ export interface EpisodePanelProps {
 
 export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, isSpiderNoir, onPersonClick, onColorModeSelected }: EpisodePanelProps) {
   const logEpisode = useAppStore((s) => s.logEpisode)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
   const [pendingDeleteWeId, setPendingDeleteWeId] = useState<string | null>(null)
   const [log, setLog] = useState<EpLogState>(EMPTY_EP_LOG)
@@ -359,7 +368,10 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
     setPendingLog(null)
   }
 
-  const stillSrc = stillSrcFor(episode)
+  // A one-off reveal for the episode on screen; picking another episode hides again.
+  const [revealedEpisodeId, setRevealedEpisodeId] = useState<string | null>(null)
+  const spoilerHidden = revealedEpisodeId !== episode.id && isEpisodeSpoilerHidden(episode, spoilerProtection, isSharedView)
+  const stillSrc = spoilerHidden ? null : stillSrcFor(episode)
 
   return (
     <div className="ep-panel px-3 py-3 space-y-3 rounded-lg" style={{ borderTop: '1px solid var(--line)', background: 'var(--inset)' }}>
@@ -382,12 +394,25 @@ export function EpisodePanel({ episode, season, titleId, tmdbId, isSharedView, i
       )}
 
       {/* Still + full synopsis */}
-      {(stillSrc || episode.synopsis) && (
+      {spoilerHidden && (stillSrcFor(episode) || episode.synopsis) ? (
+        <div className="flex items-center gap-2 font-sans text-xs" style={{ color: 'var(--paper-faint)' }}>
+          <EyeOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span className="flex-1 min-w-0">Still and synopsis hidden to avoid spoilers.</span>
+          <button
+            type="button"
+            onClick={() => setRevealedEpisodeId(episode.id)}
+            className="font-mono shrink-0 transition-colors hover:text-amber focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+            style={{ color: 'var(--amber-deep)' }}
+          >
+            Reveal
+          </button>
+        </div>
+      ) : (stillSrc || episode.synopsis) && (
         <div className="flex gap-3">
           {stillSrc && (
             <img
               src={stillSrc}
-              alt={episode.episodeName ?? `Episode ${episode.episodeNumber}`}
+              alt={episodeLabel(episode, false)}
               className="rounded-md object-cover shrink-0"
               style={{ width: '120px', height: '68px', objectPosition: 'center' }}
             />

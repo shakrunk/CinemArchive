@@ -210,6 +210,8 @@ describe('safe cache migration and strict owner refresh', () => {
     expect(pickDevicePreferences({ theme: 'catppuccin-mocha' })).toEqual({ theme: 'catppuccin-mocha' })
     expect(pickDevicePreferences({ pureBlack: true })).toEqual({ pureBlack: true })
     expect(pickDevicePreferences({ pureBlack: 'yes' })).toEqual({})
+    expect(pickDevicePreferences({ spoilerProtection: true })).toEqual({ spoilerProtection: true })
+    expect(pickDevicePreferences({ spoilerProtection: 'on' })).toEqual({})
     expect(pickDevicePreferences({ themeSyncEnabled: true, themeUpdatedAt: '2026-10-24T10:00:00.000Z' }))
       .toEqual({ themeSyncEnabled: true, themeUpdatedAt: '2026-10-24T10:00:00.000Z' })
     expect(pickDevicePreferences({ themeSyncEnabled: 1, themeUpdatedAt: 'yesterday' })).toEqual({})

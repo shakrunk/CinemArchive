@@ -227,6 +227,9 @@ interface UISlice {
   // copy last applied; last-write-wins compares it to the account's copy.
   themeSyncEnabled: boolean
   themeUpdatedAt: string | null
+  // Device preference: hide stills, names and synopses of episodes not yet
+  // watched (see isEpisodeSpoilerHidden). Not appearance, so never synced.
+  spoilerProtection: boolean
   navPrefs: NavPrefs
   ledgerPrefs: LedgerPrefs
   // The board arrangement of whoever is being viewed in a shared/friend view.
@@ -268,6 +271,7 @@ interface UISlice {
   unlockTheme: (theme: Theme) => void
   setPureBlack: (pureBlack: boolean) => void
   setThemeSyncEnabled: (enabled: boolean) => void
+  setSpoilerProtection: (enabled: boolean) => void
   moveNavItem: (id: NavItemId, direction: 'up' | 'down') => void
   reorderNav: (order: NavItemId[]) => void
   toggleNavItemHidden: (id: NavItemId) => void
@@ -841,6 +845,7 @@ export const useAppStore = create<AppStore>()(
   pureBlack: false,
   themeSyncEnabled: false,
   themeUpdatedAt: null,
+  spoilerProtection: false,
   navPrefs: defaultNavPrefs,
   ledgerPrefs: defaultLedgerPrefs,
   viewedLedgerWidgets: null,
@@ -864,6 +869,8 @@ export const useAppStore = create<AppStore>()(
   setPureBlack: (pureBlack) => set({ pureBlack, themeUpdatedAt: new Date().toISOString() }),
 
   setThemeSyncEnabled: (themeSyncEnabled) => set({ themeSyncEnabled }),
+
+  setSpoilerProtection: (spoilerProtection) => set({ spoilerProtection }),
 
   unlockTheme: (theme) => {
     if (isThemeAvailable(theme, get().unlockedThemes)) return
@@ -1397,6 +1404,7 @@ export const useAppStore = create<AppStore>()(
         pureBlack: s.pureBlack,
         themeSyncEnabled: s.themeSyncEnabled,
         themeUpdatedAt: s.themeUpdatedAt,
+        spoilerProtection: s.spoilerProtection,
         navPrefs: s.navPrefs,
       }),
       merge: (persisted, current) => ({ ...current, ...pickDevicePreferences(persisted) }),

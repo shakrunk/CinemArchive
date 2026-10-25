@@ -22,6 +22,7 @@ import {
   getUnlockedModes,
   getEarnedModes,
   nextScheduledEpisode,
+  isEpisodeSpoilerHidden,
   mainSeasons,
   orderSeasonsForDisplay,
   seasonLabel,
@@ -699,6 +700,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, i
   const totalCount = totalEpisodeCount(seasons)
   const seriesAvg = avgSeriesRating(seasons)
   const nextScheduled = nextScheduledEpisode(seasons)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
 
   const CARD_WIDTH = 252 // 240px card + 12px gap
 
@@ -844,7 +846,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, i
               <span className="font-mono text-xs mr-1.5" style={{ color: 'var(--amber)' }}>
                 S{nextScheduled.season.seasonNumber} E{nextScheduled.episode.episodeNumber}
               </span>
-              {nextScheduled.episode.episodeName ?? `Episode ${nextScheduled.episode.episodeNumber}`}
+              {(isEpisodeSpoilerHidden(nextScheduled.episode, spoilerProtection, isSharedView) ? null : nextScheduled.episode.episodeName) ?? `Episode ${nextScheduled.episode.episodeNumber}`}
             </div>
           </div>
           <div className="font-mono text-xs shrink-0 text-right" style={{ color: 'var(--amber)' }}>
@@ -864,6 +866,8 @@ function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, i
           </Eyebrow>
           <SeriesGraph
             seasons={seriesSeasons}
+            spoilerProtection={spoilerProtection}
+            isSharedView={isSharedView}
             onCellClick={(seasonNumber, episodeNumber) => {
               const targetSeason = seasons.find((s) => s.seasonNumber === seasonNumber)
               const ep = targetSeason?.episodes?.find((e) => e.episodeNumber === episodeNumber)

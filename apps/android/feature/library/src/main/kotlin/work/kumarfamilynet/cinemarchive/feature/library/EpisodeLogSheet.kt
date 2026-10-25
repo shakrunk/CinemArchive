@@ -26,9 +26,11 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.designsystem.DraggableStarRating
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeDetail
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeLogDraft
 import work.kumarfamilynet.cinemarchive.core.model.EpisodeWatch
+import work.kumarfamilynet.cinemarchive.core.model.isEpisodeSpoilerHidden
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -152,7 +154,8 @@ private fun EpisodeLogSheet(episode: EpisodeDetail, isSpiderNoir: Boolean, onSav
     }
     ModalBottomSheet(onDismissRequest = { if (!saving) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(episode.episodeName ?: "Episode ${episode.episodeNumber}", style = MaterialTheme.typography.headlineSmall)
+            val spoilerHidden = isEpisodeSpoilerHidden(episode.watchCount > 0, LocalSpoilerProtection.current)
+            Text(episode.episodeName?.takeUnless { spoilerHidden } ?: "Episode ${episode.episodeNumber}", style = MaterialTheme.typography.headlineSmall)
             CheckboxRow("Log a watch event", includeWatch, editable) { includeWatch = it }
             if (includeWatch) {
                 CheckboxRow("Watched before joining (no date)", prePlatform, editable) { prePlatform = it }

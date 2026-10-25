@@ -118,6 +118,18 @@ export function isUnaired(episode: Episode, today: string = localTodayYmd()): bo
   return !!episode.airDate && episode.airDate > today
 }
 
+/** Spoiler protection: with it on, an episode's still, name and synopsis are
+ *  hidden until it has been watched. In a shared view the watch history is
+ *  the library owner's, not the viewer's, so every episode stays hidden. */
+export function isEpisodeSpoilerHidden(
+  episode: Pick<Episode, 'watchEvents'> | null | undefined,
+  spoilerProtection: boolean,
+  isSharedView = false,
+): boolean {
+  if (!spoilerProtection) return false
+  return isSharedView || !episode || episode.watchEvents.length === 0
+}
+
 /** Earliest (ascending season → episode) episode with a known air date after
  *  `today` — the next scheduled broadcast. Episodes without an air date are
  *  skipped: TMDB lists placeholder episodes with no date that aren't scheduled.

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchSeasonDetails, TMDB_STILL_BASE, type RawTmdbEpisode, type RawTmdbSeason } from 'src/lib/media'
 import { fmtReleaseDate, fmtRuntime } from 'src/lib/utils'
 import { orderSeasonsForDisplay, seasonLabel, seasonShortLabel } from 'src/store/episodeUtils'
+import { useAppStore } from 'src/store/useAppStore'
 import { SubsectionLabel } from 'src/components/ui/typography'
 
 interface DiscoverEpisodeBrowserProps {
@@ -17,6 +18,9 @@ export function DiscoverEpisodeBrowser({ tmdbId, seasons }: DiscoverEpisodeBrows
   const [selected, setSelected] = useState(ordered[0]?.seasonNumber)
   const [loaded, setLoaded] = useState<Record<number, SeasonState>>({})
   const [openEpisode, setOpenEpisode] = useState<number | null>(null)
+  // Nothing here is in the library, so nothing has been watched: spoiler
+  // protection hides every episode's still, name and synopsis.
+  const spoilerHidden = useAppStore((s) => s.spoilerProtection)
 
   useEffect(() => {
     if (selected === undefined || loaded[selected] !== undefined) return
@@ -62,7 +66,7 @@ export function DiscoverEpisodeBrowser({ tmdbId, seasons }: DiscoverEpisodeBrows
         <ul className="space-y-2">
           {state.map((ep) => {
             const open = openEpisode === ep.episode_number
-            const still = ep.still_path ? `${TMDB_STILL_BASE}${ep.still_path}` : null
+            const still = ep.still_path && !spoilerHidden ? `${TMDB_STILL_BASE}${ep.still_path}` : null
             const info = [ep.air_date ? fmtReleaseDate(ep.air_date) : null, ep.runtime ? fmtRuntime(ep.runtime) : null].filter(Boolean).join(' · ')
             return (
               <li key={ep.episode_number} className="rounded-lg border border-(--line)" style={{ background: 'var(--inset)' }}>
@@ -76,10 +80,10 @@ export function DiscoverEpisodeBrowser({ tmdbId, seasons }: DiscoverEpisodeBrows
                   <div className="min-w-0 flex-1">
                     <p className="font-sans text-sm text-paper leading-tight">
                       <span className="font-mono text-xs text-amber mr-1.5">{seasonShortLabel(selected)} E{ep.episode_number}</span>
-                      {ep.name}
+                      {spoilerHidden ? `Episode ${ep.episode_number}` : ep.name}
                     </p>
                     {info && <p className="font-mono text-[11px] text-paper-faint mt-0.5">{info}</p>}
-                    {ep.overview && (
+                    {ep.overview && !spoilerHidden && (
                       <p className={`font-sans text-xs text-paper/70 mt-1 ${open ? '' : 'line-clamp-2'}`}>{ep.overview}</p>
                     )}
                   </div>

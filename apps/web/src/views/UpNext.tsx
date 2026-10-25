@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { TicketButton } from '../components/TicketViewer'
-import { isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
+import { isEpisodeSpoilerHidden, isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
 import type { UpNextEntry, UpcomingEntry } from 'src/store/upNext'
@@ -129,9 +129,10 @@ function LiveCard({
   const logNextEpisodeWatch = useAppStore((s) => s.logNextEpisodeWatch)
   const deleteEpisodeWatchEvent = useAppStore((s) => s.deleteEpisodeWatchEvent)
   const isSharedView = useAppStore((s) => s.isSharedView)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
 
   const { title, season, episode, watchedCount, totalCount } = entry
-  const epName = episode.episodeName ?? `Episode ${episode.episodeNumber}`
+  const epName = (isEpisodeSpoilerHidden(episode, spoilerProtection, isSharedView) ? null : episode.episodeName) ?? `Episode ${episode.episodeNumber}`
   const hasNotAired = isUnaired(episode)
 
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null)

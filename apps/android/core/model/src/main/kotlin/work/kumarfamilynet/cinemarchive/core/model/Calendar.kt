@@ -178,14 +178,15 @@ fun formatEpisodeRange(numbers: List<Int>): String {
 }
 
 /** "S2 · E1–E8 (8 episodes)" / "S1 · E2 — The Turn" / "Release day" … — the agenda row's subtitle,
- *  except for outings, whose time label is formatted by the UI. */
-fun calendarEventLabel(event: CalendarEvent): String = when (event) {
+ *  except for outings, whose time label is formatted by the UI. Calendar events carry no watch
+ *  history, so [hideEpisodeNames] (spoiler protection) drops every episode name. */
+fun calendarEventLabel(event: CalendarEvent, hideEpisodeNames: Boolean = false): String = when (event) {
     is CalendarEvent.Release -> "Release day"
     is CalendarEvent.Premiere -> "Series premiere"
     is CalendarEvent.Episodes -> {
         val code = "${seasonShortLabel(event.seasonNumber)} · ${formatEpisodeRange(event.episodeNumbers)}"
         when {
-            event.episodeName != null -> "$code — ${event.episodeName}"
+            event.episodeName != null && !hideEpisodeNames -> "$code — ${event.episodeName}"
             event.episodeNumbers.size > 1 -> "$code (${event.episodeNumbers.size} episodes)"
             else -> code
         }

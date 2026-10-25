@@ -31,6 +31,8 @@ import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.data.*
 import work.kumarfamilynet.cinemarchive.core.model.LibraryFilters
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
+import work.kumarfamilynet.cinemarchive.core.model.isEpisodeSpoilerHidden
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerScreen
 import work.kumarfamilynet.cinemarchive.feature.ledger.LedgerUiState
 
@@ -280,10 +282,12 @@ private fun SharedTitleDetail(title: SharedLibraryTitle, socialContent: (@Compos
     val ratings = episode.rows("episode_ratings")
     val reviews = episode.rows("episode_reviews")
     val crew = episode.rows("episode_crew")
+    // The watches here are the owner's, not the viewer's, so every episode stays hidden.
+    val spoilerHidden = isEpisodeSpoilerHidden(watches.isNotEmpty(), LocalSpoilerProtection.current, sharedView = true)
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("E${episode.getInt("episode_number")} · ${episode.text("episode_name") ?: "Episode"}",
+                Text("E${episode.getInt("episode_number")} · ${episode.text("episode_name")?.takeUnless { spoilerHidden } ?: "Episode"}",
                     style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 if (watches.isNotEmpty()) Icon(Icons.Filled.CheckCircle, contentDescription = "Watched",
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -291,7 +295,7 @@ private fun SharedTitleDetail(title: SharedLibraryTitle, socialContent: (@Compos
             val meta = listOfNotNull(episode.text("air_date")?.let(::formatSharedDate), episode.text("runtime")?.let { "$it min" })
             if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            episode.text("synopsis")?.let {
+            episode.text("synopsis")?.takeUnless { spoilerHidden }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
             }

@@ -57,7 +57,9 @@ import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
+import work.kumarfamilynet.cinemarchive.core.model.UpdateDownloadPolicy
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateController
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.PreferencesRepository
 
@@ -330,9 +332,12 @@ private val CREDIT_SECTIONS = listOf(
 fun AboutRoute(
     appVersionName: String,
     appUpdateRepository: AppUpdateRepository,
+    appUpdateController: AppUpdateController,
     apkInstaller: ApkInstaller,
     preferencesRepository: PreferencesRepository,
     onBack: () -> Unit,
+    /** Opens the shared [UpdateSheet], which the host owns so the banner can open it too. */
+    onOpenUpdate: () -> Unit,
     // False in the wide/split settings layout, where this screen sits permanently in the
     // trailing pane rather than having been navigated to. Only applies to the top-level list —
     // the Doc/Credits subpages below it are real in-pane navigation (List -> Doc), so they keep
@@ -369,25 +374,19 @@ fun AboutRoute(
 
     val autoCheck by preferencesRepository.observeAutoCheckUpdates()
         .collectAsStateWithLifecycle(initialValue = true)
-    var updateResult by remember { mutableStateOf<UpdateCheckResult>(UpdateCheckResult.Idle) }
+    // Shared with the launch-time check, so an update it already found shows here at once.
+    val updateResult by appUpdateController.state.collectAsStateWithLifecycle()
+    val isCheckingForUpdate by appUpdateController.isChecking.collectAsStateWithLifecycle()
     // Owned by ApkInstaller rather than this screen: the decisive transitions arrive on a
     // manifest receiver (InstallStatusReceiver) that outlives this composable.
     val installState by apkInstaller.installState.collectAsStateWithLifecycle()
-    // Re-read on each recomposition rather than caching: the user can grant the permission in
-    // Settings and come straight back, and a cached "false" would strand them on the fallback.
-    val canInstallDirectly = apkInstaller.canRequestInstalls()
-
-    fun runCheck() {
-        scope.launch {
-            updateResult = UpdateCheckResult.Checking
-            updateResult = appUpdateRepository.checkForUpdate()
-        }
-    }
+    val downloadPolicy by preferencesRepository.observeUpdateDownloadPolicy()
+        .collectAsStateWithLifecycle(initialValue = UpdateDownloadPolicy.WIFI_ONLY)
 
     // The automatic check the toggle governs. Runs once per entry into About; the manual
     // button below ignores the toggle entirely.
     LaunchedEffect(autoCheck) {
-        if (autoCheck && updateResult == UpdateCheckResult.Idle) runCheck()
+        if (autoCheck && updateResult == UpdateCheckResult.Idle) appUpdateController.check()
     }
 
     BackHandler(enabled = subpage != null) { subpage = null }
@@ -408,18 +407,12 @@ fun AboutRoute(
             autoCheckEnabled = autoCheck,
             onSetAutoCheck = { enabled -> scope.launch { preferencesRepository.setAutoCheckUpdates(enabled) } },
             updateResult = updateResult,
-            canInstallDirectly = canInstallDirectly,
-            onCheckNow = ::runCheck,
+            onCheckNow = { scope.launch { appUpdateController.check(force = true) } },
+            isChecking = isCheckingForUpdate,
             installState = installState,
-            // Failures surface through installState, not updateResult: overwriting the latter
-            // would drop the Available result this screen needs to keep offering a retry.
-            onInstall = { apkUrl -> scope.launch { apkInstaller.downloadAndInstall(apkUrl) } },
-            onOpenReleasePage = { url -> uriHandler.openUri(url) },
-            onGrantInstallPermission = {
-                apkInstaller.unknownSourcesSettingsIntent()?.let { intent ->
-                    context.startActivity(intent)
-                }
-            },
+            onOpenUpdate = onOpenUpdate,
+            downloadPolicy = downloadPolicy,
+            onSetDownloadPolicy = { policy -> scope.launch { preferencesRepository.setUpdateDownloadPolicy(policy) } },
         )
     }
 }
@@ -439,12 +432,12 @@ private fun AboutListScreen(
     autoCheckEnabled: Boolean,
     onSetAutoCheck: (Boolean) -> Unit,
     updateResult: UpdateCheckResult,
-    canInstallDirectly: Boolean,
     installState: ApkInstallState,
     onCheckNow: () -> Unit,
-    onInstall: (String) -> Unit,
-    onOpenReleasePage: (String) -> Unit,
-    onGrantInstallPermission: () -> Unit,
+    isChecking: Boolean,
+    onOpenUpdate: () -> Unit,
+    downloadPolicy: UpdateDownloadPolicy,
+    onSetDownloadPolicy: (UpdateDownloadPolicy) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 2.dp)) {
@@ -532,12 +525,12 @@ private fun AboutListScreen(
                         autoCheckEnabled = autoCheckEnabled,
                         onSetAutoCheck = onSetAutoCheck,
                         result = updateResult,
-                        canInstallDirectly = canInstallDirectly,
                         installState = installState,
                         onCheckNow = onCheckNow,
-                        onInstall = onInstall,
-                        onOpenReleasePage = onOpenReleasePage,
-                        onGrantInstallPermission = onGrantInstallPermission,
+                        isChecking = isChecking,
+                        onOpenUpdate = onOpenUpdate,
+                        downloadPolicy = downloadPolicy,
+                        onSetDownloadPolicy = onSetDownloadPolicy,
                         modifier = Modifier.padding(bottom = 22.dp),
                     )
                 }

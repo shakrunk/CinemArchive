@@ -1,22 +1,23 @@
 package work.kumarfamilynet.cinemarchive
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
 import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
+import work.kumarfamilynet.cinemarchive.core.model.UpdateDownloadPolicy
 import work.kumarfamilynet.cinemarchive.data.AccountRuntimeManager
 import work.kumarfamilynet.cinemarchive.data.ApkInstaller
+import work.kumarfamilynet.cinemarchive.data.AppUpdateController
 import work.kumarfamilynet.cinemarchive.data.AppUpdateRepository
 import work.kumarfamilynet.cinemarchive.data.AuthRepository
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
@@ -49,7 +50,17 @@ class CinemArchiveApplication : Application() {
     private val installSourceProvider: InstallSourceProvider by lazy { InstallSourceProvider(this) }
 
     val appUpdateRepository: AppUpdateRepository by lazy {
-        AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME)
+        val feedOverride = BuildConfig.UPDATE_FEED_URL.takeIf { it.isNotBlank() }
+        if (feedOverride == null) {
+            AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME)
+        } else {
+            AppUpdateRepository(installSourceProvider, BuildConfig.VERSION_NAME, latestReleaseUrl = feedOverride)
+        }
+    }
+
+    /** The one shared update check every surface reads; see [AppUpdateController]. */
+    val appUpdateController: AppUpdateController by lazy {
+        AppUpdateController(fetch = appUpdateRepository::checkForUpdate)
     }
 
     val apkInstaller: ApkInstaller by lazy { ApkInstaller(this) }
@@ -101,63 +112,96 @@ class CinemArchiveApplication : Application() {
         }
     }
 
+    // Activities currently resumed. The install receiver reads this: a confirmation prompt
+    // can only be launched while the app is in the foreground.
+    private var resumedActivities = 0
+
+    /** Whether one of this app's activities is resumed right now. Main thread only. */
+    val isInForeground: Boolean get() = resumedActivities > 0
+
     override fun onCreate() {
         super.onCreate()
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: Activity) { resumedActivities++ }
+            override fun onActivityPaused(activity: Activity) { resumedActivities-- }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) {
+                // The first activity start of a process is the user opening the app: check
+                // then, rather than on every process start (alarms and the boot receiver start
+                // the process too, and shouldn't spend the GitHub rate limit or the battery).
+                if (!checkedOnOpen) {
+                    checkedOnOpen = true
+                    applicationScope.launch { runAutomaticUpdateCheck(fromBackground = false) }
+                }
+            }
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
         // Bring up (only) the stored session's owner; everything account-scoped — sync, outing
         // reconciliation, outbox flush, Ledger-layout reconcile — now starts inside that runtime.
         accountRuntimeManager.start()
-        applicationScope.launch { checkAndInstallUpdateIfDue() }
+        applicationScope.launch {
+            // Before any check: clears the staged APK once this build has caught up with it,
+            // along with the "ready to install" notification that announced it.
+            if (apkInstaller.reconcileAfterLaunch()) UpdateInstallNotifier.clear(this@CinemArchiveApplication)
+            restoreStagedUpdates()
+        }
+        applicationScope.launch { keepPeriodicCheckScheduled() }
     }
 
+    private var checkedOnOpen = false
+
+    /** Keeps the daily background check scheduled exactly while automatic checks are on. */
+    private suspend fun keepPeriodicCheckScheduled() {
+        if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
+        preferencesRepository.observeAutoCheckUpdates().collect { enabled ->
+            if (enabled) {
+                UpdateScheduler.schedulePeriodicCheck(this@CinemArchiveApplication)
+            } else {
+                UpdateScheduler.cancelPeriodicCheck(this@CinemArchiveApplication)
+            }
+        }
+    }
 
     /**
-     * Sideloaded-install analogue of Play's own background auto-update (issue #166) — without
-     * this, "Automatically check for updates" only ever ran when Settings → About happened to be
-     * open (AboutScreen.kt's `LaunchedEffect(autoCheck)`), so granting the install permission and
-     * turning the toggle on still required remembering to open that screen. Play-installed
-     * builds are untouched (see #147/AppUpdateRepository.checkForUpdate's own gate); without the
-     * install permission granted, this changes nothing from #146's original behavior — no silent
-     * download, the user still has to open About and tap through manually.
+     * Whenever a check finds an update that an earlier process already downloaded, offer the
+     * install straight away instead of downloading it again.
      */
-    private suspend fun checkAndInstallUpdateIfDue() {
+    private suspend fun restoreStagedUpdates() {
+        appUpdateController.state
+            .filterIsInstance<UpdateCheckResult.Available>()
+            .collect { apkInstaller.restoreIfStaged(it.latestVersion) }
+    }
+
+    /**
+     * The automatic update check — on opening the app, and daily from [UpdateCheckWorker].
+     * Sideloaded-install analogue of Play's own background auto-update (issue #166);
+     * Play-installed builds are untouched (see #147/AppUpdateRepository.checkForUpdate's own
+     * gate).
+     *
+     * A found update is downloaded in the background when the download policy allows it and the
+     * install permission is granted, via [UpdateDownloadWorker] so the policy's network
+     * constraint applies. It stops at "ready": installing always waits for a tap, since Android
+     * can block the system's prompt from the background. Otherwise a check that ran with the app
+     * in the background announces the update in a notification; in the foreground the banner
+     * already does.
+     */
+    suspend fun runAutomaticUpdateCheck(fromBackground: Boolean) {
         if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
         if (!preferencesRepository.observeAutoCheckUpdates().first()) return
 
-        val result = appUpdateRepository.checkForUpdate()
-        val apkUrl = (result as? UpdateCheckResult.Available)?.apkUrl ?: return
-        if (!apkInstaller.canRequestInstalls()) return
-
-        // installState's decisive transitions (AwaitingConfirmation/Installed/Failed) arrive
-        // later, off InstallStatusReceiver's broadcast — this has to keep collecting past
-        // downloadAndInstall() returning (which only means the session was committed), and
-        // stop itself once a terminal state lands rather than being cancelled from outside.
-        coroutineScope {
-            var downloadStarted = false
-            val notifyJob = launch {
-                apkInstaller.installState
-                    .onEach { state ->
-                        when (state) {
-                            ApkInstallState.Downloading -> {
-                                downloadStarted = true
-                                UpdateInstallNotifier.postDownloading(this@CinemArchiveApplication, result.latestVersion)
-                            }
-                            ApkInstallState.AwaitingConfirmation -> UpdateInstallNotifier.postAwaitingConfirmation(this@CinemArchiveApplication)
-                            ApkInstallState.Installed -> UpdateInstallNotifier.clear(this@CinemArchiveApplication)
-                            is ApkInstallState.Failed -> UpdateInstallNotifier.postFailed(this@CinemArchiveApplication, state.message)
-                            ApkInstallState.Idle -> Unit
-                        }
-                    }
-                    // Stops once a terminal state lands. Idle only counts as terminal after a
-                    // download started — the initial subscribe-time replay of the StateFlow's
-                    // starting value is also Idle, and must not stop this before it begins.
-                    .takeWhile { state ->
-                        state !is ApkInstallState.Failed && state != ApkInstallState.Installed &&
-                            !(state == ApkInstallState.Idle && downloadStarted)
-                    }
-                    .collect()
-            }
-            apkInstaller.downloadAndInstall(apkUrl)
-            notifyJob.join()
+        val result = appUpdateController.check() as? UpdateCheckResult.Available ?: return
+        val policy = preferencesRepository.observeUpdateDownloadPolicy().first()
+        val canDownload = result.apkUrl != null && apkInstaller.canRequestInstalls()
+        when {
+            apkInstaller.installState.value is ApkInstallState.Ready -> Unit
+            canDownload && policy != UpdateDownloadPolicy.NOTIFY_ONLY ->
+                UpdateScheduler.enqueueDownload(this, policy)
+            // Daily runs would otherwise repeat the same announcement; a dismissed banner means
+            // the user has seen this version.
+            fromBackground && preferencesRepository.observeDismissedUpdateVersion().first() != result.latestVersion ->
+                UpdateInstallNotifier.postAvailable(this, result.latestVersion)
         }
     }
 }

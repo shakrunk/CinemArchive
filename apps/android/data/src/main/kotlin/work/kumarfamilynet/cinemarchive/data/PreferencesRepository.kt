@@ -20,6 +20,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 import work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences
 import work.kumarfamilynet.cinemarchive.core.model.SyncedAppearance
+import work.kumarfamilynet.cinemarchive.core.model.UpdateDownloadPolicy
 import work.kumarfamilynet.cinemarchive.core.model.isSecret
 
 private val Context.preferencesDataStore by preferencesDataStore(name = "cinemarchive_prefs")
@@ -39,6 +40,8 @@ class PreferencesRepository(context: Context) {
     private val fontScaleKey = stringPreferencesKey("font_scale")
     private val libraryViewModeKey = stringPreferencesKey("library_view_mode")
     private val autoCheckUpdatesKey = booleanPreferencesKey("auto_check_updates")
+    private val dismissedUpdateVersionKey = stringPreferencesKey("dismissed_update_version")
+    private val updateDownloadPolicyKey = stringPreferencesKey("update_download_policy")
     private val posterGridColumnsKey = intPreferencesKey("poster_grid_columns")
     private val devSettingsUnlockedKey = booleanPreferencesKey("dev_settings_unlocked")
     private val devShowBuildBannerKey = booleanPreferencesKey("dev_show_build_banner")
@@ -232,6 +235,27 @@ class PreferencesRepository(context: Context) {
 
     suspend fun setAutoCheckUpdates(enabled: Boolean) {
         dataStore.edit { it[autoCheckUpdatesKey] = enabled }
+    }
+
+    /** The release whose "update available" banner was dismissed. Stored per version, so the
+     *  banner returns for the next release rather than staying hidden for good. */
+    fun observeDismissedUpdateVersion(): Flow<String?> = dataStore.data.map { preferences ->
+        preferences[dismissedUpdateVersionKey]
+    }
+
+    suspend fun setDismissedUpdateVersion(version: String) {
+        dataStore.edit { it[dismissedUpdateVersionKey] = version }
+    }
+
+    /** When automatically found updates download without asking. Wi-Fi only by default. */
+    fun observeUpdateDownloadPolicy(): Flow<UpdateDownloadPolicy> = dataStore.data.map { preferences ->
+        preferences[updateDownloadPolicyKey]?.let { stored ->
+            UpdateDownloadPolicy.entries.firstOrNull { it.name == stored }
+        } ?: UpdateDownloadPolicy.WIFI_ONLY
+    }
+
+    suspend fun setUpdateDownloadPolicy(policy: UpdateDownloadPolicy) {
+        dataStore.edit { it[updateDownloadPolicyKey] = policy.name }
     }
 
     /** Column count for the Library and Discover poster grids, set by pinching either one.

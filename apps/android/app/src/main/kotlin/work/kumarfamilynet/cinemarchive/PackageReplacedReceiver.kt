@@ -14,5 +14,10 @@ import android.content.Intent
  * deliberately left alone, for the first launch the user actually sees.
  */
 class PackageReplacedReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) = Unit
+    override fun onReceive(context: Context, intent: Intent) {
+        // Same guard as BootCompletedReceiver: act only on the one system action registered.
+        if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        // Reaching here already ran CinemArchiveApplication.onCreate, which reconciled the
+        // staged update; nothing further to do.
+    }
 }

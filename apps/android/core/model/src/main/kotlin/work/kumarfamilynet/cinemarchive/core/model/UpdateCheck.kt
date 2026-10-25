@@ -1,5 +1,7 @@
 package work.kumarfamilynet.cinemarchive.core.model
 
+import java.time.Instant
+
 /** Outcome of an update check, for the Settings screen to render inline. */
 sealed interface UpdateCheckResult {
     /** No check has run yet this session. */
@@ -16,6 +18,13 @@ sealed interface UpdateCheckResult {
         val apkUrl: String?,
         /** The release's own page, used as the fallback when we can't install directly. */
         val releasePageUrl: String,
+        /** The release body as published on GitHub (Markdown), blank when it has none. */
+        val releaseNotes: String = "",
+        val publishedAt: Instant? = null,
+        /** Size of [apkUrl]'s asset, for download progress when the server omits a length. */
+        val apkSizeBytes: Long? = null,
+        /** The release's `SHA256SUMS` asset, which CI publishes alongside every APK. */
+        val checksumUrl: String? = null,
     ) : UpdateCheckResult
 
     data class Failed(val message: String) : UpdateCheckResult
@@ -27,22 +36,50 @@ sealed interface UpdateCheckResult {
  * folding a failure into [UpdateCheckResult.Failed] would erase the
  * [UpdateCheckResult.Available] that the retry button depends on.
  *
- * [AwaitingConfirmation] is a real state, not a formality — `PackageInstaller` never installs
- * without the user accepting a system dialog, even with `REQUEST_INSTALL_PACKAGES` granted, so
- * the app hands the session over and waits.
+ * Downloading and installing are separate steps: the APK is staged and verified first
+ * ([Ready]), and only an explicit install hands it to the system. Declining the system prompt
+ * returns to [Ready], so a retry never downloads again.
+ *
+ * There is no "installed" state. Replacing the app's own package kills the process, so success
+ * is detected on the next launch instead (see `ApkInstaller.consumeJustUpdatedVersion`).
  */
 sealed interface ApkInstallState {
     data object Idle : ApkInstallState
 
-    data object Downloading : ApkInstallState
+    /** [totalBytes] is null when neither the server nor the release reported a size. */
+    data class Downloading(val bytes: Long, val totalBytes: Long?) : ApkInstallState {
+        val fraction: Float?
+            get() = totalBytes?.takeIf { it > 0 }?.let { (bytes.toFloat() / it).coerceIn(0f, 1f) }
+    }
+
+    /** Downloaded and verified; installing it needs no further network. */
+    data class Ready(val version: String) : ApkInstallState
+
+    /** Writing the staged APK into an install session. The install button must stay disabled. */
+    data object Committing : ApkInstallState
 
     /** Handed to the system installer; its confirmation dialog is up. */
     data object AwaitingConfirmation : ApkInstallState
 
-    /** Rarely observed — the system usually kills the app as it swaps the package out. */
-    data object Installed : ApkInstallState
+    data class Failed(val message: String, val stage: Stage) : ApkInstallState {
+        /** A download failure leaves nothing staged; an install failure keeps the staged APK. */
+        enum class Stage { DOWNLOAD, INSTALL }
+    }
+}
 
-    data class Failed(val message: String) : ApkInstallState
+/**
+ * When an update the automatic check finds is downloaded without asking. Installing always
+ * waits for a tap; this only decides whether the APK is already staged by then.
+ */
+enum class UpdateDownloadPolicy {
+    /** Announce the update; download only when the user taps Download. */
+    NOTIFY_ONLY,
+
+    /** Download in the background on an unmetered network. The default. */
+    WIFI_ONLY,
+
+    /** Download in the background on any network. */
+    ANY_NETWORK,
 }
 
 /**

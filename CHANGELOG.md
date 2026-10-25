@@ -9,6 +9,18 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-10-25
+
+### Added
+
+- **Android update sheet.** A new sheet shows what changed in the release, then Download (with the size), real download progress, and Install, with a clear message and a retry for every failure. It opens from a banner at the top of every tab when an update is available, from Settings → About, and from the update notifications. The banner can be dismissed until the next release. After an in-app update, the new version confirms it was installed, with a link to what's new.
+- **Android automatic update downloads.** Settings → About → "Download updates automatically" chooses Wi-Fi only (the default), Always, or Never. Found updates download in the background under that rule and wait for you to install them. A daily background check finds updates even if you rarely open the app, and a manual download on mobile data asks first.
+- **Android updates install without the system prompt.** Tapping Install now replaces the app straight away, with no "Do you want to update this app?" dialog in between. The app closes while it updates (Android doesn't reopen it), and a notification offers to open the new version. If Android still asks (it can), the prompt appears as before.
+
+### Fixed
+
+- **Android in-app updates.** Downloading and installing are now separate steps. The update downloads with real progress (percent and MB) and is checked against the release's published checksum before it can be installed. Declining or leaving the system's install prompt keeps the download, so trying again is one tap with no new download. Automatic downloads stop at "ready to install" instead of raising the install prompt while the app is in the background, where Android blocked it and the update stalled. The downloaded file is removed once the update is installed.
+
 ## [1.44.0] - 2026-10-25
 
 ### Added

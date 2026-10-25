@@ -187,7 +187,7 @@ fun UpdateSheet(
                     }
                     SheetBody.INSTALLING -> BusyLine(
                         if (installState == ApkInstallState.Committing) {
-                            "Installing — CinemArchive will restart…"
+                            "Installing — CinemArchive will close…"
                         } else {
                             // The system asked after all; its dialog is a step the app can't skip.
                             "Confirm the install in the system dialog"
@@ -259,7 +259,12 @@ private fun DetailsBody(
                     "Until then, you can download the update from its release page.",
                 MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            staged -> Notice("Downloaded and verified.", MaterialTheme.colorScheme.onSurfaceVariant)
+            // Said up front: installing replaces the running app, so it closes, and Android
+            // doesn't reopen it (a notification offers to).
+            staged -> Notice(
+                "Downloaded and verified. CinemArchive will close while it installs.",
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (installState is ApkInstallState.Failed) Notice(installState.message, MaterialTheme.colorScheme.error)
 
@@ -270,7 +275,7 @@ private fun DetailsBody(
             when {
                 release.apkUrl == null -> Button(onClick = onCheckAgain, modifier = Modifier.weight(1f)) { Text("Check again") }
                 !canInstallDirectly -> Button(onClick = onGrantInstallPermission, modifier = Modifier.weight(1f)) { Text("Allow installs") }
-                staged -> Button(onClick = onInstall, modifier = Modifier.weight(1f)) { Text("Install and restart") }
+                staged -> Button(onClick = onInstall, modifier = Modifier.weight(1f)) { Text("Install") }
                 else -> Button(onClick = onDownload, modifier = Modifier.weight(1f)) {
                     val size = release.apkSizeBytes?.let { " · ${megabytes(it)}" }.orEmpty()
                     Text(if (installState is ApkInstallState.Failed) "Retry download$size" else "Download$size")

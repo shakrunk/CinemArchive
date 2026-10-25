@@ -50,7 +50,7 @@ data class ApkArchiveInfo(val packageName: String, val versionName: String?)
  *
  * **Install** ([install]) copies the staged file into a [PackageInstaller] session and commits
  * it, asking the system to skip its confirmation dialog: an app updating itself is allowed to,
- * so usually the app is simply replaced and restarts on the new version. It is only ever started
+ * so usually the app is simply replaced (it closes; Android doesn't reopen it). It is only ever started
  * by an explicit user action, so when the system does still ask, its prompt is raised while the
  * app is in the foreground (#166's automatic path used to
  * commit from a background process start, where Android blocks the prompt). Declining that
@@ -362,6 +362,10 @@ class ApkInstaller(
         }
         return caughtUp
     }
+
+    /** Whether this build was just installed by an in-app update, without consuming that. */
+    fun wasJustUpdatedInApp(): Boolean =
+        prefs.getString(KEY_PENDING_VERSION, null)?.let { compareVersions(currentVersionName, it) == 0 } == true
 
     /**
      * The version this build was just updated to by an in-app install, returned once, or null.

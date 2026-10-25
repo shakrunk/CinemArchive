@@ -7,13 +7,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -21,7 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.GroupedSeamGap
+import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.designsystem.groupedItemShape
 import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 import work.kumarfamilynet.cinemarchive.core.model.InstallSource
@@ -96,21 +99,18 @@ fun UpdatesSection(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val options = listOf(
-                        UpdateDownloadPolicy.WIFI_ONLY to "Wi-Fi only",
-                        UpdateDownloadPolicy.ANY_NETWORK to "Any network",
-                        UpdateDownloadPolicy.NOTIFY_ONLY to "Never",
+                    // The app's own M3 Expressive group (as Appearance → Theme uses), with a glyph
+                    // per option so the choice reads before its word does.
+                    SegmentedGroup(
+                        options = listOf(
+                            ChoiceOption(UpdateDownloadPolicy.WIFI_ONLY, "Wi-Fi only", icon = Icons.Filled.Wifi),
+                            ChoiceOption(UpdateDownloadPolicy.ANY_NETWORK, "Always", icon = Icons.Filled.SignalCellularAlt),
+                            ChoiceOption(UpdateDownloadPolicy.NOTIFY_ONLY, "Never", icon = Icons.Filled.Block),
+                        ),
+                        selected = downloadPolicy,
+                        onSelect = onSetDownloadPolicy,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                        options.forEachIndexed { index, (policy, label) ->
-                            SegmentedButton(
-                                selected = downloadPolicy == policy,
-                                onClick = { onSetDownloadPolicy(policy) },
-                                shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                                enabled = autoCheckEnabled,
-                            ) { Text(label) }
-                        }
-                    }
                 }
             }
         }

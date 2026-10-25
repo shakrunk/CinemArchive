@@ -289,7 +289,11 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleUpdateIntent(intent)
         // A self-update can't report its own success (the old process is killed), so the new
         // version says so on its first launch. Not on recreation, which would repeat it.
-        if (savedInstanceState == null) justUpdatedVersion = apkInstaller.consumeJustUpdatedVersion()
+        if (savedInstanceState == null) {
+            justUpdatedVersion = apkInstaller.consumeJustUpdatedVersion()
+            // The "updated — tap to open" notification has done its job once the app is open.
+            if (justUpdatedVersion != null) UpdateInstallNotifier.clear(this)
+        }
 
         setContent {
             val themeMode by preferencesRepository.observeThemeMode()
@@ -812,7 +816,7 @@ private fun CinemArchiveApp(
         androidx.compose.material3.AlertDialog(
             onDismissRequest = onJustUpdatedSeen,
             title = { Text("Updated to $version") },
-            text = { Text("CinemArchive installed the update and restarted.") },
+            text = { Text("The update was installed.") },
             confirmButton = { androidx.compose.material3.TextButton(onClick = onJustUpdatedSeen) { Text("OK") } },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = {

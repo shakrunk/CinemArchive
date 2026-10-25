@@ -5,19 +5,24 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * Runs once after this app is updated, so the staged update APK in `cacheDir/updates/` is
- * cleaned up even if the user doesn't reopen the app straight away.
+ * Runs once after this app is updated.
  *
- * The work itself happens in [CinemArchiveApplication.onCreate], which calls
- * `ApkInstaller.reconcileAfterLaunch` on every process start; this broadcast's job is only to
- * start the process. The "just updated" result (`ApkInstaller.consumeJustUpdatedVersion`) is
- * deliberately left alone, for the first launch the user actually sees.
+ * Starting the process is enough to clean up the staged update APK: [CinemArchiveApplication]
+ * calls `ApkInstaller.reconcileAfterLaunch` on every process start.
+ *
+ * After an *in-app* update it also offers the way back in. Android doesn't relaunch an app that
+ * replaced itself — the old process is killed and the user is dropped on whatever was underneath
+ * — and it blocks this receiver from starting an activity itself (verified on Android 16:
+ * "Background activity launch blocked"). A notification tap is allowed to, so this posts
+ * "updated — tap to open". Updates from anywhere else (adb, a store) are left alone.
  */
 class PackageReplacedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         // Same guard as BootCompletedReceiver: act only on the one system action registered.
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-        // Reaching here already ran CinemArchiveApplication.onCreate, which reconciled the
-        // staged update; nothing further to do.
+        val app = context.applicationContext as CinemArchiveApplication
+        if (!app.apkInstaller.wasJustUpdatedInApp()) return
+
+        UpdateInstallNotifier.postUpdated(context, BuildConfig.VERSION_NAME)
     }
 }

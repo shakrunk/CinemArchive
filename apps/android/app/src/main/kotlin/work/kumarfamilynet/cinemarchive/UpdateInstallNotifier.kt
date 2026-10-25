@@ -35,6 +35,10 @@ object UpdateInstallNotifier {
     fun postReady(context: Context, versionName: String) =
         notify(context, "Update ready to install", "CinemArchive $versionName is downloaded. Tap to install.", ongoing = false)
 
+    /** The way back in after an in-app update: Android closes the app and won't reopen it. */
+    fun postUpdated(context: Context, versionName: String) =
+        notify(context, "CinemArchive updated", "Version $versionName is installed. Tap to open.", ongoing = false, openUpdateSheet = false)
+
     /** The install prompt arrived after the user left the app; it reopens with them. */
     fun postReadyToConfirm(context: Context) =
         notify(context, "Confirm the update", "Open CinemArchive to finish installing the update.", ongoing = false)
@@ -51,6 +55,8 @@ object UpdateInstallNotifier {
         title: String,
         text: String,
         ongoing: Boolean,
+        // Every notification but "updated" is about an update still to act on.
+        openUpdateSheet: Boolean = true,
         configure: NotificationCompat.Builder.() -> Unit = {},
     ) {
         ensureChannel(context)
@@ -60,7 +66,7 @@ object UpdateInstallNotifier {
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(text)
-            .setContentIntent(openAppIntent(context))
+            .setContentIntent(openAppIntent(context, openUpdateSheet))
             .setOngoing(ongoing)
             .setAutoCancel(!ongoing)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -68,12 +74,12 @@ object UpdateInstallNotifier {
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
     }
 
-    private fun openAppIntent(context: Context): PendingIntent =
+    private fun openAppIntent(context: Context, openUpdateSheet: Boolean): PendingIntent =
         PendingIntent.getActivity(
             context,
             NOTIFICATION_ID,
             Intent(context, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_OPEN_UPDATE, true)
+                .putExtra(MainActivity.EXTRA_OPEN_UPDATE, openUpdateSheet)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

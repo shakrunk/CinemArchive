@@ -716,7 +716,9 @@ private fun CinemArchiveApp(
     // so firing once here covers "just completed the magic-link sign-in" — a case cold-launch
     // sync (CinemArchiveApplication.onCreate) can't, since that runs before any session exists
     // yet. Harmless if it races/duplicates that launch-time sync — syncNow() is idempotent.
-    LaunchedEffect(Unit) { librarySyncRepository.syncNow() }
+    LaunchedEffect(Unit) {
+        librarySyncRepository.trySyncNow()?.let { android.util.Log.w("CinemArchiveApp", "launch sync failed", it) }
+    }
 
     // onResume reconciliation trigger (docs/superpowers/plans/2026-07-21-android-cinema-
     // outings.md §5) — a superset of the web's foreground triggers (app load is already
@@ -834,7 +836,12 @@ private fun CinemArchiveApp(
                 // deciding which outings are due, same ordering rationale as the launch path.
                 coroutineScope.launch {
                     try {
-                        librarySyncRepository.syncNow()
+                        // Resume often lands while the network is still coming back; a failed
+                        // pull waits for the next trigger rather than crashing the app.
+                        librarySyncRepository.trySyncNow()?.let {
+                            android.util.Log.w("CinemArchiveApp", "resume sync failed", it)
+                            return@launch
+                        }
                         if (authRepository.observeIdentity().value != runtime.identity) return@launch
                         outingsRepository.completeDueOutings()
                     } catch (e: CancellationException) {

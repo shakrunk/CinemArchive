@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-10-25
+
 ### Added
 
 - **Episode spoiler protection.** Settings → Appearance → "Hide episode spoilers" hides the still, title, and synopsis of episodes you haven't watched yet: on episode cards and rows (with a one-off Reveal), Discover's episode guide, Up Next, the next-episode banner, the Calendar, and on web the series graph. In a shared library every episode stays hidden, since its watch history is the owner's. Available on web and Android; the setting is per device.

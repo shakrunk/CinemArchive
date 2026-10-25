@@ -413,7 +413,9 @@ fun AboutRoute(
             installState = installState,
             // Failures surface through installState, not updateResult: overwriting the latter
             // would drop the Available result this screen needs to keep offering a retry.
-            onInstall = { apkUrl -> scope.launch { apkInstaller.downloadAndInstall(apkUrl) } },
+            // Started on the installer's own scope, so leaving About doesn't cancel them.
+            onDownload = { (updateResult as? UpdateCheckResult.Available)?.let(apkInstaller::startDownload) },
+            onInstall = apkInstaller::startInstall,
             onOpenReleasePage = { url -> uriHandler.openUri(url) },
             onGrantInstallPermission = {
                 apkInstaller.unknownSourcesSettingsIntent()?.let { intent ->
@@ -442,7 +444,8 @@ private fun AboutListScreen(
     canInstallDirectly: Boolean,
     installState: ApkInstallState,
     onCheckNow: () -> Unit,
-    onInstall: (String) -> Unit,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit,
     onOpenReleasePage: (String) -> Unit,
     onGrantInstallPermission: () -> Unit,
 ) {
@@ -535,6 +538,7 @@ private fun AboutListScreen(
                         canInstallDirectly = canInstallDirectly,
                         installState = installState,
                         onCheckNow = onCheckNow,
+                        onDownload = onDownload,
                         onInstall = onInstall,
                         onOpenReleasePage = onOpenReleasePage,
                         onGrantInstallPermission = onGrantInstallPermission,

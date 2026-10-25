@@ -89,6 +89,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.CinemArchiveTheme
@@ -210,11 +211,40 @@ class MainActivity : ComponentActivity() {
          *  title whose outing just completed (FLAG_ACTIVITY_CLEAR_TASK recreates this
          *  Activity, so onCreate always sees a fresh intent). */
         const val EXTRA_OPEN_TITLE_ID = "open_title_id"
+
+        /** How long the app must hold the foreground before an unanswered install prompt
+         *  counts as abandoned rather than still opening (morphe-manager uses the same). */
+        private const val ABANDONED_PROMPT_GRACE_MILLIS = 1_500L
+    }
+
+    /**
+     * The install prompt can only be raised, and only reports being left, while this activity
+     * is in front. On every resume: raise a prompt that arrived while the app was in the
+     * background, then — after a grace period long enough for a just-launched prompt to take
+     * the foreground — treat one still unanswered as abandoned (the user pressed Home or
+     * switched away from it, which the system never reports) and offer the install again.
+     */
+    private fun watchUpdateInstallOnResume() {
+        val installer = (application as CinemArchiveApplication).apkInstaller
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                launch {
+                    installer.stashedConfirmation.filterNotNull().collect { confirmation ->
+                        UpdateInstallNotifier.clear(this@MainActivity)
+                        startActivity(confirmation)
+                        installer.onStashedConfirmationLaunched(confirmation)
+                    }
+                }
+                delay(ABANDONED_PROMPT_GRACE_MILLIS)
+                installer.resetIfPromptAbandoned()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        watchUpdateInstallOnResume()
         // The system splash (static reel on void) hands off to this fade rather than
         // vanishing abruptly, so it reads as one continuous transition into the Compose
         // splash beneath, which is already on-screen and picks up the spin from here.

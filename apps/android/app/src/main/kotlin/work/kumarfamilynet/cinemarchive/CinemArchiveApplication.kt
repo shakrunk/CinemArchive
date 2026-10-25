@@ -1,15 +1,15 @@
 package work.kumarfamilynet.cinemarchive
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
@@ -107,63 +107,90 @@ class CinemArchiveApplication : Application() {
         }
     }
 
+    // Activities currently resumed. The install receiver reads this: a confirmation prompt
+    // can only be launched while the app is in the foreground.
+    private var resumedActivities = 0
+
+    /** Whether one of this app's activities is resumed right now. Main thread only. */
+    val isInForeground: Boolean get() = resumedActivities > 0
+
     override fun onCreate() {
         super.onCreate()
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: Activity) { resumedActivities++ }
+            override fun onActivityPaused(activity: Activity) { resumedActivities-- }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
         // Bring up (only) the stored session's owner; everything account-scoped — sync, outing
         // reconciliation, outbox flush, Ledger-layout reconcile — now starts inside that runtime.
         accountRuntimeManager.start()
-        applicationScope.launch { checkAndInstallUpdateIfDue() }
+        applicationScope.launch {
+            // Before any check: clears the staged APK once this build has caught up with it,
+            // along with the "ready to install" notification that announced it.
+            if (apkInstaller.reconcileAfterLaunch()) UpdateInstallNotifier.clear(this@CinemArchiveApplication)
+            restoreStagedUpdates()
+        }
+        applicationScope.launch { checkAndDownloadUpdateIfDue() }
     }
 
+    /**
+     * Whenever a check finds an update that an earlier process already downloaded, offer the
+     * install straight away instead of downloading it again.
+     */
+    private suspend fun restoreStagedUpdates() {
+        appUpdateController.state
+            .filterIsInstance<UpdateCheckResult.Available>()
+            .collect { apkInstaller.restoreIfStaged(it.latestVersion) }
+    }
 
     /**
      * Sideloaded-install analogue of Play's own background auto-update (issue #166) — without
      * this, "Automatically check for updates" only ever ran when Settings → About happened to be
-     * open (AboutScreen.kt's `LaunchedEffect(autoCheck)`), so granting the install permission and
-     * turning the toggle on still required remembering to open that screen. Play-installed
-     * builds are untouched (see #147/AppUpdateRepository.checkForUpdate's own gate); without the
-     * install permission granted, this changes nothing from #146's original behavior — no silent
-     * download, the user still has to open About and tap through manually.
+     * open, so granting the install permission and turning the toggle on still required
+     * remembering to open that screen. Play-installed builds are untouched (see
+     * #147/AppUpdateRepository.checkForUpdate's own gate); without the install permission
+     * granted, this changes nothing from #146's original behavior — no silent download.
+     *
+     * This only ever downloads. It stops at [ApkInstallState.Ready] and leaves the install to a
+     * tap: it can run from a background process start (an alarm, a boot receiver), where
+     * Android blocks the system's confirmation prompt, which used to strand the update in
+     * "waiting for the system installer" with nothing on screen.
      */
-    private suspend fun checkAndInstallUpdateIfDue() {
+    private suspend fun checkAndDownloadUpdateIfDue() {
         if (appUpdateRepository.installSource == InstallSource.PLAY_STORE) return
         if (!preferencesRepository.observeAutoCheckUpdates().first()) return
 
-        val result = appUpdateController.check()
-        val apkUrl = (result as? UpdateCheckResult.Available)?.apkUrl ?: return
-        if (!apkInstaller.canRequestInstalls()) return
+        val result = appUpdateController.check() as? UpdateCheckResult.Available ?: return
+        if (result.apkUrl == null || !apkInstaller.canRequestInstalls()) return
 
-        // installState's decisive transitions (AwaitingConfirmation/Installed/Failed) arrive
-        // later, off InstallStatusReceiver's broadcast — this has to keep collecting past
-        // downloadAndInstall() returning (which only means the session was committed), and
-        // stop itself once a terminal state lands rather than being cancelled from outside.
         coroutineScope {
-            var downloadStarted = false
-            val notifyJob = launch {
-                apkInstaller.installState
-                    .onEach { state ->
-                        when (state) {
-                            ApkInstallState.Downloading -> {
-                                downloadStarted = true
-                                UpdateInstallNotifier.postDownloading(this@CinemArchiveApplication, result.latestVersion)
-                            }
-                            ApkInstallState.AwaitingConfirmation -> UpdateInstallNotifier.postAwaitingConfirmation(this@CinemArchiveApplication)
-                            ApkInstallState.Installed -> UpdateInstallNotifier.clear(this@CinemArchiveApplication)
-                            is ApkInstallState.Failed -> UpdateInstallNotifier.postFailed(this@CinemArchiveApplication, state.message)
-                            ApkInstallState.Idle -> Unit
-                        }
+            val progressJob = launch {
+                // The installer publishes progress every 100 ms for the in-app bar; Android
+                // rate-limits notification updates and drops the excess, so repost at most once
+                // a second, and only when the whole percentage moved.
+                var lastPercent = -1
+                var lastPostedAt = 0L
+                apkInstaller.installState.filterIsInstance<ApkInstallState.Downloading>().collect { state ->
+                    val percent = state.fraction?.let { (it * 100).toInt() } ?: -1
+                    val now = System.currentTimeMillis()
+                    if (lastPostedAt == 0L || (percent != lastPercent && now - lastPostedAt >= 1_000)) {
+                        lastPercent = percent
+                        lastPostedAt = now
+                        UpdateInstallNotifier.postDownloading(this@CinemArchiveApplication, result.latestVersion, state.fraction)
                     }
-                    // Stops once a terminal state lands. Idle only counts as terminal after a
-                    // download started — the initial subscribe-time replay of the StateFlow's
-                    // starting value is also Idle, and must not stop this before it begins.
-                    .takeWhile { state ->
-                        state !is ApkInstallState.Failed && state != ApkInstallState.Installed &&
-                            !(state == ApkInstallState.Idle && downloadStarted)
-                    }
-                    .collect()
+                }
             }
-            apkInstaller.downloadAndInstall(apkUrl)
-            notifyJob.join()
+            apkInstaller.download(result)
+            progressJob.cancel()
+            when (val state = apkInstaller.installState.value) {
+                is ApkInstallState.Ready -> UpdateInstallNotifier.postReady(this@CinemArchiveApplication, state.version)
+                is ApkInstallState.Failed -> UpdateInstallNotifier.postFailed(this@CinemArchiveApplication, state.message)
+                else -> UpdateInstallNotifier.clear(this@CinemArchiveApplication)
+            }
         }
     }
 }

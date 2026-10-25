@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -29,10 +30,11 @@ import work.kumarfamilynet.cinemarchive.core.model.UpdateCheckResult
  * Settings → Updates (#148): the auto-check toggle plus a manual check that runs regardless of
  * it, with the result shown inline.
  *
- * [onInstall] is only offered when an update is actually installable — a sideloaded build with
- * a published APK asset and the install permission granted. Otherwise the affordance is
- * [onOpenReleasePage], so an ungranted permission degrades to "here's the release" instead of
- * failing silently.
+ * [onDownload] and then [onInstall] are only offered when an update is actually installable —
+ * a sideloaded build with a published APK asset and the install permission granted. Otherwise
+ * the affordance is [onOpenReleasePage], so an ungranted permission degrades to "here's the
+ * release" instead of failing silently. Downloading and installing are separate taps: the APK
+ * is staged and verified first, so declining the system prompt leaves Install one tap away.
  *
  * [installState] is tracked separately from [result] because an install runs *against* an
  * already-found update: the download takes seconds and the system's confirmation dialog is a
@@ -48,7 +50,8 @@ fun UpdatesSection(
     canInstallDirectly: Boolean,
     installState: ApkInstallState,
     onCheckNow: () -> Unit,
-    onInstall: (String) -> Unit,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit,
     onOpenReleasePage: (String) -> Unit,
     onGrantInstallPermission: () -> Unit,
     modifier: Modifier = Modifier,
@@ -120,37 +123,30 @@ fun UpdatesSection(
                 }
 
                 if (result is UpdateCheckResult.Available) {
-                    val busyLabel = when (installState) {
-                        ApkInstallState.Downloading -> "Downloading ${result.latestVersion}…"
-                        // The system dialog is up (or the user backgrounded it). Naming it
-                        // matters: the app can't install by itself, and a plain spinner here
-                        // looks identical to the old do-nothing bug.
-                        ApkInstallState.AwaitingConfirmation -> "Waiting for the system installer…"
-                        ApkInstallState.Installed -> "Installed — reopen to finish"
-                        else -> null
-                    }
-                    if (busyLabel != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-                        ) {
-                            if (installState != ApkInstallState.Installed) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            }
-                            Text(busyLabel, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    } else {
-                        Row(
+                    when (installState) {
+                        is ApkInstallState.Downloading -> DownloadProgressRow(result.latestVersion, installState)
+                        // Naming each wait matters: a plain spinner here looks identical to the
+                        // old do-nothing bug, and the system dialog is a step the app can't skip.
+                        ApkInstallState.Committing -> BusyRow("Preparing install…")
+                        ApkInstallState.AwaitingConfirmation -> BusyRow("Waiting for the system installer…")
+                        else -> Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         ) {
-                            if (canInstallDirectly && result.apkUrl != null) {
-                                Button(onClick = { onInstall(result.apkUrl!!) }, modifier = Modifier.weight(1f)) {
+                            val staged = installState is ApkInstallState.Ready ||
+                                (installState is ApkInstallState.Failed && installState.stage == ApkInstallState.Failed.Stage.INSTALL)
+                            when {
+                                // Already downloaded and verified: installing needs no network.
+                                canInstallDirectly && staged -> Button(onClick = onInstall, modifier = Modifier.weight(1f)) {
                                     Text("Install ${result.latestVersion}")
                                 }
-                            } else {
-                                Button(
+                                canInstallDirectly && result.apkUrl != null -> Button(
+                                    onClick = onDownload,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(if (installState is ApkInstallState.Failed) "Retry download" else "Download ${result.latestVersion}")
+                                }
+                                else -> Button(
                                     onClick = { onOpenReleasePage(result.releasePageUrl) },
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -180,6 +176,45 @@ fun UpdatesSection(
         }
     }
 }
+
+@Composable
+private fun BusyRow(label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Real progress — percent and MB — with an indeterminate bar only when no size is known. */
+@Composable
+private fun DownloadProgressRow(version: String, state: ApkInstallState.Downloading) {
+    val fraction = state.fraction
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text("Downloading $version", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            if (fraction != null) {
+                Text("${(fraction * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (fraction != null) {
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+        }
+        Text(
+            state.totalBytes?.let { "${megabytes(state.bytes)} / ${megabytes(it)}" } ?: megabytes(state.bytes),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+private fun megabytes(bytes: Long): String = "%.1f MB".format(bytes / 1_000_000.0)
 
 private fun statusLine(result: UpdateCheckResult): String = when (result) {
     UpdateCheckResult.Idle -> "Not checked yet"

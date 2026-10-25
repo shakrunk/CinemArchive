@@ -36,22 +36,35 @@ sealed interface UpdateCheckResult {
  * folding a failure into [UpdateCheckResult.Failed] would erase the
  * [UpdateCheckResult.Available] that the retry button depends on.
  *
- * [AwaitingConfirmation] is a real state, not a formality — `PackageInstaller` never installs
- * without the user accepting a system dialog, even with `REQUEST_INSTALL_PACKAGES` granted, so
- * the app hands the session over and waits.
+ * Downloading and installing are separate steps: the APK is staged and verified first
+ * ([Ready]), and only an explicit install hands it to the system. Declining the system prompt
+ * returns to [Ready], so a retry never downloads again.
+ *
+ * There is no "installed" state. Replacing the app's own package kills the process, so success
+ * is detected on the next launch instead (see `ApkInstaller.consumeJustUpdatedVersion`).
  */
 sealed interface ApkInstallState {
     data object Idle : ApkInstallState
 
-    data object Downloading : ApkInstallState
+    /** [totalBytes] is null when neither the server nor the release reported a size. */
+    data class Downloading(val bytes: Long, val totalBytes: Long?) : ApkInstallState {
+        val fraction: Float?
+            get() = totalBytes?.takeIf { it > 0 }?.let { (bytes.toFloat() / it).coerceIn(0f, 1f) }
+    }
+
+    /** Downloaded and verified; installing it needs no further network. */
+    data class Ready(val version: String) : ApkInstallState
+
+    /** Writing the staged APK into an install session. The install button must stay disabled. */
+    data object Committing : ApkInstallState
 
     /** Handed to the system installer; its confirmation dialog is up. */
     data object AwaitingConfirmation : ApkInstallState
 
-    /** Rarely observed — the system usually kills the app as it swaps the package out. */
-    data object Installed : ApkInstallState
-
-    data class Failed(val message: String) : ApkInstallState
+    data class Failed(val message: String, val stage: Stage) : ApkInstallState {
+        /** A download failure leaves nothing staged; an install failure keeps the staged APK. */
+        enum class Stage { DOWNLOAD, INSTALL }
+    }
 }
 
 /**

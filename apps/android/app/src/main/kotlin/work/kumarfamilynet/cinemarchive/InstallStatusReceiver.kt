@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
-import work.kumarfamilynet.cinemarchive.core.model.ApkInstallState
 
 /**
  * The other half of [work.kumarfamilynet.cinemarchive.data.ApkInstaller]'s update flow.
@@ -33,28 +32,35 @@ class InstallStatusReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 val confirmation = intent.confirmationIntent()
                 if (confirmation == null) {
-                    installer.publishInstallState(
-                        ApkInstallState.Failed("The system didn't hand back an install prompt"),
-                    )
+                    installer.onInstallEnded("The system didn't hand back an install prompt")
                     return
                 }
-                installer.publishInstallState(ApkInstallState.AwaitingConfirmation)
-                // FLAG_ACTIVITY_NEW_TASK is required starting an activity from a receiver.
-                // The background-activity-launch restrictions don't bite here: this only ever
-                // runs moments after the user tapped Install, with the app in the foreground.
-                context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val app = context.applicationContext as CinemArchiveApplication
+                if (app.isInForeground) {
+                    // FLAG_ACTIVITY_NEW_TASK is required starting an activity from a receiver.
+                    // Allowed here because the app is in the foreground: installs only start
+                    // from a tap, so this is moments after the user asked for it.
+                    context.startActivity(confirmation)
+                    installer.onPromptLaunched()
+                } else {
+                    // The user left while the session was being written. Android would block
+                    // the launch from the background, so hold the prompt for MainActivity to
+                    // raise on the next resume and say so in a notification.
+                    installer.stashConfirmation(confirmation)
+                    UpdateInstallNotifier.postReadyToConfirm(context)
+                }
             }
 
-            PackageInstaller.STATUS_SUCCESS ->
-                installer.publishInstallState(ApkInstallState.Installed)
+            // Normally unseen: replacing our own package kills this process first. Success is
+            // judged on the next launch instead (ApkInstaller.consumeJustUpdatedVersion).
+            PackageInstaller.STATUS_SUCCESS -> Unit
 
-            // Declining the system dialog isn't an error — drop back to the plain
-            // "update available" state so the button reads as retryable rather than broken.
-            PackageInstaller.STATUS_FAILURE_ABORTED ->
-                installer.publishInstallState(ApkInstallState.Idle)
+            // Declining the system dialog isn't an error — back to the staged update, so the
+            // button reads as retryable rather than broken and needs no new download.
+            PackageInstaller.STATUS_FAILURE_ABORTED -> installer.onInstallEnded(failure = null)
 
-            else ->
-                installer.publishInstallState(ApkInstallState.Failed(describe(status, message)))
+            else -> installer.onInstallEnded(describe(status, message))
         }
     }
 

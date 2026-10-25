@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Android in-app updates.** Downloading and installing are now separate steps. The update downloads with real progress (percent and MB) and is checked against the release's published checksum before it can be installed. Declining or leaving the system's install prompt keeps the download, so trying again is one tap with no new download. Automatic downloads stop at "ready to install" instead of raising the install prompt while the app is in the background, where Android blocked it and the update stalled. The downloaded file is removed once the update is installed.
+
 ## [1.44.0] - 2026-10-25
 
 ### Added

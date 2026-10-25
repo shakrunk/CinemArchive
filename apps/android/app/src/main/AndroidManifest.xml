@@ -92,6 +92,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Starts the process once after an update so the staged update APK is cleaned up
+             (see PackageReplacedReceiver). MY_PACKAGE_REPLACED is sent by the system only to
+             the updated app itself, so the receiver needn't be exported. -->
+        <receiver
+            android:name=".PackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".BootCompletedReceiver"
             android:exported="true"

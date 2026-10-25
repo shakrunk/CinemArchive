@@ -1,6 +1,6 @@
 import { scaledTextSize } from 'src/lib/textScale'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link2, Pencil, Check, X, Home, Disc3, Plus, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Link2, Pencil, Check, X, Home, Disc3, Plus, Trash2, ChevronDown } from 'lucide-react'
 import type { WatchProviders } from 'src/lib/media'
 import { PHYSICAL_MEDIA_FORMATS, type PhysicalMediaFormat, type PhysicalMediaItem } from 'src/store/mockData'
 import { SubsectionLabel } from 'src/components/ui/typography'
@@ -108,7 +108,7 @@ function HomeCollectionRow() {
       </span>
       <span
         className="inline-flex items-center gap-1.5 h-8 rounded-md px-2.5 font-sans text-xs text-amber shrink-0"
-        style={{ background: 'rgba(233,178,102,0.08)', border: '1px solid rgba(233,178,102,0.3)' }}
+        style={{ background: 'rgb(var(--amber-rgb) / 0.08)', border: '1px solid rgb(var(--amber-rgb) / 0.3)' }}
         title="This title is part of your home collection"
       >
         <Home className="w-3.5 h-3.5" />
@@ -254,6 +254,8 @@ export function WatchProvidersSection({
 }: WatchProvidersSectionProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(customUrl ?? '')
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const optionsId = useId()
 
   const streaming = [...(providers?.flatrate ?? []), ...(providers?.free ?? []), ...(providers?.ads ?? [])]
   const rent = providers?.rent ?? []
@@ -305,19 +307,27 @@ export function WatchProvidersSection({
     <div>
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <SubsectionLabel className="mb-0">Where to Watch</SubsectionLabel>
-        {!isSharedView && !editing && (
+        {!isSharedView && (
           <button type="button"
-            onClick={() => { setDraft(customUrl ?? ''); setEditing(true) }}
+            onClick={() => setOptionsOpen((o) => !o)}
+            aria-expanded={optionsOpen}
+            aria-controls={optionsId}
             className="text-xs font-mono text-amber/50 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm px-1 flex items-center gap-1"
           >
-            <Pencil className="w-2.5 h-2.5" />
-            {customUrl ? 'edit link for friends' : 'set link for friends'}
+            options
+            <ChevronDown className={`w-3 h-3 transition-transform ${optionsOpen ? 'rotate-180' : ''}`} aria-hidden />
           </button>
         )}
       </div>
 
-      {!isSharedView && editing && (
-        <div className="flex items-center gap-2 mb-3">
+      {!isSharedView && optionsOpen && (
+        <div
+          id={optionsId}
+          className="mb-4 rounded-md p-3 space-y-3"
+          style={{ background: 'var(--inset)', border: '1px solid var(--line)' }}
+        >
+      {editing ? (
+        <div className="flex items-center gap-2">
           <input
             autoFocus
             value={draft}
@@ -338,35 +348,45 @@ export function WatchProvidersSection({
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
-      )}
-
-      {!isSharedView && customUrl && !editing && (
-        <div className="mb-3 font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
-          Friends will see:{' '}
-          <a href={customUrl} target="_blank" rel="noopener noreferrer" className="hover:text-amber transition-colors underline decoration-dotted">
-            {customUrl}
-          </a>
+      ) : (
+        <div className="space-y-2">
+          <button type="button"
+            onClick={() => { setDraft(customUrl ?? ''); setEditing(true) }}
+            className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm flex items-center gap-1"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+            {customUrl ? 'edit link for friends' : 'set link for friends'}
+          </button>
+          {customUrl && (
+            <div className="font-mono text-xs break-all" style={{ color: 'var(--paper-faint)' }}>
+              Friends will see:{' '}
+              <a href={customUrl} target="_blank" rel="noopener noreferrer" className="hover:text-amber transition-colors underline decoration-dotted">
+                {customUrl}
+              </a>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="space-y-2">
-        {hasTmdbData && providers && <WatchProviderListings providers={providers} />}
-        {!isSharedView && (
           <button
             type="button"
             onClick={() => onToggleHomeCollection(!inHomeCollection)}
             aria-pressed={inHomeCollection}
             className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 font-mono text-xs transition-colors hover:border-amber/50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
-              background: inHomeCollection ? 'rgba(233,178,102,0.12)' : 'var(--inset)',
-              border: `1px solid ${inHomeCollection ? 'rgba(233,178,102,0.38)' : 'var(--line)'}`,
+              background: inHomeCollection ? 'rgb(var(--amber-rgb) / 0.12)' : 'var(--inset)',
+              border: `1px solid ${inHomeCollection ? 'rgb(var(--amber-rgb) / 0.38)' : 'var(--line)'}`,
               color: inHomeCollection ? 'var(--amber)' : 'var(--paper-faint)',
             }}
           >
             {inHomeCollection ? <Check className="w-3.5 h-3.5" aria-hidden /> : <Home className="w-3.5 h-3.5" aria-hidden />}
             {inHomeCollection ? 'In my home collection' : 'Add to my home collection'}
           </button>
-        )}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {hasTmdbData && providers && <WatchProviderListings providers={providers} />}
         {isSharedView && inHomeCollection && <HomeCollectionRow />}
         {(inHomeCollection || physicalMedia.length > 0) && (
           <PhysicalMediaShelf

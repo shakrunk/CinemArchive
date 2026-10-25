@@ -9,6 +9,34 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-10-24
+
+### Added
+
+- **Jellyfin watch sync (web).** Settings → Import & sync can connect a Jellyfin account (signed in as the user, so only their own watches are visible). New movie and episode watches are offered one at a time ("Add to history?") and are never written without a yes; existing history can optionally be imported once.
+
+### Changed
+
+- **Web:** The Where to Watch link and the home-collection controls now sit behind an options toggle, keeping the title and home views tidier.
+
+## [1.42.0] - 2026-10-24
+
+### Added
+
+- **Web & Android:** A **Pure black** switch in Appearance gives dark themes a true-black background for OLED screens. Light themes are unaffected.
+- **Web & Android:** **Sync appearance across devices** (off by default) keeps your theme and Pure black in step on every browser and device where you turn it on. Material You stays on Android, and a secret theme only follows you to devices where you've unlocked it.
+
+### Changed
+
+- **Web & Android:** A series' cast takes up much less room in the title detail. An open episode shows its guest stars up front and folds the series regulars into a "series regulars in this episode" toggle. The season cast is collapsed by default, and opening it lists the people new to that season first.
+
+### Fixed
+
+- **Web:** The series graph's rating colors now follow the Spider-Noir, Construct and Catppuccin themes.
+- **Web:** Trailer thumbnails, their play buttons and the trailer player now follow the Spider-Noir, Construct and Catppuccin themes instead of staying gold and brown.
+- **Web:** Discover cards no longer repeat the release year under the title; it appears once, beside Movie or TV.
+- **Web:** The last gold accents (Discover search and filter borders, episode rows, the command palette, Ledger highlights, watch providers and the cast panel) now follow the Spider-Noir, Construct and Catppuccin themes.
+
 ## [1.41.0] - 2026-10-24
 
 ### Fixed

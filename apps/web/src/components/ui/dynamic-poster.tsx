@@ -50,7 +50,7 @@ function hashString(str: string): number {
 const STATUS_BADGE: Record<WatchStatus, { label: string; cls: string }> = {
   watched: { label: 'Seen', cls: 'bg-amber/18 text-amber-bright' },
   watchlist: { label: 'Watchlist', cls: 'bg-[rgba(143,182,203,0.18)] text-moon' },
-  watching: { label: 'Watching', cls: 'bg-[rgba(247,205,134,0.16)] text-amber' },
+  watching: { label: 'Watching', cls: 'bg-[rgb(var(--amber-bright-rgb)/0.16)] text-amber' },
   dropped: { label: 'Dropped', cls: 'bg-[rgba(215,106,73,0.18)] text-ember-soft' },
 }
 

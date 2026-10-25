@@ -26,6 +26,7 @@ import {
   type MyProfile,
   type InviteCode,
 } from 'src/lib/auth'
+import { isDevMockUser } from 'src/lib/devAuth'
 import { exportLibrary, parseImportFile } from 'src/lib/export-import'
 import { parseLetterboxdCsv, letterboxdToSyncItems } from 'src/lib/letterboxd-import'
 import { resolveSyncItems } from 'src/lib/sync/core'
@@ -33,7 +34,7 @@ import { applySyncOutcome } from 'src/lib/sync/apply'
 import { titleToSearchResult, fetchRefreshedTitlePatch } from 'src/lib/refreshMetadata'
 import { captureLibrarySession } from 'src/lib/localSave'
 import { applyTheme } from 'src/lib/theme'
-import { CATPPUCCIN_FLAVORS, isThemeAvailable, type Theme } from 'src/store/useAppStore'
+import { CATPPUCCIN_FLAVORS, isLightTheme, isThemeAvailable, type Theme } from 'src/store/useAppStore'
 import { ThemeModeToggle } from 'src/components/ThemeModeToggle'
 import { NAV_ITEM_LABELS, type NavItemId } from 'src/lib/navigation'
 import { isThemeDiscovered } from 'src/lib/easterEggThemes'
@@ -229,7 +230,7 @@ function AccountSection({ profile }: { profile: MyProfile | null }) {
       <div className="flex items-center gap-4">
         <div
           className="w-14 h-14 rounded-full shrink-0 flex items-center justify-center font-serif text-lg text-amber border"
-          style={{ borderColor: 'var(--line)', background: 'rgba(233,178,102,0.08)' }}
+          style={{ borderColor: 'var(--line)', background: 'rgb(var(--amber-rgb) / 0.08)' }}
           aria-hidden="true"
         >
           {initialsOf(displayName) || 'A'}
@@ -366,6 +367,41 @@ function IdentitySection({
 
 // ─── Appearance ───────────────────────────────────────────────────────────────
 
+/** Labeled on/off switch with a one-line hint, for Appearance's device settings. */
+function SettingToggle({ checked, onChange, label, hint, disabled }: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+  hint: string
+  disabled?: boolean
+}) {
+  return (
+    <label className={cn('flex items-start gap-2.5 pt-1', disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer')}>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only peer"
+      />
+      <span
+        className={cn(
+          'mt-0.5 w-9 h-5 rounded-full transition-colors relative shrink-0 peer-focus-visible:ring-1 peer-focus-visible:ring-amber/60',
+          checked ? 'bg-amber' : 'bg-secondary'
+        )}
+        aria-hidden="true"
+      >
+        <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', checked && 'translate-x-4')} />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-sans text-sm text-paper">{label}</span>
+        <span className="block font-sans text-xs text-muted-foreground mt-0.5 leading-relaxed">{hint}</span>
+      </span>
+    </label>
+  )
+}
+
 function AppearanceSection() {
   // ⚡ Bolt: Unbatch atomic selectors to remove useShallow overhead
   const theme = useAppStore((s) => s.theme)
@@ -373,6 +409,12 @@ function AppearanceSection() {
   const setTheme = useAppStore((s) => s.setTheme)
   const unlockedThemes = useAppStore((s) => s.unlockedThemes)
   const titles = useAppStore((s) => s.titles)
+  const pureBlack = useAppStore((s) => s.pureBlack)
+  const setPureBlack = useAppStore((s) => s.setPureBlack)
+  const themeSyncEnabled = useAppStore((s) => s.themeSyncEnabled)
+  const setThemeSyncEnabled = useAppStore((s) => s.setThemeSyncEnabled)
+  const user = useAppStore((s) => s.user)
+  const canSync = isSupabaseConfigured && !!user && !isDevMockUser(user)
 
   const activeFlavor = CATPPUCCIN_FLAVORS.find((f) => f.value === theme)
 
@@ -493,6 +535,28 @@ function AppearanceSection() {
           </div>
         </div>
       )}
+      <div className="mt-4">
+        <SettingToggle
+          checked={pureBlack}
+          onChange={(next) => {
+            setPureBlack(next)
+            applyTheme(theme)
+          }}
+          label="Pure black"
+          hint={isLightTheme(theme)
+            ? 'True-black background for OLED screens. Takes effect on dark themes.'
+            : 'True-black background for OLED screens; cards keep their lifted surfaces.'}
+        />
+        <SettingToggle
+          checked={canSync && themeSyncEnabled}
+          disabled={!canSync}
+          onChange={setThemeSyncEnabled}
+          label="Sync appearance across devices"
+          hint={canSync
+            ? 'Keeps your theme and Pure black in step on every browser and Android device where this is on.'
+            : 'Sign in to keep your theme in step across your browsers and devices.'}
+        />
+      </div>
       <TextPreferences />
     </Section>
   )

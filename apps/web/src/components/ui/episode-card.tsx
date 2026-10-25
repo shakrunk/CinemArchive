@@ -1,14 +1,14 @@
 import { saveSucceeded } from 'src/lib/localSave'
 import { scaledTextSize } from 'src/lib/textScale'
 import { useEffect, useRef, useState } from 'react'
-import { Eye, Check, Plus, Trash2 } from 'lucide-react'
+import { Eye, Check, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { avgEpisodeRating, isUnaired } from 'src/store/episodeUtils'
 import { StarRating } from 'src/components/ui/star-rating'
 import { Eyebrow } from 'src/components/ui/typography'
 import { Input } from 'src/components/ui/input'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
-import { CastCard } from 'src/components/CastCrewSection'
+import { CastChip } from 'src/components/CastCrewSection'
 import type { PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import { cn, fmtDate, fmtDateTime, fmtReleaseDate, fmtRuntime } from 'src/lib/utils'
 import { TMDB_STILL_BASE, fetchEpisodeCast, type EpisodeCast } from 'src/lib/media'
@@ -120,8 +120,8 @@ export function EpisodeCard({
             aria-label={watched ? 'Mark as watched again' : 'Mark as watched'}
             className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
-              background: watched ? 'rgba(233,178,102,0.22)' : 'rgba(0,0,0,0.55)',
-              border: watched ? '1px solid rgba(233,178,102,0.4)' : '1px solid transparent',
+              background: watched ? 'rgb(var(--amber-rgb) / 0.22)' : 'rgba(0,0,0,0.55)',
+              border: watched ? '1px solid rgb(var(--amber-rgb) / 0.4)' : '1px solid transparent',
             }}
           >
             <Eye
@@ -176,23 +176,18 @@ export function EpisodeCard({
 // ─── EpisodeCastSection ──────────────────────────────────────────────────────
 // Per-episode cast, fetched on demand from TMDB when the panel opens (not stored).
 
-function EpisodeCastRow({
-  label,
+function EpisodeCastChips({
   members,
   onPersonClick,
 }: {
-  label: string
   members: CastMember[]
   onPersonClick: (person: PersonDetailTarget) => void
 }) {
   return (
-    <div>
-      <Eyebrow as="div" className="mb-1.5">{label}</Eyebrow>
-      <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1">
-        {members.map((member) => (
-          <CastCard key={member.tmdbPersonId} member={member} onPersonClick={onPersonClick} />
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {members.map((member) => (
+        <CastChip key={member.tmdbPersonId} member={member} onPersonClick={onPersonClick} />
+      ))}
     </div>
   )
 }
@@ -210,6 +205,7 @@ function EpisodeCastSection({
 }) {
   const key = `${tmdbId}:${seasonNumber}:${episodeNumber}`
   const [loaded, setLoaded] = useState<{ key: string; credits: EpisodeCast } | null>(null)
+  const [showRegulars, setShowRegulars] = useState(false)
 
   useEffect(() => {
     if (tmdbId <= 0) return
@@ -232,13 +228,34 @@ function EpisodeCastSection({
   }
   if (credits.cast.length === 0 && credits.guestStars.length === 0) return null
 
+  // Guest stars are what's new about this episode, so they stay in view; the
+  // regulars largely repeat the series and season cast and sit behind a toggle.
   return (
-    <div className="space-y-3">
-      {credits.cast.length > 0 && (
-        <EpisodeCastRow label="Episode Cast" members={credits.cast} onPersonClick={onPersonClick} />
-      )}
+    <div className="space-y-2">
       {credits.guestStars.length > 0 && (
-        <EpisodeCastRow label="Guest Stars" members={credits.guestStars} onPersonClick={onPersonClick} />
+        <div>
+          <Eyebrow as="div" className="mb-1.5">Guest Stars</Eyebrow>
+          <EpisodeCastChips members={credits.guestStars} onPersonClick={onPersonClick} />
+        </div>
+      )}
+      {credits.cast.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowRegulars((v) => !v)}
+            aria-expanded={showRegulars}
+            className="flex items-center gap-1 font-mono text-xs transition-colors hover:text-amber focus:outline-hidden focus-visible:text-amber"
+            style={{ color: 'var(--paper-faint)' }}
+          >
+            <ChevronRight className={cn('w-3 h-3 transition-transform', showRegulars && 'rotate-90')} />
+            {credits.cast.length} series regular{credits.cast.length === 1 ? '' : 's'} in this episode
+          </button>
+          {showRegulars && (
+            <div className="mt-1.5">
+              <EpisodeCastChips members={credits.cast} onPersonClick={onPersonClick} />
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

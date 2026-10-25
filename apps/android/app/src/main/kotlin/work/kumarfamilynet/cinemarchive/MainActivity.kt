@@ -244,6 +244,8 @@ class MainActivity : ComponentActivity() {
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontFamily.DEFAULT)
             val fontScale by preferencesRepository.observeFontScale()
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
+            val pureBlack by preferencesRepository.observePureBlack()
+                .collectAsStateWithLifecycle(initialValue = false)
             val session by authRepository.observeSession().collectAsStateWithLifecycle()
             val identity by authRepository.observeIdentity().collectAsStateWithLifecycle()
             val publishedRuntime by app.accountRuntimeManager.runtime.collectAsStateWithLifecycle()
@@ -258,7 +260,7 @@ class MainActivity : ComponentActivity() {
             // would still be a fresh Flow instance).
             val showBuildBannerFlow = remember(isDebugBuild) { preferencesRepository.observeDevShowBuildBanner(isDebugBuild) }
             val showBuildBanner by showBuildBannerFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
-            CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale) {
+            CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale, pureBlack = pureBlack) {
                 // The window theme pins light-on-dark system bar icons, which vanish against a
                 // light palette (Light, Catppuccin Latte); follow the resolved background instead.
                 val lightSystemBars = MaterialTheme.colorScheme.background.luminance() > 0.5f

@@ -138,7 +138,7 @@ export function ActivityHeatmap({
                     ...(cell.count > 0
                       ? {
                           opacity: 0.32 + 0.68 * Math.min(cell.count / maxCellCount, 1),
-                          boxShadow: '0 0 6px -1px rgba(233,178,102,0.4)',
+                          boxShadow: '0 0 6px -1px rgb(var(--amber-rgb) / 0.4)',
                         }
                       : undefined),
                   }}

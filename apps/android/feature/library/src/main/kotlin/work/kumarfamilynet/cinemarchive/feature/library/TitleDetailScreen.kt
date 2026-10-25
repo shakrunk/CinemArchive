@@ -109,12 +109,14 @@ import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 import work.kumarfamilynet.cinemarchive.core.model.SeasonDetail
 import work.kumarfamilynet.cinemarchive.core.model.TitleDetail
 import work.kumarfamilynet.cinemarchive.core.model.LibraryPerson
+import work.kumarfamilynet.cinemarchive.core.model.newcomersFirst
 import work.kumarfamilynet.cinemarchive.core.model.Viewing
 import work.kumarfamilynet.cinemarchive.core.model.ViewingDraft
 import work.kumarfamilynet.cinemarchive.core.model.isUnaired
 import work.kumarfamilynet.cinemarchive.core.model.mainSeasons
 import work.kumarfamilynet.cinemarchive.core.model.nextScheduledEpisode
 import work.kumarfamilynet.cinemarchive.core.model.orderedForDisplay
+import work.kumarfamilynet.cinemarchive.core.model.seasonLabel
 import work.kumarfamilynet.cinemarchive.core.model.seasonShortLabel
 import work.kumarfamilynet.cinemarchive.data.LibraryRepository
 import work.kumarfamilynet.cinemarchive.data.ListsRepository
@@ -813,9 +815,22 @@ fun TitleDetailScreen(
 
                 val selectedSeason = detail.seasons.firstOrNull { it.seasonNumber == selectedSeasonNumber }
                     ?: detail.seasons.orderedForDisplay().first()
+                // Collapsed by default: it mostly repeats the series cast above, so the people new
+                // to this season lead when it opens.
                 if (selectedSeason.cast.isNotEmpty()) item(key = "season-credits") {
-                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 22.dp)) {
-                        PersonCreditsSection("Season cast", selectedSeason.cast, onBrowsePerson)
+                    var seasonCastExpanded by rememberSaveable { mutableStateOf(false) }
+                    ReadingWidthColumn(modifier = Modifier.padding(horizontal = 18.dp)) {
+                        CollapsibleCastToggle(
+                            label = "${seasonLabel(selectedSeason.seasonNumber)} cast · ${selectedSeason.cast.distinctBy { it.tmdbPersonId }.size}",
+                            expanded = seasonCastExpanded,
+                            onToggle = { seasonCastExpanded = !seasonCastExpanded },
+                        )
+                        if (seasonCastExpanded) {
+                            val ordered = remember(selectedSeason.cast, detail.cast) { selectedSeason.cast.newcomersFirst(detail.cast) }
+                            Box(Modifier.padding(horizontal = 4.dp)) {
+                                PersonCreditsSection("Season cast", ordered, onBrowsePerson)
+                            }
+                        }
                     }
                 }
                 items(selectedSeason.episodes, key = EpisodeDetail::id) { episode ->
@@ -1284,8 +1299,9 @@ private fun EpisodeRow(
     }
 }
 
-/** The expanded cast of one episode: series regulars, then guest stars, each a horizontal row
- *  of headshots — the web app's `EpisodeCastSection`. A null [cast] means it's still loading. */
+/** The expanded cast of one episode: guest stars, then the series regulars behind a toggle, each a
+ *  horizontal row of headshots — the web app's `EpisodeCastSection`. A null [cast] means it's
+ *  still loading. */
 @Composable
 private fun EpisodeCastSection(cast: EpisodeCast?, onBrowsePerson: ((LibraryPerson) -> Unit)?, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1301,10 +1317,33 @@ private fun EpisodeCastSection(cast: EpisodeCast?, onBrowsePerson: ((LibraryPers
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
             else -> {
-                if (cast.cast.isNotEmpty()) EpisodeCastRow("Episode cast", cast.cast, onBrowsePerson)
+                // Guest stars are what's new about this episode, so they lead; the regulars mostly
+                // repeat the series and season cast and sit behind their own toggle.
                 if (cast.guestStars.isNotEmpty()) EpisodeCastRow("Guest stars", cast.guestStars, onBrowsePerson)
+                if (cast.cast.isNotEmpty()) {
+                    var regularsExpanded by rememberSaveable { mutableStateOf(false) }
+                    CollapsibleCastToggle(
+                        label = "${cast.cast.size} series regular${if (cast.cast.size == 1) "" else "s"} in this episode",
+                        expanded = regularsExpanded,
+                        onToggle = { regularsExpanded = !regularsExpanded },
+                    )
+                    if (regularsExpanded) EpisodeCastRow("Series regulars", cast.cast, onBrowsePerson)
+                }
             }
         }
+    }
+}
+
+/** A compact text toggle that shows or hides a cast list kept out of view by default. */
+@Composable
+private fun CollapsibleCastToggle(label: String, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(onClick = onToggle, contentPadding = PaddingValues(horizontal = 4.dp), modifier = modifier) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        Icon(
+            if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.padding(start = 2.dp).size(18.dp),
+        )
     }
 }
 

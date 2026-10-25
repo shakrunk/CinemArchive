@@ -4,15 +4,16 @@ import { cn } from 'src/lib/utils'
 import { avgEpisodeRating } from 'src/store/episodeUtils'
 import type { Season } from 'src/store/mockData'
 
-// ─── Color scale: null→void, 1→crimson, 2→rust, 3→stone, 4→amber, 5→gold ───
+// ─── Color scale: unrated, then 1★–5★ (brand: crimson, rust, stone, amber, gold) ───
+// The --rating-* tokens live in index.css so each theme can re-tint the scale.
 
 function ratingColor(avg: number | null): string {
-  if (avg === null) return 'rgba(28, 20, 14, 0.55)'    // void (unrated)
-  if (avg < 1.5) return 'rgba(170, 45, 45, 0.90)'      // crimson (★)
-  if (avg < 2.5) return 'rgba(195, 90, 55, 0.85)'      // rust (★★)
-  if (avg < 3.5) return 'rgba(155, 138, 112, 0.78)'    // warm stone (★★★)
-  if (avg < 4.5) return 'rgba(224, 172, 90, 0.90)'     // amber (★★★★)
-  return 'rgba(247, 210, 120, 1.00)'                   // bright gold (★★★★★)
+  if (avg === null) return 'var(--rating-none)'
+  if (avg < 1.5) return 'var(--rating-1)'
+  if (avg < 2.5) return 'var(--rating-2)'
+  if (avg < 3.5) return 'var(--rating-3)'
+  if (avg < 4.5) return 'var(--rating-4)'
+  return 'var(--rating-5)'
 }
 
 function ratingLabel(avg: number | null): string {

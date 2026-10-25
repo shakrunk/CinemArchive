@@ -11,7 +11,9 @@ import { useOutingReconciler } from 'src/lib/useOutingReconciler'
 import { useEpisodeScheduleRefresh } from 'src/lib/useEpisodeScheduleRefresh'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
+import { startThemeSync } from 'src/lib/themeSync'
 import { NotificationStack } from 'src/components/NotificationStack'
+import { JellyfinWatchPrompt } from 'src/components/JellyfinWatchPrompt'
 import { LibrarySyncToast } from 'src/components/LibrarySyncToast'
 import { LibrarySyncDialog } from 'src/components/LibrarySyncDialog'
 import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
@@ -140,6 +142,7 @@ export default function App() {
   useEffect(() => {
     applyTheme(useAppStore.getState().theme)
     watchSystemTheme()
+    startThemeSync()
   }, [])
 
   // ⌘K / Ctrl+K toggles the palette from anywhere.
@@ -334,6 +337,7 @@ export default function App() {
               <main>, which remounts on every view change. */}
           <LibrarySyncToast key={librarySession} />
           <LibrarySyncDialog key={`sync-${librarySession}`} />
+          <JellyfinWatchPrompt key={`jellyfin-${librarySession}`} />
         </>
       )}
       {commandPaletteEverOpened && (

@@ -1617,6 +1617,32 @@ export async function fetchLedgerLayout(ownerUserId: string): Promise<LedgerWidg
   return normalizeLedgerWidgets(data.ledger_layout)
 }
 
+// ─── User Prefs (opt-in appearance sync, docs/android-contracts/theme-sync.md) ─
+
+/** The owner's raw synced appearance (validated by themeSync.parseThemePrefs),
+ *  or null when none has been synced. Throws on any failure, including a
+ *  missing theme_prefs column before its migration deploys; callers treat a
+ *  throw as "unknown" and leave both sides alone. */
+export async function fetchThemePrefs(userId: string): Promise<unknown> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('user_prefs')
+    .select('theme_prefs')
+    .eq('user_id', userId)
+    .maybeSingle()
+  unwrap(error, 'fetchThemePrefs:')
+  return data?.theme_prefs ?? null
+}
+
+/** Upserts only theme_prefs, so the row's ledger_layout is left as it is. */
+export async function saveThemePrefs(userId: string, prefs: unknown): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('user_prefs')
+    .upsert({ user_id: userId, theme_prefs: prefs }, { onConflict: 'user_id' })
+  unwrap(error, 'saveThemePrefs:')
+}
+
 export async function saveLedgerLayout(userId: string, widgets: LedgerWidget[]): Promise<void> {
   if (!supabase) return
   const { error } = await supabase

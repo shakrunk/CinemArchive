@@ -68,6 +68,11 @@ test('creates a local list, restores its deep link, goes back, and confirms dele
   await expect(page.getByRole('heading', { name: 'Release rehearsal', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Delete list', exact: true }).click()
   await page.getByRole('button', { name: 'Delete', exact: true }).click()
+  // The detail view has no list buttons, so "no Release rehearsal button" is true before the
+  // delete lands. Wait for the view to leave it: list writes commit before the view updates,
+  // so this proves the delete is saved before the reload.
+  await expect(page.getByRole('heading', { name: 'Release rehearsal', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /My List/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Release rehearsal/ })).toHaveCount(0)
   await page.reload()
   await expect(page.getByRole('button', { name: /Release rehearsal/ })).toHaveCount(0)

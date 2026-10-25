@@ -82,10 +82,9 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
           <p className="font-serif text-[13px] font-semibold text-[rgb(var(--ivory))] leading-snug line-clamp-2 mb-0.5">
             {result.title}
           </p>
-          <p className="font-mono text-[10px] text-white/60">
-            {result.year > 0 ? result.year : ''}
-            {result.type === 'tv' && result.seasonCount ? ` · ${result.seasonCount}S` : ''}
-          </p>
+          {result.type === 'tv' && result.seasonCount ? (
+            <p className="font-mono text-[10px] text-white/60">{result.seasonCount}S</p>
+          ) : null}
           {result.genres.length > 0 && (
             <p className="font-mono text-[9px] text-amber/70 truncate mt-1">
               {result.genres.slice(0, 2).join(' · ')}
@@ -122,7 +121,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
                     <div className="absolute bottom-full right-0 mb-1.5 pointer-events-none z-10">
                       <div
                         className="relative px-2 py-1 rounded shadow-lg"
-                        style={{ background: '#0d0906', border: '1px solid rgba(233,178,102,0.35)' }}
+                        style={{ background: 'rgb(var(--scrim-ink))', border: '1px solid rgb(var(--amber-rgb) / 0.35)' }}
                       >
                         <p className="font-mono text-[9px] text-white/60 whitespace-nowrap">Click for more details</p>
                         <div
@@ -131,7 +130,7 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
                             width: 0, height: 0,
                             borderLeft: '4px solid transparent',
                             borderRight: '4px solid transparent',
-                            borderTop: '4px solid rgba(233,178,102,0.35)',
+                            borderTop: '4px solid rgb(var(--amber-rgb) / 0.35)',
                           }}
                         />
                       </div>
@@ -590,7 +589,7 @@ function TasteDropdown({ options, value, onChange, ariaLabel, placeholder = 'Sel
         aria-expanded={open}
         disabled={options.length === 0}
         className="flex items-center gap-1.5 font-mono text-xs rounded-md border px-2.5 py-1.5 text-amber-bright hover:border-amber/40 transition-colors max-w-[220px] disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ background: 'var(--inset)', borderColor: open ? 'rgba(233,178,102,0.4)' : 'var(--line)' }}
+        style={{ background: 'var(--inset)', borderColor: open ? 'rgb(var(--amber-rgb) / 0.4)' : 'var(--line)' }}
       >
         <span className="truncate">{selected?.label ?? placeholder}</span>
         <ChevronDown className={cn('w-3.5 h-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
@@ -1278,7 +1277,7 @@ export function Discover() {
             className="w-full h-12 pl-11 pr-10 rounded-xl border text-base font-sans text-paper placeholder:text-paper-faint focus:outline-hidden focus:ring-2 focus:ring-amber/30 transition-all duration-150"
             style={{
               background: 'var(--inset)',
-              borderColor: isSearchFocused ? 'rgba(233,178,102,0.35)' : 'var(--line)',
+              borderColor: isSearchFocused ? 'rgb(var(--amber-rgb) / 0.35)' : 'var(--line)',
             }}
           />
           {query && (

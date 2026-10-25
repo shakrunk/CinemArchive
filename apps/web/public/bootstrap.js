@@ -7,6 +7,8 @@
   };
   // Only the easter-egg themes need an unlock (see isThemeAvailable).
   var GATED = ['noir', 'matrix'];
+  // Pure black only applies on dark themes (see isLightTheme / applyTheme).
+  var LIGHT = ['light', 'catppuccin-latte'];
   function systemTheme() {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   }
@@ -20,9 +22,11 @@
     if (state && state.themeMode === 'system') theme = systemTheme();
     if (!Object.prototype.hasOwnProperty.call(COLORS, theme) || (GATED.indexOf(theme) !== -1 && unlocked.indexOf(theme) === -1)) theme = systemTheme();
     document.documentElement.setAttribute('data-theme', theme);
-    if (theme !== 'dark') {
+    var pureBlack = state && state.pureBlack === true && LIGHT.indexOf(theme) === -1;
+    if (pureBlack) document.documentElement.setAttribute('data-pure-black', '');
+    if (theme !== 'dark' || pureBlack) {
       var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', COLORS[theme]);
+      if (m) m.setAttribute('content', pureBlack ? '#000000' : COLORS[theme]);
     }
   } catch {
     var fallback = systemTheme();

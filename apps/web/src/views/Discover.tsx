@@ -82,10 +82,9 @@ function DiscoverCard({ result, isOwned, isSharedView, onAdd, onSelect, style, c
           <p className="font-serif text-[13px] font-semibold text-[rgb(var(--ivory))] leading-snug line-clamp-2 mb-0.5">
             {result.title}
           </p>
-          <p className="font-mono text-[10px] text-white/60">
-            {result.year > 0 ? result.year : ''}
-            {result.type === 'tv' && result.seasonCount ? ` · ${result.seasonCount}S` : ''}
-          </p>
+          {result.type === 'tv' && result.seasonCount ? (
+            <p className="font-mono text-[10px] text-white/60">{result.seasonCount}S</p>
+          ) : null}
           {result.genres.length > 0 && (
             <p className="font-mono text-[9px] text-amber/70 truncate mt-1">
               {result.genres.slice(0, 2).join(' · ')}

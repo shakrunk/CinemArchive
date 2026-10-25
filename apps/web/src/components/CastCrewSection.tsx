@@ -73,6 +73,60 @@ export function CastCard({
   )
 }
 
+// Compact cast entry — a round avatar beside name and character, for spots
+// where a full poster card would crowd the surrounding content.
+export function CastChip({
+  member,
+  onPersonClick,
+}: {
+  member: CastMember
+  onPersonClick: (person: PersonDetailTarget) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPersonClick({ tmdbPersonId: member.tmdbPersonId, name: member.name, profileUrl: member.profileUrl, character: member.character })}
+      aria-label={`View details for ${member.name}`}
+      className="group flex items-center gap-2 min-w-0 max-w-[220px] rounded-full pr-3 text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60 transition-colors hover:bg-(--wash)"
+      style={{ border: '1px solid var(--line)' }}
+    >
+      {member.profileUrl ? (
+        <img
+          src={member.profileUrl}
+          alt=""
+          className="w-8 h-8 shrink-0 rounded-full object-cover object-top"
+        />
+      ) : (
+        <span
+          className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-mono text-sm"
+          style={{ background: 'var(--card)', color: 'var(--paper-faint)' }}
+          aria-hidden="true"
+        >
+          {member.name.charAt(0).toUpperCase()}
+        </span>
+      )}
+      <span className="min-w-0 py-1">
+        <span
+          className="block font-sans font-semibold truncate transition-colors group-hover:text-amber"
+          style={{ fontSize: scaledTextSize('12px'), color: 'var(--paper)', lineHeight: 1.3 }}
+          title={member.name}
+        >
+          {member.name}
+        </span>
+        {member.character && (
+          <span
+            className="block font-mono truncate"
+            style={{ fontSize: scaledTextSize('10px'), color: 'var(--paper-faint)', lineHeight: 1.3 }}
+            title={member.character}
+          >
+            {member.character}
+          </span>
+        )}
+      </span>
+    </button>
+  )
+}
+
 // Wrapping cast layout: as many members as fit one row show, with a "View All"
 // tile in the final slot expanding the rest (no single-axis horizontal scroll).
 // Both constants must track the w-[110px] on CastCard/the tile and the gap-2.5
@@ -83,7 +137,7 @@ const CAST_ROW_GAP = 10
 // first paint is never emptier than it used to be.
 const CAST_FALLBACK_COUNT = 5
 
-function CastGrid({
+export function CastGrid({
   cast,
   onPersonClick,
 }: {

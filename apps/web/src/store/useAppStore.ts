@@ -218,6 +218,15 @@ interface UISlice {
   // black & white, The Matrix red pill). Always includes 'dark' and 'light';
   // the Catppuccin flavors need no entry (see `isThemeAvailable`).
   unlockedThemes: Theme[]
+  // AMOLED "pure black": a true-black page on dark themes (ignored on light
+  // ones). Device preference, applied as <html data-pure-black> by applyTheme.
+  pureBlack: boolean
+  // Opt-in, per device: sync the appearance above across the signed-in
+  // account's browsers and devices (lib/themeSync.ts). themeUpdatedAt is the
+  // ISO stamp of the last user-made appearance change here, or of the remote
+  // copy last applied; last-write-wins compares it to the account's copy.
+  themeSyncEnabled: boolean
+  themeUpdatedAt: string | null
   navPrefs: NavPrefs
   ledgerPrefs: LedgerPrefs
   // The board arrangement of whoever is being viewed in a shared/friend view.
@@ -257,6 +266,8 @@ interface UISlice {
   setThemeMode: (mode: ThemeMode) => void
   // No-op if already unlocked or the theme is dark/light (always unlocked).
   unlockTheme: (theme: Theme) => void
+  setPureBlack: (pureBlack: boolean) => void
+  setThemeSyncEnabled: (enabled: boolean) => void
   moveNavItem: (id: NavItemId, direction: 'up' | 'down') => void
   reorderNav: (order: NavItemId[]) => void
   toggleNavItemHidden: (id: NavItemId) => void
@@ -827,6 +838,9 @@ export const useAppStore = create<AppStore>()(
   theme: getSystemTheme(),
   themeMode: 'system',
   unlockedThemes: ['dark', 'light'],
+  pureBlack: false,
+  themeSyncEnabled: false,
+  themeUpdatedAt: null,
   navPrefs: defaultNavPrefs,
   ledgerPrefs: defaultLedgerPrefs,
   viewedLedgerWidgets: null,
@@ -840,9 +854,16 @@ export const useAppStore = create<AppStore>()(
 
   setGridSize: (gridSize) => set({ gridSize }),
 
-  setTheme: (theme) => set({ theme, themeMode: isLightTheme(theme) ? 'light' : 'dark' }),
+  // The three user-made appearance changes stamp themeUpdatedAt, which is what
+  // theme sync pushes on. Rehydration, OS scheme changes and applying a synced
+  // copy write the store directly instead, so they never push.
+  setTheme: (theme) => set({ theme, themeMode: isLightTheme(theme) ? 'light' : 'dark', themeUpdatedAt: new Date().toISOString() }),
 
-  setThemeMode: (mode) => set({ themeMode: mode, theme: mode === 'system' ? getSystemTheme() : mode }),
+  setThemeMode: (mode) => set({ themeMode: mode, theme: mode === 'system' ? getSystemTheme() : mode, themeUpdatedAt: new Date().toISOString() }),
+
+  setPureBlack: (pureBlack) => set({ pureBlack, themeUpdatedAt: new Date().toISOString() }),
+
+  setThemeSyncEnabled: (themeSyncEnabled) => set({ themeSyncEnabled }),
 
   unlockTheme: (theme) => {
     if (isThemeAvailable(theme, get().unlockedThemes)) return
@@ -1373,6 +1394,9 @@ export const useAppStore = create<AppStore>()(
         theme: s.theme,
         themeMode: s.themeMode,
         unlockedThemes: s.unlockedThemes,
+        pureBlack: s.pureBlack,
+        themeSyncEnabled: s.themeSyncEnabled,
+        themeUpdatedAt: s.themeUpdatedAt,
         navPrefs: s.navPrefs,
       }),
       merge: (persisted, current) => ({ ...current, ...pickDevicePreferences(persisted) }),

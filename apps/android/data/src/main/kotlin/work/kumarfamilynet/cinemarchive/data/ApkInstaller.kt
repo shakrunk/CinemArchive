@@ -43,8 +43,10 @@ data class ApkArchiveInfo(val packageName: String, val versionName: String?)
  * fails any check is deleted, so nothing unverified is ever handed to the installer.
  *
  * **Install** ([install]) copies the staged file into a [PackageInstaller] session and commits
- * it. It is only ever started by an explicit user action, so the confirmation prompt that the
- * commit leads to is raised while the app is in the foreground (#166's automatic path used to
+ * it, asking the system to skip its confirmation dialog: an app updating itself is allowed to,
+ * so usually the app is simply replaced and restarts on the new version. It is only ever started
+ * by an explicit user action, so when the system does still ask, its prompt is raised while the
+ * app is in the foreground (#166's automatic path used to
  * commit from a background process start, where Android blocks the prompt). Declining that
  * prompt goes back to [ApkInstallState.Ready], so a retry never downloads again.
  *
@@ -249,6 +251,11 @@ class ApkInstaller(
 
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
                 params.setSize(file.length())
+                // An app updating itself may skip the confirmation dialog (API 31+, which is our
+                // minSdk) when it declares UPDATE_PACKAGES_WITHOUT_USER_ACTION and targets a
+                // recent enough SDK. The system can still ask, so STATUS_PENDING_USER_ACTION
+                // stays handled; when it doesn't, the process is replaced straight away.
+                params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
                 val sessionId = installer.createSession(params)
                 activeSessionId = sessionId
                 installer.openSession(sessionId).use { session ->

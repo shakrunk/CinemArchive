@@ -127,7 +127,7 @@ fun UpdatesSection(
                         is ApkInstallState.Downloading -> DownloadProgressRow(result.latestVersion, installState)
                         // Naming each wait matters: a plain spinner here looks identical to the
                         // old do-nothing bug, and the system dialog is a step the app can't skip.
-                        ApkInstallState.Committing -> BusyRow("Preparing install…")
+                        ApkInstallState.Committing -> BusyRow("Installing — CinemArchive will restart…")
                         ApkInstallState.AwaitingConfirmation -> BusyRow("Waiting for the system installer…")
                         else -> Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -138,7 +138,9 @@ fun UpdatesSection(
                             when {
                                 // Already downloaded and verified: installing needs no network.
                                 canInstallDirectly && staged -> Button(onClick = onInstall, modifier = Modifier.weight(1f)) {
-                                    Text("Install ${result.latestVersion}")
+                                    // The app is usually replaced without a system dialog, so say
+                                    // up front that it will close and reopen.
+                                    Text("Install ${result.latestVersion} and restart")
                                 }
                                 canInstallDirectly && result.apkUrl != null -> Button(
                                     onClick = onDownload,

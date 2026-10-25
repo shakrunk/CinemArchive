@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Android updates install without the system prompt.** Tapping Install now replaces the app and reopens it on the new version, with no "Do you want to update this app?" dialog in between. If Android still asks (it can), the prompt appears as before.
+
 ### Fixed
 
 - **Android in-app updates.** Downloading and installing are now separate steps. The update downloads with real progress (percent and MB) and is checked against the release's published checksum before it can be installed. Declining or leaving the system's install prompt keeps the download, so trying again is one tap with no new download. Automatic downloads stop at "ready to install" instead of raising the install prompt while the app is in the background, where Android blocked it and the update stalled. The downloaded file is removed once the update is installed.

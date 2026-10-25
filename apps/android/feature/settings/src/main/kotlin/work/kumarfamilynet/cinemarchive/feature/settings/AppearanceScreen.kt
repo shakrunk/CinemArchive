@@ -138,6 +138,7 @@ fun AppearanceRoute(
     val glassBlur by preferencesRepository.observeGlassBlur().collectAsStateWithLifecycle(initialValue = true)
     val pureBlack by preferencesRepository.observePureBlack().collectAsStateWithLifecycle(initialValue = false)
     val themeSync by preferencesRepository.observeThemeSyncEnabled().collectAsStateWithLifecycle(initialValue = false)
+    val spoilerProtection by preferencesRepository.observeSpoilerProtection().collectAsStateWithLifecycle(initialValue = false)
     val scope = rememberCoroutineScope()
 
     AppearanceScreen(
@@ -150,6 +151,7 @@ fun AppearanceRoute(
         glassBlur = glassBlur,
         pureBlack = pureBlack,
         themeSync = themeSync,
+        spoilerProtection = spoilerProtection,
         onSetThemeMode = { mode -> scope.launch { preferencesRepository.setThemeMode(mode) } },
         onSetPalette = { p -> scope.launch { preferencesRepository.setPalette(p) } },
         onSetFontFamily = { f -> scope.launch { preferencesRepository.setFontFamily(f) } },
@@ -157,6 +159,7 @@ fun AppearanceRoute(
         onSetGlassBlur = { enabled -> scope.launch { preferencesRepository.setGlassBlur(enabled) } },
         onSetPureBlack = { enabled -> scope.launch { preferencesRepository.setPureBlack(enabled) } },
         onSetThemeSync = { enabled -> scope.launch { preferencesRepository.setThemeSyncEnabled(enabled) } },
+        onSetSpoilerProtection = { enabled -> scope.launch { preferencesRepository.setSpoilerProtection(enabled) } },
         onBack = onBack,
         showBack = showBack,
     )
@@ -173,6 +176,7 @@ private fun AppearanceScreen(
     glassBlur: Boolean,
     pureBlack: Boolean,
     themeSync: Boolean,
+    spoilerProtection: Boolean,
     onSetThemeMode: (ArchiveThemeMode) -> Unit,
     onSetPalette: (ArchivePalette) -> Unit,
     onSetFontFamily: (ArchiveFontFamily) -> Unit,
@@ -180,6 +184,7 @@ private fun AppearanceScreen(
     onSetGlassBlur: (Boolean) -> Unit,
     onSetPureBlack: (Boolean) -> Unit,
     onSetThemeSync: (Boolean) -> Unit,
+    onSetSpoilerProtection: (Boolean) -> Unit,
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -290,6 +295,13 @@ private fun AppearanceScreen(
                         caption = "Keeps your palette and Pure black in step with your other devices and browsers",
                         enabled = themeSync,
                         onToggle = onSetThemeSync,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                    SettingSwitchCard(
+                        title = "Hide episode spoilers",
+                        caption = "Hides the still, title and synopsis of episodes you haven't watched yet, on this device",
+                        enabled = spoilerProtection,
+                        onToggle = onSetSpoilerProtection,
                         modifier = Modifier.padding(top = 10.dp),
                     )
                 }

@@ -157,6 +157,24 @@
 }
 
 @layer base {
+  /* Native scroll edge handling. The page keeps the browser's own bounce/glow at the
+     top and bottom; nested scrollers contain their overscroll so hitting an end never
+     drags the page or modal behind them, and horizontal rows don't trigger the
+     browser's back/forward swipe at their far sides. */
+  html {
+    overscroll-behavior-y: contain;
+  }
+  .overflow-y-auto,
+  .overflow-y-scroll {
+    overscroll-behavior-y: contain;
+  }
+  .overflow-x-auto,
+  .overflow-x-scroll {
+    overscroll-behavior-x: contain;
+  }
+}
+
+@layer base {
   :root {
     --text-scale: 1;
     --serif: var(--display);

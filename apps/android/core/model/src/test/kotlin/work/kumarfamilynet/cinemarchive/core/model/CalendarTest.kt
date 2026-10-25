@@ -172,6 +172,7 @@ class CalendarTest {
             emptyList(), today, la,
         )
         assertEquals(listOf("S2 · E1–E2 (2 episodes)", "SP · E4 — Holiday Special"), events.map(::calendarEventLabel))
+        assertEquals(listOf("S2 · E1–E2 (2 episodes)", "SP · E4"), events.map { calendarEventLabel(it, hideEpisodeNames = true) })
     }
 
     @Test fun padsToWholeSundayFirstWeeks() {

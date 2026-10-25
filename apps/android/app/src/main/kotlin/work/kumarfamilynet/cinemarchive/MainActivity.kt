@@ -100,6 +100,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import work.kumarfamilynet.cinemarchive.core.designsystem.GlassBackdrop
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalGlassBackdrop
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalTabReselect
 import work.kumarfamilynet.cinemarchive.core.designsystem.TabReselect
 import work.kumarfamilynet.cinemarchive.core.designsystem.glassBackdropSource
@@ -246,6 +247,8 @@ class MainActivity : ComponentActivity() {
                 .collectAsStateWithLifecycle(initialValue = ArchiveFontScale.DEFAULT)
             val pureBlack by preferencesRepository.observePureBlack()
                 .collectAsStateWithLifecycle(initialValue = false)
+            val spoilerProtection by preferencesRepository.observeSpoilerProtection()
+                .collectAsStateWithLifecycle(initialValue = false)
             val session by authRepository.observeSession().collectAsStateWithLifecycle()
             val identity by authRepository.observeIdentity().collectAsStateWithLifecycle()
             val publishedRuntime by app.accountRuntimeManager.runtime.collectAsStateWithLifecycle()
@@ -261,95 +264,97 @@ class MainActivity : ComponentActivity() {
             val showBuildBannerFlow = remember(isDebugBuild) { preferencesRepository.observeDevShowBuildBanner(isDebugBuild) }
             val showBuildBanner by showBuildBannerFlow.collectAsStateWithLifecycle(initialValue = isDebugBuild)
             CinemArchiveTheme(mode = themeMode, palette = palette, fontFamily = fontFamily, fontScale = fontScale, pureBlack = pureBlack) {
-                // The window theme pins light-on-dark system bar icons, which vanish against a
-                // light palette (Light, Catppuccin Latte); follow the resolved background instead.
-                val lightSystemBars = MaterialTheme.colorScheme.background.luminance() > 0.5f
-                val view = LocalView.current
-                SideEffect {
-                    WindowCompat.getInsetsController(window, view).apply {
-                        isAppearanceLightStatusBars = lightSystemBars
-                        isAppearanceLightNavigationBars = lightSystemBars
+                CompositionLocalProvider(LocalSpoilerProtection provides spoilerProtection) {
+                    // The window theme pins light-on-dark system bar icons, which vanish against a
+                    // light palette (Light, Catppuccin Latte); follow the resolved background instead.
+                    val lightSystemBars = MaterialTheme.colorScheme.background.luminance() > 0.5f
+                    val view = LocalView.current
+                    SideEffect {
+                        WindowCompat.getInsetsController(window, view).apply {
+                            isAppearanceLightStatusBars = lightSystemBars
+                            isAppearanceLightNavigationBars = lightSystemBars
+                        }
                     }
-                }
-                Surface {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val openedToken = sharedToken
-                        if (openedToken != null) {
-                            androidx.compose.runtime.key(openedToken, sharedLaunch) {
-                                SharedLibraryRoute(openedToken, app.sharedLibraryRepository, onClose = {
-                                    sharedToken = null
-                                    intent.data = null
-                                })
-                            }
-                        } else if (identity == null) {
-                            androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
-                                LoginRoute(authRepository, modifier = Modifier.weight(1f))
-                                SharedLinkPromptButton(onOpen = { sharedToken = it })
-                            }
-                        } else {
-                            val rt = runtime
-                            if (rt == null) {
-                                // Signed in, but the account runtime is still being assembled (local-only,
-                                // no network wait) — or is being swapped for another account.
-                                Box(modifier = Modifier.fillMaxSize())
+                    Surface {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            val openedToken = sharedToken
+                            if (openedToken != null) {
+                                androidx.compose.runtime.key(openedToken, sharedLaunch) {
+                                    SharedLibraryRoute(openedToken, app.sharedLibraryRepository, onClose = {
+                                        sharedToken = null
+                                        intent.data = null
+                                    })
+                                }
+                            } else if (identity == null) {
+                                androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+                                    LoginRoute(authRepository, modifier = Modifier.weight(1f))
+                                    SharedLinkPromptButton(onOpen = { sharedToken = it })
+                                }
                             } else {
-                                // key(rt): a new sign-in is a fresh composition, so no remembered UI state
-                                // survives across accounts; the runtime is also the ViewModel store.
-                                androidx.compose.runtime.key(rt) {
-                                    androidx.compose.runtime.DisposableEffect(rt) {
-                                        rt.onUiAttached()
-                                        onDispose { rt.onUiDetached() }
-                                    }
-                                    androidx.compose.runtime.CompositionLocalProvider(
-                                        androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner provides rt,
-                                        LocalUnreadNotificationCount provides rt.notificationsRepository.inbox.collectAsStateWithLifecycle().value.unreadCount,
-                                    ) {
-                                        CinemArchiveApp(
-                                            rt,
-                                            discoverRepository,
-                                            preferencesRepository,
-                                            authRepository,
-                                            appUpdateRepository,
-                                            apkInstaller,
-                                            initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
-                                            pendingNavigation = pendingNavigation,
-                                            onNavigationConsumed = { consumed ->
-                                                if (pendingNavigation == consumed) {
-                                                    pendingNavigation = null
-                                                    intent.data = null
-                                                }
-                                            },
-                                            appVersionName = BuildConfig.VERSION_NAME,
-                                            isDebugBuild = isDebugBuild,
-                                             onOpenSharedLink = { sharedToken = it },
-                                        )
+                                val rt = runtime
+                                if (rt == null) {
+                                    // Signed in, but the account runtime is still being assembled (local-only,
+                                    // no network wait) — or is being swapped for another account.
+                                    Box(modifier = Modifier.fillMaxSize())
+                                } else {
+                                    // key(rt): a new sign-in is a fresh composition, so no remembered UI state
+                                    // survives across accounts; the runtime is also the ViewModel store.
+                                    androidx.compose.runtime.key(rt) {
+                                        androidx.compose.runtime.DisposableEffect(rt) {
+                                            rt.onUiAttached()
+                                            onDispose { rt.onUiDetached() }
+                                        }
+                                        androidx.compose.runtime.CompositionLocalProvider(
+                                            androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner provides rt,
+                                            LocalUnreadNotificationCount provides rt.notificationsRepository.inbox.collectAsStateWithLifecycle().value.unreadCount,
+                                        ) {
+                                            CinemArchiveApp(
+                                                rt,
+                                                discoverRepository,
+                                                preferencesRepository,
+                                                authRepository,
+                                                appUpdateRepository,
+                                                apkInstaller,
+                                                initialTitleId = initialTitleId.takeIf { initialTitleOwnerId == rt.ownerId },
+                                                pendingNavigation = pendingNavigation,
+                                                onNavigationConsumed = { consumed ->
+                                                    if (pendingNavigation == consumed) {
+                                                        pendingNavigation = null
+                                                        intent.data = null
+                                                    }
+                                                },
+                                                appVersionName = BuildConfig.VERSION_NAME,
+                                                isDebugBuild = isDebugBuild,
+                                                 onOpenSharedLink = { sharedToken = it },
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        // Sibling of both LoginRoute and CinemArchiveApp (rather than nested
-                        // inside the latter) so it covers sign-in too — added after the app
-                        // content but before the splash below, so it sits under the splash while
-                        // that's still up and over everything once it fades out.
-                        if (showBuildBanner) {
-                            DebugBuildBanner(isDebugBuild)
-                        }
-                        if (callbackFailed) {
-                            androidx.compose.material3.AlertDialog(
-                                onDismissRequest = { callbackFailed = false },
-                                title = { Text("Couldn't finish sign-in") },
-                                text = { Text("Check your connection and open the sign-in link again. If it has expired, request a new link.") },
-                                confirmButton = {
-                                    androidx.compose.material3.TextButton(onClick = { callbackFailed = false }) { Text("OK") }
-                                },
-                            )
-                        }
-                        var showBrandedSplash by remember { mutableStateOf(true) }
-                        AnimatedVisibility(
-                            visible = showBrandedSplash,
-                            exit = fadeOut(animationSpec = tween(250)),
-                        ) {
-                            CinemArchiveSplash(onFinished = { showBrandedSplash = false })
+                            // Sibling of both LoginRoute and CinemArchiveApp (rather than nested
+                            // inside the latter) so it covers sign-in too — added after the app
+                            // content but before the splash below, so it sits under the splash while
+                            // that's still up and over everything once it fades out.
+                            if (showBuildBanner) {
+                                DebugBuildBanner(isDebugBuild)
+                            }
+                            if (callbackFailed) {
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { callbackFailed = false },
+                                    title = { Text("Couldn't finish sign-in") },
+                                    text = { Text("Check your connection and open the sign-in link again. If it has expired, request a new link.") },
+                                    confirmButton = {
+                                        androidx.compose.material3.TextButton(onClick = { callbackFailed = false }) { Text("OK") }
+                                    },
+                                )
+                            }
+                            var showBrandedSplash by remember { mutableStateOf(true) }
+                            AnimatedVisibility(
+                                visible = showBrandedSplash,
+                                exit = fadeOut(animationSpec = tween(250)),
+                            ) {
+                                CinemArchiveSplash(onFinished = { showBrandedSplash = false })
+                            }
                         }
                     }
                 }

@@ -11,7 +11,6 @@ import { Input } from 'src/components/ui/input'
 import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { TicketButton } from './TicketViewer'
-import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
 import { CastCrewSection, CastGrid } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
 import {
@@ -23,6 +22,7 @@ import {
   getUnlockedModes,
   getEarnedModes,
   nextScheduledEpisode,
+  isEpisodeSpoilerHidden,
   mainSeasons,
   orderSeasonsForDisplay,
   seasonLabel,
@@ -700,6 +700,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, i
   const totalCount = totalEpisodeCount(seasons)
   const seriesAvg = avgSeriesRating(seasons)
   const nextScheduled = nextScheduledEpisode(seasons)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
 
   const CARD_WIDTH = 252 // 240px card + 12px gap
 
@@ -845,7 +846,7 @@ function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, i
               <span className="font-mono text-xs mr-1.5" style={{ color: 'var(--amber)' }}>
                 S{nextScheduled.season.seasonNumber} E{nextScheduled.episode.episodeNumber}
               </span>
-              {nextScheduled.episode.episodeName ?? `Episode ${nextScheduled.episode.episodeNumber}`}
+              {(isEpisodeSpoilerHidden(nextScheduled.episode, spoilerProtection, isSharedView) ? null : nextScheduled.episode.episodeName) ?? `Episode ${nextScheduled.episode.episodeNumber}`}
             </div>
           </div>
           <div className="font-mono text-xs shrink-0 text-right" style={{ color: 'var(--amber)' }}>
@@ -865,6 +866,8 @@ function TVSeriesSection({ titleId, tmdbId, seasons, seriesCast, isSharedView, i
           </Eyebrow>
           <SeriesGraph
             seasons={seriesSeasons}
+            spoilerProtection={spoilerProtection}
+            isSharedView={isSharedView}
             onCellClick={(seasonNumber, episodeNumber) => {
               const targetSeason = seasons.find((s) => s.seasonNumber === seasonNumber)
               const ep = targetSeason?.episodes?.find((e) => e.episodeNumber === episodeNumber)
@@ -1440,13 +1443,6 @@ export function TitleDetailDrawer() {
   // Track which title IDs have already been backfilled this session to avoid repeat calls.
   const backfilledRef = useRef<Set<string>>(new Set())
 
-  // Scrollable drawer body — own Lenis instance since the page-level one is `window`-scoped
-  // and already suspended while this dialog holds the scroll lock (see useSmoothScroll.ts).
-  // A callback-ref-backed state, not a plain useRef: the hook needs to re-run exactly when
-  // this node mounts into the Dialog's portal, which a stable ref-object identity can't signal.
-  const [scrollBodyEl, setScrollBodyEl] = useState<HTMLDivElement | null>(null)
-  useScopedSmoothScroll(scrollBodyEl, isDetailDrawerOpen)
-
   // When a TV show is opened and episode metadata is missing, fetch season details
   // from TMDB and hydrate them in-place, then persist to DB. Handles two cases:
   // (a) season rows exist but no episode rows were ever inserted, and
@@ -1664,7 +1660,7 @@ export function TitleDetailDrawer() {
         />
       )}
 
-      <div ref={setScrollBodyEl} className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
+      <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
         {/* Hero: cinematic backdrop (stored or fetched) or blurred-poster fallback */}
         {(title.backdropUrl || heroBackdropUrl) ? (
           <HeroBackdrop

@@ -1,7 +1,7 @@
 import { scaledTextSize } from 'src/lib/textScale'
 import { useState, useRef } from 'react'
 import { cn } from 'src/lib/utils'
-import { avgEpisodeRating } from 'src/store/episodeUtils'
+import { avgEpisodeRating, isEpisodeSpoilerHidden } from 'src/store/episodeUtils'
 import type { Season } from 'src/store/mockData'
 
 // ─── Color scale: unrated, then 1★–5★ (brand: crimson, rust, stone, amber, gold) ───
@@ -37,6 +37,9 @@ interface SeriesGraphProps {
   seasons: Season[]
   onCellClick?: (seasonNumber: number, episodeNumber: number) => void
   className?: string
+  /** Leave unwatched episodes' names out of cell labels and tooltips. */
+  spoilerProtection?: boolean
+  isSharedView?: boolean
 }
 
 interface TooltipState {
@@ -46,7 +49,7 @@ interface TooltipState {
   y: number
 }
 
-export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProps) {
+export function SeriesGraph({ seasons, onCellClick, className, spoilerProtection = false, isSharedView = false }: SeriesGraphProps) {
   const maxEpisodes = Math.max(...seasons.map((s) => s.episodeCount), 1)
   const containerRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
@@ -163,6 +166,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
             const exists = epNum <= season.episodeCount
             const avg = ep ? avgEpisodeRating(ep) : null
             const watched = (ep?.watchEvents.length ?? 0) > 0
+            const epName = isEpisodeSpoilerHidden(ep, spoilerProtection, isSharedView) ? undefined : ep?.episodeName
 
             if (!exists) {
               return <div key={i} style={{ aspectRatio: '1' }} />
@@ -173,7 +177,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
                 key={i}
                 role={onCellClick ? 'button' : undefined}
                 tabIndex={onCellClick ? 0 : undefined}
-                aria-label={ep ? `S${season.seasonNumber}E${epNum}${ep.episodeName ? ` · ${ep.episodeName}` : ''} — ${ratingLabel(avg)}` : `S${season.seasonNumber}E${epNum}`}
+                aria-label={ep ? `S${season.seasonNumber}E${epNum}${epName ? ` · ${epName}` : ''} — ${ratingLabel(avg)}` : `S${season.seasonNumber}E${epNum}`}
                 onClick={() => onCellClick?.(season.seasonNumber, epNum)}
                 onKeyDown={(e) => {
                   if (onCellClick && (e.key === 'Enter' || e.key === ' ')) {
@@ -181,7 +185,7 @@ export function SeriesGraph({ seasons, onCellClick, className }: SeriesGraphProp
                     onCellClick(season.seasonNumber, epNum)
                   }
                 }}
-                onMouseEnter={(e) => showTooltip(e, season, epNum, avg, watched, ep?.episodeName)}
+                onMouseEnter={(e) => showTooltip(e, season, epNum, avg, watched, epName)}
                 onMouseLeave={() => setTooltip(null)}
                 className={cn(
                   'series-graph__cell',

@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { EpisodePanel } from './episode-card'
+import { EpisodeCard, EpisodePanel } from './episode-card'
 import { fetchEpisodeCast } from 'src/lib/media'
-import { makeEpisode, makeSeason } from '@/test/fixtures'
+import { makeEpisode, makeSeason, makeWatchEvent } from '@/test/fixtures'
+import { useAppStore } from 'src/store/useAppStore'
 import type { CastMember } from 'src/store/mockData'
 
 vi.mock('src/lib/media', async (importOriginal) => ({
@@ -27,7 +28,7 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); vi.resetAllMocks(); useAppStore.setState({ spoilerProtection: false }) })
 
 describe('episode cast', () => {
   it('shows guest stars and keeps the series regulars behind a toggle', async () => {
@@ -41,5 +42,58 @@ describe('episode cast', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('button', { name: 'View details for Regular One' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'View details for Regular Two' })).toBeVisible()
+  })
+})
+
+describe('spoiler protection', () => {
+  const spoiler = { episodeName: 'The Twist', synopsis: 'Everyone was a ghost.', stillUrl: 'https://img.test/still.jpg' }
+
+  function renderCard(episode = makeEpisode({ episodeNumber: 3, ...spoiler }), isSharedView = false) {
+    const season = makeSeason({ episodes: [episode] })
+    return render(
+      <EpisodeCard episode={episode} season={season} titleId="t1" isSelected={false} onSelect={vi.fn()} isSharedView={isSharedView} isSpiderNoir={false} />
+    )
+  }
+
+  it('shows the still, name and synopsis when off', () => {
+    const { container } = renderCard()
+    expect(screen.getByText('The Twist')).toBeVisible()
+    expect(screen.getByText('Everyone was a ghost.')).toBeVisible()
+    expect(container.querySelector('img')).not.toBeNull()
+  })
+
+  it('hides an unwatched episode, including from its accessible name', () => {
+    useAppStore.setState({ spoilerProtection: true })
+    const { container } = renderCard()
+    expect(screen.queryByText('The Twist')).not.toBeInTheDocument()
+    expect(screen.queryByText('Everyone was a ghost.')).not.toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('Episode 3')).toBeVisible()
+    expect(screen.getByText('Hidden to avoid spoilers')).toBeVisible()
+    expect(container.innerHTML).not.toContain('The Twist')
+  })
+
+  it('leaves a watched episode visible in the owner view', () => {
+    useAppStore.setState({ spoilerProtection: true })
+    renderCard(makeEpisode({ ...spoiler, watchEvents: [makeWatchEvent()] }))
+    expect(screen.getByText('The Twist')).toBeVisible()
+  })
+
+  it('hides every episode in a shared view, since its watches belong to the owner', () => {
+    useAppStore.setState({ spoilerProtection: true })
+    renderCard(makeEpisode({ ...spoiler, watchEvents: [makeWatchEvent()] }), true)
+    expect(screen.queryByText('The Twist')).not.toBeInTheDocument()
+  })
+
+  it('lets the panel reveal the hidden still and synopsis on request', () => {
+    useAppStore.setState({ spoilerProtection: true })
+    vi.mocked(fetchEpisodeCast).mockResolvedValue({ cast: [], guestStars: [] })
+    const episode = makeEpisode(spoiler)
+    render(
+      <EpisodePanel episode={episode} season={makeSeason({ episodes: [episode] })} titleId="t1" tmdbId={7} isSharedView={false} isSpiderNoir={false} onPersonClick={vi.fn()} />
+    )
+    expect(screen.queryByText('Everyone was a ghost.')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }))
+    expect(screen.getByText('Everyone was a ghost.')).toBeVisible()
   })
 })

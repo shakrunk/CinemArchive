@@ -47,6 +47,7 @@ class PreferencesRepository(context: Context) {
     private val navigationCompactKey = booleanPreferencesKey("navigation_compact")
     private val glassBlurKey = booleanPreferencesKey("glass_blur")
     private val pureBlackKey = booleanPreferencesKey("pure_black")
+    private val spoilerProtectionKey = booleanPreferencesKey("spoiler_protection")
     private val themeSyncEnabledKey = booleanPreferencesKey("theme_sync_enabled")
     // ISO instant of the last user-made appearance change here, or of the synced copy last
     // applied — what theme sync's last-write-wins compares against the account's copy.
@@ -153,6 +154,16 @@ class PreferencesRepository(context: Context) {
             it[pureBlackKey] = enabled
             it[themeUpdatedAtKey] = appearanceStamp()
         }
+    }
+
+    /** Hide the still, name and synopsis of episodes not yet watched. Off by default; a device
+     *  preference like the web app's, and not part of the synced appearance. */
+    fun observeSpoilerProtection(): Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[spoilerProtectionKey] ?: false
+    }
+
+    suspend fun setSpoilerProtection(enabled: Boolean) {
+        dataStore.edit { it[spoilerProtectionKey] = enabled }
     }
 
     /** Opt-in, per device: mirror the appearance to the signed-in account. Off by default. */

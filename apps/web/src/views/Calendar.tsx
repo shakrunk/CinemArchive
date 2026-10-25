@@ -38,7 +38,9 @@ function dayHeading(date: string, today: string): string {
   return label
 }
 
-function eventLabel(event: CalendarEvent): string {
+// Calendar events carry no watch history, so spoiler protection drops every
+// episode name rather than only unwatched ones.
+function eventLabel(event: CalendarEvent, hideEpisodeNames: boolean): string {
   switch (event.kind) {
     case 'release':
       return 'Release day'
@@ -46,7 +48,7 @@ function eventLabel(event: CalendarEvent): string {
       return 'Series premiere'
     case 'episodes': {
       const code = `${seasonShortLabel(event.seasonNumber)} · ${formatEpisodeRange(event.episodeNumbers)}`
-      if (event.episodeName) return `${code} — ${event.episodeName}`
+      if (event.episodeName && !hideEpisodeNames) return `${code} — ${event.episodeName}`
       return event.episodeNumbers.length > 1 ? `${code} (${event.episodeNumbers.length} episodes)` : code
     }
     case 'outing': {
@@ -68,6 +70,7 @@ function useLocalToday(): string {
 
 function EventRow({ event }: { event: CalendarEvent }) {
   const openDetailDrawer = useAppStore((s) => s.openDetailDrawer)
+  const spoilerProtection = useAppStore((s) => s.spoilerProtection)
   const { Icon } = KIND_META[event.kind]
   return (
     <li>
@@ -86,7 +89,7 @@ function EventRow({ event }: { event: CalendarEvent }) {
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-amber">
             <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span className="truncate">{eventLabel(event)}</span>
+            <span className="truncate">{eventLabel(event, spoilerProtection)}</span>
           </span>
         </span>
       </button>

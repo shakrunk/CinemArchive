@@ -59,6 +59,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
 import work.kumarfamilynet.cinemarchive.core.designsystem.PosterSurface
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.designsystem.tintForKey
@@ -339,8 +340,8 @@ private fun CalendarEvent.icon(): ImageVector = when (this) {
     is CalendarEvent.Episodes -> Icons.Filled.Tv
 }
 
-private fun rowLabel(event: CalendarEvent): String {
-    if (event !is CalendarEvent.Outing) return calendarEventLabel(event)
+private fun rowLabel(event: CalendarEvent, hideEpisodeNames: Boolean): String {
+    if (event !is CalendarEvent.Outing) return calendarEventLabel(event, hideEpisodeNames)
     val time = runCatching {
         Instant.parse(event.outing.showtime).atZone(ZoneId.systemDefault())
             .format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
@@ -371,7 +372,7 @@ private fun EventRow(event: CalendarEvent, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(event.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                 Text(
-                    rowLabel(event),
+                    rowLabel(event, LocalSpoilerProtection.current),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,

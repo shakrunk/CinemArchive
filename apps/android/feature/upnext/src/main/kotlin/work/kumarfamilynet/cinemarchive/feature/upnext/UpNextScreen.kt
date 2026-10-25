@@ -100,6 +100,8 @@ import work.kumarfamilynet.cinemarchive.data.OutingsRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 import work.kumarfamilynet.cinemarchive.core.designsystem.ScrollToTopOnReselect
 import work.kumarfamilynet.cinemarchive.core.designsystem.horizontalEdgeFade
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
+import work.kumarfamilynet.cinemarchive.core.model.isEpisodeSpoilerHidden
 
 class UpNextViewModel(
     private val repository: LibraryRepository,
@@ -657,8 +659,10 @@ private fun ContinueWatchingCard(
         )
         Column(modifier = Modifier.weight(1f)) {
             val hasNext = title.nextSeasonNumber != null && title.nextEpisodeNumber != null
+            // The next episode is unwatched by definition, so spoiler protection always hides its name.
+            val nextName = title.nextEpisodeName?.takeUnless { isEpisodeSpoilerHidden(watched = false, LocalSpoilerProtection.current) }
             Text(
-                if (hasNext) title.nextEpisodeName ?: "Episode ${title.nextEpisodeNumber}" else title.name,
+                if (hasNext) nextName ?: "Episode ${title.nextEpisodeNumber}" else title.name,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

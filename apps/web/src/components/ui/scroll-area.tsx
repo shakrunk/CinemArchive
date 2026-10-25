@@ -14,7 +14,6 @@ const ScrollArea = React.forwardRef<
   >
     <ScrollAreaPrimitive.Viewport
       className="h-full w-full rounded-[inherit]"
-      data-lenis-prevent
     >
       {children}
     </ScrollAreaPrimitive.Viewport>

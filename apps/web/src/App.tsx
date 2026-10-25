@@ -19,7 +19,6 @@ import { LibrarySyncDialog } from 'src/components/LibrarySyncDialog'
 import { PWAUpdateToast } from 'src/components/PWAUpdateToast'
 import { LandingScreen } from 'src/components/LandingScreen'
 import { useKeyboardShortcuts } from 'src/lib/useKeyboardShortcuts'
-import { useSmoothScroll } from 'src/lib/useSmoothScroll'
 import { useTabVisibility } from 'src/lib/useTabVisibility'
 import { watchTextPreferences } from 'src/lib/textPreferences'
 
@@ -86,7 +85,6 @@ export default function App() {
   useNavigationSync({ currentView, setCurrentView })
   useOutingReconciler()
   useEpisodeScheduleRefresh()
-  useSmoothScroll()
   useTabVisibility()
 
   const [isProfileOpen, setIsProfileOpen] = useState(false)

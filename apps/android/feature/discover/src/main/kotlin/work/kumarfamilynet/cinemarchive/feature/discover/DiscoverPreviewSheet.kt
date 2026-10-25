@@ -54,6 +54,8 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
 import work.kumarfamilynet.cinemarchive.core.model.catalogWatchRegion
 import work.kumarfamilynet.cinemarchive.core.model.isSpecials
+import work.kumarfamilynet.cinemarchive.core.designsystem.LocalSpoilerProtection
+import work.kumarfamilynet.cinemarchive.core.model.isEpisodeSpoilerHidden
 import work.kumarfamilynet.cinemarchive.data.CatalogExtrasController
 import work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource
 import work.kumarfamilynet.cinemarchive.data.DiscoverRepository
@@ -292,6 +294,8 @@ private fun PreviewEpisodes(
 @Composable
 private fun PreviewEpisodeRow(episode: MediaEpisode, seasonNumber: Int) {
     var expanded by rememberSaveable("$seasonNumber-${episode.episodeNumber}") { mutableStateOf(false) }
+    // Nothing here is in the library yet, so nothing has been watched.
+    val spoilerHidden = isEpisodeSpoilerHidden(watched = false, LocalSpoilerProtection.current)
     Surface(
         onClick = { expanded = !expanded },
         shape = RoundedCornerShape(14.dp),
@@ -299,7 +303,7 @@ private fun PreviewEpisodeRow(episode: MediaEpisode, seasonNumber: Int) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(modifier = Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            episode.stillUrl?.let {
+            episode.stillUrl?.takeUnless { spoilerHidden }?.let {
                 PosterSurface(
                     tint = tintForKey("$seasonNumber-${episode.episodeNumber}"),
                     imageUrl = it,
@@ -310,14 +314,14 @@ private fun PreviewEpisodeRow(episode: MediaEpisode, seasonNumber: Int) {
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "E${episode.episodeNumber} · ${episode.name ?: "Episode ${episode.episodeNumber}"}",
+                    "E${episode.episodeNumber} · ${episode.name?.takeUnless { spoilerHidden } ?: "Episode ${episode.episodeNumber}"}",
                     style = MaterialTheme.typography.titleSmall,
                 )
                 val meta = listOfNotNull(episode.airDate, episode.runtime?.let { "${it}m" }).joinToString(" · ")
                 if (meta.isNotEmpty()) {
                     Text(meta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                episode.synopsis?.takeIf { it.isNotBlank() }?.let {
+                episode.synopsis?.takeIf { it.isNotBlank() && !spoilerHidden }?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.bodySmall,

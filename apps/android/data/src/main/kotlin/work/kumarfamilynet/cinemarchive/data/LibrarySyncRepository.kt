@@ -217,7 +217,8 @@ class LibrarySyncRepository(
         // Persist before any ACK can drain the queue. A crash after ACK must still replay
         // rows/tombstones skipped while credits, title edits or natural-key memberships were protected.
         val pendingAtStart = pendingKeys()
-        if (pendingAtStart.any { key -> listOf("title_credits:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }) {
+        val epochResetKey = pendingAtStart.firstOrNull { key -> listOf("title_credits:", "title_metadata:", "list_membership:", "viewing_history:", "moviegoing:", "library_import:", "provider_merge:", "outing_lifecycle:", "episode_bulk:").any(key::startsWith) }
+        if (epochResetKey != null) {
             dataStore.edit { it[cursorKey] = EPOCH }
         }
         // Catalog commands replay from a durable floor instead: the daily episode-schedule check
@@ -246,6 +247,10 @@ class LibrarySyncRepository(
         val storedSchemaVersion = prefs[schemaVersionKey] ?: 1
         var cursor = if (storedSchemaVersion < SYNC_SCHEMA_VERSION) EPOCH
             else earlierCursor(prefs[replayFloorKey], prefs[cursorKey] ?: EPOCH)
+        // A from-epoch pull re-reads the whole library, so say why one started: release builds
+        // can't be inspected with run-as, but this still reaches logcat.
+        if (cursor == EPOCH) android.util.Log.i("LibrarySync", "full pull: schema=$storedSchemaVersion " +
+            "cursor=${prefs[cursorKey]} floor=${prefs[replayFloorKey]} resetKey=${epochResetKey?.substringBefore(':')}")
         // Durable before the first page moves the cursor: a deferred row can be skipped at the
         // final flush, behind cursors already persisted.
         val runSince = cursor

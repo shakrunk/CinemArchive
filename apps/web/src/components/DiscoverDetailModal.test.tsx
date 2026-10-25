@@ -27,7 +27,6 @@ function props(result: SearchResult | null = movie) {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  // jsdom has no layout; leave smooth scrolling disabled while exercising the real UI.
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} })
   vi.mocked(fetchMediaDetails).mockResolvedValue({ result: hydrated, tmdbSeasons: [] })

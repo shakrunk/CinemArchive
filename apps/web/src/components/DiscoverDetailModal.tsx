@@ -11,7 +11,6 @@ import { DiscoverEpisodeBrowser } from 'src/components/DiscoverEpisodeBrowser'
 import { FranchiseSection } from 'src/components/FranchiseSection'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import type { PersonDetailTarget } from 'src/components/PersonDetailPanel'
-import { useScopedSmoothScroll } from 'src/lib/useSmoothScroll'
 
 interface DiscoverDetailModalProps {
   result: SearchResult | null
@@ -35,8 +34,6 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
   const [tmdbSeasons, setTmdbSeasons] = useState<RawTmdbSeason[]>([])
   const [providers, setProviders] = useState<WatchProviders | null | undefined>(undefined)
   const [expanded, setExpanded] = useState(false)
-  const [scrollBody, setScrollBody] = useState<HTMLDivElement | null>(null)
-  useScopedSmoothScroll(scrollBody, true)
   const hydrating = details === null
 
   useEffect(() => {
@@ -77,7 +74,7 @@ function DiscoverTitlePreview({ result, isOwned, isSharedView, onClose, onAdd, o
       expanded={expanded}
       onToggleExpand={() => setExpanded((value) => !value)}
     >
-      <div ref={setScrollBody} className="overflow-y-auto flex-1 min-h-0 scrollbar-thin">
+      <div className="overflow-y-auto flex-1 min-h-0 scrollbar-thin">
         {/* Backdrop */}
         {hasBackdrop ? (
           <div className="relative aspect-16/8 overflow-hidden shrink-0">

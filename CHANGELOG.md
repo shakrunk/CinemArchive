@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Changed
+
+- Web: replaced the inertia smooth-scrolling with native browser scrolling for a snappier feel, keeping contained overscroll at vertical and horizontal scroll edges.
+
 ## [1.43.0] - 2026-10-24
 
 ### Added

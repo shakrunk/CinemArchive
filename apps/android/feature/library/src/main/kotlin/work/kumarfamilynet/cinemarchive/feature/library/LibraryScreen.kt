@@ -109,7 +109,8 @@ class LibraryViewModel(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                librarySyncRepository.syncNow()
+                // Offline just leaves the list as it is; the next trigger retries.
+                librarySyncRepository.trySyncNow()
             } finally {
                 _isRefreshing.value = false
             }

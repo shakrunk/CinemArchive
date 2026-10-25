@@ -73,7 +73,7 @@
 
   --shadow-cinematic: 0 24px 60px -28px rgba(0, 0, 0, 0.85), 0 4px 14px -8px rgba(0, 0, 0, 0.6);
   --shadow-lift: 0 40px 90px -32px rgba(0, 0, 0, 0.9), 0 10px 30px -12px rgba(0, 0, 0, 0.7);
-  --shadow-glow: 0 0 0 1px rgba(233, 178, 102, 0.32), 0 18px 50px -18px rgba(233, 178, 102, 0.28);
+  --shadow-glow: var(--glow);
 
   --ease-cine: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
@@ -1280,7 +1280,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(80% 60% at 20% -10%, rgba(233, 178, 102, 0.1), transparent 60%);
+    background: radial-gradient(80% 60% at 20% -10%, rgb(var(--amber-rgb) / 0.1), transparent 60%);
   }
   .stat-card:hover {
     transform: translateY(-3px);
@@ -1616,7 +1616,7 @@
     height: 22px;
     border-radius: 999px;
     flex-shrink: 0;
-    background: linear-gradient(to bottom, var(--amber-bright), rgba(196, 134, 58, 0.2));
+    background: linear-gradient(to bottom, var(--amber-bright), rgb(var(--amber-deep-rgb) / 0.2));
   }
 
   /* bars + columns that grow on mount */
@@ -1855,7 +1855,7 @@
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(233, 178, 102, 0.06), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--amber-rgb) / 0.06), transparent);
   animation: skeleton-sweep 1.6s ease-in-out infinite;
 }
 @keyframes skeleton-sweep {
@@ -2016,12 +2016,12 @@
   border: 1px solid transparent;
 }
 .episode-row:hover {
-  background: rgba(233, 178, 102, 0.05);
+  background: rgb(var(--amber-rgb) / 0.05);
   border-color: var(--line);
 }
 .episode-row.is-expanded {
-  background: rgba(233, 178, 102, 0.07);
-  border-color: rgba(233, 178, 102, 0.2);
+  background: rgb(var(--amber-rgb) / 0.07);
+  border-color: rgb(var(--amber-rgb) / 0.2);
 }
 .episode-row.is-watched .ep-num {
   color: var(--amber);
@@ -2259,7 +2259,7 @@ body.spider-noir-color .projector-beam {
   transition: background 0.12s ease;
 }
 .command-item.is-active {
-  background: rgba(233, 178, 102, 0.1);
+  background: rgb(var(--amber-rgb) / 0.1);
 }
 .command-item__kind {
   font-family: var(--mono);

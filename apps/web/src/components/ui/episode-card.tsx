@@ -120,8 +120,8 @@ export function EpisodeCard({
             aria-label={watched ? 'Mark as watched again' : 'Mark as watched'}
             className="absolute top-1.5 right-1.5 rounded-full p-1 transition-all hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
-              background: watched ? 'rgba(233,178,102,0.22)' : 'rgba(0,0,0,0.55)',
-              border: watched ? '1px solid rgba(233,178,102,0.4)' : '1px solid transparent',
+              background: watched ? 'rgb(var(--amber-rgb) / 0.22)' : 'rgba(0,0,0,0.55)',
+              border: watched ? '1px solid rgb(var(--amber-rgb) / 0.4)' : '1px solid transparent',
             }}
           >
             <Eye

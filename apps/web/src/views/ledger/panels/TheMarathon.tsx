@@ -67,7 +67,7 @@ export function TheMarathon({ className, settings, width = 'sm' }: { className?:
                 className={cn('w-full max-w-[13px] aspect-square rounded-full justify-self-center', isToday && 'ring-1 ring-amber-bright/60 ring-offset-1 ring-offset-transparent')}
                 style={{
                   background: active ? 'var(--amber)' : 'var(--wash)',
-                  boxShadow: active ? '0 0 6px -1px rgba(233,178,102,0.5)' : undefined,
+                  boxShadow: active ? '0 0 6px -1px rgb(var(--amber-rgb) / 0.5)' : undefined,
                 }}
               />
             )

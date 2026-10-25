@@ -108,7 +108,7 @@ function HomeCollectionRow() {
       </span>
       <span
         className="inline-flex items-center gap-1.5 h-8 rounded-md px-2.5 font-sans text-xs text-amber shrink-0"
-        style={{ background: 'rgba(233,178,102,0.08)', border: '1px solid rgba(233,178,102,0.3)' }}
+        style={{ background: 'rgb(var(--amber-rgb) / 0.08)', border: '1px solid rgb(var(--amber-rgb) / 0.3)' }}
         title="This title is part of your home collection"
       >
         <Home className="w-3.5 h-3.5" />
@@ -358,8 +358,8 @@ export function WatchProvidersSection({
             aria-pressed={inHomeCollection}
             className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 font-mono text-xs transition-colors hover:border-amber/50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
             style={{
-              background: inHomeCollection ? 'rgba(233,178,102,0.12)' : 'var(--inset)',
-              border: `1px solid ${inHomeCollection ? 'rgba(233,178,102,0.38)' : 'var(--line)'}`,
+              background: inHomeCollection ? 'rgb(var(--amber-rgb) / 0.12)' : 'var(--inset)',
+              border: `1px solid ${inHomeCollection ? 'rgb(var(--amber-rgb) / 0.38)' : 'var(--line)'}`,
               color: inHomeCollection ? 'var(--amber)' : 'var(--paper-faint)',
             }}
           >

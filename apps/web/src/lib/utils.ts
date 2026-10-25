@@ -117,7 +117,7 @@ export function rankBarFill(ratio: number, isTop: boolean, delayMs: number): Rea
 export function rankBubbleAccent(isTop: boolean, boxShadowSpreadPx: number, delayMs: number): React.CSSProperties {
   return {
     border: isTop ? 'none' : '1px solid var(--line-2)',
-    boxShadow: isTop ? `0 8px ${boxShadowSpreadPx}px -8px rgba(233,178,102,0.55)` : 'var(--shadow)',
+    boxShadow: isTop ? `0 8px ${boxShadowSpreadPx}px -8px rgb(var(--amber-rgb) / 0.55)` : 'var(--shadow)',
     opacity: 0,
     transform: 'scale(0)',
     animationDelay: `${delayMs}ms`,

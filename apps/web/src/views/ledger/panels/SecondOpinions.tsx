@@ -83,7 +83,7 @@ export function SecondOpinions({ className, settings, width = 'lg' }: { classNam
                     className="font-mono text-[11px] px-1.5 py-0.5 rounded-md border shrink-0"
                     style={{
                       color: up ? 'var(--amber-bright)' : 'var(--ember)',
-                      borderColor: up ? 'rgba(233,178,102,0.3)' : 'rgba(200,90,60,0.35)',
+                      borderColor: up ? 'rgb(var(--amber-rgb) / 0.3)' : 'rgba(200,90,60,0.35)',
                     }}
                     {...tip.bind({
                       label: r.title.title,

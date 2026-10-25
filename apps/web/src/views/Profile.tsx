@@ -230,7 +230,7 @@ function AccountSection({ profile }: { profile: MyProfile | null }) {
       <div className="flex items-center gap-4">
         <div
           className="w-14 h-14 rounded-full shrink-0 flex items-center justify-center font-serif text-lg text-amber border"
-          style={{ borderColor: 'var(--line)', background: 'rgba(233,178,102,0.08)' }}
+          style={{ borderColor: 'var(--line)', background: 'rgb(var(--amber-rgb) / 0.08)' }}
           aria-hidden="true"
         >
           {initialsOf(displayName) || 'A'}

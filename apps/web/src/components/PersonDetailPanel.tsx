@@ -118,12 +118,12 @@ export function PersonDetailPanel({ person, onClose }: PersonDetailPanelProps) {
             onClick={handleBrowse}
             className="w-full py-2 rounded-lg font-mono text-sm transition-colors"
             style={{
-              background: 'rgba(233,178,102,0.08)',
-              border: '1px solid rgba(233,178,102,0.2)',
+              background: 'rgb(var(--amber-rgb) / 0.08)',
+              border: '1px solid rgb(var(--amber-rgb) / 0.2)',
               color: 'var(--amber)',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(233,178,102,0.14)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(233,178,102,0.08)')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgb(var(--amber-rgb) / 0.14)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgb(var(--amber-rgb) / 0.08)')}
           >
             Browse library — {person.name}
           </button>

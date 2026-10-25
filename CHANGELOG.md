@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-10-25
+
 ### Added
 
 - **Android update sheet.** A new sheet shows what changed in the release, then Download (with the size), real download progress, and Install, with a clear message and a retry for every failure. It opens from a banner at the top of every tab when an update is available, from Settings → About, and from the update notifications. The banner can be dismissed until the next release. After an in-app update, the new version confirms it was installed, with a link to what's new.

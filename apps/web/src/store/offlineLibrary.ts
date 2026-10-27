@@ -1,9 +1,9 @@
 import { supabase } from '../lib/auth'
-import { fetchAllTitlePins, fetchLedgerLayout, fetchListMemberships, fetchLists, fetchUserLibrary } from '../lib/db'
+import { fetchAllTitlePins, fetchLedgerLayout, fetchListMemberships, fetchLists, fetchUserLibrary, type CreditPlan } from '../lib/db'
 import { OfflineCoordinator, type DeliveryContext, type DeliveryResult, type ExclusiveLock, type OfflineCoordinatorState } from '../lib/offline/coordinator'
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
-import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
-import type { Mutation, PendingCommand } from '../lib/offline/commands'
+import { emptySnapshot, staleCreditTitles, type OfflineSnapshot } from '../lib/offline/snapshot'
+import { scopeKey, type Mutation, type PendingCommand } from '../lib/offline/commands'
 import { createCommand } from '../lib/offline/commands'
 import { DEFAULT_NAV_ORDER } from '../lib/navigation'
 import type { TicketCapture } from '../lib/tickets/types'
@@ -19,16 +19,22 @@ import type { VenueNoteReview } from '../lib/venueNotes'
  * refreshes still fetch whenever they run. */
 export const WAKE_REFRESH_INTERVAL_MS = 10 * 60 * 1000
 
+/** Every title's credits are re-read at least this often. In between, owner
+ * refreshes read credits only for titles whose cached ones may be stale (see
+ * createOwnerSnapshotFetcher), since credits are most of a library's bytes. */
+export const CREDIT_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000
+const CREDITS_READ_KEY = 'cinemarchive-credits-read-v1'
+
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
 export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
 
 /** No partial refresh can be mistaken for an authoritative empty domain. The
  * caller holds the coordinator lock and checks its generation before applying. */
-export async function fetchOwnerSnapshot(context: DeliveryContext, requireTickets = false): Promise<OfflineSnapshot> {
+export async function fetchOwnerSnapshot(context: DeliveryContext, requireTickets = false, planCredits?: CreditPlan): Promise<OfflineSnapshot> {
   if (!context.isCurrent()) throw new Error('Library owner changed')
   const userId = context.scope.userId
   const [library, lists, listMemberships, pins, ledgerWidgets, tickets, moviegoing] = await Promise.all([
-    fetchUserLibrary(userId), fetchLists(userId), fetchListMemberships(userId),
+    fetchUserLibrary(userId, planCredits), fetchLists(userId), fetchListMemberships(userId),
     fetchAllTitlePins(userId), fetchLedgerLayout(userId),
     ticketRemote.descriptors(context),
     fetchOwnedMoviegoingPreferences(context),
@@ -39,6 +45,43 @@ export async function fetchOwnerSnapshot(context: DeliveryContext, requireTicket
     rowRevisions: { ...library.rowRevisions, ...Object.fromEntries(lists.map((list) => [`lists:${list.id}`, list.updatedAt])) },
     pinnedModes: Object.fromEntries(pins.map((pin) => [`${pin.titleId}:${pin.easterEggKey}`, pin.pinnedVariant])),
   }, tickets), moviegoing)
+}
+
+export interface OwnerSnapshotOptions {
+  requireTickets?: boolean
+  /** Titles a just-delivered command rewrote credits for. */
+  creditTitleIds?: readonly string[]
+}
+export type OwnerSnapshotFetcher = (context: DeliveryContext, options?: OwnerSnapshotOptions) => Promise<OfflineSnapshot>
+
+export interface CreditReadStamps { get(key: string): number; set(key: string, at: number): void }
+const localCreditReadStamps: CreditReadStamps = {
+  get: (key) => {
+    try { return Number(localStorage.getItem(`${CREDITS_READ_KEY}:${key}`)) || 0 } catch { return 0 }
+  },
+  set: (key, at) => {
+    try { localStorage.setItem(`${CREDITS_READ_KEY}:${key}`, String(at)) } catch { /* the next fetch reads every title's credits */ }
+  },
+}
+
+/** Owner snapshots that read credits only for titles whose cached credits may
+ * be stale, judged against the base already stored for this owner. Every
+ * title's credits are read on the first fetch and then once per
+ * CREDIT_REFRESH_INTERVAL_MS. Call only under the coordinator lock, so the
+ * stored base cannot change between this read and the merge. */
+export function createOwnerSnapshotFetcher(options: { store: Pick<IndexedDbOfflineStore, 'read'>; now?: () => number; stamps?: CreditReadStamps }): OwnerSnapshotFetcher {
+  const now = options.now ?? Date.now
+  const stamps = options.stamps ?? localCreditReadStamps
+  return async (context, { requireTickets = false, creditTitleIds } = {}) => {
+    const key = scopeKey(context.scope)
+    const previous = await options.store.read(context.scope).then((read) => read.document.base, () => undefined)
+    const startedAt = now()
+    const full = !previous?.titles.length || startedAt - stamps.get(key) >= CREDIT_REFRESH_INTERVAL_MS
+    const snapshot = await fetchOwnerSnapshot(context, requireTickets,
+      full ? undefined : (titles, revisions) => staleCreditTitles(previous, titles, revisions, creditTitleIds))
+    if (full && context.isCurrent()) stamps.set(key, startedAt)
+    return snapshot
+  }
 }
 
 export interface OfflineLibraryStatus {
@@ -55,7 +98,7 @@ interface RuntimeOptions {
   onError: (error: unknown) => void
   deliver: (command: PendingCommand, context: DeliveryContext) => Promise<DeliveryResult>
   isAuthenticated?: (userId: string) => Promise<boolean>
-  fetchBase?: typeof fetchOwnerSnapshot
+  fetchBase?: OwnerSnapshotFetcher
   ownerStorage?: IndexedDbOfflineStore
   anonymousStorage?: IndexedDbOfflineStore
   lock?: ExclusiveLock
@@ -88,6 +131,7 @@ export class OfflineLibraryRuntime {
   private lastBaseAt = 0
   private refreshing: Promise<void> | undefined
   private readonly now: () => number
+  private readonly fetchOwnerBase: OwnerSnapshotFetcher
 
   constructor(options: RuntimeOptions) {
     this.options = options
@@ -95,6 +139,7 @@ export class OfflineLibraryRuntime {
     this.ownerStorage = options.ownerStorage ?? new IndexedDbOfflineStore()
     this.anonymousScope = { projectId: options.projectId, userId: 'anonymous-local-only' }
     this.now = options.now ?? Date.now
+    this.fetchOwnerBase = options.fetchBase ?? createOwnerSnapshotFetcher({ store: this.ownerStorage, now: this.now })
     this.coordinator = new OfflineCoordinator({
       store: this.ownerStorage,
       deliver: async (command, context) => {
@@ -194,7 +239,7 @@ export class OfflineLibraryRuntime {
   }
   private readonly fetchBase = async (context: DeliveryContext): Promise<OfflineSnapshot> => {
     const generation = this.generation
-    const base = await (this.options.fetchBase ?? fetchOwnerSnapshot)(context)
+    const base = await this.fetchOwnerBase(context)
     if (generation === this.generation) this.lastBaseAt = this.now()
     return base
   }

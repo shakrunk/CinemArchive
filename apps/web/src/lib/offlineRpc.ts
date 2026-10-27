@@ -1,6 +1,6 @@
 import { supabase } from './auth'
 import type { CastMember, CrewMember, Episode, EpisodeCrew, Season } from '../store/mockData'
-import { sameScope, type PendingCommand, type TrackingMutation } from './offline/commands'
+import { sameScope, type Mutation, type PendingCommand, type TrackingMutation } from './offline/commands'
 import type { DeliveryContext, DeliveryResult } from './offline/coordinator'
 import type { OfflineSnapshot } from './offline/snapshot'
 import { isTicketMutation } from './tickets/types'
@@ -183,7 +183,22 @@ export function classifyLibraryError(status: number, code: string | undefined, m
   return {kind:'failed',message}
 }
 
-export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContext)=>Promise<OfflineSnapshot>, deliverTicket?: (command: PendingCommand, context: DeliveryContext) => Promise<DeliveryResult>, onOutingReverted?: (outingId: string) => void) {
+/** Titles whose credits a command rewrites. The snapshot refetched after its
+ * delivery reads credits for these even when nothing else marks them stale. */
+export function creditTitleIds(mutation: Mutation): string[] {
+  const ids = (mutation.kind === 'batch' ? mutation.mutations : [mutation]).flatMap((leaf): string[] => {
+    switch (leaf.kind) {
+      case 'title.create': return [leaf.title.id]
+      case 'title.patch': return 'cast' in leaf.patch || 'crew' in leaf.patch ? [leaf.titleId] : []
+      case 'season.put': return leaf.season.cast || leaf.season.episodes?.some((episode) => episode.crew) ? [leaf.titleId] : []
+      case 'episode.metadata': return 'crew' in leaf.patch ? [leaf.titleId] : []
+      default: return []
+    }
+  })
+  return [...new Set(ids)]
+}
+
+export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContext, options?: { creditTitleIds?: readonly string[] })=>Promise<OfflineSnapshot>, deliverTicket?: (command: PendingCommand, context: DeliveryContext) => Promise<DeliveryResult>, onOutingReverted?: (outingId: string) => void) {
   return async (command: PendingCommand, context: DeliveryContext): Promise<DeliveryResult> => {
     if (isTicketMutation(command.mutation)) return deliverTicket ? deliverTicket(command, context) : { kind: 'failed', message: 'Ticket attachment sync is not configured. Your saved photo remains on this device.' }
     const project=import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -223,7 +238,7 @@ export function createLibraryCommandDelivery(fetchBase: (context: DeliveryContex
     if (!context.isCurrent() || context.signal.aborted) return {kind:'auth',message:'Account changed during sync.'}
     // Receipts intentionally describe the ORIGINAL result. A fresh snapshot
     // preserves edits made on another device after that command was committed.
-    const canonicalBase=await fetchBase(context)
+    const canonicalBase=await fetchBase(context, { creditTitleIds: creditTitleIds(command.mutation) })
     const interests = command.mutation.kind === 'batch' ? command.mutation.mutations : [command.mutation]
     if (interests.some((mutation) => mutation.kind === 'theaterInterest.set' || mutation.kind === 'venueNote.change') && canonicalBase.moviegoingPreferencesSupport !== 'authoritative') {
       return { kind: 'retry', message: 'The saved moviegoing preference needs an authoritative server read before confirmation. Retry when moviegoing preference sync is available.' }

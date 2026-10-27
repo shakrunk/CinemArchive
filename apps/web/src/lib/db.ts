@@ -250,6 +250,26 @@ const CAST_COLUMNS = 'tmdb_person_id, name, character_name, episode_count, profi
 const TITLE_CREW_COLUMNS = 'tmdb_person_id, name, job, department, profile_url'
 const EPISODE_CREW_COLUMNS = 'tmdb_person_id, name, job'
 const EPISODE_COLUMNS = 'id, season_number, episode_number, episode_name, air_date, runtime, synopsis, still_url, updated_at'
+const CREDIT_SELECT = `
+  title_cast (${CAST_COLUMNS}),
+  title_crew (${TITLE_CREW_COLUMNS}),
+  seasons (id, season_cast (${CAST_COLUMNS})),
+  episodes (id, episode_crew (${EPISODE_CREW_COLUMNS}))
+`
+// Everything except credits. Credits are about two thirds of a library's bytes
+// yet only change when a title's metadata is refreshed, so routine owner
+// refreshes read them separately (see fetchUserLibrary).
+const TITLE_CORE_SELECT = `
+  *,
+  seasons (*),
+  viewings (*),
+  episodes (
+    ${EPISODE_COLUMNS},
+    episode_watch_events (*),
+    episode_ratings (*),
+    episode_reviews (*)
+  )
+`
 const TITLE_SELECT = `
   *,
   title_cast (${CAST_COLUMNS}),
@@ -271,49 +291,98 @@ const TITLE_SELECT = `
 // Titles per library request. Each page is a separate statement, so a large
 // library never has to fit inside one statement timeout.
 const LIBRARY_PAGE_SIZE = 100
+// Title ids per credit request when only some titles' credits are read; keeps
+// the `id=in.(...)` filter well inside URL length limits.
+const CREDIT_ID_CHUNK = 50
 
 // Keyset-paginated (by id) so a title added mid-load can't shift a page
 // boundary and drop or duplicate a row the way offset paging would.
-async function fetchTitleRows(userId: string, message: string): Promise<Record<string, unknown>[]> {
+async function fetchTitleRows(userId: string, message: string, select = TITLE_SELECT, ids?: readonly string[]): Promise<Record<string, unknown>[]> {
   const rows: Record<string, unknown>[] = []
   let lastId: string | undefined
   for (;;) {
     let query = supabase!
       .from('titles')
-      .select(TITLE_SELECT)
+      .select(select)
       .eq('user_id', userId)
+    // PostgREST rejects modifiers on a resource the select does not embed.
+    if (select !== TITLE_CORE_SELECT) query = query
       .order('cast_order', { referencedTable: 'title_cast' })
       .limit(MAX_STORED_CAST, { referencedTable: 'title_cast' })
       .order('cast_order', { referencedTable: 'seasons.season_cast' })
       .limit(MAX_STORED_CAST, { referencedTable: 'seasons.season_cast' })
-      .order('id')
-      .limit(LIBRARY_PAGE_SIZE)
+    if (ids) query = query.in('id', ids as string[])
+    query = query.order('id').limit(LIBRARY_PAGE_SIZE)
     if (lastId) query = query.gt('id', lastId)
     const { data, error } = await query
     unwrap(error, message)
-    const page = data || []
+    const page = (data || []) as unknown as Record<string, unknown>[]
     rows.push(...page)
     if (page.length < LIBRARY_PAGE_SIZE) return rows
     lastId = page[page.length - 1].id as string
   }
 }
 
+async function fetchCreditRows(userId: string, ids: readonly string[] | 'all'): Promise<Record<string, unknown>[]> {
+  const select = `id, ${CREDIT_SELECT}`
+  if (ids === 'all') return fetchTitleRows(userId, 'Error fetching library credits:', select)
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += CREDIT_ID_CHUNK) chunks.push(ids.slice(i, i + CREDIT_ID_CHUNK))
+  return (await Promise.all(chunks.map((chunk) => fetchTitleRows(userId, 'Error fetching library credits:', select, chunk)))).flat()
+}
+
+/** Copies credit embeds onto core rows so mapDbTitleToLocal sees one full row. */
+function attachCredits(row: Record<string, unknown>, credits: Record<string, unknown> | undefined): Record<string, unknown> {
+  const byId = (list: unknown) => new Map(((list as Record<string, unknown>[] | undefined) ?? []).map((child) => [child.id, child]))
+  const seasons = byId(credits?.seasons), episodes = byId(credits?.episodes)
+  return {
+    ...row,
+    title_cast: credits?.title_cast ?? [],
+    title_crew: credits?.title_crew ?? [],
+    seasons: ((row.seasons as Record<string, unknown>[] | undefined) ?? []).map((season) => ({ ...season, season_cast: seasons.get(season.id)?.season_cast ?? [] })),
+    episodes: ((row.episodes as Record<string, unknown>[] | undefined) ?? []).map((episode) => ({ ...episode, episode_crew: episodes.get(episode.id)?.episode_crew ?? [] })),
+  }
+}
+
+export interface UserLibrary {
+  titles: Title[]
+  outings: CinemaOuting[]
+  rowRevisions?: Record<string, string>
+  /** Set when credits were read for only these titles; see OfflineSnapshot.creditsFor. */
+  creditsFor?: string[]
+}
+
+/** Picks whose credits to read once the credit-free titles and their revisions
+ * are known: 'all', or the ids of titles whose cached credits may be stale. */
+export type CreditPlan = (titles: Title[], rowRevisions: Record<string, string>) => 'all' | string[]
+
 // Cinema outings are owner-private (rule §9) — folded into the owner's own
 // library fetch only, never into fetchSharedLibrary/fetchFriendLibrary below.
-export async function fetchUserLibrary(userId: string): Promise<{ titles: Title[]; outings: CinemaOuting[]; rowRevisions?: Record<string, string> }> {
+// Without a plan every title's credits are read. With one, the credit-free core
+// is read first and only the titles the plan names get credits.
+export async function fetchUserLibrary(userId: string, planCredits?: CreditPlan): Promise<UserLibrary> {
   if (!supabase) return { titles: [], outings: [] }
 
-  const [data, { data: outingRows, error: outingsError }] = await Promise.all([
-    fetchTitleRows(userId, 'Error fetching user library:'),
+  const [core, { data: outingRows, error: outingsError }] = await Promise.all([
+    fetchTitleRows(userId, 'Error fetching user library:', planCredits ? TITLE_CORE_SELECT : TITLE_SELECT),
     supabase.from('cinema_outings').select('*').eq('user_id', userId),
   ])
 
   unwrap(outingsError, 'Error fetching cinema outings:')
+  const rowRevisions = collectRowRevisions(core, outingRows || [])
+  const outings = (outingRows || []).map(mapDbOutingToLocal)
+  if (!planCredits) return { titles: core.map(mapDbTitleToLocal), outings, rowRevisions }
 
+  const plan = planCredits(core.map(mapDbTitleToLocal), rowRevisions)
+  const wanted = plan === 'all' ? undefined : new Set(plan)
+  const ids = plan === 'all' ? 'all' : core.map((row) => row.id as string).filter((id) => wanted!.has(id))
+  const credits = ids === 'all' || ids.length ? await fetchCreditRows(userId, ids) : []
+  const creditsById = new Map(credits.map((row) => [row.id, row]))
   return {
-    titles: data.map(mapDbTitleToLocal),
-    outings: (outingRows || []).map(mapDbOutingToLocal),
-    rowRevisions: collectRowRevisions(data, outingRows || []),
+    titles: core.map((row) => attachCredits(row, creditsById.get(row.id))).map(mapDbTitleToLocal),
+    outings,
+    rowRevisions,
+    ...(ids === 'all' ? {} : { creditsFor: ids }),
   }
 }
 

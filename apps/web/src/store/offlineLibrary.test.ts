@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OfflineLibraryRuntime, WAKE_REFRESH_INTERVAL_MS, fetchOwnerSnapshot, readLegacyDevicePreferences, pickDevicePreferences } from './offlineLibrary'
+import { CREDIT_REFRESH_INTERVAL_MS, OfflineLibraryRuntime, WAKE_REFRESH_INTERVAL_MS, createOwnerSnapshotFetcher, fetchOwnerSnapshot, readLegacyDevicePreferences, pickDevicePreferences } from './offlineLibrary'
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
 import { createCommand } from '../lib/offline/commands'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
@@ -263,6 +263,38 @@ describe('safe cache migration and strict owner refresh', () => {
     vi.mocked(fetchLedgerLayout).mockResolvedValue(null)
     vi.mocked(fetchAllTitlePins).mockRejectedValue(new Error('pins unavailable'))
     await expect(fetchOwnerSnapshot({ scope: { projectId: 'project', userId: 'owner' }, signal: new AbortController().signal, isCurrent: () => true })).rejects.toThrow('pins unavailable')
+  })
+
+  it('reads every credit first and once a day, and otherwise only stale or rewritten titles', async () => {
+    vi.mocked(fetchUserLibrary).mockResolvedValue({ titles: [title], outings: [] })
+    vi.mocked(fetchLists).mockResolvedValue([])
+    vi.mocked(fetchListMemberships).mockResolvedValue({})
+    vi.mocked(fetchLedgerLayout).mockResolvedValue(null)
+    vi.mocked(fetchAllTitlePins).mockResolvedValue([])
+    const scope = { projectId: 'project', userId: 'owner' }
+    const context = { scope, signal: new AbortController().signal, isCurrent: () => true }
+    const store = new IndexedDbOfflineStore({ indexedDB: new IDBFactory(), databaseName: 'credits' })
+    stores.push(store)
+    let clock = 1_000
+    const saved = new Map<string, number>()
+    const fetchBase = createOwnerSnapshotFetcher({ store, now: () => clock, stamps: { get: (key) => saved.get(key) ?? 0, set: (key, at) => saved.set(key, at) } })
+    const plan = () => vi.mocked(fetchUserLibrary).mock.lastCall?.[1]
+
+    // Nothing cached yet: every credit, and the read is remembered.
+    await fetchBase(context)
+    expect(plan()).toBeUndefined()
+    await store.replaceBase(scope, { ...snapshot(), rowRevisions: { [`titles:${title.id}`]: '2026-10-01T00:00:00.000Z' } })
+
+    clock += CREDIT_REFRESH_INTERVAL_MS - 1
+    await fetchBase(context)
+    expect(plan()!([title], { [`titles:${title.id}`]: '2026-10-01T00:00:00.000Z' })).toEqual([])
+    expect(plan()!([title], { [`titles:${title.id}`]: '2026-10-02T00:00:00.000Z' })).toEqual([title.id])
+    await fetchBase(context, { creditTitleIds: [title.id] })
+    expect(plan()!([title], { [`titles:${title.id}`]: '2026-10-01T00:00:00.000Z' })).toEqual([title.id])
+
+    clock += 1
+    await fetchBase(context)
+    expect(plan()).toBeUndefined()
   })
 
   it('includes private preferences only in the owner snapshot and fences late results', async () => {

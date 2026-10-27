@@ -242,19 +242,26 @@ function mapDbTitleToLocal(row: any): Title {
 // ─── Database Operations ─────────────────────────────────────────────────────
 
 // Shared by every full-library fetch (own/shared/friend) so a schema/column
-// change only needs to be applied once.
+// change only needs to be applied once. Credit and episode embeds name only
+// the columns mapDbTitleToLocal reads: their owner/parent keys and timestamps
+// were more than half of a full snapshot's bytes. Every table whose revision
+// collectRowRevisions records keeps `id` and `updated_at`.
+const CAST_COLUMNS = 'tmdb_person_id, name, character_name, episode_count, profile_url, cast_order'
+const TITLE_CREW_COLUMNS = 'tmdb_person_id, name, job, department, profile_url'
+const EPISODE_CREW_COLUMNS = 'tmdb_person_id, name, job'
+const EPISODE_COLUMNS = 'id, season_number, episode_number, episode_name, air_date, runtime, synopsis, still_url, updated_at'
 const TITLE_SELECT = `
   *,
-  title_cast (*),
-  title_crew (*),
+  title_cast (${CAST_COLUMNS}),
+  title_crew (${TITLE_CREW_COLUMNS}),
   seasons (
     *,
-    season_cast (*)
+    season_cast (${CAST_COLUMNS})
   ),
   viewings (*),
   episodes (
-    *,
-    episode_crew (*),
+    ${EPISODE_COLUMNS},
+    episode_crew (${EPISODE_CREW_COLUMNS}),
     episode_watch_events (*),
     episode_ratings (*),
     episode_reviews (*)

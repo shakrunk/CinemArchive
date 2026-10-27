@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchUserLibrary } from './db'
+import { emptySnapshot, mergeRefreshedSnapshot, staleCreditTitles } from './offline/snapshot'
 
 interface Query { select: string; ids?: string[]; referenced: string[] }
 const server = vi.hoisted(() => ({ queries: [] as Query[], rows: [] as Record<string, unknown>[] }))
@@ -92,5 +93,15 @@ describe('fetchUserLibrary credit plans', () => {
     expect(library.creditsFor).toBeUndefined()
     expect(server.queries[1].ids).toBeUndefined()
     expect(library.titles.map((title) => title.seasons?.[0]?.cast?.[0]?.name)).toEqual(['a guest', 'b guest'])
+  })
+
+  it('reuses every cached credit when nothing changed since a full read', async () => {
+    const first = await fetchUserLibrary('owner')
+    const cached = mergeRefreshedSnapshot(emptySnapshot(), { ...emptySnapshot(), ...first })
+    server.queries = []
+    const second = await fetchUserLibrary('owner', (titles, revisions) => staleCreditTitles(cached, titles, revisions))
+    expect(second.creditsFor).toEqual([])
+    expect(server.queries).toHaveLength(1)
+    expect(mergeRefreshedSnapshot(cached, { ...emptySnapshot(), ...second }).titles).toEqual(cached.titles)
   })
 })

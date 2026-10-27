@@ -1363,7 +1363,8 @@ export const useAppStore = create<AppStore>()(
     let results: OutingCompletionResult[]
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-      results = await libraryRuntime.runIdleRemote((context) => completeDueOutings(tz, context)) ?? []
+      // Most checks find nothing due; skip the library refetch unless one completed.
+      results = await libraryRuntime.runIdleRemote((context) => completeDueOutings(tz, context), (completed) => completed.length > 0) ?? []
     } catch (err) {
       console.error('Failed to reconcile cinema outings:', err)
       return

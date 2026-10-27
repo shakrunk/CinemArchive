@@ -297,6 +297,17 @@ describe('owner offline coordinator', () => {
     expect(onState.mock.lastCall![0]!.snapshot.titles[0].rating).toBe(5)
   })
 
+  it('keeps the current base when idle remote work reports no server change', async () => {
+    const { coordinator } = setup()
+    await coordinator.activate(owner)
+    const fetchBase = vi.fn(async () => snapshot())
+    const changed = (results: string[]) => results.length > 0
+    expect(await coordinator.runIdleRemote(async () => [], fetchBase, changed)).toEqual([])
+    expect(fetchBase).not.toHaveBeenCalled()
+    expect(await coordinator.runIdleRemote(async () => ['completed'], fetchBase, changed)).toEqual(['completed'])
+    expect(fetchBase).toHaveBeenCalledOnce()
+  })
+
   it('discards old-account reconciliation results before refreshing or notifying', async () => {
     const { coordinator } = setup()
     await coordinator.activate(owner)

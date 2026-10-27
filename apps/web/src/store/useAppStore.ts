@@ -5,7 +5,7 @@ import { mockTitles, type Title, type CinemaOuting, type List, type LedgerStats,
 import type { SharedOutingSnapshot } from '../lib/outingSharing'
 import { computeLedgerStats } from './ledgerStats'
 import { createBrowserCacheStorage } from '../lib/browserCacheStorage'
-import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, fetchOwnerSnapshot, type OfflineLibraryStatus } from './offlineLibrary'
+import { DEVICE_PREFERENCES_KEY, OfflineLibraryRuntime, hasLegacyLibraryCache, readLegacyDevicePreferences, pickDevicePreferences, createOwnerSnapshotFetcher, type OfflineLibraryStatus } from './offlineLibrary'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
 import type { TheaterInterest, VenueNote } from '../lib/moviegoingPreferences'
 import { captureVenueDraft, venueChange, type VenueNoteDraft, type VenueNoteReview } from '../lib/venueNotes'
@@ -752,12 +752,14 @@ function reportOfflineStorageError(error: unknown): void {
 }
 
 const ownerOfflineStorage = new IndexedDbOfflineStore()
+const fetchOwnerBase = createOwnerSnapshotFetcher({ store: ownerOfflineStorage })
 const libraryRuntime = new OfflineLibraryRuntime({
   projectId: import.meta.env.VITE_SUPABASE_URL || 'unconfigured-local',
   ownerStorage: ownerOfflineStorage,
-  deliver: createLibraryCommandDelivery(fetchOwnerSnapshot, createTicketCommandDelivery({ ...ticketRemoteOptions,
+  fetchBase: fetchOwnerBase,
+  deliver: createLibraryCommandDelivery(fetchOwnerBase, createTicketCommandDelivery({ ...ticketRemoteOptions,
     readBlob: (scope, id) => ownerOfflineStorage.readTicketBlob(scope, id),
-    fetchBase: (context) => fetchOwnerSnapshot(context, true),
+    fetchBase: (context) => fetchOwnerBase(context, { requireTickets: true }),
   }), (outingId) => afterOutingRevert(outingId, true)),
   onSnapshot: (snapshot) => {
     const s = useAppStore.getState()
@@ -1363,7 +1365,8 @@ export const useAppStore = create<AppStore>()(
     let results: OutingCompletionResult[]
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-      results = await libraryRuntime.runIdleRemote((context) => completeDueOutings(tz, context)) ?? []
+      // Most checks find nothing due; skip the library refetch unless one completed.
+      results = await libraryRuntime.runIdleRemote((context) => completeDueOutings(tz, context), (completed) => completed.length > 0) ?? []
     } catch (err) {
       console.error('Failed to reconcile cinema outings:', err)
       return

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCommand } from './offline/commands'
-import { assertDeliverableCommand, classifyLibraryError, createLibraryCommandDelivery, libraryOperations } from './offlineRpc'
+import { assertDeliverableCommand, classifyLibraryError, createLibraryCommandDelivery, creditTitleIds, libraryOperations } from './offlineRpc'
 import { title } from './offline/fixtures.test-support'
 import type { DeliveryContext } from './offline/coordinator'
 import type { OfflineSnapshot } from './offline/snapshot'
@@ -156,6 +156,24 @@ describe('account-fenced delivery',()=>{
     expect(request.mock.calls[0][1].headers.Authorization).toBe('Bearer owner-a-token')
     expect(JSON.parse(request.mock.calls[0][1].body).p_operation_id).toBe(pending.id)
     expect(fetchBase).toHaveBeenCalledOnce()
+    expect(fetchBase).toHaveBeenCalledWith(expect.anything(),{creditTitleIds:[]})
+  })
+  it('asks the refetch for credits of exactly the titles a command rewrote',async()=>{
+    const season={...title.seasons![0],episodes:title.seasons![0].episodes!.map((episode)=>({...episode,crew:[{tmdbPersonId:1,name:'Director',job:'Director'}]}))}
+    expect(creditTitleIds({kind:'batch',mutations:[
+      {kind:'season.put',titleId:'series',season},
+      {kind:'season.put',titleId:'quiet',season:{...title.seasons![0],episodes:[]}},
+      {kind:'title.patch',titleId:'recast',patch:{cast:[]}},
+      {kind:'title.patch',titleId:'rated',patch:{rating:4}},
+      {kind:'episode.metadata',titleId:'crewed',episodeId:'e',patch:{crew:[]}},
+      {kind:'title.create',title:{...title,id:'new'}},
+      {kind:'season.put',titleId:'series',season},
+    ]})).toEqual(['series','recast','crewed','new'])
+    const pending=createCommand(scope,{kind:'season.put',titleId:'series',season})
+    const fetchBase=vi.fn().mockResolvedValue(snapshot)
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({operationId:pending.id,rows:[]}))))
+    await createLibraryCommandDelivery(fetchBase)(pending,context())
+    expect(fetchBase).toHaveBeenCalledWith(expect.anything(),{creditTitleIds:['series']})
   })
   it('does not send owner A work with owner B credentials',async()=>{
     getSession.mockResolvedValue({data:{session:{user:{id:'owner-b'},access_token:'owner-b-token'}},error:null})

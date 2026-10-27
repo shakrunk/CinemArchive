@@ -1,6 +1,6 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OfflineLibraryRuntime, fetchOwnerSnapshot, readLegacyDevicePreferences, pickDevicePreferences } from './offlineLibrary'
+import { CREDIT_REFRESH_INTERVAL_MS, OfflineLibraryRuntime, WAKE_REFRESH_INTERVAL_MS, createOwnerSnapshotFetcher, fetchOwnerSnapshot, readLegacyDevicePreferences, pickDevicePreferences } from './offlineLibrary'
 import { IndexedDbOfflineStore } from '../lib/offline/storage'
 import { createCommand } from '../lib/offline/commands'
 import { emptySnapshot, type OfflineSnapshot } from '../lib/offline/snapshot'
@@ -14,7 +14,7 @@ vi.mock('../lib/moviegoingPreferences', async (original) => ({ ...await original
 
 const stores: IndexedDbOfflineStore[] = []
 const runtimes: OfflineLibraryRuntime[] = []
-function setup(factory = new IDBFactory(), browserEvents = false) {
+function setup(factory = new IDBFactory(), browserEvents = false, now?: () => number) {
   const ownerStorage = new IndexedDbOfflineStore({ indexedDB: factory, databaseName: 'owner' })
   const anonymousStorage = new IndexedDbOfflineStore({ indexedDB: factory, databaseName: 'anonymous' })
   stores.push(ownerStorage, anonymousStorage)
@@ -23,7 +23,7 @@ function setup(factory = new IDBFactory(), browserEvents = false) {
   const deliver = vi.fn().mockResolvedValue({ kind: 'success' })
   const runtime = new OfflineLibraryRuntime({ projectId: 'project', ownerStorage, anonymousStorage,
     onSnapshot, onStatus: vi.fn(), onError: vi.fn(), fetchBase, deliver,
-    isAuthenticated: async () => true, lock: async (_name, work) => work(), browserEvents,
+    isAuthenticated: async () => true, lock: async (_name, work) => work(), browserEvents, now,
   })
   runtimes.push(runtime)
   return { runtime, ownerStorage, anonymousStorage, onSnapshot, fetchBase, deliver }
@@ -61,9 +61,11 @@ describe('owner library runtime', () => {
     window.dispatchEvent(new Event('online'))
     window.dispatchEvent(new Event('focus'))
     delayed.resolve(snapshot())
-    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(flush).toHaveBeenCalledTimes(2))
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(flush).toHaveBeenCalledTimes(2)
+    // The follow-up wake delivers, but the snapshot it would refetch is seconds old.
+    expect(fetchBase).toHaveBeenCalledOnce()
     expect(deliver).toHaveBeenCalledOnce()
     expect((await ownerStorage.read(scope)).document.commands).toMatchObject([{ state: 'failed' }])
   })
@@ -102,7 +104,8 @@ describe('owner library runtime', () => {
       constructor() { channels.push(this) }
     }
     vi.stubGlobal('BroadcastChannel', FakeChannel)
-    const { runtime, fetchBase, ownerStorage } = setup(new IDBFactory(), true)
+    let now = 1_000_000
+    const { runtime, fetchBase, ownerStorage } = setup(new IDBFactory(), true, () => now)
     const read = vi.spyOn(ownerStorage, 'read')
     await runtime.activate('owner')
     await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledOnce())
@@ -111,12 +114,48 @@ describe('owner library runtime', () => {
     channels[0].onmessage!(new MessageEvent('message', { data: { kind: 'changed' } }))
     await vi.waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads + 1))
     expect(fetchBase).toHaveBeenCalledOnce()
+    const flush = vi.spyOn(runtime, 'flush')
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(flush).toHaveBeenCalledOnce())
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(fetchBase).toHaveBeenCalledOnce()
+    now += WAKE_REFRESH_INTERVAL_MS
     window.dispatchEvent(new Event('online'))
     await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledTimes(2))
     runtime.deactivate()
     window.dispatchEvent(new Event('online'))
     expect(channels[0].close).toHaveBeenCalledOnce()
     expect(fetchBase).toHaveBeenCalledTimes(2)
+  })
+
+  it('shares one in-flight snapshot fetch between concurrent refreshes', async () => {
+    const { runtime, fetchBase } = setup()
+    await runtime.activate('owner')
+    const delayed = deferred<OfflineSnapshot>()
+    fetchBase.mockReturnValueOnce(delayed.promise)
+    const first = runtime.refresh()
+    const second = runtime.refresh()
+    delayed.resolve(emptySnapshot())
+    await Promise.all([first, second])
+    expect(fetchBase).toHaveBeenCalledOnce()
+    await runtime.refresh()
+    expect(fetchBase).toHaveBeenCalledTimes(2)
+  })
+
+  it('skips the wake refresh after a delivery that returned a server base', async () => {
+    let now = 1_000_000
+    const { runtime, ownerStorage, fetchBase, deliver } = setup(new IDBFactory(), true, () => now)
+    const scope = { projectId: 'project', userId: 'owner' }
+    await ownerStorage.replaceBase(scope, snapshot())
+    await runtime.activate(scope.userId)
+    await vi.waitFor(() => expect(fetchBase).toHaveBeenCalledOnce())
+    now += WAKE_REFRESH_INTERVAL_MS
+    deliver.mockResolvedValue({ kind: 'success', canonicalBase: snapshot() })
+    await runtime.submit({ kind: 'title.patch', titleId: title.id, patch: { notes: 'delivered' } })
+    await vi.waitFor(async () => expect((await ownerStorage.read(scope)).document.commands).toEqual([]))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(deliver).toHaveBeenCalledOnce()
+    expect(fetchBase).toHaveBeenCalledOnce()
   })
 
   it('publishes anonymous edits only after the durable transaction commits', async () => {
@@ -224,6 +263,38 @@ describe('safe cache migration and strict owner refresh', () => {
     vi.mocked(fetchLedgerLayout).mockResolvedValue(null)
     vi.mocked(fetchAllTitlePins).mockRejectedValue(new Error('pins unavailable'))
     await expect(fetchOwnerSnapshot({ scope: { projectId: 'project', userId: 'owner' }, signal: new AbortController().signal, isCurrent: () => true })).rejects.toThrow('pins unavailable')
+  })
+
+  it('reads every credit first and once a day, and otherwise only stale or rewritten titles', async () => {
+    vi.mocked(fetchUserLibrary).mockResolvedValue({ titles: [title], outings: [] })
+    vi.mocked(fetchLists).mockResolvedValue([])
+    vi.mocked(fetchListMemberships).mockResolvedValue({})
+    vi.mocked(fetchLedgerLayout).mockResolvedValue(null)
+    vi.mocked(fetchAllTitlePins).mockResolvedValue([])
+    const scope = { projectId: 'project', userId: 'owner' }
+    const context = { scope, signal: new AbortController().signal, isCurrent: () => true }
+    const store = new IndexedDbOfflineStore({ indexedDB: new IDBFactory(), databaseName: 'credits' })
+    stores.push(store)
+    let clock = 1_000
+    const saved = new Map<string, number>()
+    const fetchBase = createOwnerSnapshotFetcher({ store, now: () => clock, stamps: { get: (key) => saved.get(key) ?? 0, set: (key, at) => saved.set(key, at) } })
+    const plan = () => vi.mocked(fetchUserLibrary).mock.lastCall?.[1]
+
+    // Nothing cached yet: every credit, and the read is remembered.
+    await fetchBase(context)
+    expect(plan()).toBeUndefined()
+    await store.replaceBase(scope, { ...snapshot(), rowRevisions: { [`titles:${title.id}`]: '2026-10-01T00:00:00.000Z' } })
+
+    clock += CREDIT_REFRESH_INTERVAL_MS - 1
+    await fetchBase(context)
+    expect(plan()!([title], { [`titles:${title.id}`]: '2026-10-01T00:00:00.000Z' })).toEqual([])
+    expect(plan()!([title], { [`titles:${title.id}`]: '2026-10-02T00:00:00.000Z' })).toEqual([title.id])
+    await fetchBase(context, { creditTitleIds: [title.id] })
+    expect(plan()!([title], { [`titles:${title.id}`]: '2026-10-01T00:00:00.000Z' })).toEqual([title.id])
+
+    clock += 1
+    await fetchBase(context)
+    expect(plan()).toBeUndefined()
   })
 
   it('includes private preferences only in the owner snapshot and fences late results', async () => {

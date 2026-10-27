@@ -176,6 +176,7 @@ const snapshot = shape({ titles: array(title), outings: array(outingSnapshot), l
   listMemberships: dictionary(strings), pinnedModes: dictionary(color), ledgerWidgets: nullable(array(widget)),
 }, { rowRevisions: dictionary(timestamp), ticketAttachmentSupport: (v) => v === 'authoritative' || v === 'unsupported',
   venueNotes: array(isVenueNote), theaterInterest: array(isTheaterInterest), moviegoingPreferencesSupport: oneOf('authoritative', 'unsupported'),
+  creditsFor: array(id),
 })
 export function assertSnapshot(value: unknown, ownerId?: string): asserts value is OfflineSnapshot {
   rejected = undefined

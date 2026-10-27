@@ -159,8 +159,10 @@ export class OfflineCoordinator {
   /** Server-maintained changes (for example due outings) share the delivery
    * lock. Recheck the durable journal here: another tab may have appended work
    * since the UI last reported an empty queue. New local edits during the
-   * request remain journaled and are replayed over the refreshed base. */
-  async runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>): Promise<T | undefined> {
+   * request remain journaled and are replayed over the refreshed base. When
+   * `changed` reports that the work left the server untouched, the current
+   * base is still authoritative and the snapshot refetch is skipped. */
+  async runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>, fetchBase: (context: DeliveryContext) => Promise<OfflineSnapshot>, changed: (result: T) => boolean = () => true): Promise<T | undefined> {
     const session = this.capture()
     return this.lock(`cinemarchive-offline:${scopeKey(session.scope)}`, async () => {
       if (!this.current(session) || !await this.options.isAuthenticated(session.scope) || !this.current(session)) return
@@ -169,6 +171,7 @@ export class OfflineCoordinator {
       if (!this.current(session) || read.document.commands.length || read.quarantined.length) return
       const result = await work(this.context(session))
       if (!this.current(session)) return
+      if (!changed(result)) return result
       const base = await fetchBase(this.context(session))
       if (!this.current(session)) return
       this.publish(session, await this.options.store.replaceBase(session.scope, base))

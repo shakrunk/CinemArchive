@@ -9,6 +9,13 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.45.2] - 2026-10-27
+
+### Performance
+
+- **Far less data downloaded by the web app.** The web app re-downloaded your entire library, every title with its cast, crew and episodes, each time you switched back to the tab, twice more when it opened, and again after every outing check that found nothing to complete. It now reuses the copy it already has unless that copy is over ten minutes old, opens with a single download, and only re-reads the library when an outing actually completed. Your own edits still sync immediately.
+- **Smaller library downloads on the web.** Cast and crew make up most of a library's data but rarely change, so the web app now downloads them for every title only once a day. Routine refreshes, including the one after each saved edit, fetch credits only for titles that are new or have changed. Library downloads also skip database columns the app never reads. On the largest library a routine refresh drops from about 18 MB to about 3.4 MB.
+
 ## [1.45.1] - 2026-10-25
 
 ### Fixed

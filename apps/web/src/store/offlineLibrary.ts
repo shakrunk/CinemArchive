@@ -13,6 +13,12 @@ import { assertTicketBytes, sameTicketAttachment } from '../lib/tickets/validati
 import { fetchOwnedMoviegoingPreferences, mergeOwnedMoviegoingPreferences } from '../lib/moviegoingPreferences'
 import type { VenueNoteReview } from '../lib/venueNotes'
 
+/** Focus, visibility and reconnect wakes re-read the server snapshot at most
+ * this often. A full owner snapshot is megabytes of JSON, so refetching it on
+ * every alt-tab dominated the project's egress. Deliveries and explicit
+ * refreshes still fetch whenever they run. */
+export const WAKE_REFRESH_INTERVAL_MS = 10 * 60 * 1000
+
 export const DEVICE_PREFERENCES_KEY = 'cinemarchive-device-preferences-v1'
 export const LEGACY_LIBRARY_KEY = 'cinemarchive-library'
 
@@ -55,6 +61,7 @@ interface RuntimeOptions {
   lock?: ExclusiveLock
   browserEvents?: boolean
   downloadTicket?: typeof ticketRemote.download
+  now?: () => number
 }
 
 /** Anonymous data uses a separate database and never enters the delivery
@@ -77,15 +84,28 @@ export class OfflineLibraryRuntime {
   private wakeRequested = false
   private broadcastRevision = -1
   private ticketRequests = new AbortController()
+  /** When this owner's server base was last fetched; 0 forces the next wake to refresh. */
+  private lastBaseAt = 0
+  private refreshing: Promise<void> | undefined
+  private readonly now: () => number
 
   constructor(options: RuntimeOptions) {
     this.options = options
     this.anonymous = options.anonymousStorage ?? new IndexedDbOfflineStore({ databaseName: 'cinemarchive-anonymous-v1' })
     this.ownerStorage = options.ownerStorage ?? new IndexedDbOfflineStore()
     this.anonymousScope = { projectId: options.projectId, userId: 'anonymous-local-only' }
+    this.now = options.now ?? Date.now
     this.coordinator = new OfflineCoordinator({
       store: this.ownerStorage,
-      deliver: options.deliver, lock: options.lock,
+      deliver: async (command, context) => {
+        const generation = this.generation
+        const result = await options.deliver(command, context)
+        // A confirmed delivery carries a fresh server base; the wake that
+        // follows it has nothing newer to fetch.
+        if (result.kind === 'success' && result.canonicalBase && generation === this.generation) this.lastBaseAt = this.now()
+        return result
+      },
+      lock: options.lock,
       isAuthenticated: async (scope) => {
         if (scope.projectId !== options.projectId) return false
         if (options.isAuthenticated) return options.isAuthenticated(scope.userId)
@@ -116,6 +136,8 @@ export class OfflineLibraryRuntime {
     this.detachEvents()
     this.generation++
     this.ownerId = userId
+    this.lastBaseAt = 0
+    this.refreshing = undefined
     await this.coordinator.activate({ projectId: this.options.projectId, userId })
     if (this.ownerId === userId) {
       this.attachEvents()
@@ -131,6 +153,8 @@ export class OfflineLibraryRuntime {
     this.detachEvents()
     this.generation++
     this.ownerId = null
+    this.lastBaseAt = 0
+    this.refreshing = undefined
     this.coordinator.deactivate()
   }
 
@@ -152,12 +176,27 @@ export class OfflineLibraryRuntime {
     await this.anonymous.replaceBase(this.anonymousScope, snapshot)
   }
 
-  refresh(): Promise<void> { return this.coordinator.refresh(this.options.fetchBase ?? fetchOwnerSnapshot) }
-  runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>): Promise<T | undefined> {
-    return this.coordinator.runIdleRemote(work, this.options.fetchBase ?? fetchOwnerSnapshot)
+  /** Concurrent callers (startup load, a wake, a retry) share one in-flight
+   * snapshot fetch instead of each downloading the whole library. */
+  refresh(): Promise<void> {
+    if (this.refreshing) return this.refreshing
+    const refreshing = this.coordinator.refresh(this.fetchBase).finally(() => {
+      if (this.refreshing === refreshing) this.refreshing = undefined
+    })
+    this.refreshing = refreshing
+    return refreshing
+  }
+  runIdleRemote<T>(work: (context: DeliveryContext) => Promise<T>, changed?: (result: T) => boolean): Promise<T | undefined> {
+    return this.coordinator.runIdleRemote(work, this.fetchBase, changed)
   }
   runSyncedRemote<T>(keys: readonly string[], work: (snapshot: OfflineSnapshot, context: DeliveryContext, assertReady: () => Promise<void>) => Promise<T>): Promise<T> {
-    return this.coordinator.runSyncedRemote(keys, work, this.options.fetchBase ?? fetchOwnerSnapshot)
+    return this.coordinator.runSyncedRemote(keys, work, this.fetchBase)
+  }
+  private readonly fetchBase = async (context: DeliveryContext): Promise<OfflineSnapshot> => {
+    const generation = this.generation
+    const base = await (this.options.fetchBase ?? fetchOwnerSnapshot)(context)
+    if (generation === this.generation) this.lastBaseAt = this.now()
+    return base
   }
   reload(): Promise<void> { return this.coordinator.reload() }
   flush(): Promise<void> { return this.coordinator.flush() }
@@ -281,7 +320,9 @@ export class OfflineLibraryRuntime {
   /** Delivery precedes refresh so reconnect cannot overwrite queued optimism.
    * Coordinator locking excludes competing tabs, and repeated browser events
    * coalesce into one follow-up wake. Edits appended during refresh must get
-   * another delivery pass after that refresh releases the coordinator lock. */
+   * another delivery pass after that refresh releases the coordinator lock.
+   * The refresh itself only runs once the base is older than
+   * WAKE_REFRESH_INTERVAL_MS, so that follow-up pass is usually delivery-only. */
   private wake(): void {
     if (!this.ownerId || (typeof navigator !== 'undefined' && navigator.onLine === false)) return
     if (this.syncing) {
@@ -291,7 +332,7 @@ export class OfflineLibraryRuntime {
     this.wakeRequested = false
     const generation = this.generation
     const sync = this.flush().then(async () => {
-      if (generation === this.generation && this.ownerId) await this.refresh()
+      if (generation === this.generation && this.ownerId && this.now() - this.lastBaseAt >= WAKE_REFRESH_INTERVAL_MS) await this.refresh()
     }).catch(this.options.onError).finally(() => {
       if (this.syncing !== sync) return
       this.syncing = undefined
@@ -300,9 +341,9 @@ export class OfflineLibraryRuntime {
     this.syncing = sync
   }
   retry(commandId: string): Promise<void> { return this.coordinator.retry(commandId) }
-  reviewVenue(commandId: string): Promise<VenueNoteReview> { return this.coordinator.reviewVenue(commandId, this.options.fetchBase ?? fetchOwnerSnapshot) }
+  reviewVenue(commandId: string): Promise<VenueNoteReview> { return this.coordinator.reviewVenue(commandId, this.fetchBase) }
   async resolveVenue(review: VenueNoteReview, keepLocal: boolean): Promise<void> {
-    await this.coordinator.resolveVenue(review, keepLocal, this.options.fetchBase ?? fetchOwnerSnapshot)
+    await this.coordinator.resolveVenue(review, keepLocal, this.fetchBase)
     this.channel?.postMessage({ kind: 'changed' })
     this.wake()
   }

@@ -39,8 +39,17 @@ function carryCredits(previous: OfflineSnapshot, incoming: OfflineSnapshot, cred
       const oldSeason = oldSeasons.get(season.id)
       return { ...season, cast: oldSeason?.cast ?? season.cast, episodes: season.episodes?.map((episode) => {
         const oldEpisode = oldEpisodes.get(episode.id)
-        // director/writers are derived from episode crew when it is mapped.
-        return oldEpisode ? { ...episode, director: oldEpisode.director, writers: oldEpisode.writers, crew: oldEpisode.crew } : episode
+        // director/writers are derived from episode crew when it is mapped. Absent
+        // fields stay absent: the snapshot validator rejects an explicit undefined.
+        if (!oldEpisode) return episode
+        const { director, writers, crew, ...rest } = episode
+        void director; void writers; void crew
+        return {
+          ...rest,
+          ...(oldEpisode.director !== undefined && { director: oldEpisode.director }),
+          ...(oldEpisode.writers !== undefined && { writers: oldEpisode.writers }),
+          ...(oldEpisode.crew !== undefined && { crew: oldEpisode.crew }),
+        }
       }) }
     }) }
   })

@@ -1,6 +1,6 @@
 import { isCatalogTitleOwned, libraryCatalogKeys } from 'src/lib/catalogIdentity'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Compass, X, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Search, Compass, X, User, Building2, ChevronLeft, ChevronRight, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import {
   searchMedia, fetchTrending, fetchDiscover,
@@ -17,6 +17,8 @@ import { Eyebrow } from 'src/components/ui/typography'
 import { DiscoverCarousel } from './discover/DiscoverCarousel'
 import { CarouselPauseButton } from './discover/CarouselPauseButton'
 import { TasteDropdown } from './discover/TasteDropdown'
+import { DiscoverEmptyState } from './discover/DiscoverEmptyState'
+import { DiscoverSkeleton } from './discover/DiscoverSkeleton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,61 +29,6 @@ const SEARCH_PLACEHOLDERS: Record<SearchMode, string> = {
   titles: 'Search movies & TV shows…',
   people: 'Search by actor, director, crew…',
   studios: 'Search by studio or company…',
-}
-
-// ─── Empty state — no-results / prompt states across all three search modes ───
-
-function DiscoverEmptyState({
-  icon: Icon,
-  message,
-  onClearSearch,
-  dim = false,
-}: {
-  icon: LucideIcon
-  message: string
-  onClearSearch?: () => void
-  dim?: boolean
-}) {
-  return (
-    <div className="py-16 text-center flex flex-col items-center">
-      <Icon className={cn('w-10 h-10 mx-auto mb-3 text-paper-faint', dim ? 'opacity-20' : 'opacity-30')} />
-      <p className={cn('font-mono text-sm text-paper-faint', onClearSearch && 'mb-4')}>{message}</p>
-      {onClearSearch && (
-        <button
-          onClick={onClearSearch}
-          className="flex items-center gap-1.5 text-xs font-mono transition-colors text-amber-deep hover:text-amber mx-auto rounded-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
-        >
-          <X className="w-3.5 h-3.5" aria-hidden="true" />
-          Clear search
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── Loading skeleton ─────────────────────────────────────────────────────────
-
-function DiscoverSkeleton() {
-  return (
-    <div className="-mx-4 sm:-mx-8 px-4 sm:px-8" aria-hidden>
-      <div className="film-strip">
-        <div className="reel-strip reel-strip--top" />
-        <div className="reel-strip reel-strip--bottom" />
-        <div className="discover-grid flex">
-          {Array.from({ length: 10 }, (_, i) => (
-            <div key={i} className="film-frame shrink-0 w-[38vw] sm:w-[170px] md:w-[185px]">
-              <div className="film-frame__window aspect-2/3">
-                <div className="w-full h-full rounded-[1px] animate-pulse" style={{ background: 'var(--inset)' }} />
-              </div>
-              <div className="film-frame__caption px-1.5 py-1.5">
-                <div className="h-2.5 w-2/3 rounded animate-pulse" style={{ background: 'var(--inset)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ─── PersonPicker ─────────────────────────────────────────────────────────────

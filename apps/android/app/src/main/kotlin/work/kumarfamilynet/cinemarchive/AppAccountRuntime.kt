@@ -209,6 +209,10 @@ class AppAccountRuntime(
 
     val ledgerLayoutRepository = LedgerLayoutRepository(dataStore("cinemarchive_ledger_layout"), session, SupabaseLedgerLayoutWriter(client))
 
+    val moviegoingPrefsRepository = work.kumarfamilynet.cinemarchive.data.MoviegoingPrefsRepository(
+        dataStore("cinemarchive_moviegoing_prefs"), session, client, ::isCurrent,
+    )
+
     // The appearance itself is device-level; only this account's copy is reconciled here, and
     // both jobs die with the runtime's scope on sign-out or account switch.
     private val themeSyncRepository = work.kumarfamilynet.cinemarchive.data.ThemeSyncRepository(preferences, session, client, ::isCurrent)
@@ -380,6 +384,7 @@ class AppAccountRuntime(
             if (episodeScheduleRefresher.refresh() > 0) librarySyncRepository.syncNow()
         }
         scope.launch { ledgerLayoutRepository.reconcile() }
+        scope.launch { moviegoingPrefsRepository.reconcile() }
         scope.launch { themeSyncRepository.reconcile() }
         scope.launch { themeSyncRepository.watchLocalChanges() }
     }

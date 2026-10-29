@@ -101,7 +101,7 @@ export function posterSrcSet(url: string | undefined): string | undefined {
 
 /** Episode-still base URL, shared by consumers that build `stillUrl` fields
  *  from raw TMDB episode payloads (AddTitleWorkflow, RefreshMetadataModal,
- *  TitleDetailDrawer, episode-card.tsx). */
+ *  title-detail/useEpisodeBackfill, episode-card.tsx). */
 export const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // ─── Genre Lists (stable TMDB IDs — hardcoded to avoid an extra round-trip) ─

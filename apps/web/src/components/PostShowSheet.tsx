@@ -36,7 +36,7 @@ function PostShowBody({
   const [showRecommend, setShowRecommend] = useState(false)
 
   // Writes straight onto the auto-logged viewing — same control and semantics
-  // as logViewing (TitleDetailDrawer): rating updates both the viewing and
+  // as logViewing (title-detail/useLogViewingForm): rating updates both the viewing and
   // title.rating, notes land on the viewing alone.
   async function commitViewing(patch: Partial<Pick<Viewing, 'rating' | 'notes'>>) {
     if (!viewing) return false

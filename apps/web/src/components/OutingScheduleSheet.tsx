@@ -19,7 +19,7 @@ import { formatSeatShort, parseSeatsInput } from 'src/lib/seating'
 import { TicketButton } from './TicketViewer'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
-// Exported for reuse by the viewing editor (TitleDetailDrawer, plan §4.6/§7.4)
+// Exported for reuse by the viewing editor (title-detail/VenueCompanionsFields, plan §4.6/§7.4)
 // — venue/companions get the same chip-input affordance on any viewing.
 
 export function CompanionInput({

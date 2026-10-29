@@ -8,7 +8,7 @@ import { PosterLightbox } from 'src/components/ui/poster-lightbox'
 import { SeriesGraph } from 'src/components/ui/series-graph'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
-import { CardTitle, BodyText, MetaBadge, StatLabel, SubsectionLabel, Eyebrow } from 'src/components/ui/typography'
+import { CardTitle, BodyText, MetaBadge, StatLabel, Eyebrow } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { TicketButton } from './TicketViewer'
 import { CastCrewSection, CastGrid } from 'src/components/CastCrewSection'
@@ -60,6 +60,7 @@ import { WatchProvidersSection } from 'src/components/ui/watch-providers'
 import { ReviewBadges, ExternalLinks, HeroScores } from 'src/components/ui/media-badges'
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 import { parseSeatsInput } from 'src/lib/seating'
+import { SectionCard } from './title-detail/SectionCard'
 
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
@@ -531,38 +532,6 @@ function ViewingTimeline({
           )})}
       </div>
     </div>
-  )
-}
-
-// ─── Section container ────────────────────────────────────────────────────────
-// Every drawer section sits in one of these bordered cards so related content
-// reads as a common region (gestalt) instead of floating in open space.
-
-function SectionCard({
-  title,
-  action,
-  className,
-  children,
-}: {
-  title?: React.ReactNode
-  /** Rendered on the right of the heading row (e.g. a "Log a viewing" button). */
-  action?: React.ReactNode
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section
-      className={cn('rounded-xl border p-4 sm:p-5 min-w-0', className)}
-      style={{ borderColor: 'var(--line)', background: 'var(--wash)' }}
-    >
-      {(title || action) && (
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <SubsectionLabel className="mb-0">{title}</SubsectionLabel>
-          {action}
-        </div>
-      )}
-      {children}
-    </section>
   )
 }
 

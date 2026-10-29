@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
 import type { Title, Viewing, Episode, EpisodeCrew, Companion } from 'src/store/mockData'
-import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, TMDB_STILL_BASE, type TitleVideo, type WatchProviders } from 'src/lib/media'
+import { fetchSeasonDetails, TMDB_STILL_BASE } from 'src/lib/media'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
 import { TheaterInterestControl } from './TheaterInterestControl'
@@ -44,6 +44,7 @@ import { ViewingTimeline } from './title-detail/ViewingTimeline'
 import { TVSeriesSection } from './title-detail/TVSeriesSection'
 import { DrawerTagEditor } from './title-detail/DrawerTagEditor'
 import { OutingBanner } from './title-detail/OutingBanner'
+import { useTitleMedia } from './title-detail/useTitleMedia'
 
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
@@ -212,57 +213,12 @@ export function TitleDetailDrawer() {
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
-  const [videos, setVideos] = useState<TitleVideo[]>([])
-  const [watchProviders, setWatchProviders] = useState<WatchProviders | null>(null)
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [heroBackdropUrl, setHeroBackdropUrl] = useState<string | null>(null)
+
+  const { videos, watchProviders, logoUrl, heroBackdropUrl } = useTitleMedia(isDetailDrawerOpen, title?.tmdbId, title?.type)
 
   const displayLogoUrl = isSpiderNoir
     ? (effectiveNoirMode === 'color' ? SPIDER_NOIR_LOGO_COLOR : effectiveNoirMode === 'bw' ? SPIDER_NOIR_LOGO_BW : SPIDER_NOIR_LOGO_NORMAL)
     : logoUrl
-
-  useEffect(() => {
-    if (!isDetailDrawerOpen || !title?.tmdbId) {
-      // Deferred to satisfy react-hooks/set-state-in-effect (same pattern as manualMode seeding above).
-      const t = setTimeout(() => setVideos([]), 0)
-      return () => clearTimeout(t)
-    }
-    let cancelled = false
-    fetchTitleVideos(title.tmdbId, title.type).then((v) => {
-      if (!cancelled) setVideos(v)
-    })
-    return () => { cancelled = true }
-  }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
-
-  useEffect(() => {
-    if (!isDetailDrawerOpen || !title?.tmdbId) {
-      const t = setTimeout(() => setWatchProviders(null), 0)
-      return () => clearTimeout(t)
-    }
-    let cancelled = false
-    fetchWatchProviders(title.tmdbId, title.type).then((wp) => {
-      if (!cancelled) setWatchProviders(wp)
-    })
-    return () => { cancelled = true }
-  }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
-
-  // Images: best logo + best backdrop at original resolution, fetched together.
-  // No backdropUrl guard — we fetch for any title with a tmdbId so titles
-  // without a stored backdrop can still get a cinematic hero + logo.
-  useEffect(() => {
-    if (!isDetailDrawerOpen || !title?.tmdbId) {
-      const t = setTimeout(() => { setLogoUrl(null); setHeroBackdropUrl(null) }, 0)
-      return () => clearTimeout(t)
-    }
-    let cancelled = false
-    fetchTitleImages(title.tmdbId, title.type).then(({ logoUrl: logo, backdropUrl: backdrop }) => {
-      if (!cancelled) {
-        setLogoUrl(logo)
-        setHeroBackdropUrl(backdrop)
-      }
-    })
-    return () => { cancelled = true }
-  }, [isDetailDrawerOpen, title?.tmdbId, title?.type])
 
   function onClose() {
     setPendingDeleteTitle(false)

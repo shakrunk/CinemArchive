@@ -4,18 +4,12 @@ import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { PosterLightbox } from 'src/components/ui/poster-lightbox'
-import { Button } from 'src/components/ui/button'
-import { Input } from 'src/components/ui/input'
-import { CardTitle, BodyText, MetaBadge, StatLabel, Eyebrow } from 'src/components/ui/typography'
+import { CardTitle, BodyText, MetaBadge, StatLabel } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
-import {
-  Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
-  RefreshCw, Send, Ticket,
-} from 'lucide-react'
+import { Calendar, Clock, Eye, Film, Tv, Plus, Trash2, RefreshCw, Send, Ticket } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
-import type { Viewing, Companion } from 'src/store/mockData'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
 import { TheaterInterestControl } from './TheaterInterestControl'
@@ -35,7 +29,6 @@ import { SectionCard } from './title-detail/SectionCard'
 import { StatusCard } from './title-detail/StatusCard'
 import { ListsCard } from './title-detail/ListsCard'
 import { DetailRow } from './title-detail/DetailRow'
-import { VenueCompanionsFields } from './title-detail/VenueCompanionsFields'
 import { viewingTime } from './title-detail/viewingTime'
 import { ViewingTimeline } from './title-detail/ViewingTimeline'
 import { TVSeriesSection } from './title-detail/TVSeriesSection'
@@ -44,6 +37,8 @@ import { OutingBanner } from './title-detail/OutingBanner'
 import { useTitleMedia } from './title-detail/useTitleMedia'
 import { useEpisodeBackfill } from './title-detail/useEpisodeBackfill'
 import { useSpiderNoirMode } from './title-detail/useSpiderNoirMode'
+import { useLogViewingForm } from './title-detail/useLogViewingForm'
+import { LogViewingForm } from './title-detail/LogViewingForm'
 
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
@@ -52,7 +47,6 @@ export function TitleDetailDrawer() {
   const isDetailDrawerOpen = useAppStore((s) => s.isDetailDrawerOpen)
   const closeDetailDrawer = useAppStore((s) => s.closeDetailDrawer)
   const updateTitle = useAppStore((s) => s.updateTitle)
-  const addViewing = useAppStore((s) => s.addViewing)
   const removeTitle = useAppStore((s) => s.removeTitle)
   const removeViewing = useAppStore((s) => s.removeViewing)
   const openRefreshMetadata = useAppStore((s) => s.openRefreshMetadata)
@@ -81,16 +75,8 @@ export function TitleDetailDrawer() {
     if (showMatrixRain) unlockTheme('matrix')
   }, [showMatrixRain, unlockTheme])
 
-  const [showLogForm, setShowLogForm] = useState(false)
-  const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [logPrePlatform, setLogPrePlatform] = useState(false)
-  const [logRating, setLogRating] = useState(0)
-  const [logNotes, setLogNotes] = useState('')
-  // Home viewings can record company too (plan §4.6) — the generalized
-  // payoff of putting venue/companions on `viewings` rather than only outings.
-  const [logVenue, setLogVenue] = useState('')
-  const [logCompanions, setLogCompanions] = useState<Companion[]>([])
-  const [showMovieSaved, setShowMovieSaved] = useState(false)
+  const logForm = useLogViewingForm(title)
+  const { showLogForm, setShowLogForm, logViewing } = logForm
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState(false)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
   const [activePerson, setActivePerson] = useState<PersonDetailTarget | null>(null)
@@ -109,35 +95,6 @@ export function TitleDetailDrawer() {
   useEpisodeBackfill(title, isSharedView)
 
   if (!title) return null
-
-  async function logViewing() {
-    if (!title || (!logPrePlatform && !logDate)) return
-    const viewing: Viewing = {
-      id: crypto.randomUUID(),
-      titleId: title.id,
-      date: logPrePlatform ? undefined : logDate,
-      rating: logRating > 0 ? logRating : undefined,
-      notes: logNotes || undefined,
-      venue: logVenue.trim() || undefined,
-      companions: logCompanions.length > 0 ? logCompanions : undefined,
-    }
-    if (!await saveSucceeded(addViewing(title.id, viewing, {
-      status: 'watched',
-      ...(logRating > 0 ? { rating: logRating } : {}),
-    }))) return false
-    setShowMovieSaved(true)
-    setTimeout(() => {
-      setShowMovieSaved(false)
-      setShowLogForm(false)
-      setLogDate(new Date().toISOString().slice(0, 10))
-      setLogPrePlatform(false)
-      setLogRating(0)
-      setLogNotes('')
-      setLogVenue('')
-      setLogCompanions([])
-    }, 1500)
-    return true
-  }
 
   async function handleDelete() {
     if (!title) return
@@ -478,83 +435,7 @@ export function TitleDetailDrawer() {
               >
 
                 {showLogForm && (
-                  <div className="border-t pt-3 mb-4 space-y-3" style={{ borderColor: 'var(--line)' }}>
-                    <div>
-                      <Eyebrow as="label" htmlFor="viewing-date" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
-                        <Calendar className="inline w-3 h-3 mr-1" />
-                        Date Watched
-                      </Eyebrow>
-                      {!logPrePlatform && (
-                        <Input
-                          id="viewing-date"
-                          type="date"
-                          value={logDate}
-                          onChange={(e) => setLogDate(e.target.value)}
-                          className="bg-secondary/50 border-border font-mono"
-                        />
-                      )}
-                      <label htmlFor={`drawer-pre-platform-${title.id}`} className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          id={`drawer-pre-platform-${title.id}`}
-                          type="checkbox"
-                          checked={logPrePlatform}
-                          onChange={(e) => setLogPrePlatform(e.target.checked)}
-                          className="accent-amber w-3.5 h-3.5"
-                        />
-                        <span className="font-sans text-xs text-muted-foreground">
-                          Watched before joining CinemArchive (no date)
-                        </span>
-                      </label>
-                    </div>
-                    <div>
-                      <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-2">
-                        Rating
-                      </Eyebrow>
-                      <StarRating value={logRating} onChange={setLogRating} size="md" />
-                    </div>
-                    <VenueCompanionsFields
-                      venue={logVenue}
-                      onVenueChange={setLogVenue}
-                      companions={logCompanions}
-                      onCompanionsChange={setLogCompanions}
-                    />
-                    <div>
-                      <Eyebrow as="label" htmlFor="viewing-notes" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
-                        <FileText className="inline w-3 h-3 mr-1" />
-                        Notes
-                      </Eyebrow>
-                      <textarea
-                        id="viewing-notes"
-                        value={logNotes}
-                        onChange={(e) => setLogNotes(e.target.value)}
-                        placeholder="Your thoughts…"
-                        rows={2}
-                        className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
-                        onClick={handleSaveViewing}
-                        disabled={showMovieSaved}
-                      >
-                        {showMovieSaved ? (
-                          <>
-                            <Check className="w-4 h-4 mr-2" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <Star className="w-4 h-4 mr-2" />
-                            Save Viewing
-                          </>
-                        )}
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowLogForm(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
+                  <LogViewingForm form={logForm} titleId={title.id} onSave={handleSaveViewing} />
                 )}
 
                 <ViewingTimeline

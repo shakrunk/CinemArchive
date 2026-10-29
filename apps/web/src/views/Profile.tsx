@@ -4,7 +4,6 @@ import {
 } from 'lucide-react'
 import { useAppStore } from 'src/store/useAppStore'
 import { isSupabaseConfigured, getMyProfile, type MyProfile } from 'src/lib/auth'
-import { Eyebrow } from 'src/components/ui/typography'
 import { AccountSection } from './profile/AccountSection'
 import { IdentitySection } from './profile/IdentitySection'
 import { AppearanceSection } from './profile/AppearanceSection'
@@ -14,6 +13,7 @@ import { InvitesSection } from './profile/InvitesSection'
 import { DataSection } from './profile/DataSection'
 import { MaintenanceSection } from './profile/MaintenanceSection'
 import { AboutSection } from './profile/AboutSection'
+import { ArchiveGlance } from './profile/ArchiveGlance'
 
 const SECTION_NAV: { id: string; label: string; Icon: LucideIcon; authOnly: boolean }[] = [
   { id: 'account', label: 'Account', Icon: UserCircle, authOnly: false },
@@ -26,37 +26,6 @@ const SECTION_NAV: { id: string; label: string; Icon: LucideIcon; authOnly: bool
   { id: 'maintenance', label: 'Maintenance', Icon: RefreshCw, authOnly: true },
   { id: 'about', label: 'About', Icon: Info, authOnly: false },
 ]
-
-// ─── Archive at a glance ──────────────────────────────────────────────────────
-
-function ArchiveGlance() {
-  const stats = useAppStore((s) => s.stats)
-  const total = stats.totalMovies + stats.totalSeries
-  const hours = Math.round(stats.totalMinutes / 60)
-
-  const items: { value: string; sub: string }[] = [
-    { value: String(total), sub: `${stats.totalMovies} films · ${stats.totalSeries} series` },
-    { value: String(stats.totalViewings), sub: 'screenings' },
-    { value: stats.avgRating.toFixed(1), sub: 'avg rating' },
-    { value: `${hours}h`, sub: 'screen time' },
-  ]
-
-  return (
-    <div className="flex items-start overflow-x-auto pb-3 mb-[clamp(24px,4vw,40px)] border-b border-(--line)">
-      {items.map((item, i) => (
-        <div key={item.sub} className="flex items-stretch shrink-0">
-          {i > 0 && <div className="w-px bg-(--line-2) mx-6 sm:mx-8 self-stretch" />}
-          <div className="flex flex-col">
-            <div className="stat-num text-[clamp(22px,2.6vw,34px)]">{item.value}</div>
-            <Eyebrow as="div" size="md" className="mt-1.5 whitespace-nowrap">
-              {item.sub}
-            </Eyebrow>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 

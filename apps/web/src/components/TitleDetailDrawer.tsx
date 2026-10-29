@@ -1,35 +1,24 @@
 import { saveSucceeded } from 'src/lib/localSave'
 import { useState, useEffect } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
-import { StarRating } from 'src/components/ui/star-rating'
-import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { PosterLightbox } from 'src/components/ui/poster-lightbox'
-import { CardTitle, BodyText, MetaBadge, StatLabel } from 'src/components/ui/typography'
+import { BodyText, MetaBadge } from 'src/components/ui/typography'
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
-import { Calendar, Clock, Eye, Film, Tv, Plus, Trash2, RefreshCw, Send, Ticket } from 'lucide-react'
-import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
+import { Plus, Ticket } from 'lucide-react'
+import { cn } from 'src/lib/utils'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
 import { TheaterInterestControl } from './TheaterInterestControl'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
-import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
 import { MatrixPillModal } from 'src/components/MatrixPillModal'
 import { MatrixDigitalRain } from 'src/components/MatrixDigitalRain'
-import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
-import { HeroBackdrop } from 'src/components/ui/hero-backdrop'
 import { TrailerRow } from 'src/components/ui/trailer-row'
 import { FranchiseSection } from 'src/components/FranchiseSection'
-import { WatchProvidersSection } from 'src/components/ui/watch-providers'
-import { ReviewBadges, ExternalLinks, HeroScores } from 'src/components/ui/media-badges'
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 import { SectionCard } from './title-detail/SectionCard'
-import { StatusCard } from './title-detail/StatusCard'
-import { ListsCard } from './title-detail/ListsCard'
-import { DetailRow } from './title-detail/DetailRow'
-import { viewingTime } from './title-detail/viewingTime'
 import { ViewingTimeline } from './title-detail/ViewingTimeline'
 import { TVSeriesSection } from './title-detail/TVSeriesSection'
 import { DrawerTagEditor } from './title-detail/DrawerTagEditor'
@@ -39,6 +28,9 @@ import { useEpisodeBackfill } from './title-detail/useEpisodeBackfill'
 import { useSpiderNoirMode } from './title-detail/useSpiderNoirMode'
 import { useLogViewingForm } from './title-detail/useLogViewingForm'
 import { LogViewingForm } from './title-detail/LogViewingForm'
+import { TitleHero } from './title-detail/TitleHero'
+import { TitleActions } from './title-detail/TitleActions'
+import { TitleSidebar } from './title-detail/TitleSidebar'
 
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
@@ -49,14 +41,12 @@ export function TitleDetailDrawer() {
   const updateTitle = useAppStore((s) => s.updateTitle)
   const removeTitle = useAppStore((s) => s.removeTitle)
   const removeViewing = useAppStore((s) => s.removeViewing)
-  const openRefreshMetadata = useAppStore((s) => s.openRefreshMetadata)
   const isSharedView = useAppStore((s) => s.isSharedView)
   const viewerContext = useAppStore((s) => s.viewerContext)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
   const browseByStudio = useAppStore((s) => s.browseByStudio)
   const unlockTheme = useAppStore((s) => s.unlockTheme)
   const title = useSelectedTitle()
-  const user = useAppStore((s) => s.user)
 
   const {
     isSpiderNoir, unlockedModes, earnedModes, manualMode, pinnedModeRaw, noirAnim, noirLogoUrl,
@@ -166,167 +156,20 @@ export function TitleDetailDrawer() {
       )}
 
       <div className="overflow-y-auto flex-1 scrollbar-thin pb-16 sm:pb-0">
-        {/* Hero: cinematic backdrop (stored or fetched) or blurred-poster fallback */}
-        {(title.backdropUrl || heroBackdropUrl) ? (
-          <HeroBackdrop
-            title={title}
-            backdropOverride={heroBackdropUrl ?? undefined}
-            onPosterClick={() => setPosterLightboxOpen(true)}
-          >
-            <div className="flex items-center gap-2">
-              {title.type === 'movie' ? (
-                <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              ) : (
-                <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              )}
-              <StatLabel>
-                {title.type === 'tv' ? 'Series' : 'Film'}
-              </StatLabel>
-              {title.network && (
-                <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
-              )}
-            </div>
-            {displayLogoUrl ? (
-              <img
-                src={displayLogoUrl}
-                alt={title.title}
-                className="object-contain object-left max-h-20 sm:max-h-28 max-w-[90%] drop-shadow-lg"
-              />
-            ) : (
-              <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-                <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.year}</MetaBadge>
-              {title.director && (
-                <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.director}</MetaBadge>
-              )}
-              {title.runtime && title.type === 'movie' && (
-                <MetaBadge className="h-7 inline-flex items-center gap-1 whitespace-nowrap border-amber/20 text-amber/80">
-                  <Clock className="w-3 h-3 shrink-0" />
-                  {fmtRuntime(title.runtime)}
-                </MetaBadge>
-              )}
-              {title.contentRating && <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.contentRating}</MetaBadge>}
-              {title.genres.slice(0, 2).map((genre) => (
-                <MetaBadge key={genre} className="border-amber/20 text-amber/80">{genre}</MetaBadge>
-              ))}
-            </div>
-            {isSpiderNoir && (
-              <SpiderNoirModeSelector
-                unlockedModes={unlockedModes}
-                earnedModes={earnedModes}
-                selected={manualMode}
-                pinned={pinnedModeRaw}
-                onSelect={handleModeSelect}
-                onTogglePin={handleTogglePin}
-              />
-            )}
-            {isMatrix && (title.viewings.length > 0 || title.status === 'watched') && (
-              <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-xs border border-white/10">
-                <StarRating
-                  value={title.rating ?? 0}
-                  size="sm"
-                  tone="onArt"
-                  onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
-                />
-              </div>
-              <HeroScores imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
-            </div>
-          </HeroBackdrop>
-        ) : (
-          <div className="relative overflow-hidden shrink-0">
-            {(title.backdropUrl ?? title.posterUrl) && (
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage: `url(${title.backdropUrl ?? title.posterUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center top',
-                  filter: 'blur(20px)',
-                  transform: 'scale(1.3)',
-                  opacity: 0.18,
-                }}
-              />
-            )}
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, hsl(var(--card) / 0.55) 0%, hsl(var(--card) / 0.92) 45%, hsl(var(--card)) 65%)' }} />
-            <div className="relative z-10 flex gap-5 px-6 pt-10 pb-6">
-              <div className="w-28 sm:w-36 shrink-0">
-                {title.posterUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => setPosterLightboxOpen(true)}
-                    aria-label={`View full poster for ${title.title}`}
-                    className="block w-full rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber/60"
-                    title="View full poster"
-                  >
-                    <DynamicPoster title={title} hideBadges />
-                  </button>
-                ) : (
-                  <DynamicPoster title={title} hideBadges />
-                )}
-              </div>
-              <div className="flex-1 min-w-0 space-y-2 pt-6">
-                <div className="flex items-center gap-2">
-                  {title.type === 'movie' ? (
-                    <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  ) : (
-                    <Tv className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  )}
-                  <StatLabel>
-                    {title.type === 'tv' ? 'Series' : 'Film'}
-                  </StatLabel>
-                  {title.network && (
-                    <span className="font-mono text-xs text-muted-foreground">· {title.network}</span>
-                  )}
-                </div>
-                <CardTitle className="text-xl leading-tight">{title.title}</CardTitle>
-                <div className="flex flex-wrap items-center gap-2">
-                  <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.year}</MetaBadge>
-                  {title.director && (
-                    <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.director}</MetaBadge>
-                  )}
-                  {title.runtime && title.type === 'movie' && (
-                    <MetaBadge className="h-7 inline-flex items-center gap-1 whitespace-nowrap border-amber/20 text-amber/80">
-                      <Clock className="w-3 h-3 shrink-0" />
-                      {fmtRuntime(title.runtime)}
-                    </MetaBadge>
-                  )}
-                  {title.contentRating && <MetaBadge className="h-7 inline-flex items-center whitespace-nowrap border-amber/20 text-amber/80">{title.contentRating}</MetaBadge>}
-                  {title.genres.slice(0, 2).map((genre) => (
-                    <MetaBadge key={genre} className="border-amber/20 text-amber/80">{genre}</MetaBadge>
-                  ))}
-                </div>
-                {isSpiderNoir && (
-                  <SpiderNoirModeSelector
-                    unlockedModes={unlockedModes}
-                    earnedModes={earnedModes}
-                    selected={manualMode}
-                    pinned={pinnedModeRaw}
-                    onSelect={handleModeSelect}
-                    onTogglePin={handleTogglePin}
-                  />
-                )}
-                {isMatrix && (title.viewings.length > 0 || title.status === 'watched') && (
-                  <MatrixPillSelector onRedPill={() => setShowMatrixRain(true)} />
-                )}
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="h-8 flex items-center rounded-md px-2.5 bg-black/55 backdrop-blur-xs border border-white/10">
-                    <StarRating
-                      value={title.rating ?? 0}
-                      size="sm"
-                      tone="onArt"
-                      onChange={isSharedView ? undefined : (rating) => updateTitle(title.id, { rating })}
-                    />
-                  </div>
-                  <HeroScores imdb={title.imdbRating} rt={title.rtScore} meta={title.metacriticScore} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <TitleHero
+          title={title}
+          backdropOverride={heroBackdropUrl}
+          logoUrl={displayLogoUrl}
+          isSharedView={isSharedView}
+          noirSelector={isSpiderNoir ? {
+            unlockedModes, earnedModes, selected: manualMode, pinned: pinnedModeRaw,
+            onSelect: handleModeSelect, onTogglePin: handleTogglePin,
+          } : null}
+          showMatrixPill={isMatrix && (title.viewings.length > 0 || title.status === 'watched')}
+          onRedPill={() => setShowMatrixRain(true)}
+          onPosterClick={() => setPosterLightboxOpen(true)}
+          onRate={(rating) => updateTitle(title.id, { rating })}
+        />
 
         {!isSharedView && title.type === 'movie' && <OutingBanner title={title} />}
 
@@ -464,163 +307,23 @@ export function TitleDetailDrawer() {
 
           {/* Maintenance actions */}
           {!isSharedView && (
-            <div
-              className="pt-2 border-t"
-              style={{ borderColor: 'var(--line)' }}
-            >
-              {pendingDeleteTitle ? (
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs" style={{ color: 'var(--paper-faint)' }}>
-                    Remove from library forever?
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <button type="button"
-                      onClick={handleDelete}
-                      className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
-                      style={{ color: 'var(--ember)' }}
-                      aria-label="Delete forever: title from library"
-                    >
-                      Delete forever
-                    </button>
-                    <button type="button"
-                      onClick={() => setPendingDeleteTitle(false)}
-                      className="focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm font-mono text-xs transition-opacity hover:opacity-80"
-                      style={{ color: 'var(--paper-faint)' }}
-                      aria-label="Cancel deleting title from library"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button"
-                    onClick={openRefreshMetadata}
-                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Refresh poster &amp; metadata
-                  </button>
-                  {title.type === 'movie' && (title.status === 'watched' || title.status === 'dropped') && (
-                    <button type="button"
-                      onClick={() => openOutingSchedule(title.id)}
-                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
-                    >
-                      <Ticket className="w-3.5 h-3.5" />
-                      Plan a cinema trip
-                    </button>
-                  )}
-                  {user && (
-                    <button type="button"
-                      onClick={() => setSendPanelOpen(true)}
-                      className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-amber hover:border-amber/40 hover:bg-amber/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      Send to a friend
-                    </button>
-                  )}
-                  <button type="button"
-                    onClick={() => setPendingDeleteTitle(true)}
-                    className="flex items-center gap-2 text-xs font-mono rounded-full px-3 py-1.5 border border-(--line) text-muted-foreground hover:text-ember hover:border-ember/30 hover:bg-ember/5 transition-all focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ember/60"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Remove from library
-                  </button>
-                </div>
-              )}
-            </div>
+            <TitleActions
+              title={title}
+              confirmingDelete={pendingDeleteTitle}
+              onConfirmingDeleteChange={setPendingDeleteTitle}
+              onDelete={handleDelete}
+              onSendToFriend={() => setSendPanelOpen(true)}
+            />
           )}
           </main>
 
           {/* Right column — supplementary metadata flows independently. */}
-          <aside className="space-y-5 min-w-0">
-            <StatusCard
-              status={title.status}
-              isSharedView={isSharedView}
-              onChange={(status) => updateTitle(title.id, { status })}
-            />
-            {!isSharedView && <ListsCard titleId={title.id} onOpenPicker={() => setIsAddToListOpen(true)} />}
-            {title.type === 'movie' && (
-              <SectionCard title="Viewing Stats">
-                <div className="space-y-2">
-                  <div className="bg-secondary/40 rounded-lg px-3 py-3 min-w-0 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 whitespace-nowrap">
-                      <Eye className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
-                      <StatLabel>Viewings</StatLabel>
-                    </div>
-                    <span className="font-mono text-base leading-none font-medium text-amber tabular-nums shrink-0">
-                      {title.viewings.length}
-                    </span>
-                  </div>
-                  <div className="bg-secondary/40 rounded-lg px-3 py-3 min-w-0 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 whitespace-nowrap">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
-                      <StatLabel>Last Seen</StatLabel>
-                    </div>
-                    <span className="font-mono text-xs leading-none font-medium text-amber tabular-nums whitespace-nowrap shrink-0 text-right">
-                      {(() => {
-                        if (title.viewings.length === 0) return '—'
-                        const latest = title.viewings.slice().sort((a, b) => viewingTime(b) - viewingTime(a))[0]
-                        return latest.date ? fmtDate(latest.date) : 'Before joining'
-                      })()}
-                    </span>
-                  </div>
-                </div>
-              </SectionCard>
-            )}
-            <SectionCard title="Details">
-              <dl className="space-y-2 rounded-lg bg-secondary/30 p-3">
-                {title.network && <DetailRow label="Network" value={title.network} />}
-                {title.runtime ? <DetailRow label="Runtime" value={`${title.runtime} min`} /> : null}
-                {title.contentRating && <DetailRow label="Rated" value={title.contentRating} />}
-                {title.originalLanguage && <DetailRow label="Language" value={languageName(title.originalLanguage)} />}
-                {title.releaseDate && (
-                  <DetailRow
-                    label={title.releaseDate > new Date().toISOString().slice(0, 10) ? 'Releases' : 'Released'}
-                    value={fmtReleaseDate(title.releaseDate)}
-                  />
-                )}
-                {title.studios && title.studios.length > 0 && (
-                  <DetailRow label="Studio" value={title.studios.join(', ')} />
-                )}
-                {title.collectionName && (
-                  <DetailRow label="Franchise" value={title.collectionName.replace(/\s+Collection$/i, '')} />
-                )}
-                <DetailRow label="Added" value={fmtDate(title.addedAt)} />
-              </dl>
-            </SectionCard>
-
-            {title.imdbId && (
-              <SectionCard title="Critical Reception">
-                <ReviewBadges
-                  imdb={title.imdbRating}
-                  rt={title.rtScore}
-                  meta={title.metacriticScore}
-                  awardsCount={title.awardsCount}
-                  bechdelOutcome={title.bechdelOutcome}
-                  bechdelScore={title.bechdelScore}
-                  showScores={false}
-                />
-              </SectionCard>
-            )}
-
-            <SectionCard>
-              <ExternalLinks media={title} />
-            </SectionCard>
-
-            <SectionCard>
-              <WatchProvidersSection
-                providers={watchProviders}
-                customUrl={title.customWatchUrl}
-                inHomeCollection={title.inHomeCollection}
-                physicalMedia={title.physicalMedia}
-                isSharedView={isSharedView}
-                onSaveCustomUrl={(url) => updateTitle(title.id, { customWatchUrl: url })}
-                onToggleHomeCollection={(value) => updateTitle(title.id, { inHomeCollection: value })}
-                onChangePhysicalMedia={(items) => updateTitle(title.id, { physicalMedia: items })}
-              />
-            </SectionCard>
-          </aside>
+          <TitleSidebar
+            title={title}
+            isSharedView={isSharedView}
+            watchProviders={watchProviders}
+            onOpenListPicker={() => setIsAddToListOpen(true)}
+          />
         </div>
       </div>
     </CinemaModal>

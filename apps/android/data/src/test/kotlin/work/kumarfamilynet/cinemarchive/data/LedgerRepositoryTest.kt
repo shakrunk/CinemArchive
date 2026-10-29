@@ -446,6 +446,9 @@ class LedgerRepositoryTest {
         assertEquals(null, moviegoing.bestValueVenue)
         // The one priced trip is exposed with its date so a budget can bucket it by period.
         assertEquals(listOf(24.50), moviegoing.pricedTrips.map { it.amount })
+        // Every dated trip, priced or not, is exposed so a plan's outing cap can bucket it.
+        assertEquals(1, moviegoing.tripDates.size)
+        assertEquals(moviegoing.pricedTrips.map { it.date }, moviegoing.tripDates)
     }
 
     @Test

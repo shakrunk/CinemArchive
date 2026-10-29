@@ -583,6 +583,7 @@ class LedgerRepository(
             formatSpend = formatSpend,
             bestValueVenue = venueSpend.filter { it.tripCount >= 2 }.minByOrNull { it.perTrip },
             milestoneBadges = milestoneBadges(trips, joinedOutings),
+            tripDates = trips.mapNotNull { parseLocalDate(it.date) },
             pricedTrips = trips.mapNotNull { trip ->
                 val price = trip.outingId?.let { outingById[it] }?.ticketPrice ?: return@mapNotNull null
                 parseLocalDate(trip.date)?.let { MoviegoingPricedTrip(it, price) }

@@ -71,6 +71,11 @@ class MoviegoingRecapTest {
         assertEquals(1, recap.tripCount)
     }
 
+    @Test fun labelsAreTrimmedBeforeTheyAreTallied() {
+        val trips = listOf(trip("2026-01-05", companions = listOf(" Sam ")), trip("2026-02-05", companions = listOf("Sam")))
+        assertEquals(RecapHighlight("Sam", 2), MoviegoingRecapRules.recap(trips, 2026)!!.topCompanion)
+    }
+
     @Test fun blankLabelsAreIgnored() {
         val recap = MoviegoingRecapRules.recap(listOf(trip("2026-01-05", venue = "  ", companions = listOf(""))), 2026)!!
         assertNull(recap.topVenue)

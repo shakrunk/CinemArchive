@@ -39,8 +39,8 @@ object MoviegoingRecapRules {
     }
 
     /** The recap for [year], or null when that year has no trips. The leading venue, format and
-     *  companion are the most frequent; a tie goes to the label that sorts first, so the same
-     *  trips give the same card on every device and client. */
+     *  companion are the most frequent (labels trimmed, blanks ignored); a tie goes to the label
+     *  that sorts first, so the same trips give the same card on every device and client. */
     fun recap(trips: List<MoviegoingTrip>, year: Int): MoviegoingRecap? {
         val inYear = trips.filter { it.date.year == year }
         if (inYear.isEmpty()) return null
@@ -56,7 +56,8 @@ object MoviegoingRecapRules {
     }
 
     private fun top(labels: List<String>): RecapHighlight? = labels
-        .filter { it.isNotBlank() }
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
         .groupingBy { it }
         .eachCount()
         .entries

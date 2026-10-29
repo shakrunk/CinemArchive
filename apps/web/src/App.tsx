@@ -12,6 +12,7 @@ import { useEpisodeScheduleRefresh } from 'src/lib/useEpisodeScheduleRefresh'
 import { useEverTrue } from 'src/lib/useEverTrue'
 import { applyTheme, toggleTheme, watchSystemTheme } from 'src/lib/theme'
 import { startThemeSync } from 'src/lib/themeSync'
+import { startMoviegoingPrefsSync } from 'src/lib/moviegoingPrefsSync'
 import { NotificationStack } from 'src/components/NotificationStack'
 import { JellyfinWatchPrompt } from 'src/components/JellyfinWatchPrompt'
 import { LibrarySyncToast } from 'src/components/LibrarySyncToast'
@@ -141,6 +142,7 @@ export default function App() {
     applyTheme(useAppStore.getState().theme)
     watchSystemTheme()
     startThemeSync()
+    startMoviegoingPrefsSync()
   }, [])
 
   // ⌘K / Ctrl+K toggles the palette from anywhere.

@@ -85,4 +85,10 @@ data class LedgerMoviegoingStats(
     /** Every dated trip with a recorded ticket price, so a budget can be checked against the
      *  current calendar period. Owner-private like [totalSpend]. */
     val pricedTrips: List<MoviegoingPricedTrip> = emptyList(),
+    /** The date of every dated cinema trip, priced or not, so a subscription plan's outing cap
+     *  can be checked against the current period. */
+    val tripDates: List<java.time.LocalDate> = emptyList(),
+    /** Every dated cinema trip with the facts a yearly recap tallies. Venue and companions sit on
+     *  the shared-readable viewing; format and price are the owner-private half. */
+    val trips: List<MoviegoingTrip> = emptyList(),
 )

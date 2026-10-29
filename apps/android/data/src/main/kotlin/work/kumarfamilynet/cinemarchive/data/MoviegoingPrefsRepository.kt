@@ -14,6 +14,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.model.BudgetPeriod
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
+import work.kumarfamilynet.cinemarchive.core.model.PlanPeriod
+import work.kumarfamilynet.cinemarchive.core.model.SubscriptionPlan
 import java.time.Instant
 
 /**
@@ -21,15 +23,31 @@ import java.time.Instant
  * [json] is the whole payload, kept so keys this client doesn't know (written by a newer one)
  * survive a local edit and the push that follows it.
  */
-class SyncedMoviegoingPrefs(val budget: MoviegoingBudget?, val updatedAt: Instant, val json: JSONObject)
+class SyncedMoviegoingPrefs(
+    val budget: MoviegoingBudget?,
+    val plan: SubscriptionPlan?,
+    val updatedAt: Instant,
+    val json: JSONObject,
+)
 
-/** Rejects the whole payload on a missing/unparseable `updatedAt` or an invalid `budget`
- *  rather than half-applying it. An absent or null `budget` is valid: it means "no budget". */
+/** Rejects the whole payload on a missing/unparseable `updatedAt` or an invalid `budget` or
+ *  `plan` rather than half-applying it. An absent or null `budget`/`plan` is valid: it means
+ *  "none set". */
 fun parseMoviegoingPrefs(json: JSONObject): SyncedMoviegoingPrefs? {
     val updatedAt = (json.opt("updatedAt") as? String)?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
-    val raw = json.opt("budget")
-    val budget = if (raw == null || raw == JSONObject.NULL) null else parseBudget(raw) ?: return null
-    return SyncedMoviegoingPrefs(budget, updatedAt, json)
+    val rawBudget = json.opt("budget")
+    val budget = if (rawBudget == null || rawBudget == JSONObject.NULL) null else parseBudget(rawBudget) ?: return null
+    val rawPlan = json.opt("plan")
+    val plan = if (rawPlan == null || rawPlan == JSONObject.NULL) null else parsePlan(rawPlan) ?: return null
+    return SyncedMoviegoingPrefs(budget, plan, updatedAt, json)
+}
+
+private fun parsePlan(value: Any): SubscriptionPlan? {
+    val obj = value as? JSONObject ?: return null
+    val cap = (obj.opt("cap") as? Number)?.let { n -> n.toInt().takeIf { it.toDouble() == n.toDouble() } } ?: return null
+    if (!SubscriptionPlan.isValidCap(cap)) return null
+    val period = PlanPeriod.fromWire(obj.opt("period") as? String) ?: return null
+    return SubscriptionPlan(cap, period)
 }
 
 private fun parseBudget(value: Any): MoviegoingBudget? {
@@ -42,12 +60,21 @@ private fun parseBudget(value: Any): MoviegoingBudget? {
 
 /** A copy of [base] (or an empty payload) with [budget] set — or explicitly nulled when
  *  clearing, so the clear carries a fresh [updatedAt] and propagates — and every other key kept. */
-fun moviegoingPrefsWithBudget(base: JSONObject?, budget: MoviegoingBudget?, updatedAt: String): JSONObject {
-    val next = JSONObject((base ?: JSONObject()).toString())
-    next.put(
+fun moviegoingPrefsWithBudget(base: JSONObject?, budget: MoviegoingBudget?, updatedAt: String): JSONObject =
+    withKey(
+        base,
         "budget",
-        budget?.let { JSONObject().put("amount", it.amount).put("period", it.period.wire) } ?: JSONObject.NULL,
+        budget?.let { JSONObject().put("amount", it.amount).put("period", it.period.wire) },
+        updatedAt,
     )
+
+/** [moviegoingPrefsWithBudget]'s counterpart for the subscription plan. */
+fun moviegoingPrefsWithPlan(base: JSONObject?, plan: SubscriptionPlan?, updatedAt: String): JSONObject =
+    withKey(base, "plan", plan?.let { JSONObject().put("cap", it.cap).put("period", it.period.wire) }, updatedAt)
+
+private fun withKey(base: JSONObject?, key: String, value: JSONObject?, updatedAt: String): JSONObject {
+    val next = JSONObject((base ?: JSONObject()).toString())
+    next.put(key, value ?: JSONObject.NULL)
     return next.put("updatedAt", updatedAt)
 }
 
@@ -76,8 +103,8 @@ fun resolveMoviegoingPrefsReconciliation(remoteJson: JSONObject?, local: SyncedM
 
 /**
  * The signed-in account's owner-private moviegoing settings. The local DataStore copy is the
- * source of truth for reads ([observeBudget] never hits the network); [setBudget] writes it
- * first, then pushes best-effort, and [reconcile] resolves any difference last-write-wins. A
+ * source of truth for reads ([observeBudget]/[observePlan] never hit the network); [setBudget]
+ * and [setPlan] write it first, then pushes best-effort, and [reconcile] resolves any difference last-write-wins. A
  * failed fetch, a missing table or an invalid payload leaves both sides untouched, and a push
  * that failed offline is retried by the next reconcile.
  */
@@ -92,12 +119,24 @@ class MoviegoingPrefsRepository(
 
     fun observeBudget(): Flow<MoviegoingBudget?> = dataStore.data.map { readLocal(it)?.budget }.distinctUntilChanged()
 
+    fun observePlan(): Flow<SubscriptionPlan?> = dataStore.data.map { readLocal(it)?.plan }.distinctUntilChanged()
+
     /** Sets, replaces or (with null) clears the budget. An invalid amount is rejected. */
     suspend fun setBudget(budget: MoviegoingBudget?) {
         require(budget == null || MoviegoingBudget.isValidAmount(budget.amount)) { "Invalid budget amount" }
+        update { base, stamp -> moviegoingPrefsWithBudget(base, budget, stamp) }
+    }
+
+    /** Sets, replaces or (with null) clears the subscription plan. An invalid cap is rejected. */
+    suspend fun setPlan(plan: SubscriptionPlan?) {
+        require(plan == null || SubscriptionPlan.isValidCap(plan.cap)) { "Invalid plan cap" }
+        update { base, stamp -> moviegoingPrefsWithPlan(base, plan, stamp) }
+    }
+
+    private suspend fun update(change: (base: JSONObject?, stamp: String) -> JSONObject) {
         var next: JSONObject? = null
         dataStore.edit { stored ->
-            val updated = moviegoingPrefsWithBudget(readLocal(stored)?.json, budget, now().toString())
+            val updated = change(readLocal(stored)?.json, now().toString())
             next = updated
             stored[prefsKey] = updated.toString()
         }

@@ -70,5 +70,5 @@ object MoviegoingBudgetRules {
         return BudgetStatus(budget, spentCents / 100.0, range.start, range.endInclusive, state)
     }
 
-    private fun cents(amount: Double): Long = (amount * 100).roundToLong()
+    internal fun cents(amount: Double): Long = (amount * 100).roundToLong()
 }

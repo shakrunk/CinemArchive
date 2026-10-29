@@ -1719,6 +1719,31 @@ export async function saveThemePrefs(userId: string, prefs: unknown): Promise<vo
   unwrap(error, 'saveThemePrefs:')
 }
 
+// ─── Moviegoing prefs (owner-private budget and plan, docs/android-contracts/moviegoing-prefs.md) ─
+
+/** The owner's raw `moviegoing_prefs.prefs` payload (validated by
+ *  moviegoingPrefsSync.parseMoviegoingPrefs), or null when there is no row. Throws on any
+ *  failure, including the table missing before its migration deploys; callers treat a throw
+ *  as "unknown" and leave both sides alone. */
+export async function fetchMoviegoingPrefs(userId: string): Promise<unknown> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('moviegoing_prefs')
+    .select('prefs')
+    .eq('user_id', userId)
+    .maybeSingle()
+  unwrap(error, 'fetchMoviegoingPrefs:')
+  return data?.prefs ?? null
+}
+
+export async function saveMoviegoingPrefs(userId: string, prefs: unknown): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('moviegoing_prefs')
+    .upsert({ user_id: userId, prefs }, { onConflict: 'user_id' })
+  unwrap(error, 'saveMoviegoingPrefs:')
+}
+
 export async function saveLedgerLayout(userId: string, widgets: LedgerWidget[]): Promise<void> {
   if (!supabase) return
   const { error } = await supabase

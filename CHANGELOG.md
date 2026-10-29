@@ -9,6 +9,12 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.45.3] - 2026-10-28
+
+### Fixed
+
+- **Library failing to load on the web with "Couldn't load your library".** A routine refresh could be rejected when a TV episode had no director on record, which blocked the library from loading and left saved changes stuck waiting to sync. Those changes were never lost and will sync once this fix is live.
+
 ## [1.45.2] - 2026-10-27
 
 ### Performance

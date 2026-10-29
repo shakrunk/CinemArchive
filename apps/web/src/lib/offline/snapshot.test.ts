@@ -36,6 +36,15 @@ describe('credit carry-over', () => {
     expect(merged).not.toHaveProperty('creditsFor')
   })
 
+  it('leaves episode fields absent, not undefined, when the cached episode has none', () => {
+    const bare = { ...emptySnapshot(), titles: [series('a', false)], rowRevisions: revisions(['a']) }
+    const merged = mergeRefreshedSnapshot(bare, { ...bare, creditsFor: [] })
+    const episode = merged.titles[0].seasons![0].episodes![0]
+    expect(episode).not.toHaveProperty('director')
+    expect(episode).not.toHaveProperty('crew')
+    expect(() => assertSnapshot(merged)).not.toThrow()
+  })
+
   it('replaces credits for the titles that were read, even when they became empty', () => {
     const fresh = { ...series('b', true), cast: [{ tmdbPersonId: 9, name: 'recast', order: 0 }] }
     const merged = mergeRefreshedSnapshot(cached, { ...emptySnapshot(), titles: [series('a', false), fresh], creditsFor: ['a', 'b'] })

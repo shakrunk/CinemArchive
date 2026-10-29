@@ -101,6 +101,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetWidth
 import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
 import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
+import work.kumarfamilynet.cinemarchive.core.model.SubscriptionPlan
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
 import work.kumarfamilynet.cinemarchive.data.MoviegoingPrefsRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
@@ -181,6 +182,13 @@ class LedgerViewModel(
         viewModelScope.launch { prefsRepository.setBudget(budget) }
     }
 
+    val plan = prefsRepository.observePlan()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setPlan(plan: SubscriptionPlan?) {
+        viewModelScope.launch { prefsRepository.setPlan(plan) }
+    }
+
     private val editModeFlow = MutableStateFlow(false)
     val editMode: StateFlow<Boolean> = editModeFlow
 
@@ -228,7 +236,9 @@ fun LedgerRoute(
     val expandedWidgets by viewModel.expandedWidgets.collectAsStateWithLifecycle()
     val budget by viewModel.budget.collectAsStateWithLifecycle()
     val budgetUi = remember(budget) { MoviegoingBudgetUi(budget, viewModel::setBudget) }
-    CompositionLocalProvider(LocalMoviegoingBudget provides budgetUi) {
+    val plan by viewModel.plan.collectAsStateWithLifecycle()
+    val planUi = remember(plan) { MoviegoingPlanUi(plan, viewModel::setPlan) }
+    CompositionLocalProvider(LocalMoviegoingBudget provides budgetUi, LocalMoviegoingPlan provides planUi) {
         LedgerScreen(
             uiState = uiState,
             layout = layout,

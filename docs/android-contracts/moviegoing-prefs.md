@@ -44,6 +44,11 @@ so a newer client's additions survive an older client's edit.
 - A user clearing the budget or the plan writes that key as `null` with a fresh `updatedAt`, so
   the clear propagates rather than being undone by an older remote copy.
 - Changing one of `budget`/`plan` leaves the other untouched. Both share the one `updatedAt`.
+- The web client (`apps/web/src/lib/moviegoingPrefsSync.ts`) follows the same payload, validation and
+  last-write-wins rules, with one deliberate difference: it keeps its copy in memory for the session
+  rather than on the device, because browser device storage is shared by whoever signs in next and
+  this is one account's private data. It refetches on sign-in and when the browser comes back online,
+  and a push that failed is retried by the next reconcile while the tab stays open.
 
 ## Period spend
 
@@ -56,8 +61,8 @@ the calendar month or year containing "today" in local time. The status is:
 | 0.8 up to and including 1.0 | `near` |
 | above 1.0 | `over` |
 
-Android pins these cases in `MoviegoingBudgetTest` (core/model). The web implementation (#389) must
-mirror the same cases in its own suite, as the Calendar derivation does.
+Android pins these cases in `MoviegoingBudgetTest` (core/model) and web in `moviegoingRules.test.ts`
+(`apps/web/src/store`); the two suites hold the same cases.
 
 ## Plan usage (#211)
 
@@ -79,4 +84,4 @@ With `used` trips against `cap`:
 | otherwise | `under` |
 
 So a cap of 1 stays `under` until used, a cap of 3 turns `near` at 2, and a cap of 10 at 8. Android
-pins these in `SubscriptionPlanTest` (core/model); the web implementation (#390) must mirror them.
+pins these in `SubscriptionPlanTest` (core/model) and web in `moviegoingRules.test.ts`, with the same cases.

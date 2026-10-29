@@ -2,8 +2,8 @@
 
 The yearly "moviegoing wrapped" card (#216): one calendar year of cinema trips summarised as a
 shareable card. It is pure presentation over trips the Ledger's "At the Movies" widget already
-derives; it adds no tracking, table or sync. Android implements it first; the web client (#391)
-must produce the same figures for the same year.
+derives; it adds no tracking, table or sync. Both clients implement it and produce the same
+figures for the same year.
 
 ## Inputs
 
@@ -30,7 +30,7 @@ date is a plain calendar date). A year with no trips has no recap.
 | Field | Rule |
 |-------|------|
 | `tripCount` | trips in the year |
-| `topVenue` / `topFormat` / `topCompanion` | the most frequent label, with its count. A tie goes to the label that sorts first (plain code-point order). Blank labels are ignored. Absent when no trip has one. |
+| `topVenue` / `topFormat` / `topCompanion` | the most frequent label, with its count. A tie goes to the label that sorts first (plain code-point order). Labels are trimmed and blank ones ignored. Absent when no trip has one. |
 | `totalSpend` | sum of the year's priced trips, added in whole cents (`round(price * 100)`) so float drift never changes the total. Absent when no trip that year has a price; a price of `0` still counts as known. |
 
 Companions are counted per name occurrence, as in the Ledger's companion tally.
@@ -43,9 +43,10 @@ point is hidden.
 
 ## Sharing
 
-The Android card renders to a 1080 x 1350 PNG in the app's cache and hands it to the system share
-sheet together with a one-line text summary of the same figures. Nothing is
-uploaded by the app.
+Both clients render the card to a 1080 x 1350 PNG. Android writes it to the app's cache and hands it to
+the system share sheet together with a one-line text summary of the same figures. The web client shares
+the PNG through the browser's share sheet where it can share files, and otherwise downloads it. Nothing is
+uploaded by either app.
 
-Android pins the rules above in `MoviegoingRecapTest` (core/model). The web implementation must mirror
-the same cases in its own suite.
+Android pins the rules above in `MoviegoingRecapTest` (core/model) and web in `moviegoingRules.test.ts`
+(`apps/web/src/store`), with the same cases.

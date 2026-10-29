@@ -154,6 +154,15 @@ it('applies a pinned Spider-Noir mode on open and drops it for Normal', async ()
   expect(actions.unlockTheme).toHaveBeenCalledWith('noir')
 })
 
+it('replays the digital rain from the hero once The Matrix is watched', async () => {
+  open([movie({ id: 'matrix', tmdbId: THE_MATRIX_TMDB_ID, title: 'The Matrix', status: 'watched' })])
+  render(<TitleDetailDrawer />)
+  expect(screen.queryByText('digital rain')).toBeNull()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Red Pill — replay the digital rain' })))
+  expect(screen.getByText('digital rain')).toBeTruthy()
+  expect(actions.unlockTheme).toHaveBeenCalledWith('matrix')
+})
+
 it('asks for a pill before logging The Matrix and unlocks its theme on red', async () => {
   open([movie({ id: 'matrix', tmdbId: THE_MATRIX_TMDB_ID, title: 'The Matrix' })])
   render(<TitleDetailDrawer />)

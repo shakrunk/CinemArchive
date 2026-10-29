@@ -1,6 +1,6 @@
 import { captureLibrarySession, saveSucceeded } from 'src/lib/localSave'
 import { scaledTextSize } from 'src/lib/textScale'
-import { useState, useEffect, useRef, useMemo, useId } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -33,17 +33,15 @@ import { EpisodeCard, EpisodePanel } from 'src/components/ui/episode-card'
 import {
   Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
   ChevronLeft, ChevronRight, ChevronDown, RefreshCw, Tag, X, Send, Ticket, Clapperboard,
-  Pencil, MapPin, Users,
+  Pencil,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
-import { formatCompanions, findPendingFollowUpOuting, companionSuggestions, venueSuggestions } from 'src/store/outings'
+import { formatCompanions, findPendingFollowUpOuting } from 'src/store/outings'
 import { CINEMA_FORMATS, type CastMember, type Title, type Viewing, type Season, type Episode, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, TMDB_STILL_BASE, type TitleVideo, type WatchProviders } from 'src/lib/media'
-import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
-import { CompanionInput } from 'src/components/OutingScheduleSheet'
 import { TheaterInterestControl } from './TheaterInterestControl'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
@@ -63,6 +61,7 @@ import { SectionCard } from './title-detail/SectionCard'
 import { StatusCard } from './title-detail/StatusCard'
 import { ListsCard } from './title-detail/ListsCard'
 import { DetailRow } from './title-detail/DetailRow'
+import { VenueCompanionsFields } from './title-detail/VenueCompanionsFields'
 
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
@@ -90,74 +89,6 @@ function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
 // Undated viewings are pre-platform (watched before joining) and order as oldest.
 function viewingTime(v: Viewing): number {
   return v.date ? new Date(v.date).getTime() : -Infinity
-}
-
-// Venue + companions fields — shared by the log-viewing form and the
-// per-viewing editor (plan §4.6/§7.4): the same chip-input/autocomplete
-// affordances as OutingScheduleSheet's ticket form, driven by the same
-// src/store/outings.ts suggestion helpers, so "your usual theater" and
-// "who you usually go with" complete the same way everywhere.
-function VenueCompanionsFields({
-  venue,
-  onVenueChange,
-  companions,
-  onCompanionsChange,
-}: {
-  venue: string
-  onVenueChange: (venue: string) => void
-  companions: Companion[]
-  onCompanionsChange: (companions: Companion[]) => void
-}) {
-  const outings = useAppStore((s) => s.outings)
-  const titles = useAppStore((s) => s.titles)
-  const allViewings = useMemo(() => titles.flatMap((t) => t.viewings), [titles])
-  const [friends, setFriends] = useState<FriendshipView[]>([])
-  const datalistId = useId()
-
-  useEffect(() => {
-    // Deferred to satisfy react-hooks/set-state-in-effect (same pattern as
-    // OutingScheduleSheet's friend fetch).
-    const t = setTimeout(() => {
-      listFriendships()
-        .then((list) => setFriends(list.filter((f) => f.status === 'accepted')))
-        .catch((err) => console.error('Failed to load friends for viewing companions:', err))
-    }, 0)
-    return () => clearTimeout(t)
-  }, [])
-
-  const suggestions = useMemo(
-    () => companionSuggestions(outings, allViewings, friends),
-    [outings, allViewings, friends]
-  )
-  const venues = useMemo(() => venueSuggestions(outings, allViewings), [outings, allViewings])
-
-  return (
-    <>
-      <div>
-        <Eyebrow as="label" size="xl" tone="muted" font="sans" className="flex items-center gap-1 mb-2">
-          <MapPin className="w-3 h-3" />
-          Theater
-        </Eyebrow>
-        <Input
-          list={datalistId}
-          value={venue}
-          onChange={(e) => onVenueChange(e.target.value)}
-          placeholder="e.g. AMC Georgetown"
-          className="bg-secondary/50 border-border"
-        />
-        <datalist id={datalistId}>
-          {venues.map((v) => <option key={v} value={v} />)}
-        </datalist>
-      </div>
-      <div>
-        <Eyebrow as="p" size="xl" tone="muted" font="sans" className="flex items-center gap-1 mb-2">
-          <Users className="w-3 h-3" />
-          Companions
-        </Eyebrow>
-        <CompanionInput companions={companions} onChange={onCompanionsChange} suggestions={suggestions} />
-      </div>
-    </>
-  )
 }
 
 // Ticket stub line (plan §4.6/§7.4/§13): "at AMC Georgetown · with Alex &

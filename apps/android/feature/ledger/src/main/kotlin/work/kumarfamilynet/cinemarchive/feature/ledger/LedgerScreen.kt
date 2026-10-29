@@ -238,7 +238,11 @@ fun LedgerRoute(
     val budgetUi = remember(budget) { MoviegoingBudgetUi(budget, viewModel::setBudget) }
     val plan by viewModel.plan.collectAsStateWithLifecycle()
     val planUi = remember(plan) { MoviegoingPlanUi(plan, viewModel::setPlan) }
-    CompositionLocalProvider(LocalMoviegoingBudget provides budgetUi, LocalMoviegoingPlan provides planUi) {
+    CompositionLocalProvider(
+        LocalMoviegoingBudget provides budgetUi,
+        LocalMoviegoingPlan provides planUi,
+        LocalMoviegoingRecap provides true,
+    ) {
         LedgerScreen(
             uiState = uiState,
             layout = layout,

@@ -37,12 +37,11 @@ import {
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
 import { formatCompanions, findPendingFollowUpOuting, companionSuggestions, venueSuggestions } from 'src/store/outings'
-import { CINEMA_FORMATS, type CastMember, type Title, type Viewing, type WatchStatus, type Season, type Episode, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
+import { CINEMA_FORMATS, type CastMember, type Title, type Viewing, type Season, type Episode, type EpisodeCrew, type CinemaOuting, type CinemaFormat, type Companion } from 'src/store/mockData'
 import { fetchSeasonDetails, fetchTitleVideos, fetchTitleImages, fetchWatchProviders, TMDB_STILL_BASE, type TitleVideo, type WatchProviders } from 'src/lib/media'
 import { listFriendships, type FriendshipView } from 'src/lib/auth'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
-import { Chip } from 'src/components/ui/chip'
 import { ShareOutingPanel } from 'src/components/ShareOutingPanel'
 import { CompanionInput } from 'src/components/OutingScheduleSheet'
 import { TheaterInterestControl } from './TheaterInterestControl'
@@ -61,6 +60,9 @@ import { ReviewBadges, ExternalLinks, HeroScores } from 'src/components/ui/media
 import { SPIDER_NOIR_TMDB_ID, THE_MATRIX_TMDB_ID } from 'src/lib/easterEggThemes'
 import { parseSeatsInput } from 'src/lib/seating'
 import { SectionCard } from './title-detail/SectionCard'
+import { StatusCard } from './title-detail/StatusCard'
+import { ListsCard } from './title-detail/ListsCard'
+import { DetailRow } from './title-detail/DetailRow'
 
 type SelectorMode = 'normal' | 'bw' | 'color'
 const EASTER_EGG_KEY = 'spider_noir_color'
@@ -82,15 +84,6 @@ function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
   }
   return lastMode
 }
-
-// ─── Shared status options ────────────────────────────────────────────────────
-
-const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
-  { value: 'watched', label: 'Watched' },
-  { value: 'watchlist', label: 'Watchlist' },
-  { value: 'watching', label: 'Watching' },
-  { value: 'dropped', label: 'Dropped' },
-]
 
 // ─── Movie-only: viewing timeline ────────────────────────────────────────────
 
@@ -531,92 +524,6 @@ function ViewingTimeline({
             </div>
           )})}
       </div>
-    </div>
-  )
-}
-
-// ─── Details sidebar ──────────────────────────────────────────────────────────
-
-function StatusCard({
-  status,
-  isSharedView,
-  onChange,
-}: {
-  status: WatchStatus
-  isSharedView: boolean
-  onChange: (status: WatchStatus) => void
-}) {
-  return (
-    <SectionCard title="Status">
-      <div className="relative inline-block">
-        <select
-          value={status}
-          onChange={isSharedView ? undefined : (e) => onChange(e.target.value as WatchStatus)}
-          disabled={isSharedView}
-          aria-label="Title status"
-          className={cn(
-            'appearance-none font-sans text-sm rounded-lg pl-3 pr-9 py-2 bg-secondary border border-amber/30 focus:outline-hidden focus:border-amber/60',
-            isSharedView && 'opacity-60 cursor-default'
-          )}
-          style={{ color: 'var(--amber)' }}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
-          style={{ color: 'var(--amber)' }}
-        />
-      </div>
-    </SectionCard>
-  )
-}
-
-// Lists is private-only — never rendered for a shared/friend viewer (isSharedView).
-function ListsCard({ titleId, onOpenPicker }: { titleId: string; onOpenPicker: () => void }) {
-  // Atomic selectors + local useMemo, not `s.listsForTitle(titleId)` directly as the selector —
-  // that store method allocates a fresh array every call, so useSyncExternalStore's snapshot
-  // comparison never sees it as equal and re-renders forever ("Maximum update depth exceeded",
-  // which takes the whole app down since nothing catches it).
-  const allLists = useAppStore((s) => s.lists)
-  const listMemberships = useAppStore((s) => s.listMemberships)
-  const lists = useMemo(
-    () => allLists.filter((l) => listMemberships[l.id]?.has(titleId)),
-    [allLists, listMemberships, titleId]
-  )
-  return (
-    <SectionCard
-      title="Lists"
-      action={
-        <button type="button"
-          onClick={onOpenPicker}
-          className="font-mono text-xs text-amber hover:underline focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded"
-        >
-          {lists.length > 0 ? 'Edit' : 'Add to list'}
-        </button>
-      }
-    >
-      {lists.length === 0 ? (
-        <p className="font-sans text-xs text-muted-foreground">Not in any lists yet.</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {lists.map((l) => (
-            <Chip key={l.id} active onClick={onOpenPicker}>{l.name}</Chip>
-          ))}
-        </div>
-      )}
-    </SectionCard>
-  )
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <Eyebrow as="dt" size="xl" tone="muted" className="shrink-0">{label}</Eyebrow>
-      <dd className="font-sans text-sm text-foreground text-right min-w-0 wrap-break-word">{value}</dd>
     </div>
   )
 }

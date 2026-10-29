@@ -1,5 +1,5 @@
 import { saveSucceeded } from 'src/lib/localSave'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { StarRating } from 'src/components/ui/star-rating'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
@@ -10,20 +10,18 @@ import { CardTitle, BodyText, MetaBadge, StatLabel, Eyebrow } from 'src/componen
 import { useAppStore, useSelectedTitle } from 'src/store/useAppStore'
 import { CastCrewSection } from 'src/components/CastCrewSection'
 import { PersonDetailPanel, type PersonDetailTarget } from 'src/components/PersonDetailPanel'
-import { getUnlockedModes, getEarnedModes } from 'src/store/episodeUtils'
 import {
   Calendar, Check, Clock, Eye, Film, Tv, Plus, FileText, Trash2, Star,
   RefreshCw, Send, Ticket,
 } from 'lucide-react'
 import { cn, fmtDate, fmtReleaseDate, fmtRuntime, languageName } from 'src/lib/utils'
-import type { Title, Viewing, Companion } from 'src/store/mockData'
+import type { Viewing, Companion } from 'src/store/mockData'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { AddToListSheet } from 'src/components/AddToListSheet'
 import { TheaterInterestControl } from './TheaterInterestControl'
 import { TitleCommentsPanel } from 'src/components/TitleCommentsPanel'
 import SpiderWebOverlay from 'src/components/SpiderWebOverlay'
 import { SpiderNoirModeSelector } from 'src/components/SpiderNoirModeSelector'
-import { transitionSpiderNoir } from 'src/lib/theme'
 import { MatrixPillModal } from 'src/components/MatrixPillModal'
 import { MatrixDigitalRain } from 'src/components/MatrixDigitalRain'
 import { MatrixPillSelector } from 'src/components/MatrixPillSelector'
@@ -45,27 +43,7 @@ import { DrawerTagEditor } from './title-detail/DrawerTagEditor'
 import { OutingBanner } from './title-detail/OutingBanner'
 import { useTitleMedia } from './title-detail/useTitleMedia'
 import { useEpisodeBackfill } from './title-detail/useEpisodeBackfill'
-
-type SelectorMode = 'normal' | 'bw' | 'color'
-const EASTER_EGG_KEY = 'spider_noir_color'
-const SPIDER_NOIR_LOGO_NORMAL = 'https://image.tmdb.org/t/p/original/o2D8loRUDlEuOf7BMRgulerNJ6p.png'
-const SPIDER_NOIR_LOGO_COLOR  = 'https://image.tmdb.org/t/p/original/ubGbGqmbfWW1B7kNXDI1KrooK7S.png'
-const SPIDER_NOIR_LOGO_BW     = 'https://image.tmdb.org/t/p/original/tcS3i7X9XvYcFGEEnjHG147sQrq.png'
-
-function getSpiderNoirActiveMode(title: Title): 'bw' | 'color' | null {
-  let lastMode: 'bw' | 'color' | null = null
-  for (const season of title.seasons ?? []) {
-    for (const ep of season.episodes ?? []) {
-      for (const we of ep.watchEvents) {
-        if (we.colorMode) lastMode = we.colorMode
-      }
-      for (const rv of ep.reviews) {
-        if (rv.colorMode) lastMode = rv.colorMode
-      }
-    }
-  }
-  return lastMode
-}
+import { useSpiderNoirMode } from './title-detail/useSpiderNoirMode'
 
 // ─── Main drawer ─────────────────────────────────────────────────────────────
 
@@ -82,10 +60,14 @@ export function TitleDetailDrawer() {
   const viewerContext = useAppStore((s) => s.viewerContext)
   const openOutingSchedule = useAppStore((s) => s.openOutingSchedule)
   const browseByStudio = useAppStore((s) => s.browseByStudio)
+  const unlockTheme = useAppStore((s) => s.unlockTheme)
   const title = useSelectedTitle()
   const user = useAppStore((s) => s.user)
 
-  const isSpiderNoir = title?.tmdbId === SPIDER_NOIR_TMDB_ID
+  const {
+    isSpiderNoir, unlockedModes, earnedModes, manualMode, pinnedModeRaw, noirAnim, noirLogoUrl,
+    handleModeSelect, handleTogglePin,
+  } = useSpiderNoirMode(title, isDetailDrawerOpen)
   const isMatrix = title?.tmdbId === THE_MATRIX_TMDB_ID
 
   const [showMatrixModal, setShowMatrixModal] = useState(false)
@@ -94,110 +76,10 @@ export function TitleDetailDrawer() {
   const [sendPanelOpen, setSendPanelOpen] = useState(false)
   const [isAddToListOpen, setIsAddToListOpen] = useState(false)
 
-  const pinnedModes = useAppStore((s) => s.pinnedModes)
-  const setPinnedMode = useAppStore((s) => s.setPinnedMode)
-  const unlockTheme = useAppStore((s) => s.unlockTheme)
-
-  const unlockedModes = useMemo(
-    () => (isSpiderNoir && title ? getUnlockedModes(title) : new Set<'bw' | 'color'>()),
-    [isSpiderNoir, title]
-  )
-  const earnedModes = useMemo(
-    () => (isSpiderNoir && title ? getEarnedModes(title) : new Set<'bw' | 'color'>()),
-    [isSpiderNoir, title]
-  )
-
-  // Global theme easter eggs: earning the Spider-Noir black & white mode, or
-  // taking the Matrix red pill, unlocks the matching app-wide theme (Settings
-  // → Appearance). Keyed on the "earned"/"rain shown" signals so it fires
-  // regardless of whether the title was already watched before this session.
-  useEffect(() => {
-    if (earnedModes.has('bw')) unlockTheme('noir')
-  }, [earnedModes, unlockTheme])
-
+  // Taking the red pill unlocks the app-wide Matrix theme (Settings → Appearance).
   useEffect(() => {
     if (showMatrixRain) unlockTheme('matrix')
   }, [showMatrixRain, unlockTheme])
-
-  const prevNoirModeRef = useRef<'bw' | 'color' | null | undefined>(undefined)
-  const [noirAnim, setNoirAnim] = useState<'bw' | 'color' | null>(null)
-  const noirAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [manualMode, setManualMode] = useState<SelectorMode>('normal')
-
-  // closeDetailDrawer only sets isDetailDrawerOpen=false, not selectedTitleId=null,
-  // so title and isSpiderNoir remain valid here even when the drawer is closed.
-  const pinnedModeRaw = (title ? (pinnedModes[`${title.id}:${EASTER_EGG_KEY}`] ?? null) : null) as 'bw' | 'color' | null
-
-  // Seed manualMode from pinned → last watch event → normal when the drawer opens.
-  // setTimeout(0) defers the setState out of the effect body to satisfy react-hooks/set-state-in-effect.
-  useEffect(() => {
-    if (!isSpiderNoir || !title || !isDetailDrawerOpen) return
-    const derived = getSpiderNoirActiveMode(title)
-    const seeded = pinnedModeRaw ?? derived ?? 'normal'
-    const t = setTimeout(() => setManualMode(seeded as SelectorMode), 0)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title?.id, isDetailDrawerOpen])
-
-  // While drawer is open: use manual selection. When closed: use pinned (if any).
-  const effectiveNoirMode: 'bw' | 'color' | null = isSpiderNoir
-    ? (isDetailDrawerOpen ? (manualMode !== 'normal' ? (manualMode as 'bw' | 'color') : null) : pinnedModeRaw)
-    : null
-
-  useEffect(() => {
-    const ALL = ['spider-noir-bw', 'spider-noir-color', 'spider-noir-bw-enter', 'spider-noir-color-enter'] as const
-    const prevMode = prevNoirModeRef.current
-
-    // Skip the transition on the very first render (prev === undefined) —
-    // the drawer isn't open yet so there's nothing to animate between.
-    // Also skip if the mode hasn't actually changed.
-    const isVisualChange = prevMode !== undefined && prevMode !== effectiveNoirMode
-
-    function applyClasses() {
-      document.body.classList.remove(...ALL)
-      if (effectiveNoirMode) {
-        document.body.classList.add(effectiveNoirMode === 'bw' ? 'spider-noir-bw' : 'spider-noir-color')
-        document.body.classList.add(effectiveNoirMode === 'bw' ? 'spider-noir-bw-enter' : 'spider-noir-color-enter')
-      }
-    }
-
-    if (isVisualChange) {
-      // The View Transition must capture the current (pre-change) DOM state
-      // before applyClasses runs. We pass applyClasses as the commit so the
-      // API snapshots before/after correctly — this works for both the enter
-      // (normal → noir) and exit (noir → normal) directions.
-      transitionSpiderNoir(applyClasses)
-      if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
-      if (effectiveNoirMode) {
-        // Entering or switching: cast the web overlay on top of the VT reveal.
-        // Deferred so it runs as an async callback (not synchronously in the
-        // effect body) — avoids the react-hooks/set-state-in-effect lint rule.
-        noirAnimTimerRef.current = setTimeout(() => {
-          setNoirAnim(effectiveNoirMode)
-          noirAnimTimerRef.current = setTimeout(() => {
-            setNoirAnim(null)
-            document.body.classList.remove('spider-noir-bw-enter', 'spider-noir-color-enter')
-          }, 2100)
-        }, 0)
-      } else {
-        // Exiting: dismiss any lingering web overlay so it doesn't hang over
-        // the returned normal view.
-        noirAnimTimerRef.current = setTimeout(() => setNoirAnim(null), 0)
-      }
-    } else {
-      applyClasses()
-    }
-
-    prevNoirModeRef.current = effectiveNoirMode
-
-    // Do NOT remove body classes in the cleanup — the cleanup fires before the
-    // next effect run, which would cause the exit View Transition to capture
-    // no-noir → no-noir (invisible). Class removal is handled by applyClasses
-    // in the next run. The timer must still be cleared on unmount.
-    return () => {
-      if (noirAnimTimerRef.current) clearTimeout(noirAnimTimerRef.current)
-    }
-  }, [effectiveNoirMode])
 
   const [showLogForm, setShowLogForm] = useState(false)
   const [logDate, setLogDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -215,9 +97,7 @@ export function TitleDetailDrawer() {
 
   const { videos, watchProviders, logoUrl, heroBackdropUrl } = useTitleMedia(isDetailDrawerOpen, title?.tmdbId, title?.type)
 
-  const displayLogoUrl = isSpiderNoir
-    ? (effectiveNoirMode === 'color' ? SPIDER_NOIR_LOGO_COLOR : effectiveNoirMode === 'bw' ? SPIDER_NOIR_LOGO_BW : SPIDER_NOIR_LOGO_NORMAL)
-    : logoUrl
+  const displayLogoUrl = noirLogoUrl ?? logoUrl
 
   function onClose() {
     setPendingDeleteTitle(false)
@@ -262,16 +142,6 @@ export function TitleDetailDrawer() {
   async function handleDelete() {
     if (!title) return
     if (await saveSucceeded(removeTitle(title.id))) closeDetailDrawer()
-  }
-
-  function handleModeSelect(mode: SelectorMode) {
-    setManualMode(mode)
-  }
-
-  function handleTogglePin(mode: 'bw' | 'color') {
-    if (!title) return
-    const newVariant = pinnedModeRaw === mode ? null : mode
-    setPinnedMode(title.id, EASTER_EGG_KEY, newVariant)
   }
 
   function handleSaveViewing() {

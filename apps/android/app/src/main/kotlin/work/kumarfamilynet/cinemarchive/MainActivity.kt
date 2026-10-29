@@ -1297,6 +1297,7 @@ private fun CinemArchiveApp(
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refreshMetadata(current.titleId) },
                     noirPins = runtime.titlePins,
+                    moviegoingPrefs = moviegoingPrefsRepository,
                     onUnlockPalette = { palette -> coroutineScope.launch { preferencesRepository.unlockPalette(palette) } },
                     onNoirMode = { mode ->
                         if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)

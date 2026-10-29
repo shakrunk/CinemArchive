@@ -13,10 +13,15 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.model.BudgetPeriod
+import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
+import work.kumarfamilynet.cinemarchive.core.model.OutingTemplate
+import work.kumarfamilynet.cinemarchive.core.model.OutingTemplateRules
 import work.kumarfamilynet.cinemarchive.core.model.PlanPeriod
 import work.kumarfamilynet.cinemarchive.core.model.SubscriptionPlan
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalTime
 
 /**
  * A validated `moviegoing_prefs.prefs` payload (docs/android-contracts/moviegoing-prefs.md).
@@ -28,19 +33,70 @@ class SyncedMoviegoingPrefs(
     val plan: SubscriptionPlan?,
     val updatedAt: Instant,
     val json: JSONObject,
+    val templates: List<OutingTemplate> = emptyList(),
 )
 
-/** Rejects the whole payload on a missing/unparseable `updatedAt` or an invalid `budget` or
- *  `plan` rather than half-applying it. An absent or null `budget`/`plan` is valid: it means
- *  "none set". */
+/** Rejects the whole payload on a missing/unparseable `updatedAt`, an invalid `budget` or
+ *  `plan`, or a `templates` that is not an array, rather than half-applying it. An absent or
+ *  null `budget`/`plan`/`templates` is valid: it means "none set". Individual invalid template
+ *  entries are skipped, not fatal, so one bad entry never blocks the budget and plan. */
 fun parseMoviegoingPrefs(json: JSONObject): SyncedMoviegoingPrefs? {
     val updatedAt = (json.opt("updatedAt") as? String)?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
     val rawBudget = json.opt("budget")
     val budget = if (rawBudget == null || rawBudget == JSONObject.NULL) null else parseBudget(rawBudget) ?: return null
     val rawPlan = json.opt("plan")
     val plan = if (rawPlan == null || rawPlan == JSONObject.NULL) null else parsePlan(rawPlan) ?: return null
-    return SyncedMoviegoingPrefs(budget, plan, updatedAt, json)
+    val rawTemplates = json.opt("templates")
+    val templates = when (rawTemplates) {
+        null, JSONObject.NULL -> emptyList()
+        is JSONArray -> parseTemplates(rawTemplates)
+        else -> return null
+    }
+    return SyncedMoviegoingPrefs(budget, plan, updatedAt, json, templates)
 }
+
+private fun parseTemplates(array: JSONArray): List<OutingTemplate> {
+    val seen = HashSet<String>()
+    return (0 until array.length()).mapNotNull { parseTemplate(array.opt(it)) }
+        .filter { seen.add(it.id) }
+        .take(OutingTemplateRules.MAX_TEMPLATES)
+}
+
+private fun parseTemplate(value: Any?): OutingTemplate? {
+    val obj = value as? JSONObject ?: return null
+    val id = obj.opt("id") as? String ?: return null
+    val name = obj.opt("name") as? String ?: return null
+    val venue = obj.opt("venue").let { if (it == null || it == JSONObject.NULL) null else it as? String ?: return null }
+    val rawCompanions = obj.opt("companions").let { if (it == null || it == JSONObject.NULL) JSONArray() else it as? JSONArray ?: return null }
+    val companions = (0 until rawCompanions.length()).map { rawCompanions.opt(it) as? String ?: return null }
+    val format = obj.opt("format").let {
+        if (it == null || it == JSONObject.NULL) null else CinemaFormat.fromWire(it as? String) ?: return null
+    }
+    val weekday = obj.opt("weekday").let {
+        if (it == null || it == JSONObject.NULL) null
+        else (it as? Number)?.let { n -> n.toInt().takeIf { day -> day.toDouble() == n.toDouble() && day in 1..7 } }?.let(DayOfWeek::of) ?: return null
+    }
+    val time = obj.opt("time").let {
+        if (it == null || it == JSONObject.NULL) null
+        else (it as? String)?.takeIf { text -> TEMPLATE_TIME.matches(text) }?.let(LocalTime::parse) ?: return null
+    }
+    return OutingTemplateRules.create(id, name, venue, companions, format, weekday, time)
+}
+
+private val TEMPLATE_TIME = Regex("""([01]\d|2[0-3]):[0-5]\d""")
+
+private fun OutingTemplate.toJson(): JSONObject = JSONObject()
+    .put("id", id)
+    .put("name", name)
+    .put("venue", venue ?: JSONObject.NULL)
+    .put("companions", JSONArray(companions))
+    .put("format", format?.wireValue ?: JSONObject.NULL)
+    .put("weekday", weekday?.value ?: JSONObject.NULL)
+    .put("time", time?.toString()?.take(5) ?: JSONObject.NULL)
+
+/** [moviegoingPrefsWithBudget]'s counterpart for the saved outing templates. */
+fun moviegoingPrefsWithTemplates(base: JSONObject?, templates: List<OutingTemplate>, updatedAt: String): JSONObject =
+    withKey(base, "templates", JSONArray(templates.map { it.toJson() }), updatedAt)
 
 private fun parsePlan(value: Any): SubscriptionPlan? {
     val obj = value as? JSONObject ?: return null
@@ -72,7 +128,7 @@ fun moviegoingPrefsWithBudget(base: JSONObject?, budget: MoviegoingBudget?, upda
 fun moviegoingPrefsWithPlan(base: JSONObject?, plan: SubscriptionPlan?, updatedAt: String): JSONObject =
     withKey(base, "plan", plan?.let { JSONObject().put("cap", it.cap).put("period", it.period.wire) }, updatedAt)
 
-private fun withKey(base: JSONObject?, key: String, value: JSONObject?, updatedAt: String): JSONObject {
+private fun withKey(base: JSONObject?, key: String, value: Any?, updatedAt: String): JSONObject {
     val next = JSONObject((base ?: JSONObject()).toString())
     next.put(key, value ?: JSONObject.NULL)
     return next.put("updatedAt", updatedAt)
@@ -120,6 +176,27 @@ class MoviegoingPrefsRepository(
     fun observeBudget(): Flow<MoviegoingBudget?> = dataStore.data.map { readLocal(it)?.budget }.distinctUntilChanged()
 
     fun observePlan(): Flow<SubscriptionPlan?> = dataStore.data.map { readLocal(it)?.plan }.distinctUntilChanged()
+
+    fun observeTemplates(): Flow<List<OutingTemplate>> =
+        dataStore.data.map { readLocal(it)?.templates.orEmpty() }.distinctUntilChanged()
+
+    /** Adds a template, or replaces the one with the same id. Fails when it would be the
+     *  [OutingTemplateRules.MAX_TEMPLATES]+1st, so the synced payload stays small. */
+    suspend fun saveTemplate(template: OutingTemplate) {
+        update { base, stamp ->
+            val current = base?.let(::parseMoviegoingPrefs)?.templates.orEmpty()
+            val next = if (current.any { it.id == template.id }) current.map { if (it.id == template.id) template else it } else current + template
+            require(next.size <= OutingTemplateRules.MAX_TEMPLATES) { "Too many templates" }
+            moviegoingPrefsWithTemplates(base, next, stamp)
+        }
+    }
+
+    suspend fun deleteTemplate(id: String) {
+        update { base, stamp ->
+            val current = base?.let(::parseMoviegoingPrefs)?.templates.orEmpty()
+            moviegoingPrefsWithTemplates(base, current.filterNot { it.id == id }, stamp)
+        }
+    }
 
     /** Sets, replaces or (with null) clears the budget. An invalid amount is rejected. */
     suspend fun setBudget(budget: MoviegoingBudget?) {

@@ -94,3 +94,39 @@ class MoviegoingRecapTest {
         assertEquals(0.0, MoviegoingRecapRules.recap(listOf(trip("2026-01-05", price = 0.0)), 2026)!!.totalSpend!!, 0.0)
     }
 }
+
+class MoviegoingRecapTextTest {
+    private val full = MoviegoingRecap(
+        year = 2026,
+        tripCount = 24,
+        topVenue = RecapHighlight("AMC", 9),
+        topFormat = RecapHighlight("IMAX", 5),
+        topCompanion = RecapHighlight("Sam", 12),
+        totalSpend = 1312.5,
+    )
+
+    @Test fun fieldsListEveryFigureInPrintOrder() {
+        assertEquals(
+            listOf(
+                RecapField("top venue", "AMC"),
+                RecapField("top format", "IMAX"),
+                RecapField("most often with", "Sam"),
+                RecapField("total spent", "$1,312.50"),
+            ),
+            MoviegoingRecapText.fields(full),
+        )
+    }
+
+    @Test fun fieldsOmitFiguresTheYearLacks() {
+        val bare = MoviegoingRecap(2026, 1, null, null, null, null)
+        assertEquals(emptyList<RecapField>(), MoviegoingRecapText.fields(bare))
+    }
+
+    @Test fun summaryReadsAsOneLine() {
+        assertEquals("My 2026 at the movies: 24 trips, top venue AMC, $1,312.50 spent.", MoviegoingRecapText.summary(full))
+    }
+
+    @Test fun summaryHandlesOneTripAndMissingFigures() {
+        assertEquals("My 2025 at the movies: 1 trip.", MoviegoingRecapText.summary(MoviegoingRecap(2025, 1, null, null, null, null)))
+    }
+}

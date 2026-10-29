@@ -63,3 +63,31 @@ object MoviegoingRecapRules {
         .minWithOrNull(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
         ?.let { RecapHighlight(it.key, it.value) }
 }
+
+/** One labelled line of the recap card. */
+data class RecapField(val label: String, val value: String)
+
+/** The recap's wording, shared by the on-screen card, the shared image and the text summary so
+ *  all three always show the same figures. */
+object MoviegoingRecapText {
+    /** The lines under the headline trip count, in print order; a figure the year lacks is left out. */
+    fun fields(recap: MoviegoingRecap): List<RecapField> = listOfNotNull(
+        recap.topVenue?.let { RecapField("top venue", it.label) },
+        recap.topFormat?.let { RecapField("top format", it.label) },
+        recap.topCompanion?.let { RecapField("most often with", it.label) },
+        recap.totalSpend?.let { RecapField("total spent", money(it)) },
+    )
+
+    /** "My 2026 at the movies: 24 trips, top venue AMC, $312.50 spent." */
+    fun summary(recap: MoviegoingRecap): String {
+        val trips = "${recap.tripCount} ${if (recap.tripCount == 1) "trip" else "trips"}"
+        val parts = listOfNotNull(
+            trips,
+            recap.topVenue?.let { "top venue ${it.label}" },
+            recap.totalSpend?.let { "${money(it)} spent" },
+        )
+        return "My ${recap.year} at the movies: ${parts.joinToString(", ")}."
+    }
+
+    private fun money(amount: Double): String = String.format(java.util.Locale.US, "$%,.2f", amount)
+}

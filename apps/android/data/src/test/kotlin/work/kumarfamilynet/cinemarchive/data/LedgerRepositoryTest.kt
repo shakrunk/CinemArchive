@@ -444,6 +444,8 @@ class LedgerRepositoryTest {
         assertEquals(listOf(LedgerSpendBreakdown("IMAX", 24.50, 1)), moviegoing.formatSpend)
         // Fixture has exactly one priced trip, so no venue clears the 2-trip bar for "best value".
         assertEquals(null, moviegoing.bestValueVenue)
+        // The one priced trip is exposed with its date so a budget can bucket it by period.
+        assertEquals(listOf(24.50), moviegoing.pricedTrips.map { it.amount })
     }
 
     @Test

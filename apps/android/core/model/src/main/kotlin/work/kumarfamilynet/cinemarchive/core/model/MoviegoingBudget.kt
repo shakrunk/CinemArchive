@@ -19,6 +19,11 @@ data class MoviegoingBudget(val amount: Double, val period: BudgetPeriod) {
         const val MAX_AMOUNT = 100_000.0
 
         fun isValidAmount(amount: Double): Boolean = amount.isFinite() && amount > 0.0 && amount <= MAX_AMOUNT
+
+        /** Parses what a person types into the budget field: an optional `$` and thousands
+         *  commas are ignored. Null for anything that is not a valid amount. */
+        fun parseAmount(text: String): Double? =
+            text.trim().removePrefix("$").replace(",", "").trim().toDoubleOrNull()?.takeIf(::isValidAmount)
     }
 }
 

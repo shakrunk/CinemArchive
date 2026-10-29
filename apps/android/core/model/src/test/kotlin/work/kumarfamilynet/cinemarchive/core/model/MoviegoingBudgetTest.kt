@@ -90,6 +90,17 @@ class MoviegoingBudgetTest {
         assertFalse(MoviegoingBudget.isValidAmount(MoviegoingBudget.MAX_AMOUNT + 1))
     }
 
+    @Test fun typedAmountsParseLeniently() {
+        assertEquals(40.0, MoviegoingBudget.parseAmount("40")!!, 0.0)
+        assertEquals(1234.5, MoviegoingBudget.parseAmount(" $1,234.50 ")!!, 0.0)
+        assertNull(MoviegoingBudget.parseAmount(""))
+        assertNull(MoviegoingBudget.parseAmount("abc"))
+        assertNull(MoviegoingBudget.parseAmount("0"))
+        assertNull(MoviegoingBudget.parseAmount("-10"))
+        assertNull(MoviegoingBudget.parseAmount("NaN"))
+        assertNull(MoviegoingBudget.parseAmount("1e9"))
+    }
+
     @Test fun periodWireNamesRoundTripAndRejectUnknowns() {
         assertEquals(BudgetPeriod.MONTH, BudgetPeriod.fromWire("month"))
         assertEquals(BudgetPeriod.YEAR, BudgetPeriod.fromWire("year"))

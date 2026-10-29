@@ -568,6 +568,7 @@ private fun CinemArchiveApp(
     val repository = runtime.libraryRepository
     val ledgerRepository = runtime.ledgerRepository
     val ledgerLayoutRepository = runtime.ledgerLayoutRepository
+    val moviegoingPrefsRepository = runtime.moviegoingPrefsRepository
     val outingsRepository = runtime.outingsRepository
     val listsRepository = runtime.listsRepository
     val librarySyncRepository = runtime.librarySyncRepository
@@ -1056,6 +1057,7 @@ private fun CinemArchiveApp(
                             Tab.LEDGER -> LedgerRoute(
                                 ledgerRepository,
                                 ledgerLayoutRepository,
+                                moviegoingPrefsRepository,
                                 onTitleClick = { overlay = Overlay.Detail(it) },
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,

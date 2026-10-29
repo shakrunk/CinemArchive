@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Moviegoing budget on Android.** Set a monthly or yearly budget in the At the Movies panel of the Ledger and see how much of it your cinema tickets have used, with a warning as you near or pass the cap. The budget follows your account across devices and is visible only to you.
+
 ## [1.45.3] - 2026-10-28
 
 ### Fixed

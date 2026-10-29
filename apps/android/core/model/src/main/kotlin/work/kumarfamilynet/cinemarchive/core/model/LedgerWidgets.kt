@@ -82,4 +82,7 @@ data class LedgerMoviegoingStats(
     /** Milestone badges (issue #217) — a format's first outing, and venue visit-count
      *  milestones. Unordered by significance; the UI sorts for display. */
     val milestoneBadges: List<LedgerMilestoneBadge> = emptyList(),
+    /** Every dated trip with a recorded ticket price, so a budget can be checked against the
+     *  current calendar period. Owner-private like [totalSpend]. */
+    val pricedTrips: List<MoviegoingPricedTrip> = emptyList(),
 )

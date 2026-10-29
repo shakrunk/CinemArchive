@@ -19,6 +19,8 @@ import { CarouselPauseButton } from './discover/CarouselPauseButton'
 import { TasteDropdown } from './discover/TasteDropdown'
 import { DiscoverEmptyState } from './discover/DiscoverEmptyState'
 import { DiscoverSkeleton } from './discover/DiscoverSkeleton'
+import { PersonPicker } from './discover/PersonPicker'
+import { CompanyPicker } from './discover/CompanyPicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,87 +31,6 @@ const SEARCH_PLACEHOLDERS: Record<SearchMode, string> = {
   titles: 'Search movies & TV shows…',
   people: 'Search by actor, director, crew…',
   studios: 'Search by studio or company…',
-}
-
-// ─── PersonPicker ─────────────────────────────────────────────────────────────
-
-interface PersonPickerProps {
-  persons: PersonResult[]
-  onSelect: (person: PersonResult) => void
-}
-
-function PersonPicker({ persons, onSelect }: PersonPickerProps) {
-  return (
-    <div className="max-w-lg mx-auto space-y-2">
-      {persons.map((p) => (
-        <button
-          key={p.id}
-          onClick={() => onSelect(p)}
-          className="w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors hover:border-amber/30"
-          style={{ background: 'var(--inset)', borderColor: 'var(--line)' }}
-        >
-          <div
-            className="w-10 h-10 rounded-full overflow-hidden shrink-0 border flex items-center justify-center"
-            style={{ borderColor: 'var(--line)', background: 'var(--void)' }}
-          >
-            {p.profileUrl ? (
-              <img src={p.profileUrl} alt={p.name} className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-4 h-4 text-paper-faint opacity-40" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="font-serif text-sm text-paper">{p.name}</p>
-            {p.department && (
-              <p className="font-mono text-[10px] text-amber/60 mt-0.5">{p.department}</p>
-            )}
-            {p.knownFor && (
-              <p className="font-mono text-[10px] text-paper-faint truncate mt-0.5">{p.knownFor}</p>
-            )}
-          </div>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ─── CompanyPicker ────────────────────────────────────────────────────────────
-
-interface CompanyPickerProps {
-  companies: CompanyResult[]
-  onSelect: (company: CompanyResult) => void
-}
-
-function CompanyPicker({ companies, onSelect }: CompanyPickerProps) {
-  return (
-    <div className="max-w-lg mx-auto space-y-2">
-      {companies.map((c) => (
-        <button
-          key={c.id}
-          onClick={() => onSelect(c)}
-          className="w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors hover:border-amber/30"
-          style={{ background: 'var(--inset)', borderColor: 'var(--line)' }}
-        >
-          <div
-            className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border flex items-center justify-center"
-            style={{ borderColor: 'var(--line)', background: 'var(--void)' }}
-          >
-            {c.logoUrl ? (
-              <img src={c.logoUrl} alt={c.name} className="w-full h-full object-contain p-1" style={{ filter: 'invert(1)' }} />
-            ) : (
-              <Building2 className="w-4 h-4 text-paper-faint opacity-40" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="font-serif text-sm text-paper">{c.name}</p>
-            {c.originCountry && (
-              <p className="font-mono text-[10px] text-paper-faint mt-0.5">{c.originCountry}</p>
-            )}
-          </div>
-        </button>
-      ))}
-    </div>
-  )
 }
 
 // ─── Detail modal ─────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import {
   isValidBudgetAmount, isValidPlanCap, type BudgetPeriod, type MoviegoingBudget, type PlanPeriod, type SubscriptionPlan,
 } from 'src/store/moviegoingRules'
+import { isValidRegion } from 'src/store/moviegoingRegion'
 import {
   createOutingTemplate, isValidTemplateTime, isValidTemplateWeekday, templateFormat, MAX_TEMPLATES, type OutingTemplate,
 } from 'src/store/outingTemplates'
@@ -19,6 +20,8 @@ export interface MoviegoingPrefs {
   budget: MoviegoingBudget | null
   plan: SubscriptionPlan | null
   templates: OutingTemplate[]
+  /** Default now-playing country (#202), or null when none is saved. */
+  region: string | null
   updatedAt: string
   /** The whole payload, kept so keys this client doesn't know (written by a newer one)
    *  survive a local edit and the push that follows it. */
@@ -82,7 +85,8 @@ function parseTemplates(list: unknown[]): OutingTemplate[] {
 }
 
 /** Rejects the whole payload on a missing/unparseable `updatedAt`, an invalid `budget` or
- *  `plan`, or a `templates` that is not an array, rather than half-applying it. An absent or
+ *  `plan`, a `templates` that is not an array, or a `region` that is not two uppercase letters,
+ *  rather than half-applying it. An absent or
  *  null `budget`/`plan`/`templates` is valid: it means "none set". */
 export function parseMoviegoingPrefs(value: unknown): MoviegoingPrefs | null {
   if (!isRecord(value)) return null
@@ -102,14 +106,22 @@ export function parseMoviegoingPrefs(value: unknown): MoviegoingPrefs | null {
     if (!Array.isArray(value.templates)) return null
     templates = parseTemplates(value.templates)
   }
-  return { budget, plan, templates, updatedAt: value.updatedAt, raw: value }
+  let region: string | null = null
+  if (value.region != null) {
+    if (!isValidRegion(value.region)) return null
+    region = value.region
+  }
+  return { budget, plan, templates, region, updatedAt: value.updatedAt, raw: value }
 }
 
 /** A copy of `base` (or an empty payload) with one key set, or explicitly nulled when
  *  clearing so the clear carries a fresh `updatedAt` and propagates, and every other key kept. */
-function withKey(base: Record<string, unknown> | null, key: 'budget' | 'plan' | 'templates', value: unknown, updatedAt: string) {
+function withKey(base: Record<string, unknown> | null, key: 'budget' | 'plan' | 'templates' | 'region', value: unknown, updatedAt: string) {
   return { ...(base ?? {}), [key]: value ?? null, updatedAt }
 }
+
+export const moviegoingPrefsWithRegion = (base: Record<string, unknown> | null, region: string | null, updatedAt: string) =>
+  withKey(base, 'region', region, updatedAt)
 
 export const moviegoingPrefsWithTemplates = (base: Record<string, unknown> | null, templates: OutingTemplate[], updatedAt: string) =>
   withKey(base, 'templates', templates.map((t) => ({
@@ -217,6 +229,13 @@ export async function setMoviegoingBudget(budget: MoviegoingBudget | null): Prom
 export async function setMoviegoingPlan(plan: SubscriptionPlan | null): Promise<void> {
   if (plan && !isValidPlanCap(plan.cap)) throw new Error('Invalid plan cap')
   await update((base, stamp) => moviegoingPrefsWithPlan(base, plan, stamp))
+}
+
+/** Sets, replaces or (with null) clears the default now-playing region. Anything but two
+ *  uppercase letters is rejected. */
+export async function setMoviegoingRegion(region: string | null): Promise<void> {
+  if (region !== null && !isValidRegion(region)) throw new Error('Invalid region')
+  await update((base, stamp) => moviegoingPrefsWithRegion(base, region, stamp))
 }
 
 /** Adds a template, or replaces the one with the same id. Throws when it would be the

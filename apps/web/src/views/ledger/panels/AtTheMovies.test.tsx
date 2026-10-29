@@ -132,6 +132,7 @@ const savedPrefs = {
   budget: { amount: 40, period: 'month' as const },
   plan: { cap: 2, period: 'week' as const },
   templates: [],
+  region: null,
   updatedAt: '2026-10-29T10:00:00Z',
   raw: {},
 }

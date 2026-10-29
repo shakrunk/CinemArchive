@@ -4,12 +4,18 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { useAppStore } from 'src/store/useAppStore'
 import type { CinemaOuting, Title } from 'src/store/mockData'
 import { useMoviegoingPrefs } from 'src/lib/moviegoingPrefsSync'
+import { fetchNowPlaying, type SearchResult } from 'src/lib/media'
 import type { OutingTemplate } from 'src/store/outingTemplates'
 import { OutingScheduleSheet } from './OutingScheduleSheet'
 
 vi.mock('src/lib/auth', async (importOriginal) => ({
   ...(await importOriginal<typeof import('src/lib/auth')>()),
   listFriendships: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock('src/lib/media', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('src/lib/media')>()),
+  fetchNowPlaying: vi.fn(),
 }))
 
 const title: Title = {
@@ -29,6 +35,7 @@ const matinee: OutingTemplate = {
 const initialState = useAppStore.getState()
 afterEach(() => {
   cleanup()
+  vi.mocked(fetchNowPlaying).mockReset()
   useAppStore.setState(initialState, true)
   useMoviegoingPrefs.setState({ prefs: null })
 })
@@ -36,7 +43,7 @@ afterEach(() => {
 function open(templates: OutingTemplate[] = [], editing = false) {
   useAppStore.setState({ titles: [title], outings: editing ? [outing] : [] })
   useMoviegoingPrefs.setState({
-    prefs: templates.length ? { budget: null, plan: null, templates, updatedAt: '2026-10-29T10:00:00Z', raw: {} } : null,
+    prefs: templates.length ? { budget: null, plan: null, templates, region: null, updatedAt: '2026-10-29T10:00:00Z', raw: {} } : null,
   })
   render(<OutingScheduleSheet />)
   act(() => { useAppStore.getState().openOutingSchedule('film', editing ? 'o1' : undefined) })
@@ -88,4 +95,63 @@ it('offers no templates when editing an existing outing', async () => {
   expect(await screen.findByLabelText('Theater')).toHaveValue('Palace')
   expect(screen.queryByRole('button', { name: 'Use template Tuesday matinee' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Save as template' })).not.toBeInTheDocument()
+})
+
+// Now playing (#202): the picker shown when no title is preselected.
+const playing = (tmdbId: number, name: string): SearchResult => ({ tmdbId, type: 'movie', title: name, year: 2026, genres: [] })
+
+function openPicker(saved: string | null = null) {
+  useAppStore.setState({ titles: [title], outings: [] })
+  useMoviegoingPrefs.setState({
+    prefs: saved ? { budget: null, plan: null, templates: [], region: saved, updatedAt: '2026-10-29T10:00:00Z', raw: { region: saved } } : null,
+  })
+  render(<OutingScheduleSheet />)
+  act(() => { useAppStore.getState().openOutingSchedule() })
+}
+
+it('lists what is playing for the saved region and schedules a movie already in the library', async () => {
+  vi.mocked(fetchNowPlaying).mockResolvedValue([playing(1, 'Cinema film'), playing(2, 'New release')])
+  openPicker('GB')
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: "What's playing in theaters" }))
+  expect(fetchNowPlaying).toHaveBeenCalledWith('GB')
+  await user.click(await screen.findByRole('button', { name: 'Schedule Cinema film' }))
+  expect(await screen.findByLabelText('Theater')).toBeInTheDocument()
+})
+
+it('hands a movie that is not in the library to the Add flow', async () => {
+  vi.mocked(fetchNowPlaying).mockResolvedValue([playing(2, 'New release')])
+  openPicker('GB')
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: "What's playing in theaters" }))
+  await user.click(await screen.findByRole('button', { name: 'Schedule New release' }))
+  const state = useAppStore.getState()
+  expect(state.isAddTitleOpen).toBe(true)
+  expect(state.preselectedResult?.tmdbId).toBe(2)
+  expect(state.isOutingScheduleOpen).toBe(false)
+})
+
+it('saves a changed country code as the default region and reloads the list', async () => {
+  vi.mocked(fetchNowPlaying).mockResolvedValue([])
+  openPicker('GB')
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: "What's playing in theaters" }))
+  const code = await screen.findByLabelText('Country code')
+  const use = screen.getByRole('button', { name: 'Use' })
+  expect(use).toBeDisabled()
+  await user.clear(code)
+  await user.type(code, 'ca')
+  await user.click(use)
+  expect(fetchNowPlaying).toHaveBeenLastCalledWith('CA')
+  expect(useMoviegoingPrefs.getState().prefs?.region).toBe('CA')
+})
+
+it('offers a retry when the list cannot be loaded', async () => {
+  vi.mocked(fetchNowPlaying).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([playing(2, 'New release')])
+  openPicker('GB')
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: "What's playing in theaters" }))
+  expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load")
+  await user.click(screen.getByRole('button', { name: 'Try again' }))
+  expect(await screen.findByRole('button', { name: 'Schedule New release' })).toBeInTheDocument()
 })

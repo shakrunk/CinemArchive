@@ -163,10 +163,12 @@ export function resolveReconciliation(remoteRaw: unknown, local: MoviegoingPrefs
 
 // ─── Runtime ──────────────────────────────────────────────────────────────────
 
-/** In-memory only, on purpose: this is one account's private data, and the device-preference
- *  store is shared by whoever signs in next. It is cleared on sign-out and refetched on
- *  sign-in, so a push that failed offline is retried by the next reconcile only while the
- *  tab stays open. */
+/** The copy in memory is the one the app reads. Each edit and each applied remote copy is also
+ *  written to this browser under a key for that account alone (see `storageKey`), so an edit made
+ *  offline, or while signed out, survives a reload and is replayed against the server by the next
+ *  reconcile: last write wins on `updatedAt`, so a pending newer edit is pushed, never overwritten
+ *  by an older remote copy. Another account never reads it, and only its own copy is ever
+ *  pushed to the server. */
 interface MoviegoingPrefsState {
   prefs: MoviegoingPrefs | null
   setPrefs: (prefs: MoviegoingPrefs | null) => void
@@ -176,6 +178,53 @@ export const useMoviegoingPrefs = create<MoviegoingPrefsState>((set) => ({
   prefs: null,
   setPrefs: (prefs) => set({ prefs }),
 }))
+
+const STORAGE_PREFIX = 'cinemarchive:moviegoing-prefs:v1:'
+
+/** One key per account, plus one for the signed-out device, so a copy is only ever read back by
+ *  the account that wrote it. */
+export const storageKey = (ownerId: string | null) => `${STORAGE_PREFIX}${ownerId ?? 'signed-out'}`
+
+const currentOwnerId = () => useAppStore.getState().user?.id ?? null
+
+function deviceStorage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
+/** The stored payload for `ownerId`, or null when there is none, storage is blocked, or it no
+ *  longer parses (a damaged copy is ignored, and replaced by the next edit). */
+export function readStoredMoviegoingPrefs(ownerId: string | null): MoviegoingPrefs | null {
+  try {
+    const text = deviceStorage()?.getItem(storageKey(ownerId))
+    return text ? parseMoviegoingPrefs(JSON.parse(text)) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredMoviegoingPrefs(ownerId: string | null, prefs: MoviegoingPrefs): void {
+  try {
+    deviceStorage()?.setItem(storageKey(ownerId), JSON.stringify(prefs.raw))
+  } catch {
+    // Storage is a cache of a pending edit; a full or blocked one costs only the reload survival.
+  }
+}
+
+/** Makes `prefs` the in-memory copy and stores it for `ownerId`. */
+function commit(ownerId: string | null, prefs: MoviegoingPrefs): void {
+  useMoviegoingPrefs.getState().setPrefs(prefs)
+  writeStoredMoviegoingPrefs(ownerId, prefs)
+}
+
+/** Loads the stored copy of whoever is signed in now (or of the signed-out device), replacing
+ *  whatever the previous account had in memory. */
+function hydrate(): void {
+  useMoviegoingPrefs.getState().setPrefs(readStoredMoviegoingPrefs(currentOwnerId()))
+}
 
 function syncUserId(): string | null {
   const { user } = useAppStore.getState()
@@ -206,7 +255,7 @@ export async function reconcileMoviegoingPrefs(): Promise<void> {
   if (syncUserId() !== userId) return
   const local = useMoviegoingPrefs.getState().prefs
   const decision = resolveReconciliation(remoteRaw, local)
-  if (decision.kind === 'apply-remote') useMoviegoingPrefs.getState().setPrefs(decision.prefs)
+  if (decision.kind === 'apply-remote') commit(userId, decision.prefs)
   else if (decision.kind === 'push-local' && local) await push(userId, local.raw)
 }
 
@@ -214,7 +263,7 @@ async function update(change: (base: Record<string, unknown> | null, stamp: stri
   const state = useMoviegoingPrefs.getState()
   const next = parseMoviegoingPrefs(change(state.prefs?.raw ?? null, new Date().toISOString()))
   if (!next) return
-  state.setPrefs(next)
+  commit(currentOwnerId(), next)
   const userId = syncUserId()
   if (userId) await push(userId, next.raw)
 }
@@ -256,14 +305,17 @@ export async function deleteOutingTemplate(id: string): Promise<void> {
 
 let started = false
 
-/** Reconciles on sign-in and when the browser comes back online, and drops the previous
- *  account's copy on any account change. Idempotent; call once on app mount. */
+/** Loads this browser's stored copy, then reconciles with the server on launch, on sign-in and
+ *  when the browser comes back online, which replays an edit that never reached it. On any
+ *  account change the previous account's copy leaves memory and the new account's stored copy
+ *  (or the signed-out one) takes its place. Idempotent; call once on app mount. */
 export function startMoviegoingPrefsSync(): void {
   if (started) return
   started = true
+  hydrate()
   useAppStore.subscribe((s, prev) => {
     if (s.user?.id === prev.user?.id) return
-    useMoviegoingPrefs.getState().setPrefs(null)
+    hydrate()
     void reconcileMoviegoingPrefs()
   })
   if (typeof window !== 'undefined') window.addEventListener('online', () => void reconcileMoviegoingPrefs())

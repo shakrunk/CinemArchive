@@ -65,10 +65,15 @@ so a newer client's additions survive an older client's edit.
   sync keep only the newer device's list. Templates are a handful of small, rarely edited items,
   so a per-template merge is not worth a table here.
 - The web client (`apps/web/src/lib/moviegoingPrefsSync.ts`) follows the same payload, validation and
-  last-write-wins rules, with one deliberate difference: it keeps its copy in memory for the session
-  rather than on the device, because browser device storage is shared by whoever signs in next and
-  this is one account's private data. It refetches on sign-in and when the browser comes back online,
-  and a push that failed is retried by the next reconcile while the tab stays open.
+  last-write-wins rules. It reads from an in-memory copy and also stores that copy in the browser
+  (`localStorage`, one key per signed-in account plus one for the signed-out device), so an edit made
+  offline, or while signed out, survives a reload. On launch it loads the stored copy of whoever is
+  signed in, then reconciles: a stored copy newer than the server's is pushed (the replay of an edit
+  that never reached it), an older one is replaced. It also reconciles on sign-in and when the browser
+  comes back online. A different account never reads another's stored copy, signed-out edits are
+  never carried into an account or pushed, and a damaged or blocked store is ignored. This is the same
+  class of owner-private data the web offline library already keeps per account on the device; it is
+  not removed on sign-out, so the same account finds its copy again.
 
 ## Period spend
 

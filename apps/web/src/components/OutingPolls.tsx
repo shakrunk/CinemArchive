@@ -116,6 +116,12 @@ function NewPollForm({ movies, onCancel, onCreated }: { movies: Title[]; onCance
   const [chosen, setChosen] = useState<string[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The clock only moves on a timer, so "showtimes must be in the future" is judged against a recent time.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(tick)
+  }, [])
 
   useEffect(() => {
     let current = true
@@ -129,7 +135,7 @@ function NewPollForm({ movies, onCancel, onCreated }: { movies: Title[]; onCance
   const candidates = drafts.map(draftToCandidate)
   const complete = candidates.every((c): c is PollCandidate => c !== null)
   const problem = !complete ? 'Choose a movie, a date and a time for every option.'
-    : pollProblem(question, candidates, chosen.length, Date.now())
+    : pollProblem(question, candidates, chosen.length, now)
   const patch = (index: number, change: Partial<Draft>) => setDrafts((list) => list.map((d, i) => (i === index ? { ...d, ...change } : d)))
 
   async function send() {

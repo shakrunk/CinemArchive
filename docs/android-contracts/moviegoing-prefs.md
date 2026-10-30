@@ -4,7 +4,7 @@ Owner-private moviegoing settings that follow a signed-in account across devices
 read and write one row of `moviegoing_prefs`
 (`supabase/migrations/20261029000000_moviegoing_prefs.sql`). It starts with the spend budget
 (#209) and is the home for the subscription plan (#211), recurring outing templates (#204) and
-default region (#202) as they land.
+default region (#202).
 
 This is a separate table, not a `user_prefs` column, on purpose: `user_prefs` has friend and
 shared-key read policies that expose the whole row, and a spending budget must not be visible to
@@ -28,6 +28,7 @@ and the Ledger "At the Movies" panel shows the budget only to the owner.
       "time": "14:00"
     }
   ],
+  "region": "GB",
   "updatedAt": "2026-10-29T10:00:00.000Z"
 }
 ```
@@ -41,11 +42,12 @@ and the Ledger "At the Movies" panel shows the budget only to the owner.
 | `plan.cap` | whole number from 1 to 100: the outings the plan allows per period. `3` and `3.0` are both accepted; `2.5` is not. |
 | `plan.period` | `week` or `month` |
 | `templates` | optional. Absent or `null` means no templates. An array of at most 12 [outing templates](#outing-templates-204). |
+| `region` | optional. Absent or `null` means none saved. Exactly two uppercase ASCII letters (ISO 3166-1 alpha-2), the country whose [now-playing list](#now-playing-202) is shown. |
 | `updatedAt` | ISO-8601 instant of the user's last change to any key, on the writing device |
 
 A payload whose `budget` or `plan` is present but invalid (non-positive, non-finite or fractional
 value, out-of-range `cap`, unknown `period`, wrong types), whose `templates` is present but not an
-array, or whose `updatedAt` is missing or unparseable, is ignored entirely: it is neither applied nor
+array, whose `region` is present but not two uppercase letters, or whose `updatedAt` is missing or unparseable, is ignored entirely: it is neither applied nor
 overwritten. A valid `budget` does not rescue an invalid `plan`, or the reverse. An invalid
 individual template is the exception: see below. Unknown top-level keys are preserved when a client writes back,
 so a newer client's additions survive an older client's edit.
@@ -139,3 +141,29 @@ A missing `time` is `19:00`. A missing `venue` or `format` leaves the form's val
 companions are always replaced by the template's. Android pins these cases in `OutingTemplateTest`
 (core/model) and `MoviegoingTemplatesPrefsTest` (data); web pins the same in `outingTemplates.test.ts`
 and `moviegoingPrefsSync.test.ts`.
+
+## Now playing (#202)
+
+"What's playing in theaters" sits at the top of the "Which movie are your tickets for?" step (the
+`I've got tickets` command on Android, the movie picker on web). It lists the movies TMDB has in
+theaters for the saved `region`, and picking one starts the usual schedule form.
+
+- **Titles, not showtimes.** TMDB has no per-theater schedule, so the user still enters the time,
+  exactly as before. The list only saves hunting for the title.
+- **A region, not a location.** The country is chosen by code, saved in the `region` key above and
+  shared across devices; there is no GPS and no location permission. Until one is saved the device
+  locale's country is used (Android `Locale`, web `navigator.language`), then `US`. Changing the code
+  in the picker saves it.
+- **Library first.** The schedule form belongs to a library title. A movie already in the library
+  opens its form; one that is not opens the Add flow with it preselected, and scheduling follows
+  once it is added.
+- **Edge function.** `media-proxy?action=now_playing&region=XX[&page=N]` returns TMDB's
+  `/movie/now_playing` for that region (movies only, English titles), cached for 24 hours per
+  region and page. `region` must be two letters (the function upper-cases it; clients send it
+  upper-cased) and `page` an integer 1 to 500, or the call fails with a 400. The function is deployed separately from the apps by
+  `.github/workflows/deploy-functions.yml`, so a client that ships first shows "Couldn't load
+  what's playing" until it is.
+
+Android pins the region rules in `MoviegoingRegionTest` (core/model) and the payload and request in
+`MoviegoingRegionPrefsTest` (data); web pins the same in `moviegoingRegion.test.ts`,
+`moviegoingPrefsSync.test.ts` and `mediaBrowse.test.ts`.

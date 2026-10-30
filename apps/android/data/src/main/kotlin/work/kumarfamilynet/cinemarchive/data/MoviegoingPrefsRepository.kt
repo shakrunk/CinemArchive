@@ -15,6 +15,7 @@ import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.model.BudgetPeriod
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
+import work.kumarfamilynet.cinemarchive.core.model.MoviegoingRegion
 import work.kumarfamilynet.cinemarchive.core.model.OutingTemplate
 import work.kumarfamilynet.cinemarchive.core.model.OutingTemplateRules
 import work.kumarfamilynet.cinemarchive.core.model.PlanPeriod
@@ -34,10 +35,12 @@ class SyncedMoviegoingPrefs(
     val updatedAt: Instant,
     val json: JSONObject,
     val templates: List<OutingTemplate> = emptyList(),
+    val region: String? = null,
 )
 
 /** Rejects the whole payload on a missing/unparseable `updatedAt`, an invalid `budget` or
- *  `plan`, or a `templates` that is not an array, rather than half-applying it. An absent or
+ *  `plan`, a `templates` that is not an array, or a `region` that is not two uppercase letters,
+ *  rather than half-applying it. An absent or
  *  null `budget`/`plan`/`templates` is valid: it means "none set". Individual invalid template
  *  entries are skipped, not fatal, so one bad entry never blocks the budget and plan. */
 fun parseMoviegoingPrefs(json: JSONObject): SyncedMoviegoingPrefs? {
@@ -52,7 +55,12 @@ fun parseMoviegoingPrefs(json: JSONObject): SyncedMoviegoingPrefs? {
         is JSONArray -> parseTemplates(rawTemplates)
         else -> return null
     }
-    return SyncedMoviegoingPrefs(budget, plan, updatedAt, json, templates)
+    val region = when (val rawRegion = json.opt("region")) {
+        null, JSONObject.NULL -> null
+        is String -> rawRegion.takeIf(MoviegoingRegion::isValid) ?: return null
+        else -> return null
+    }
+    return SyncedMoviegoingPrefs(budget, plan, updatedAt, json, templates, region)
 }
 
 private fun parseTemplates(array: JSONArray): List<OutingTemplate> {
@@ -93,6 +101,10 @@ private fun OutingTemplate.toJson(): JSONObject = JSONObject()
     .put("format", format?.wireValue ?: JSONObject.NULL)
     .put("weekday", weekday?.value ?: JSONObject.NULL)
     .put("time", time?.toString()?.take(5) ?: JSONObject.NULL)
+
+/** [moviegoingPrefsWithBudget]'s counterpart for the default now-playing region (#202). */
+fun moviegoingPrefsWithRegion(base: JSONObject?, region: String?, updatedAt: String): JSONObject =
+    withKey(base, "region", region, updatedAt)
 
 /** [moviegoingPrefsWithBudget]'s counterpart for the saved outing templates. */
 fun moviegoingPrefsWithTemplates(base: JSONObject?, templates: List<OutingTemplate>, updatedAt: String): JSONObject =
@@ -176,6 +188,15 @@ class MoviegoingPrefsRepository(
     fun observeBudget(): Flow<MoviegoingBudget?> = dataStore.data.map { readLocal(it)?.budget }.distinctUntilChanged()
 
     fun observePlan(): Flow<SubscriptionPlan?> = dataStore.data.map { readLocal(it)?.plan }.distinctUntilChanged()
+
+    /** The saved default region, or null when none is set (callers fall back to the device locale). */
+    fun observeRegion(): Flow<String?> = dataStore.data.map { readLocal(it)?.region }.distinctUntilChanged()
+
+    /** Sets, replaces or (with null) clears the default region. Anything but two uppercase letters is rejected. */
+    suspend fun setRegion(region: String?) {
+        require(region == null || MoviegoingRegion.isValid(region)) { "Invalid region" }
+        update { base, stamp -> moviegoingPrefsWithRegion(base, region, stamp) }
+    }
 
     fun observeTemplates(): Flow<List<OutingTemplate>> =
         dataStore.data.map { readLocal(it)?.templates.orEmpty() }.distinctUntilChanged()

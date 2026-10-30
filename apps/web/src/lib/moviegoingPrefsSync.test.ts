@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  moviegoingPrefsWithBudget, moviegoingPrefsWithPlan, moviegoingPrefsWithTemplates, parseMoviegoingPrefs, resolveReconciliation,
+  moviegoingPrefsWithBudget, moviegoingPrefsWithPlan, moviegoingPrefsWithRegion, moviegoingPrefsWithTemplates, parseMoviegoingPrefs, resolveReconciliation,
   type MoviegoingPrefs,
 } from './moviegoingPrefsSync'
 import { MAX_TEMPLATES, type OutingTemplate } from 'src/store/outingTemplates'
@@ -196,5 +196,30 @@ describe('outing templates in the payload', () => {
     const written = moviegoingPrefsWithTemplates({ templates: [full], updatedAt: '2026-10-29T10:00:00Z' }, [], '2026-10-30T00:00:00Z')
     expect(written.templates).toEqual([])
     expect(written.updatedAt).toBe('2026-10-30T00:00:00Z')
+  })
+})
+
+// Default now-playing region (#202): the same cases as Android's MoviegoingRegionPrefsTest.
+describe('default region in the payload', () => {
+  const stamp = '2026-10-29T10:00:00Z'
+  const parseRegion = (region: unknown) => parseMoviegoingPrefs({ region, updatedAt: stamp })
+
+  it('parses an uppercase code, and absent or null means none', () => {
+    expect(parseRegion('GB')?.region).toBe('GB')
+    expect(parseMoviegoingPrefs({ updatedAt: stamp })?.region).toBeNull()
+    expect(parseRegion(null)?.region).toBeNull()
+  })
+
+  it('anything but two uppercase letters rejects the payload', () => {
+    for (const bad of ['gb', 'G', 'GBR', 'G1', '', ' GB', 7, ['GB']]) expect(parseRegion(bad)).toBeNull()
+  })
+
+  it('setting keeps every other key and stamps the edit; clearing writes an explicit null', () => {
+    const base = { budget: { amount: 50, period: 'month' }, future: 1, updatedAt: stamp }
+    const next = moviegoingPrefsWithRegion(base, 'CA', '2026-10-30T10:00:00Z')
+    expect(next).toMatchObject({ region: 'CA', future: 1, budget: { amount: 50 }, updatedAt: '2026-10-30T10:00:00Z' })
+    const cleared = moviegoingPrefsWithRegion(next, null, '2026-10-31T10:00:00Z')
+    expect(cleared).toHaveProperty('region', null)
+    expect(parseMoviegoingPrefs(cleared)?.region).toBeNull()
   })
 })

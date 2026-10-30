@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalMovies
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -276,6 +277,8 @@ fun TitleDetailRoute(
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
     /** Resolves the group-reactions actions for one of the user's outings, or null when never shared (#207). */
     groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    /** Opens an outing's keepsake photos (#208); null hides the entry point. */
+    onOpenKeepsakes: ((CinemaOuting, String) -> Unit)? = null,
     onRequestNotificationPermission: () -> Unit = {},
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
     onRecommendTitle: ((String) -> Unit)? = null,
@@ -375,6 +378,7 @@ fun TitleDetailRoute(
         onCancelOuting = viewModel::onCancelOuting,
         onViewTicket = onViewTicket,
         groupReactions = groupReactions,
+        onOpenKeepsakes = onOpenKeepsakes,
         ticketOutings = ticketOutings.orEmpty(),
         onPreparePostShow = viewModel::preparePostShow,
         onSavePostShow = viewModel::savePostShow,
@@ -432,6 +436,7 @@ fun TitleDetailScreen(
     onCancelOuting: (String) -> Unit = {},
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
     groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    onOpenKeepsakes: ((CinemaOuting, String) -> Unit)? = null,
     ticketOutings: List<CinemaOuting> = emptyList(),
     onPreparePostShow: (suspend (String) -> PostShowOpening)? = null,
     onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
@@ -608,6 +613,16 @@ fun TitleDetailScreen(
                             Icon(Icons.Filled.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text(
                                 "View ticket · ${outing.venue ?: "Cinema"} · ${formatShowtimeDate(outing.showtime)}",
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
+                        }
+                    }
+
+                    if (onOpenKeepsakes != null) ticketOutings.forEach { outing ->
+                        TextButton(onClick = { onOpenKeepsakes(outing, detail.title) }) {
+                            Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Photos · ${outing.venue ?: "Cinema"} · ${formatShowtimeDate(outing.showtime)}",
                                 modifier = Modifier.padding(start = 6.dp),
                             )
                         }

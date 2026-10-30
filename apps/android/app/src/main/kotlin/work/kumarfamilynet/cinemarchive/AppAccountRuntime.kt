@@ -93,6 +93,11 @@ class AppAccountRuntime(
 
     private val transactor = RoomTransactor(database)
 
+    /** Online-only keepsake photos for outings (#208). */
+    val keepsakes: work.kumarfamilynet.cinemarchive.data.KeepsakeRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.KeepsakeRepository(client, session::currentSession, ownerId, ::isCurrent)
+    }
+
     val tickets: work.kumarfamilynet.cinemarchive.data.TicketRuntime by lazy {
         work.kumarfamilynet.cinemarchive.data.TicketRuntime.create(database,
             work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId),

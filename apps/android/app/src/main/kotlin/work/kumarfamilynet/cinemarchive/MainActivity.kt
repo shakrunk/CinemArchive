@@ -537,6 +537,9 @@ private sealed interface Overlay {
      *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
      *  that opens this already has both in memory. */
     data class Ticket(val outingId: String, val titleName: String) : Overlay
+
+    /** An outing's keepsake photos (#208). */
+    data class Keepsakes(val outingId: String, val titleName: String) : Overlay
 }
 
 /**
@@ -1290,6 +1293,7 @@ private fun CinemArchiveApp(
                     onRecommendTitle = { recommendTitleId = it },
                     onShareOutingPlans = { shareOutingId = it },
                     onViewTicket = { outing, title -> overlay = Overlay.Ticket(outing.id, title) },
+                    onOpenKeepsakes = { outing, title -> overlay = Overlay.Keepsakes(outing.id, title) },
                     onBrowsePerson = { person ->
                         libraryFiltersState.value = libraryFiltersState.value.copy(person = person)
                         overlay = null
@@ -1403,6 +1407,9 @@ private fun CinemArchiveApp(
                 )
                 is Overlay.Ticket -> work.kumarfamilynet.cinemarchive.feature.library.PortableTicketRoute(
                     runtime.tickets, current.outingId, current.titleName, onBack = closeOverlay, onSaved = runtime::syncTickets,
+                )
+                is Overlay.Keepsakes -> work.kumarfamilynet.cinemarchive.feature.library.KeepsakesRoute(
+                    runtime.keepsakes, current.outingId, current.titleName, onBack = closeOverlay,
                 )
             }
             }

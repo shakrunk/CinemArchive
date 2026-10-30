@@ -24,6 +24,8 @@ enum class NotificationType(val wire: String) {
     OUTING_PLANS_SHARED("outing_plans_shared"),
     OUTING_INVITE("outing_invite"),
     OUTING_INVITE_RESPONSE("outing_invite_response"),
+    TICKET_RECEIVED("ticket_received"),
+    TICKET_OPENED("ticket_opened"),
     UNKNOWN("");
 
     companion object {
@@ -78,7 +80,7 @@ object NotificationRules {
         NotificationType.FRIEND_REQUEST_RECEIVED, NotificationType.FRIEND_REQUEST_ACCEPTED,
         NotificationType.RECOMMENDATION_RECEIVED -> NotificationRoute.Friends
         NotificationType.INVITE_REDEEMED -> NotificationRoute.Profile
-        NotificationType.OUTING_INVITE -> NotificationRoute.UpNext
+        NotificationType.OUTING_INVITE, NotificationType.TICKET_RECEIVED -> NotificationRoute.UpNext
         NotificationType.OUTING_INVITE_RESPONSE ->
             n.titleId?.let { NotificationRoute.TitleDetail(it) } ?: NotificationRoute.None
         else -> NotificationRoute.None
@@ -103,6 +105,8 @@ object NotificationRules {
             }
             NotificationType.OUTING_COMPLETED -> "${n.title ?: "Your movie"} just let out — how was it?"
             NotificationType.OUTING_PLANS_SHARED -> "${n.actorName} has tickets to \"${n.title ?: "a movie"}\""
+            NotificationType.TICKET_RECEIVED -> "${n.actorName} sent you a ticket to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
+            NotificationType.TICKET_OPENED -> "${n.actorName} opened your ticket to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
             NotificationType.OUTING_INVITE -> "${n.actorName} invited you to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
             NotificationType.OUTING_INVITE_RESPONSE -> {
                 val film = n.payload.optString("title").ifEmpty { n.title ?: "your outing" }

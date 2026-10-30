@@ -11,6 +11,7 @@ number is chosen.
 
 ### Added
 
+- **Keepsake photos for cinema outings on Android and web.** Open "Photos" on a trip to keep up to eight pictures with it: a ticket stub, the poster board, a selfie. Choose one from your gallery or take it with the camera. Photos are private to you, are shrunk and stripped of location data before upload, and need a connection to add or view.
 - **Moviegoing budget on Android and web.** Set a monthly or yearly budget for the At the Movies panel of the Ledger (the "Budget, plan and year" dialog on the web) and see how much of it your cinema tickets have used, with a warning as you near or pass the cap. The budget follows your account across devices and is visible only to you.
 - **Subscription plan tracking on Android and web.** Set a theater subscription (outings per week or month) for the At the Movies panel of the Ledger and see how many of your allowed outings you have used this period, with a warning when one is left and a note when you reach or pass the cap. The plan follows your account across devices and is visible only to you.
 - **Yearly moviegoing recap on Android and web.** Open "Your year at the movies" from the At the Movies panel of the Ledger for a card summing up a year of cinema trips (trip count, top venue, format and companion, and total spent), pick any year you went, and share it as an image. It is only shown to you.

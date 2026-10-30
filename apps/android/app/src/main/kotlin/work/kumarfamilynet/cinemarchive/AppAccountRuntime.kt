@@ -98,6 +98,11 @@ class AppAccountRuntime(
         work.kumarfamilynet.cinemarchive.data.KeepsakeRepository(client, session::currentSession, ownerId, ::isCurrent)
     }
 
+    /** Invitations to join friends' outings, and inviting friends to this user's (#206). Online-only. */
+    val sharedOutings: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository(client, session::currentSession, ownerId, ::isCurrent)
+    }
+
     val tickets: work.kumarfamilynet.cinemarchive.data.TicketRuntime by lazy {
         work.kumarfamilynet.cinemarchive.data.TicketRuntime.create(database,
             work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId),

@@ -19,13 +19,15 @@ beforeEach(() => {
   vi.mocked(listOutingShareFriends).mockResolvedValue([friend])
 })
 afterEach(() => { cleanup(); useAppStore.setState(initial, true); vi.resetAllMocks() })
+// The "Invite to join" rows also name Alice, so the in-app share row is matched by excluding them.
+const SHARE_WITH_ALICE = /^(?!Invite|Remove).*Alice/
 const open = () => render(<ShareOutingPanel outing={upcoming} title={title} onClose={() => {}} />)
 
 it('keeps one operation ID across unknown outcomes and makes Share again an explicit new send', async () => {
   const response = deferred<SharedOutingSnapshot>()
   share.mockReturnValueOnce(response.promise).mockResolvedValue(confirmation)
   open()
-  const button = await screen.findByRole('button', { name: /Alice/ })
+  const button = await screen.findByRole('button', { name: SHARE_WITH_ALICE })
   fireEvent.click(button); fireEvent.click(button)
   expect(share).toHaveBeenCalledTimes(1)
   const operationId = share.mock.calls[0][2]
@@ -44,7 +46,7 @@ it('never publishes a late friend list or send notification into the next accoun
   const response = deferred<SharedOutingSnapshot>()
   share.mockReturnValue(response.promise)
   open()
-  fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
+  fireEvent.click(await screen.findByRole('button', { name: SHARE_WITH_ALICE }))
   const nextFriends = deferred<FriendshipView[]>()
   vi.mocked(listOutingShareFriends).mockReturnValue(nextFriends.promise)
   act(() => useAppStore.setState({ user: { id: 'owner-b' } as User, librarySession: 2 }))
@@ -62,7 +64,7 @@ it('uses current owner data rather than stale props and disables ended or cancel
   useAppStore.setState({ outings: [{ ...upcoming, venue: 'Updated cinema', status: 'cancelled' }] })
   open()
   expect(screen.getByText(/Updated cinema/)).toBeInTheDocument()
-  const button = await screen.findByRole('button', { name: /Alice/ })
+  const button = await screen.findByRole('button', { name: SHARE_WITH_ALICE })
   expect(button).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Copy / share text' })).toBeDisabled()
   fireEvent.click(button)

@@ -179,7 +179,10 @@ fun UpNextRoute(
     onFabExpandedChange: (Boolean) -> Unit = {},
     onRecommendTitle: ((String) -> Unit)? = null,
     onOpenCalendar: () -> Unit = {},
+    /** Invitations from friends and outings they are taking you to (#206); null hides the section. */
+    sharedOutings: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository? = null,
 ) {
+    val shared = rememberSharedOutingsState(sharedOutings)
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
     )
@@ -204,9 +207,13 @@ fun UpNextRoute(
         profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
         isRefreshing = isRefreshing,
-        onRefresh = viewModel::refresh,
+        onRefresh = { viewModel.refresh(); shared.refresh() },
         onRecommendTitle = onRecommendTitle,
         onOpenCalendar = onOpenCalendar,
+        sharedOutings = shared.outings,
+        sharedBusy = shared.busy,
+        sharedError = shared.error,
+        onRespondShared = shared::respond,
     )
 }
 
@@ -233,6 +240,10 @@ fun UpNextScreen(
     onRefresh: () -> Unit = {},
     onRecommendTitle: ((String) -> Unit)? = null,
     onOpenCalendar: () -> Unit = {},
+    sharedOutings: List<work.kumarfamilynet.cinemarchive.core.model.SharedOuting> = emptyList(),
+    sharedBusy: Collection<String> = emptyList(),
+    sharedError: String? = null,
+    onRespondShared: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -306,6 +317,12 @@ fun UpNextScreen(
                         Text("Calendar", modifier = Modifier.padding(start = 6.dp))
                     }
                     ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
+                }
+            }
+
+            if (sharedOutings.isNotEmpty() || sharedError != null) item(key = "shared-outings") {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
+                    SharedOutingsSection(sharedOutings, sharedBusy, sharedError, now, onRespondShared)
                 }
             }
 

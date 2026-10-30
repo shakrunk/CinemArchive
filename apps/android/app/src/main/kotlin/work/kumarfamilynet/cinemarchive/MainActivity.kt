@@ -872,11 +872,23 @@ private fun CinemArchiveApp(
     val moviegoingScreen: @Composable (() -> Unit, Boolean) -> Unit = { onBack, showBack ->
         work.kumarfamilynet.cinemarchive.feature.settings.SettingsPanelScreen(
             title = "Moviegoing",
-            description = "Venue notes and theater interest follow your account.",
+            description = "Venue notes and theater interest follow your account. Showtime reminders stay on this device.",
             onBack = onBack,
             showBack = showBack,
         ) {
-            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
+            val reminderLeadFlow = remember(preferencesRepository) { preferencesRepository.observeOutingReminderLead() }
+            val reminderLead by reminderLeadFlow.collectAsStateWithLifecycle(initialValue = null)
+            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(
+                runtime.moviegoingPreferences,
+                reminderLeadMinutes = reminderLead,
+                onReminderLeadChange = { minutes ->
+                    coroutineScope.launch {
+                        preferencesRepository.setOutingReminderLead(minutes)
+                        // The one alarm now also covers reminders: re-arm for the new lead (or without one).
+                        if (runtime.isCurrent()) runtime.outingsRepository.refreshAlarm()
+                    }
+                },
+            ) { venue, dismiss ->
                 work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
             }
         }

@@ -103,6 +103,11 @@ class AppAccountRuntime(
         work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository(client, session::currentSession, ownerId, ::isCurrent)
     }
 
+    /** Sending a ticket to friends, and opening ones they sent (#220). Online-only. */
+    val ticketSharing: work.kumarfamilynet.cinemarchive.data.TicketSharingRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.TicketSharingRepository(client, session::currentSession, ownerId, ::isCurrent, friendsRepository::listFriendships)
+    }
+
     /** Polls with friends (#203). Online-only. */
     val outingPolls: work.kumarfamilynet.cinemarchive.data.OutingPollsRepository by lazy {
         work.kumarfamilynet.cinemarchive.data.OutingPollsRepository(client, session::currentSession, ownerId, ::isCurrent, friendsRepository::listFriendships)

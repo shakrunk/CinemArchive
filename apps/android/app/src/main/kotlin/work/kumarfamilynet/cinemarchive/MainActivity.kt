@@ -1096,6 +1096,7 @@ private fun CinemArchiveApp(
                                 onFabExpandedChange = { fabExpanded = it },
                                 onOpenCalendar = { upNextCalendar = true },
                                 sharedOutings = runtime.sharedOutings,
+                                ticketSharing = runtime.ticketSharing,
                                 outingPolls = runtime.outingPolls,
                                 onSchedulePoll = { option, voters ->
                                     coroutineScope.launch {
@@ -1467,6 +1468,7 @@ private fun CinemArchiveApp(
                 )
                 is Overlay.Ticket -> work.kumarfamilynet.cinemarchive.feature.library.PortableTicketRoute(
                     runtime.tickets, current.outingId, current.titleName, onBack = closeOverlay, onSaved = runtime::syncTickets,
+                    sharing = runtime.ticketSharing,
                 )
                 is Overlay.Keepsakes -> work.kumarfamilynet.cinemarchive.feature.library.KeepsakesRoute(
                     runtime.keepsakes, current.outingId, current.titleName, onBack = closeOverlay,

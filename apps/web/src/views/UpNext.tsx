@@ -19,6 +19,7 @@ import { TicketButton } from '../components/TicketViewer'
 import { OutingPollsButton } from '../components/OutingPolls'
 import { KeepsakeButton } from '../components/OutingKeepsakes'
 import { SharedWithYou } from '../components/SharedWithYou'
+import { ReceivedTickets } from '../components/SentTickets'
 import { isEpisodeSpoilerHidden, isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
@@ -661,6 +662,7 @@ export function UpNext({ onBrowseLibrary, onOpenCalendar }: { onBrowseLibrary: (
           </button>
         </div>
       </header>
+      <ReceivedTickets />
       <SharedWithYou />
       {isEmpty ? (
         <UpNextEmptyState onBrowseLibrary={onBrowseLibrary} />

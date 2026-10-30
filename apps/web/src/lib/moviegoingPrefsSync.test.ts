@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import fixture from '../../../../docs/android-contracts/fixtures/moviegoing.json'
 import {
   moviegoingPrefsWithBudget, moviegoingPrefsWithPlan, moviegoingPrefsWithRegion, moviegoingPrefsWithTemplates, parseMoviegoingPrefs, resolveReconciliation,
   type MoviegoingPrefs,
@@ -221,5 +222,19 @@ describe('default region in the payload', () => {
     const cleared = moviegoingPrefsWithRegion(next, null, '2026-10-31T10:00:00Z')
     expect(cleared).toHaveProperty('region', null)
     expect(parseMoviegoingPrefs(cleared)?.region).toBeNull()
+  })
+})
+
+describe('updatedAt strictness (shared fixture)', () => {
+  it('accepts only the UTC instants Android accepts', () => {
+    for (const c of fixture.timestamps) {
+      expect(parseMoviegoingPrefs({ updatedAt: c.value }) !== null, c.value).toBe(c.valid)
+    }
+  })
+
+  it('compares sub-second instants by their written time', () => {
+    const older = { budget: { amount: 40, period: 'month' }, updatedAt: '2026-10-29T10:00:00.100Z' }
+    const newer = { budget: { amount: 50, period: 'month' }, updatedAt: '2026-10-29T10:00:00.200Z' }
+    expect(resolveReconciliation(newer, parseMoviegoingPrefs(older)).kind).toBe('apply-remote')
   })
 })

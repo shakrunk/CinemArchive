@@ -1,6 +1,7 @@
 import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, type MediaType, type Title, type Viewing } from './mockData'
 import type { FriendshipView } from '../lib/auth'
 import { normalizeCompanions } from './companions'
+import { isTripVenue, tripDate } from './moviegoingRules'
 
 // Pure, unit-testable derivations for Cinema Outings ("I've got tickets") —
 // modeled on upNext.ts. See docs/superpowers/plans/2026-07-11-cinema-outings.md
@@ -406,16 +407,15 @@ export function deriveAtTheMovies(titles: Title[], outings: CinemaOuting[], now 
 
   for (const t of titles) {
     for (const v of t.viewings) {
-      if (!v.venue) continue
+      if (!isTripVenue(v.venue)) continue
       tripsTotal += 1
       venueCounts.set(v.venue, (venueCounts.get(v.venue) ?? 0) + 1)
 
-      if (v.date) {
-        const year = Number(v.date.slice(0, 4))
-        if (Number.isFinite(year)) {
-          yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1)
-          if (year === currentYear) tripsThisYear += 1
-        }
+      const day = tripDate(v.date)
+      if (day) {
+        const year = Number(day.slice(0, 4))
+        yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1)
+        if (year === currentYear) tripsThisYear += 1
       }
 
       for (const c of normalizeCompanions(v.companions)) {

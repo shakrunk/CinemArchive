@@ -7,7 +7,7 @@ figures for the same year.
 
 ## Inputs
 
-A trip is a viewing with a non-null `venue` and a parseable date (the same set as the Ledger's trip
+A trip is a viewing with a non-empty `venue` and a real calendar date (the same set as the Ledger's trip
 count). Each carries:
 
 | Fact | Source |
@@ -31,7 +31,7 @@ date is a plain calendar date). A year with no trips has no recap.
 |-------|------|
 | `tripCount` | trips in the year |
 | `topVenue` / `topFormat` / `topCompanion` | the most frequent label, with its count. A tie goes to the label that sorts first (plain code-point order). Labels are trimmed and blank ones ignored. Absent when no trip has one. |
-| `totalSpend` | sum of the year's priced trips, added in whole cents (`round(price * 100)`) so float drift never changes the total. Absent when no trip that year has a price; a price of `0` still counts as known. |
+| `totalSpend` | sum of the year's priced trips, added in whole cents (`round(price * 100)`) so float drift never changes the total. Printed as `$1,234.50` (dollar sign, comma thousands, two decimals) on the card and in the text summary, whatever the device locale. Absent when no trip that year has a price; a price of `0` still counts as known. |
 
 Companions are counted per name occurrence, as in the Ledger's companion tally.
 
@@ -48,5 +48,5 @@ the system share sheet together with a one-line text summary of the same figures
 the PNG through the browser's share sheet where it can share files, and otherwise downloads it. Nothing is
 uploaded by either app.
 
-Android pins the rules above in `MoviegoingRecapTest` (core/model) and web in `moviegoingRules.test.ts`
+Both clients load [`fixtures/moviegoing.json`](fixtures/moviegoing.json): Android pins the rules above in `MoviegoingRecapTest` (core/model) and web in `moviegoingRules.test.ts`
 (`apps/web/src/store`), with the same cases.

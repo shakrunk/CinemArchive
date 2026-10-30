@@ -23,7 +23,7 @@ data class SubscriptionPlan(val cap: Int, val period: PlanPeriod) {
 
         /** Parses what a person types into the cap field. Null for anything that is not a whole
          *  number within range. */
-        fun parseCap(text: String): Int? = text.trim().toIntOrNull()?.takeIf(::isValidCap)
+        fun parseCap(text: String): Int? = MoviegoingRules.parseWholeNumberText(text.trim())?.takeIf(::isValidCap)
     }
 }
 

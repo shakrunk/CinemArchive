@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { cn, fmtCurrency } from 'src/lib/utils'
+import { cn } from 'src/lib/utils'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
 import { SegmentedToggle } from 'src/components/ui/segmented-toggle'
@@ -7,7 +7,7 @@ import { Eyebrow } from 'src/components/ui/typography'
 import { setMoviegoingBudget, setMoviegoingPlan } from 'src/lib/moviegoingPrefsSync'
 import { shareRecap } from 'src/lib/moviegoingRecapImage'
 import {
-  budgetSummary, moviegoingRecap, parseBudgetAmount, parsePlanCap, planSummary, recapFields, recapSummary, recapYears,
+  budgetSummary, formatMoney, moviegoingRecap, parseBudgetAmount, parsePlanCap, planSummary, recapFields, recapSummary, recapYears,
   MAX_BUDGET_AMOUNT, MAX_PLAN_CAP,
   type BudgetPeriod, type BudgetState, type BudgetStatus, type MoviegoingBudget, type MoviegoingTrip, type PlanPeriod,
   type PlanState, type PlanStatus, type SubscriptionPlan,
@@ -53,7 +53,7 @@ export function MoviegoingStatusLines({ budget, plan }: { budget: BudgetStatus |
     <div className="flex flex-col gap-0.5">
       {budget && (
         <p className={cn('text-xs', STATE_TONE[budget.state])}>
-          Budget · {budget.budget.period === 'month' ? 'this month' : 'this year'}: {budgetSummary(budget, fmtCurrency)}
+          Budget · {budget.budget.period === 'month' ? 'this month' : 'this year'}: {budgetSummary(budget, formatMoney)}
         </p>
       )}
       {plan && (
@@ -78,8 +78,8 @@ export function BudgetSection({ status, current }: { status: BudgetStatus | null
       <h3 className="font-serif text-lg text-paper">Budget</h3>
       {status && (
         <div className="space-y-1.5">
-          <p className={cn('text-sm', STATE_TONE[status.state])}>{budgetSummary(status, fmtCurrency)}</p>
-          <Meter label={budgetSummary(status, fmtCurrency)} fraction={status.fraction} state={status.state} />
+          <p className={cn('text-sm', STATE_TONE[status.state])}>{budgetSummary(status, formatMoney)}</p>
+          <Meter label={budgetSummary(status, formatMoney)} fraction={status.fraction} state={status.state} />
         </div>
       )}
       <form
@@ -207,7 +207,7 @@ export function RecapSection({ trips, initialYear }: { trips: MoviegoingTrip[]; 
           <span className="pb-1 text-paper">{recap.tripCount === 1 ? 'trip' : 'trips'}</span>
         </p>
         <dl className="space-y-2">
-          {recapFields(recap, fmtCurrency).map((field) => (
+          {recapFields(recap, formatMoney).map((field) => (
             <div key={field.label}>
               <dt><Eyebrow as="span">{field.label}</Eyebrow></dt>
               <dd className="text-paper">{field.value}</dd>
@@ -220,8 +220,8 @@ export function RecapSection({ trips, initialYear }: { trips: MoviegoingTrip[]; 
           type="button"
           size="sm"
           onClick={() => {
-            void shareRecap(recap, fmtCurrency).then((result) => {
-              setNotice(result === 'downloaded' ? 'Image saved.' : result === 'unavailable' ? recapSummary(recap, fmtCurrency) : '')
+            void shareRecap(recap, formatMoney).then((result) => {
+              setNotice(result === 'downloaded' ? 'Image saved.' : result === 'unavailable' ? recapSummary(recap, formatMoney) : '')
             })
           }}
         >

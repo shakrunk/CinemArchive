@@ -161,4 +161,14 @@ class MoviegoingPrefsTest {
         assertEquals(MoviegoingPrefsReconciliation.Keep, resolveMoviegoingPrefsReconciliation(invalid, prefs("2026-10-29T00:00:00Z")))
         assertEquals(MoviegoingPrefsReconciliation.Keep, resolveMoviegoingPrefsReconciliation(invalid, null))
     }
+
+    /** The `updatedAt` cases web's moviegoingPrefsSync.test.ts runs too (fixtures/moviegoing.json). */
+    @Test fun acceptsOnlyTheUtcInstantsTheFixtureNames() {
+        val cases = JSONObject(java.io.File("../../../docs/android-contracts/fixtures/moviegoing.json").readText()).getJSONArray("timestamps")
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val parsed = parseMoviegoingPrefs(JSONObject().put("updatedAt", case.getString("value")))
+            assertEquals(case.getString("value"), case.getBoolean("valid"), parsed != null)
+        }
+    }
 }

@@ -4,7 +4,7 @@ import { isDevMockUser } from './devAuth'
 import { fetchMoviegoingPrefs, saveMoviegoingPrefs } from './db'
 import { useAppStore } from 'src/store/useAppStore'
 import {
-  isValidBudgetAmount, isValidPlanCap, type BudgetPeriod, type MoviegoingBudget, type PlanPeriod, type SubscriptionPlan,
+  isValidBudgetAmount, isValidPlanCap, parseInstant, type BudgetPeriod, type MoviegoingBudget, type PlanPeriod, type SubscriptionPlan,
 } from 'src/store/moviegoingRules'
 import { isValidRegion } from 'src/store/moviegoingRegion'
 import {
@@ -90,7 +90,7 @@ function parseTemplates(list: unknown[]): OutingTemplate[] {
  *  null `budget`/`plan`/`templates` is valid: it means "none set". */
 export function parseMoviegoingPrefs(value: unknown): MoviegoingPrefs | null {
   if (!isRecord(value)) return null
-  if (typeof value.updatedAt !== 'string' || Number.isNaN(Date.parse(value.updatedAt))) return null
+  if (typeof value.updatedAt !== 'string' || parseInstant(value.updatedAt) === null) return null
   let budget: MoviegoingBudget | null = null
   if (value.budget != null) {
     budget = parseBudget(value.budget)
@@ -154,8 +154,8 @@ export function resolveReconciliation(remoteRaw: unknown, local: MoviegoingPrefs
   if (!absent && !remote) return { kind: 'keep' }
   if (!remote) return local ? { kind: 'push-local' } : { kind: 'keep' }
   if (!local) return { kind: 'apply-remote', prefs: remote }
-  const remoteAt = Date.parse(remote.updatedAt)
-  const localAt = Date.parse(local.updatedAt)
+  const remoteAt = parseInstant(remote.updatedAt) ?? 0
+  const localAt = parseInstant(local.updatedAt) ?? 0
   if (remoteAt > localAt) return { kind: 'apply-remote', prefs: remote }
   if (localAt > remoteAt) return { kind: 'push-local' }
   return { kind: 'keep' }

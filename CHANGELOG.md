@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Moviegoing budget, plan and recap now agree on Android and web.** Both clients ignore an impossible trip date such as 30 February, treat an empty theater as no theater, accept the same typed amounts, and show budget and recap money as `$1,234.50` whatever the device language. The web Ledger also lets you set a budget or plan before your first cinema trip, as Android does.
+
 ## [1.46.0] - 2026-10-30
 
 ### Added

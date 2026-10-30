@@ -107,4 +107,22 @@ class MoviegoingBudgetTest {
         assertNull(BudgetPeriod.fromWire("week"))
         assertNull(BudgetPeriod.fromWire(null))
     }
+
+    /** The cases web's moviegoingRules.test.ts runs too (fixtures/moviegoing.json). */
+    @Test fun matchesTheSharedFixture() {
+        for (case in MoviegoingFixture.cases("budget")) {
+            val name = case.getString("name")
+            val spec = case.getJSONObject("budget")
+            val budget = MoviegoingBudget(spec.getDouble("amount"), BudgetPeriod.fromWire(spec.getString("period"))!!)
+            val trips = case.getJSONArray("trips").objects()
+                .map { MoviegoingPricedTrip(LocalDate.parse(it.getString("date")), it.getDouble("price")) }
+            val expected = case.getJSONObject("expected")
+            val status = MoviegoingBudgetRules.status(budget, trips, LocalDate.parse(case.getString("today")))
+            assertEquals(name, expected.getDouble("spent"), status.spent, 1e-9)
+            assertEquals(name, expected.getDouble("remaining"), status.remaining, 1e-9)
+            assertEquals(name, expected.getString("state").uppercase(), status.state.name)
+            assertEquals(name, LocalDate.parse(expected.getString("start")), status.periodStart)
+            assertEquals(name, LocalDate.parse(expected.getString("end")), status.periodEnd)
+        }
+    }
 }

@@ -98,6 +98,11 @@ class AppAccountRuntime(
         work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository(client, session::currentSession, ownerId, ::isCurrent)
     }
 
+    /** Polls with friends (#203). Online-only. */
+    val outingPolls: work.kumarfamilynet.cinemarchive.data.OutingPollsRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.OutingPollsRepository(client, session::currentSession, ownerId, ::isCurrent, friendsRepository::listFriendships)
+    }
+
     val tickets: work.kumarfamilynet.cinemarchive.data.TicketRuntime by lazy {
         work.kumarfamilynet.cinemarchive.data.TicketRuntime.create(database,
             work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId),

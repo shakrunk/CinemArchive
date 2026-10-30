@@ -181,8 +181,14 @@ fun UpNextRoute(
     onOpenCalendar: () -> Unit = {},
     /** Invitations from friends and outings they are taking you to (#206); null hides the section. */
     sharedOutings: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository? = null,
+    /** Polls with friends (#203); null hides the Polls button. */
+    outingPolls: work.kumarfamilynet.cinemarchive.data.OutingPollsRepository? = null,
+    /** A poll's winner and the friends who ticked it, to turn into a real outing. */
+    onSchedulePoll: (work.kumarfamilynet.cinemarchive.core.model.PollOption, List<String>) -> Unit = { _, _ -> },
 ) {
     val shared = rememberSharedOutingsState(sharedOutings)
+    var showPolls by rememberSaveable { mutableStateOf(false) }
+    val libraryMovies by remember(repository) { repository.observeLibrary() }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
     )
@@ -214,6 +220,13 @@ fun UpNextRoute(
         sharedBusy = shared.busy,
         sharedError = shared.error,
         onRespondShared = shared::respond,
+        onOpenPolls = outingPolls?.let { { showPolls = true } },
+    )
+    if (showPolls && outingPolls != null) OutingPollsSheet(
+        repository = outingPolls,
+        movies = libraryMovies,
+        onSchedule = { option, voters -> showPolls = false; onSchedulePoll(option, voters) },
+        onDismiss = { showPolls = false },
     )
 }
 
@@ -244,6 +257,8 @@ fun UpNextScreen(
     sharedBusy: Collection<String> = emptyList(),
     sharedError: String? = null,
     onRespondShared: (String, Boolean) -> Unit = { _, _ -> },
+    /** Shows a Polls button in the header (#203). */
+    onOpenPolls: (() -> Unit)? = null,
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -312,6 +327,7 @@ fun UpNextScreen(
                         )
                         Text("Up Next", style = MaterialTheme.typography.headlineLarge)
                     }
+                    if (onOpenPolls != null) TextButton(onClick = onOpenPolls) { Text("Polls") }
                     TextButton(onClick = onOpenCalendar) {
                         Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                         Text("Calendar", modifier = Modifier.padding(start = 6.dp))

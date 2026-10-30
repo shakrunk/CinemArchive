@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { TicketButton } from '../components/TicketViewer'
+import { KeepsakeButton } from '../components/OutingKeepsakes'
 import { isEpisodeSpoilerHidden, isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
@@ -405,7 +406,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
           <span aria-label={presentation.ariaLabel}>{presentation.label}</span>
         </p>
         {detailLine && <p className="font-sans text-sm text-paper-dim truncate">{detailLine}</p>}
-        {!isSharedView && <div className="pt-2"><TicketButton outingId={outing.id} /></div>}
+        {!isSharedView && <div className="pt-2 flex flex-wrap items-center gap-3"><TicketButton outingId={outing.id} /><KeepsakeButton outingId={outing.id} /></div>}
         {!isSharedView && (
           <div className="mt-auto pt-3 flex items-center justify-between gap-2">
             {confirmingCancel ? (

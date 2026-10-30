@@ -155,6 +155,15 @@ function NowPlaying({ titles, onPick, onAdd }: {
   const [open, setOpen] = useState(false)
   const [region, setRegion] = useState(effective)
   const [draft, setDraft] = useState(effective)
+  // A region that syncs in (or changes) after this mounted replaces the one shown and drafted,
+  // as Android's NowPlayingDialog does by keying its state on the effective region. Picking a
+  // region here saves it, so the saved value then equals `region` and nothing reloads.
+  const [followed, setFollowed] = useState(effective)
+  if (followed !== effective) {
+    setFollowed(effective)
+    setRegion(effective)
+    setDraft(effective)
+  }
   const [attempt, setAttempt] = useState(0)
   // The outcome is tagged with the request it answers, so a new region or retry reads as
   // loading again without resetting state inside the effect.

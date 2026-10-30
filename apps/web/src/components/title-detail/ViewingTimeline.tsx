@@ -2,6 +2,7 @@ import { saveSucceeded } from 'src/lib/localSave'
 import { useState, useMemo } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { TicketButton } from '../TicketViewer'
+import { KeepsakeButton } from '../OutingKeepsakes'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { fmtDate } from 'src/lib/utils'
 import { formatCompanions } from 'src/store/outings'
@@ -27,6 +28,7 @@ function TicketStubLine({ viewing, outing }: { viewing: Viewing; outing: CinemaO
       <span className="ticket-perforation" aria-hidden="true" />
       <span className="font-mono text-xs text-amber/80">{segments.join(' · ')}</span>
       {outing && <TicketButton outingId={outing.id} />}
+      {outing && <KeepsakeButton outingId={outing.id} />}
     </div>
   )
 }

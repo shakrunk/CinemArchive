@@ -42,7 +42,7 @@ All require an authenticated caller. Errors use SQLSTATE `42501` for "not yours 
   the status without notifying. A declined member cannot re-accept without a new invitation, and
   nothing can be answered once the outing is cancelled, completed or ended. Notifies the owner.
 - `remove_outing_member(p_shared_outing_id, p_user_id)`. Owner only.
-- `get_shared_outings()`. The caller's invited or accepted outings that ended less than two days ago
+- `get_shared_outings()`. The caller's invited or accepted outings that ended less than seven days ago
   or are upcoming, with `owner_name`, `my_status` and the snapshot.
 - `get_outing_members(p_outing_id)`. The owner's members with display names and status.
 

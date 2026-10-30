@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +55,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.designsystem.ReadingWidthColumn
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
+import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.data.IntegrationConnection
+import work.kumarfamilynet.cinemarchive.data.JellyfinConfirmResult
+import work.kumarfamilynet.cinemarchive.data.JellyfinPlay
 import work.kumarfamilynet.cinemarchive.data.SimklPoll
 import work.kumarfamilynet.cinemarchive.data.SyncItem
 import work.kumarfamilynet.cinemarchive.data.SyncProvider
@@ -74,10 +78,12 @@ fun ImportSyncRoute(
     services: SyncServices,
     onBack: () -> Unit,
     showBack: Boolean = true,
+    /** A confirmed Jellyfin episode whose series isn't in the library opens the normal Add flow. */
+    onOpenAddFlow: (MediaSearchResult) -> Unit = {},
     backupContent: @Composable () -> Unit = {},
 ) {
     key(services) {
-        if (services.repository.isCurrent()) ImportSyncContent(services, onBack, showBack, backupContent)
+        if (services.repository.isCurrent()) ImportSyncContent(services, onBack, showBack, onOpenAddFlow, backupContent)
     }
 }
 
@@ -86,6 +92,7 @@ private fun ImportSyncContent(
     services: SyncServices,
     onBack: () -> Unit,
     showBack: Boolean,
+    onOpenAddFlow: (MediaSearchResult) -> Unit,
     backupContent: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -102,6 +109,13 @@ private fun ImportSyncContent(
     var embyUrl by rememberSaveable { mutableStateOf("") }
     var embyUser by rememberSaveable { mutableStateOf("") }
     var embyPassword by remember { mutableStateOf("") }
+    var jellyfinUrl by rememberSaveable { mutableStateOf("") }
+    var jellyfinUser by rememberSaveable { mutableStateOf("") }
+    var jellyfinPassword by remember { mutableStateOf("") }
+    // Plays awaiting an answer live on this device; the card below is where they are answered
+    // when notifications are off, and where a tap on a notification's body lands.
+    val jellyfinView by services.jellyfin.view.collectAsState()
+    var jellyfinAnswering by remember { mutableStateOf<String?>(null) }
 
     fun ensureCurrent() {
         if (!services.repository.isCurrent()) throw CancellationException("Account changed.")
@@ -115,6 +129,11 @@ private fun ImportSyncContent(
         connections = latest
     }
     LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(Unit) {
+        try { services.jellyfin.load() } catch (error: CancellationException) {
+            throw error
+        } catch (cause: Exception) { /* unreadable device storage: shown as not connected */ }
+    }
 
     fun connected(p: SyncProvider) = connections.firstOrNull { it.provider == p }
 
@@ -239,6 +258,61 @@ private fun ImportSyncContent(
         runImport(items)
     }
 
+    // Jellyfin: signing in only starts watching from now on. Plays that happen later are offered
+    // one at a time (notification or the list below); nothing is added without an explicit yes.
+    fun connectJellyfin(importHistory: Boolean) = guarded(SyncProvider.JELLYFIN, "Jellyfin sign-in failed.") {
+        val alreadyConnected = connected(SyncProvider.JELLYFIN) != null
+        val session = services.jellyfin.signIn(jellyfinUrl, jellyfinUser, jellyfinPassword)
+        ensureCurrent()
+        jellyfinPassword = ""
+        services.jellyfin.connect(session, alreadyConnected)
+        services.repository.recordConnection(SyncProvider.JELLYFIN, session.baseUrl, session.username)
+        if (alreadyConnected) services.jellyfin.check()
+        if (importHistory) {
+            status = "Reading your Jellyfin library…"
+            runImport(services.jellyfin.fetchLibrary(session))
+        } else {
+            message = false to "Connected as ${session.username}. New watches will be offered for you to confirm."
+        }
+    }
+
+    fun checkJellyfin() = guarded(SyncProvider.JELLYFIN, "Couldn't check Jellyfin.") {
+        status = "Checking Jellyfin…"
+        val fresh = services.jellyfin.check()
+        ensureCurrent()
+        message = false to if (fresh.isEmpty()) "No new watches." else "${fresh.size} new watch${if (fresh.size == 1) "" else "es"} to review."
+    }
+
+    fun answerJellyfin(play: JellyfinPlay, add: Boolean) {
+        if (jellyfinAnswering != null || !services.repository.isCurrent()) return
+        jellyfinAnswering = play.key
+        scope.launch {
+            try {
+                ensureCurrent()
+                if (!add) {
+                    services.jellyfin.resolve(play.key)
+                } else {
+                    val result = services.jellyfinConfirm.confirm(play)
+                    ensureCurrent()
+                    services.jellyfin.resolve(play.key)
+                    when (result) {
+                        JellyfinConfirmResult.Added -> message = false to "Added ${play.describe()} to your history."
+                        JellyfinConfirmResult.Duplicate -> message = false to "Already in your history."
+                        JellyfinConfirmResult.Unmatched -> message = false to "Couldn't match that to a title."
+                        is JellyfinConfirmResult.OpenAddFlow -> onOpenAddFlow(result.match)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) { e.rethrowIfCancelled();
+                // Kept queued so it can be retried.
+                if (services.repository.isCurrent()) message = true to e.userMessage("Couldn't add that watch.")
+            } finally {
+                jellyfinAnswering = null
+            }
+        }
+    }
+
     fun importLetterboxd(uri: Uri) = guarded(SyncProvider.LETTERBOXD, "Letterboxd import failed.") {
         val (text, fileName) = withContext(Dispatchers.IO) {
             val body = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
@@ -263,6 +337,7 @@ private fun ImportSyncContent(
         scope.launch {
             try {
                 ensureCurrent()
+                if (provider == SyncProvider.JELLYFIN) services.jellyfin.disconnect()
                 if (provider == SyncProvider.SIMKL) withContext(Dispatchers.IO) { services.simkl.disconnect() }
                 else services.repository.removeConnection(provider)
                 ensureCurrent()
@@ -302,9 +377,12 @@ private fun ImportSyncContent(
                 ReadingWidthColumn {
                     Text(
                         "Import only: watched titles and ratings are copied in. Nothing is sent back to these " +
-                            "services, and existing ratings and viewings are never overwritten. Plex and Emby are " +
-                            "contacted straight from your phone, so the server must be reachable over https. Plex " +
-                            "tokens and Emby passwords are not stored.",
+                            "services, and existing ratings and viewings are never overwritten. Plex, Emby and " +
+                            "Jellyfin are contacted straight from your phone, so the server must be reachable over " +
+                            "https. Plex tokens and Emby/Jellyfin passwords are not stored. Jellyfin signs in as your " +
+                            "own user, so only your watches are seen, and new ones are always offered for you to " +
+                            "confirm before anything is added. Its session token stays on this device; Disconnect " +
+                            "signs it out.",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -393,6 +471,85 @@ private fun ImportSyncContent(
             }
             item {
                 ReadingWidthColumn {
+                    val jellyfinConnected = connected(SyncProvider.JELLYFIN) != null || jellyfinView.connected
+                    val jellyfinFilled = jellyfinUrl.isNotBlank() && jellyfinUser.isNotBlank() && jellyfinPassword.isNotEmpty()
+                    ProviderCard(
+                        name = "Jellyfin",
+                        connection = connected(SyncProvider.JELLYFIN),
+                        busy = busy == SyncProvider.JELLYFIN,
+                        enabled = busy == null && jellyfinFilled,
+                        onSync = { connectJellyfin(false) },
+                        onDisconnect = { disconnect(SyncProvider.JELLYFIN) },
+                        connectLabel = "Connect",
+                        syncLabel = "Sign in again",
+                    ) {
+                        if (jellyfinView.authExpired) {
+                            Text(
+                                "Your Jellyfin session expired. Sign in again to keep checking for new watches.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        OutlinedTextField(
+                            value = jellyfinUrl,
+                            onValueChange = { jellyfinUrl = it },
+                            label = { Text("Server (e.g. jellyfin.example.com)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = jellyfinUser,
+                            onValueChange = { jellyfinUser = it },
+                            label = { Text("Username") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = jellyfinPassword,
+                            onValueChange = { jellyfinPassword = it },
+                            label = { Text("Password") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { connectJellyfin(true) }, enabled = busy == null && jellyfinFilled) {
+                                Text("Import existing history")
+                            }
+                            if (jellyfinConnected && !jellyfinView.authExpired) {
+                                OutlinedButton(onClick = ::checkJellyfin, enabled = busy == null) { Text("Check for new watches") }
+                            }
+                        }
+                        jellyfinView.pending.forEach { play ->
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        "Add ${play.describe()}, watched ${play.date}, to your watch history?",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(onClick = { answerJellyfin(play, add = true) }, enabled = jellyfinAnswering == null) {
+                                            if (jellyfinAnswering == play.key) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.padding(end = 8.dp).size(16.dp))
+                                            Text("Add to history")
+                                        }
+                                        OutlinedButton(onClick = { answerJellyfin(play, add = false) }, enabled = jellyfinAnswering == null) {
+                                            Text("Not this one")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                ReadingWidthColumn {
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -445,6 +602,8 @@ private fun ProviderCard(
     enabled: Boolean,
     onSync: () -> Unit,
     onDisconnect: () -> Unit,
+    connectLabel: String = "Connect & import",
+    syncLabel: String = "Sync now",
     extra: @Composable () -> Unit,
 ) {
     Surface(
@@ -467,7 +626,7 @@ private fun ProviderCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = onSync, enabled = enabled) {
                     if (busy) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.padding(end = 8.dp).size(16.dp))
-                    Text(if (connection != null) "Sync now" else "Connect & import")
+                    Text(if (connection != null) syncLabel else connectLabel)
                 }
                 if (connection != null) {
                     OutlinedButton(onClick = onDisconnect, enabled = !busy) { Text("Disconnect") }

@@ -1329,6 +1329,7 @@ private fun CinemArchiveApp(
                             SettingsCategory.MOVIEGOING -> moviegoingScreen(closeOverlay, false)
                             SettingsCategory.DATA_RECOVERY -> dataRecoveryScreen(closeOverlay, false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
+                                onOpenAddFlow = { overlay = Overlay.Add(it) },
                                 backupContent = { Column {
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
@@ -1473,6 +1474,7 @@ private fun CinemArchiveApp(
                 Overlay.Moviegoing -> moviegoingScreen(openProfile, true)
                 Overlay.DataRecovery -> dataRecoveryScreen(openProfile, true)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
+                    onOpenAddFlow = { overlay = Overlay.Add(it) },
                     backupContent = { Column {
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)

@@ -15,6 +15,7 @@ number is chosen.
 - **Moviegoing budget, plan, templates and region saved on the web survive a reload.** An edit made offline or while signed out is now kept in the browser and sent to your account when you are back online, instead of being lost or overwritten by an older copy from the server.
 - **"What's playing in theaters" follows your saved country on the web.** If your default country syncs in after you open the picker, the list now switches to it instead of staying on the device's country.
 - **Tapping "opened your ticket" now goes somewhere, on Android and web.** The notification that a friend opened a ticket you sent opens that movie's details, where you can see who has opened it.
+- **Keepsake photos can be replaced, attached from the schedule sheet, and recovered after an interrupted upload, on Android and web.** "Replace photo" swaps a keepsake without ever leaving the trip with neither photo (a failed upload leaves the original alone). "Photos" now also opens from the schedule sheet when you edit an outing, and from the web post-show sheet. If a photo uploads but cannot be saved to the trip, the album offers "Finish saving" or "Discard" instead of silently losing it.
 
 ## [1.46.0] - 2026-10-30
 

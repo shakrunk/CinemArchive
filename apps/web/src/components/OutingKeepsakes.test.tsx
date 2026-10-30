@@ -14,6 +14,8 @@ vi.mock('src/lib/keepsakes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('src/lib/keepsakes')>()),
   listKeepsakes: vi.fn(),
   addKeepsake: vi.fn(),
+  replaceKeepsake: vi.fn(),
+  finishKeepsake: vi.fn(),
   removeKeepsake: vi.fn(),
   keepsakeUrl: vi.fn(),
   prepareKeepsake: vi.fn(),
@@ -44,6 +46,7 @@ afterEach(() => {
   cleanup()
   useAppStore.setState(initialState, true)
   vi.clearAllMocks()
+  localStorage.clear()
 })
 
 async function openAlbum() {

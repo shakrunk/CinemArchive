@@ -3,7 +3,8 @@ import { isSupabaseConfigured, supabase } from './auth'
 // Keepsake photos for cinema outings (#208): a ticket stub, a poster board, a popcorn selfie.
 // Owner-private and separate from the single scannable ticket attachment. Mirrors Android's
 // KeepsakeRules.kt / KeepsakeRepository.kt; the contract is docs/android-contracts/outing-keepsakes.md.
-// Online-only: there is no offline queue, so adding or viewing a photo needs a connection.
+// Online-only: there is no offline queue for edits, so adding, replacing or viewing a photo needs a connection;
+// the one thing remembered on the device is an uploaded photo whose row did not save, so it can be finished.
 
 export interface OutingKeepsake {
   id: string
@@ -89,23 +90,172 @@ export async function listKeepsakes(outingId: string): Promise<OutingKeepsake[]>
   return parseKeepsakes(data)
 }
 
-/** Uploads the (already prepared) photo under the owner's folder, then records it against the outing. */
-export async function addKeepsake(ownerId: string, outingId: string, photo: Blob): Promise<OutingKeepsake> {
+// ─── Interrupted uploads ─────────────────────────────────────────────────────
+// Adding is two steps: the bytes go to storage, then a row ties them to the outing. A photo whose
+// bytes arrived but whose row did not (the connection dropped, or the outing was still syncing) is
+// remembered in this browser, per account, so "Finish saving" can retry just the row insert. The
+// photo itself is not kept: a failed upload starts over from the picker.
+
+/** An uploaded object that has no row yet. */
+export interface PendingKeepsake {
+  id: string
+  outingId: string
+  mimeType: string
+  byteLength: number
+}
+
+/** The row insert failed after the bytes uploaded. `pending` is set when finishing later can still
+ *  work, and null when it cannot (the outing is full, gone or not the caller's). */
+export class KeepsakeSaveError extends Error {
+  readonly pending: PendingKeepsake | null
+  /** Set by `replaceKeepsake` when the old photo had to be removed and could not be put back, so the new one is all that is left to finish. */
+  originalRemoved = false
+  constructor(message: string, pending: PendingKeepsake | null) {
+    super(message)
+    this.name = 'KeepsakeSaveError'
+    this.pending = pending
+  }
+}
+
+/** Row-insert failures a retry can never fix: the guard trigger's mismatched object (22023), ninth
+ *  photo (54000) and someone else's outing (42501). */
+const FINAL_INSERT_CODES = ['22023', '54000', '42501']
+
+const pendingKey = (ownerId: string) => `cinemarchive:keepsake-pending:v1:${ownerId}`
+
+function readPending(ownerId: string): PendingKeepsake[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(pendingKey(ownerId)) ?? '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((p): p is PendingKeepsake => !!p && typeof p === 'object' && isUuid(p.id) && isUuid(p.outingId) &&
+      typeof p.mimeType === 'string' && typeof p.byteLength === 'number' && isValidKeepsake(p.mimeType, p.byteLength))
+  } catch {
+    return []
+  }
+}
+
+function writePending(ownerId: string, list: PendingKeepsake[]): void {
+  try {
+    if (list.length === 0) localStorage.removeItem(pendingKey(ownerId))
+    else localStorage.setItem(pendingKey(ownerId), JSON.stringify(list))
+  } catch {
+    // Without storage a reload forgets the object; the daily cleanup still removes it.
+  }
+}
+
+/** Uploaded-but-unsaved photos for one outing, oldest first. */
+export const pendingKeepsakes = (ownerId: string, outingId: string): PendingKeepsake[] =>
+  readPending(ownerId).filter((p) => p.outingId === outingId)
+
+/** Forgets a pending photo (saved, given up on, or already a row). Its object is left to the daily cleanup. */
+export function discardPendingKeepsake(ownerId: string, id: string): void {
+  writePending(ownerId, readPending(ownerId).filter((p) => p.id !== id))
+}
+
+const errorCode = (error: unknown) => (error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '')
+const errorText = (error: unknown, fallback: string) => error instanceof Error && error.message ? error.message : (error as { message?: string } | null)?.message || fallback
+
+async function fetchKeepsake(client: ReturnType<typeof connection>, id: string): Promise<OutingKeepsake | null> {
+  const { data, error } = await client.from('outing_keepsakes').select('*').eq('id', id).maybeSingle()
+  return error ? null : parseKeepsakes([data])[0] ?? null
+}
+
+/** Step one: uploads the (already prepared) photo under the owner's folder without overwriting and
+ *  remembers it as pending. A failure here changes nothing. */
+export async function uploadKeepsake(ownerId: string, outingId: string, photo: Blob): Promise<PendingKeepsake> {
   if (!isUuid(ownerId) || !isUuid(outingId)) throw new Error('Invalid id')
   if (!isValidKeepsake(photo.type, photo.size)) throw new Error("That photo can't be kept: use a JPEG, PNG or WebP under 10 MB.")
   const client = connection()
   const id = crypto.randomUUID()
-  const key = keepsakeObjectKey(ownerId, id)
-  const upload = await client.storage.from(BUCKET).upload(key, photo, { contentType: photo.type, upsert: false })
+  const upload = await client.storage.from(BUCKET).upload(keepsakeObjectKey(ownerId, id), photo, { contentType: photo.type, upsert: false })
   if (upload.error) throw upload.error
-  // A failed insert leaves an unreferenced object; the daily cleanup removes it after a day.
+  const pending = { id, outingId, mimeType: photo.type, byteLength: photo.size }
+  writePending(ownerId, [...readPending(ownerId), pending])
+  return pending
+}
+
+/** Step two, safe to repeat: records an uploaded photo against its outing. A row that already exists
+ *  (an earlier attempt whose reply was lost) counts as saved. Throws `KeepsakeSaveError`. */
+export async function finishKeepsake(ownerId: string, pending: PendingKeepsake): Promise<OutingKeepsake> {
+  if (!isUuid(ownerId) || !isUuid(pending.id) || !isUuid(pending.outingId)) throw new Error('Invalid id')
+  const client = connection()
   const { data, error } = await client.from('outing_keepsakes')
-    .insert({ id, user_id: ownerId, outing_id: outingId, object_key: key, mime_type: photo.type, byte_length: photo.size })
+    .insert({ id: pending.id, user_id: ownerId, outing_id: pending.outingId, object_key: keepsakeObjectKey(ownerId, pending.id), mime_type: pending.mimeType, byte_length: pending.byteLength })
     .select().single()
+  if (!error) {
+    const saved = parseKeepsakes([data])[0]
+    if (!saved) throw new KeepsakeSaveError('The photo could not be saved.', pending)
+    discardPendingKeepsake(ownerId, pending.id)
+    return saved
+  }
+  const code = errorCode(error)
+  if (code === '23505') {
+    const existing = await fetchKeepsake(client, pending.id)
+    if (existing) { discardPendingKeepsake(ownerId, pending.id); return existing }
+  }
+  const message = errorText(error, "The photo uploaded but couldn't be saved to this trip.")
+  if (FINAL_INSERT_CODES.includes(code)) {
+    discardPendingKeepsake(ownerId, pending.id)
+    throw new KeepsakeSaveError(message, null)
+  }
+  throw new KeepsakeSaveError(message, pending)
+}
+
+/** Uploads the (already prepared) photo, then records it against the outing. When only the second
+ *  step fails, the thrown `KeepsakeSaveError` carries the pending photo to finish later. */
+export async function addKeepsake(ownerId: string, outingId: string, photo: Blob): Promise<OutingKeepsake> {
+  return finishKeepsake(ownerId, await uploadKeepsake(ownerId, outingId, photo))
+}
+
+/** Puts a removed row back (same id, same object), used to undo a replace that could not finish. */
+async function restoreKeepsake(ownerId: string, old: OutingKeepsake): Promise<void> {
+  const { error } = await connection().from('outing_keepsakes')
+    .insert({ id: old.id, user_id: ownerId, outing_id: old.outingId, object_key: keepsakeObjectKey(ownerId, old.id), mime_type: old.mimeType, byte_length: old.byteLength })
   if (error) throw error
-  const saved = parseKeepsakes([data])[0]
-  if (!saved) throw new Error('The photo could not be saved.')
-  return saved
+}
+
+export interface KeepsakeReplacement {
+  saved: OutingKeepsake
+  /** False when the new photo is saved but the old row could not be removed yet. */
+  oldRemoved: boolean
+}
+
+/**
+ * Swaps `old` for a new photo without ever leaving the trip with neither. The new bytes upload first,
+ * so a failed upload changes nothing. With room for a ninth row the new row is added, then the old one
+ * removed (if that last step fails both stay, reported by `oldRemoved`). A full album cannot hold both
+ * rows, so the old row is removed first and put back, with the same id and object, if the new row
+ * cannot be saved.
+ */
+export async function replaceKeepsake(ownerId: string, old: OutingKeepsake, photo: Blob, count: number): Promise<KeepsakeReplacement> {
+  const pending = await uploadKeepsake(ownerId, old.outingId, photo)
+  if (canAddKeepsake(count)) {
+    const saved = await finishKeepsake(ownerId, pending)
+    try {
+      await removeKeepsake(ownerId, old.id)
+      return { saved, oldRemoved: true }
+    } catch {
+      return { saved, oldRemoved: false }
+    }
+  }
+  try {
+    await removeKeepsake(ownerId, old.id)
+  } catch (cause) {
+    discardPendingKeepsake(ownerId, pending.id)
+    throw cause
+  }
+  try {
+    return { saved: await finishKeepsake(ownerId, pending), oldRemoved: true }
+  } catch (cause) {
+    try {
+      await restoreKeepsake(ownerId, old)
+      discardPendingKeepsake(ownerId, pending.id)
+    } catch {
+      // The old row stays removed; its object lasts about a day, and the new photo can still be finished.
+      if (cause instanceof KeepsakeSaveError) cause.originalRemoved = true
+    }
+    throw cause
+  }
 }
 
 /** Deletes the row, which makes the bytes unreadable at once; cleanup removes them later. */

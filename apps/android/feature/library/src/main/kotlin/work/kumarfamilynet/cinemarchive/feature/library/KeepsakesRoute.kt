@@ -56,7 +56,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import work.kumarfamilynet.cinemarchive.core.model.KeepsakeRules
+import work.kumarfamilynet.cinemarchive.core.model.KeepsakeSaveException
 import work.kumarfamilynet.cinemarchive.core.model.OutingKeepsake
+import work.kumarfamilynet.cinemarchive.core.model.PendingKeepsake
 import work.kumarfamilynet.cinemarchive.data.KeepsakeRepository
 import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 import work.kumarfamilynet.cinemarchive.data.userMessage
@@ -98,7 +100,8 @@ internal fun decodeKeepsake(bytes: ByteArray, targetEdge: Int): Bitmap? {
 }
 
 /**
- * A private photo album for one outing (#208): add from the gallery or the camera, view, remove.
+ * A private photo album for one outing (#208): add from the gallery or the camera, view, replace,
+ * remove, and finish saving a photo whose upload was interrupted.
  * Needs a connection (see [KeepsakeRepository]); the account runtime is replaced on sign-in
  * changes, so the repository is keyed by the caller.
  */
@@ -115,6 +118,10 @@ fun KeepsakesRoute(repository: KeepsakeRepository, outingId: String, titleName: 
     var cameraPath by rememberSaveable(outingId) { mutableStateOf<String?>(null) }
     val photos = remember(repository, outingId) { mutableStateMapOf<String, ByteArray>() }
     val failed = remember(repository, outingId) { mutableStateListOf<String>() }
+    // Photos whose bytes uploaded but whose row did not save, remembered on this device (KeepsakeJournal).
+    var pending by remember(repository, outingId) { mutableStateOf(repository.pending(outingId)) }
+    // The photo a gallery pick replaces, or null when it is a plain add.
+    var replacing by rememberSaveable(outingId) { mutableStateOf<String?>(null) }
     BackHandler(onBack = onBack)
 
     fun perform(failure: String, work: suspend () -> Unit) {
@@ -124,7 +131,7 @@ fun KeepsakesRoute(repository: KeepsakeRepository, outingId: String, titleName: 
             try { work() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (cause: Exception) { cause.rethrowIfCancelled(); error = cause.userMessage(failure) }
-            finally { busy = false }
+            finally { busy = false; pending = repository.pending(outingId) }
         }
     }
 
@@ -136,7 +143,45 @@ fun KeepsakesRoute(repository: KeepsakeRepository, outingId: String, titleName: 
         keepsakes = keepsakes.orEmpty() + saved
     }
 
-    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) add(uri) }
+    fun replace(old: OutingKeepsake, uri: Uri) {
+        val failure = "Couldn't replace that photo. Check your connection and try again."
+        perform(failure) {
+            try {
+                val (result, bytes) = withContext(Dispatchers.IO) {
+                    val prepared = prepareKeepsake(context.contentResolver, uri)
+                    repository.replace(old, prepared.bytes, prepared.mimeType, keepsakes.orEmpty().size) to prepared.bytes
+                }
+                photos[result.saved.id] = bytes
+                keepsakes = keepsakes.orEmpty().filterNot { result.oldRemoved && it.id == old.id } + result.saved
+                if (!result.oldRemoved) throw IllegalStateException("The new photo is saved, but the old one couldn't be removed. Remove it to finish the swap.")
+            } catch (cause: KeepsakeSaveException) {
+                if (cause.originalRemoved) keepsakes = keepsakes.orEmpty().filterNot { it.id == old.id }
+                throw IllegalStateException(
+                    if (cause.originalRemoved) "${cause.message} Your original photo was removed to make room: finish saving the new one below, or add the original again."
+                    else "${cause.message} Your original photo is unchanged.",
+                )
+            } catch (cause: IllegalStateException) {
+                throw cause
+            } catch (cause: Exception) {
+                cause.rethrowIfCancelled()
+                throw IllegalStateException("${cause.userMessage(failure)} Your original photo is unchanged.")
+            }
+        }
+    }
+
+    fun finish(photo: PendingKeepsake) = perform("Couldn't save that photo. Check your connection and try again.") {
+        val saved = repository.finish(photo)
+        if (keepsakes.orEmpty().none { it.id == saved.id }) keepsakes = keepsakes.orEmpty() + saved
+    }
+
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val target = replacing
+        replacing = null
+        if (uri != null) {
+            val old = target?.let { id -> keepsakes.orEmpty().firstOrNull { it.id == id } }
+            if (old != null) replace(old, uri) else add(uri)
+        }
+    }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val path = cameraPath
         cameraPath = null
@@ -162,7 +207,13 @@ fun KeepsakesRoute(repository: KeepsakeRepository, outingId: String, titleName: 
 
     LaunchedEffect(repository, outingId, reload) {
         keepsakes = null
-        try { keepsakes = repository.list(outingId) }
+        try {
+            val list = repository.list(outingId)
+            // A pending photo that already has a row was saved after all: its reply was lost.
+            repository.pending(outingId).filter { photo -> list.any { it.id == photo.id } }.forEach { repository.discardPending(it.id) }
+            pending = repository.pending(outingId)
+            keepsakes = list
+        }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (cause: Exception) { cause.rethrowIfCancelled(); keepsakes = emptyList(); error = cause.userMessage("Couldn't load your photos. Check your connection.") }
     }
@@ -218,7 +269,16 @@ fun KeepsakesRoute(repository: KeepsakeRepository, outingId: String, titleName: 
                     else permission.launch(Manifest.permission.CAMERA)
                 }) { Text("Take photo") }
             }
-            if (!canAdd) Text("This trip keeps up to ${KeepsakeRules.MAX_PER_OUTING} photos. Remove one to add another.", style = MaterialTheme.typography.bodySmall)
+            if (!canAdd) Text("This trip keeps up to ${KeepsakeRules.MAX_PER_OUTING} photos. Remove one to add another, or replace one.", style = MaterialTheme.typography.bodySmall)
+            pending.forEach { photo ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("A photo uploaded but wasn't saved to this trip.", style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(enabled = !busy && canAdd, onClick = { finish(photo) }) { Text("Finish saving") }
+                        TextButton(enabled = !busy, onClick = { repository.discardPending(photo.id); pending = repository.pending(outingId) }) { Text("Discard") }
+                    }
+                }
+            }
             if (busy) { CircularProgressIndicator(); Text("Working…") }
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
@@ -236,6 +296,11 @@ fun KeepsakesRoute(repository: KeepsakeRepository, outingId: String, titleName: 
                     else Text("Couldn't load this photo.")
                     Row {
                         TextButton(onClick = { viewing = null }) { Text("Close") }
+                        TextButton(onClick = {
+                            replacing = item.id
+                            viewing = null
+                            gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }, enabled = !busy) { Text("Replace") }
                         TextButton(onClick = { removing = item; viewing = null }, enabled = !busy) { Text("Remove") }
                     }
                 }

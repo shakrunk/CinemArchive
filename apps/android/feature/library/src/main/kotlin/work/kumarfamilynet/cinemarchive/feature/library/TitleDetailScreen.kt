@@ -967,6 +967,10 @@ fun TitleDetailScreen(
             templates = outingTemplates,
             onSaveTemplate = onSaveTemplate,
             onDeleteTemplate = onDeleteTemplate,
+            onOpenKeepsakes = onOpenKeepsakes?.let { open -> { outing ->
+                scheduleOpening = null
+                open(outing, detail?.title ?: "Cinema outing")
+            } },
             onManageTicket = onViewTicket?.let { open -> { outing ->
                 scheduleOpening = null
                 open(outing, detail?.title ?: "Cinema outing")

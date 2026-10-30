@@ -183,9 +183,15 @@ fun UpNextRoute(
     sharedOutings: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository? = null,
     /** Tickets friends sent you (#220); null hides the section. */
     ticketSharing: work.kumarfamilynet.cinemarchive.data.TicketSharingRepository? = null,
+    /** Polls with friends (#203); null hides the Polls button. */
+    outingPolls: work.kumarfamilynet.cinemarchive.data.OutingPollsRepository? = null,
+    /** A poll's winner and the friends who ticked it, to turn into a real outing. */
+    onSchedulePoll: (work.kumarfamilynet.cinemarchive.core.model.PollOption, List<String>) -> Unit = { _, _ -> },
 ) {
     val shared = rememberSharedOutingsState(sharedOutings)
     val receivedTickets = rememberReceivedTicketsState(ticketSharing)
+    var showPolls by rememberSaveable { mutableStateOf(false) }
+    val libraryMovies by remember(repository) { repository.observeLibrary() }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
     )
@@ -221,6 +227,13 @@ fun UpNextRoute(
         groupReactions = sharedOutings?.let { repo -> { outingId: String -> repo.reactionActionsForOuting(outingId) } },
         receivedTicketsContent = ticketSharing?.let { repo -> { now -> ReceivedTicketsSection(receivedTickets, repo, now) } },
         hasReceivedTickets = ticketSharing != null && (receivedTickets.tickets.isNotEmpty() || receivedTickets.error != null),
+        onOpenPolls = outingPolls?.let { { showPolls = true } },
+    )
+    if (showPolls && outingPolls != null) OutingPollsSheet(
+        repository = outingPolls,
+        movies = libraryMovies,
+        onSchedule = { option, voters -> showPolls = false; onSchedulePoll(option, voters) },
+        onDismiss = { showPolls = false },
     )
 }
 
@@ -258,6 +271,8 @@ fun UpNextScreen(
     /** The "Tickets from friends" section (#220), given the current time; rendered only when [hasReceivedTickets]. */
     receivedTicketsContent: (@Composable (Instant) -> Unit)? = null,
     hasReceivedTickets: Boolean = false,
+    /** Shows a Polls button in the header (#203). */
+    onOpenPolls: (() -> Unit)? = null,
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -326,6 +341,7 @@ fun UpNextScreen(
                         )
                         Text("Up Next", style = MaterialTheme.typography.headlineLarge)
                     }
+                    if (onOpenPolls != null) TextButton(onClick = onOpenPolls) { Text("Polls") }
                     TextButton(onClick = onOpenCalendar) {
                         Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                         Text("Calendar", modifier = Modifier.padding(start = 6.dp))

@@ -1097,6 +1097,22 @@ private fun CinemArchiveApp(
                                 onOpenCalendar = { upNextCalendar = true },
                                 sharedOutings = runtime.sharedOutings,
                                 ticketSharing = runtime.ticketSharing,
+                                outingPolls = runtime.outingPolls,
+                                onSchedulePoll = { option, voters ->
+                                    coroutineScope.launch {
+                                        // The poll's movie came from this library, so it is normally still here; if it
+                                        // was removed, the schedule flow cannot start from it.
+                                        val owned = repository.findLibraryTitleId(option.tmdbId, work.kumarfamilynet.cinemarchive.core.model.MediaType.MOVIE)
+                                        if (owned != null && runtime.isCurrent()) {
+                                            overlay = Overlay.Detail(
+                                                owned, initialSchedule = true,
+                                                schedulePrefill = work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill(
+                                                    option.showtime, option.venue, null, voters,
+                                                ),
+                                            )
+                                        }
+                                    }
+                                },
                             )
                             Tab.LEDGER -> LedgerRoute(
                                 ledgerRepository,

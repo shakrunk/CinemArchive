@@ -683,6 +683,8 @@ export type NotificationType =
   | 'outing_invite_response'
   | 'ticket_received'
   | 'ticket_opened'
+  | 'outing_poll'
+  | 'outing_poll_closed'
 
 export interface AppNotificationItem {
   id: string

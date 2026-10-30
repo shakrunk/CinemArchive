@@ -54,6 +54,18 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
     Icon: Ticket,
     verb: (n) => `opened your ticket to "${typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'a movie')}"`,
   },
+  outing_poll: {
+    Icon: Ticket,
+    verb: (n) => `asked "${typeof n.payload.question === 'string' && n.payload.question ? n.payload.question : 'Which one works?'}"`,
+  },
+  outing_poll_closed: {
+    Icon: Ticket,
+    verb: (n) => {
+      const question = typeof n.payload.question === 'string' && n.payload.question ? n.payload.question : 'the poll'
+      const chosen = typeof n.payload.title === 'string' ? n.payload.title : ''
+      return n.payload.cancelled === true || !chosen ? `cancelled "${question}"` : `picked "${chosen}" for "${question}"`
+    },
+  },
   outing_plans_shared: {
     Icon: Ticket,
     verb: (n) => `has tickets to "${n.title ?? 'a movie'}"`,
@@ -121,7 +133,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       onNavigate('friends')
     } else if (n.type === 'invite_redeemed') {
       onNavigate('profile')
-    } else if (n.type === 'outing_invite' || n.type === 'ticket_received') {
+    } else if (n.type === 'outing_invite' || n.type === 'outing_poll' || n.type === 'outing_poll_closed' || n.type === 'ticket_received') {
       onNavigate('upnext')
     } else if (n.type === 'outing_invite_response' && n.titleId) {
       openDetailDrawer(n.titleId)

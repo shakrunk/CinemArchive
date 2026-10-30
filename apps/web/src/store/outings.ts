@@ -315,7 +315,10 @@ export function formatOutingShareSnapshotLine(payload: OutingSharePayload): stri
 /** The fields "I've got tickets too" seeds the recipient's own
  *  `OutingScheduleSheet` with — seat is deliberately absent (rule §4.10:
  *  "that's the part they go buy"). */
-export type OutingSchedulePrefill = Pick<OutingSharePayload, 'showtime' | 'venue' | 'format'>
+export type OutingSchedulePrefill = Pick<OutingSharePayload, 'showtime' | 'venue' | 'format'> & {
+  /** Names to fill in as companions, such as the friends who ticked a poll's winner (#203). */
+  companions?: string[]
+}
 
 // ─── Ledger — "At the Movies" (plan §4.8) ────────────────────────────────────
 

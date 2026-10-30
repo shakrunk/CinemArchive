@@ -19,6 +19,7 @@ import work.kumarfamilynet.cinemarchive.core.model.ArchiveThemeMode
 import work.kumarfamilynet.cinemarchive.core.model.LibraryViewMode
 import work.kumarfamilynet.cinemarchive.core.model.NavigationDestination
 import work.kumarfamilynet.cinemarchive.core.model.NavigationPreferences
+import work.kumarfamilynet.cinemarchive.core.model.OutingReminderRules
 import work.kumarfamilynet.cinemarchive.core.model.SyncedAppearance
 import work.kumarfamilynet.cinemarchive.core.model.UpdateDownloadPolicy
 import work.kumarfamilynet.cinemarchive.core.model.isSecret
@@ -31,7 +32,7 @@ private val Context.preferencesDataStore by preferencesDataStore(name = "cinemar
  * appearance (palette, mode, pure black), which [ThemeSyncRepository] mirrors to
  * `user_prefs.theme_prefs` when the user opts in (docs/android-contracts/theme-sync.md).
  */
-class PreferencesRepository(context: Context) {
+class PreferencesRepository(context: Context) : OutingReminderStore {
     private val dataStore = context.preferencesDataStore
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val paletteKey = stringPreferencesKey("palette")
@@ -52,9 +53,31 @@ class PreferencesRepository(context: Context) {
     private val pureBlackKey = booleanPreferencesKey("pure_black")
     private val spoilerProtectionKey = booleanPreferencesKey("spoiler_protection")
     private val themeSyncEnabledKey = booleanPreferencesKey("theme_sync_enabled")
+    // Showtime reminders (#213): device-local on purpose. Absent means off.
+    private val outingReminderLeadKey = intPreferencesKey("outing_reminder_lead_minutes")
+    private val outingReminderSentKey = stringSetPreferencesKey("outing_reminders_sent")
     // ISO instant of the last user-made appearance change here, or of the synced copy last
     // applied — what theme sync's last-write-wins compares against the account's copy.
     private val themeUpdatedAtKey = stringPreferencesKey("theme_updated_at")
+
+    /** Minutes before showtime to post a reminder, or null when off (the default). A stored value
+     *  that is no longer one of the offered leads reads as off. */
+    fun observeOutingReminderLead(): Flow<Int?> = dataStore.data.map { prefs ->
+        prefs[outingReminderLeadKey]?.takeIf(OutingReminderRules::isValidLead)
+    }
+
+    suspend fun setOutingReminderLead(minutes: Int?) {
+        require(OutingReminderRules.isValidLead(minutes)) { "Unsupported reminder lead" }
+        dataStore.edit { prefs -> if (minutes == null) prefs.remove(outingReminderLeadKey) else prefs[outingReminderLeadKey] = minutes }
+    }
+
+    override suspend fun leadMinutes(): Int? = observeOutingReminderLead().first()
+
+    override suspend fun sentKeys(): Set<String> = dataStore.data.first()[outingReminderSentKey].orEmpty()
+
+    override suspend fun saveSentKeys(keys: Set<String>) {
+        dataStore.edit { prefs -> if (keys.isEmpty()) prefs.remove(outingReminderSentKey) else prefs[outingReminderSentKey] = keys }
+    }
 
     fun observeNavigation(): Flow<NavigationPreferences> = dataStore.data.map(::navigation)
 

@@ -81,7 +81,7 @@ than one platform (or every future platform); "web-only" moves under `apps/web/`
 | `docs/adr/`, `docs/known-problems.md`, `docs/import-feasibility.md`, `docs/planned-features-human-written.md` | Repo-wide | Stays at root |
 | `CHANGELOG.md`, `LICENSE`, `CODE_OF_CONDUCT.md`, `README.md` | Repo-wide | Stay at root; `README.md` gets rewritten as a top-level index (see [Phase 6](#phase-6-rewrite-repo-root-documentation)) |
 | `.github/workflows/*.yml` | Repo-wide orchestration | Stays at root (paths/working-directories inside them change) |
-| `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, `QODER.md`, `.claude/`, `.jules/`, `openwiki/`, `.code-review-graph/` | AI-tool configuration, discovered by convention at true repo root | Stay at root; content gets rewritten (see [Decision 6](#decision-6-ai-tool-configuration-files)) |
+| `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, `QODER.md`, `.claude/`, `openwiki/`, `.code-review-graph/` | AI-tool configuration, discovered by convention at true repo root | Stay at root; content gets rewritten (see [Decision 6](#decision-6-ai-tool-configuration-files)) |
 | `scripts/migrate-from-v1.mjs`, `scripts/verify-*.mjs` | Operate on `src/store/mockData.ts` / web-app-internal logic | `apps/web/scripts/` |
 | `benchmark.js`, `benchmark-seasons-upsert.js`, `test-zustand.js`, `test-zustand-shallow.js` | Ad hoc scratch scripts, currently loose at repo root, web-specific | See [Phase 9](#phase-9-clean-up-stray-root-files) — relocate or delete, not left at root either way |
 | `plan_review.md`, `projection-room-ui-audit.md` | Stray planning/audit docs, currently loose at repo root | See Phase 9 — relocate into `docs/` or delete |
@@ -136,7 +136,7 @@ than one platform (or every future platform); "web-only" moves under `apps/web/`
 ├── README.md                    # rewritten as a top-level index
 ├── CLAUDE.md                    # rewritten as a router/index over apps/*
 ├── AGENTS.md / .cursorrules / GEMINI.md / QODER.md / .windsurfrules
-├── .claude/ .jules/ openwiki/ .code-review-graph/
+├── .claude/ openwiki/ .code-review-graph/
 └── LICENSE / CODE_OF_CONDUCT.md
 ```
 
@@ -251,7 +251,7 @@ those *do* stay at root.
 ### Decision 6: AI tool configuration files
 
 `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`, `GEMINI.md`, `QODER.md`,
-`.claude/`, `.jules/`, `openwiki/`, and `.code-review-graph/` are discovered by their
+`.claude/`, `openwiki/`, and `.code-review-graph/` are discovered by their
 respective tools **by convention at the true repository root** — none of them move.
 What changes is their content:
 
@@ -269,12 +269,6 @@ What changes is their content:
   does; for any that only read a single root file, that root file needs to describe the
   `apps/*` layout well enough to route the tool correctly (point it at the right nested
   `CLAUDE.md`-equivalent, if the tool has one, rather than duplicating content).
-- `.jules/bolt.md` and `.jules/palette.md` currently hold web-specific learnings
-  (Zustand selector patterns). Leave them at root for now — Jules' own discovery
-  convention is presumably also root-anchored — but be aware their content is
-  web-scoped and will read oddly once Android learnings start accumulating too. Not
-  blocking for this migration; worth a follow-up once there's enough Android-specific
-  learning content to warrant an `apps/android`-scoped equivalent, if Jules supports one.
 - `.code-review-graph/`, `openwiki/`: these tools index the whole repo tree and will
   need to be **re-run/re-indexed after the move**, not reconfigured — their generated
   content refers to file paths that all shift. This is an operational step (Phase 10),

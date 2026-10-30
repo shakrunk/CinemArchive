@@ -282,6 +282,7 @@ fun TitleDetailRoute(
     onRefreshCredits: (suspend () -> Boolean)? = null,
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
+    moviegoingPrefs: work.kumarfamilynet.cinemarchive.data.MoviegoingPrefsRepository? = null,
     initialSchedule: Boolean = false,
     schedulePrefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
     initialPostShow: Boolean = false,
@@ -316,6 +317,8 @@ fun TitleDetailRoute(
     val venueSuggestions by viewModel.venueSuggestions.collectAsStateWithLifecycle()
     val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
     val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
+    val outingTemplates by remember(moviegoingPrefs) { moviegoingPrefs?.observeTemplates() ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     val listOptions by viewModel.listOptions.collectAsStateWithLifecycle()
     val episodeCast by viewModel.episodeCast.collectAsStateWithLifecycle()
     var showAddToListSheet by rememberSaveable { mutableStateOf(false) }
@@ -378,6 +381,9 @@ fun TitleDetailRoute(
         companionSuggestions = companionSuggestions,
         venueNotes = venueNotes,
         onEditVenueNote = { editVenue = it },
+        outingTemplates = outingTemplates,
+        onSaveTemplate = moviegoingPrefs?.let { prefs -> { template -> prefs.saveTemplate(template) } },
+        onDeleteTemplate = moviegoingPrefs?.let { prefs -> { id -> prefs.deleteTemplate(id) } },
         onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
         listOptions = listOptions,
         onOpenAddToList = { showAddToListSheet = true },
@@ -431,6 +437,9 @@ fun TitleDetailScreen(
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
     onEditVenueNote: ((String) -> Unit)? = null,
+    outingTemplates: List<work.kumarfamilynet.cinemarchive.core.model.OutingTemplate> = emptyList(),
+    onSaveTemplate: (suspend (work.kumarfamilynet.cinemarchive.core.model.OutingTemplate) -> Unit)? = null,
+    onDeleteTemplate: (suspend (String) -> Unit)? = null,
     onRemoveTitle: () -> Unit = {},
     listOptions: List<ListMembershipOption> = emptyList(),
     onOpenAddToList: () -> Unit = {},
@@ -936,6 +945,9 @@ fun TitleDetailScreen(
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
             onEditVenueNote = onEditVenueNote,
+            templates = outingTemplates,
+            onSaveTemplate = onSaveTemplate,
+            onDeleteTemplate = onDeleteTemplate,
             onManageTicket = onViewTicket?.let { open -> { outing ->
                 scheduleOpening = null
                 open(outing, detail?.title ?: "Cinema outing")

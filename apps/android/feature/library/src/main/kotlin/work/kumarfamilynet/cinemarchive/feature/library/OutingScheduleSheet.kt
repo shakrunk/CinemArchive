@@ -4,6 +4,7 @@ import work.kumarfamilynet.cinemarchive.data.rethrowIfCancelled
 
 import work.kumarfamilynet.cinemarchive.data.userMessage
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
@@ -24,6 +26,7 @@ import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -49,12 +52,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import work.kumarfamilynet.cinemarchive.core.designsystem.ChoiceOption
 import work.kumarfamilynet.cinemarchive.core.designsystem.SegmentedGroup
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
+import work.kumarfamilynet.cinemarchive.core.model.OutingTemplate
+import work.kumarfamilynet.cinemarchive.core.model.OutingTemplateRules
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
 
 /** Display label for [CinemaFormat] — the fixed UI list from the web plan §4.1, kept as a UI
@@ -103,6 +109,11 @@ fun OutingScheduleSheet(
     /** Portable ticket capture lives in the account-scoped viewer after the outing is saved. */
     onManageTicket: ((CinemaOuting) -> Unit)? = null,
     prefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
+    /** Saved outing templates (#204). The picker and "Save as template" show only on a fresh
+     *  schedule, never when editing an existing outing. */
+    templates: List<OutingTemplate> = emptyList(),
+    onSaveTemplate: (suspend (OutingTemplate) -> Unit)? = null,
+    onDeleteTemplate: (suspend (String) -> Unit)? = null,
 ) {
     val zoneId = rememberSaveable { ZoneId.systemDefault().id }
     val zone = remember(zoneId) { ZoneId.of(zoneId) }
@@ -115,7 +126,7 @@ fun OutingScheduleSheet(
     var date by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalDate().toString()) }
     var time by rememberSaveable { mutableStateOf(initialInstant.atZone(zone).toLocalTime().withSecond(0).withNano(0).toString()) }
     var venue by rememberSaveable { mutableStateOf(initial?.venue ?: prefill?.venue ?: "") }
-    var companionsText by rememberSaveable { mutableStateOf(initial?.companions?.joinToString(", ") ?: "") }
+    var companionsText by rememberSaveable { mutableStateOf(initial?.companions?.joinToString(", ") ?: prefill?.companions?.joinToString(", ") ?: "") }
     var format by rememberSaveable { mutableStateOf(initial?.format ?: prefill?.format ?: CinemaFormat.STANDARD) }
     var formatChanged by rememberSaveable { mutableStateOf(false) }
     var previews by rememberSaveable { mutableStateOf((initial?.previewsMinutes ?: 20).toString()) }
@@ -131,6 +142,10 @@ fun OutingScheduleSheet(
     var showTimePicker by remember { mutableStateOf(false) }
     var venueMenuExpanded by remember { mutableStateOf(false) }
     var companionMenuExpanded by remember { mutableStateOf(false) }
+    var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
+    var templateName by rememberSaveable { mutableStateOf("") }
+    var templateError by rememberSaveable { mutableStateOf<String?>(null) }
+    var templateBusy by remember { mutableStateOf(false) }
 
     val venueMatches = remember(venue, venueSuggestions) {
         if (venue.isBlank()) venueSuggestions else venueSuggestions.filter { it.contains(venue, ignoreCase = true) && !it.equals(venue, ignoreCase = true) }
@@ -172,6 +187,36 @@ fun OutingScheduleSheet(
             )
 
             if (!attempted) {
+            if (initial == null && templates.isNotEmpty()) {
+                Text("TEMPLATES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
+                templates.forEach { template ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.weight(1f).clickable(onClickLabel = "Use template ${template.name}") {
+                                val showtime = OutingTemplateRules.nextShowtime(template, LocalDateTime.now(zone))
+                                date = showtime.toLocalDate().toString()
+                                time = showtime.toLocalTime().withSecond(0).withNano(0).toString()
+                                template.venue?.let { venue = it }
+                                companionsText = template.companions.joinToString(", ")
+                                template.format?.let { format = it; formatChanged = true }
+                            }.padding(vertical = 6.dp),
+                        ) {
+                            Text(template.name, style = MaterialTheme.typography.bodyLarge)
+                            OutingTemplateRules.summary(template).takeIf { it.isNotEmpty() }?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (onDeleteTemplate != null) IconButton(onClick = {
+                            scope.launch {
+                                try { onDeleteTemplate(template.id) }
+                                catch (cancelled: CancellationException) { throw cancelled }
+                                catch (failure: Exception) { failure.rethrowIfCancelled(); error = failure.userMessage("The template could not be deleted.") }
+                            }
+                        }) { Icon(Icons.Filled.Delete, contentDescription = "Delete template ${template.name}") }
+                    }
+                }
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(bottom = 10.dp))
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
                 PickerField(label = "Date", value = parsedDate.toString(), onClick = { showDatePicker = true }, modifier = Modifier.weight(1f))
                 PickerField(label = "Showtime", value = parsedTime.toString().take(5), onClick = { showTimePicker = true }, modifier = Modifier.weight(1f))
@@ -337,8 +382,13 @@ fun OutingScheduleSheet(
                 "Lets out ≈ ${"%02d:%02d".format(endsAtLabel.hour, endsAtLabel.minute)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 20.dp),
+                modifier = Modifier.padding(bottom = if (initial == null && onSaveTemplate != null) 8.dp else 20.dp),
             )
+            if (initial == null && onSaveTemplate != null) {
+                TextButton(onClick = { templateName = ""; templateError = null; showTemplateDialog = true }, modifier = Modifier.padding(bottom = 12.dp)) {
+                    Text("Save as template")
+                }
+            }
 
             } else {
                 Text("$date · $time · ${venue.ifBlank { "Cinema" }}", modifier = Modifier.padding(vertical = 12.dp))
@@ -383,6 +433,53 @@ fun OutingScheduleSheet(
                     else if (showtimeInstant.isBefore(Instant.now())) "Log this outing" else "Save tickets") }
             }
         }
+    }
+
+    if (showTemplateDialog && onSaveTemplate != null) {
+        val parsed = OutingTemplateRules.create(
+            id = "new",
+            name = templateName,
+            venue = venue,
+            companions = companionsText.split(","),
+            format = format,
+            weekday = parsedDate.dayOfWeek,
+            time = parsedTime,
+        )
+        AlertDialog(
+            onDismissRequest = { if (!templateBusy) showTemplateDialog = false },
+            title = { Text("Save as template") },
+            text = {
+                Column {
+                    Text("Keeps the theater, companions, format, and this weekday and showtime.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp))
+                    OutlinedTextField(
+                        value = templateName,
+                        onValueChange = { templateName = it.take(OutingTemplateRules.MAX_NAME + 1) },
+                        label = { Text("Template name") },
+                        singleLine = true,
+                        isError = templateName.isNotBlank() && parsed == null,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    templateError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
+                }
+            },
+            dismissButton = { TextButton(enabled = !templateBusy, onClick = { showTemplateDialog = false }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(enabled = parsed != null && !templateBusy, onClick = {
+                    val toSave = parsed?.copy(id = java.util.UUID.randomUUID().toString()) ?: return@TextButton
+                    templateBusy = true
+                    templateError = null
+                    scope.launch {
+                        try {
+                            onSaveTemplate(toSave)
+                            showTemplateDialog = false
+                        } catch (cancelled: CancellationException) { throw cancelled
+                        } catch (failure: Exception) { failure.rethrowIfCancelled()
+                            templateError = failure.userMessage("The template could not be saved.")
+                        } finally { templateBusy = false }
+                    }
+                }) { Text(if (templateBusy) "Saving…" else "Save") }
+            },
+        )
     }
 
     if (showDatePicker) {

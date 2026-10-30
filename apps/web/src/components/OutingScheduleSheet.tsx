@@ -2,7 +2,7 @@ import { saveSucceeded } from 'src/lib/localSave'
 import { VenueNoteEditor } from './VenueNoteEditor'
 import { normalizeVenue } from '../lib/venueNotes'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Ticket, Search, Calendar, Clock, MapPin, Users, Film, X, Share2, Download, RefreshCw } from 'lucide-react'
+import { Ticket, Search, Calendar, Clock, MapPin, Users, Film, X, Share2, Download, RefreshCw, Trash2 } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -17,6 +17,10 @@ import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, t
 import { Eyebrow } from 'src/components/ui/typography'
 import { formatSeatShort, parseSeatsInput } from 'src/lib/seating'
 import { TicketButton } from './TicketViewer'
+import { deleteOutingTemplate, saveOutingTemplate, useMoviegoingPrefs } from 'src/lib/moviegoingPrefsSync'
+import {
+  createOutingTemplate, isoWeekday, nextTemplateShowtime, templateSummary, MAX_TEMPLATE_NAME, type OutingTemplate,
+} from 'src/store/outingTemplates'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
 // Exported for reuse by the viewing editor (title-detail/VenueCompanionsFields, plan §4.6/§7.4)
@@ -204,6 +208,99 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
   )
 }
 
+// ─── Outing templates (#204) ─────────────────────────────────────────────────
+
+const NO_TEMPLATES: OutingTemplate[] = []
+
+function TemplateList({ templates, onUse }: { templates: OutingTemplate[]; onUse: (template: OutingTemplate) => void }) {
+  const [error, setError] = useState('')
+  if (templates.length === 0) return null
+  return (
+    <section aria-label="Templates" className="space-y-1">
+      <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-1">Templates</Eyebrow>
+      {templates.map((template) => {
+        const summary = templateSummary(template)
+        return (
+          <div key={template.id} className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onUse(template)}
+              aria-label={`Use template ${template.name}`}
+              className="flex-1 min-w-0 rounded-md px-2 py-1.5 text-left hover:bg-secondary/60 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
+            >
+              <span className="block font-sans text-sm text-foreground truncate">{template.name}</span>
+              {summary && <span className="block font-mono text-xs text-muted-foreground truncate">{summary}</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError('')
+                deleteOutingTemplate(template.id).catch(() => setError('The template could not be deleted.'))
+              }}
+              aria-label={`Delete template ${template.name}`}
+              className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-md focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
+            >
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )
+      })}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </section>
+  )
+}
+
+function SaveTemplate({ build }: { build: (name: string) => OutingTemplate | null }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setName(''); setError(''); setOpen(true) }}
+        className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+      >
+        Save as template
+      </button>
+    )
+  }
+  const template = build(name)
+  async function save() {
+    if (!template || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await saveOutingTemplate(template)
+      setOpen(false)
+    } catch {
+      setError('The template could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="space-y-2" role="group" aria-label="Save as template">
+      <p className="font-sans text-xs text-muted-foreground">Keeps the theater, companions, format, and this weekday and showtime.</p>
+      <div className="flex gap-2">
+        <Input
+          aria-label="Template name"
+          value={name}
+          maxLength={MAX_TEMPLATE_NAME}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void save() } }}
+          placeholder="Tuesday matinee"
+          className="bg-secondary/50 border-border"
+        />
+        <Button type="button" size="sm" disabled={!template || busy} onClick={() => void save()}>Save template</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
 // ─── Ticket form ─────────────────────────────────────────────────────────────
 
 interface FormState {
@@ -329,6 +426,33 @@ function OutingForm({
     [outings, allViewings, friends]
   )
   const venues = useMemo(() => venueSuggestions(outings, allViewings), [outings, allViewings])
+  const templates = useMoviegoingPrefs((s) => s.prefs?.templates) ?? NO_TEMPLATES
+
+  function applyTemplate(template: OutingTemplate) {
+    const showtime = nextTemplateShowtime(template, new Date())
+    patch({
+      date: showtime.date,
+      time: showtime.time,
+      ...(template.venue ? { venue: template.venue } : {}),
+      companions: template.companions.map(
+        (name) => suggestions.find((s) => s.name.toLowerCase() === name.toLowerCase()) ?? { name },
+      ),
+      ...(template.format ? { format: template.format } : {}),
+    })
+  }
+
+  function buildTemplate(name: string): OutingTemplate | null {
+    const day = new Date(`${form.date}T00:00:00`)
+    return createOutingTemplate({
+      id: crypto.randomUUID(),
+      name,
+      venue: form.venue,
+      companions: form.companions.map((c) => c.name),
+      format: form.format || null,
+      weekday: Number.isNaN(day.getTime()) ? null : isoWeekday(day),
+      time: /^\d{2}:\d{2}$/.test(form.time) ? form.time : null,
+    })
+  }
 
   const endsAt = computeEndsAt(form)
   const endsAtLabel = endsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -411,6 +535,8 @@ function OutingForm({
           {new Date(duplicateOuting.showtime).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.
         </p>
       )}
+
+      {!editingOuting && <TemplateList templates={templates} onUse={applyTemplate} />}
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -544,6 +670,8 @@ function OutingForm({
       <p className="font-mono text-xs text-amber/80 bg-amber/5 border border-amber/15 rounded-md px-3 py-2">
         Lets out ≈ {endsAtLabel}
       </p>
+
+      {!editingOuting && <SaveTemplate build={buildTemplate} />}
 
       <div>
         <Eyebrow as="label" htmlFor="outing-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">

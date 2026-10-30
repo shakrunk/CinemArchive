@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  moviegoingPrefsWithBudget, moviegoingPrefsWithPlan, parseMoviegoingPrefs, resolveReconciliation, type MoviegoingPrefs,
+  moviegoingPrefsWithBudget, moviegoingPrefsWithPlan, moviegoingPrefsWithTemplates, parseMoviegoingPrefs, resolveReconciliation,
+  type MoviegoingPrefs,
 } from './moviegoingPrefsSync'
+import { MAX_TEMPLATES, type OutingTemplate } from 'src/store/outingTemplates'
 
 // The same payload and merge cases as Android's MoviegoingPrefsTest
 // (docs/android-contracts/moviegoing-prefs.md).
@@ -128,5 +130,71 @@ describe('resolveReconciliation', () => {
     const invalid = { budget: { amount: -1, period: 'month' }, updatedAt: '2026-12-01T00:00:00Z' }
     expect(resolveReconciliation(invalid, prefs('2026-10-29T00:00:00Z'))).toEqual({ kind: 'keep' })
     expect(resolveReconciliation(invalid, null)).toEqual({ kind: 'keep' })
+  })
+})
+
+// Outing templates (#204): the same cases as Android's MoviegoingTemplatesPrefsTest.
+describe('outing templates in the payload', () => {
+  const parseTemplates = (templates: unknown) => parseMoviegoingPrefs({ templates, updatedAt: '2026-10-29T10:00:00Z' })
+  const full = { id: 'a', name: 'Tuesday matinee', venue: 'AMC', companions: ['Sam'], format: 'IMAX', weekday: 2, time: '14:00' }
+
+  it('parses a full template and needs only an id and name', () => {
+    expect(parseTemplates([full])?.templates).toEqual([
+      { id: 'a', name: 'Tuesday matinee', venue: 'AMC', companions: ['Sam'], format: 'IMAX', weekday: 2, time: '14:00' },
+    ])
+    expect(parseTemplates([{ id: 'a', name: 'Bare' }])?.templates).toEqual([{ id: 'a', name: 'Bare', companions: [] }])
+  })
+
+  it('an absent or null list means no templates, and a non-array rejects the payload', () => {
+    expect(parseMoviegoingPrefs({ updatedAt: '2026-10-29T10:00:00Z' })?.templates).toEqual([])
+    expect(parseTemplates(null)?.templates).toEqual([])
+    expect(parseTemplates({ id: 'a' })).toBeNull()
+    expect(parseTemplates('nope')).toBeNull()
+  })
+
+  it('skips invalid entries without losing the rest', () => {
+    const bad: unknown[] = [
+      { id: 'b' },
+      { id: 'b', name: '  ' },
+      { id: 'b', name: 'x', weekday: 0 },
+      { id: 'b', name: 'x', weekday: 8 },
+      { id: 'b', name: 'x', weekday: 2.5 },
+      { id: 'b', name: 'x', time: '25:00' },
+      { id: 'b', name: 'x', time: '7pm' },
+      { id: 'b', name: 'x', format: 'Betamax' },
+      { id: 'b', name: 'x', companions: 'Sam' },
+      { id: 'b', name: 'x', companions: [1] },
+      { id: 'b', name: 'x', venue: 4 },
+      7,
+    ]
+    for (const entry of bad) expect(parseTemplates([full, entry])?.templates.map((t) => t.id)).toEqual(['a'])
+  })
+
+  it('a bad template never rejects the budget and plan', () => {
+    const parsed = parseMoviegoingPrefs({ budget: { amount: 40, period: 'month' }, templates: [{ id: 'b' }], updatedAt: '2026-10-29T10:00:00Z' })
+    expect(parsed?.budget).toEqual({ amount: 40, period: 'month' })
+  })
+
+  it('keeps the first of a repeated id and caps the list', () => {
+    expect(parseTemplates([full, { id: 'a', name: 'Other' }])?.templates.map((t) => t.name)).toEqual(['Tuesday matinee'])
+    const many = Array.from({ length: MAX_TEMPLATES + 3 }, (_, i) => ({ id: `t${i}`, name: `T${i}` }))
+    expect(parseTemplates(many)?.templates).toHaveLength(MAX_TEMPLATES)
+  })
+
+  it('writing templates keeps every other key and round-trips', () => {
+    const template: OutingTemplate = { id: 'a', name: 'Matinee', venue: 'AMC', companions: ['Sam'], format: 'Dolby', weekday: 7, time: '11:30' }
+    const base = { budget: { amount: 40, period: 'month' }, future: { x: 1 }, updatedAt: '2026-10-29T10:00:00Z' }
+    const written = moviegoingPrefsWithTemplates(base, [template], '2026-10-30T00:00:00Z')
+    expect(written.updatedAt).toBe('2026-10-30T00:00:00Z')
+    expect(written.future).toEqual({ x: 1 })
+    const reread = parseMoviegoingPrefs(written)
+    expect(reread?.templates).toEqual([template])
+    expect(reread?.budget).toEqual({ amount: 40, period: 'month' })
+  })
+
+  it('clearing writes an empty list with a fresh stamp', () => {
+    const written = moviegoingPrefsWithTemplates({ templates: [full], updatedAt: '2026-10-29T10:00:00Z' }, [], '2026-10-30T00:00:00Z')
+    expect(written.templates).toEqual([])
+    expect(written.updatedAt).toBe('2026-10-30T00:00:00Z')
   })
 })

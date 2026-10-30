@@ -46,6 +46,14 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
       return n.payload.accepted === true ? `is going to "${film}"` : `can't make "${film}"`
     },
   },
+  ticket_received: {
+    Icon: Ticket,
+    verb: (n) => `sent you a ticket to "${typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'a movie')}"`,
+  },
+  ticket_opened: {
+    Icon: Ticket,
+    verb: (n) => `opened your ticket to "${typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'a movie')}"`,
+  },
   outing_plans_shared: {
     Icon: Ticket,
     verb: (n) => `has tickets to "${n.title ?? 'a movie'}"`,
@@ -113,7 +121,7 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       onNavigate('friends')
     } else if (n.type === 'invite_redeemed') {
       onNavigate('profile')
-    } else if (n.type === 'outing_invite') {
+    } else if (n.type === 'outing_invite' || n.type === 'ticket_received') {
       onNavigate('upnext')
     } else if (n.type === 'outing_invite_response' && n.titleId) {
       openDetailDrawer(n.titleId)

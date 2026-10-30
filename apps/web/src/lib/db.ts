@@ -681,6 +681,8 @@ export type NotificationType =
   | 'outing_plans_shared'
   | 'outing_invite'
   | 'outing_invite_response'
+  | 'ticket_received'
+  | 'ticket_opened'
 
 export interface AppNotificationItem {
   id: string

@@ -18,6 +18,7 @@ import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useApp
 import { TicketButton } from '../components/TicketViewer'
 import { KeepsakeButton } from '../components/OutingKeepsakes'
 import { SharedWithYou } from '../components/SharedWithYou'
+import { ReceivedTickets } from '../components/SentTickets'
 import { isEpisodeSpoilerHidden, isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
@@ -657,6 +658,7 @@ export function UpNext({ onBrowseLibrary, onOpenCalendar }: { onBrowseLibrary: (
           <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" /> Calendar
         </button>
       </header>
+      <ReceivedTickets />
       <SharedWithYou />
       {isEmpty ? (
         <UpNextEmptyState onBrowseLibrary={onBrowseLibrary} />

@@ -112,4 +112,57 @@ class SharedOutingsRepositoryTest {
         try { repo.list(); fail() } catch (_: IllegalStateException) {}
         assertTrue(requests.isEmpty())
     }
+
+    private fun reaction(me: Boolean, name: String, rating: String = "4.5", note: String = "\"Loved it\"") =
+        """{"user_id":"$friend","is_me":$me,"name":"$name","rating":$rating,"note":$note,"updated_at":"2026-11-01T22:00:00+00:00"}"""
+
+    @Test fun readsEveryonesReactionsAndMarksTheCallersOwn() = runBlocking {
+        val repo = respond(200 to "[${reaction(false, "Fran Friend")},${reaction(true, "You", "null", "\"Just words\"")}]")
+        val list = repo.reactions(shared)
+        assertEquals("/rest/v1/rpc/get_outing_reactions", requests.single().url.encodedPath)
+        assertEquals(shared, JSONObject(bodies.single()).getString("p_shared_outing_id"))
+        assertEquals(listOf(Triple("Fran Friend", false, 4.5), Triple("You", true, null)), list.map { Triple(it.name, it.isMe, it.rating) })
+        assertEquals("Just words", list[1].note)
+    }
+
+    @Test fun parsingSkipsReactionsWithNothingToShowAndDropsAnInvalidRatingButKeepsTheNote() {
+        val body = "[${reaction(false, "ok")},${reaction(false, "bad", "2.3")},${reaction(false, "empty", "null", "null")},{\"user_id\":\"x\"}]"
+        val parsed = parseOutingReactions(body)
+        assertEquals(listOf("ok", "bad"), parsed.map { it.name })
+        assertEquals(null, parsed[1].rating)
+        assertEquals("Loved it", parsed[1].note)
+    }
+
+    @Test fun sharesTheTrimmedNoteAndRatingAndRefusesAnEmptyOne() = runBlocking {
+        val repo = respond(200 to "{}", 200 to "{}")
+        repo.shareReaction(shared, 3.5, "  fun  ")
+        val sent = JSONObject(bodies[0])
+        assertEquals("/rest/v1/rpc/share_outing_reaction", requests[0].url.encodedPath)
+        assertEquals(3.5, sent.getDouble("p_rating"), 0.0)
+        assertEquals("fun", sent.getString("p_note"))
+        repo.shareReaction(shared, null, "words only")
+        assertTrue(JSONObject(bodies[1]).isNull("p_rating"))
+        for ((rating, note) in listOf<Pair<Double?, String?>>(null to null, null to "  ", 2.3 to null, null to "x".repeat(501))) {
+            try { repo.shareReaction(shared, rating, note); fail() } catch (_: IllegalArgumentException) {}
+        }
+        assertEquals(2, requests.size)
+    }
+
+    @Test fun mapsAClosedOutingToAReadableMessageAndWithdraws() = runBlocking {
+        val repo = respond(400 to """{"code":"22023","message":"Reactions open once the show has ended"}""", 204 to "")
+        try { repo.shareReaction(shared, 4.0, null); fail() } catch (e: IllegalStateException) { assertTrue(e.message!!.isNotBlank()) }
+        repo.withdrawReaction(shared)
+        assertEquals("/rest/v1/rpc/withdraw_outing_reaction", requests[1].url.encodedPath)
+    }
+
+    @Test fun theOwnersActionsResolveThroughTheirMembersOrAreAbsent() = runBlocking {
+        val repo = respond(
+            200 to """[{"shared_outing_id":"$shared","user_id":"$friend","name":"Fran","status":"accepted"}]""",
+            200 to "[${reaction(false, "Fran Friend")}]",
+            200 to "[]",
+        )
+        val actions = repo.reactionActionsForOuting(outing)!!
+        assertEquals(listOf("Fran Friend"), actions.load().map { it.name })
+        assertEquals(null, repo.reactionActionsForOuting(outing))
+    }
 }

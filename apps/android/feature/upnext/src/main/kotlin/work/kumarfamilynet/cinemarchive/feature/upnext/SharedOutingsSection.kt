@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -30,7 +31,10 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.designsystem.GroupReactionsSection
+import work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions
 import work.kumarfamilynet.cinemarchive.core.model.MemberStatus
+import work.kumarfamilynet.cinemarchive.core.model.ReactionRules
 import work.kumarfamilynet.cinemarchive.core.model.SharedOuting
 import work.kumarfamilynet.cinemarchive.core.model.SharedOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.SharedOutingStatus
@@ -55,6 +59,8 @@ internal class SharedOutingsState(private val repository: SharedOutingsRepositor
             catch (cause: Exception) { cause.rethrowIfCancelled(); error = cause.userMessage("Couldn't load invitations from friends.") }
         }
     }
+
+    fun reactionActions(id: String): GroupReactionActions? = repository?.reactionActions(id)
 
     fun respond(id: String, accept: Boolean) {
         val repo = repository ?: return
@@ -87,6 +93,7 @@ internal fun SharedOutingsSection(
     error: String?,
     now: Instant,
     onRespond: (String, Boolean) -> Unit,
+    reactionActions: ((String) -> GroupReactionActions?)? = null,
 ) {
     val invitations = SharedOutingRules.invitations(outings, now)
     val going = SharedOutingRules.going(outings)
@@ -116,6 +123,11 @@ internal fun SharedOutingsSection(
                     Text("Cancelled by ${outing.ownerName}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                 } else {
                     Text("You're going with ${outing.ownerName}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    if (ReactionRules.isOpen(outing, now)) {
+                        var open by rememberSaveable(outing.id) { mutableStateOf(false) }
+                        TextButton(onClick = { open = !open }) { Text(if (open) "Hide reactions" else "How was it?") }
+                        if (open) reactionActions?.invoke(outing.id)?.let { actions -> GroupReactionsSection(actions) }
+                    }
                     if (SharedOutingRules.canRespond(outing, now)) TextButton(
                         enabled = outing.id !in busy,
                         onClick = { onRespond(outing.id, false) },

@@ -274,6 +274,8 @@ fun TitleDetailRoute(
     titleId: String,
     onBack: () -> Unit,
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
+    /** Resolves the group-reactions actions for one of the user's outings, or null when never shared (#207). */
+    groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
     onRequestNotificationPermission: () -> Unit = {},
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
     onRecommendTitle: ((String) -> Unit)? = null,
@@ -372,6 +374,7 @@ fun TitleDetailRoute(
         onInitialScheduleConsumed = onInitialScheduleConsumed,
         onCancelOuting = viewModel::onCancelOuting,
         onViewTicket = onViewTicket,
+        groupReactions = groupReactions,
         ticketOutings = ticketOutings.orEmpty(),
         onPreparePostShow = viewModel::preparePostShow,
         onSavePostShow = viewModel::savePostShow,
@@ -428,6 +431,7 @@ fun TitleDetailScreen(
     onSaveSchedule: suspend (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> error("Ticket scheduling unavailable") },
     onCancelOuting: (String) -> Unit = {},
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
+    groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
     ticketOutings: List<CinemaOuting> = emptyList(),
     onPreparePostShow: (suspend (String) -> PostShowOpening)? = null,
     onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
@@ -964,6 +968,15 @@ fun TitleDetailScreen(
                 onRevert = onRevertPostShow,
                 onDismiss = { postShowState = null },
                 onRecommend = if (detail?.tmdbId != null && onRecommendTitle != null) ({ onRecommendTitle(captured.titleId) }) else null,
+                groupContent = groupReactions?.let { resolve ->
+                    captured.followUpOutingId?.let { outingId ->
+                        { rating, note ->
+                            work.kumarfamilynet.cinemarchive.core.designsystem.ResolvedGroupReactions(
+                                resolve = { resolve(outingId) }, initialRating = rating, initialNote = note,
+                            )
+                        }
+                    }
+                },
             )
         }
     }

@@ -214,6 +214,8 @@ fun UpNextRoute(
         sharedBusy = shared.busy,
         sharedError = shared.error,
         onRespondShared = shared::respond,
+        sharedReactionActions = shared::reactionActions,
+        groupReactions = sharedOutings?.let { repo -> { outingId: String -> repo.reactionActionsForOuting(outingId) } },
     )
 }
 
@@ -244,6 +246,10 @@ fun UpNextScreen(
     sharedBusy: Collection<String> = emptyList(),
     sharedError: String? = null,
     onRespondShared: (String, Boolean) -> Unit = { _, _ -> },
+    /** The group-reactions actions for a shared outing a friend invited you to (#207); null hides them. */
+    sharedReactionActions: ((String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    /** Resolves the actions for one of the user's own outings, or null when it was never shared (#207). */
+    groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -322,7 +328,7 @@ fun UpNextScreen(
 
             if (sharedOutings.isNotEmpty() || sharedError != null) item(key = "shared-outings") {
                 ReadingWidthColumn(Modifier.animatedListItem(this)) {
-                    SharedOutingsSection(sharedOutings, sharedBusy, sharedError, now, onRespondShared)
+                    SharedOutingsSection(sharedOutings, sharedBusy, sharedError, now, onRespondShared, sharedReactionActions)
                 }
             }
 
@@ -447,6 +453,15 @@ fun UpNextScreen(
                 onSave = onSavePostShow,
                 onRevert = onRevertPostShow,
                 onRecommend = onRecommendTitle?.let { recommend -> { recommend(captured.titleId) } },
+                groupContent = groupReactions?.let { resolve ->
+                    captured.followUpOutingId?.let { outingId ->
+                        { rating, note ->
+                            work.kumarfamilynet.cinemarchive.core.designsystem.ResolvedGroupReactions(
+                                resolve = { resolve(outingId) }, initialRating = rating, initialNote = note,
+                            )
+                        }
+                    }
+                },
                 onDismiss = {
                     captured.followUpOutingId?.let(onDismissFollowUp)
                     postShowState = null

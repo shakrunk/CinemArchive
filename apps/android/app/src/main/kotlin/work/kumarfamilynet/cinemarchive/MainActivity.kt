@@ -1331,6 +1331,7 @@ private fun CinemArchiveApp(
                     onRecommendTitle = { recommendTitleId = it },
                     onShareOutingPlans = { shareOutingId = it },
                     onViewTicket = { outing, title -> overlay = Overlay.Ticket(outing.id, title) },
+                    groupReactions = { outingId -> runtime.sharedOutings.reactionActionsForOuting(outingId) },
                     onBrowsePerson = { person ->
                         libraryFiltersState.value = libraryFiltersState.value.copy(person = person)
                         overlay = null

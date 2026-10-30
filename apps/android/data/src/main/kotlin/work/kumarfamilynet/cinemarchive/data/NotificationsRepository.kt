@@ -83,7 +83,7 @@ object NotificationRules {
         NotificationType.RECOMMENDATION_RECEIVED -> NotificationRoute.Friends
         NotificationType.INVITE_REDEEMED -> NotificationRoute.Profile
         NotificationType.OUTING_INVITE, NotificationType.TICKET_RECEIVED, NotificationType.OUTING_POLL, NotificationType.OUTING_POLL_CLOSED -> NotificationRoute.UpNext
-        NotificationType.OUTING_INVITE_RESPONSE ->
+        NotificationType.OUTING_INVITE_RESPONSE, NotificationType.TICKET_OPENED ->
             n.titleId?.let { NotificationRoute.TitleDetail(it) } ?: NotificationRoute.None
         else -> NotificationRoute.None
     }

@@ -26,6 +26,10 @@ Receipts contain `operationId`, `outingId`, `attachment`, `outingUpdatedAt`, `re
 
 Both guard arguments null preserve the old association-only API: unrelated outing edits do not conflict, but the result is not evidence of an observed ordinary outing revision. New unguarded results mark `outingRevisionGuarded:false`; older accepted receipts remain unchanged and may omit the marker. Generic outing edits, completion, reversal and guarded ticket operations reject such predecessor receipts with `40001`, even if their result contains a full outing row. Historical completion receipts likewise require explicit completion-time provenance. Already accepted generic dependent commands still replay their original receipt after exact payload comparison; this compatibility path cannot authorize a new write. Never add a guard to an existing command with an uncertain HTTP outcome.
 
+## Sending to friends
+
+An owner can send an attached ticket to accepted friends ([ticket-sending.md](ticket-sending.md)). A recipient with a live grant can read that attachment's bytes through the Storage read policy; owners, uploads, overwrites and deletions are unchanged.
+
 ## Retirement and cleanup
 
 Replacing, detaching or deleting an outing retires its attachments without immediately deleting bytes. Cleanup is service-only: retired objects wait seven days, abandoned preparations wait thirty days, and active references are never claimed. Upload policy checks hold a metadata lock through insertion; finalize and cleanup also lock metadata so a delayed upload cannot restore an object after cleanup finishes.

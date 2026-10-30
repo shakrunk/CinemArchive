@@ -11,6 +11,7 @@ number is chosen.
 
 ### Added
 
+- **Send a ticket to friends, on Android and web.** On a trip with a saved ticket, choose "Send to a friend" to give friends you pick access to the ticket photo and its barcode. They find it under "Tickets from friends" on Up Next; you see who has opened it and can take it back at any time. Your seats, booking reference and notes are never shared.
 - **Share how an outing went with the friends who came along, on Android and web.** Once a shared outing has ended, everyone on it can add a star rating and a short note for the group and see each other's. It is a deliberate "Share with the group" and separate from your own rating and notes, which stay private. Open it from "How was it?" on the outing in Up Next, or from the post-show sheet if you shared the outing.
 - **Keepsake photos for cinema outings on Android and web.** Open "Photos" on a trip to keep up to eight pictures with it: a ticket stub, the poster board, a selfie. Choose one from your gallery or take it with the camera. Photos are private to you, are shrunk and stripped of location data before upload, and need a connection to add or view.
 - **Invite friends to a cinema outing on Android and web.** From "Share outing plans", invite accepted friends to join a scheduled outing. They see an invitation on Up Next (and in their notifications) and accept or decline; the outing then stays up to date if you change the time or venue, and shows as cancelled if you cancel it. Friends never see your tickets, booking reference, price or notes.

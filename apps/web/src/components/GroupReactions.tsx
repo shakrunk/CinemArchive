@@ -23,9 +23,9 @@ export function GroupReactions({ sharedOutingId, initialRating = null, initialNo
   const [reactions, setReactions] = useState<OutingReaction[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [rating, setRating] = useState<number>(initialRating ?? 0)
-  const [note, setNote] = useState(initialNote ?? '')
-  const [prefilled, setPrefilled] = useState(false)
+  // What the person has typed or tapped; null until they do, so the fields show what they already
+  // shared, else the private prefill, without copying either into state.
+  const [draft, setDraft] = useState<{ rating: number; note: string } | null>(null)
 
   const load = useCallback(() => outingReactions(sharedOutingId), [sharedOutingId])
 
@@ -39,10 +39,11 @@ export function GroupReactions({ sharedOutingId, initialRating = null, initialNo
   }, [load])
 
   const mine = reactions?.find((r) => r.isMe) ?? null
-  useEffect(() => {
-    // Once, show what was already shared rather than the prefill from the private log.
-    if (mine && !prefilled) { setPrefilled(true); setRating(mine.rating ?? 0); setNote(mine.note ?? '') }
-  }, [mine, prefilled])
+  const base = mine ? { rating: mine.rating ?? 0, note: mine.note ?? '' } : { rating: initialRating ?? 0, note: initialNote ?? '' }
+  const rating = draft?.rating ?? base.rating
+  const note = draft?.note ?? base.note
+  const setRating = (value: number) => setDraft({ rating: value, note })
+  const setNote = (value: string) => setDraft({ rating, note: value })
 
   async function run(fallback: string, work: () => Promise<void>) {
     if (busy) return
@@ -86,7 +87,7 @@ export function GroupReactions({ sharedOutingId, initialRating = null, initialNo
           </Button>
           {mine && <Button type="button" size="sm" variant="ghost" disabled={busy}
             onClick={() => void run("Couldn't take your reaction back.", async () => {
-              await withdrawOutingReaction(sharedOutingId); setRating(0); setNote(''); setPrefilled(false)
+              await withdrawOutingReaction(sharedOutingId); setDraft({ rating: 0, note: '' })
             })}>Take mine back</Button>}
           {rating > 0 && <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setRating(0)}>Clear rating</Button>}
         </div>

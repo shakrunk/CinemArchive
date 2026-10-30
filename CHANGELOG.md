@@ -9,6 +9,8 @@ number is chosen.
 
 ## [Unreleased]
 
+## [1.46.0] - 2026-10-30
+
 ### Added
 
 - **Send a ticket to friends, on Android and web.** On a trip with a saved ticket, choose "Send to a friend" to give friends you pick access to the ticket photo and its barcode. They find it under "Tickets from friends" on Up Next; you see who has opened it and can take it back at any time. Your seats, booking reference and notes are never shared.

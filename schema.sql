@@ -7993,6 +7993,67 @@ $$;
 
 -- Everyone's reaction on the outing, for a participant. `is_me` marks the caller's own.
 create function cinemarchive_private.get_outing_reactions(p_shared_outing_id uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if not cinemarchive_private.is_outing_participant(p_shared_outing_id, me) then
+    raise exception 'Outing not found' using errcode = '42501';
+  end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'user_id', r.user_id, 'is_me', r.user_id = me,
+      'name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'rating', r.rating, 'note', r.note, 'updated_at', r.updated_at) order by r.updated_at), '[]'::jsonb)
+    from public.shared_outing_reactions r
+    left join public.profiles p on p.user_id = r.user_id
+    where r.shared_outing_id = p_shared_outing_id
+      and cinemarchive_private.is_outing_participant(p_shared_outing_id, r.user_id));
+end;
+$$;
+
+-- Reactions come after the show, so a member's "going" card has to outlast the screening.
+create or replace function cinemarchive_private.get_shared_outings()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', s.id, 'status', s.status, 'my_status', m.status, 'owner_id', s.owner_id,
+      'owner_name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'showtime', s.showtime, 'ends_at', s.ends_at, 'snapshot', s.snapshot) order by s.showtime), '[]'::jsonb)
+    from public.shared_outing_members m
+    join public.shared_outings s on s.id = m.shared_outing_id
+    left join public.profiles p on p.user_id = s.owner_id
+    where m.user_id = auth.uid() and m.status in ('invited','accepted')
+      and s.ends_at > now() - interval '7 days');
+end;
+$$;
+
+revoke all on function cinemarchive_private.share_outing_reaction(uuid, numeric, text) from public, anon;
+revoke all on function cinemarchive_private.withdraw_outing_reaction(uuid) from public, anon;
+revoke all on function cinemarchive_private.get_outing_reactions(uuid) from public, anon;
+grant execute on function cinemarchive_private.share_outing_reaction(uuid, numeric, text) to authenticated;
+grant execute on function cinemarchive_private.withdraw_outing_reaction(uuid) to authenticated;
+grant execute on function cinemarchive_private.get_outing_reactions(uuid) to authenticated;
+
+-- Public wrappers: PostgREST exposes only the public schema.
+create function public.share_outing_reaction(p_shared_outing_id uuid, p_rating numeric, p_note text)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.share_outing_reaction(p_shared_outing_id, p_rating, p_note);
+$$;
+create function public.withdraw_outing_reaction(p_shared_outing_id uuid)
+returns void language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.withdraw_outing_reaction(p_shared_outing_id);
+$$;
+create function public.get_outing_reactions(p_shared_outing_id uuid)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_outing_reactions(p_shared_outing_id);
+$$;
+revoke all on function public.share_outing_reaction(uuid, numeric, text) from public, anon;
+revoke all on function public.withdraw_outing_reaction(uuid) from public, anon;
+revoke all on function public.get_outing_reactions(uuid) from public, anon;
+grant execute on function public.share_outing_reaction(uuid, numeric, text) to authenticated;
+grant execute on function public.withdraw_outing_reaction(uuid) to authenticated;
+grant execute on function public.get_outing_reactions(uuid) to authenticated;
 
 -- Outing polls (20261102000000).
 -- Outing polls (#203): propose a few title and time candidates to linked friends, collect their
@@ -8246,64 +8307,6 @@ returns jsonb language plpgsql stable security definer set search_path = '' as $
 declare me uuid := auth.uid();
 begin
   if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
-  if not cinemarchive_private.is_outing_participant(p_shared_outing_id, me) then
-    raise exception 'Outing not found' using errcode = '42501';
-  end if;
-  return (select coalesce(jsonb_agg(jsonb_build_object(
-      'user_id', r.user_id, 'is_me', r.user_id = me,
-      'name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
-      'rating', r.rating, 'note', r.note, 'updated_at', r.updated_at) order by r.updated_at), '[]'::jsonb)
-    from public.shared_outing_reactions r
-    left join public.profiles p on p.user_id = r.user_id
-    where r.shared_outing_id = p_shared_outing_id
-      and cinemarchive_private.is_outing_participant(p_shared_outing_id, r.user_id));
-end;
-$$;
-
--- Reactions come after the show, so a member's "going" card has to outlast the screening.
-create or replace function cinemarchive_private.get_shared_outings()
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
-begin
-  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
-  return (select coalesce(jsonb_agg(jsonb_build_object(
-      'id', s.id, 'status', s.status, 'my_status', m.status, 'owner_id', s.owner_id,
-      'owner_name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
-      'showtime', s.showtime, 'ends_at', s.ends_at, 'snapshot', s.snapshot) order by s.showtime), '[]'::jsonb)
-    from public.shared_outing_members m
-    join public.shared_outings s on s.id = m.shared_outing_id
-    left join public.profiles p on p.user_id = s.owner_id
-    where m.user_id = auth.uid() and m.status in ('invited','accepted')
-      and s.ends_at > now() - interval '7 days');
-end;
-$$;
-
-revoke all on function cinemarchive_private.share_outing_reaction(uuid, numeric, text) from public, anon;
-revoke all on function cinemarchive_private.withdraw_outing_reaction(uuid) from public, anon;
-revoke all on function cinemarchive_private.get_outing_reactions(uuid) from public, anon;
-grant execute on function cinemarchive_private.share_outing_reaction(uuid, numeric, text) to authenticated;
-grant execute on function cinemarchive_private.withdraw_outing_reaction(uuid) to authenticated;
-grant execute on function cinemarchive_private.get_outing_reactions(uuid) to authenticated;
-
--- Public wrappers: PostgREST exposes only the public schema.
-create function public.share_outing_reaction(p_shared_outing_id uuid, p_rating numeric, p_note text)
-returns jsonb language sql security invoker set search_path = '' as $$
-  select cinemarchive_private.share_outing_reaction(p_shared_outing_id, p_rating, p_note);
-$$;
-create function public.withdraw_outing_reaction(p_shared_outing_id uuid)
-returns void language sql security invoker set search_path = '' as $$
-  select cinemarchive_private.withdraw_outing_reaction(p_shared_outing_id);
-$$;
-create function public.get_outing_reactions(p_shared_outing_id uuid)
-returns jsonb language sql stable security invoker set search_path = '' as $$
-  select cinemarchive_private.get_outing_reactions(p_shared_outing_id);
-$$;
-revoke all on function public.share_outing_reaction(uuid, numeric, text) from public, anon;
-revoke all on function public.withdraw_outing_reaction(uuid) from public, anon;
-revoke all on function public.get_outing_reactions(uuid) from public, anon;
-grant execute on function public.share_outing_reaction(uuid, numeric, text) to authenticated;
-grant execute on function public.withdraw_outing_reaction(uuid) to authenticated;
-grant execute on function public.get_outing_reactions(uuid) to authenticated;
-
   return (select coalesce(jsonb_agg(jsonb_build_object(
       'id', p.id, 'question', p.question, 'status', p.status, 'is_owner', p.owner_id = me,
       'owner_name', coalesce(nullif(op.display_name, ''), op.username, 'A friend'),

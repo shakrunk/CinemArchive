@@ -6,8 +6,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
+import work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions
 import work.kumarfamilynet.cinemarchive.core.model.MemberStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingMember
+import work.kumarfamilynet.cinemarchive.core.model.OutingReaction
+import work.kumarfamilynet.cinemarchive.core.model.ReactionRules
 import work.kumarfamilynet.cinemarchive.core.model.SharedOuting
 import work.kumarfamilynet.cinemarchive.core.model.SharedOutingStatus
 
@@ -57,6 +60,43 @@ class SharedOutingsRepository(
         token()
         Unit
     }
+
+    /** Everyone's reaction on [sharedOutingId], for a participant; the server refuses anyone else. */
+    suspend fun reactions(sharedOutingId: String): List<OutingReaction> = withContext(Dispatchers.IO) {
+        val token = token()
+        val body = JSONObject().put("p_shared_outing_id", checkedUuid(sharedOutingId)).toString()
+        parseOutingReactions(client.rpc("get_outing_reactions", body, token)).also { token() }
+    }
+
+    /** Shares or updates the caller's own reaction. Reactions open once the show has ended. */
+    suspend fun shareReaction(sharedOutingId: String, rating: Double?, note: String?) = withContext(Dispatchers.IO) {
+        require(ReactionRules.canShare(rating, note)) { "Add a rating, a note, or both." }
+        val token = token()
+        val body = JSONObject().put("p_shared_outing_id", checkedUuid(sharedOutingId))
+            .put("p_rating", rating ?: JSONObject.NULL).put("p_note", ReactionRules.cleanNote(note) ?: JSONObject.NULL).toString()
+        try { client.rpc("share_outing_reaction", body, token) }
+        catch (e: SupabaseHttpException) { throw IllegalStateException(FriendsRules.errorMessage(e, "Could not share your reaction."), e) }
+        token()
+        Unit
+    }
+
+    suspend fun withdrawReaction(sharedOutingId: String) = withContext(Dispatchers.IO) {
+        val token = token()
+        client.rpc("withdraw_outing_reaction", JSONObject().put("p_shared_outing_id", checkedUuid(sharedOutingId)).toString(), token)
+        token()
+        Unit
+    }
+
+    /** The group-reactions panel's view of one shared outing. */
+    fun reactionActions(sharedOutingId: String): GroupReactionActions = GroupReactionActions(
+        load = { reactions(sharedOutingId) },
+        share = { rating, note -> shareReaction(sharedOutingId, rating, note) },
+        withdraw = { withdrawReaction(sharedOutingId) },
+    )
+
+    /** The owner's side: the actions for the shared outing made from [outingId], or null if it was never shared. */
+    suspend fun reactionActionsForOuting(outingId: String): GroupReactionActions? =
+        members(outingId).firstOrNull()?.let { reactionActions(it.sharedOutingId) }
 
     suspend fun removeMember(sharedOutingId: String, userId: String) = withContext(Dispatchers.IO) {
         val token = token()
@@ -133,6 +173,24 @@ internal fun parseOutingMembers(body: String): List<OutingMember> {
             name = row.stringOrNull("name") ?: "A friend",
             status = memberStatus(row.optString("status")) ?: return@mapNotNull null,
             sharedOutingId = row.optString("shared_outing_id").takeIf(UUID_SHAPE::matches) ?: return@mapNotNull null,
+        )
+    }
+}
+
+internal fun parseOutingReactions(body: String): List<OutingReaction> {
+    val rows = JSONArray(body)
+    return (0 until rows.length()).mapNotNull { index ->
+        val row = rows.optJSONObject(index) ?: return@mapNotNull null
+        val rating = if (row.isNull("rating")) null else row.optDouble("rating").takeIf(ReactionRules::isValidRating)
+        val note = row.stringOrNull("note")
+        if (rating == null && note == null) return@mapNotNull null
+        OutingReaction(
+            userId = row.optString("user_id").takeIf(UUID_SHAPE::matches) ?: return@mapNotNull null,
+            name = row.stringOrNull("name") ?: "A friend",
+            isMe = row.optBoolean("is_me"),
+            rating = rating,
+            note = note,
+            updatedAt = row.optString("updated_at"),
         )
     }
 }

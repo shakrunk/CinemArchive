@@ -11,6 +11,7 @@ number is chosen.
 
 ### Added
 
+- **Poll friends on which movie and time to go, on Android and web.** Open "Polls" on Up Next to offer 2 to 4 of your movies at different times to up to 8 friends. They tick every option that works for them, you see who can make which, and you pick a winner. "Schedule this" then opens the usual schedule sheet for it with the time, theater and the friends who ticked it filled in.
 - **Invite friends to a cinema outing on Android and web.** From "Share outing plans", invite accepted friends to join a scheduled outing. They see an invitation on Up Next (and in their notifications) and accept or decline; the outing then stays up to date if you change the time or venue, and shows as cancelled if you cancel it. Friends never see your tickets, booking reference, price or notes.
 - **Showtime reminders on Android.** Turn on "Showtime reminders" in the Moviegoing settings to get a notification 30 minutes, 1 hour or 2 hours before a scheduled cinema trip starts. It is off by default and stays on your device. It does not account for travel time.
 - **Moviegoing budget on Android and web.** Set a monthly or yearly budget for the At the Movies panel of the Ledger (the "Budget, plan and year" dialog on the web) and see how much of it your cinema tickets have used, with a warning as you near or pass the cap. The budget follows your account across devices and is visible only to you.

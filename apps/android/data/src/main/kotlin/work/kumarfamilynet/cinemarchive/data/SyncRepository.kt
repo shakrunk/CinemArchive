@@ -133,6 +133,13 @@ class SyncRepository(
         return pickBestMatch(discoverRepository.searchMedia(item.title), item.title, item.year, item.type)
     }
 
+    /** The TMDB match for a single provider item, or null when nothing confident was found. Used by
+     *  the Jellyfin confirm path; a lookup failure throws rather than reading as "unmatched". */
+    suspend fun resolveMatch(item: SyncItem): MediaSearchResult? = withContext(Dispatchers.IO) {
+        fence()
+        resolve(item).also { fence() }
+    }
+
     /** True when something changed. */
     private suspend fun mergeInto(titleId: String, type: MediaType, item: SyncItem): Boolean {
         require(type == item.type)
@@ -192,6 +199,8 @@ class SyncServices(
     val simkl: SimklApi,
     val plex: PlexClient,
     val emby: EmbyClient,
+    val jellyfin: JellyfinWatch,
+    val jellyfinConfirm: JellyfinConfirm,
 ) {
     companion object {
         fun create(
@@ -204,13 +213,19 @@ class SyncServices(
             merges: ProviderMergeRepository,
             current: () -> Boolean,
             synchronize: suspend () -> Unit,
+            jellyfinStore: JellyfinStore = InMemoryJellyfinStore(),
+            onJellyfinConnectionChanged: (Boolean) -> Unit = {},
         ): SyncServices {
             val http = okhttp3.OkHttpClient()
+            val repository = SyncRepository(library, discover, auth, client, newTitles, merges, current, synchronize)
             return SyncServices(
-                repository = SyncRepository(library, discover, auth, client, newTitles, merges, current, synchronize),
+                repository = repository,
                 simkl = SimklApi(client, auth),
                 plex = PlexClient(http, plexClientId),
                 emby = EmbyClient(http),
+                // plexClientId is a stable random per-install id, reused as Jellyfin's DeviceId.
+                jellyfin = JellyfinWatch(jellyfinStore, JellyfinClient(http, plexClientId), current, onJellyfinConnectionChanged),
+                jellyfinConfirm = JellyfinConfirm(library, repository),
             )
         }
     }

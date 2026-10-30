@@ -447,7 +447,7 @@ function defaultForm(runtime?: number, prefill?: OutingSchedulePrefill | null): 
     date: showtime ? `${showtime.getFullYear()}-${pad(showtime.getMonth() + 1)}-${pad(showtime.getDate())}` : todayStr(),
     time: showtime ? `${pad(showtime.getHours())}:${pad(showtime.getMinutes())}` : '19:00',
     venue: prefill?.venue ?? '',
-    companions: [],
+    companions: (prefill?.companions ?? []).map((name) => ({ name })),
     format: prefill?.format ?? '',
     previewsMinutes: 20,
     runtimeMinutes: runtime ?? 120,

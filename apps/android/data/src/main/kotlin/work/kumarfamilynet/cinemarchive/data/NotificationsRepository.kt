@@ -22,6 +22,8 @@ enum class NotificationType(val wire: String) {
     INVITE_REDEEMED("invite_redeemed"),
     OUTING_COMPLETED("outing_completed"),
     OUTING_PLANS_SHARED("outing_plans_shared"),
+    OUTING_INVITE("outing_invite"),
+    OUTING_INVITE_RESPONSE("outing_invite_response"),
     UNKNOWN("");
 
     companion object {
@@ -55,6 +57,8 @@ data class AppNotification(
 sealed interface NotificationRoute {
     data class TitleDetail(val titleId: String) : NotificationRoute
     data object Profile : NotificationRoute
+    /** An outing invitation lands on Up Next, where it is answered (#206). */
+    data object UpNext : NotificationRoute
     /** Friends isn't on Android yet; the screen falls back to showing the row in place. */
     data object Friends : NotificationRoute
     data object None : NotificationRoute
@@ -74,6 +78,9 @@ object NotificationRules {
         NotificationType.FRIEND_REQUEST_RECEIVED, NotificationType.FRIEND_REQUEST_ACCEPTED,
         NotificationType.RECOMMENDATION_RECEIVED -> NotificationRoute.Friends
         NotificationType.INVITE_REDEEMED -> NotificationRoute.Profile
+        NotificationType.OUTING_INVITE -> NotificationRoute.UpNext
+        NotificationType.OUTING_INVITE_RESPONSE ->
+            n.titleId?.let { NotificationRoute.TitleDetail(it) } ?: NotificationRoute.None
         else -> NotificationRoute.None
     }
 
@@ -96,6 +103,11 @@ object NotificationRules {
             }
             NotificationType.OUTING_COMPLETED -> "${n.title ?: "Your movie"} just let out — how was it?"
             NotificationType.OUTING_PLANS_SHARED -> "${n.actorName} has tickets to \"${n.title ?: "a movie"}\""
+            NotificationType.OUTING_INVITE -> "${n.actorName} invited you to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
+            NotificationType.OUTING_INVITE_RESPONSE -> {
+                val film = n.payload.optString("title").ifEmpty { n.title ?: "your outing" }
+                if (n.payload.optBoolean("accepted")) "${n.actorName} is going to \"$film\"" else "${n.actorName} can't make \"$film\""
+            }
             NotificationType.UNKNOWN -> "New activity"
         }
     }

@@ -629,7 +629,7 @@ private fun CinemArchiveApp(
         TitleRecommendationDialog(repository, titleSocialSource, runtime.ownerId, id, onDismiss = { recommendTitleId = null })
     }
     shareOutingId?.let { id ->
-        work.kumarfamilynet.cinemarchive.feature.friends.OutingPlansDialog(runtime.outingPlansRepository, id, onDismiss = { shareOutingId = null })
+        work.kumarfamilynet.cinemarchive.feature.friends.OutingPlansDialog(runtime.outingPlansRepository, id, onDismiss = { shareOutingId = null }, invites = runtime.sharedOutings)
     }
     // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
     // stays on screen permanently, so which detail sits opposite it needs its own state
@@ -741,6 +741,9 @@ private fun CinemArchiveApp(
     }
     val openNotificationPostShow: (String) -> Unit = { id ->
         if (runtime.isCurrent()) overlay = Overlay.Detail(id, initialPostShow = true)
+    }
+    val openUpNext: () -> Unit = {
+        if (runtime.isCurrent()) { overlay = null; upNextCalendar = false; tab = Tab.UP_NEXT }
     }
     val addSharedToCalendar: (work.kumarfamilynet.cinemarchive.data.SharedOutingNotification) -> Unit = { shared ->
         if (runtime.isCurrent()) conflictContext.startActivity(
@@ -1089,6 +1092,7 @@ private fun CinemArchiveApp(
                                 onViewTicket = { overlay = Overlay.Ticket(it.outing.id, it.titleName) },
                                 onFabExpandedChange = { fabExpanded = it },
                                 onOpenCalendar = { upNextCalendar = true },
+                                sharedOutings = runtime.sharedOutings,
                             )
                             Tab.LEDGER -> LedgerRoute(
                                 ledgerRepository,
@@ -1270,6 +1274,7 @@ private fun CinemArchiveApp(
                                 onGotTicketsToo = openSharedOuting,
                                 onAddToCalendar = addSharedToCalendar,
                                 showBack = false,
+                                onOpenUpNext = openUpNext,
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false, libraryTmdbIds = remember(repository) { repository.observeLibraryTmdbIds() })
                             SettingsCategory.NAVIGATION -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
@@ -1392,6 +1397,7 @@ private fun CinemArchiveApp(
                     onOpenPostShow = openNotificationPostShow,
                     onGotTicketsToo = openSharedOuting,
                     onAddToCalendar = addSharedToCalendar,
+                    onOpenUpNext = openUpNext,
                 )
                 Overlay.Friends -> FriendsWithAccessEditor(
                     runtime, titleSocialSource,

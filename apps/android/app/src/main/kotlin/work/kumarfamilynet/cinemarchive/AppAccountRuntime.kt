@@ -319,6 +319,7 @@ class AppAccountRuntime(
         moviegoingPreferences = moviegoingPreferences,
         lifecycle = outingLifecycle,
         scheduleCommands = work.kumarfamilynet.cinemarchive.data.OutingScheduleCommands(database, outbox, importOwner, ::isCurrent),
+        reminders = preferences,
     )
 
     val outingPlansRepository = work.kumarfamilynet.cinemarchive.data.OutingPlansRepository.create(
@@ -409,6 +410,9 @@ class AppAccountRuntime(
 
     /** Runs the completion engine and returns the transitions, for the alarm receiver. */
     suspend fun completeDueOutings() = outingsRepository.completeDueOutings()
+
+    /** Showtime reminders due now, already marked sent (#213). */
+    suspend fun claimDueReminders() = outingsRepository.claimDueReminders()
 
     /** Runs [block] inside this runtime's scope: closing the runtime cancels it. */
     suspend fun <T> runOwned(block: suspend () -> T): T = scope.async { block() }.await()

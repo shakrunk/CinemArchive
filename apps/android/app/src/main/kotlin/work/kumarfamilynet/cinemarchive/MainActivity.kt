@@ -594,6 +594,7 @@ private fun CinemArchiveApp(
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
     var shareOutingId by remember { mutableStateOf<String?>(null) }
     var globalSearch by remember(runtime) { mutableStateOf(false) }
+    var nowPlaying by remember(runtime) { mutableStateOf(false) }
     var linkedListId by remember { mutableStateOf<String?>(null) }
     var linkedListSequence by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     LaunchedEffect(pendingNavigation) {
@@ -604,6 +605,7 @@ private fun CinemArchiveApp(
             upNextCalendar = route.view == "calendar"
             if (upNextCalendar) tab = Tab.UP_NEXT
             globalSearch = false
+            nowPlaying = false
             recommendTitleId = null
             shareOutingId = null
             linkedListId = route.listId
@@ -747,11 +749,33 @@ private fun CinemArchiveApp(
         if (runtime.isCurrent()) conflictContext.startActivity(
             work.kumarfamilynet.cinemarchive.feature.friends.outingCalendarIntent(shared.plan))
     }
+    if (nowPlaying && runtime.isCurrent()) {
+        val regionFlow = remember(moviegoingPrefsRepository) { moviegoingPrefsRepository.observeRegion() }
+        val savedRegion by regionFlow.collectAsStateWithLifecycle(initialValue = null)
+        NowPlayingDialog(
+            savedRegion = savedRegion,
+            load = { region -> discoverRepository.fetchNowPlaying(region) },
+            onSaveRegion = { region -> if (runtime.isCurrent()) moviegoingPrefsRepository.setRegion(region) },
+            onPick = { movie ->
+                coroutineScope.launch {
+                    // Already in the library: schedule it. Otherwise add it first (the schedule sheet
+                    // belongs to a library title), through the same Add flow as Discover.
+                    val owned = repository.findLibraryTitleId(movie.tmdbId, movie.type)
+                    if (runtime.isCurrent()) {
+                        nowPlaying = false
+                        overlay = if (owned != null) Overlay.Detail(owned, initialSchedule = true) else Overlay.Add(movie)
+                    }
+                }
+            },
+            onDismiss = { nowPlaying = false },
+        )
+    }
     if (globalSearch && runtime.isCurrent()) OwnerGlobalSearch(
         "${runtime.ownerId}:${runtime.identity.generation}", commandTitles,
         onDismiss = { globalSearch = false },
         onTitle = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id) } },
         onSchedule = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id, initialSchedule = true) } },
+        onNowPlaying = { if (runtime.isCurrent()) { globalSearch = false; nowPlaying = true } },
         onCommand = { id -> if (runtime.isCurrent()) {
             globalSearch = false
             when (id) {
@@ -875,11 +899,23 @@ private fun CinemArchiveApp(
     val moviegoingScreen: @Composable (() -> Unit, Boolean) -> Unit = { onBack, showBack ->
         work.kumarfamilynet.cinemarchive.feature.settings.SettingsPanelScreen(
             title = "Moviegoing",
-            description = "Venue notes and theater interest follow your account.",
+            description = "Venue notes and theater interest follow your account. Showtime reminders stay on this device.",
             onBack = onBack,
             showBack = showBack,
         ) {
-            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
+            val reminderLeadFlow = remember(preferencesRepository) { preferencesRepository.observeOutingReminderLead() }
+            val reminderLead by reminderLeadFlow.collectAsStateWithLifecycle(initialValue = null)
+            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(
+                runtime.moviegoingPreferences,
+                reminderLeadMinutes = reminderLead,
+                onReminderLeadChange = { minutes ->
+                    coroutineScope.launch {
+                        preferencesRepository.setOutingReminderLead(minutes)
+                        // The one alarm now also covers reminders: re-arm for the new lead (or without one).
+                        if (runtime.isCurrent()) runtime.outingsRepository.refreshAlarm()
+                    }
+                },
+            ) { venue, dismiss ->
                 work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
             }
         }
@@ -1301,6 +1337,7 @@ private fun CinemArchiveApp(
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refreshMetadata(current.titleId) },
                     noirPins = runtime.titlePins,
+                    moviegoingPrefs = moviegoingPrefsRepository,
                     onUnlockPalette = { palette -> coroutineScope.launch { preferencesRepository.unlockPalette(palette) } },
                     onNoirMode = { mode ->
                         if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)

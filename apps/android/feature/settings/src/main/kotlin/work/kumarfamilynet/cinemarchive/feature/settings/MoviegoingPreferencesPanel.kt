@@ -25,11 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import work.kumarfamilynet.cinemarchive.core.model.OutingReminderRules
 import work.kumarfamilynet.cinemarchive.data.MoviegoingComparison
 import work.kumarfamilynet.cinemarchive.data.MoviegoingPreferencesRepository
 
 @Composable
 fun MoviegoingPreferencesPanel(repository: MoviegoingPreferencesRepository,
+    reminderLeadMinutes: Int? = null, onReminderLeadChange: ((Int?) -> Unit)? = null,
     noteEditor: @Composable (String, () -> Unit) -> Unit) {
     val notes by repository.notes.collectAsState(emptyList())
     val changes by repository.changes.collectAsState(emptyList())
@@ -77,6 +79,20 @@ fun MoviegoingPreferencesPanel(repository: MoviegoingPreferencesRepository,
                     }
                 })
         }
+        // Device-local (#213): the lead and what was already announced never leave this phone.
+        if (onReminderLeadChange != null) PreferenceCard("Showtime reminders") {
+            Text("A notification before a scheduled trip starts. This setting stays on this device.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(selected = reminderLeadMinutes == null, onClick = { onReminderLeadChange(null) }, label = { Text("Off") })
+                OutingReminderRules.LEAD_OPTIONS_MINUTES.forEach { minutes ->
+                    FilterChip(selected = reminderLeadMinutes == minutes, onClick = { onReminderLeadChange(minutes) },
+                        label = { Text(reminderLeadLabel(minutes)) })
+                }
+            }
+            Text("Needs notifications allowed. Without exact alarms in system settings a reminder may not arrive.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if (changes.isNotEmpty()) PreferenceCard("Unsynced changes") {
             Text("Some edits haven't reached your account yet. Retry, or compare an edit with your account before keeping or discarding it.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -118,6 +134,9 @@ fun MoviegoingPreferencesPanel(repository: MoviegoingPreferencesRepository,
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
+
+internal fun reminderLeadLabel(minutes: Int): String =
+    if (minutes % 60 == 0) "${minutes / 60} hour${if (minutes == 60) "" else "s"}" else "$minutes min"
 
 @Composable
 private fun PreferenceCard(title: String, content: @Composable ColumnScope.() -> Unit) {

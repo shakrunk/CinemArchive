@@ -11,6 +11,7 @@ import work.kumarfamilynet.cinemarchive.core.model.MediaEpisode
 import work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult
 import work.kumarfamilynet.cinemarchive.core.model.MediaSeason
 import work.kumarfamilynet.cinemarchive.core.model.MediaType
+import work.kumarfamilynet.cinemarchive.core.model.MoviegoingRegion
 import work.kumarfamilynet.cinemarchive.core.model.TrendingTitle
 import work.kumarfamilynet.cinemarchive.core.model.isSpecials
 
@@ -54,6 +55,13 @@ class DiscoverRepository(
     suspend fun fetchBrowse(type: MediaType?, genreId: Int?, page: Int): List<TrendingTitle> = withContext(Dispatchers.IO) {
         val token = accessToken()
         fetchDiscoverBrowse(type, genreId, page) { query -> client.invokeFunction("media-proxy", query, token) }
+    }
+
+    /** Movies in theaters in [region] (ISO 3166-1 alpha-2), TMDB's own order. Titles only: TMDB
+     *  has no showtimes, so the schedule sheet still asks for the time (#202). */
+    suspend fun fetchNowPlaying(region: String): List<MediaSearchResult> = withContext(Dispatchers.IO) {
+        val token = accessToken()
+        fetchNowPlayingPage(region) { query -> client.invokeFunction("media-proxy", query, token) }
     }
 
     /** This week's trending movies and TV, interleaved so both kinds stay visible near the
@@ -226,6 +234,13 @@ class DiscoverRepository(
         }
         return combined
     }
+}
+
+/** The `now_playing` proxy action for one region. The code is checked here as well as in the
+ *  edge function so a malformed one never reaches the query string. */
+internal suspend fun fetchNowPlayingPage(region: String, invoke: suspend (String) -> String): List<MediaSearchResult> {
+    require(MoviegoingRegion.isValid(region)) { "Invalid region" }
+    return parseSearchPage(invoke("action=now_playing&region=$region"), MediaType.MOVIE)
 }
 
 /** Mirrors web's movie-first mixed page, with each request retaining the same genre and page. */

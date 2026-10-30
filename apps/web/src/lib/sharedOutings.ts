@@ -132,3 +132,79 @@ export async function removeOutingMember(sharedOutingId: string, userId: string)
   const { error } = await connection().rpc('remove_outing_member', { p_shared_outing_id: sharedOutingId, p_user_id: userId })
   if (error) throw failure(error, "Couldn't take back that invitation.")
 }
+
+// ─── Group post-show reactions (#207) ─────────────────────────────────────────
+// How it went, shared on purpose with the people on a shared outing and separate from anyone's
+// private viewing log: nothing here is copied into or out of a library. Mirrors Android's
+// OutingReaction.kt; the contract is docs/android-contracts/shared-outing-reactions.md.
+
+export interface OutingReaction {
+  userId: string
+  name: string
+  isMe: boolean
+  /** Half stars from 0.5 to 5, or null for a note-only reaction. */
+  rating: number | null
+  note: string | null
+  updatedAt: string
+}
+
+export const MAX_REACTION_NOTE = 500
+
+/** Reactions open once the show has ended (or the owner's outing completed) and stay closed if it was cancelled. */
+export const reactionsOpen = (outing: Pick<SharedOuting, 'status' | 'endsAt'>, now: number) =>
+  outing.status !== 'cancelled' && (outing.status === 'completed' || Date.parse(outing.endsAt) <= now)
+
+/** Half stars between 0.5 and 5. */
+export const isValidReactionRating = (rating: number) => rating >= 0.5 && rating <= 5 && rating * 2 === Math.floor(rating * 2)
+
+/** The note as it will be stored: trimmed, or null when blank. */
+export const cleanReactionNote = (note: string | null | undefined) => note?.trim() || null
+
+/** A reaction needs a valid rating, a note within the limit, or both. */
+export function canShareReaction(rating: number | null, note: string | null | undefined): boolean {
+  const cleaned = cleanReactionNote(note)
+  if (rating === null && cleaned === null) return false
+  if (rating !== null && !isValidReactionRating(rating)) return false
+  return cleaned === null || cleaned.length <= MAX_REACTION_NOTE
+}
+
+/** Rows with nothing to show are skipped; an invalid rating is dropped but its note is kept. */
+export function parseOutingReactions(rows: unknown): OutingReaction[] {
+  if (!Array.isArray(rows)) return []
+  return rows.flatMap((raw): OutingReaction[] => {
+    const row = record(raw)
+    if (!row || !isUuid(row.user_id)) return []
+    const rating = typeof row.rating === 'number' && isValidReactionRating(row.rating) ? row.rating : null
+    const note = text(row.note)
+    if (rating === null && note === null) return []
+    return [{ userId: row.user_id, name: text(row.name) ?? 'A friend', isMe: row.is_me === true, rating, note, updatedAt: typeof row.updated_at === 'string' ? row.updated_at : '' }]
+  })
+}
+
+/** Everyone's reaction on a shared outing, for a participant; the server refuses anyone else. */
+export async function outingReactions(sharedOutingId: string): Promise<OutingReaction[]> {
+  if (!isUuid(sharedOutingId)) throw new Error('Invalid outing')
+  const { data, error } = await connection().rpc('get_outing_reactions', { p_shared_outing_id: sharedOutingId })
+  if (error) throw failure(error, "Couldn't load the group's reactions.")
+  return parseOutingReactions(data)
+}
+
+/** Shares or updates the caller's own reaction. Reactions open once the show has ended. */
+export async function shareOutingReaction(sharedOutingId: string, rating: number | null, note: string | null): Promise<void> {
+  if (!isUuid(sharedOutingId)) throw new Error('Invalid outing')
+  if (!canShareReaction(rating, note)) throw new Error('Add a rating, a note, or both.')
+  const { error } = await connection().rpc('share_outing_reaction', { p_shared_outing_id: sharedOutingId, p_rating: rating, p_note: cleanReactionNote(note) })
+  if (error) throw failure(error, 'Could not share your reaction.')
+}
+
+export async function withdrawOutingReaction(sharedOutingId: string): Promise<void> {
+  if (!isUuid(sharedOutingId)) throw new Error('Invalid outing')
+  const { error } = await connection().rpc('withdraw_outing_reaction', { p_shared_outing_id: sharedOutingId })
+  if (error) throw failure(error, "Couldn't take your reaction back.")
+}
+
+/** The owner's side: the shared outing made from [outingId], or null if it was never shared. */
+export async function sharedOutingIdFor(outingId: string): Promise<string | null> {
+  return (await outingMembers(outingId))[0]?.sharedOutingId ?? null
+}
+

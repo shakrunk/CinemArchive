@@ -8,6 +8,7 @@ import { Button } from 'src/components/ui/button'
 import { useAppStore } from 'src/store/useAppStore'
 import { formatCompanions } from 'src/store/outings'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
+import { OwnerGroupReactions } from 'src/components/GroupReactions'
 import type { CinemaOuting, Title, Viewing } from 'src/store/mockData'
 import { Eyebrow } from 'src/components/ui/typography'
 
@@ -106,6 +107,9 @@ function PostShowBody({
           className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
         />
       </div>
+
+      {/* Only appears for an outing shared with friends (#207); the fields above only prefill it. */}
+      <OwnerGroupReactions outingId={outing.id} initialRating={rating > 0 ? rating : null} initialNote={note || null} />
 
       <Button
         onClick={handleRecommend}

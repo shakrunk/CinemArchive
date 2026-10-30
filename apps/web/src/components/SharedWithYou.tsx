@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { isSupabaseConfigured } from 'src/lib/auth'
 import { isDevMockUser } from 'src/lib/devAuth'
 import {
-  canRespond, goingOf, invitationsOf, listSharedOutings, respondToInvite, type SharedOuting,
+  canRespond, goingOf, invitationsOf, listSharedOutings, reactionsOpen, respondToInvite, type SharedOuting,
 } from 'src/lib/sharedOutings'
 import { useAppStore } from 'src/store/useAppStore'
 import { Button } from 'src/components/ui/button'
 import { Eyebrow } from 'src/components/ui/typography'
+import { GroupReactions } from 'src/components/GroupReactions'
 
 function when(outing: SharedOuting): string {
   return [
@@ -14,6 +15,18 @@ function when(outing: SharedOuting): string {
     outing.venue,
     outing.format && outing.format !== 'Standard' ? outing.format : null,
   ].filter(Boolean).join(' · ')
+}
+
+function ReactionsToggle({ outing }: { outing: SharedOuting }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="space-y-2">
+      <Button type="button" size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        {open ? 'Hide reactions' : 'How was it?'}
+      </Button>
+      {open && <GroupReactions sharedOutingId={outing.id} />}
+    </div>
+  )
 }
 
 function SharedCard({ outing, children }: { outing: SharedOuting; children: React.ReactNode }) {
@@ -89,6 +102,7 @@ export function SharedWithYou() {
               ? <p className="font-mono text-xs" style={{ color: 'var(--ember)' }}>Cancelled by {outing.ownerName}</p>
               : <>
                 <p className="font-mono text-xs" style={{ color: 'var(--amber)' }}>You're going with {outing.ownerName}</p>
+                {reactionsOpen(outing, now) && <ReactionsToggle outing={outing} />}
                 {canRespond(outing, now) && (
                   <Button type="button" size="sm" variant="ghost" disabled={busy.includes(outing.id)} aria-label={`Leave ${outing.title}`}
                     onClick={() => void respond(outing.id, false)}>Can't make it after all</Button>

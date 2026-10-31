@@ -182,6 +182,25 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleIncomingLink(intent)
         handleUpdateIntent(intent)
+        handleJellyfinAddIntent(intent)
+    }
+
+    /** A "not in your library" Jellyfin notification tap: open the normal Add flow on that title.
+     *  Only for the account the notification was posted for. */
+    private fun handleJellyfinAddIntent(incoming: Intent) {
+        if (!incoming.hasExtra(EXTRA_ADD_TMDB_ID)) return
+        val match = mediaSearchResultFromExtras(
+            incoming.getIntExtra(EXTRA_ADD_TMDB_ID, 0),
+            incoming.getStringExtra(EXTRA_ADD_TYPE),
+            incoming.getStringExtra(EXTRA_ADD_TITLE),
+            if (incoming.hasExtra(EXTRA_ADD_YEAR)) incoming.getIntExtra(EXTRA_ADD_YEAR, 0) else null,
+        )
+        val ownerId = incoming.getStringExtra(OutingCompletionReceiver.EXTRA_OWNER_ID)
+        listOf(EXTRA_ADD_TMDB_ID, EXTRA_ADD_TYPE, EXTRA_ADD_TITLE, EXTRA_ADD_YEAR).forEach(incoming::removeExtra)
+        val identity = (application as CinemArchiveApplication).authRepository.observeIdentity().value
+        if (match == null || identity == null || ownerId != identity.userId) return
+        sharedToken = null
+        pendingNavigation = PendingNavigation(IncomingNavigation(null, null, null, true, match), identity, ++navigationSequence)
     }
 
     private fun handleUpdateIntent(incoming: Intent) {
@@ -228,6 +247,12 @@ class MainActivity : ComponentActivity() {
 
         /** Set by update notifications: open the update sheet. */
         const val EXTRA_OPEN_UPDATE = "open_update"
+
+        /** Set by a Jellyfin "not in your library" notification: open the Add flow on this title. */
+        const val EXTRA_ADD_TMDB_ID = "add_tmdb_id"
+        const val EXTRA_ADD_TYPE = "add_type"
+        const val EXTRA_ADD_TITLE = "add_title"
+        const val EXTRA_ADD_YEAR = "add_year"
 
         /** How long the app must hold the foreground before an unanswered install prompt
          *  counts as abandoned rather than still opening (morphe-manager uses the same). */
@@ -286,7 +311,10 @@ class MainActivity : ComponentActivity() {
         handleIncomingLink(intent)
         // Not on recreation: the system re-delivers the original intent, extra and all, and a
         // rotation shouldn't reopen a sheet the user already closed.
-        if (savedInstanceState == null) handleUpdateIntent(intent)
+        if (savedInstanceState == null) {
+            handleUpdateIntent(intent)
+            handleJellyfinAddIntent(intent)
+        }
         // A self-update can't report its own success (the old process is killed), so the new
         // version says so on its first launch. Not on recreation, which would repeat it.
         if (savedInstanceState == null) {
@@ -611,7 +639,7 @@ private fun CinemArchiveApp(
             linkedListId = route.listId
             linkedListSequence = pending.sequence
             overlay = when {
-                route.add -> Overlay.Add()
+                route.add -> Overlay.Add(route.addTitle)
                 route.titleId != null -> Overlay.Detail(route.titleId)
                 route.view == "profile" -> Overlay.Profile
                 route.view == "friends" -> Overlay.Friends
@@ -1301,6 +1329,7 @@ private fun CinemArchiveApp(
                             SettingsCategory.MOVIEGOING -> moviegoingScreen(closeOverlay, false)
                             SettingsCategory.DATA_RECOVERY -> dataRecoveryScreen(closeOverlay, false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
+                                onOpenAddFlow = { overlay = Overlay.Add(it) },
                                 backupContent = { Column {
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
@@ -1445,6 +1474,7 @@ private fun CinemArchiveApp(
                 Overlay.Moviegoing -> moviegoingScreen(openProfile, true)
                 Overlay.DataRecovery -> dataRecoveryScreen(openProfile, true)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
+                    onOpenAddFlow = { overlay = Overlay.Add(it) },
                     backupContent = { Column {
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)

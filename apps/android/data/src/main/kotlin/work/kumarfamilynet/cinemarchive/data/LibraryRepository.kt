@@ -318,6 +318,17 @@ class LibraryRepository(
     suspend fun findLibraryTitleId(tmdbId: Int, type: MediaType): String? =
         titleDao.findIdByTmdbKey(tmdbId, type.name)
 
+    /** The local episode for [seasonNumber]/[episodeNumber] of [titleId] with the dates already
+     *  logged on it, or null when the series' catalog doesn't have that episode (yet). */
+    suspend fun findEpisodeWatchState(titleId: String, seasonNumber: Int, episodeNumber: Int): EpisodeWatchState? {
+        val seasonId = seasonDao.findSeasonId(titleId, seasonNumber) ?: return null
+        val episodeId = episodeDao.observeEpisodes(titleId).first()
+            .firstOrNull { it.seasonId == seasonId && it.episodeNumber == episodeNumber }?.id ?: return null
+        val dates = watchEventDao.observeAllWatchEvents().first()
+            .filter { it.episodeId == episodeId }.mapNotNull { it.watchedAt?.take(10) }.toSet()
+        return EpisodeWatchState(episodeId, dates)
+    }
+
     fun observeLibrary(): Flow<List<LibraryTitle>> = combine(
         titleDao.observeLibrary(),
         cinemaOutingDao.observeAllOutings(),

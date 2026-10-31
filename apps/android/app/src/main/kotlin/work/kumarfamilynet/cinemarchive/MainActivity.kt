@@ -182,6 +182,25 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleIncomingLink(intent)
         handleUpdateIntent(intent)
+        handleJellyfinAddIntent(intent)
+    }
+
+    /** A "not in your library" Jellyfin notification tap: open the normal Add flow on that title.
+     *  Only for the account the notification was posted for. */
+    private fun handleJellyfinAddIntent(incoming: Intent) {
+        if (!incoming.hasExtra(EXTRA_ADD_TMDB_ID)) return
+        val match = mediaSearchResultFromExtras(
+            incoming.getIntExtra(EXTRA_ADD_TMDB_ID, 0),
+            incoming.getStringExtra(EXTRA_ADD_TYPE),
+            incoming.getStringExtra(EXTRA_ADD_TITLE),
+            if (incoming.hasExtra(EXTRA_ADD_YEAR)) incoming.getIntExtra(EXTRA_ADD_YEAR, 0) else null,
+        )
+        val ownerId = incoming.getStringExtra(OutingCompletionReceiver.EXTRA_OWNER_ID)
+        listOf(EXTRA_ADD_TMDB_ID, EXTRA_ADD_TYPE, EXTRA_ADD_TITLE, EXTRA_ADD_YEAR).forEach(incoming::removeExtra)
+        val identity = (application as CinemArchiveApplication).authRepository.observeIdentity().value
+        if (match == null || identity == null || ownerId != identity.userId) return
+        sharedToken = null
+        pendingNavigation = PendingNavigation(IncomingNavigation(null, null, null, true, match), identity, ++navigationSequence)
     }
 
     private fun handleUpdateIntent(incoming: Intent) {
@@ -228,6 +247,12 @@ class MainActivity : ComponentActivity() {
 
         /** Set by update notifications: open the update sheet. */
         const val EXTRA_OPEN_UPDATE = "open_update"
+
+        /** Set by a Jellyfin "not in your library" notification: open the Add flow on this title. */
+        const val EXTRA_ADD_TMDB_ID = "add_tmdb_id"
+        const val EXTRA_ADD_TYPE = "add_type"
+        const val EXTRA_ADD_TITLE = "add_title"
+        const val EXTRA_ADD_YEAR = "add_year"
 
         /** How long the app must hold the foreground before an unanswered install prompt
          *  counts as abandoned rather than still opening (morphe-manager uses the same). */
@@ -286,7 +311,10 @@ class MainActivity : ComponentActivity() {
         handleIncomingLink(intent)
         // Not on recreation: the system re-delivers the original intent, extra and all, and a
         // rotation shouldn't reopen a sheet the user already closed.
-        if (savedInstanceState == null) handleUpdateIntent(intent)
+        if (savedInstanceState == null) {
+            handleUpdateIntent(intent)
+            handleJellyfinAddIntent(intent)
+        }
         // A self-update can't report its own success (the old process is killed), so the new
         // version says so on its first launch. Not on recreation, which would repeat it.
         if (savedInstanceState == null) {
@@ -537,6 +565,9 @@ private sealed interface Overlay {
      *  by value, like [Add]'s [preselected], rather than an ID to re-fetch: the marquee card
      *  that opens this already has both in memory. */
     data class Ticket(val outingId: String, val titleName: String) : Overlay
+
+    /** An outing's keepsake photos (#208). */
+    data class Keepsakes(val outingId: String, val titleName: String) : Overlay
 }
 
 /**
@@ -568,6 +599,7 @@ private fun CinemArchiveApp(
     val repository = runtime.libraryRepository
     val ledgerRepository = runtime.ledgerRepository
     val ledgerLayoutRepository = runtime.ledgerLayoutRepository
+    val moviegoingPrefsRepository = runtime.moviegoingPrefsRepository
     val outingsRepository = runtime.outingsRepository
     val listsRepository = runtime.listsRepository
     val librarySyncRepository = runtime.librarySyncRepository
@@ -590,6 +622,7 @@ private fun CinemArchiveApp(
     var recommendTitleId by remember { mutableStateOf<String?>(null) }
     var shareOutingId by remember { mutableStateOf<String?>(null) }
     var globalSearch by remember(runtime) { mutableStateOf(false) }
+    var nowPlaying by remember(runtime) { mutableStateOf(false) }
     var linkedListId by remember { mutableStateOf<String?>(null) }
     var linkedListSequence by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     LaunchedEffect(pendingNavigation) {
@@ -600,12 +633,13 @@ private fun CinemArchiveApp(
             upNextCalendar = route.view == "calendar"
             if (upNextCalendar) tab = Tab.UP_NEXT
             globalSearch = false
+            nowPlaying = false
             recommendTitleId = null
             shareOutingId = null
             linkedListId = route.listId
             linkedListSequence = pending.sequence
             overlay = when {
-                route.add -> Overlay.Add()
+                route.add -> Overlay.Add(route.addTitle)
                 route.titleId != null -> Overlay.Detail(route.titleId)
                 route.view == "profile" -> Overlay.Profile
                 route.view == "friends" -> Overlay.Friends
@@ -626,7 +660,7 @@ private fun CinemArchiveApp(
         TitleRecommendationDialog(repository, titleSocialSource, runtime.ownerId, id, onDismiss = { recommendTitleId = null })
     }
     shareOutingId?.let { id ->
-        work.kumarfamilynet.cinemarchive.feature.friends.OutingPlansDialog(runtime.outingPlansRepository, id, onDismiss = { shareOutingId = null })
+        work.kumarfamilynet.cinemarchive.feature.friends.OutingPlansDialog(runtime.outingPlansRepository, id, onDismiss = { shareOutingId = null }, invites = runtime.sharedOutings)
     }
     // Only consulted in the wide/foldable-unfolded split layout below — the list pane there
     // stays on screen permanently, so which detail sits opposite it needs its own state
@@ -739,15 +773,40 @@ private fun CinemArchiveApp(
     val openNotificationPostShow: (String) -> Unit = { id ->
         if (runtime.isCurrent()) overlay = Overlay.Detail(id, initialPostShow = true)
     }
+    val openUpNext: () -> Unit = {
+        if (runtime.isCurrent()) { overlay = null; upNextCalendar = false; tab = Tab.UP_NEXT }
+    }
     val addSharedToCalendar: (work.kumarfamilynet.cinemarchive.data.SharedOutingNotification) -> Unit = { shared ->
         if (runtime.isCurrent()) conflictContext.startActivity(
             work.kumarfamilynet.cinemarchive.feature.friends.outingCalendarIntent(shared.plan))
+    }
+    if (nowPlaying && runtime.isCurrent()) {
+        val regionFlow = remember(moviegoingPrefsRepository) { moviegoingPrefsRepository.observeRegion() }
+        val savedRegion by regionFlow.collectAsStateWithLifecycle(initialValue = null)
+        NowPlayingDialog(
+            savedRegion = savedRegion,
+            load = { region -> discoverRepository.fetchNowPlaying(region) },
+            onSaveRegion = { region -> if (runtime.isCurrent()) moviegoingPrefsRepository.setRegion(region) },
+            onPick = { movie ->
+                coroutineScope.launch {
+                    // Already in the library: schedule it. Otherwise add it first (the schedule sheet
+                    // belongs to a library title), through the same Add flow as Discover.
+                    val owned = repository.findLibraryTitleId(movie.tmdbId, movie.type)
+                    if (runtime.isCurrent()) {
+                        nowPlaying = false
+                        overlay = if (owned != null) Overlay.Detail(owned, initialSchedule = true) else Overlay.Add(movie)
+                    }
+                }
+            },
+            onDismiss = { nowPlaying = false },
+        )
     }
     if (globalSearch && runtime.isCurrent()) OwnerGlobalSearch(
         "${runtime.ownerId}:${runtime.identity.generation}", commandTitles,
         onDismiss = { globalSearch = false },
         onTitle = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id) } },
         onSchedule = { id -> if (runtime.isCurrent()) { globalSearch = false; overlay = Overlay.Detail(id, initialSchedule = true) } },
+        onNowPlaying = { if (runtime.isCurrent()) { globalSearch = false; nowPlaying = true } },
         onCommand = { id -> if (runtime.isCurrent()) {
             globalSearch = false
             when (id) {
@@ -871,11 +930,23 @@ private fun CinemArchiveApp(
     val moviegoingScreen: @Composable (() -> Unit, Boolean) -> Unit = { onBack, showBack ->
         work.kumarfamilynet.cinemarchive.feature.settings.SettingsPanelScreen(
             title = "Moviegoing",
-            description = "Venue notes and theater interest follow your account.",
+            description = "Venue notes and theater interest follow your account. Showtime reminders stay on this device.",
             onBack = onBack,
             showBack = showBack,
         ) {
-            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(runtime.moviegoingPreferences) { venue, dismiss ->
+            val reminderLeadFlow = remember(preferencesRepository) { preferencesRepository.observeOutingReminderLead() }
+            val reminderLead by reminderLeadFlow.collectAsStateWithLifecycle(initialValue = null)
+            work.kumarfamilynet.cinemarchive.feature.settings.MoviegoingPreferencesPanel(
+                runtime.moviegoingPreferences,
+                reminderLeadMinutes = reminderLead,
+                onReminderLeadChange = { minutes ->
+                    coroutineScope.launch {
+                        preferencesRepository.setOutingReminderLead(minutes)
+                        // The one alarm now also covers reminders: re-arm for the new lead (or without one).
+                        if (runtime.isCurrent()) runtime.outingsRepository.refreshAlarm()
+                    }
+                },
+            ) { venue, dismiss ->
                 work.kumarfamilynet.cinemarchive.feature.library.VenueNoteEditor(runtime.moviegoingPreferences, venue, dismiss)
             }
         }
@@ -1052,10 +1123,29 @@ private fun CinemArchiveApp(
                                 onViewTicket = { overlay = Overlay.Ticket(it.outing.id, it.titleName) },
                                 onFabExpandedChange = { fabExpanded = it },
                                 onOpenCalendar = { upNextCalendar = true },
+                                sharedOutings = runtime.sharedOutings,
+                                ticketSharing = runtime.ticketSharing,
+                                outingPolls = runtime.outingPolls,
+                                onSchedulePoll = { option, voters ->
+                                    coroutineScope.launch {
+                                        // The poll's movie came from this library, so it is normally still here; if it
+                                        // was removed, the schedule flow cannot start from it.
+                                        val owned = repository.findLibraryTitleId(option.tmdbId, work.kumarfamilynet.cinemarchive.core.model.MediaType.MOVIE)
+                                        if (owned != null && runtime.isCurrent()) {
+                                            overlay = Overlay.Detail(
+                                                owned, initialSchedule = true,
+                                                schedulePrefill = work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill(
+                                                    option.showtime, option.venue, null, voters,
+                                                ),
+                                            )
+                                        }
+                                    }
+                                },
                             )
                             Tab.LEDGER -> LedgerRoute(
                                 ledgerRepository,
                                 ledgerLayoutRepository,
+                                moviegoingPrefsRepository,
                                 onTitleClick = { overlay = Overlay.Detail(it) },
                                 onOpenProfile = openProfile,
                                 profileInitial = profileInitial,
@@ -1232,12 +1322,14 @@ private fun CinemArchiveApp(
                                 onGotTicketsToo = openSharedOuting,
                                 onAddToCalendar = addSharedToCalendar,
                                 showBack = false,
+                                onOpenUpNext = openUpNext,
                             )
                             SettingsCategory.APPEARANCE -> AppearanceRoute(preferencesRepository, onBack = closeOverlay, showBack = false, libraryTmdbIds = remember(repository) { repository.observeLibraryTmdbIds() })
                             SettingsCategory.NAVIGATION -> work.kumarfamilynet.cinemarchive.feature.settings.NavigationSettingsRoute(preferencesRepository, onBack = closeOverlay, showBack = false)
                             SettingsCategory.MOVIEGOING -> moviegoingScreen(closeOverlay, false)
                             SettingsCategory.DATA_RECOVERY -> dataRecoveryScreen(closeOverlay, false)
                             SettingsCategory.IMPORT_SYNC -> ImportSyncRoute(syncServices, onBack = closeOverlay, showBack = false,
+                                onOpenAddFlow = { overlay = Overlay.Add(it) },
                                 backupContent = { Column {
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
                                     work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
@@ -1288,6 +1380,8 @@ private fun CinemArchiveApp(
                     onRecommendTitle = { recommendTitleId = it },
                     onShareOutingPlans = { shareOutingId = it },
                     onViewTicket = { outing, title -> overlay = Overlay.Ticket(outing.id, title) },
+                    groupReactions = { outingId -> runtime.sharedOutings.reactionActionsForOuting(outingId) },
+                    onOpenKeepsakes = { outing, title -> overlay = Overlay.Keepsakes(outing.id, title) },
                     onBrowsePerson = { person ->
                         libraryFiltersState.value = libraryFiltersState.value.copy(person = person)
                         overlay = null
@@ -1295,6 +1389,7 @@ private fun CinemArchiveApp(
                     },
                     onRefreshCredits = { runtime.creditRefreshRepository.refreshMetadata(current.titleId) },
                     noirPins = runtime.titlePins,
+                    moviegoingPrefs = moviegoingPrefsRepository,
                     onUnlockPalette = { palette -> coroutineScope.launch { preferencesRepository.unlockPalette(palette) } },
                     onNoirMode = { mode ->
                         if (runtime.isCurrent() && (overlay as? Overlay.Detail)?.titleId == current.titleId)
@@ -1353,6 +1448,7 @@ private fun CinemArchiveApp(
                     onOpenPostShow = openNotificationPostShow,
                     onGotTicketsToo = openSharedOuting,
                     onAddToCalendar = addSharedToCalendar,
+                    onOpenUpNext = openUpNext,
                 )
                 Overlay.Friends -> FriendsWithAccessEditor(
                     runtime, titleSocialSource,
@@ -1378,6 +1474,7 @@ private fun CinemArchiveApp(
                 Overlay.Moviegoing -> moviegoingScreen(openProfile, true)
                 Overlay.DataRecovery -> dataRecoveryScreen(openProfile, true)
                 Overlay.ImportSync -> ImportSyncRoute(syncServices, onBack = openProfile,
+                    onOpenAddFlow = { overlay = Overlay.Add(it) },
                     backupContent = { Column {
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryBackupSection(runtime.backupRepository)
                         work.kumarfamilynet.cinemarchive.feature.settings.LibraryRestoreSection(runtime.restoreRepository)
@@ -1401,6 +1498,10 @@ private fun CinemArchiveApp(
                 )
                 is Overlay.Ticket -> work.kumarfamilynet.cinemarchive.feature.library.PortableTicketRoute(
                     runtime.tickets, current.outingId, current.titleName, onBack = closeOverlay, onSaved = runtime::syncTickets,
+                    sharing = runtime.ticketSharing,
+                )
+                is Overlay.Keepsakes -> work.kumarfamilynet.cinemarchive.feature.library.KeepsakesRoute(
+                    runtime.keepsakes, current.outingId, current.titleName, onBack = closeOverlay,
                 )
             }
             }

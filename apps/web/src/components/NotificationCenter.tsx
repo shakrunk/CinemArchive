@@ -35,6 +35,37 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
       </>
     ),
   },
+  outing_invite: {
+    Icon: Ticket,
+    verb: (n) => `invited you to "${typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'a movie')}"`,
+  },
+  outing_invite_response: {
+    Icon: Ticket,
+    verb: (n) => {
+      const film = typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'your outing')
+      return n.payload.accepted === true ? `is going to "${film}"` : `can't make "${film}"`
+    },
+  },
+  ticket_received: {
+    Icon: Ticket,
+    verb: (n) => `sent you a ticket to "${typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'a movie')}"`,
+  },
+  ticket_opened: {
+    Icon: Ticket,
+    verb: (n) => `opened your ticket to "${typeof n.payload.title === 'string' && n.payload.title ? n.payload.title : (n.title ?? 'a movie')}"`,
+  },
+  outing_poll: {
+    Icon: Ticket,
+    verb: (n) => `asked "${typeof n.payload.question === 'string' && n.payload.question ? n.payload.question : 'Which one works?'}"`,
+  },
+  outing_poll_closed: {
+    Icon: Ticket,
+    verb: (n) => {
+      const question = typeof n.payload.question === 'string' && n.payload.question ? n.payload.question : 'the poll'
+      const chosen = typeof n.payload.title === 'string' ? n.payload.title : ''
+      return n.payload.cancelled === true || !chosen ? `cancelled "${question}"` : `picked "${chosen}" for "${question}"`
+    },
+  },
   outing_plans_shared: {
     Icon: Ticket,
     verb: (n) => `has tickets to "${n.title ?? 'a movie'}"`,
@@ -102,6 +133,11 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       onNavigate('friends')
     } else if (n.type === 'invite_redeemed') {
       onNavigate('profile')
+    } else if (n.type === 'outing_invite' || n.type === 'outing_poll' || n.type === 'outing_poll_closed' || n.type === 'ticket_received') {
+      onNavigate('upnext')
+    } else if ((n.type === 'outing_invite_response' || n.type === 'ticket_opened') && n.titleId) {
+      // The title's detail drawer holds the outing and its ticket, where the owner sees who opened it.
+      openDetailDrawer(n.titleId)
     }
   }
 

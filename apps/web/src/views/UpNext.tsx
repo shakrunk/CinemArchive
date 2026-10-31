@@ -16,6 +16,10 @@ import {
 } from 'lucide-react'
 import { useUpNextShows, useUpcomingTitles, useAppStore } from 'src/store/useAppStore'
 import { TicketButton } from '../components/TicketViewer'
+import { OutingPollsButton } from '../components/OutingPolls'
+import { KeepsakeButton } from '../components/OutingKeepsakes'
+import { SharedWithYou } from '../components/SharedWithYou'
+import { ReceivedTickets } from '../components/SentTickets'
 import { isEpisodeSpoilerHidden, isUnaired, nextUnwatchedEpisode } from 'src/store/episodeUtils'
 import { DynamicPoster } from 'src/components/ui/dynamic-poster'
 import { SpiderNoirModeModal } from 'src/components/SpiderNoirModeModal'
@@ -405,7 +409,7 @@ function MarqueeCard({ entry, delayMs }: { entry: MarqueeEntry; delayMs?: number
           <span aria-label={presentation.ariaLabel}>{presentation.label}</span>
         </p>
         {detailLine && <p className="font-sans text-sm text-paper-dim truncate">{detailLine}</p>}
-        {!isSharedView && <div className="pt-2"><TicketButton outingId={outing.id} /></div>}
+        {!isSharedView && <div className="pt-2 flex flex-wrap items-center gap-3"><TicketButton outingId={outing.id} /><KeepsakeButton outingId={outing.id} /></div>}
         {!isSharedView && (
           <div className="mt-auto pt-3 flex items-center justify-between gap-2">
             {confirmingCancel ? (
@@ -646,15 +650,20 @@ export function UpNext({ onBrowseLibrary, onOpenCalendar }: { onBrowseLibrary: (
           </p>
           <h1 className="display-title text-[clamp(32px,6vw,56px)] mt-3">Up Next</h1>
         </div>
-        <button
-          type="button"
-          onClick={onOpenCalendar}
-          className="mb-2 shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs text-amber/85 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
-          style={{ border: '1px solid var(--line)' }}
-        >
-          <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" /> Calendar
-        </button>
+        <div className="flex items-end gap-2">
+          <OutingPollsButton />
+          <button
+            type="button"
+            onClick={onOpenCalendar}
+            className="mb-2 shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs text-amber/85 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
+            style={{ border: '1px solid var(--line)' }}
+          >
+            <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" /> Calendar
+          </button>
+        </div>
       </header>
+      <ReceivedTickets />
+      <SharedWithYou />
       {isEmpty ? (
         <UpNextEmptyState onBrowseLibrary={onBrowseLibrary} />
       ) : (

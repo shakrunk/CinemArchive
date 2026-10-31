@@ -50,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -99,7 +100,10 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetSettings
 import work.kumarfamilynet.cinemarchive.core.model.LedgerWidgetWidth
 import work.kumarfamilynet.cinemarchive.core.model.effectiveLedgerSettings
 import work.kumarfamilynet.cinemarchive.core.model.honorsLedgerSetting
+import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
+import work.kumarfamilynet.cinemarchive.core.model.SubscriptionPlan
 import work.kumarfamilynet.cinemarchive.data.LedgerLayoutRepository
+import work.kumarfamilynet.cinemarchive.data.MoviegoingPrefsRepository
 import work.kumarfamilynet.cinemarchive.data.LedgerRepository
 import work.kumarfamilynet.cinemarchive.core.designsystem.LocalBottomBarClearance
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -161,6 +165,7 @@ data class LedgerUiState(val stats: LedgerStats, val boards: Map<String, LedgerB
 class LedgerViewModel(
     repository: LedgerRepository,
     private val layoutRepository: LedgerLayoutRepository,
+    private val prefsRepository: MoviegoingPrefsRepository,
 ) : ViewModel() {
     private val layoutFlow = layoutRepository.observeLayout()
 
@@ -169,6 +174,20 @@ class LedgerViewModel(
 
     val layout = layoutFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val budget = prefsRepository.observeBudget()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setBudget(budget: MoviegoingBudget?) {
+        viewModelScope.launch { prefsRepository.setBudget(budget) }
+    }
+
+    val plan = prefsRepository.observePlan()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setPlan(plan: SubscriptionPlan?) {
+        viewModelScope.launch { prefsRepository.setPlan(plan) }
+    }
 
     private val editModeFlow = MutableStateFlow(false)
     val editMode: StateFlow<Boolean> = editModeFlow
@@ -204,29 +223,40 @@ class LedgerViewModel(
 fun LedgerRoute(
     repository: LedgerRepository,
     layoutRepository: LedgerLayoutRepository,
+    prefsRepository: MoviegoingPrefsRepository,
     onOpenProfile: () -> Unit,
     onTitleClick: (String) -> Unit,
     profileInitial: String = "C",
     isWideLayout: Boolean = false,
 ) {
-    val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository, layoutRepository))
+    val viewModel: LedgerViewModel = viewModel(factory = LedgerViewModelFactory(repository, layoutRepository, prefsRepository))
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val layout by viewModel.layout.collectAsStateWithLifecycle()
     val editMode by viewModel.editMode.collectAsStateWithLifecycle()
     val expandedWidgets by viewModel.expandedWidgets.collectAsStateWithLifecycle()
-    LedgerScreen(
-        uiState = uiState,
-        layout = layout,
-        editMode = editMode,
-        expandedWidgets = expandedWidgets,
-        onToggleEditMode = { viewModel.setEditMode(!editMode) },
-        onToggleExpanded = viewModel::toggleExpanded,
-        onLayoutChange = viewModel::updateLayout,
-        onOpenProfile = onOpenProfile,
-        onTitleClick = onTitleClick,
-        profileInitial = profileInitial,
-        isWideLayout = isWideLayout,
-    )
+    val budget by viewModel.budget.collectAsStateWithLifecycle()
+    val budgetUi = remember(budget) { MoviegoingBudgetUi(budget, viewModel::setBudget) }
+    val plan by viewModel.plan.collectAsStateWithLifecycle()
+    val planUi = remember(plan) { MoviegoingPlanUi(plan, viewModel::setPlan) }
+    CompositionLocalProvider(
+        LocalMoviegoingBudget provides budgetUi,
+        LocalMoviegoingPlan provides planUi,
+        LocalMoviegoingRecap provides true,
+    ) {
+        LedgerScreen(
+            uiState = uiState,
+            layout = layout,
+            editMode = editMode,
+            expandedWidgets = expandedWidgets,
+            onToggleEditMode = { viewModel.setEditMode(!editMode) },
+            onToggleExpanded = viewModel::toggleExpanded,
+            onLayoutChange = viewModel::updateLayout,
+            onOpenProfile = onOpenProfile,
+            onTitleClick = onTitleClick,
+            profileInitial = profileInitial,
+            isWideLayout = isWideLayout,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1240,7 +1270,8 @@ private fun EncoreRow(entry: LedgerEncoreEntry, fraction: Float) {
 private class LedgerViewModelFactory(
     private val repository: LedgerRepository,
     private val layoutRepository: LedgerLayoutRepository,
+    private val prefsRepository: MoviegoingPrefsRepository,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = LedgerViewModel(repository, layoutRepository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = LedgerViewModel(repository, layoutRepository, prefsRepository) as T
 }

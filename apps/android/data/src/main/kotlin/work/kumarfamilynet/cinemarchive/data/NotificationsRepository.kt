@@ -22,6 +22,12 @@ enum class NotificationType(val wire: String) {
     INVITE_REDEEMED("invite_redeemed"),
     OUTING_COMPLETED("outing_completed"),
     OUTING_PLANS_SHARED("outing_plans_shared"),
+    OUTING_INVITE("outing_invite"),
+    OUTING_INVITE_RESPONSE("outing_invite_response"),
+    TICKET_RECEIVED("ticket_received"),
+    TICKET_OPENED("ticket_opened"),
+    OUTING_POLL("outing_poll"),
+    OUTING_POLL_CLOSED("outing_poll_closed"),
     UNKNOWN("");
 
     companion object {
@@ -55,6 +61,8 @@ data class AppNotification(
 sealed interface NotificationRoute {
     data class TitleDetail(val titleId: String) : NotificationRoute
     data object Profile : NotificationRoute
+    /** An outing invitation lands on Up Next, where it is answered (#206). */
+    data object UpNext : NotificationRoute
     /** Friends isn't on Android yet; the screen falls back to showing the row in place. */
     data object Friends : NotificationRoute
     data object None : NotificationRoute
@@ -74,6 +82,9 @@ object NotificationRules {
         NotificationType.FRIEND_REQUEST_RECEIVED, NotificationType.FRIEND_REQUEST_ACCEPTED,
         NotificationType.RECOMMENDATION_RECEIVED -> NotificationRoute.Friends
         NotificationType.INVITE_REDEEMED -> NotificationRoute.Profile
+        NotificationType.OUTING_INVITE, NotificationType.TICKET_RECEIVED, NotificationType.OUTING_POLL, NotificationType.OUTING_POLL_CLOSED -> NotificationRoute.UpNext
+        NotificationType.OUTING_INVITE_RESPONSE, NotificationType.TICKET_OPENED ->
+            n.titleId?.let { NotificationRoute.TitleDetail(it) } ?: NotificationRoute.None
         else -> NotificationRoute.None
     }
 
@@ -96,6 +107,20 @@ object NotificationRules {
             }
             NotificationType.OUTING_COMPLETED -> "${n.title ?: "Your movie"} just let out — how was it?"
             NotificationType.OUTING_PLANS_SHARED -> "${n.actorName} has tickets to \"${n.title ?: "a movie"}\""
+            NotificationType.TICKET_RECEIVED -> "${n.actorName} sent you a ticket to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
+            NotificationType.TICKET_OPENED -> "${n.actorName} opened your ticket to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
+            NotificationType.OUTING_POLL -> "${n.actorName} asked \"${n.payload.optString("question").ifEmpty { "Which one works?" }}\""
+            NotificationType.OUTING_POLL_CLOSED -> {
+                val question = n.payload.optString("question").ifEmpty { "the poll" }
+                val chosen = n.payload.optString("title")
+                if (n.payload.optBoolean("cancelled") || chosen.isEmpty()) "${n.actorName} cancelled \"$question\""
+                else "${n.actorName} picked \"$chosen\" for \"$question\""
+            }
+            NotificationType.OUTING_INVITE -> "${n.actorName} invited you to \"${n.payload.optString("title").ifEmpty { n.title ?: "a movie" }}\""
+            NotificationType.OUTING_INVITE_RESPONSE -> {
+                val film = n.payload.optString("title").ifEmpty { n.title ?: "your outing" }
+                if (n.payload.optBoolean("accepted")) "${n.actorName} is going to \"$film\"" else "${n.actorName} can't make \"$film\""
+            }
             NotificationType.UNKNOWN -> "New activity"
         }
     }

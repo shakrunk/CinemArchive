@@ -18,4 +18,6 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 
 dependencies {
     testImplementation(libs.junit)
+    // Android's org.json is a compile-only stub that throws on the JVM; the cross-client fixture needs the real one.
+    testImplementation(libs.json)
 }

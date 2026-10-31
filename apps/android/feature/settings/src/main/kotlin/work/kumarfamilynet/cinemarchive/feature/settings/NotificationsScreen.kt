@@ -61,6 +61,7 @@ fun NotificationsRoute(
     onGotTicketsToo: suspend (SharedOutingNotification) -> Unit,
     onAddToCalendar: (SharedOutingNotification) -> Unit,
     showBack: Boolean = true,
+    onOpenUpNext: () -> Unit = {},
 ) {
     val inbox by repository.inbox.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -102,6 +103,7 @@ fun NotificationsRoute(
                                 is NotificationRoute.TitleDetail -> if (n.type == NotificationType.OUTING_COMPLETED)
                                     onOpenPostShow(route.titleId) else onOpenTitle(route.titleId)
                                 NotificationRoute.Profile -> onOpenProfile()
+                                NotificationRoute.UpNext -> onOpenUpNext()
                                 NotificationRoute.Friends -> onOpenFriends()
                                 NotificationRoute.None -> Unit
                             }

@@ -93,6 +93,33 @@ class AppAccountRuntime(
 
     private val transactor = RoomTransactor(database)
 
+    /** Online-only keepsake photos for outings (#208). */
+    val keepsakes: work.kumarfamilynet.cinemarchive.data.KeepsakeRepository by lazy {
+        val pending = context.getSharedPreferences("keepsake-pending-${identity.userId}", android.content.Context.MODE_PRIVATE)
+        work.kumarfamilynet.cinemarchive.data.KeepsakeRepository(
+            client, session::currentSession, ownerId, ::isCurrent,
+            work.kumarfamilynet.cinemarchive.data.TextKeepsakeJournal(
+                read = { pending.getString("pending", null) },
+                write = { text -> pending.edit().apply { if (text == null) remove("pending") else putString("pending", text) }.apply() },
+            ),
+        )
+    }
+
+    /** Invitations to join friends' outings, and inviting friends to this user's (#206). Online-only. */
+    val sharedOutings: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository(client, session::currentSession, ownerId, ::isCurrent)
+    }
+
+    /** Sending a ticket to friends, and opening ones they sent (#220). Online-only. */
+    val ticketSharing: work.kumarfamilynet.cinemarchive.data.TicketSharingRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.TicketSharingRepository(client, session::currentSession, ownerId, ::isCurrent, friendsRepository::listFriendships)
+    }
+
+    /** Polls with friends (#203). Online-only. */
+    val outingPolls: work.kumarfamilynet.cinemarchive.data.OutingPollsRepository by lazy {
+        work.kumarfamilynet.cinemarchive.data.OutingPollsRepository(client, session::currentSession, ownerId, ::isCurrent, friendsRepository::listFriendships)
+    }
+
     val tickets: work.kumarfamilynet.cinemarchive.data.TicketRuntime by lazy {
         work.kumarfamilynet.cinemarchive.data.TicketRuntime.create(database,
             work.kumarfamilynet.cinemarchive.core.model.TicketOwnerScope(BuildConfig.SUPABASE_URL.trimEnd('/'), ownerId),
@@ -209,6 +236,10 @@ class AppAccountRuntime(
 
     val ledgerLayoutRepository = LedgerLayoutRepository(dataStore("cinemarchive_ledger_layout"), session, SupabaseLedgerLayoutWriter(client))
 
+    val moviegoingPrefsRepository = work.kumarfamilynet.cinemarchive.data.MoviegoingPrefsRepository(
+        dataStore("cinemarchive_moviegoing_prefs"), session, client, ::isCurrent,
+    )
+
     // The appearance itself is device-level; only this account's copy is reconciled here, and
     // both jobs die with the runtime's scope on sign-out or account switch.
     private val themeSyncRepository = work.kumarfamilynet.cinemarchive.data.ThemeSyncRepository(preferences, session, client, ::isCurrent)
@@ -270,7 +301,16 @@ class AppAccountRuntime(
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId,
         work.kumarfamilynet.cinemarchive.data.ProviderImportAdmission(database, outbox, importOwner, ::isCurrent),
         providerMerges,
-        ::isCurrent, { librarySyncRepository.syncNow() })
+        ::isCurrent, { librarySyncRepository.syncNow() },
+        jellyfinStore = work.kumarfamilynet.cinemarchive.data.EncryptedJellyfinStore(context, ownerId),
+        onJellyfinConnectionChanged = { connected -> JellyfinScheduler.update(context, connected) })
+
+    /** Polls Jellyfin for new plays and announces each newly queued one with an Add/Dismiss
+     *  notification. Nothing reaches the library until the user answers (see [JellyfinNotifier]). */
+    suspend fun checkJellyfinAndNotify() {
+        val fresh = syncServices.jellyfin.check()
+        JellyfinNotifier.postPlays(context, this, fresh)
+    }
 
     val backupRepository by lazy {
         work.kumarfamilynet.cinemarchive.data.LibraryBackupRepository(database,
@@ -310,6 +350,7 @@ class AppAccountRuntime(
         moviegoingPreferences = moviegoingPreferences,
         lifecycle = outingLifecycle,
         scheduleCommands = work.kumarfamilynet.cinemarchive.data.OutingScheduleCommands(database, outbox, importOwner, ::isCurrent),
+        reminders = preferences,
     )
 
     val outingPlansRepository = work.kumarfamilynet.cinemarchive.data.OutingPlansRepository.create(
@@ -379,7 +420,15 @@ class AppAccountRuntime(
             // Also after sync: queued schedule changes carry the revisions that pull just cached.
             if (episodeScheduleRefresher.refresh() > 0) librarySyncRepository.syncNow()
         }
+        scope.launch {
+            // The periodic check exists only while a Jellyfin account is connected; the first check
+            // runs now so a watch since the app was last open is offered straight away.
+            val connected = syncServices.jellyfin.isConnected()
+            JellyfinScheduler.update(context, connected)
+            if (connected) checkJellyfinAndNotify()
+        }
         scope.launch { ledgerLayoutRepository.reconcile() }
+        scope.launch { moviegoingPrefsRepository.reconcile() }
         scope.launch { themeSyncRepository.reconcile() }
         scope.launch { themeSyncRepository.watchLocalChanges() }
     }
@@ -399,6 +448,9 @@ class AppAccountRuntime(
 
     /** Runs the completion engine and returns the transitions, for the alarm receiver. */
     suspend fun completeDueOutings() = outingsRepository.completeDueOutings()
+
+    /** Showtime reminders due now, already marked sent (#213). */
+    suspend fun claimDueReminders() = outingsRepository.claimDueReminders()
 
     /** Runs [block] inside this runtime's scope: closing the runtime cancels it. */
     suspend fun <T> runOwned(block: suspend () -> T): T = scope.async { block() }.await()

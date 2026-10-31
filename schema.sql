@@ -7375,3 +7375,1257 @@ $$;
 
 revoke all on function cinemarchive_private.sync_library_changes(timestamptz,integer) from public, anon;
 grant execute on function cinemarchive_private.sync_library_changes(timestamptz,integer) to authenticated;
+
+-- Moviegoing preferences: budget and related owner-private settings (20261029000000).
+-- Owner-private moviegoing preferences that follow the account across devices
+-- (docs/android-contracts/moviegoing-prefs.md): the spend budget today, with room for
+-- the theater subscription plan and default region as those features land.
+--
+-- Deliberately NOT a column on user_prefs: that table's friend and shared-key read
+-- policies expose the whole row, and a spending budget is not something to show friends.
+-- This table has an owner policy only, so no friend, shared-token or anonymous read exists.
+--
+-- Shape of `prefs`: { budget?: { amount, period }, updatedAt, ... }. Clients resolve
+-- conflicts last-write-wins on prefs.updatedAt, never on the row's updated_at (which any
+-- write bumps), and ignore keys they do not know so a newer client's additions survive.
+create table public.moviegoing_prefs (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  prefs      jsonb not null default '{}'::jsonb
+             check (jsonb_typeof(prefs) = 'object' and pg_column_size(prefs) <= 8192),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.moviegoing_prefs enable row level security;
+
+create policy "moviegoing_prefs: owner full access"
+  on public.moviegoing_prefs for all
+  using  ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+revoke all on public.moviegoing_prefs from public, anon;
+grant select, insert, update, delete on public.moviegoing_prefs to authenticated;
+grant all on public.moviegoing_prefs to service_role;
+
+create trigger moviegoing_prefs_updated_at
+  before update on public.moviegoing_prefs
+  for each row execute function public.update_updated_at();
+
+-- Outing keepsake photos (20261030000000).
+-- Keepsake photos for cinema outings (#208): a ticket stub, a poster board, a popcorn selfie.
+-- Distinct from the single scannable ticket attachment (private_ticket_attachments): there is
+-- no barcode, an outing can have several, and each is plain owner-private data.
+--
+-- Bytes live in the private `outing-keepsakes` bucket under `<owner>/<keepsake id>`. A photo is
+-- uploaded first, then its row is inserted; the insert trigger checks that the stored object
+-- exists and matches the row's size and type, so a row can never point at nothing or at
+-- someone else's bytes. Rows are immutable (no UPDATE) and owner-only (no friend, shared-token
+-- or anonymous read exists).
+--
+-- Clients cannot delete or overwrite bytes. Removing a keepsake deletes its row, which makes
+-- the object unreadable at once; a service-only cleanup (scripts/cleanup-keepsake-photos.mjs)
+-- later removes objects that have no row for a day, which also covers an upload whose row
+-- insert failed and the cascade when an outing or account is deleted.
+create table public.outing_keepsakes (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  outing_id   uuid not null references public.cinema_outings(id) on delete cascade,
+  object_key  text not null unique,
+  mime_type   text not null check (mime_type in ('image/jpeg','image/png','image/webp')),
+  byte_length integer not null check (byte_length between 1 and 10485760),
+  created_at  timestamptz not null default now(),
+  check (object_key = user_id::text || '/' || id::text)
+);
+create index outing_keepsakes_outing_idx on public.outing_keepsakes(outing_id);
+create index outing_keepsakes_owner_idx on public.outing_keepsakes(user_id, created_at desc);
+
+alter table public.outing_keepsakes enable row level security;
+revoke all on public.outing_keepsakes from public, anon, authenticated;
+grant select, insert, delete on public.outing_keepsakes to authenticated;
+grant all on public.outing_keepsakes to service_role;
+
+create policy "outing keepsakes: owner read" on public.outing_keepsakes
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy "outing keepsakes: owner insert" on public.outing_keepsakes
+  for insert to authenticated with check (
+    user_id = (select auth.uid())
+    and exists (select 1 from public.cinema_outings o where o.id = outing_id and o.user_id = (select auth.uid())));
+create policy "outing keepsakes: owner delete" on public.outing_keepsakes
+  for delete to authenticated using (user_id = (select auth.uid()));
+
+create schema if not exists cinemarchive_private;
+
+-- Runs as the owner of the function so it can read Storage metadata that the caller's own
+-- Storage policies would not yet show (the read policy requires the row being inserted).
+create function cinemarchive_private.guard_keepsake_insert()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare stored jsonb;
+begin
+  -- Refuse before looking at Storage, so a row for someone else's key cannot probe which objects exist.
+  if auth.uid() is not null and new.user_id is distinct from auth.uid() then
+    raise exception 'Not allowed' using errcode = '42501';
+  end if;
+  select metadata into stored from storage.objects
+    where bucket_id = 'outing-keepsakes' and name = new.object_key;
+  if stored is null then
+    raise exception 'Upload the photo before adding it to the outing' using errcode = '22023';
+  end if;
+  if (stored->>'size')::bigint is distinct from new.byte_length::bigint
+     or stored->>'mimetype' is distinct from new.mime_type then
+    raise exception 'The uploaded photo does not match its description' using errcode = '22023';
+  end if;
+  if (select count(*) from public.outing_keepsakes where outing_id = new.outing_id) >= 8 then
+    raise exception 'An outing can keep at most 8 photos' using errcode = '54000';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function cinemarchive_private.guard_keepsake_insert() from public, anon, authenticated;
+create trigger outing_keepsakes_guard_insert
+  before insert on public.outing_keepsakes
+  for each row execute function cinemarchive_private.guard_keepsake_insert();
+
+-- An owner may put an object only under their own folder, with a UUID name, and only while they
+-- hold fewer than 500 objects in the bucket, so the folder is not an unbounded file drop.
+create function cinemarchive_private.can_upload_keepsake_object(p_name text)
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then return false; end if;
+  if p_name !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return false;
+  end if;
+  if split_part(p_name, '/', 1) <> auth.uid()::text then return false; end if;
+  return (select count(*) from storage.objects
+    where bucket_id = 'outing-keepsakes' and split_part(name, '/', 1) = auth.uid()::text) < 500;
+end;
+$$;
+revoke all on function cinemarchive_private.can_upload_keepsake_object(text) from public, anon;
+grant execute on function cinemarchive_private.can_upload_keepsake_object(text) to authenticated;
+
+insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+  values ('outing-keepsakes', 'outing-keepsakes', false, 10485760, array['image/jpeg','image/png','image/webp'])
+  on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "keepsake bytes: owner upload" on storage.objects for insert to authenticated with check (
+  bucket_id = 'outing-keepsakes' and cinemarchive_private.can_upload_keepsake_object(name));
+create policy "keepsake bytes: owner read" on storage.objects for select to authenticated using (
+  bucket_id = 'outing-keepsakes' and exists (select 1 from public.outing_keepsakes k
+    where k.user_id = (select auth.uid()) and k.object_key = name));
+-- No UPDATE or DELETE policy: bytes are immutable, and only the service-only cleanup removes them.
+
+-- Restrictive fences keep an unrelated permissive policy on this bucket from granting access.
+create policy "keepsake bytes: anonymous fence" on storage.objects as restrictive for all to anon
+  using (bucket_id <> 'outing-keepsakes') with check (bucket_id <> 'outing-keepsakes');
+create policy "keepsake bytes: upload fence" on storage.objects as restrictive for insert to authenticated with check (
+  bucket_id <> 'outing-keepsakes' or cinemarchive_private.can_upload_keepsake_object(name));
+create policy "keepsake bytes: read fence" on storage.objects as restrictive for select to authenticated using (
+  bucket_id <> 'outing-keepsakes' or exists (select 1 from public.outing_keepsakes k
+    where k.user_id = (select auth.uid()) and k.object_key = name));
+create policy "keepsake bytes: overwrite fence" on storage.objects as restrictive for update to authenticated
+  using (bucket_id <> 'outing-keepsakes') with check (bucket_id <> 'outing-keepsakes');
+create policy "keepsake bytes: deletion fence" on storage.objects as restrictive for delete to authenticated
+  using (bucket_id <> 'outing-keepsakes');
+
+-- Service-only: object names in the bucket with no keepsake row for over a day, at most 100.
+-- The cleanup script removes each through the Storage API (never by deleting the metadata row).
+create function public.claim_keepsake_cleanup(p_limit integer default 100)
+returns table (object_key text)
+language sql stable security definer set search_path = '' as $$
+  select o.name from storage.objects o
+  where o.bucket_id = 'outing-keepsakes'
+    and o.created_at < now() - interval '1 day'
+    and not exists (select 1 from public.outing_keepsakes k where k.object_key = o.name)
+  order by o.created_at
+  limit least(greatest(coalesce(p_limit, 100), 1), 100)
+$$;
+revoke all on function public.claim_keepsake_cleanup(integer) from public, anon, authenticated;
+grant execute on function public.claim_keepsake_cleanup(integer) to service_role;
+
+-- Shared outings (20261031000000).
+-- Shared outings (#206): invite linked friends to a cinema outing so it shows on their Up Next.
+--
+-- cinema_outings stays owner-only (booking ref, price, notes, seats and the ticket reference are
+-- never shared). Inviting friends creates a separate shared_outings record holding only the
+-- minimal snapshot the in-app plan sharing already exposes (title, time, venue, format and
+-- companion display names), plus one shared_outing_members row per invited friend. Polls, group
+-- reactions and ticket sending (#203, #207, #220) attach to this record.
+--
+-- Consent is invite then accept: a friend is shown an invite and accepts or declines. Clients
+-- have read-only table access; every change goes through the RPCs below, which require an
+-- accepted friendship. The owner's later edits to time, venue, format, companions and status
+-- flow into the snapshot, and unfriending or blocking removes the member.
+create table public.shared_outings (
+  id         uuid primary key default gen_random_uuid(),
+  owner_id   uuid not null references auth.users(id) on delete cascade,
+  -- Set null (not cascade) when the owner deletes the outing, so members see it as cancelled.
+  outing_id  uuid references public.cinema_outings(id) on delete set null,
+  status     text not null default 'scheduled' check (status in ('scheduled','completed','cancelled')),
+  showtime   timestamptz not null,
+  ends_at    timestamptz not null,
+  snapshot   jsonb not null check (jsonb_typeof(snapshot) = 'object' and pg_column_size(snapshot) <= 4096),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index shared_outings_outing_idx on public.shared_outings(outing_id) where outing_id is not null;
+create index shared_outings_owner_idx on public.shared_outings(owner_id, showtime);
+
+create table public.shared_outing_members (
+  shared_outing_id uuid not null references public.shared_outings(id) on delete cascade,
+  user_id          uuid not null references auth.users(id) on delete cascade,
+  status           text not null default 'invited' check (status in ('invited','accepted','declined')),
+  invited_at       timestamptz not null default now(),
+  responded_at     timestamptz,
+  primary key (shared_outing_id, user_id)
+);
+create index shared_outing_members_user_idx on public.shared_outing_members(user_id, status);
+
+alter table public.shared_outings enable row level security;
+alter table public.shared_outing_members enable row level security;
+revoke all on public.shared_outings, public.shared_outing_members from public, anon, authenticated;
+grant select on public.shared_outings, public.shared_outing_members to authenticated;
+grant all on public.shared_outings, public.shared_outing_members to service_role;
+
+create schema if not exists cinemarchive_private;
+
+-- The two policies reference each other's table, so each check lives in a definer function to
+-- avoid recursive row-level security.
+create function cinemarchive_private.is_shared_outing_member(p_shared_outing_id uuid, p_user_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.shared_outing_members
+    where shared_outing_id = p_shared_outing_id and user_id = p_user_id and status in ('invited','accepted'));
+$$;
+create function cinemarchive_private.owns_shared_outing(p_shared_outing_id uuid, p_user_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.shared_outings where id = p_shared_outing_id and owner_id = p_user_id);
+$$;
+revoke all on function cinemarchive_private.is_shared_outing_member(uuid, uuid) from public, anon;
+revoke all on function cinemarchive_private.owns_shared_outing(uuid, uuid) from public, anon;
+grant execute on function cinemarchive_private.is_shared_outing_member(uuid, uuid) to authenticated;
+grant execute on function cinemarchive_private.owns_shared_outing(uuid, uuid) to authenticated;
+
+-- A member sees a shared outing only while invited or accepted; the owner always sees theirs.
+-- A member sees only their own membership row; the owner sees every member of their outing.
+create policy "shared outings: owner or member read" on public.shared_outings
+  for select to authenticated using (
+    owner_id = (select auth.uid())
+    or cinemarchive_private.is_shared_outing_member(id, (select auth.uid())));
+create policy "shared outing members: self or owner read" on public.shared_outing_members
+  for select to authenticated using (
+    user_id = (select auth.uid())
+    or cinemarchive_private.owns_shared_outing(shared_outing_id, (select auth.uid())));
+
+-- Notification types for an invitation and the invitee's answer.
+alter table public.notifications drop constraint notifications_type_check;
+alter table public.notifications add constraint notifications_type_check check (type in (
+  'friend_request_received', 'friend_request_accepted',
+  'share_link_used', 'recommendation_received',
+  'comment_received', 'reaction_received', 'invite_redeemed',
+  'outing_completed', 'outing_plans_shared',
+  'outing_invite', 'outing_invite_response'
+));
+
+-- Display names from either legacy string companions or {name, friendUserId?} objects, as the
+-- plan-share snapshot builds them. Account identifiers are never included.
+create function cinemarchive_private.companion_names(p_companions jsonb)
+returns jsonb language sql stable set search_path = '' as $$
+  select coalesce(jsonb_agg(v.name order by v.ordinality) filter (where v.name is not null and btrim(v.name) <> ''), '[]'::jsonb)
+  from (
+    select ordinality, case
+      when jsonb_typeof(value) = 'string' then value #>> '{}'
+      when jsonb_typeof(value) = 'object' and jsonb_typeof(value -> 'name') = 'string' then value ->> 'name'
+      else null end as name
+    from jsonb_array_elements(case when jsonb_typeof(p_companions) = 'array' then p_companions else '[]'::jsonb end) with ordinality
+  ) v;
+$$;
+
+create function cinemarchive_private.shared_outing_snapshot(o public.cinema_outings, t public.titles)
+returns jsonb language sql stable set search_path = '' as $$
+  select jsonb_build_object(
+    'tmdb_id', t.tmdb_id, 'type', t.type, 'title', t.title, 'year', t.year, 'poster_url', t.poster_url,
+    'venue', o.venue, 'format', o.format, 'companions', cinemarchive_private.companion_names(o.companions));
+$$;
+
+create function cinemarchive_private.shared_outing_status(p_outing_status text)
+returns text language sql immutable set search_path = '' as $$
+  select case p_outing_status when 'scheduled' then 'scheduled' when 'completed' then 'completed' else 'cancelled' end;
+$$;
+
+-- Keep the shared record in step with the owner's outing.
+create function cinemarchive_private.sync_shared_outing()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare t public.titles;
+begin
+  if not exists (select 1 from public.shared_outings where outing_id = new.id) then return new; end if;
+  select * into t from public.titles where id = new.title_id;
+  update public.shared_outings set
+      status = cinemarchive_private.shared_outing_status(new.status),
+      showtime = new.showtime, ends_at = new.ends_at,
+      snapshot = cinemarchive_private.shared_outing_snapshot(new, t), updated_at = now()
+    where outing_id = new.id;
+  return new;
+end;
+$$;
+revoke all on function cinemarchive_private.sync_shared_outing() from public, anon, authenticated;
+create trigger cinema_outings_sync_shared
+  after update of showtime, ends_at, venue, format, companions, status, title_id on public.cinema_outings
+  for each row execute function cinemarchive_private.sync_shared_outing();
+
+create function cinemarchive_private.cancel_shared_outing_on_delete()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.shared_outings set status = 'cancelled', updated_at = now() where outing_id = old.id;
+  return old;
+end;
+$$;
+revoke all on function cinemarchive_private.cancel_shared_outing_on_delete() from public, anon, authenticated;
+create trigger cinema_outings_cancel_shared
+  before delete on public.cinema_outings
+  for each row execute function cinemarchive_private.cancel_shared_outing_on_delete();
+
+-- Unfriending or blocking ends any shared outing between the two people, in both directions.
+create function cinemarchive_private.drop_members_when_unfriended()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'UPDATE' and not (old.status = 'accepted' and new.status <> 'accepted') then return new; end if;
+  if tg_op = 'DELETE' and old.status <> 'accepted' then return old; end if;
+  delete from public.shared_outing_members m using public.shared_outings s
+    where m.shared_outing_id = s.id
+      and ((s.owner_id = old.user_id_a and m.user_id = old.user_id_b)
+        or (s.owner_id = old.user_id_b and m.user_id = old.user_id_a));
+  return coalesce(new, old);
+end;
+$$;
+revoke all on function cinemarchive_private.drop_members_when_unfriended() from public, anon, authenticated;
+create trigger friendships_drop_shared_members
+  after update of status or delete on public.friendships
+  for each row execute function cinemarchive_private.drop_members_when_unfriended();
+
+-- Invite accepted friends to an upcoming scheduled outing of the caller's. Idempotent: friends
+-- already invited or accepted are left alone and not notified again; a friend who declined is
+-- invited again. At most eight people may be invited or accepted at once.
+create function cinemarchive_private.invite_friends_to_outing(p_outing_id uuid, p_friend_ids uuid[])
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  ids uuid[];
+  outing public.cinema_outings;
+  t public.titles;
+  shared public.shared_outings;
+  member public.shared_outing_members;
+  friend uuid;
+  newly uuid[] := '{}';
+  payload jsonb;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if p_outing_id is null or p_friend_ids is null or cardinality(p_friend_ids) = 0
+     or array_position(p_friend_ids, null) is not null then
+    raise exception 'At least one valid friend is required' using errcode = '22023';
+  end if;
+  select array_agg(distinct id order by id) into ids from unnest(p_friend_ids) id;
+  if cardinality(ids) > 8 then raise exception 'An outing can invite at most 8 friends' using errcode = '22023'; end if;
+  select * into outing from public.cinema_outings where id = p_outing_id and user_id = me;
+  if outing.id is null then raise exception 'Outing not found' using errcode = '42501'; end if;
+  if outing.status <> 'scheduled' or outing.ends_at <= now() then
+    raise exception 'Can only invite friends to an upcoming scheduled outing' using errcode = '22023';
+  end if;
+  select * into t from public.titles where id = outing.title_id and user_id = me;
+  if t.id is null then raise exception 'Title not found' using errcode = '42501'; end if;
+  foreach friend in array ids loop
+    if friend = me or not public.is_friend(me, friend) then
+      raise exception 'Can only invite accepted friends' using errcode = '42501';
+    end if;
+  end loop;
+
+  insert into public.shared_outings(owner_id, outing_id, showtime, ends_at, snapshot)
+    values (me, outing.id, outing.showtime, outing.ends_at, cinemarchive_private.shared_outing_snapshot(outing, t))
+    on conflict (outing_id) where outing_id is not null do update set
+      status = 'scheduled', showtime = excluded.showtime, ends_at = excluded.ends_at,
+      snapshot = excluded.snapshot, updated_at = now()
+    returning * into shared;
+
+  foreach friend in array ids loop
+    select * into member from public.shared_outing_members
+      where shared_outing_id = shared.id and user_id = friend for update;
+    if member.user_id is null then
+      insert into public.shared_outing_members(shared_outing_id, user_id) values (shared.id, friend);
+      newly := newly || friend;
+    elsif member.status = 'declined' then
+      update public.shared_outing_members set status = 'invited', invited_at = now(), responded_at = null
+        where shared_outing_id = shared.id and user_id = friend;
+      newly := newly || friend;
+    end if;
+  end loop;
+
+  if (select count(*) from public.shared_outing_members
+        where shared_outing_id = shared.id and status in ('invited','accepted')) > 8 then
+    raise exception 'An outing can invite at most 8 friends' using errcode = '22023';
+  end if;
+
+  payload := shared.snapshot || jsonb_build_object('shared_outing_id', shared.id, 'showtime', shared.showtime, 'ends_at', shared.ends_at);
+  foreach friend in array newly loop
+    insert into public.notifications(recipient_id, type, actor_id, title_id, payload)
+      values (friend, 'outing_invite', me, outing.title_id, payload);
+  end loop;
+  return jsonb_build_object('shared_outing_id', shared.id, 'members',
+    (select coalesce(jsonb_agg(jsonb_build_object('user_id', m.user_id, 'status', m.status) order by m.invited_at), '[]'::jsonb)
+       from public.shared_outing_members m where m.shared_outing_id = shared.id));
+end;
+$$;
+
+-- Accept or decline an invitation, or (accepted then declined) leave. Idempotent for the same
+-- answer. A declined member needs a new invitation to rejoin.
+create function cinemarchive_private.respond_to_outing_invite(p_shared_outing_id uuid, p_accept boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  shared public.shared_outings;
+  member public.shared_outing_members;
+  want text := case when p_accept then 'accepted' else 'declined' end;
+  title_id uuid;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if p_shared_outing_id is null or p_accept is null then raise exception 'An outing and an answer are required' using errcode = '22023'; end if;
+  select * into member from public.shared_outing_members where shared_outing_id = p_shared_outing_id and user_id = me for update;
+  if member.user_id is null then raise exception 'Invitation not found' using errcode = '42501'; end if;
+  select * into shared from public.shared_outings where id = p_shared_outing_id;
+  if member.status = want then return jsonb_build_object('status', want); end if;
+  if member.status = 'declined' then raise exception 'Ask for a new invitation to join' using errcode = '22023'; end if;
+  if shared.status <> 'scheduled' or shared.ends_at <= now() then
+    raise exception 'This outing is no longer open' using errcode = '22023';
+  end if;
+  update public.shared_outing_members set status = want, responded_at = now()
+    where shared_outing_id = p_shared_outing_id and user_id = me;
+  select o.title_id into title_id from public.cinema_outings o where o.id = shared.outing_id;
+  insert into public.notifications(recipient_id, type, actor_id, title_id, payload)
+    values (shared.owner_id, 'outing_invite_response', me, title_id,
+      jsonb_build_object('shared_outing_id', shared.id, 'accepted', p_accept, 'title', shared.snapshot ->> 'title',
+        'showtime', shared.showtime));
+  return jsonb_build_object('status', want);
+end;
+$$;
+
+-- The owner removes a member from their outing.
+create function cinemarchive_private.remove_outing_member(p_shared_outing_id uuid, p_user_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if not exists (select 1 from public.shared_outings where id = p_shared_outing_id and owner_id = auth.uid()) then
+    raise exception 'Outing not found' using errcode = '42501';
+  end if;
+  delete from public.shared_outing_members where shared_outing_id = p_shared_outing_id and user_id = p_user_id;
+end;
+$$;
+
+-- Outings the caller is invited to or going to, recent and upcoming, with the owner's name.
+create function cinemarchive_private.get_shared_outings()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', s.id, 'status', s.status, 'my_status', m.status, 'owner_id', s.owner_id,
+      'owner_name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'showtime', s.showtime, 'ends_at', s.ends_at, 'snapshot', s.snapshot) order by s.showtime), '[]'::jsonb)
+    from public.shared_outing_members m
+    join public.shared_outings s on s.id = m.shared_outing_id
+    left join public.profiles p on p.user_id = s.owner_id
+    where m.user_id = auth.uid() and m.status in ('invited','accepted')
+      and s.ends_at > now() - interval '2 days');
+end;
+$$;
+
+-- The owner's view of who is invited to one of their outings.
+create function cinemarchive_private.get_outing_members(p_outing_id uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'shared_outing_id', s.id, 'user_id', m.user_id,
+      'name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'), 'status', m.status) order by m.invited_at), '[]'::jsonb)
+    from public.shared_outings s
+    join public.shared_outing_members m on m.shared_outing_id = s.id
+    left join public.profiles p on p.user_id = m.user_id
+    where s.outing_id = p_outing_id and s.owner_id = auth.uid());
+end;
+$$;
+
+revoke all on function cinemarchive_private.invite_friends_to_outing(uuid, uuid[]) from public, anon;
+revoke all on function cinemarchive_private.respond_to_outing_invite(uuid, boolean) from public, anon;
+revoke all on function cinemarchive_private.remove_outing_member(uuid, uuid) from public, anon;
+revoke all on function cinemarchive_private.get_shared_outings() from public, anon;
+revoke all on function cinemarchive_private.get_outing_members(uuid) from public, anon;
+grant execute on function cinemarchive_private.invite_friends_to_outing(uuid, uuid[]) to authenticated;
+grant execute on function cinemarchive_private.respond_to_outing_invite(uuid, boolean) to authenticated;
+grant execute on function cinemarchive_private.remove_outing_member(uuid, uuid) to authenticated;
+grant execute on function cinemarchive_private.get_shared_outings() to authenticated;
+grant execute on function cinemarchive_private.get_outing_members(uuid) to authenticated;
+
+-- Public wrappers: PostgREST exposes only the public schema.
+create function public.invite_friends_to_outing(p_outing_id uuid, p_friend_ids uuid[])
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.invite_friends_to_outing(p_outing_id, p_friend_ids);
+$$;
+create function public.respond_to_outing_invite(p_shared_outing_id uuid, p_accept boolean)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.respond_to_outing_invite(p_shared_outing_id, p_accept);
+$$;
+create function public.remove_outing_member(p_shared_outing_id uuid, p_user_id uuid)
+returns void language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.remove_outing_member(p_shared_outing_id, p_user_id);
+$$;
+create function public.get_shared_outings()
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_shared_outings();
+$$;
+create function public.get_outing_members(p_outing_id uuid)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_outing_members(p_outing_id);
+$$;
+revoke all on function public.invite_friends_to_outing(uuid, uuid[]) from public, anon;
+revoke all on function public.respond_to_outing_invite(uuid, boolean) from public, anon;
+revoke all on function public.remove_outing_member(uuid, uuid) from public, anon;
+revoke all on function public.get_shared_outings() from public, anon;
+revoke all on function public.get_outing_members(uuid) from public, anon;
+grant execute on function public.invite_friends_to_outing(uuid, uuid[]) to authenticated;
+grant execute on function public.respond_to_outing_invite(uuid, boolean) to authenticated;
+grant execute on function public.remove_outing_member(uuid, uuid) to authenticated;
+grant execute on function public.get_shared_outings() to authenticated;
+grant execute on function public.get_outing_members(uuid) to authenticated;
+
+-- Shared outing reactions (20261101000000).
+-- Group post-show reactions (#207): the people on a shared outing (shared_outings, #206) can
+-- share how it went, a star rating and a short note, and see each other's.
+--
+-- Sharing is a deliberate act and separate from the private viewing log: a reaction is written
+-- here only by an explicit "share with the group", and never copied from or into the owner's or a
+-- member's own library. Only the outing's participants (the owner and members who accepted) can
+-- read or write reactions, and only after the show has ended. Clients have no table access at all;
+-- everything goes through the RPCs below.
+create table public.shared_outing_reactions (
+  shared_outing_id uuid not null references public.shared_outings(id) on delete cascade,
+  user_id          uuid not null references auth.users(id) on delete cascade,
+  rating           numeric(2,1) check (rating is null or (rating between 0.5 and 5 and rating * 2 = floor(rating * 2))),
+  note             text check (note is null or char_length(note) between 1 and 500),
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  primary key (shared_outing_id, user_id),
+  check (rating is not null or note is not null)
+);
+
+alter table public.shared_outing_reactions enable row level security;
+revoke all on public.shared_outing_reactions from public, anon, authenticated;
+grant all on public.shared_outing_reactions to service_role;
+
+-- A member who declines, leaves or is removed takes their reaction with them.
+create function cinemarchive_private.drop_reaction_of_departed_member()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' or new.status = 'declined' then
+    delete from public.shared_outing_reactions
+      where shared_outing_id = old.shared_outing_id and user_id = old.user_id;
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+revoke all on function cinemarchive_private.drop_reaction_of_departed_member() from public, anon, authenticated;
+create trigger shared_outing_members_drop_reaction
+  after update of status or delete on public.shared_outing_members
+  for each row execute function cinemarchive_private.drop_reaction_of_departed_member();
+
+-- The owner, or a member who accepted.
+create function cinemarchive_private.is_outing_participant(p_shared_outing_id uuid, p_user_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.shared_outings where id = p_shared_outing_id and owner_id = p_user_id)
+      or exists (select 1 from public.shared_outing_members
+           where shared_outing_id = p_shared_outing_id and user_id = p_user_id and status = 'accepted');
+$$;
+revoke all on function cinemarchive_private.is_outing_participant(uuid, uuid) from public, anon, authenticated;
+
+-- Reactions open once the show has ended (or the owner's outing completed) and stay closed for a
+-- cancelled one.
+create function cinemarchive_private.reactions_open(s public.shared_outings)
+returns boolean language sql stable set search_path = '' as $$
+  select s.status <> 'cancelled' and (s.status = 'completed' or s.ends_at <= now());
+$$;
+revoke all on function cinemarchive_private.reactions_open(public.shared_outings) from public, anon, authenticated;
+
+-- Share or update the caller's own reaction. Idempotent for the same values.
+create function cinemarchive_private.share_outing_reaction(p_shared_outing_id uuid, p_rating numeric, p_note text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  shared public.shared_outings;
+  note text := nullif(btrim(coalesce(p_note, '')), '');
+  saved public.shared_outing_reactions;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  select * into shared from public.shared_outings where id = p_shared_outing_id;
+  if shared.id is null or not cinemarchive_private.is_outing_participant(shared.id, me) then
+    raise exception 'Outing not found' using errcode = '42501';
+  end if;
+  if not cinemarchive_private.reactions_open(shared) then
+    raise exception 'Reactions open once the show has ended' using errcode = '22023';
+  end if;
+  if p_rating is null and note is null then
+    raise exception 'Add a rating or a note' using errcode = '22023';
+  end if;
+  if p_rating is not null and (p_rating < 0.5 or p_rating > 5 or p_rating * 2 <> floor(p_rating * 2)) then
+    raise exception 'Rate from 0.5 to 5 in half stars' using errcode = '22023';
+  end if;
+  if note is not null and char_length(note) > 500 then
+    raise exception 'Keep the note to 500 characters' using errcode = '22023';
+  end if;
+  insert into public.shared_outing_reactions(shared_outing_id, user_id, rating, note)
+    values (shared.id, me, p_rating, note)
+    on conflict (shared_outing_id, user_id) do update
+      set rating = excluded.rating, note = excluded.note, updated_at = now()
+    returning * into saved;
+  return jsonb_build_object('rating', saved.rating, 'note', saved.note, 'updated_at', saved.updated_at);
+end;
+$$;
+
+create function cinemarchive_private.withdraw_outing_reaction(p_shared_outing_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  delete from public.shared_outing_reactions where shared_outing_id = p_shared_outing_id and user_id = auth.uid();
+end;
+$$;
+
+-- Everyone's reaction on the outing, for a participant. `is_me` marks the caller's own.
+create function cinemarchive_private.get_outing_reactions(p_shared_outing_id uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if not cinemarchive_private.is_outing_participant(p_shared_outing_id, me) then
+    raise exception 'Outing not found' using errcode = '42501';
+  end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'user_id', r.user_id, 'is_me', r.user_id = me,
+      'name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'rating', r.rating, 'note', r.note, 'updated_at', r.updated_at) order by r.updated_at), '[]'::jsonb)
+    from public.shared_outing_reactions r
+    left join public.profiles p on p.user_id = r.user_id
+    where r.shared_outing_id = p_shared_outing_id
+      and cinemarchive_private.is_outing_participant(p_shared_outing_id, r.user_id));
+end;
+$$;
+
+-- Reactions come after the show, so a member's "going" card has to outlast the screening.
+create or replace function cinemarchive_private.get_shared_outings()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', s.id, 'status', s.status, 'my_status', m.status, 'owner_id', s.owner_id,
+      'owner_name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'showtime', s.showtime, 'ends_at', s.ends_at, 'snapshot', s.snapshot) order by s.showtime), '[]'::jsonb)
+    from public.shared_outing_members m
+    join public.shared_outings s on s.id = m.shared_outing_id
+    left join public.profiles p on p.user_id = s.owner_id
+    where m.user_id = auth.uid() and m.status in ('invited','accepted')
+      and s.ends_at > now() - interval '7 days');
+end;
+$$;
+
+revoke all on function cinemarchive_private.share_outing_reaction(uuid, numeric, text) from public, anon;
+revoke all on function cinemarchive_private.withdraw_outing_reaction(uuid) from public, anon;
+revoke all on function cinemarchive_private.get_outing_reactions(uuid) from public, anon;
+grant execute on function cinemarchive_private.share_outing_reaction(uuid, numeric, text) to authenticated;
+grant execute on function cinemarchive_private.withdraw_outing_reaction(uuid) to authenticated;
+grant execute on function cinemarchive_private.get_outing_reactions(uuid) to authenticated;
+
+-- Public wrappers: PostgREST exposes only the public schema.
+create function public.share_outing_reaction(p_shared_outing_id uuid, p_rating numeric, p_note text)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.share_outing_reaction(p_shared_outing_id, p_rating, p_note);
+$$;
+create function public.withdraw_outing_reaction(p_shared_outing_id uuid)
+returns void language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.withdraw_outing_reaction(p_shared_outing_id);
+$$;
+create function public.get_outing_reactions(p_shared_outing_id uuid)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_outing_reactions(p_shared_outing_id);
+$$;
+revoke all on function public.share_outing_reaction(uuid, numeric, text) from public, anon;
+revoke all on function public.withdraw_outing_reaction(uuid) from public, anon;
+revoke all on function public.get_outing_reactions(uuid) from public, anon;
+grant execute on function public.share_outing_reaction(uuid, numeric, text) to authenticated;
+grant execute on function public.withdraw_outing_reaction(uuid) to authenticated;
+grant execute on function public.get_outing_reactions(uuid) to authenticated;
+
+-- Outing polls (20261102000000).
+-- Outing polls (#203): propose a few title and time candidates to linked friends, collect their
+-- votes, then close the poll on a winner that the owner turns into a real outing.
+--
+-- A poll is separate from cinema_outings and from shared_outings: it is a question put to a
+-- handful of accepted friends. The owner chooses 2 to 4 candidates (a movie from their own library
+-- plus a showtime and optional venue) and 1 to 8 friends. Voting is approval style: a participant
+-- ticks every candidate that works for them. Closing picks one winning candidate; creating the
+-- outing and inviting the voters then reuses the existing schedule and invite flows on the client,
+-- so nothing here writes to cinema_outings.
+--
+-- Clients have no table access at all; every read and write goes through the RPCs below, which
+-- require an accepted friendship. Participants see candidates, vote counts and the display names of
+-- the people who voted for each, never the owner's library, ratings, tickets or notes.
+create table public.outing_polls (
+  id               uuid primary key default gen_random_uuid(),
+  owner_id         uuid not null references auth.users(id) on delete cascade,
+  question         text not null default 'Which one works?' check (char_length(question) between 1 and 100),
+  status           text not null default 'open' check (status in ('open','closed','cancelled')),
+  winner_option_id uuid,
+  created_at       timestamptz not null default now(),
+  closed_at        timestamptz
+);
+create index outing_polls_owner_idx on public.outing_polls(owner_id, created_at desc);
+
+create table public.outing_poll_options (
+  id         uuid primary key default gen_random_uuid(),
+  poll_id    uuid not null references public.outing_polls(id) on delete cascade,
+  position   smallint not null check (position between 1 and 4),
+  tmdb_id    integer not null,
+  media_type text not null default 'movie' check (media_type = 'movie'),
+  title      text not null check (char_length(title) between 1 and 300),
+  year       integer,
+  poster_url text,
+  showtime   timestamptz not null,
+  venue      text check (venue is null or char_length(venue) between 1 and 100),
+  unique (poll_id, position),
+  unique (id, poll_id)
+);
+
+alter table public.outing_polls
+  add constraint outing_polls_winner_fk foreign key (winner_option_id)
+  references public.outing_poll_options(id) on delete set null;
+
+create table public.outing_poll_members (
+  poll_id    uuid not null references public.outing_polls(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  invited_at timestamptz not null default now(),
+  primary key (poll_id, user_id)
+);
+create index outing_poll_members_user_idx on public.outing_poll_members(user_id);
+
+create table public.outing_poll_votes (
+  poll_id  uuid not null,
+  option_id uuid not null,
+  user_id  uuid not null references auth.users(id) on delete cascade,
+  voted_at timestamptz not null default now(),
+  primary key (option_id, user_id),
+  foreign key (option_id, poll_id) references public.outing_poll_options(id, poll_id) on delete cascade
+);
+create index outing_poll_votes_poll_idx on public.outing_poll_votes(poll_id, user_id);
+
+-- RLS on, with no policy and no grant: only the service role and the definer RPCs touch these.
+alter table public.outing_polls enable row level security;
+alter table public.outing_poll_options enable row level security;
+alter table public.outing_poll_members enable row level security;
+alter table public.outing_poll_votes enable row level security;
+revoke all on public.outing_polls, public.outing_poll_options, public.outing_poll_members, public.outing_poll_votes
+  from public, anon, authenticated;
+grant all on public.outing_polls, public.outing_poll_options, public.outing_poll_members, public.outing_poll_votes
+  to service_role;
+
+create schema if not exists cinemarchive_private;
+
+-- Notification types for a new poll and for its result.
+alter table public.notifications drop constraint notifications_type_check;
+alter table public.notifications add constraint notifications_type_check check (type in (
+  'friend_request_received', 'friend_request_accepted',
+  'share_link_used', 'recommendation_received',
+  'comment_received', 'reaction_received', 'invite_redeemed',
+  'outing_completed', 'outing_plans_shared',
+  'outing_invite', 'outing_invite_response',
+  'outing_poll', 'outing_poll_closed'
+));
+
+-- The owner, or a friend the poll was put to.
+create function cinemarchive_private.is_poll_participant(p_poll_id uuid, p_user_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.outing_polls where id = p_poll_id and owner_id = p_user_id)
+      or exists (select 1 from public.outing_poll_members where poll_id = p_poll_id and user_id = p_user_id);
+$$;
+revoke all on function cinemarchive_private.is_poll_participant(uuid, uuid) from public, anon, authenticated;
+
+-- Unfriending or blocking takes a person out of each other's polls, and their votes with them.
+create function cinemarchive_private.drop_poll_members_when_unfriended()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'UPDATE' and not (old.status = 'accepted' and new.status <> 'accepted') then return new; end if;
+  if tg_op = 'DELETE' and old.status <> 'accepted' then return old; end if;
+  delete from public.outing_poll_votes v using public.outing_polls p
+    where v.poll_id = p.id
+      and ((p.owner_id = old.user_id_a and v.user_id = old.user_id_b)
+        or (p.owner_id = old.user_id_b and v.user_id = old.user_id_a));
+  delete from public.outing_poll_members m using public.outing_polls p
+    where m.poll_id = p.id
+      and ((p.owner_id = old.user_id_a and m.user_id = old.user_id_b)
+        or (p.owner_id = old.user_id_b and m.user_id = old.user_id_a));
+  return coalesce(new, old);
+end;
+$$;
+revoke all on function cinemarchive_private.drop_poll_members_when_unfriended() from public, anon, authenticated;
+create trigger friendships_drop_poll_members
+  after update of status or delete on public.friendships
+  for each row execute function cinemarchive_private.drop_poll_members_when_unfriended();
+
+-- Put a poll to accepted friends. p_options is a JSON array of 2 to 4 objects
+-- { "title_id": <the caller's movie>, "showtime": <future timestamp>, "venue": <optional text> }.
+create function cinemarchive_private.create_outing_poll(p_question text, p_options jsonb, p_friend_ids uuid[])
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  question text := coalesce(nullif(btrim(coalesce(p_question, '')), ''), 'Which one works?');
+  ids uuid[];
+  friend uuid;
+  poll public.outing_polls;
+  opt jsonb;
+  idx integer := 0;
+  t public.titles;
+  at timestamptz;
+  venue text;
+  seen text[] := '{}';
+  key text;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if char_length(question) > 100 then raise exception 'Keep the question to 100 characters' using errcode = '22023'; end if;
+  if p_options is null or jsonb_typeof(p_options) <> 'array' or jsonb_array_length(p_options) not between 2 and 4 then
+    raise exception 'Offer 2 to 4 options' using errcode = '22023';
+  end if;
+  if p_friend_ids is null or cardinality(p_friend_ids) = 0 or array_position(p_friend_ids, null) is not null then
+    raise exception 'Choose at least one friend' using errcode = '22023';
+  end if;
+  select array_agg(distinct id order by id) into ids from unnest(p_friend_ids) id;
+  if cardinality(ids) > 8 then raise exception 'A poll can include at most 8 friends' using errcode = '22023'; end if;
+  foreach friend in array ids loop
+    if friend = me or not public.is_friend(me, friend) then
+      raise exception 'Can only poll accepted friends' using errcode = '42501';
+    end if;
+  end loop;
+  if (select count(*) from public.outing_polls where owner_id = me and status = 'open') >= 5 then
+    raise exception 'Close a poll before starting another' using errcode = '22023';
+  end if;
+
+  insert into public.outing_polls(owner_id, question) values (me, question) returning * into poll;
+
+  for opt in select value from jsonb_array_elements(p_options) loop
+    idx := idx + 1;
+    if jsonb_typeof(opt) <> 'object' then raise exception 'Invalid option' using errcode = '22023'; end if;
+    begin
+      select * into t from public.titles where id = (opt ->> 'title_id')::uuid and user_id = me;
+      at := (opt ->> 'showtime')::timestamptz;
+    exception when invalid_text_representation or datetime_field_overflow or invalid_datetime_format then
+      raise exception 'Invalid option' using errcode = '22023';
+    end;
+    if t.id is null then raise exception 'Title not found' using errcode = '42501'; end if;
+    if t.type <> 'movie' then raise exception 'Polls are for movies' using errcode = '22023'; end if;
+    if at is null or at <= now() then raise exception 'Showtimes must be in the future' using errcode = '22023'; end if;
+    venue := nullif(btrim(coalesce(opt ->> 'venue', '')), '');
+    if venue is not null and char_length(venue) > 100 then raise exception 'Keep the venue to 100 characters' using errcode = '22023'; end if;
+    key := t.id::text || '@' || at::text;
+    if key = any (seen) then raise exception 'Two options are the same' using errcode = '22023'; end if;
+    seen := seen || key;
+    insert into public.outing_poll_options(poll_id, position, tmdb_id, title, year, poster_url, showtime, venue)
+      values (poll.id, idx, t.tmdb_id, t.title, t.year, t.poster_url, at, venue);
+  end loop;
+
+  foreach friend in array ids loop
+    insert into public.outing_poll_members(poll_id, user_id) values (poll.id, friend);
+    insert into public.notifications(recipient_id, type, actor_id, payload)
+      values (friend, 'outing_poll', me, jsonb_build_object('poll_id', poll.id, 'question', poll.question, 'options', idx));
+  end loop;
+  return jsonb_build_object('poll_id', poll.id);
+end;
+$$;
+
+-- Replace the caller's votes: every option they tick, none for an empty list. Only while the
+-- poll is open, and only for showtimes still ahead.
+create function cinemarchive_private.cast_poll_votes(p_poll_id uuid, p_option_ids uuid[])
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  poll public.outing_polls;
+  ids uuid[];
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  select * into poll from public.outing_polls where id = p_poll_id for update;
+  if poll.id is null or not cinemarchive_private.is_poll_participant(poll.id, me) then
+    raise exception 'Poll not found' using errcode = '42501';
+  end if;
+  if poll.status <> 'open' then raise exception 'This poll is closed' using errcode = '22023'; end if;
+  if p_option_ids is null or array_position(p_option_ids, null) is not null then
+    raise exception 'Invalid options' using errcode = '22023';
+  end if;
+  select coalesce(array_agg(distinct id), '{}') into ids from unnest(p_option_ids) id;
+  if (select count(*) from public.outing_poll_options where poll_id = poll.id and id = any (ids)) <> cardinality(ids) then
+    raise exception 'Invalid options' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.outing_poll_options where poll_id = poll.id and id = any (ids) and showtime <= now()) then
+    raise exception 'That showtime has passed' using errcode = '22023';
+  end if;
+  delete from public.outing_poll_votes where poll_id = poll.id and user_id = me;
+  insert into public.outing_poll_votes(poll_id, option_id, user_id) select poll.id, id, me from unnest(ids) id;
+end;
+$$;
+
+-- The owner closes the poll on a winning option, or cancels it by passing no option. Members are told.
+create function cinemarchive_private.close_outing_poll(p_poll_id uuid, p_option_id uuid default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  poll public.outing_polls;
+  won public.outing_poll_options;
+  member uuid;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  select * into poll from public.outing_polls where id = p_poll_id and owner_id = me for update;
+  if poll.id is null then raise exception 'Poll not found' using errcode = '42501'; end if;
+  if poll.status <> 'open' then raise exception 'This poll is already closed' using errcode = '22023'; end if;
+  if p_option_id is not null then
+    select * into won from public.outing_poll_options where id = p_option_id and poll_id = poll.id;
+    if won.id is null then raise exception 'Invalid option' using errcode = '22023'; end if;
+    if won.showtime <= now() then raise exception 'That showtime has passed' using errcode = '22023'; end if;
+  end if;
+  update public.outing_polls
+    set status = case when won.id is null then 'cancelled' else 'closed' end,
+        winner_option_id = won.id, closed_at = now()
+    where id = poll.id;
+  for member in select user_id from public.outing_poll_members where poll_id = poll.id loop
+    insert into public.notifications(recipient_id, type, actor_id, payload)
+      values (member, 'outing_poll_closed', me, jsonb_build_object(
+        'poll_id', poll.id, 'question', poll.question, 'cancelled', won.id is null,
+        'title', won.title, 'showtime', won.showtime, 'venue', won.venue));
+  end loop;
+  return jsonb_build_object('status', case when won.id is null then 'cancelled' else 'closed' end, 'winner_option_id', won.id);
+end;
+$$;
+
+-- Polls the caller owns or was asked into, from the last 30 days, with each option's tally.
+create function cinemarchive_private.get_outing_polls()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', p.id, 'question', p.question, 'status', p.status, 'is_owner', p.owner_id = me,
+      'owner_name', coalesce(nullif(op.display_name, ''), op.username, 'A friend'),
+      'created_at', p.created_at, 'closed_at', p.closed_at, 'winner_option_id', p.winner_option_id,
+      'members', (select coalesce(jsonb_agg(jsonb_build_object('user_id', m.user_id,
+          'name', coalesce(nullif(mp.display_name, ''), mp.username, 'A friend')) order by m.invited_at), '[]'::jsonb)
+        from public.outing_poll_members m left join public.profiles mp on mp.user_id = m.user_id where m.poll_id = p.id),
+      'options', (select coalesce(jsonb_agg(jsonb_build_object(
+          'id', o.id, 'position', o.position, 'tmdb_id', o.tmdb_id, 'title', o.title, 'year', o.year,
+          'poster_url', o.poster_url, 'showtime', o.showtime, 'venue', o.venue,
+          'votes', (select count(*) from public.outing_poll_votes v where v.option_id = o.id),
+          'mine', exists (select 1 from public.outing_poll_votes v where v.option_id = o.id and v.user_id = me),
+          'voters', (select coalesce(jsonb_agg(coalesce(nullif(vp.display_name, ''), vp.username, 'A friend') order by v.voted_at), '[]'::jsonb)
+            from public.outing_poll_votes v left join public.profiles vp on vp.user_id = v.user_id where v.option_id = o.id)
+        ) order by o.position), '[]'::jsonb) from public.outing_poll_options o where o.poll_id = p.id)
+    ) order by p.created_at desc), '[]'::jsonb)
+    from public.outing_polls p
+    left join public.profiles op on op.user_id = p.owner_id
+    where cinemarchive_private.is_poll_participant(p.id, me) and p.created_at > now() - interval '30 days');
+end;
+$$;
+
+revoke all on function cinemarchive_private.create_outing_poll(text, jsonb, uuid[]) from public, anon;
+revoke all on function cinemarchive_private.cast_poll_votes(uuid, uuid[]) from public, anon;
+revoke all on function cinemarchive_private.close_outing_poll(uuid, uuid) from public, anon;
+revoke all on function cinemarchive_private.get_outing_polls() from public, anon;
+grant execute on function cinemarchive_private.create_outing_poll(text, jsonb, uuid[]) to authenticated;
+grant execute on function cinemarchive_private.cast_poll_votes(uuid, uuid[]) to authenticated;
+grant execute on function cinemarchive_private.close_outing_poll(uuid, uuid) to authenticated;
+grant execute on function cinemarchive_private.get_outing_polls() to authenticated;
+
+-- Public wrappers: PostgREST exposes only the public schema.
+create function public.create_outing_poll(p_question text, p_options jsonb, p_friend_ids uuid[])
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.create_outing_poll(p_question, p_options, p_friend_ids);
+$$;
+create function public.cast_poll_votes(p_poll_id uuid, p_option_ids uuid[])
+returns void language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.cast_poll_votes(p_poll_id, p_option_ids);
+$$;
+create function public.close_outing_poll(p_poll_id uuid, p_option_id uuid default null)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.close_outing_poll(p_poll_id, p_option_id);
+$$;
+create function public.get_outing_polls()
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_outing_polls();
+$$;
+revoke all on function public.create_outing_poll(text, jsonb, uuid[]) from public, anon;
+revoke all on function public.cast_poll_votes(uuid, uuid[]) from public, anon;
+revoke all on function public.close_outing_poll(uuid, uuid) from public, anon;
+revoke all on function public.get_outing_polls() from public, anon;
+grant execute on function public.create_outing_poll(text, jsonb, uuid[]) to authenticated;
+grant execute on function public.cast_poll_votes(uuid, uuid[]) to authenticated;
+grant execute on function public.close_outing_poll(uuid, uuid) to authenticated;
+grant execute on function public.get_outing_polls() to authenticated;
+
+-- Ticket sending (20261103000000).
+-- Sending a ticket to a friend (#220): one person buys the group's tickets, or a ticket has to
+-- reach someone meeting the group there. The owner sends the ticket photo and its decoded barcode to
+-- accepted friends; each recipient gets it in the notification inbox, and the owner can see who was
+-- sent it, who has opened it, and take it back.
+--
+-- Tickets stay owner-private by default. A send creates a per-recipient grant on one attached ticket
+-- attachment (private_ticket_attachments). A grant lets that one friend read that one attachment's
+-- bytes and descriptor, and only while all of these hold: the grant is not revoked, the attachment is
+-- still the outing's attached ticket (replacing or removing the ticket ends every grant on the old
+-- one), and the two are still accepted friends. Nothing else about the outing is shared: not its
+-- seats, booking reference, price or notes.
+--
+-- Clients have no table access. Sending, revoking, listing and opening all go through the RPCs below.
+create table public.ticket_grants (
+  id            uuid primary key default gen_random_uuid(),
+  attachment_id uuid not null references public.ticket_attachments(id) on delete cascade,
+  outing_id     uuid not null references public.cinema_outings(id) on delete cascade,
+  owner_id      uuid not null references auth.users(id) on delete cascade,
+  recipient_id  uuid not null references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  opened_at     timestamptz,
+  revoked_at    timestamptz,
+  unique (attachment_id, recipient_id),
+  check (owner_id <> recipient_id)
+);
+create index ticket_grants_recipient_idx on public.ticket_grants(recipient_id) where revoked_at is null;
+create index ticket_grants_outing_idx on public.ticket_grants(outing_id);
+
+alter table public.ticket_grants enable row level security;
+revoke all on public.ticket_grants from public, anon, authenticated;
+grant all on public.ticket_grants to service_role;
+
+create schema if not exists cinemarchive_private;
+
+-- A type for the notifications a send and an open produce. The list is a superset of every type
+-- defined so far, so applying migrations out of order never drops one.
+alter table public.notifications drop constraint notifications_type_check;
+alter table public.notifications add constraint notifications_type_check check (type in (
+  'friend_request_received', 'friend_request_accepted',
+  'share_link_used', 'recommendation_received',
+  'comment_received', 'reaction_received', 'invite_redeemed',
+  'outing_completed', 'outing_plans_shared',
+  'outing_invite', 'outing_invite_response',
+  'outing_poll', 'outing_poll_closed',
+  'ticket_received', 'ticket_opened'
+));
+
+-- Is this a grant the recipient can still use? Not revoked, the attachment is still the attached
+-- ticket, and the owner and recipient are still accepted friends.
+create function cinemarchive_private.grant_is_live(g public.ticket_grants)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select g.revoked_at is null
+     and exists (select 1 from public.ticket_attachments a where a.id = g.attachment_id and a.state = 'attached')
+     and public.is_friend(g.owner_id, g.recipient_id);
+$$;
+revoke all on function cinemarchive_private.grant_is_live(public.ticket_grants) from public, anon, authenticated;
+
+-- The bytes of a ticket someone sent the caller.
+create function cinemarchive_private.can_read_granted_ticket_object(p_name text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.ticket_grants g join public.ticket_attachments a on a.id = g.attachment_id
+    where a.object_key = p_name and g.recipient_id = auth.uid() and cinemarchive_private.grant_is_live(g));
+$$;
+revoke all on function cinemarchive_private.can_read_granted_ticket_object(text) from public, anon;
+grant execute on function cinemarchive_private.can_read_granted_ticket_object(text) to authenticated;
+
+-- Reading ticket bytes: the owner as before, or a recipient with a live grant. Uploads, overwrites
+-- and deletions are untouched.
+drop policy "ticket bytes: owner read" on storage.objects;
+create policy "ticket bytes: owner or recipient read" on storage.objects for select to authenticated using (
+  bucket_id = 'ticket-attachments' and (
+    exists (select 1 from public.ticket_attachments a
+      where a.user_id = (select auth.uid()) and a.object_key = name and a.state in ('prepared','attached','retired'))
+    or cinemarchive_private.can_read_granted_ticket_object(name)));
+drop policy "ticket bytes: read fence" on storage.objects;
+create policy "ticket bytes: read fence" on storage.objects as restrictive for select to authenticated using (
+  bucket_id <> 'ticket-attachments' or exists (select 1 from public.ticket_attachments a
+      where a.user_id = (select auth.uid()) and a.object_key = name and a.state in ('prepared','attached','retired'))
+    or cinemarchive_private.can_read_granted_ticket_object(name));
+
+-- Send the outing's current ticket to up to 8 accepted friends. Idempotent: a friend who already
+-- holds a live grant is left alone and not notified again; a friend whose grant was taken back is
+-- sent it again and notified.
+create function cinemarchive_private.send_ticket(p_outing_id uuid, p_recipient_ids uuid[])
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  ids uuid[];
+  recipient uuid;
+  outing public.cinema_outings;
+  attachment public.ticket_attachments;
+  t public.titles;
+  existing public.ticket_grants;
+  newly uuid[] := '{}';
+  granted public.ticket_grants;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if p_outing_id is null or p_recipient_ids is null or cardinality(p_recipient_ids) = 0
+     or array_position(p_recipient_ids, null) is not null then
+    raise exception 'At least one valid friend is required' using errcode = '22023';
+  end if;
+  select array_agg(distinct id order by id) into ids from unnest(p_recipient_ids) id;
+  if cardinality(ids) > 8 then raise exception 'A ticket can be sent to at most 8 friends' using errcode = '22023'; end if;
+  select * into outing from public.cinema_outings where id = p_outing_id and user_id = me;
+  if outing.id is null then raise exception 'Outing not found' using errcode = '42501'; end if;
+  select * into attachment from public.ticket_attachments
+    where id = outing.ticket_attachment_id and user_id = me and state = 'attached';
+  if attachment.id is null then raise exception 'This outing has no ticket to send' using errcode = '22023'; end if;
+  foreach recipient in array ids loop
+    if recipient = me or not public.is_friend(me, recipient) then
+      raise exception 'Can only send a ticket to accepted friends' using errcode = '42501';
+    end if;
+  end loop;
+  select * into t from public.titles where id = outing.title_id;
+
+  foreach recipient in array ids loop
+    select * into existing from public.ticket_grants where attachment_id = attachment.id and recipient_id = recipient for update;
+    if existing.id is null then
+      insert into public.ticket_grants(attachment_id, outing_id, owner_id, recipient_id)
+        values (attachment.id, outing.id, me, recipient);
+      newly := newly || recipient;
+    elsif existing.revoked_at is not null then
+      update public.ticket_grants set revoked_at = null, opened_at = null, created_at = now() where id = existing.id;
+      newly := newly || recipient;
+    end if;
+  end loop;
+
+  if (select count(*) from public.ticket_grants where attachment_id = attachment.id and revoked_at is null) > 8 then
+    raise exception 'A ticket can be sent to at most 8 friends' using errcode = '22023';
+  end if;
+
+  foreach recipient in array newly loop
+    select * into granted from public.ticket_grants where attachment_id = attachment.id and recipient_id = recipient;
+    insert into public.notifications(recipient_id, type, actor_id, title_id, payload)
+      values (recipient, 'ticket_received', me, outing.title_id, jsonb_build_object(
+        'grant_id', granted.id, 'title', t.title, 'showtime', outing.showtime, 'venue', outing.venue));
+  end loop;
+  return cinemarchive_private.get_ticket_grants(p_outing_id);
+end;
+$$;
+
+-- The owner takes a ticket back from one friend. Idempotent.
+create function cinemarchive_private.revoke_ticket_grant(p_grant_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  if not exists (select 1 from public.ticket_grants where id = p_grant_id and owner_id = auth.uid()) then
+    raise exception 'Ticket not found' using errcode = '42501';
+  end if;
+  update public.ticket_grants set revoked_at = now() where id = p_grant_id and revoked_at is null;
+end;
+$$;
+
+-- The owner's view of who was sent this outing's current ticket, and who has opened it.
+create function cinemarchive_private.get_ticket_grants(p_outing_id uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'grant_id', g.id, 'user_id', g.recipient_id,
+      'name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'sent_at', g.created_at, 'opened_at', g.opened_at) order by g.created_at), '[]'::jsonb)
+    from public.ticket_grants g
+    join public.cinema_outings o on o.id = g.outing_id and o.ticket_attachment_id = g.attachment_id
+    left join public.profiles p on p.user_id = g.recipient_id
+    where g.owner_id = auth.uid() and g.outing_id = p_outing_id and cinemarchive_private.grant_is_live(g));
+end;
+$$;
+
+-- Tickets friends have sent the caller for shows that ended less than a day ago or are upcoming.
+-- Only enough to list them: the barcode and the file come from opening one.
+create function cinemarchive_private.get_received_tickets()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'grant_id', g.id, 'sender_id', g.owner_id,
+      'sender_name', coalesce(nullif(p.display_name, ''), p.username, 'A friend'),
+      'title', t.title, 'year', t.year, 'poster_url', t.poster_url,
+      'showtime', o.showtime, 'ends_at', o.ends_at, 'venue', o.venue,
+      'sent_at', g.created_at, 'opened_at', g.opened_at) order by o.showtime), '[]'::jsonb)
+    from public.ticket_grants g
+    join public.cinema_outings o on o.id = g.outing_id and o.ticket_attachment_id = g.attachment_id
+    join public.titles t on t.id = o.title_id
+    left join public.profiles p on p.user_id = g.owner_id
+    where g.recipient_id = auth.uid() and cinemarchive_private.grant_is_live(g)
+      and o.ends_at > now() - interval '1 day');
+end;
+$$;
+
+-- Open a ticket someone sent the caller: the first open is recorded and the sender is told. Returns
+-- the attachment descriptor (the file's key, type, size, digest and decoded barcode) with the show.
+create function cinemarchive_private.open_received_ticket(p_grant_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  g public.ticket_grants;
+  a public.ticket_attachments;
+  o public.cinema_outings;
+  t public.titles;
+  first_open boolean;
+begin
+  if me is null then raise exception 'Not authenticated' using errcode = '42501'; end if;
+  select * into g from public.ticket_grants where id = p_grant_id and recipient_id = me for update;
+  if g.id is null or not cinemarchive_private.grant_is_live(g) then
+    raise exception 'Ticket not found' using errcode = '42501';
+  end if;
+  select * into a from public.ticket_attachments where id = g.attachment_id;
+  select * into o from public.cinema_outings where id = g.outing_id;
+  select * into t from public.titles where id = o.title_id;
+  first_open := g.opened_at is null;
+  if first_open then
+    update public.ticket_grants set opened_at = now() where id = g.id;
+    insert into public.notifications(recipient_id, type, actor_id, title_id, payload)
+      values (g.owner_id, 'ticket_opened', me, o.title_id, jsonb_build_object('grant_id', g.id, 'title', t.title));
+  end if;
+  return cinemarchive_private.ticket_descriptor(a) || jsonb_build_object(
+    'title', t.title, 'showtime', o.showtime, 'venue', o.venue);
+end;
+$$;
+
+revoke all on function cinemarchive_private.send_ticket(uuid, uuid[]) from public, anon;
+revoke all on function cinemarchive_private.revoke_ticket_grant(uuid) from public, anon;
+revoke all on function cinemarchive_private.get_ticket_grants(uuid) from public, anon;
+revoke all on function cinemarchive_private.get_received_tickets() from public, anon;
+revoke all on function cinemarchive_private.open_received_ticket(uuid) from public, anon;
+grant execute on function cinemarchive_private.send_ticket(uuid, uuid[]) to authenticated;
+grant execute on function cinemarchive_private.revoke_ticket_grant(uuid) to authenticated;
+grant execute on function cinemarchive_private.get_ticket_grants(uuid) to authenticated;
+grant execute on function cinemarchive_private.get_received_tickets() to authenticated;
+grant execute on function cinemarchive_private.open_received_ticket(uuid) to authenticated;
+
+-- Public wrappers: PostgREST exposes only the public schema.
+create function public.send_ticket(p_outing_id uuid, p_recipient_ids uuid[])
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.send_ticket(p_outing_id, p_recipient_ids);
+$$;
+create function public.revoke_ticket_grant(p_grant_id uuid)
+returns void language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.revoke_ticket_grant(p_grant_id);
+$$;
+create function public.get_ticket_grants(p_outing_id uuid)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_ticket_grants(p_outing_id);
+$$;
+create function public.get_received_tickets()
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select cinemarchive_private.get_received_tickets();
+$$;
+create function public.open_received_ticket(p_grant_id uuid)
+returns jsonb language sql security invoker set search_path = '' as $$
+  select cinemarchive_private.open_received_ticket(p_grant_id);
+$$;
+revoke all on function public.send_ticket(uuid, uuid[]) from public, anon;
+revoke all on function public.revoke_ticket_grant(uuid) from public, anon;
+revoke all on function public.get_ticket_grants(uuid) from public, anon;
+revoke all on function public.get_received_tickets() from public, anon;
+revoke all on function public.open_received_ticket(uuid) from public, anon;
+grant execute on function public.send_ticket(uuid, uuid[]) to authenticated;
+grant execute on function public.revoke_ticket_grant(uuid) to authenticated;
+grant execute on function public.get_ticket_grants(uuid) to authenticated;
+grant execute on function public.get_received_tickets() to authenticated;
+grant execute on function public.open_received_ticket(uuid) to authenticated;

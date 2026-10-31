@@ -9,6 +9,10 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Jellyfin watch sync on Android.** Settings → Import & sync can now connect a Jellyfin account, signed in as you so only your own watches are visible. New movie and episode watches arrive as a notification with Add and Dismiss actions (also listed on the Jellyfin card), and nothing is added without a yes. An episode of a series that is not in your library opens the usual add flow. Existing history can optionally be imported once. Background checks run about every 15 minutes.
+
 ## [1.46.0] - 2026-10-30
 
 ### Added

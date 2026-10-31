@@ -18,6 +18,7 @@ enum class SyncProvider(val wire: String) {
     SIMKL("simkl"),
     PLEX("plex"),
     EMBY("emby"),
+    JELLYFIN("jellyfin"),
     LETTERBOXD("letterboxd"),
     ;
 

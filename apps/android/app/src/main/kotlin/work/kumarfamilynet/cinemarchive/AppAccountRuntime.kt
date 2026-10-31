@@ -294,7 +294,16 @@ class AppAccountRuntime(
     val syncServices = SyncServices.create(libraryRepository, discoverRepository, session, client, plexClientId,
         work.kumarfamilynet.cinemarchive.data.ProviderImportAdmission(database, outbox, importOwner, ::isCurrent),
         providerMerges,
-        ::isCurrent, { librarySyncRepository.syncNow() })
+        ::isCurrent, { librarySyncRepository.syncNow() },
+        jellyfinStore = work.kumarfamilynet.cinemarchive.data.EncryptedJellyfinStore(context, ownerId),
+        onJellyfinConnectionChanged = { connected -> JellyfinScheduler.update(context, connected) })
+
+    /** Polls Jellyfin for new plays and announces each newly queued one with an Add/Dismiss
+     *  notification. Nothing reaches the library until the user answers (see [JellyfinNotifier]). */
+    suspend fun checkJellyfinAndNotify() {
+        val fresh = syncServices.jellyfin.check()
+        JellyfinNotifier.postPlays(context, this, fresh)
+    }
 
     val backupRepository by lazy {
         work.kumarfamilynet.cinemarchive.data.LibraryBackupRepository(database,
@@ -403,6 +412,13 @@ class AppAccountRuntime(
             outingsRepository.completeDueOutings()
             // Also after sync: queued schedule changes carry the revisions that pull just cached.
             if (episodeScheduleRefresher.refresh() > 0) librarySyncRepository.syncNow()
+        }
+        scope.launch {
+            // The periodic check exists only while a Jellyfin account is connected; the first check
+            // runs now so a watch since the app was last open is offered straight away.
+            val connected = syncServices.jellyfin.isConnected()
+            JellyfinScheduler.update(context, connected)
+            if (connected) checkJellyfinAndNotify()
         }
         scope.launch { ledgerLayoutRepository.reconcile() }
         scope.launch { moviegoingPrefsRepository.reconcile() }

@@ -212,3 +212,22 @@ it('prints this year\'s recap with the same figures the rules derive', async () 
   expect(card.getByText('Sam')).toBeInTheDocument()
   expect(card.getByText('$37.00')).toBeInTheDocument()
 })
+
+it('lets an owner with no trips yet set a budget and plan, as Android does', async () => {
+  useAppStore.setState({ titles: [], outings: [], isSharedView: false, viewerContext: { kind: 'owner' } })
+  const user = userEvent.setup()
+  render(<AtTheMovies />)
+  expect(screen.getByText(/No cinema trips logged yet/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Budget, plan and year' }))
+  const budget = within(screen.getByRole('region', { name: 'Budget' }))
+  await user.type(budget.getByLabelText('Amount'), '40')
+  await user.click(budget.getByRole('button', { name: 'Set budget' }))
+  await waitFor(() => expect(useMoviegoingPrefs.getState().prefs?.budget).toEqual({ amount: 40, period: 'month' }))
+  expect(screen.queryByRole('region', { name: 'Your year at the movies' })).not.toBeInTheDocument()
+})
+
+it('offers no budget or plan setup with no trips to a friend or shared viewer', () => {
+  useAppStore.setState({ titles: [], outings: [], isSharedView: true, viewerContext: { kind: 'friend', userId: 'friend', displayName: 'Friend' } })
+  render(<AtTheMovies />)
+  expect(screen.queryByRole('button', { name: 'Budget, plan and year' })).not.toBeInTheDocument()
+})

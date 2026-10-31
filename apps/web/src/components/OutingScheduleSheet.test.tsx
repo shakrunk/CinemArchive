@@ -155,3 +155,31 @@ it('offers a retry when the list cannot be loaded', async () => {
   await user.click(screen.getByRole('button', { name: 'Try again' }))
   expect(await screen.findByRole('button', { name: 'Schedule New release' })).toBeInTheDocument()
 })
+
+it('follows a saved region that syncs in after the picker is open', async () => {
+  vi.mocked(fetchNowPlaying).mockResolvedValue([])
+  openPicker()
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: "What's playing in theaters" }))
+  const first = vi.mocked(fetchNowPlaying).mock.lastCall?.[0]
+  const synced = first === 'FR' ? 'JP' : 'FR'
+  act(() => {
+    useMoviegoingPrefs.setState({
+      prefs: { budget: null, plan: null, templates: [], region: synced, updatedAt: '2026-10-29T10:00:00Z', raw: { region: synced } },
+    })
+  })
+  expect(fetchNowPlaying).toHaveBeenLastCalledWith(synced)
+  expect(await screen.findByLabelText('Country code')).toHaveValue(synced)
+})
+
+it('does not reload when the region it just saved comes back as the saved one', async () => {
+  vi.mocked(fetchNowPlaying).mockResolvedValue([])
+  openPicker('GB')
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: "What's playing in theaters" }))
+  await user.clear(await screen.findByLabelText('Country code'))
+  await user.type(screen.getByLabelText('Country code'), 'ca')
+  await user.click(screen.getByRole('button', { name: 'Use' }))
+  await vi.waitFor(() => expect(useMoviegoingPrefs.getState().prefs?.region).toBe('CA'))
+  expect(vi.mocked(fetchNowPlaying).mock.calls.map((c) => c[0])).toEqual(['GB', 'CA'])
+})

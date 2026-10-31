@@ -90,5 +90,5 @@ object MoviegoingRecapText {
         return "My ${recap.year} at the movies: ${parts.joinToString(", ")}."
     }
 
-    private fun money(amount: Double): String = String.format(java.util.Locale.US, "$%,.2f", amount)
+    private fun money(amount: Double): String = MoviegoingRules.formatMoney(amount)
 }

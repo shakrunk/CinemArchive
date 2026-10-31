@@ -10,13 +10,54 @@ import { normalizeCompanions } from './companions'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
-/** `YYYY-MM-DD` of a viewing's date, or null when it has none or it is malformed. */
-export function tripDate(value: string | undefined): string | null {
+const isLeapYear = (year: number) => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+/** True for a real calendar date written `YYYY-MM-DD`: `2026-02-30` is not one, whatever
+ *  `Date.parse` rolls it over to. Mirrors `java.time.LocalDate.parse`. */
+export function isCalendarDate(day: string): boolean {
+  if (!DATE_RE.test(day)) return false
+  const year = Number(day.slice(0, 4))
+  const month = Number(day.slice(5, 7))
+  const date = Number(day.slice(8, 10))
+  if (month < 1 || month > 12 || date < 1) return false
+  return date <= (month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1])
+}
+
+/** `YYYY-MM-DD` of a viewing's date, or null when it has none or is not a real calendar date. */
+export function tripDate(value: string | undefined | null): string | null {
   const day = value?.slice(0, 10)
-  return day && DATE_RE.test(day) && Number.isFinite(Date.parse(`${day}T00:00:00Z`)) ? day : null
+  return day && isCalendarDate(day) ? day : null
+}
+
+/** A viewing counts as a cinema trip only with a non-empty venue; an empty string is the same
+ *  as none (`db.ts` maps it to `undefined`, and Android's ledger skips it too). */
+export const isTripVenue = (venue: string | undefined | null): venue is string => venue != null && venue.length > 0
+
+const ISO_INSTANT_RE = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?:\.(\d{1,9}))?Z$/
+
+/** Epoch milliseconds of a synced `updatedAt`: a UTC instant written `YYYY-MM-DDTHH:mm:ss[.f…]Z`
+ *  with up to nine fractional digits, naming a real date. Offsets, date-only or loose strings are
+ *  rejected so both clients accept exactly the same payloads. Null when it is not one. */
+export function parseInstant(value: unknown): number | null {
+  if (typeof value !== 'string') return null
+  const match = ISO_INSTANT_RE.exec(value)
+  if (!match || !isCalendarDate(match[1])) return null
+  const fraction = (match[5] ?? '').padEnd(3, '0').slice(0, 3)
+  const millis = Date.parse(`${match[1]}T${match[2]}:${match[3]}:${match[4]}.${fraction}Z`)
+  return Number.isFinite(millis) ? millis : null
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
+const cents = (amount: number) => Math.round(amount * 100)
+
+/** "$1,234.50": a dollar sign, thousands commas and two decimals, formatted from whole cents so
+ *  every locale and both clients print the same figure (amounts carry no currency code). */
+export function formatMoney(amount: number): string {
+  const total = Math.abs(cents(amount))
+  const dollars = String(Math.floor(total / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `${amount < 0 && total > 0 ? '-' : ''}$${dollars}.${pad(total % 100)}`
+}
 
 function ymd(year: number, month: number, day: number): string {
   return `${String(year).padStart(4, '0')}-${pad(month)}-${pad(day)}`
@@ -51,7 +92,7 @@ export function deriveMoviegoingTrips(titles: Title[], outings: CinemaOuting[]):
   const trips: MoviegoingTrip[] = []
   for (const title of titles) {
     for (const viewing of title.viewings) {
-      if (!viewing.venue) continue
+      if (!isTripVenue(viewing.venue)) continue
       const date = tripDate(viewing.date)
       if (!date) continue
       const outing = viewing.outingId ? outingById.get(viewing.outingId) : undefined
@@ -92,8 +133,6 @@ export function budgetRange(period: BudgetPeriod, today: string): DateRange {
   const month = Number(today.slice(5, 7))
   return { start: ymd(year, month, 1), end: ymd(year, month, lastDayOfMonth(year, month)) }
 }
-
-const cents = (amount: number) => Math.round(amount * 100)
 
 export type BudgetState = 'under' | 'near' | 'over'
 export interface BudgetStatus {

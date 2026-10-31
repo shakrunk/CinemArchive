@@ -23,7 +23,7 @@ data class MoviegoingBudget(val amount: Double, val period: BudgetPeriod) {
         /** Parses what a person types into the budget field: an optional `$` and thousands
          *  commas are ignored. Null for anything that is not a valid amount. */
         fun parseAmount(text: String): Double? =
-            text.trim().removePrefix("$").replace(",", "").trim().toDoubleOrNull()?.takeIf(::isValidAmount)
+            MoviegoingRules.parseAmountText(text.trim().removePrefix("$").replace(",", "").trim())?.takeIf(::isValidAmount)
     }
 }
 

@@ -71,7 +71,18 @@ export function AtTheMovies({
       className={className}
     >
       {stats.tripsTotal === 0 ? (
-        <PanelEmpty message="No cinema trips logged yet — get some tickets" />
+        <div className="flex h-full min-h-0 flex-col">
+          <PanelEmpty message="No cinema trips logged yet — get some tickets" />
+          {/* Android shows the budget and plan before the first trip, so a budget can be set up front. */}
+          {!isSharedView && (
+            <div className="flex shrink-0 flex-col items-start gap-1">
+              <MoviegoingStatusLines budget={budgetState} plan={planState} />
+              <Button ref={settingsTrigger} variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+                Budget, plan and year
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col gap-3">
           <div className="flex shrink-0 items-end gap-6">
@@ -173,7 +184,7 @@ export function AtTheMovies({
       </div>
     </CinemaModal>
     <CinemaModal
-      open={settingsOpen && !isSharedView && stats.tripsTotal > 0}
+      open={settingsOpen && !isSharedView}
       onClose={() => {
         setSettingsOpen(false)
         requestAnimationFrame(() => settingsTrigger.current?.focus())

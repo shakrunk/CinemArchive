@@ -33,6 +33,7 @@ import work.kumarfamilynet.cinemarchive.core.model.BudgetStatus
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudgetRules
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingPricedTrip
+import work.kumarfamilynet.cinemarchive.core.model.MoviegoingRules
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -111,11 +112,11 @@ internal fun budgetSummary(status: BudgetStatus): String {
     }
 }
 
-private fun money(amount: Double): String = "$%,.2f".format(amount)
+private fun money(amount: Double): String = MoviegoingRules.formatMoney(amount)
 
 @Composable
 private fun BudgetDialog(current: MoviegoingBudget?, onDismiss: () -> Unit, onSave: (MoviegoingBudget?) -> Unit) {
-    var amountText by rememberSaveable { mutableStateOf(current?.amount?.let { "%.2f".format(it) } ?: "") }
+    var amountText by rememberSaveable { mutableStateOf(current?.amount?.let { "%.2f".format(Locale.US, it) } ?: "") }
     var period by rememberSaveable { mutableStateOf(current?.period ?: BudgetPeriod.MONTH) }
     val amount = MoviegoingBudget.parseAmount(amountText)
     val showError = amountText.isNotBlank() && amount == null

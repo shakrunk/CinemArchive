@@ -9,6 +9,7 @@ import { useAppStore } from 'src/store/useAppStore'
 import { formatCompanions } from 'src/store/outings'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
 import { OwnerGroupReactions } from 'src/components/GroupReactions'
+import { KeepsakeButton } from 'src/components/OutingKeepsakes'
 import type { CinemaOuting, Title, Viewing } from 'src/store/mockData'
 import { Eyebrow } from 'src/components/ui/typography'
 
@@ -110,6 +111,8 @@ function PostShowBody({
 
       {/* Only appears for an outing shared with friends (#207); the fields above only prefill it. */}
       <OwnerGroupReactions outingId={outing.id} initialRating={rating > 0 ? rating : null} initialNote={note || null} />
+
+      <KeepsakeButton outingId={outing.id} />
 
       <Button
         onClick={handleRecommend}

@@ -17,6 +17,7 @@ import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, t
 import { Eyebrow } from 'src/components/ui/typography'
 import { formatSeatShort, parseSeatsInput } from 'src/lib/seating'
 import { TicketButton } from './TicketViewer'
+import { KeepsakeButton } from './OutingKeepsakes'
 import { deleteOutingTemplate, saveOutingTemplate, setMoviegoingRegion, useMoviegoingPrefs } from 'src/lib/moviegoingPrefsSync'
 import { fetchNowPlaying, type SearchResult } from 'src/lib/media'
 import { effectiveRegion, normalizeRegion } from 'src/store/moviegoingRegion'
@@ -155,6 +156,15 @@ function NowPlaying({ titles, onPick, onAdd }: {
   const [open, setOpen] = useState(false)
   const [region, setRegion] = useState(effective)
   const [draft, setDraft] = useState(effective)
+  // A region that syncs in (or changes) after this mounted replaces the one shown and drafted,
+  // as Android's NowPlayingDialog does by keying its state on the effective region. Picking a
+  // region here saves it, so the saved value then equals `region` and nothing reloads.
+  const [followed, setFollowed] = useState(effective)
+  if (followed !== effective) {
+    setFollowed(effective)
+    setRegion(effective)
+    setDraft(effective)
+  }
   const [attempt, setAttempt] = useState(0)
   // The outcome is tagged with the request it answers, so a new region or retry reads as
   // loading again without resetting state inside the effect.
@@ -876,7 +886,7 @@ function OutingForm({
         />
       </div>
 
-      {editingOuting && <TicketButton outingId={editingOuting.id} />}
+      {editingOuting && <div className="flex flex-wrap items-center gap-4"><TicketButton outingId={editingOuting.id} /><KeepsakeButton outingId={editingOuting.id} /></div>}
       <Button type="submit" className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium">
         <Ticket className="w-4 h-4 mr-2" />
         {isPast ? 'Log this outing' : editingOuting ? 'Save changes' : 'Get tickets'}
@@ -906,6 +916,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
       </p>
       <div className="flex flex-col gap-2 items-center pt-2">
         <TicketButton outingId={outing.id} />
+        <KeepsakeButton outingId={outing.id} />
         <Button
           onClick={() => setSharePanelOpen(true)}
           className="w-full max-w-[220px] bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"

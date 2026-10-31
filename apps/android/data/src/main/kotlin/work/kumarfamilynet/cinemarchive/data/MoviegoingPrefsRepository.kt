@@ -16,6 +16,7 @@ import work.kumarfamilynet.cinemarchive.core.model.BudgetPeriod
 import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingBudget
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingRegion
+import work.kumarfamilynet.cinemarchive.core.model.MoviegoingRules
 import work.kumarfamilynet.cinemarchive.core.model.OutingTemplate
 import work.kumarfamilynet.cinemarchive.core.model.OutingTemplateRules
 import work.kumarfamilynet.cinemarchive.core.model.PlanPeriod
@@ -44,7 +45,7 @@ class SyncedMoviegoingPrefs(
  *  null `budget`/`plan`/`templates` is valid: it means "none set". Individual invalid template
  *  entries are skipped, not fatal, so one bad entry never blocks the budget and plan. */
 fun parseMoviegoingPrefs(json: JSONObject): SyncedMoviegoingPrefs? {
-    val updatedAt = (json.opt("updatedAt") as? String)?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
+    val updatedAt = MoviegoingRules.parseInstant(json.opt("updatedAt") as? String) ?: return null
     val rawBudget = json.opt("budget")
     val budget = if (rawBudget == null || rawBudget == JSONObject.NULL) null else parseBudget(rawBudget) ?: return null
     val rawPlan = json.opt("plan")

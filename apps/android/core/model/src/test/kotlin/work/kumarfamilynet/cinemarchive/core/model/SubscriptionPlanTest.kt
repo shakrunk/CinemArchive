@@ -103,4 +103,21 @@ class SubscriptionPlanTest {
         assertNull(PlanPeriod.fromWire("year"))
         assertNull(PlanPeriod.fromWire(null))
     }
+
+    /** The cases web's moviegoingRules.test.ts runs too (fixtures/moviegoing.json). */
+    @Test fun matchesTheSharedFixture() {
+        for (case in MoviegoingFixture.cases("plan")) {
+            val name = case.getString("name")
+            val spec = case.getJSONObject("plan")
+            val plan = SubscriptionPlan(spec.getInt("cap"), PlanPeriod.fromWire(spec.getString("period"))!!)
+            val dates = case.getJSONArray("dates").strings().map(LocalDate::parse)
+            val expected = case.getJSONObject("expected")
+            val status = SubscriptionPlanRules.status(plan, dates, LocalDate.parse(case.getString("today")))
+            assertEquals(name, expected.getInt("used"), status.used)
+            assertEquals(name, expected.getInt("remaining"), status.remaining)
+            assertEquals(name, expected.getString("state").uppercase(), status.state.name)
+            assertEquals(name, LocalDate.parse(expected.getString("start")), status.periodStart)
+            assertEquals(name, LocalDate.parse(expected.getString("end")), status.periodEnd)
+        }
+    }
 }

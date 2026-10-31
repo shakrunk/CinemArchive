@@ -95,7 +95,14 @@ class AppAccountRuntime(
 
     /** Online-only keepsake photos for outings (#208). */
     val keepsakes: work.kumarfamilynet.cinemarchive.data.KeepsakeRepository by lazy {
-        work.kumarfamilynet.cinemarchive.data.KeepsakeRepository(client, session::currentSession, ownerId, ::isCurrent)
+        val pending = context.getSharedPreferences("keepsake-pending-${identity.userId}", android.content.Context.MODE_PRIVATE)
+        work.kumarfamilynet.cinemarchive.data.KeepsakeRepository(
+            client, session::currentSession, ownerId, ::isCurrent,
+            work.kumarfamilynet.cinemarchive.data.TextKeepsakeJournal(
+                read = { pending.getString("pending", null) },
+                write = { text -> pending.edit().apply { if (text == null) remove("pending") else putString("pending", text) }.apply() },
+            ),
+        )
     }
 
     /** Invitations to join friends' outings, and inviting friends to this user's (#206). Online-only. */

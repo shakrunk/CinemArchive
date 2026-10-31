@@ -108,6 +108,8 @@ fun OutingScheduleSheet(
     onEditVenueNote: ((String) -> Unit)? = null,
     /** Portable ticket capture lives in the account-scoped viewer after the outing is saved. */
     onManageTicket: ((CinemaOuting) -> Unit)? = null,
+    /** Keepsake photos (#208) are attached to a saved outing, so they open from an existing one, beside the ticket. */
+    onOpenKeepsakes: ((CinemaOuting) -> Unit)? = null,
     prefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
     /** Saved outing templates (#204). The picker and "Save as template" show only on a fresh
      *  schedule, never when editing an existing outing. */
@@ -366,6 +368,9 @@ fun OutingScheduleSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
+                if (onOpenKeepsakes != null) TextButton(onClick = { onOpenKeepsakes(initial) }) {
+                    Text("Photos")
+                }
                 if (onManageTicket != null) TextButton(onClick = { onManageTicket(initial) }) {
                     Text("Open ticket photo and code")
                 }

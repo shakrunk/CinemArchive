@@ -51,8 +51,9 @@ unchanged and still the owner's alone.
 
 `ticket_received` (to the friend, payload `grant_id`, `title`, `showtime`, `venue`) and `ticket_opened`
 (to the sender on the first open, payload `grant_id`, `title`). A received ticket opens Up Next on both
-clients. The notification type list in this migration is a superset of every type defined so far, so
-applying migrations out of order never drops one.
+clients; an opened one opens the title's detail, where the sender finds the outing's ticket and who has
+opened it, as an invite response does. The notification type list in this migration is a superset of
+every type defined so far, so applying migrations out of order never drops one.
 
 ## Where it appears
 

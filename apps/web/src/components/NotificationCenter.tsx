@@ -135,7 +135,8 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
       onNavigate('profile')
     } else if (n.type === 'outing_invite' || n.type === 'outing_poll' || n.type === 'outing_poll_closed' || n.type === 'ticket_received') {
       onNavigate('upnext')
-    } else if (n.type === 'outing_invite_response' && n.titleId) {
+    } else if ((n.type === 'outing_invite_response' || n.type === 'ticket_opened') && n.titleId) {
+      // The title's detail drawer holds the outing and its ticket, where the owner sees who opened it.
       openDetailDrawer(n.titleId)
     }
   }

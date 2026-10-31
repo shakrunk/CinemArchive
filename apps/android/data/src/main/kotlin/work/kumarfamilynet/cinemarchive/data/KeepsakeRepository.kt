@@ -5,8 +5,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import work.kumarfamilynet.cinemarchive.core.model.KeepsakeReplacement
 import work.kumarfamilynet.cinemarchive.core.model.KeepsakeRules
+import work.kumarfamilynet.cinemarchive.core.model.KeepsakeSaveException
 import work.kumarfamilynet.cinemarchive.core.model.OutingKeepsake
+import work.kumarfamilynet.cinemarchive.core.model.PendingKeepsake
 
 /**
  * Keepsake photos for cinema outings (#208, docs/android-contracts/outing-keepsakes.md). Unlike
@@ -19,6 +22,7 @@ class KeepsakeRepository(
     private val session: () -> SupabaseSession?,
     private val ownerId: String,
     private val isCurrent: () -> Boolean,
+    private val journal: KeepsakeJournal = InMemoryKeepsakeJournal(),
 ) {
     suspend fun list(outingId: String): List<OutingKeepsake> = withContext(Dispatchers.IO) {
         val token = token()
@@ -26,20 +30,106 @@ class KeepsakeRepository(
             .also { token() }
     }
 
-    /** Uploads [bytes] (already downscaled), then records them against [outingId]. */
-    suspend fun add(outingId: String, bytes: ByteArray, mimeType: String): OutingKeepsake = withContext(Dispatchers.IO) {
+    /** Uploaded-but-unsaved photos for [outingId], oldest first. */
+    fun pending(outingId: String): List<PendingKeepsake> = journal.load().filter { it.outingId == outingId }
+
+    /** Forgets a pending photo (saved, given up on, or already a row). Its object is left to the daily cleanup. */
+    fun discardPending(id: String) = journal.store(journal.load().filterNot { it.id == id })
+
+    /** Step one: uploads [bytes] (already downscaled) under the owner's folder without overwriting and
+     *  remembers them as pending. A failure here changes nothing. */
+    suspend fun upload(outingId: String, bytes: ByteArray, mimeType: String): PendingKeepsake = withContext(Dispatchers.IO) {
         require(KeepsakeRules.isValidPhoto(mimeType, bytes.size)) { "That photo can't be kept: use a JPEG, PNG or WebP under 10 MB." }
         val token = token()
-        val id = UUID.randomUUID().toString()
-        val key = KeepsakeRules.objectKey(ownerId, id)
-        client.storageUpload(BUCKET, key, bytes, mimeType, token)
+        val pending = PendingKeepsake(UUID.randomUUID().toString(), checkedUuid(outingId), mimeType, bytes.size.toLong())
+        client.storageUpload(BUCKET, KeepsakeRules.objectKey(ownerId, pending.id), bytes, mimeType, token)
         token()
-        val row = JSONObject()
-            .put("id", id).put("user_id", ownerId).put("outing_id", checkedUuid(outingId))
-            .put("object_key", key).put("mime_type", mimeType).put("byte_length", bytes.size)
-        // A failed insert leaves an unreferenced object; the daily cleanup removes it after a day.
-        parseKeepsakes(client.insert("outing_keepsakes", token, JSONArray().put(row).toString())).single().also { token() }
+        journal.store(journal.load() + pending)
+        pending
     }
+
+    /** Step two, safe to repeat: records an uploaded photo against its outing. A row that already exists
+     *  (an earlier attempt whose reply was lost) counts as saved. Throws [KeepsakeSaveException]. */
+    suspend fun finish(pending: PendingKeepsake): OutingKeepsake = withContext(Dispatchers.IO) {
+        val token = token()
+        try {
+            val saved = parseKeepsakes(client.insert("outing_keepsakes", token, JSONArray().put(rowOf(pending.id, pending.outingId, pending.mimeType, pending.byteLength)).toString()))
+                .singleOrNull() ?: throw KeepsakeSaveException("The photo could not be saved.", pending)
+            token()
+            discardPending(pending.id)
+            saved
+        } catch (cause: KeepsakeSaveException) {
+            throw cause
+        } catch (cause: SupabaseHttpException) {
+            if (cause.postgresCode == "23505") {
+                val existing = parseKeepsakes(client.get("outing_keepsakes", "id=eq.${checkedUuid(pending.id)}&select=*", token)).singleOrNull()
+                if (existing != null) {
+                    discardPending(pending.id)
+                    return@withContext existing
+                }
+            }
+            val message = cause.userMessage("The photo uploaded but couldn't be saved to this trip.")
+            if (cause.postgresCode in KeepsakeRules.FINAL_INSERT_CODES) {
+                discardPending(pending.id)
+                throw KeepsakeSaveException(message, null, cause)
+            }
+            throw KeepsakeSaveException(message, pending, cause)
+        } catch (cause: java.io.IOException) {
+            throw KeepsakeSaveException(cause.userMessage("The photo uploaded but couldn't be saved to this trip."), pending, cause)
+        }
+    }
+
+    /** Uploads [bytes] (already downscaled), then records them against [outingId]. When only the second
+     *  step fails, the thrown [KeepsakeSaveException] carries the pending photo to finish later. */
+    suspend fun add(outingId: String, bytes: ByteArray, mimeType: String): OutingKeepsake = finish(upload(outingId, bytes, mimeType))
+
+    /**
+     * Swaps [old] for a new photo without ever leaving the trip with neither. The new bytes upload first,
+     * so a failed upload changes nothing. With room for another row ([count] below the limit) the new row
+     * is added, then the old one removed (if that last step fails both stay, reported by
+     * [KeepsakeReplacement.oldRemoved]). A full album cannot hold both rows, so the old row is removed first
+     * and put back, with the same id and object, if the new row cannot be saved.
+     */
+    suspend fun replace(old: OutingKeepsake, bytes: ByteArray, mimeType: String, count: Int): KeepsakeReplacement {
+        val pending = upload(old.outingId, bytes, mimeType)
+        if (KeepsakeRules.canAddAnother(count)) {
+            val saved = finish(pending)
+            val removed = try { remove(old.id); true } catch (cause: Exception) { cause.rethrowIfCancelled(); false }
+            return KeepsakeReplacement(saved, removed)
+        }
+        try {
+            remove(old.id)
+        } catch (cause: Exception) {
+            discardPending(pending.id)
+            throw cause
+        }
+        try {
+            return KeepsakeReplacement(finish(pending), true)
+        } catch (cause: Exception) {
+            cause.rethrowIfCancelled()
+            try {
+                restore(old)
+                discardPending(pending.id)
+            } catch (restoreFailure: Exception) {
+                restoreFailure.rethrowIfCancelled()
+                // The old row stays removed (its object lasts about a day); the new photo can still be finished.
+                (cause as? KeepsakeSaveException)?.originalRemoved = true
+            }
+            throw cause
+        }
+    }
+
+    /** Puts a removed row back (same id, same object), used to undo a replace that could not finish. */
+    private suspend fun restore(old: OutingKeepsake) = withContext(Dispatchers.IO) {
+        val token = token()
+        client.insert("outing_keepsakes", token, JSONArray().put(rowOf(old.id, old.outingId, old.mimeType, old.byteLength)).toString())
+        token()
+        Unit
+    }
+
+    private fun rowOf(id: String, outingId: String, mimeType: String, byteLength: Long) = JSONObject()
+        .put("id", checkedUuid(id)).put("user_id", ownerId).put("outing_id", checkedUuid(outingId))
+        .put("object_key", KeepsakeRules.objectKey(ownerId, id)).put("mime_type", mimeType).put("byte_length", byteLength)
 
     /** Deletes the row, which makes the bytes unreadable at once; cleanup removes them later. */
     suspend fun remove(id: String) = withContext(Dispatchers.IO) {

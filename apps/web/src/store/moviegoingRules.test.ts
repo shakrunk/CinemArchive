@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import fixture from '../../../../docs/android-contracts/fixtures/moviegoing.json'
 import type { CinemaOuting, Title } from './mockData'
 import {
   budgetRange, budgetStatus, budgetSummary, defaultRecapYear, deriveMoviegoingTrips, isValidBudgetAmount, isValidPlanCap,
   moviegoingRecap, parseBudgetAmount, parsePlanCap, planRange, planStatus, planSummary, recapFields, recapSummary,
-  recapYears, tripDate, type MoviegoingBudget, type MoviegoingTrip, type SubscriptionPlan,
+  recapYears, tripDate, formatMoney, isTripVenue, parseInstant, type MoviegoingBudget, type MoviegoingTrip, type SubscriptionPlan,
 } from './moviegoingRules'
 
 // Each block pins the same cases as Android's MoviegoingBudgetTest, SubscriptionPlanTest and
@@ -285,4 +286,76 @@ describe('deriveMoviegoingTrips', () => {
     expect(tripDate('2026-13-45')).toBeNull()
     expect(tripDate(undefined)).toBeNull()
   })
+})
+
+// The shared cross-client cases. Android's MoviegoingBudgetTest, SubscriptionPlanTest,
+// MoviegoingRecapTest and MoviegoingPrefsTest load the same file.
+describe('shared moviegoing fixture', () => {
+  it('parses typed budget amounts', () => {
+    for (const c of fixture.amounts) expect(parseBudgetAmount(c.text), JSON.stringify(c.text)).toBe(c.amount)
+  })
+
+  it('parses typed plan caps', () => {
+    for (const c of fixture.caps) expect(parsePlanCap(c.text), JSON.stringify(c.text)).toBe(c.cap)
+  })
+
+  it('reads only real calendar dates', () => {
+    for (const c of fixture.tripDates) expect(tripDate(c.value), JSON.stringify(c.value)).toBe(c.date)
+  })
+
+  it('counts a viewing as a trip only with a non-empty venue', () => {
+    for (const c of fixture.tripVenues) expect(isTripVenue(c.venue), JSON.stringify(c.venue)).toBe(c.isTrip)
+  })
+
+  it('accepts only UTC instants for updatedAt', () => {
+    for (const c of fixture.timestamps) expect(parseInstant(c.value) !== null, c.value).toBe(c.valid)
+  })
+
+  it('formats money from whole cents', () => {
+    for (const c of fixture.money) expect(formatMoney(c.amount), String(c.amount)).toBe(c.text)
+  })
+
+  for (const c of fixture.budget) {
+    it(`budget: ${c.name}`, () => {
+      const trips = c.trips.map((t) => priced(t.date, t.price))
+      const status = budgetStatus(c.budget as MoviegoingBudget, trips, c.today)
+      expect(status.spent).toBeCloseTo(c.expected.spent, 9)
+      expect(status.remaining).toBeCloseTo(c.expected.remaining, 9)
+      expect(status.state).toBe(c.expected.state)
+      expect(status.range).toEqual({ start: c.expected.start, end: c.expected.end })
+    })
+  }
+
+  for (const c of fixture.plan) {
+    it(`plan: ${c.name}`, () => {
+      const status = planStatus(c.plan as SubscriptionPlan, c.dates.map((date) => trip(date)), c.today)
+      expect({ used: status.used, remaining: status.remaining, state: status.state, start: status.range.start, end: status.range.end })
+        .toEqual(c.expected)
+    })
+  }
+
+  for (const c of fixture.recapYears) {
+    it(`recap years: ${c.name}`, () => {
+      const trips = c.dates.map((date) => trip(date))
+      expect(recapYears(trips)).toEqual(c.years)
+      expect(defaultRecapYear(trips, c.today)).toBe(c.default)
+    })
+  }
+
+  for (const c of fixture.recap) {
+    it(`recap: ${c.name}`, () => {
+      const trips = c.trips.map((t) => trip(t.date, {
+        venue: t.venue ?? undefined, companions: t.companions, format: t.format ?? undefined, ticketPrice: t.price ?? undefined,
+      }))
+      const recap = moviegoingRecap(trips, c.year)
+      if (!c.expected) {
+        expect(recap).toBeNull()
+        return
+      }
+      const { fields, summary, ...figures } = c.expected
+      expect(recap).toEqual({ year: c.year, ...figures })
+      expect(recapFields(recap!, formatMoney)).toEqual(fields)
+      expect(recapSummary(recap!, formatMoney)).toBe(summary)
+    })
+  }
 })

@@ -134,4 +134,50 @@ class MoviegoingRecapTextTest {
     @Test fun summaryHandlesOneTripAndMissingFigures() {
         assertEquals("My 2025 at the movies: 1 trip.", MoviegoingRecapText.summary(MoviegoingRecap(2025, 1, null, null, null, null)))
     }
+
+    /** The cases web's moviegoingRules.test.ts runs too (fixtures/moviegoing.json). */
+    @Test fun yearsMatchTheSharedFixture() {
+        for (case in MoviegoingFixture.cases("recapYears")) {
+            val name = case.getString("name")
+            val trips = case.getJSONArray("dates").strings().map { date -> MoviegoingTrip(LocalDate.parse(date), null, emptyList(), null, null) }
+            val years = case.getJSONArray("years").let { array -> (0 until array.length()).map { array.getInt(it) } }
+            assertEquals(name, years, MoviegoingRecapRules.years(trips))
+            assertEquals(name, case.intOrNull("default"), MoviegoingRecapRules.defaultYear(trips, LocalDate.parse(case.getString("today"))))
+        }
+    }
+
+    @Test fun recapsMatchTheSharedFixture() {
+        for (case in MoviegoingFixture.cases("recap")) {
+            val name = case.getString("name")
+            val trips = with(MoviegoingFixture) {
+                case.getJSONArray("trips").objects().map {
+                    MoviegoingTrip(
+                        LocalDate.parse(it.getString("date")),
+                        it.stringOrNull("venue"),
+                        it.getJSONArray("companions").strings(),
+                        it.stringOrNull("format"),
+                        it.doubleOrNull("price"),
+                    )
+                }
+            }
+            val recap = MoviegoingRecapRules.recap(trips, case.getInt("year"))
+            if (case.isNull("expected")) {
+                assertNull(name, recap)
+                continue
+            }
+            val expected = case.getJSONObject("expected")
+            assertEquals(name, expected.getInt("tripCount"), recap!!.tripCount)
+            assertEquals(name, highlight(expected, "topVenue"), recap.topVenue)
+            assertEquals(name, highlight(expected, "topFormat"), recap.topFormat)
+            assertEquals(name, highlight(expected, "topCompanion"), recap.topCompanion)
+            assertEquals(name, expected.doubleOrNull("totalSpend"), recap.totalSpend)
+            val fields = expected.getJSONArray("fields").objects()
+                .map { RecapField(it.getString("label"), it.getString("value")) }
+            assertEquals(name, fields, MoviegoingRecapText.fields(recap))
+            assertEquals(name, expected.getString("summary"), MoviegoingRecapText.summary(recap))
+        }
+    }
+
+    private fun highlight(expected: org.json.JSONObject, key: String): RecapHighlight? =
+        if (expected.isNull(key)) null else expected.getJSONObject(key).let { RecapHighlight(it.getString("label"), it.getInt("count")) }
 }

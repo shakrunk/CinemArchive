@@ -33,6 +33,7 @@ import work.kumarfamilynet.cinemarchive.core.model.LedgerMilestoneBadge
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMonthlyCount
 import work.kumarfamilynet.cinemarchive.core.model.LedgerMoviegoingStats
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingPricedTrip
+import work.kumarfamilynet.cinemarchive.core.model.MoviegoingRules
 import work.kumarfamilynet.cinemarchive.core.model.MoviegoingTrip
 import work.kumarfamilynet.cinemarchive.core.model.LedgerPremiereRevivalBucket
 import work.kumarfamilynet.cinemarchive.core.model.LedgerProgressEntry
@@ -79,7 +80,7 @@ private data class LedgerSources(
 )
 
 private fun parseLocalDate(date: String?): LocalDate? =
-    date?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+    MoviegoingRules.parseTripDate(date)
 
 /**
  * Read-only Ledger rollup — see [LedgerStats]/[LedgerBoard] and
@@ -565,7 +566,7 @@ class LedgerRepository(
      *  `viewings.venue`/`companions`/`outing_id` comment). [totalSpend]/formats are the
      *  owner-private half, joined via `outingId` (ledger.md §3). */
     private fun moviegoing(viewings: List<ViewingEntity>, outings: List<CinemaOutingEntity>): LedgerMoviegoingStats {
-        val trips = viewings.filter { it.venue != null }
+        val trips = viewings.filter { MoviegoingRules.isTripVenue(it.venue) }
         val outingById = outings.associateBy { it.id }
         val joinedOutings = trips.mapNotNull { it.outingId?.let { id -> outingById[id] } }
             .map { it.copy(format = CinemaFormat.fromWire(it.format)?.wireValue ?: it.format) }

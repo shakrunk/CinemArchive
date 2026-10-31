@@ -36,14 +36,14 @@ and the Ledger "At the Movies" panel shows the budget only to the owner.
 | Field | Values |
 |-------|--------|
 | `budget` | optional. Absent or `null` means no budget is set. |
-| `budget.amount` | finite number, greater than 0 and at most 100000, in the user's own currency (the app shows `$`, matching `ticket_price`) |
+| `budget.amount` | finite number, greater than 0 and at most 100000, in the user's own currency (the app shows `$`, matching `ticket_price`). Typed text is an optional `$`, then plain ASCII decimal digits with an optional point, with commas ignored: `1e3`, `40d`, `0x10`, `NaN` and non-ASCII digits are not amounts. |
 | `budget.period` | `month` or `year`, both calendar periods in the device's local time zone |
 | `plan` | optional. Absent or `null` means no subscription plan is set. |
-| `plan.cap` | whole number from 1 to 100: the outings the plan allows per period. `3` and `3.0` are both accepted; `2.5` is not. |
+| `plan.cap` | whole number from 1 to 100: the outings the plan allows per period. `3` and `3.0` are both accepted in the stored payload; `2.5` is not. Typed text is plain ASCII digits with an optional sign, so `3.0`, `1e1` and non-ASCII digits are not accepted. |
 | `plan.period` | `week` or `month` |
 | `templates` | optional. Absent or `null` means no templates. An array of at most 12 [outing templates](#outing-templates-204). |
 | `region` | optional. Absent or `null` means none saved. Exactly two uppercase ASCII letters (ISO 3166-1 alpha-2), the country whose [now-playing list](#now-playing-202) is shown. |
-| `updatedAt` | ISO-8601 instant of the user's last change to any key, on the writing device |
+| `updatedAt` | UTC instant of the user's last change to any key, on the writing device, written `YYYY-MM-DDTHH:mm:ss[.fraction]Z` with up to nine fractional digits and a real calendar date. A date alone, a missing `Z`, a numeric offset such as `+01:00`, a missing seconds field and an hour of `24` are all unparseable, on both clients. |
 
 A payload whose `budget` or `plan` is present but invalid (non-positive, non-finite or fractional
 value, out-of-range `cap`, unknown `period`, wrong types), whose `templates` is present but not an
@@ -65,10 +65,15 @@ so a newer client's additions survive an older client's edit.
   sync keep only the newer device's list. Templates are a handful of small, rarely edited items,
   so a per-template merge is not worth a table here.
 - The web client (`apps/web/src/lib/moviegoingPrefsSync.ts`) follows the same payload, validation and
-  last-write-wins rules, with one deliberate difference: it keeps its copy in memory for the session
-  rather than on the device, because browser device storage is shared by whoever signs in next and
-  this is one account's private data. It refetches on sign-in and when the browser comes back online,
-  and a push that failed is retried by the next reconcile while the tab stays open.
+  last-write-wins rules. It reads from an in-memory copy and also stores that copy in the browser
+  (`localStorage`, one key per signed-in account plus one for the signed-out device), so an edit made
+  offline, or while signed out, survives a reload. On launch it loads the stored copy of whoever is
+  signed in, then reconciles: a stored copy newer than the server's is pushed (the replay of an edit
+  that never reached it), an older one is replaced. It also reconciles on sign-in and when the browser
+  comes back online. A different account never reads another's stored copy, signed-out edits are
+  never carried into an account or pushed, and a damaged or blocked store is ignored. This is the same
+  class of owner-private data the web offline library already keeps per account on the device; it is
+  not removed on sign-out, so the same account finds its copy again.
 
 ## Period spend
 
@@ -81,8 +86,19 @@ the calendar month or year containing "today" in local time. The status is:
 | 0.8 up to and including 1.0 | `near` |
 | above 1.0 | `over` |
 
-Android pins these cases in `MoviegoingBudgetTest` (core/model) and web in `moviegoingRules.test.ts`
-(`apps/web/src/store`); the two suites hold the same cases.
+Both clients load the same cases from [`fixtures/moviegoing.json`](fixtures/moviegoing.json): Android in
+`MoviegoingBudgetTest`, `SubscriptionPlanTest`, `MoviegoingRecapTest` and `MoviegoingRulesTest` (core/model)
+and `MoviegoingPrefsTest` (data), web in `moviegoingRules.test.ts` and `moviegoingPrefsSync.test.ts`
+(`apps/web/src`). The fixture also pins the shared edge rules:
+
+- **A trip needs a real date.** A viewing date is read as its first ten characters and must be a real
+  calendar date, so `2026-02-30` is no trip date on either client.
+- **A trip needs a non-empty venue.** An empty `venue` is the same as none (the web client maps it to
+  absent when it reads a viewing); a venue that is only spaces still counts as a trip.
+- **Money is `$1,234.50`.** Budget lines and the recap print a dollar sign, comma thousands and two
+  decimals, built from whole cents so the device locale never changes the figure.
+- **No trips yet is not "no budget".** The panel offers the budget and plan controls before the first
+  trip, on both clients, to the owner only.
 
 ## Plan usage (#211)
 

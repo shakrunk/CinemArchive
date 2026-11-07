@@ -10,6 +10,8 @@ internal data class IncomingNavigation(
     val titleId: String?,
     val listId: String?,
     val add: Boolean,
+    /** Set by notification taps (never by links): open the Add flow on this title. */
+    val addTitle: work.kumarfamilynet.cinemarchive.core.model.MediaSearchResult? = null,
 ) {
     companion object {
         private val views = setOf("discover", "library", "upnext", "ledger", "lists", "profile", "friends", "calendar")

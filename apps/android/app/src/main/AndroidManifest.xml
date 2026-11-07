@@ -75,6 +75,12 @@
             android:name=".OutingCompletionReceiver"
             android:exported="false" />
 
+        <!-- Add / Dismiss actions on a Jellyfin "new watch" notification. The broadcast comes from
+             this app's own PendingIntent, so it is not exported; it only enqueues the real work. -->
+        <receiver
+            android:name=".JellyfinActionReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.tickets"

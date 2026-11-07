@@ -51,6 +51,8 @@ fun OutingPlansDialog(
     source: OutingPlansSource, outingId: String, onDismiss: () -> Unit,
     onShare: ((PublicOutingPlan) -> Unit)? = null,
     onCalendar: ((PublicOutingPlan) -> Unit)? = null,
+    /** Adds "Invite to join" (#206) when present; null keeps the dialog a one-way snapshot share. */
+    invites: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository? = null,
 ) {
     if (!source.isActive()) return
     key(source, outingId) {
@@ -111,6 +113,7 @@ fun OutingPlansDialog(
                     state.failures[friend.friendUserId]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 }
             }
+            if (invites != null && state.friends.isNotEmpty()) OutingInviteSection(invites, outingId, shown, enabled = state.plan != null && !state.loading)
         }
     }
 }

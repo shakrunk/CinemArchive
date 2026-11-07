@@ -233,6 +233,8 @@ class NotificationsRepositoryTest {
         assertEquals(NotificationRoute.Profile, NotificationRules.route(invite))
         val friend = parseNotifications("[" + row("n4", type = "friend_request_received") + "]").single()
         assertEquals(NotificationRoute.Friends, NotificationRules.route(friend))
+        val opened = parseNotifications("[" + row("n6", type = "ticket_opened") + "]").single()
+        assertEquals(NotificationRoute.TitleDetail("title-n6"), NotificationRules.route(opened))
         val unknown = parseNotifications("[" + row("n5", type = "future_type") + "]").single()
         assertEquals(NotificationType.UNKNOWN, unknown.type)
     }

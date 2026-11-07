@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalMovies
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -274,6 +275,10 @@ fun TitleDetailRoute(
     titleId: String,
     onBack: () -> Unit,
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
+    /** Resolves the group-reactions actions for one of the user's outings, or null when never shared (#207). */
+    groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    /** Opens an outing's keepsake photos (#208); null hides the entry point. */
+    onOpenKeepsakes: ((CinemaOuting, String) -> Unit)? = null,
     onRequestNotificationPermission: () -> Unit = {},
     socialContent: (@Composable (TitleDetail) -> Unit)? = null,
     onRecommendTitle: ((String) -> Unit)? = null,
@@ -282,6 +287,7 @@ fun TitleDetailRoute(
     onRefreshCredits: (suspend () -> Boolean)? = null,
     catalogExtrasSource: work.kumarfamilynet.cinemarchive.data.CatalogExtrasSource? = null,
     titleMetadataRecovery: work.kumarfamilynet.cinemarchive.data.TitleMetadataRecoverySource? = null,
+    moviegoingPrefs: work.kumarfamilynet.cinemarchive.data.MoviegoingPrefsRepository? = null,
     initialSchedule: Boolean = false,
     schedulePrefill: work.kumarfamilynet.cinemarchive.core.model.OutingSchedulePrefill? = null,
     initialPostShow: Boolean = false,
@@ -316,6 +322,8 @@ fun TitleDetailRoute(
     val venueSuggestions by viewModel.venueSuggestions.collectAsStateWithLifecycle()
     val companionSuggestions by viewModel.companionSuggestions.collectAsStateWithLifecycle()
     val venueNotes by viewModel.venueNotes.collectAsStateWithLifecycle()
+    val outingTemplates by remember(moviegoingPrefs) { moviegoingPrefs?.observeTemplates() ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     val listOptions by viewModel.listOptions.collectAsStateWithLifecycle()
     val episodeCast by viewModel.episodeCast.collectAsStateWithLifecycle()
     var showAddToListSheet by rememberSaveable { mutableStateOf(false) }
@@ -369,6 +377,8 @@ fun TitleDetailRoute(
         onInitialScheduleConsumed = onInitialScheduleConsumed,
         onCancelOuting = viewModel::onCancelOuting,
         onViewTicket = onViewTicket,
+        groupReactions = groupReactions,
+        onOpenKeepsakes = onOpenKeepsakes,
         ticketOutings = ticketOutings.orEmpty(),
         onPreparePostShow = viewModel::preparePostShow,
         onSavePostShow = viewModel::savePostShow,
@@ -378,6 +388,9 @@ fun TitleDetailRoute(
         companionSuggestions = companionSuggestions,
         venueNotes = venueNotes,
         onEditVenueNote = { editVenue = it },
+        outingTemplates = outingTemplates,
+        onSaveTemplate = moviegoingPrefs?.let { prefs -> { template -> prefs.saveTemplate(template) } },
+        onDeleteTemplate = moviegoingPrefs?.let { prefs -> { id -> prefs.deleteTemplate(id) } },
         onRemoveTitle = { viewModel.onRemoveTitle(onRemoved = onBack) },
         listOptions = listOptions,
         onOpenAddToList = { showAddToListSheet = true },
@@ -422,6 +435,8 @@ fun TitleDetailScreen(
     onSaveSchedule: suspend (String, Instant, Int, Int, String?, List<String>, CinemaFormat?, Double?, SeatAssignment, String?, String?) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> error("Ticket scheduling unavailable") },
     onCancelOuting: (String) -> Unit = {},
     onViewTicket: ((CinemaOuting, String) -> Unit)? = null,
+    groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    onOpenKeepsakes: ((CinemaOuting, String) -> Unit)? = null,
     ticketOutings: List<CinemaOuting> = emptyList(),
     onPreparePostShow: (suspend (String) -> PostShowOpening)? = null,
     onSavePostShow: suspend (PostShowOpening, Double?, String) -> Unit = { _, _, _ -> error("Post-show saving unavailable") },
@@ -431,6 +446,9 @@ fun TitleDetailScreen(
     companionSuggestions: List<String> = emptyList(),
     venueNotes: Map<String, String> = emptyMap(),
     onEditVenueNote: ((String) -> Unit)? = null,
+    outingTemplates: List<work.kumarfamilynet.cinemarchive.core.model.OutingTemplate> = emptyList(),
+    onSaveTemplate: (suspend (work.kumarfamilynet.cinemarchive.core.model.OutingTemplate) -> Unit)? = null,
+    onDeleteTemplate: (suspend (String) -> Unit)? = null,
     onRemoveTitle: () -> Unit = {},
     listOptions: List<ListMembershipOption> = emptyList(),
     onOpenAddToList: () -> Unit = {},
@@ -595,6 +613,16 @@ fun TitleDetailScreen(
                             Icon(Icons.Filled.ConfirmationNumber, contentDescription = null, modifier = Modifier.size(18.dp))
                             Text(
                                 "View ticket · ${outing.venue ?: "Cinema"} · ${formatShowtimeDate(outing.showtime)}",
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
+                        }
+                    }
+
+                    if (onOpenKeepsakes != null) ticketOutings.forEach { outing ->
+                        TextButton(onClick = { onOpenKeepsakes(outing, detail.title) }) {
+                            Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Photos · ${outing.venue ?: "Cinema"} · ${formatShowtimeDate(outing.showtime)}",
                                 modifier = Modifier.padding(start = 6.dp),
                             )
                         }
@@ -936,6 +964,13 @@ fun TitleDetailScreen(
             companionSuggestions = companionSuggestions,
             venueNotes = venueNotes,
             onEditVenueNote = onEditVenueNote,
+            templates = outingTemplates,
+            onSaveTemplate = onSaveTemplate,
+            onDeleteTemplate = onDeleteTemplate,
+            onOpenKeepsakes = onOpenKeepsakes?.let { open -> { outing ->
+                scheduleOpening = null
+                open(outing, detail?.title ?: "Cinema outing")
+            } },
             onManageTicket = onViewTicket?.let { open -> { outing ->
                 scheduleOpening = null
                 open(outing, detail?.title ?: "Cinema outing")
@@ -952,6 +987,15 @@ fun TitleDetailScreen(
                 onRevert = onRevertPostShow,
                 onDismiss = { postShowState = null },
                 onRecommend = if (detail?.tmdbId != null && onRecommendTitle != null) ({ onRecommendTitle(captured.titleId) }) else null,
+                groupContent = groupReactions?.let { resolve ->
+                    captured.followUpOutingId?.let { outingId ->
+                        { rating, note ->
+                            work.kumarfamilynet.cinemarchive.core.designsystem.ResolvedGroupReactions(
+                                resolve = { resolve(outingId) }, initialRating = rating, initialNote = note,
+                            )
+                        }
+                    }
+                },
             )
         }
     }

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { fetchDiscover } from './media'
+import { fetchDiscover, fetchNowPlaying } from './media'
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }))
 vi.mock('./auth', () => ({ isSupabaseConfigured: true, supabase: { functions: { invoke } } }))
@@ -19,4 +19,13 @@ it('continues when one feed is empty and rejects the whole page if either feed f
   expect((await fetchDiscover('all', 18, 2)).map((result) => result.type)).toEqual(['tv'])
   invoke.mockResolvedValueOnce({ data: { results: [{ id: 8, title: 'Partial movie' }] }, error: null }).mockResolvedValueOnce({ data: null, error: new Error('TV unavailable') })
   await expect(fetchDiscover('all', 18, 3)).rejects.toThrow('TV unavailable')
+})
+
+it('asks the proxy for a region\'s now-playing movies and refuses a malformed code before any request', async () => {
+  invoke.mockResolvedValueOnce({ data: { results: [{ id: 7, title: 'Seven', release_date: '2026-10-01' }, { id: 8 }] }, error: null })
+  const results = await fetchNowPlaying('GB')
+  expect(invoke.mock.calls.map(([url]) => String(url))).toEqual(['media-proxy?action=now_playing&region=GB'])
+  expect(results.map(({ type, tmdbId }) => [type, tmdbId])).toEqual([['movie', 7]])
+  for (const bad of ['gb', 'GBR', '', 'US&action=x']) await expect(fetchNowPlaying(bad)).rejects.toThrow('Invalid region')
+  expect(invoke).toHaveBeenCalledTimes(1)
 })

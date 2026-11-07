@@ -6,6 +6,7 @@ import type { TicketCapture } from '../lib/tickets/types'
 import { formatSeatLine } from '../lib/seating'
 import { CinemaModal } from './ui/cinema-modal'
 import { Button } from './ui/button'
+import { SendTicketPanel } from './SentTickets'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'The ticket photo could not be saved. Please retry.'
 
@@ -168,6 +169,7 @@ function TicketViewer({ outing, onClose }: { outing: CinemaOuting; onClose: () =
       </section>
       {hasLegacy && outing.ticketManaged && <p className="text-xs text-muted-foreground">Older device-local ticket data is retained for recovery. It is not the current ticket photo.</p>}
       <TicketCaptureControls outing={outing} session={session} />
+      {outing.ticketAttachment && <SendTicketPanel outingId={outing.id} />}
     </div>
   </CinemaModal>
 }

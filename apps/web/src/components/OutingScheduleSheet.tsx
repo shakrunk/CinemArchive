@@ -2,7 +2,7 @@ import { saveSucceeded } from 'src/lib/localSave'
 import { VenueNoteEditor } from './VenueNoteEditor'
 import { normalizeVenue } from '../lib/venueNotes'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Ticket, Search, Calendar, Clock, MapPin, Users, Film, X, Share2, Download, RefreshCw } from 'lucide-react'
+import { Ticket, Search, Calendar, Clock, MapPin, Users, Film, X, Share2, Download, RefreshCw, Trash2 } from 'lucide-react'
 import { CinemaModal } from 'src/components/ui/cinema-modal'
 import { Button } from 'src/components/ui/button'
 import { Input } from 'src/components/ui/input'
@@ -17,9 +17,16 @@ import { CINEMA_FORMATS, type CinemaFormat, type CinemaOuting, type Companion, t
 import { Eyebrow } from 'src/components/ui/typography'
 import { formatSeatShort, parseSeatsInput } from 'src/lib/seating'
 import { TicketButton } from './TicketViewer'
+import { KeepsakeButton } from './OutingKeepsakes'
+import { deleteOutingTemplate, saveOutingTemplate, setMoviegoingRegion, useMoviegoingPrefs } from 'src/lib/moviegoingPrefsSync'
+import { fetchNowPlaying, type SearchResult } from 'src/lib/media'
+import { effectiveRegion, normalizeRegion } from 'src/store/moviegoingRegion'
+import {
+  createOutingTemplate, isoWeekday, nextTemplateShowtime, templateSummary, MAX_TEMPLATE_NAME, type OutingTemplate,
+} from 'src/store/outingTemplates'
 
 // ─── Companion chip input (free-text + past-companion/friend autocomplete) ───
-// Exported for reuse by the viewing editor (TitleDetailDrawer, plan §4.6/§7.4)
+// Exported for reuse by the viewing editor (title-detail/VenueCompanionsFields, plan §4.6/§7.4)
 // — venue/companions get the same chip-input affordance on any viewing.
 
 export function CompanionInput({
@@ -135,7 +142,122 @@ export function CompanionInput({
 
 // ─── Movie picker (command-palette / no-preselection entry point) ───────────
 
-function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: string) => void }) {
+// ─── Now playing (#202) ──────────────────────────────────────────────────────
+// TMDB lists the movies in theaters for a country but has no showtimes, so picking one only
+// starts the form: the time is still the user's to enter.
+
+function NowPlaying({ titles, onPick, onAdd }: {
+  titles: Title[]
+  onPick: (titleId: string) => void
+  onAdd: (result: SearchResult) => void
+}) {
+  const saved = useMoviegoingPrefs((s) => s.prefs?.region ?? null)
+  const effective = effectiveRegion(saved, typeof navigator === 'undefined' ? null : navigator.language)
+  const [open, setOpen] = useState(false)
+  const [region, setRegion] = useState(effective)
+  const [draft, setDraft] = useState(effective)
+  // A region that syncs in (or changes) after this mounted replaces the one shown and drafted,
+  // as Android's NowPlayingDialog does by keying its state on the effective region. Picking a
+  // region here saves it, so the saved value then equals `region` and nothing reloads.
+  const [followed, setFollowed] = useState(effective)
+  if (followed !== effective) {
+    setFollowed(effective)
+    setRegion(effective)
+    setDraft(effective)
+  }
+  const [attempt, setAttempt] = useState(0)
+  // The outcome is tagged with the request it answers, so a new region or retry reads as
+  // loading again without resetting state inside the effect.
+  const requestKey = `${region}:${attempt}`
+  const [outcome, setOutcome] = useState<{ key: string; movies: SearchResult[] | null } | null>(null)
+  const answered = outcome?.key === requestKey ? outcome : null
+  const movies = answered?.movies ?? null
+  const error = !!answered && answered.movies === null
+
+  useEffect(() => {
+    if (!open) return
+    let current = true
+    fetchNowPlaying(region).then(
+      (list) => { if (current) setOutcome({ key: requestKey, movies: list }) },
+      () => { if (current) setOutcome({ key: requestKey, movies: null }) },
+    )
+    return () => { current = false }
+  }, [open, region, requestKey])
+
+  const draftRegion = normalizeRegion(draft)
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm">
+        What's playing in theaters
+      </button>
+    )
+  }
+
+  return (
+    <section aria-label="Now playing" className="space-y-2">
+      <Eyebrow as="p" size="lg" tone="muted">Now playing</Eyebrow>
+      <p className="font-sans text-xs text-muted-foreground">
+        Movies in theaters for a country. Showtimes aren't listed, so you'll enter the time next.
+      </p>
+      <div className="flex gap-2">
+        <Input
+          aria-label="Country code"
+          value={draft}
+          maxLength={2}
+          onChange={(e) => setDraft(e.target.value)}
+          aria-invalid={draft !== '' && !draftRegion}
+          className="bg-secondary/50 border-border w-24 uppercase"
+        />
+        <Button type="button" size="sm" disabled={!draftRegion || draftRegion === region}
+          onClick={() => {
+            if (!draftRegion) return
+            setRegion(draftRegion)
+            setMoviegoingRegion(draftRegion).catch(() => {})
+          }}>
+          Use
+        </Button>
+      </div>
+      {error ? (
+        <div className="space-y-1">
+          <p role="alert" className="text-xs text-destructive">Couldn't load what's playing.</p>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
+        </div>
+      ) : movies === null ? (
+        <p className="font-sans text-xs text-muted-foreground">Loading…</p>
+      ) : movies.length === 0 ? (
+        <p className="font-sans text-xs text-muted-foreground">Nothing is listed for {region} right now.</p>
+      ) : (
+        <div className="space-y-1 max-h-[40vh] overflow-y-auto scrollbar-thin">
+          {movies.map((m) => {
+            const owned = titles.find((t) => t.type === 'movie' && t.tmdbId === m.tmdbId)
+            return (
+              <button type="button" key={m.tmdbId}
+                onClick={() => (owned ? onPick(owned.id) : onAdd(m))}
+                aria-label={`Schedule ${m.title}`}
+                className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/60 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60">
+                <PosterThumb src={m.posterUrl} alt={m.title} type="movie" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-sans text-sm text-foreground truncate">{m.title}</p>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {[m.year || null, owned ? null : 'add to your library first'].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MoviePicker({ titles, onPick, onAdd }: {
+  titles: Title[]
+  onPick: (titleId: string) => void
+  onAdd: (result: SearchResult) => void
+}) {
   const [query, setQuery] = useState('')
   const movies = useMemo(() => titles.filter((t) => t.type === 'movie'), [titles])
 
@@ -200,6 +322,100 @@ function MoviePicker({ titles, onPick }: { titles: Title[]; onPick: (titleId: st
           ))}
         </div>
       )}
+      {!query && <NowPlaying titles={titles} onPick={onPick} onAdd={onAdd} />}
+    </div>
+  )
+}
+
+// ─── Outing templates (#204) ─────────────────────────────────────────────────
+
+const NO_TEMPLATES: OutingTemplate[] = []
+
+function TemplateList({ templates, onUse }: { templates: OutingTemplate[]; onUse: (template: OutingTemplate) => void }) {
+  const [error, setError] = useState('')
+  if (templates.length === 0) return null
+  return (
+    <section aria-label="Templates" className="space-y-1">
+      <Eyebrow as="p" size="xl" tone="muted" font="sans" className="block mb-1">Templates</Eyebrow>
+      {templates.map((template) => {
+        const summary = templateSummary(template)
+        return (
+          <div key={template.id} className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onUse(template)}
+              aria-label={`Use template ${template.name}`}
+              className="flex-1 min-w-0 rounded-md px-2 py-1.5 text-left hover:bg-secondary/60 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
+            >
+              <span className="block font-sans text-sm text-foreground truncate">{template.name}</span>
+              {summary && <span className="block font-mono text-xs text-muted-foreground truncate">{summary}</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError('')
+                deleteOutingTemplate(template.id).catch(() => setError('The template could not be deleted.'))
+              }}
+              aria-label={`Delete template ${template.name}`}
+              className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-md focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60"
+            >
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )
+      })}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </section>
+  )
+}
+
+function SaveTemplate({ build }: { build: (name: string) => OutingTemplate | null }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setName(''); setError(''); setOpen(true) }}
+        className="text-xs font-mono text-amber/70 hover:text-amber transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber/60 rounded-sm"
+      >
+        Save as template
+      </button>
+    )
+  }
+  const template = build(name)
+  async function save() {
+    if (!template || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await saveOutingTemplate(template)
+      setOpen(false)
+    } catch {
+      setError('The template could not be saved.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="space-y-2" role="group" aria-label="Save as template">
+      <p className="font-sans text-xs text-muted-foreground">Keeps the theater, companions, format, and this weekday and showtime.</p>
+      <div className="flex gap-2">
+        <Input
+          aria-label="Template name"
+          value={name}
+          maxLength={MAX_TEMPLATE_NAME}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void save() } }}
+          placeholder="Tuesday matinee"
+          className="bg-secondary/50 border-border"
+        />
+        <Button type="button" size="sm" disabled={!template || busy} onClick={() => void save()}>Save template</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }
@@ -241,7 +457,7 @@ function defaultForm(runtime?: number, prefill?: OutingSchedulePrefill | null): 
     date: showtime ? `${showtime.getFullYear()}-${pad(showtime.getMonth() + 1)}-${pad(showtime.getDate())}` : todayStr(),
     time: showtime ? `${pad(showtime.getHours())}:${pad(showtime.getMinutes())}` : '19:00',
     venue: prefill?.venue ?? '',
-    companions: [],
+    companions: (prefill?.companions ?? []).map((name) => ({ name })),
     format: prefill?.format ?? '',
     previewsMinutes: 20,
     runtimeMinutes: runtime ?? 120,
@@ -329,6 +545,33 @@ function OutingForm({
     [outings, allViewings, friends]
   )
   const venues = useMemo(() => venueSuggestions(outings, allViewings), [outings, allViewings])
+  const templates = useMoviegoingPrefs((s) => s.prefs?.templates) ?? NO_TEMPLATES
+
+  function applyTemplate(template: OutingTemplate) {
+    const showtime = nextTemplateShowtime(template, new Date())
+    patch({
+      date: showtime.date,
+      time: showtime.time,
+      ...(template.venue ? { venue: template.venue } : {}),
+      companions: template.companions.map(
+        (name) => suggestions.find((s) => s.name.toLowerCase() === name.toLowerCase()) ?? { name },
+      ),
+      ...(template.format ? { format: template.format } : {}),
+    })
+  }
+
+  function buildTemplate(name: string): OutingTemplate | null {
+    const day = new Date(`${form.date}T00:00:00`)
+    return createOutingTemplate({
+      id: crypto.randomUUID(),
+      name,
+      venue: form.venue,
+      companions: form.companions.map((c) => c.name),
+      format: form.format || null,
+      weekday: Number.isNaN(day.getTime()) ? null : isoWeekday(day),
+      time: /^\d{2}:\d{2}$/.test(form.time) ? form.time : null,
+    })
+  }
 
   const endsAt = computeEndsAt(form)
   const endsAtLabel = endsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -411,6 +654,8 @@ function OutingForm({
           {new Date(duplicateOuting.showtime).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.
         </p>
       )}
+
+      {!editingOuting && <TemplateList templates={templates} onUse={applyTemplate} />}
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -545,6 +790,8 @@ function OutingForm({
         Lets out ≈ {endsAtLabel}
       </p>
 
+      {!editingOuting && <SaveTemplate build={buildTemplate} />}
+
       <div>
         <Eyebrow as="label" htmlFor="outing-price" size="xl" tone="muted" font="sans" className="block mb-2 cursor-pointer">
           Ticket price
@@ -639,7 +886,7 @@ function OutingForm({
         />
       </div>
 
-      {editingOuting && <TicketButton outingId={editingOuting.id} />}
+      {editingOuting && <div className="flex flex-wrap items-center gap-4"><TicketButton outingId={editingOuting.id} /><KeepsakeButton outingId={editingOuting.id} /></div>}
       <Button type="submit" className="w-full bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium">
         <Ticket className="w-4 h-4 mr-2" />
         {isPast ? 'Log this outing' : editingOuting ? 'Save changes' : 'Get tickets'}
@@ -669,6 +916,7 @@ function SavedStep({ title, outing, onClose }: { title: Title; outing: CinemaOut
       </p>
       <div className="flex flex-col gap-2 items-center pt-2">
         <TicketButton outingId={outing.id} />
+        <KeepsakeButton outingId={outing.id} />
         <Button
           onClick={() => setSharePanelOpen(true)}
           className="w-full max-w-[220px] bg-amber hover:bg-amber-muted text-(--on-amber) font-sans font-medium"
@@ -716,6 +964,13 @@ function OutingScheduleBody({ onClose }: { onClose: () => void }) {
 
   const title = titles.find((t) => t.id === pickedTitleId) ?? null
 
+  // A now-playing movie that isn't in the library yet: the schedule form belongs to a library
+  // title, so hand off to the Add flow (the same one Discover uses) instead of scheduling here.
+  function addFirst(result: SearchResult) {
+    onClose()
+    useAppStore.getState().openAddTitlePreselected(result)
+  }
+
   const duplicateOuting = title
     ? outings.find((o) => o.titleId === title.id && o.status === 'scheduled' && o.id !== editingOuting?.id) ?? null
     : null
@@ -725,7 +980,7 @@ function OutingScheduleBody({ onClose }: { onClose: () => void }) {
   }
 
   if (!title) {
-    return <MoviePicker titles={titles} onPick={setPickedTitleId} />
+    return <MoviePicker titles={titles} onPick={setPickedTitleId} onAdd={addFirst} />
   }
 
   return (

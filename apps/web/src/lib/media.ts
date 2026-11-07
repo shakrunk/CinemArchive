@@ -5,6 +5,7 @@
 
 import { supabase, isSupabaseConfigured } from './auth'
 import type { CastMember, CrewMember, MediaType } from '../store/mockData'
+import { isValidRegion } from '../store/moviegoingRegion'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ export function posterSrcSet(url: string | undefined): string | undefined {
 
 /** Episode-still base URL, shared by consumers that build `stillUrl` fields
  *  from raw TMDB episode payloads (AddTitleWorkflow, RefreshMetadataModal,
- *  TitleDetailDrawer, episode-card.tsx). */
+ *  title-detail/useEpisodeBackfill, episode-card.tsx). */
 export const TMDB_STILL_BASE = 'https://image.tmdb.org/t/p/w300'
 
 // ─── Genre Lists (stable TMDB IDs — hardcoded to avoid an extra round-trip) ─
@@ -752,6 +753,21 @@ const MOCK_TRENDING: SearchResult[] = [
     seasonCount: 4,
   },
 ]
+
+/**
+ * Movies in theaters in a country (ISO 3166-1 alpha-2), in TMDB's order (#202). Titles only: TMDB
+ * has no showtimes, so the schedule flow still asks for the time. Empty in local dev (no
+ * Supabase configured), where there is no proxy to ask.
+ */
+export async function fetchNowPlaying(region: string): Promise<SearchResult[]> {
+  if (!isValidRegion(region)) throw new Error('Invalid region')
+  if (!(isSupabaseConfigured && supabase)) return []
+  const { data, error } = await supabase.functions.invoke(`media-proxy?action=now_playing&region=${region}`)
+  if (error) throw error
+  return (data?.results ?? [])
+    .map((i: TmdbItem) => mapSearchItem(i, 'movie'))
+    .filter((r: SearchResult) => !!r.title) as SearchResult[]
+}
 
 /**
  * Fetch this week's trending movies or TV shows. Falls back to a curated

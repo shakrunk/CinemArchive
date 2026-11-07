@@ -179,7 +179,19 @@ fun UpNextRoute(
     onFabExpandedChange: (Boolean) -> Unit = {},
     onRecommendTitle: ((String) -> Unit)? = null,
     onOpenCalendar: () -> Unit = {},
+    /** Invitations from friends and outings they are taking you to (#206); null hides the section. */
+    sharedOutings: work.kumarfamilynet.cinemarchive.data.SharedOutingsRepository? = null,
+    /** Tickets friends sent you (#220); null hides the section. */
+    ticketSharing: work.kumarfamilynet.cinemarchive.data.TicketSharingRepository? = null,
+    /** Polls with friends (#203); null hides the Polls button. */
+    outingPolls: work.kumarfamilynet.cinemarchive.data.OutingPollsRepository? = null,
+    /** A poll's winner and the friends who ticked it, to turn into a real outing. */
+    onSchedulePoll: (work.kumarfamilynet.cinemarchive.core.model.PollOption, List<String>) -> Unit = { _, _ -> },
 ) {
+    val shared = rememberSharedOutingsState(sharedOutings)
+    val receivedTickets = rememberReceivedTicketsState(ticketSharing)
+    var showPolls by rememberSaveable { mutableStateOf(false) }
+    val libraryMovies by remember(repository) { repository.observeLibrary() }.collectAsStateWithLifecycle(initialValue = emptyList())
     val viewModel: UpNextViewModel = viewModel(
         factory = UpNextViewModelFactory(repository, outingsRepository, librarySyncRepository),
     )
@@ -204,9 +216,24 @@ fun UpNextRoute(
         profileInitial = profileInitial,
         onFabExpandedChange = onFabExpandedChange,
         isRefreshing = isRefreshing,
-        onRefresh = viewModel::refresh,
+        onRefresh = { viewModel.refresh(); shared.refresh(); receivedTickets.refresh() },
         onRecommendTitle = onRecommendTitle,
         onOpenCalendar = onOpenCalendar,
+        sharedOutings = shared.outings,
+        sharedBusy = shared.busy,
+        sharedError = shared.error,
+        onRespondShared = shared::respond,
+        sharedReactionActions = shared::reactionActions,
+        groupReactions = sharedOutings?.let { repo -> { outingId: String -> repo.reactionActionsForOuting(outingId) } },
+        receivedTicketsContent = ticketSharing?.let { repo -> { now -> ReceivedTicketsSection(receivedTickets, repo, now) } },
+        hasReceivedTickets = ticketSharing != null && (receivedTickets.tickets.isNotEmpty() || receivedTickets.error != null),
+        onOpenPolls = outingPolls?.let { { showPolls = true } },
+    )
+    if (showPolls && outingPolls != null) OutingPollsSheet(
+        repository = outingPolls,
+        movies = libraryMovies,
+        onSchedule = { option, voters -> showPolls = false; onSchedulePoll(option, voters) },
+        onDismiss = { showPolls = false },
     )
 }
 
@@ -233,6 +260,19 @@ fun UpNextScreen(
     onRefresh: () -> Unit = {},
     onRecommendTitle: ((String) -> Unit)? = null,
     onOpenCalendar: () -> Unit = {},
+    sharedOutings: List<work.kumarfamilynet.cinemarchive.core.model.SharedOuting> = emptyList(),
+    sharedBusy: Collection<String> = emptyList(),
+    sharedError: String? = null,
+    onRespondShared: (String, Boolean) -> Unit = { _, _ -> },
+    /** The group-reactions actions for a shared outing a friend invited you to (#207); null hides them. */
+    sharedReactionActions: ((String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    /** Resolves the actions for one of the user's own outings, or null when it was never shared (#207). */
+    groupReactions: (suspend (String) -> work.kumarfamilynet.cinemarchive.core.model.GroupReactionActions?)? = null,
+    /** The "Tickets from friends" section (#220), given the current time; rendered only when [hasReceivedTickets]. */
+    receivedTicketsContent: (@Composable (Instant) -> Unit)? = null,
+    hasReceivedTickets: Boolean = false,
+    /** Shows a Polls button in the header (#203). */
+    onOpenPolls: (() -> Unit)? = null,
 ) {
     // A single shared tick for every marquee card's countdown label — the completion itself
     // is driven by the reconciler (app resume / launch), never by this cosmetic timer (web
@@ -301,11 +341,22 @@ fun UpNextScreen(
                         )
                         Text("Up Next", style = MaterialTheme.typography.headlineLarge)
                     }
+                    if (onOpenPolls != null) TextButton(onClick = onOpenPolls) { Text("Polls") }
                     TextButton(onClick = onOpenCalendar) {
                         Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                         Text("Calendar", modifier = Modifier.padding(start = 6.dp))
                     }
                     ProfileAvatarButton(initial = profileInitial, onClick = onOpenProfile)
+                }
+            }
+
+            if (hasReceivedTickets && receivedTicketsContent != null) item(key = "received-tickets") {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) { receivedTicketsContent(now) }
+            }
+
+            if (sharedOutings.isNotEmpty() || sharedError != null) item(key = "shared-outings") {
+                ReadingWidthColumn(Modifier.animatedListItem(this)) {
+                    SharedOutingsSection(sharedOutings, sharedBusy, sharedError, now, onRespondShared, sharedReactionActions)
                 }
             }
 
@@ -430,6 +481,15 @@ fun UpNextScreen(
                 onSave = onSavePostShow,
                 onRevert = onRevertPostShow,
                 onRecommend = onRecommendTitle?.let { recommend -> { recommend(captured.titleId) } },
+                groupContent = groupReactions?.let { resolve ->
+                    captured.followUpOutingId?.let { outingId ->
+                        { rating, note ->
+                            work.kumarfamilynet.cinemarchive.core.designsystem.ResolvedGroupReactions(
+                                resolve = { resolve(outingId) }, initialRating = rating, initialNote = note,
+                            )
+                        }
+                    }
+                },
                 onDismiss = {
                     captured.followUpOutingId?.let(onDismissFollowUp)
                     postShowState = null

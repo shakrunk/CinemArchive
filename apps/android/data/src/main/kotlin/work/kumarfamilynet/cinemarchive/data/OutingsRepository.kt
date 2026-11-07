@@ -19,6 +19,7 @@ import work.kumarfamilynet.cinemarchive.core.model.CinemaFormat
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOuting
 import work.kumarfamilynet.cinemarchive.core.model.CinemaOutingRules
 import work.kumarfamilynet.cinemarchive.core.model.LibraryStatus
+import work.kumarfamilynet.cinemarchive.core.model.OutingReminderRules
 import work.kumarfamilynet.cinemarchive.core.model.OutingStatus
 import work.kumarfamilynet.cinemarchive.core.model.OutingTransition
 import work.kumarfamilynet.cinemarchive.core.model.SeatAssignment
@@ -39,6 +40,8 @@ class OutingsRepository(
     val moviegoingPreferences: MoviegoingPreferencesRepository? = null,
     private val lifecycle: OutingLifecycleRepository? = null,
     private val scheduleCommands: OutingScheduleCommands? = null,
+    private val reminders: OutingReminderStore = NoOpOutingReminderStore,
+    private val now: () -> Instant = Instant::now,
 ) {
     suspend fun prepareOutingSchedule(titleId: String, outingId: String?): String =
         checkNotNull(scheduleCommands) { "Ticket scheduling requires the current account runtime." }.prepare(titleId, outingId)
@@ -269,9 +272,33 @@ class OutingsRepository(
         rearmAlarm()
     }
 
+    /** Posts-and-forgets nothing itself: marks each reminder that is due now as sent, so it is
+     *  posted exactly once, and returns what the caller should notify. The one alarm that wakes
+     *  the completion engine also wakes this (#213). A reminder is skipped, and stays unsent,
+     *  while the setting is off. */
+    suspend fun claimDueReminders(): List<OutingReminder> {
+        val scheduled = cinemaOutingDao.getScheduledOutings().map { it.toDomain() }
+        val due = OutingReminderRules.due(scheduled, reminders.leadMinutes(), now(), reminders.sentKeys())
+        if (due.isNotEmpty()) reminders.saveSentKeys(reminders.sentKeys() + due.map(OutingReminderRules::key))
+        val claimed = due.mapNotNull { outing ->
+            titleDao.getById(outing.titleId)?.let { title ->
+                OutingReminder(outing.id, outing.titleId, title.title, title.posterUrl, Instant.parse(outing.showtime), outing.venue)
+            }
+        }
+        refreshAlarm()
+        return claimed
+    }
+
     private suspend fun rearmAlarm() {
         val scheduled = cinemaOutingDao.getScheduledOutings().map { it.toDomain() }
-        alarmScheduler.scheduleNext(CinemaOutingRules.nextTransitionAt(scheduled))
+        // The one exact alarm serves two jobs: the show letting out and, when the device has a
+        // reminder lead set, the reminder before it. Sent keys of outings that moved or ended are
+        // dropped here so the set cannot grow without bound.
+        val lead = reminders.leadMinutes()
+        val sent = reminders.sentKeys()
+        val live = OutingReminderRules.pruneSent(scheduled, sent)
+        if (live != sent) reminders.saveSentKeys(live)
+        alarmScheduler.scheduleNext(OutingReminderRules.nextAlarmAt(scheduled, lead, now(), live))
     }
 
     private fun endsAt(showtime: Instant, previewsMinutes: Int, runtimeMinutes: Int): Instant =

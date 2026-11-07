@@ -12,6 +12,7 @@ import { formatCompanions } from 'src/store/outings'
 import { buildOutingIcs, outingIcsFilename, downloadIcsFile, formatOutingShareSnippet, shareOutingSnippet } from 'src/lib/ics'
 import type { CinemaOuting, Title } from 'src/store/mockData'
 import { formatSeatShort } from 'src/lib/seating'
+import { OutingInvites } from 'src/components/OutingInvites'
 
 // One panel for both plan-sharing channels (plan §4.10): the in-app friend
 // picker (modeled on SendRecommendationPanel) plus the out-of-app copy/
@@ -337,6 +338,9 @@ function CurrentShareOutingPanel({ outing, title, onClose }: ShareOutingPanelPro
                 )
               })}
             </div>
+          )}
+          {!loadingFriends && !friendsError && friends.length > 0 && (
+            <OutingInvites outingId={outing.id} friends={filteredFriends} enabled={upcoming} />
           )}
         </div>
       </div>

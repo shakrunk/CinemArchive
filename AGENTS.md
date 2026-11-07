@@ -38,35 +38,19 @@ For background rather than rules, the [wiki](https://github.com/shakrunk/CinemAr
 architecture and its rationale, per-client internals, the security model, the release pipeline,
 troubleshooting, and a glossary. Its
 [Documentation Map](https://github.com/shakrunk/CinemArchive/wiki/Documentation-Map) defines which
-of the four documentation homes (this repo, `openwiki/`, the wiki, GitHub issues) owns which kind of
-fact, and the precedence order when they disagree: **code > `schema.sql`/migrations > `docs/` >
-`openwiki/` > wiki.**
-
-### OpenWiki
-
-This repository has documentation located in the /openwiki directory.
-
-Start here:
-- [OpenWiki quickstart](openwiki/quickstart.md)
-
-OpenWiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
-
-When working in this repository, read the OpenWiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+of the documentation homes (this repo, the wiki, GitHub issues) owns which kind of fact, and the
+precedence order when they disagree: **code > `schema.sql`/migrations > `docs/` > wiki.**
 
 ### Which tool for which question
 
 | Question | Use | Why |
 |----------|-----|-----|
 | What breaks if I change X? Who calls it? Which tests cover it? Review this diff. | `code-review-graph` CLI (MCP only if registered in your client) | Structural graph for impact and review. Check `status` for freshness before relying on it; use before Grep/Glob/Read. |
-| Why is it built this way? How do the pieces fit together? Where do I start? | `openwiki/` (read `openwiki/quickstart.md`) | Prose docs: architecture, workflows, domains, operations. Orientation, not code navigation. |
-| Cross-client rules, contracts, schema ownership | `docs/`, `schema.sql`, the ADRs | Normative; they outrank `openwiki/` (see the precedence order above). |
+| Why is it built this way? How do the pieces fit together? Where do I start? | The [wiki](https://github.com/shakrunk/CinemArchive/wiki) | Prose docs: architecture, rationale, per-client internals. Orientation, not code navigation. |
+| Cross-client rules, contracts, schema ownership | `docs/`, `schema.sql`, the ADRs | Normative; they outrank the wiki (see the precedence order above). |
 
 `graphify` is not used in this repo (no graph is built or committed). Don't suggest it
 or reference its output here.
-
-`openwiki/` is generated: a regeneration overwrites hand edits. Prefer fixing the source
-or the normative docs, then regenerate; if you must patch a page by hand, expect it to be
-rewritten.
 
 ---
 
@@ -284,13 +268,3 @@ rtk code-review-graph architecture
 the current checkout. Fall back to targeted source inspection when graph coverage is missing
 or stale. See [developer tooling](docs/developer-tooling.md) for recovery and Windows output
 encoding notes. The RTK entrypoint is [RTK.md](RTK.md).
-
-<!-- OPENWIKI:START -->
-
-## OpenWiki
-
-This repository uses OpenWiki for recurring code documentation. Start with `openwiki/quickstart.md`, then follow its links to architecture, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
-
-The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
-
-<!-- OPENWIKI:END -->

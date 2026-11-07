@@ -1,4 +1,4 @@
-name: Clean retired ticket attachments
+name: Clean retired ticket attachments and keepsake photos
 
 on:
   schedule:
@@ -29,3 +29,10 @@ jobs:
           SUPABASE_URL: https://${{ vars.SUPABASE_PROJECT_REF }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/cleanup-ticket-attachments.mjs
+      - name: Verify keepsake cleanup request ordering
+        run: node --test scripts/cleanup-keepsake-photos.test.mjs
+      - name: Remove unreferenced keepsake photos
+        env:
+          SUPABASE_URL: https://${{ vars.SUPABASE_PROJECT_REF }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/cleanup-keepsake-photos.mjs

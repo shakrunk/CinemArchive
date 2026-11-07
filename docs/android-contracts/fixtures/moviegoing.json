@@ -1,0 +1,355 @@
+{
+  "$comment": "Hand-authored cross-client fixture for docs/android-contracts/moviegoing-prefs.md (budget #209, plan #211) and moviegoing-recap.md (#216). Web loads it in apps/web/src/store/moviegoingRules.test.ts and apps/web/src/lib/moviegoingPrefsSync.test.ts; Android loads it in MoviegoingBudgetTest, SubscriptionPlanTest, MoviegoingRecapTest (core/model) and MoviegoingPrefsTest (data). Dates are plain YYYY-MM-DD; 2026-10-18 is a Sunday. Not exported from a live database.",
+  "amounts": [
+    { "text": "40", "amount": 40 },
+    { "text": " 40 ", "amount": 40 },
+    { "text": "$40", "amount": 40 },
+    { "text": "$ 40", "amount": 40 },
+    { "text": "1,250.50", "amount": 1250.5 },
+    { "text": "+5", "amount": 5 },
+    { "text": "5.", "amount": 5 },
+    { "text": ".5", "amount": 0.5 },
+    { "text": "100000", "amount": 100000 },
+    { "text": "100000.01", "amount": null },
+    { "text": "0", "amount": null },
+    { "text": "-5", "amount": null },
+    { "text": "", "amount": null },
+    { "text": "$", "amount": null },
+    { "text": "abc", "amount": null },
+    { "text": "1e3", "amount": null },
+    { "text": "40d", "amount": null },
+    { "text": "40f", "amount": null },
+    { "text": "0x10", "amount": null },
+    { "text": "NaN", "amount": null },
+    { "text": "Infinity", "amount": null },
+    { "text": "4 0", "amount": null },
+    { "text": "٤٠", "amount": null }
+  ],
+  "caps": [
+    { "text": "4", "cap": 4 },
+    { "text": " 4 ", "cap": 4 },
+    { "text": "+4", "cap": 4 },
+    { "text": "100", "cap": 100 },
+    { "text": "101", "cap": null },
+    { "text": "0", "cap": null },
+    { "text": "-1", "cap": null },
+    { "text": "2.5", "cap": null },
+    { "text": "3.0", "cap": null },
+    { "text": "", "cap": null },
+    { "text": "1e1", "cap": null },
+    { "text": "٣", "cap": null },
+    { "text": "99999999999999999999", "cap": null }
+  ],
+  "tripDates": [
+    { "value": "2026-10-18", "date": "2026-10-18" },
+    { "value": "2026-10-18T19:30:00Z", "date": "2026-10-18" },
+    { "value": "2028-02-29", "date": "2028-02-29" },
+    { "value": "2026-12-31", "date": "2026-12-31" },
+    { "value": "2026-02-29", "date": null },
+    { "value": "2026-02-30", "date": null },
+    { "value": "2026-04-31", "date": null },
+    { "value": "2026-13-01", "date": null },
+    { "value": "2026-00-10", "date": null },
+    { "value": "2026-10-00", "date": null },
+    { "value": "2026-1-5", "date": null },
+    { "value": "20261018", "date": null },
+    { "value": "abc", "date": null },
+    { "value": "", "date": null },
+    { "value": null, "date": null }
+  ],
+  "tripVenues": [
+    { "venue": "AMC Georgetown", "isTrip": true },
+    { "venue": " ", "isTrip": true },
+    { "venue": "", "isTrip": false },
+    { "venue": null, "isTrip": false }
+  ],
+  "timestamps": [
+    { "value": "2026-10-29T10:00:00Z", "valid": true },
+    { "value": "2026-10-29T10:00:00.000Z", "valid": true },
+    { "value": "2026-10-29T10:00:00.123456Z", "valid": true },
+    { "value": "2026-10-29T10:00:00.123456789Z", "valid": true },
+    { "value": "2028-02-29T23:59:59Z", "valid": true },
+    { "value": "2026-10-29", "valid": false },
+    { "value": "2026-10-29T10:00:00", "valid": false },
+    { "value": "2026-10-29T10:00:00+01:00", "valid": false },
+    { "value": "2026-10-29 10:00:00Z", "valid": false },
+    { "value": "2026-10-29T10:00Z", "valid": false },
+    { "value": "2026-10-29T10:00:00.Z", "valid": false },
+    { "value": "2026-10-29T10:00:00.1234567890Z", "valid": false },
+    { "value": "2026-02-30T10:00:00Z", "valid": false },
+    { "value": "2026-02-29T10:00:00Z", "valid": false },
+    { "value": "2026-13-01T10:00:00Z", "valid": false },
+    { "value": "2026-10-29T24:00:00Z", "valid": false },
+    { "value": "2026-10-29T10:60:00Z", "valid": false },
+    { "value": "2026-10-29T10:00:60Z", "valid": false },
+    { "value": "Oct 29 2026 10:00:00 GMT", "valid": false },
+    { "value": "1793268000", "valid": false },
+    { "value": "", "valid": false }
+  ],
+  "money": [
+    { "amount": 0, "text": "$0.00" },
+    { "amount": 0.07, "text": "$0.07" },
+    { "amount": 5, "text": "$5.00" },
+    { "amount": 12.6, "text": "$12.60" },
+    { "amount": 312.5, "text": "$312.50" },
+    { "amount": 999.99, "text": "$999.99" },
+    { "amount": 1234.5, "text": "$1,234.50" },
+    { "amount": 1234567.89, "text": "$1,234,567.89" }
+  ],
+  "budget": [
+    {
+      "name": "only trips inside the month count, boundaries included",
+      "budget": { "amount": 40, "period": "month" },
+      "today": "2026-10-18",
+      "trips": [
+        { "date": "2026-09-30", "price": 15 },
+        { "date": "2026-10-01", "price": 12 },
+        { "date": "2026-10-31", "price": 8 },
+        { "date": "2026-11-01", "price": 20 }
+      ],
+      "expected": { "spent": 20, "remaining": 20, "state": "under", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "a year budget counts every month of that year",
+      "budget": { "amount": 200, "period": "year" },
+      "today": "2026-10-18",
+      "trips": [
+        { "date": "2025-12-31", "price": 50 },
+        { "date": "2026-01-01", "price": 30 },
+        { "date": "2026-10-05", "price": 25 }
+      ],
+      "expected": { "spent": 55, "remaining": 145, "state": "under", "start": "2026-01-01", "end": "2026-12-31" }
+    },
+    {
+      "name": "February ends on the 29th in a leap year",
+      "budget": { "amount": 40, "period": "month" },
+      "today": "2028-02-10",
+      "trips": [],
+      "expected": { "spent": 0, "remaining": 40, "state": "under", "start": "2028-02-01", "end": "2028-02-29" }
+    },
+    {
+      "name": "just under 80 percent is under",
+      "budget": { "amount": 40, "period": "month" },
+      "today": "2026-10-18",
+      "trips": [{ "date": "2026-10-02", "price": 31.99 }],
+      "expected": { "spent": 31.99, "remaining": 8.01, "state": "under", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "exactly 80 percent is near",
+      "budget": { "amount": 40, "period": "month" },
+      "today": "2026-10-18",
+      "trips": [{ "date": "2026-10-02", "price": 32 }],
+      "expected": { "spent": 32, "remaining": 8, "state": "near", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "spending exactly the budget is near, not over",
+      "budget": { "amount": 40, "period": "month" },
+      "today": "2026-10-18",
+      "trips": [{ "date": "2026-10-02", "price": 40 }],
+      "expected": { "spent": 40, "remaining": 0, "state": "near", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "a cent past the budget is over",
+      "budget": { "amount": 40, "period": "month" },
+      "today": "2026-10-18",
+      "trips": [{ "date": "2026-10-02", "price": 40.01 }],
+      "expected": { "spent": 40.01, "remaining": -0.01, "state": "over", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "float drift does not push a met budget over",
+      "budget": { "amount": 0.3, "period": "month" },
+      "today": "2026-10-18",
+      "trips": [{ "date": "2026-10-02", "price": 0.1 }, { "date": "2026-10-03", "price": 0.2 }],
+      "expected": { "spent": 0.3, "remaining": 0, "state": "near", "start": "2026-10-01", "end": "2026-10-31" }
+    }
+  ],
+  "plan": [
+    {
+      "name": "a week runs Monday to Sunday",
+      "plan": { "cap": 4, "period": "week" },
+      "today": "2026-10-18",
+      "dates": ["2026-10-11", "2026-10-12", "2026-10-18", "2026-10-19"],
+      "expected": { "used": 2, "remaining": 2, "state": "under", "start": "2026-10-12", "end": "2026-10-18" }
+    },
+    {
+      "name": "a week can span two months and two years",
+      "plan": { "cap": 5, "period": "week" },
+      "today": "2026-12-31",
+      "dates": ["2026-12-27", "2026-12-28", "2027-01-03", "2027-01-04"],
+      "expected": { "used": 2, "remaining": 3, "state": "under", "start": "2026-12-28", "end": "2027-01-03" }
+    },
+    {
+      "name": "a month is the calendar month and two trips on one day both count",
+      "plan": { "cap": 3, "period": "month" },
+      "today": "2026-10-18",
+      "dates": ["2026-09-30", "2026-10-02", "2026-10-02", "2026-11-01"],
+      "expected": { "used": 2, "remaining": 1, "state": "near", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "no outings is under",
+      "plan": { "cap": 3, "period": "month" },
+      "today": "2026-10-18",
+      "dates": [],
+      "expected": { "used": 0, "remaining": 3, "state": "under", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "a cap of one stays under until used",
+      "plan": { "cap": 1, "period": "month" },
+      "today": "2026-10-18",
+      "dates": [],
+      "expected": { "used": 0, "remaining": 1, "state": "under", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "a larger cap is near at 80 percent",
+      "plan": { "cap": 10, "period": "month" },
+      "today": "2026-10-18",
+      "dates": ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"],
+      "expected": { "used": 8, "remaining": 2, "state": "near", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "70 percent of a larger cap is still under",
+      "plan": { "cap": 10, "period": "month" },
+      "today": "2026-10-18",
+      "dates": ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07"],
+      "expected": { "used": 7, "remaining": 3, "state": "under", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "using the cap exactly is at_cap",
+      "plan": { "cap": 2, "period": "month" },
+      "today": "2026-10-18",
+      "dates": ["2026-10-01", "2026-10-02"],
+      "expected": { "used": 2, "remaining": 0, "state": "at_cap", "start": "2026-10-01", "end": "2026-10-31" }
+    },
+    {
+      "name": "one more than the cap is over",
+      "plan": { "cap": 2, "period": "month" },
+      "today": "2026-10-18",
+      "dates": ["2026-10-01", "2026-10-02", "2026-10-03"],
+      "expected": { "used": 3, "remaining": -1, "state": "over", "start": "2026-10-01", "end": "2026-10-31" }
+    }
+  ],
+  "recapYears": [
+    { "name": "this year has trips", "dates": ["2024-05-01", "2026-03-03", "2026-04-04", "2025-01-01"], "today": "2026-10-18", "years": [2026, 2025, 2024], "default": 2026 },
+    { "name": "this year has none, so the latest year opens", "dates": ["2024-05-01", "2025-01-01"], "today": "2026-10-18", "years": [2025, 2024], "default": 2025 },
+    { "name": "no trips", "dates": [], "today": "2026-10-18", "years": [], "default": null }
+  ],
+  "recap": [
+    {
+      "name": "tallies one calendar year and ignores its neighbours",
+      "year": 2026,
+      "trips": [
+        { "date": "2026-01-01", "venue": "AMC", "companions": ["Sam"], "format": "IMAX", "price": 12.5 },
+        { "date": "2026-06-15", "venue": "AMC", "companions": ["Sam", "Alex"], "format": "IMAX", "price": 0.1 },
+        { "date": "2026-12-31", "venue": "Alamo", "companions": ["Alex"], "format": "Standard", "price": null },
+        { "date": "2025-12-31", "venue": "Regal", "companions": [], "format": null, "price": 99 },
+        { "date": "2027-01-01", "venue": "Regal", "companions": [], "format": null, "price": 99 }
+      ],
+      "expected": {
+        "tripCount": 3,
+        "topVenue": { "label": "AMC", "count": 2 },
+        "topFormat": { "label": "IMAX", "count": 2 },
+        "topCompanion": { "label": "Alex", "count": 2 },
+        "totalSpend": 12.6,
+        "fields": [
+          { "label": "top venue", "value": "AMC" },
+          { "label": "top format", "value": "IMAX" },
+          { "label": "most often with", "value": "Alex" },
+          { "label": "total spent", "value": "$12.60" }
+        ],
+        "summary": "My 2026 at the movies: 3 trips, top venue AMC, $12.60 spent."
+      }
+    },
+    {
+      "name": "a year with no trips has no recap",
+      "year": 2024,
+      "trips": [{ "date": "2026-03-03", "venue": "AMC", "companions": [], "format": null, "price": null }],
+      "expected": null
+    },
+    {
+      "name": "missing facts leave the highlights and spend absent",
+      "year": 2026,
+      "trips": [{ "date": "2026-03-03", "venue": null, "companions": [], "format": null, "price": null }],
+      "expected": {
+        "tripCount": 1,
+        "topVenue": null,
+        "topFormat": null,
+        "topCompanion": null,
+        "totalSpend": null,
+        "fields": [],
+        "summary": "My 2026 at the movies: 1 trip."
+      }
+    },
+    {
+      "name": "a price of zero still makes spend known",
+      "year": 2026,
+      "trips": [{ "date": "2026-03-03", "venue": null, "companions": [], "format": null, "price": 0 }],
+      "expected": {
+        "tripCount": 1,
+        "topVenue": null,
+        "topFormat": null,
+        "topCompanion": null,
+        "totalSpend": 0,
+        "fields": [{ "label": "total spent", "value": "$0.00" }],
+        "summary": "My 2026 at the movies: 1 trip, $0.00 spent."
+      }
+    },
+    {
+      "name": "labels are trimmed and blanks ignored before tallying",
+      "year": 2026,
+      "trips": [
+        { "date": "2026-03-01", "venue": " AMC ", "companions": [" Sam ", ""], "format": "  ", "price": null },
+        { "date": "2026-03-02", "venue": "AMC", "companions": ["Sam"], "format": null, "price": null },
+        { "date": "2026-03-03", "venue": "   ", "companions": [], "format": null, "price": null }
+      ],
+      "expected": {
+        "tripCount": 3,
+        "topVenue": { "label": "AMC", "count": 2 },
+        "topFormat": null,
+        "topCompanion": { "label": "Sam", "count": 2 },
+        "totalSpend": null,
+        "fields": [
+          { "label": "top venue", "value": "AMC" },
+          { "label": "most often with", "value": "Sam" }
+        ],
+        "summary": "My 2026 at the movies: 3 trips, top venue AMC."
+      }
+    },
+    {
+      "name": "a tie goes to the label that sorts first, uppercase before lowercase",
+      "year": 2026,
+      "trips": [
+        { "date": "2026-03-01", "venue": "alamo", "companions": [], "format": null, "price": null },
+        { "date": "2026-03-02", "venue": "Zed", "companions": [], "format": null, "price": null }
+      ],
+      "expected": {
+        "tripCount": 2,
+        "topVenue": { "label": "Zed", "count": 1 },
+        "topFormat": null,
+        "topCompanion": null,
+        "totalSpend": null,
+        "fields": [{ "label": "top venue", "value": "Zed" }],
+        "summary": "My 2026 at the movies: 2 trips, top venue Zed."
+      }
+    },
+    {
+      "name": "spend is summed in whole cents and grouped in thousands",
+      "year": 2026,
+      "trips": [
+        { "date": "2026-03-01", "venue": "AMC", "companions": [], "format": null, "price": 1000.1 },
+        { "date": "2026-03-02", "venue": "AMC", "companions": [], "format": null, "price": 234.4 }
+      ],
+      "expected": {
+        "tripCount": 2,
+        "topVenue": { "label": "AMC", "count": 2 },
+        "topFormat": null,
+        "topCompanion": null,
+        "totalSpend": 1234.5,
+        "fields": [
+          { "label": "top venue", "value": "AMC" },
+          { "label": "total spent", "value": "$1,234.50" }
+        ],
+        "summary": "My 2026 at the movies: 2 trips, top venue AMC, $1,234.50 spent."
+      }
+    }
+  ]
+}

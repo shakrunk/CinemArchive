@@ -8,6 +8,8 @@ import { Button } from 'src/components/ui/button'
 import { useAppStore } from 'src/store/useAppStore'
 import { formatCompanions } from 'src/store/outings'
 import { SendRecommendationPanel } from 'src/components/SendRecommendationPanel'
+import { OwnerGroupReactions } from 'src/components/GroupReactions'
+import { KeepsakeButton } from 'src/components/OutingKeepsakes'
 import type { CinemaOuting, Title, Viewing } from 'src/store/mockData'
 import { Eyebrow } from 'src/components/ui/typography'
 
@@ -36,7 +38,7 @@ function PostShowBody({
   const [showRecommend, setShowRecommend] = useState(false)
 
   // Writes straight onto the auto-logged viewing — same control and semantics
-  // as logViewing (TitleDetailDrawer): rating updates both the viewing and
+  // as logViewing (title-detail/useLogViewingForm): rating updates both the viewing and
   // title.rating, notes land on the viewing alone.
   async function commitViewing(patch: Partial<Pick<Viewing, 'rating' | 'notes'>>) {
     if (!viewing) return false
@@ -106,6 +108,11 @@ function PostShowBody({
           className="w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm font-sans text-foreground placeholder:text-muted-foreground resize-none focus:outline-hidden focus:ring-2 focus:ring-amber/30"
         />
       </div>
+
+      {/* Only appears for an outing shared with friends (#207); the fields above only prefill it. */}
+      <OwnerGroupReactions outingId={outing.id} initialRating={rating > 0 ? rating : null} initialNote={note || null} />
+
+      <KeepsakeButton outingId={outing.id} />
 
       <Button
         onClick={handleRecommend}

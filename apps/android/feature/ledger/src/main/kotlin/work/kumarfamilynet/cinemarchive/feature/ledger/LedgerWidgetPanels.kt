@@ -641,6 +641,9 @@ internal fun ColumnScope.MoviegoingPanel(
                     )
                 }
             }
+            MoviegoingBudgetRow(stats.pricedTrips)
+            MoviegoingPlanRow(stats.tripDates)
+            MoviegoingRecapEntry(stats.trips)
         },
         stub = {
             if (stats.byYear.isNotEmpty()) {

@@ -239,6 +239,35 @@ class SupabaseRestClient(
         return execute(request)
     }
 
+    /** Uploads a new object to a private bucket (`x-upsert: false`, so an existing object is never
+     *  overwritten). Used by [KeepsakeRepository]; the bucket's policies decide who may write. */
+    fun storageUpload(bucket: String, path: String, bytes: ByteArray, contentType: String, accessToken: String) {
+        val request = Request.Builder()
+            .url("$baseUrl/storage/v1/object/$bucket/$path")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .header("x-upsert", "false")
+            .post(bytes.toRequestBody(contentType.toMediaType()))
+            .build()
+        execute(request)
+    }
+
+    /** Downloads an object from a private bucket as the signed-in user. */
+    fun storageDownload(bucket: String, path: String, accessToken: String): ByteArray {
+        val request = Request.Builder()
+            .url("$baseUrl/storage/v1/object/authenticated/$bucket/$path")
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw SupabaseHttpException(response.code, response.body?.string().orEmpty(), "GET storage object failed: HTTP ${response.code}")
+            }
+            return response.body?.bytes() ?: ByteArray(0)
+        }
+    }
+
     private fun execute(request: Request): String {
         httpClient.newCall(request).execute().use { response ->
             val body = response.body?.string() ?: ""

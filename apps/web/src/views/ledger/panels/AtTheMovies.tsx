@@ -3,7 +3,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAppStore } from 'src/store/useAppStore'
 import { cn, fmtCurrency, maxOrOne } from 'src/lib/utils'
-import { deriveAtTheMovies, type AtTheMoviesStats, type OutingSpendBreakdown } from 'src/store/outings'
+import { deriveAtTheMovies, localDateStr, type AtTheMoviesStats, type OutingSpendBreakdown } from 'src/store/outings'
+import { budgetStatus, defaultRecapYear, deriveMoviegoingTrips, planStatus } from 'src/store/moviegoingRules'
+import { useMoviegoingPrefs } from 'src/lib/moviegoingPrefsSync'
+import { BudgetSection, MoviegoingStatusLines, PlanSection, RecapSection } from './MoviegoingSettings'
 import { describeLedgerSettings, settingsDepKey, type LedgerPanelWidth, type LedgerWidgetSettings } from 'src/lib/ledgerPanels'
 import { Panel, PanelEmpty, RowTitle, FOOTER_CAPTION, COL_GROW_ANIMATION } from '../PanelShell'
 import { Eyebrow } from 'src/components/ui/typography'
@@ -29,6 +32,8 @@ export function AtTheMovies({
   const isSharedView = useAppStore((s) => s.isSharedView || s.viewerContext.kind !== 'owner')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const detailsTrigger = useRef<HTMLButtonElement>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsTrigger = useRef<HTMLButtonElement>(null)
   const settingsKey = settingsDepKey(settings)
 
   // Source of truth is viewings, not outings — a "trip" is any viewing with a
@@ -42,6 +47,20 @@ export function AtTheMovies({
     [titles, outings, isSharedView, settingsKey],
   )
 
+  // Budget, plan and recap read ticket prices and outings, which are owner-private: none of it
+  // is derived or shown in a friend/shared view.
+  const prefs = useMoviegoingPrefs((s) => s.prefs)
+  const trips = useMemo(
+    () => (isSharedView ? [] : deriveMoviegoingTrips(titles, outings)),
+    [titles, outings, isSharedView],
+  )
+  const today = localDateStr(new Date())
+  const budget = prefs?.budget ?? null
+  const plan = prefs?.plan ?? null
+  const budgetState = budget ? budgetStatus(budget, trips, today) : null
+  const planState = plan ? planStatus(plan, trips, today) : null
+  const recapYear = defaultRecapYear(trips, today)
+
   const years = stats.yearCounts.slice(-YEAR_BUDGET[width])
   const maxYearCount = maxOrOne(years.map((y) => y.count))
 
@@ -52,7 +71,18 @@ export function AtTheMovies({
       className={className}
     >
       {stats.tripsTotal === 0 ? (
-        <PanelEmpty message="No cinema trips logged yet — get some tickets" />
+        <div className="flex h-full min-h-0 flex-col">
+          <PanelEmpty message="No cinema trips logged yet — get some tickets" />
+          {/* Android shows the budget and plan before the first trip, so a budget can be set up front. */}
+          {!isSharedView && (
+            <div className="flex shrink-0 flex-col items-start gap-1">
+              <MoviegoingStatusLines budget={budgetState} plan={planState} />
+              <Button ref={settingsTrigger} variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+                Budget, plan and year
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col gap-3">
           <div className="flex shrink-0 items-end gap-6">
@@ -118,9 +148,17 @@ export function AtTheMovies({
                 {stats.pricedTripCount !== 1 ? 's' : ''}
               </p>
             )}
-            <Button ref={detailsTrigger} variant="ghost" size="sm" onClick={() => setDetailsOpen(true)}>
-              View moviegoing details
-            </Button>
+            {!isSharedView && <MoviegoingStatusLines budget={budgetState} plan={planState} />}
+            <div className="flex flex-wrap gap-x-2">
+              <Button ref={detailsTrigger} variant="ghost" size="sm" onClick={() => setDetailsOpen(true)}>
+                View moviegoing details
+              </Button>
+              {!isSharedView && (
+                <Button ref={settingsTrigger} variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+                  Budget, plan and year
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -143,6 +181,26 @@ export function AtTheMovies({
       </div>
       <div className="min-h-0 overflow-y-auto px-6 pb-6" tabIndex={0} role="region" aria-label="Moviegoing breakdown">
         <MoviegoingDetails stats={stats} showPrivateDetails={!isSharedView} />
+      </div>
+    </CinemaModal>
+    <CinemaModal
+      open={settingsOpen && !isSharedView}
+      onClose={() => {
+        setSettingsOpen(false)
+        requestAnimationFrame(() => settingsTrigger.current?.focus())
+      }}
+      title="Budget, plan and year"
+      description="Your moviegoing budget, subscription plan and yearly recap. Only you can see these."
+      className="flex flex-col overflow-hidden"
+    >
+      <div className="shrink-0 px-6 pb-4 pt-6 pr-16">
+        <h2 className="font-serif text-2xl text-paper">Budget, plan and year</h2>
+        <p className="mt-1 text-sm text-paper-faint">Only you can see these.</p>
+      </div>
+      <div className="min-h-0 space-y-6 overflow-y-auto px-6 pb-6">
+        <BudgetSection status={budgetState} current={budget} />
+        <PlanSection status={planState} current={plan} />
+        {recapYear !== null && <RecapSection trips={trips} initialYear={recapYear} />}
       </div>
     </CinemaModal>
   </>)

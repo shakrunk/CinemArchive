@@ -444,6 +444,17 @@ class LedgerRepositoryTest {
         assertEquals(listOf(LedgerSpendBreakdown("IMAX", 24.50, 1)), moviegoing.formatSpend)
         // Fixture has exactly one priced trip, so no venue clears the 2-trip bar for "best value".
         assertEquals(null, moviegoing.bestValueVenue)
+        // The one priced trip is exposed with its date so a budget can bucket it by period.
+        assertEquals(listOf(24.50), moviegoing.pricedTrips.map { it.amount })
+        // Every dated trip, priced or not, is exposed so a plan's outing cap can bucket it.
+        assertEquals(1, moviegoing.tripDates.size)
+        assertEquals(moviegoing.pricedTrips.map { it.date }, moviegoing.tripDates)
+        // The recap's per-trip view carries the same venue, companions, format and price.
+        val trip = moviegoing.trips.single()
+        assertEquals("AMC Lincoln Square", trip.venue)
+        assertEquals(setOf("Sam", "Jordan"), trip.companions.toSet())
+        assertEquals("IMAX", trip.format)
+        assertEquals(24.50, trip.ticketPrice!!, 0.001)
     }
 
     @Test

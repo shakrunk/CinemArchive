@@ -22,12 +22,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import work.kumarfamilynet.cinemarchive.core.model.OutingTransition
+import work.kumarfamilynet.cinemarchive.data.OutingReminder
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /**
  * Fires when the exact alarm armed by [AndroidOutingAlarmScheduler] goes off — runs the local
  * completion engine and posts the real "how was it?" notification per completed outing (the
- * Android-only payoff of docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6). Also
- * the `BOOT_COMPLETED` re-arm target, since exact alarms don't survive a reboot.
+ * Android-only payoff of docs/superpowers/plans/2026-07-21-android-cinema-outings.md §6), and the
+ * "N minutes before showtime" reminder when the device has one set (#213): the single alarm wakes
+ * for whichever comes first. Also the `BOOT_COMPLETED` re-arm target, since exact alarms don't
+ * survive a reboot.
  */
 class OutingCompletionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -44,6 +50,7 @@ class OutingCompletionReceiver : BroadcastReceiver() {
                 val runtime = app.awaitRuntime(ownerId) ?: return@launch
                 runtime.runOwned {
                     runtime.completeDueOutings().forEach { postCompletionNotification(context, runtime, it) }
+                    runtime.claimDueReminders().forEach { postReminderNotification(context, runtime, it) }
                 }
             } catch (_: kotlinx.coroutines.CancellationException) {
                 // Runtime closed mid-flight: nothing may be posted for that account.
@@ -92,6 +99,37 @@ class OutingCompletionReceiver : BroadcastReceiver() {
         }
     }
 
+    private suspend fun postReminderNotification(context: Context, runtime: AppAccountRuntime, reminder: OutingReminder) {
+        val ownerId = runtime.ownerId
+        ensureReminderChannel(context)
+        if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+
+        val openIntent = Intent(context, MainActivity::class.java)
+            .setPackage(context.packageName)
+            .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            .putExtra(MainActivity.EXTRA_OPEN_TITLE_ID, reminder.titleId)
+            .putExtra(EXTRA_OWNER_ID, ownerId)
+        val notificationId = "reminder:${reminder.outingId}".hashCode()
+        val pendingIntent = PendingIntent.getActivity(
+            context, notificationId, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val startsAt = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(reminder.showtime.atZone(ZoneId.systemDefault()))
+        val posterBitmap = loadPosterBitmap(context, reminder.posterUrl)
+        val builder = NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("${reminder.titleName} starts at $startsAt")
+            .setContentText(reminder.venue?.takeIf { it.isNotBlank() }?.let { "At $it" } ?: "Time to get ready.")
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        if (posterBitmap != null) builder.setLargeIcon(posterBitmap)
+        runtime.postIfCurrent {
+            NotificationManagerCompat.from(context)
+                .notify(AppAccountRuntime.notificationTag(ownerId), notificationId, builder.build())
+        }
+    }
+
     /** Best-effort poster fetch for the notification — a network hiccup or missing poster
      *  degrades to the plain text notification rather than losing the "how was it?" prompt
      *  entirely. [ImageRequest.allowHardware] is disabled because [Bitmap]s destined for
@@ -121,10 +159,23 @@ class OutingCompletionReceiver : BroadcastReceiver() {
         )
     }
 
+    /** Its own channel so showtime reminders can be muted without silencing "how was it?". */
+    private fun ensureReminderChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(REMINDER_CHANNEL_ID) != null) return
+        manager.createNotificationChannel(
+            NotificationChannel(REMINDER_CHANNEL_ID, "Showtime reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "A heads-up before a scheduled cinema trip starts."
+            },
+        )
+    }
+
     companion object {
         /** The account an alarm/notification was created for; consumers ignore a mismatch. */
         const val EXTRA_OWNER_ID = "owner_user_id"
 
         private const val CHANNEL_ID = "cinema_outings"
+        private const val REMINDER_CHANNEL_ID = "cinema_outing_reminders"
     }
 }

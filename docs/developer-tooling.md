@@ -53,6 +53,3 @@ Use the explicit web scripts and browser commands in [release readiness](release
 `tsconfig.node.json` includes Vite, Vitest, Playwright and browser test sources so configuration
 errors fail typecheck before the runner starts. Generated browser output is ignored by Git
 and ESLint. The lint warning budget is enforced separately from ordinary diagnostic lint.
-
-Generated OpenWiki output is refreshed by its existing scheduled workflow from source and
-normative docs. Fix these inputs first; hand edits to generated prose would be overwritten.

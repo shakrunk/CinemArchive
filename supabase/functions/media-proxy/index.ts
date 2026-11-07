@@ -249,6 +249,21 @@ async function getTMDBTrending(type: 'movie' | 'tv', page = 1) {
   return cachedFetch(`tmdb:trending:${type}:week:p${page}`, url)
 }
 
+// ISO 3166-1 alpha-2, uppercase. TMDB ignores an unknown code rather than erroring, so the
+// shape is checked here to keep arbitrary strings out of the URL and the cache key.
+function parseRegion(value: string | null): string {
+  const region = (value ?? '').trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(region)) throw new Error(`Invalid region parameter: ${value}`)
+  return region
+}
+
+// Movies only: a TV series has no theatrical run. Titles, not showtimes: TMDB has no
+// per-theater schedule, so callers still ask the user for the time.
+async function getTMDBNowPlaying(region: string, page = 1) {
+  const url = `${TMDB_BASE}/movie/now_playing?api_key=${TMDB_API_KEY}&language=en-US&region=${region}&page=${page}`
+  return cachedFetch(`tmdb:now_playing:${region}:p${page}`, url)
+}
+
 async function getTMDBDiscover(type: 'movie' | 'tv', genreId?: number, page = 1, companyId?: number) {
   let url = `${TMDB_BASE}/discover/${type}?api_key=${TMDB_API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}`
   if (genreId) url += `&with_genres=${genreId}`
@@ -384,6 +399,13 @@ Deno.serve(async (req: Request) => {
         const type = parseMediaType(url.searchParams.get('type'))
         const page = parseInt(url.searchParams.get('page') ?? '1', 10)
         result = await getTMDBTrending(type, page)
+        break
+      }
+      case 'now_playing': {
+        const region = parseRegion(url.searchParams.get('region'))
+        const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+        if (!Number.isInteger(page) || page < 1 || page > 500) throw new Error('Invalid page parameter')
+        result = await getTMDBNowPlaying(region, page)
         break
       }
       case 'discover': {

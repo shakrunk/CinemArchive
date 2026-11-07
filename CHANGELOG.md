@@ -9,6 +9,34 @@ number is chosen.
 
 ## [Unreleased]
 
+### Added
+
+- **Jellyfin watch sync on Android.** Settings → Import & sync can now connect a Jellyfin account, signed in as you so only your own watches are visible. New movie and episode watches arrive as a notification with Add and Dismiss actions (also listed on the Jellyfin card), and nothing is added without a yes. An episode of a series that is not in your library opens the usual add flow. Existing history can optionally be imported once. Background checks run about every 15 minutes.
+
+### Fixed
+
+- **Moviegoing budget, plan and recap now agree on Android and web.** Both clients ignore an impossible trip date such as 30 February, treat an empty theater as no theater, accept the same typed amounts, and show budget and recap money as `$1,234.50` whatever the device language. The web Ledger also lets you set a budget or plan before your first cinema trip, as Android does.
+- **Moviegoing budget, plan, templates and region saved on the web survive a reload.** An edit made offline or while signed out is now kept in the browser and sent to your account when you are back online, instead of being lost or overwritten by an older copy from the server.
+- **"What's playing in theaters" follows your saved country on the web.** If your default country syncs in after you open the picker, the list now switches to it instead of staying on the device's country.
+- **Tapping "opened your ticket" now goes somewhere, on Android and web.** The notification that a friend opened a ticket you sent opens that movie's details, where you can see who has opened it.
+- **Keepsake photos can be replaced, attached from the schedule sheet, and recovered after an interrupted upload, on Android and web.** "Replace photo" swaps a keepsake without ever leaving the trip with neither photo (a failed upload leaves the original alone). "Photos" now also opens from the schedule sheet when you edit an outing, and from the web post-show sheet. If a photo uploads but cannot be saved to the trip, the album offers "Finish saving" or "Discard" instead of silently losing it.
+
+## [1.46.0] - 2026-10-30
+
+### Added
+
+- **Send a ticket to friends, on Android and web.** On a trip with a saved ticket, choose "Send to a friend" to give friends you pick access to the ticket photo and its barcode. They find it under "Tickets from friends" on Up Next; you see who has opened it and can take it back at any time. Your seats, booking reference and notes are never shared.
+- **Poll friends on which movie and time to go, on Android and web.** Open "Polls" on Up Next to offer 2 to 4 of your movies at different times to up to 8 friends. They tick every option that works for them, you see who can make which, and you pick a winner. "Schedule this" then opens the usual schedule sheet for it with the time, theater and the friends who ticked it filled in.
+- **Share how an outing went with the friends who came along, on Android and web.** Once a shared outing has ended, everyone on it can add a star rating and a short note for the group and see each other's. It is a deliberate "Share with the group" and separate from your own rating and notes, which stay private. Open it from "How was it?" on the outing in Up Next, or from the post-show sheet if you shared the outing.
+- **Keepsake photos for cinema outings on Android and web.** Open "Photos" on a trip to keep up to eight pictures with it: a ticket stub, the poster board, a selfie. Choose one from your gallery or take it with the camera. Photos are private to you, are shrunk and stripped of location data before upload, and need a connection to add or view.
+- **Invite friends to a cinema outing on Android and web.** From "Share outing plans", invite accepted friends to join a scheduled outing. They see an invitation on Up Next (and in their notifications) and accept or decline; the outing then stays up to date if you change the time or venue, and shows as cancelled if you cancel it. Friends never see your tickets, booking reference, price or notes.
+- **Showtime reminders on Android.** Turn on "Showtime reminders" in the Moviegoing settings to get a notification 30 minutes, 1 hour or 2 hours before a scheduled cinema trip starts. It is off by default and stays on your device. It does not account for travel time.
+- **Moviegoing budget on Android and web.** Set a monthly or yearly budget for the At the Movies panel of the Ledger (the "Budget, plan and year" dialog on the web) and see how much of it your cinema tickets have used, with a warning as you near or pass the cap. The budget follows your account across devices and is visible only to you.
+- **Subscription plan tracking on Android and web.** Set a theater subscription (outings per week or month) for the At the Movies panel of the Ledger and see how many of your allowed outings you have used this period, with a warning when one is left and a note when you reach or pass the cap. The plan follows your account across devices and is visible only to you.
+- **"What's playing in theaters" when scheduling an outing, on Android and web.** The movie step of "I've got tickets" now starts with the movies in theaters for your country, so you can pick one instead of searching. Showtimes aren't available from the movie database, so you still enter the time. Your country defaults to your device's and follows your account across devices.
+- **Recurring outing templates on Android and web.** Save the theater, companions, format, usual weekday and showtime of a regular outing as a template from "I've got tickets", then start the next one with a single tap: the form fills in and lands on the next matching day. Templates follow your account across devices and are visible only to you.
+- **Yearly moviegoing recap on Android and web.** Open "Your year at the movies" from the At the Movies panel of the Ledger for a card summing up a year of cinema trips (trip count, top venue, format and companion, and total spent), pick any year you went, and share it as an image. It is only shown to you.
+
 ## [1.45.3] - 2026-10-28
 
 ### Fixed

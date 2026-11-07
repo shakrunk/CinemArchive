@@ -109,6 +109,9 @@ internal fun GlobalSearchDialog(
 }
 
 
+/** Heads the "Which movie are your tickets for?" list: movies in theaters now, not just the library (#202). */
+private val NOW_PLAYING_COMMAND = AppCommand("nowplaying", "What's playing in theaters\u2026", "now playing", "now playing in theaters cinemas showing")
+
 @Composable
 internal fun OwnerGlobalSearch(
     scopeKey: String,
@@ -117,11 +120,12 @@ internal fun OwnerGlobalSearch(
     onCommand: (String) -> Unit,
     onTitle: (String) -> Unit,
     onSchedule: (String) -> Unit,
+    onNowPlaying: () -> Unit,
 ) {
     key(scopeKey) {
         var choosingMovie by rememberSaveable { mutableStateOf(false) }
         val current by rememberUpdatedState(titles)
-        val commands = if (choosingMovie) titles.filter { it.type == work.kumarfamilynet.cinemarchive.core.model.MediaType.MOVIE }
+        val commands = if (choosingMovie) listOf(NOW_PLAYING_COMMAND) + titles.filter { it.type == work.kumarfamilynet.cinemarchive.core.model.MediaType.MOVIE }
             .map { work.kumarfamilynet.cinemarchive.core.model.titleCommand(it.id, it.name, it.year, it.director, false, it.genres) }
         else work.kumarfamilynet.cinemarchive.core.model.ownerCommands(titles)
         GlobalSearchDialog(scopeKey + if (choosingMovie) ":movies" else ":commands", commands,
@@ -131,6 +135,7 @@ internal fun OwnerGlobalSearch(
             onSelect = { command ->
                 when {
                     command.id == "tickets" -> choosingMovie = true
+                    command.id == NOW_PLAYING_COMMAND.id -> onNowPlaying()
                     command.id.startsWith("title:") -> {
                         val id = command.id.removePrefix("title:")
                         current.firstOrNull { it.id == id && (!choosingMovie || it.type == work.kumarfamilynet.cinemarchive.core.model.MediaType.MOVIE) }?.let {

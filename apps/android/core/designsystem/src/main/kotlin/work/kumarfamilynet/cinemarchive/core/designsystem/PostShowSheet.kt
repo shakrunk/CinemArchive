@@ -2,6 +2,7 @@ package work.kumarfamilynet.cinemarchive.core.designsystem
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -57,6 +58,8 @@ fun PostShowSheet(
     onDismiss: () -> Unit,
     onReverted: () -> Unit = onDismiss,
     onRecommend: (() -> Unit)? = null,
+    /** Group reactions for an outing shared with friends (#207); gets the private rating and note only to prefill. */
+    groupContent: (@Composable ColumnScope.(initialRating: Double?, initialNote: String?) -> Unit)? = null,
 ) {
     val viewing = opening.viewing
     var notes by rememberSaveable(viewing.id) { mutableStateOf(viewing.notes.orEmpty()) }
@@ -106,6 +109,7 @@ fun PostShowSheet(
             if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
             else if (attempted != null && !pending) Text("A previous attempt may already be queued. Retry checks the same change.")
             onRecommend?.let { recommend -> TextButton(onClick = recommend, enabled = !pending) { Text("Recommend to a friend") } }
+            groupContent?.invoke(this, viewing.rating, viewing.notes)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canRevert && (attempted == null || attempted == "revert")) TextButton(onClick = { submit("revert") }, enabled = !pending) {
                     Text(if (pending && attempted == "revert") "Reversing…" else if (attempted == "revert") "Retry reversal" else "Didn't make it")

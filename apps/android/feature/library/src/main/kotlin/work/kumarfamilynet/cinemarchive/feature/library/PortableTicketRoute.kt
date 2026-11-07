@@ -39,7 +39,9 @@ import work.kumarfamilynet.cinemarchive.data.TicketViewState
 /** The account runtime is replaced on sign-in changes; every IO call is generation fenced. */
 @Composable
 fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: String,
-    onBack: () -> Unit, onSaved: () -> Unit) {
+    onBack: () -> Unit, onSaved: () -> Unit,
+    /** Sends this ticket to friends (#220); null hides "Send to a friend". */
+    sharing: work.kumarfamilynet.cinemarchive.data.TicketSharingRepository? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by remember(runtime, outingId) { runtime.observe(outingId) }
@@ -50,6 +52,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
     var codeMode by rememberSaveable(outingId) { mutableStateOf(false) }
     var confirmLegacy by remember(runtime, outingId) { mutableStateOf(false) }
     var confirmRemove by remember(runtime, outingId) { mutableStateOf(false) }
+    var sendOpen by rememberSaveable(outingId) { mutableStateOf(false) }
     var review by remember(runtime, outingId) { mutableStateOf<TicketConflictReview?>(null) }
     var currentPhoto by remember(runtime, outingId) { mutableStateOf<File?>(null) }
     var savedPhoto by remember(runtime, outingId) { mutableStateOf<File?>(null) }
@@ -140,6 +143,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
             }, enabled = !busy) { Text("Take photo") }
         }
         if (descriptor != null) TextButton(onClick = { confirmRemove = true }, enabled = !busy) { Text("Remove photo") }
+        if (descriptor != null && sharing != null) TextButton(onClick = { sendOpen = true }, enabled = !busy) { Text("Send to a friend") }
         if (outing.ticketImagePath != null) {
             Text(if (state.association == null) "An older device-local photo is recorded. It has not been verified for this account."
                 else "The old device-local photo is retained separately for recovery; it is not the current ticket.")
@@ -182,6 +186,7 @@ fun PortableTicketRoute(runtime: TicketRuntime, outingId: String, titleName: Str
         TextButton(onClick = onBack) { Text("Back") }
         content()
     }
+    if (sendOpen && sharing != null) SendTicketSheet(sharing, outingId, titleName, onDismiss = { sendOpen = false })
     if (confirmLegacy) AlertDialog(onDismissRequest = { if (!busy) confirmLegacy = false },
         title = { Text("Recover device-local photo?") },
         text = { Column {

@@ -154,7 +154,5 @@ These are local engineering results, not production, Android-device, or final la
 ## Documentation maintenance
 
 This file, `CONTRIBUTING.md`, and the client READMEs describe current executable gates.
-Generated `openwiki/` pages are refreshed by `.github/workflows/openwiki-update.yml`; do not
-hand-edit generated pages to fix operational instructions. Its next regeneration must pick
-up these sources and remove the stale claim that web PR checks are absent. Historical audit
-results are evidence for their original commit only, not current release sign-off.
+Historical audit results are evidence for their original commit only, not current release
+sign-off.
